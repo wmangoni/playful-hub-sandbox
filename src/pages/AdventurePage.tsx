@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -1238,6 +1239,126 @@ const AdventurePage = () => {
   const [showDice, setShowDice] = useState(false);
   const [resultMessage, setResultMessage] = useState({ text: "", type: "" });
 
+  // Utility functions
+  function addToLog(message: string) {
+    setGameState(prev => ({
+      ...prev,
+      log: [...prev.log, message],
+    }));
+  }
+
+  function updateStatsDisplay() {
+    // No need to do anything - React will update the display based on state
+  }
+
+  function updateInventoryDisplay() {
+    // No need to do anything - React will update the display based on state
+  }
+
+  function changeGold(amount: number) {
+    setGameState(prev => {
+      const newGold = prev.player.gold + amount;
+      return {
+        ...prev,
+        player: {
+          ...prev.player,
+          gold: newGold < 0 ? 0 : newGold // No negative gold
+        }
+      };
+    });
+    updateStatsDisplay();
+  }
+
+  function changeXP(amount: number) {
+    setGameState(prev => ({
+      ...prev,
+      player: {
+        ...prev.player,
+        xp: prev.player.xp + amount
+      }
+    }));
+    updateStatsDisplay();
+    addToLog(`Ganhou ${amount} de experiência!`);
+  }
+
+  function addToInventory(item: string) {
+    setGameState(prev => ({
+      ...prev,
+      player: {
+        ...prev.player,
+        inventory: [...prev.player.inventory, item]
+      }
+    }));
+    updateInventoryDisplay();
+    addToLog(`Adicionado ${item} ao inventário.`);
+  }
+
+  function removeFromInventory(item: string) {
+    setGameState(prev => {
+      const index = prev.player.inventory.indexOf(item);
+      if (index > -1) {
+        const newInventory = [...prev.player.inventory];
+        newInventory.splice(index, 1);
+        return {
+          ...prev,
+          player: {
+            ...prev.player,
+            inventory: newInventory
+          }
+        };
+      }
+      return prev;
+    });
+    updateInventoryDisplay();
+    addToLog(`Removido ${item} do inventário.`);
+  }
+
+  function haveMoney(amount: number) {
+    if (amount < gameState.player.gold) {
+      setGameState(prev => ({
+        ...prev,
+        player: {
+          ...prev.player,
+          gold: prev.player.gold - amount
+        }
+      }));
+      return true;
+    }
+    return false;
+  }
+
+  function changeHealth(amount: number) {
+    setGameState(prev => {
+      let newHealth = prev.player.health + amount;
+      
+      // Cap health at max health
+      if (newHealth > prev.player.maxHealth) {
+        newHealth = prev.player.maxHealth;
+      }
+      
+      // Check for death
+      if (newHealth <= 0) {
+        addToLog("Você morreu!");
+        return {
+          ...prev,
+          player: {
+            ...prev.player,
+            health: 0
+          },
+          currentScene: "death"
+        };
+      }
+      
+      return {
+        ...prev,
+        player: {
+          ...prev.player,
+          health: newHealth
+        }
+      };
+    });
+  }
+
   // Handle character selection
   const handleSelectCharacter = (characterClass: string) => {
     setSelectedCharacter(characterClass);
@@ -1273,6 +1394,14 @@ const AdventurePage = () => {
       ...prev,
       currentScene: sceneName,
     }));
+
+    // Execute onEnter function if it exists for the scene
+    setTimeout(() => {
+      const scene = scenes[sceneName as keyof typeof scenes];
+      if (scene && scene.onEnter) {
+        scene.onEnter();
+      }
+    }, 0);
 
     // Reset dice and result message
     setShowDice(false);
