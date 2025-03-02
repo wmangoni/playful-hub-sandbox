@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -1365,7 +1366,7 @@ const AdventurePage = () => {
 
   return (
     <div className="min-h-screen font-serif bg-[#f5f1e6] text-[#333] p-5">
-      <div className="max-w-3xl mx-auto bg-white border-2 border-[#7a5c3d] rounded-lg p-6 shadow-lg">
+      <div className="max-w-5xl mx-auto bg-white border-2 border-[#7a5c3d] rounded-lg p-6 shadow-lg">
         <h1 className="text-4xl font-bold text-center text-[#8b0000] mb-2">
           A Masmorra de Drakmor
         </h1>
@@ -1444,105 +1445,109 @@ const AdventurePage = () => {
             </div>
           </div>
         ) : (
-          // Game screen
-          <div id="game-screen">
-            {/* Stats display */}
-            <div className="flex justify-between bg-[#eee8d9] p-3 rounded mb-4">
-              <div className="text-center">
-                <div>Vida</div>
-                <div className="font-bold text-lg">
-                  {gameState.player.health}
+          // Game screen with updated layout
+          <div id="game-screen" className="flex flex-col md:flex-row gap-4">
+            {/* Main game content */}
+            <div className="flex-1">
+              {/* Stats display */}
+              <div className="flex justify-between bg-[#eee8d9] p-3 rounded mb-4">
+                <div className="text-center">
+                  <div>Vida</div>
+                  <div className="font-bold text-lg">
+                    {gameState.player.health}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div>Ouro</div>
+                  <div className="font-bold text-lg">{gameState.player.gold}</div>
+                </div>
+                <div className="text-center">
+                  <div>Experiência</div>
+                  <div className="font-bold text-lg">{gameState.player.xp}</div>
                 </div>
               </div>
-              <div className="text-center">
-                <div>Ouro</div>
-                <div className="font-bold text-lg">{gameState.player.gold}</div>
-              </div>
-              <div className="text-center">
-                <div>Experiência</div>
-                <div className="font-bold text-lg">{gameState.player.xp}</div>
-              </div>
-            </div>
 
-            {/* Scene description */}
-            <div className="border-l-4 border-[#8b0000] p-3 bg-[#f9f5eb] mb-4">
-              {currentScene.text}
-            </div>
+              {/* Scene description */}
+              <div className="border-l-4 border-[#8b0000] p-3 bg-[#f9f5eb] mb-4">
+                {currentScene.text}
+              </div>
 
-            {/* Dice roll area */}
-            {showDice && (
-              <div className="flex items-center justify-center my-5">
-                <div className="w-16 h-16 bg-white border-2 border-gray-800 rounded flex items-center justify-center text-2xl font-bold mx-3">
-                  {diceResult !== null ? diceResult : "?"}
+              {/* Dice roll area */}
+              {showDice && (
+                <div className="flex items-center justify-center my-5">
+                  <div className="w-16 h-16 bg-white border-2 border-gray-800 rounded flex items-center justify-center text-2xl font-bold mx-3">
+                    {diceResult !== null ? diceResult : "?"}
+                  </div>
+                  <button
+                    onClick={rollDice}
+                    className="bg-[#7a5c3d] text-white px-4 py-2 rounded ml-4 hover:bg-[#8b0000] transition-colors"
+                  >
+                    Rolar d20
+                  </button>
                 </div>
-                <button
-                  onClick={rollDice}
-                  className="bg-[#7a5c3d] text-white px-4 py-2 rounded ml-4 hover:bg-[#8b0000] transition-colors"
-                >
-                  Rolar d20
-                </button>
-              </div>
-            )}
-
-            {/* Result message */}
-            {resultMessage.text && (
-              <div
-                className={`p-4 my-4 rounded-md font-bold ${
-                  resultMessage.type === "success"
-                    ? "bg-[#d4edda] text-[#155724]"
-                    : resultMessage.type === "failure"
-                    ? "bg-[#f8d7da] text-[#721c24]"
-                    : ""
-                }`}
-              >
-                {resultMessage.text}
-              </div>
-            )}
-
-            {/* Choices */}
-            <div className="flex flex-col gap-3 my-4">
-              {currentScene.choices.map((choice, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleChoice(choice)}
-                  className="bg-[#7a5c3d] text-white px-4 py-2 rounded hover:bg-[#8b0000] transition-colors"
-                >
-                  {choice.text}
-                </button>
-              ))}
-
-              {/* Show restart button for victory/death scenes */}
-              {(gameState.currentScene === "victory" ||
-                gameState.currentScene === "death") && (
-                <button
-                  onClick={() => setGameStarted(false)}
-                  className="bg-[#7a5c3d] text-white px-4 py-2 rounded hover:bg-[#8b0000] transition-colors mt-4"
-                >
-                  Jogar Novamente
-                </button>
               )}
-            </div>
 
-            {/* Inventory */}
-            <div className="bg-[#eee8d9] p-3 rounded mt-4">
-              <h3 className="font-bold text-[#7a5c3d] mb-2">Inventário</h3>
-              <div>
-                {gameState.player.inventory.length === 0 ? (
-                  "Mochila vazia!"
-                ) : (
-                  <ul className="list-disc pl-5">
-                    {gameState.player.inventory.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
+              {/* Result message */}
+              {resultMessage.text && (
+                <div
+                  className={`p-4 my-4 rounded-md font-bold ${
+                    resultMessage.type === "success"
+                      ? "bg-[#d4edda] text-[#155724]"
+                      : resultMessage.type === "failure"
+                      ? "bg-[#f8d7da] text-[#721c24]"
+                      : ""
+                  }`}
+                >
+                  {resultMessage.text}
+                </div>
+              )}
+
+              {/* Choices */}
+              <div className="flex flex-col gap-3 my-4">
+                {currentScene.choices.map((choice, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleChoice(choice)}
+                    className="bg-[#7a5c3d] text-white px-4 py-2 rounded hover:bg-[#8b0000] transition-colors"
+                  >
+                    {choice.text}
+                  </button>
+                ))}
+
+                {/* Show restart button for victory/death scenes */}
+                {(gameState.currentScene === "victory" ||
+                  gameState.currentScene === "death") && (
+                  <button
+                    onClick={() => setGameStarted(false)}
+                    className="bg-[#7a5c3d] text-white px-4 py-2 rounded hover:bg-[#8b0000] transition-colors mt-4"
+                  >
+                    Jogar Novamente
+                  </button>
                 )}
               </div>
+
+              {/* Inventory */}
+              <div className="bg-[#eee8d9] p-3 rounded mt-4">
+                <h3 className="font-bold text-[#7a5c3d] mb-2">Inventário</h3>
+                <div>
+                  {gameState.player.inventory.length === 0 ? (
+                    "Mochila vazia!"
+                  ) : (
+                    <ul className="list-disc pl-5">
+                      {gameState.player.inventory.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Game log */}
-            <div className="max-h-40 overflow-y-auto border border-gray-300 p-3 mt-4 italic text-sm text-gray-600">
+            {/* Game log - now positioned on the right side with full height */}
+            <div className="w-full md:w-1/3 md:h-[600px] md:max-h-full overflow-y-auto border border-gray-300 p-3 italic text-sm text-gray-600 bg-[#f9f9f9]">
+              <h3 className="font-bold text-[#7a5c3d] mb-2 sticky top-0 bg-[#f9f9f9] py-1">Game Log</h3>
               {gameState.log.map((entry, index) => (
-                <p key={index}>{entry}</p>
+                <p key={index} className="mb-1 border-b border-gray-100 pb-1">{entry}</p>
               ))}
             </div>
           </div>
