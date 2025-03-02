@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -60,21 +59,26 @@ const ArcadePage = () => {
   );
 };
 
+// Define a custom type for star elements that includes the speed property
+interface StarElement extends HTMLDivElement {
+  speed: number;
+}
+
 const SpaceShooterGame = () => {
-  const gameContainerRef = useRef(null);
-  const playerRef = useRef(null);
-  const scoreElementRef = useRef(null);
-  const livesElementRef = useRef(null);
-  const gameOverScreenRef = useRef(null);
-  const finalScoreElementRef = useRef(null);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
+  const scoreElementRef = useRef<HTMLDivElement>(null);
+  const livesElementRef = useRef<HTMLDivElement>(null);
+  const gameOverScreenRef = useRef<HTMLDivElement>(null);
+  const finalScoreElementRef = useRef<HTMLDivElement>(null);
   
-  const bulletsRef = useRef([]);
-  const enemiesRef = useRef([]);
-  const starsRef = useRef([]);
+  const bulletsRef = useRef<HTMLDivElement[]>([]);
+  const enemiesRef = useRef<HTMLDivElement[]>([]);
+  const starsRef = useRef<StarElement[]>([]);
   const scoreRef = useRef(0);
   const livesRef = useRef(5);
   const isGameOverRef = useRef(false);
-  const gameLoopIdRef = useRef(null);
+  const gameLoopIdRef = useRef<number | null>(null);
   
   // Controls state
   const isLeftPressedRef = useRef(false);
@@ -120,11 +124,11 @@ const SpaceShooterGame = () => {
     if (!gameContainer) return;
     
     for (let i = 0; i < 100; i++) {
-      const star = document.createElement('div');
+      const star = document.createElement('div') as StarElement;
       star.className = 'star';
-      star.style.left = Math.random() * containerWidthRef.current + 'px';
-      star.style.top = Math.random() * containerHeightRef.current + 'px';
-      star.style.opacity = Math.random() * 0.8 + 0.2;
+      star.style.left = `${Math.random() * containerWidthRef.current}px`;
+      star.style.top = `${Math.random() * containerHeightRef.current}px`;
+      star.style.opacity = `${Math.random() * 0.8 + 0.2}`;
       star.speed = Math.random() * 0.5 + 0.1;
       gameContainer.appendChild(star);
       starsRef.current.push(star);
@@ -238,7 +242,7 @@ const SpaceShooterGame = () => {
         y = 0;
       }
       
-      star.style.top = y + 'px';
+      star.style.top = `${y}px`;
     }
   };
   
@@ -501,7 +505,8 @@ const SpaceShooterGame = () => {
         </div>
       </div>
       
-      <style jsx>{`
+      <style>
+        {`
         .enemy {
           position: absolute;
           width: 30px;
@@ -520,7 +525,8 @@ const SpaceShooterGame = () => {
           background-color: white;
           border-radius: 50%;
         }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };

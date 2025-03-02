@@ -591,7 +591,7 @@ const MindLabyrinth = () => {
   
   return (
     <>
-      <style jsx>
+      <style>
         {`
           :root {
             --primary-color: #2d2b42;
