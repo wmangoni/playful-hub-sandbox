@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -64,16 +65,21 @@ interface StarElement extends HTMLDivElement {
   speed: number;
 }
 
+// Define a custom type for enemy elements that includes the speed property
+interface EnemyElement extends HTMLDivElement {
+  speed: number;
+}
+
 const SpaceShooterGame = () => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<SVGSVGElement>(null); // Changed to SVGSVGElement to match the player element
   const scoreElementRef = useRef<HTMLDivElement>(null);
   const livesElementRef = useRef<HTMLDivElement>(null);
   const gameOverScreenRef = useRef<HTMLDivElement>(null);
   const finalScoreElementRef = useRef<HTMLDivElement>(null);
   
   const bulletsRef = useRef<HTMLDivElement[]>([]);
-  const enemiesRef = useRef<HTMLDivElement[]>([]);
+  const enemiesRef = useRef<EnemyElement[]>([]); // Using EnemyElement instead of HTMLDivElement
   const starsRef = useRef<StarElement[]>([]);
   const scoreRef = useRef(0);
   const livesRef = useRef(5);
@@ -191,7 +197,7 @@ const SpaceShooterGame = () => {
     if (!gameContainer) return;
     
     if (Math.random() < 0.02 && enemiesRef.current.length < 8) { // Reduced spawn rate and max enemies
-      const enemy = document.createElement('div');
+      const enemy = document.createElement('div') as EnemyElement;
       enemy.className = 'enemy';
       
       // Random enemy type
@@ -505,8 +511,7 @@ const SpaceShooterGame = () => {
         </div>
       </div>
       
-      <style>
-        {`
+      <style jsx>{`
         .enemy {
           position: absolute;
           width: 30px;
@@ -525,8 +530,7 @@ const SpaceShooterGame = () => {
           background-color: white;
           border-radius: 50%;
         }
-        `}
-      </style>
+      `}</style>
     </div>
   );
 };
