@@ -52,23 +52,25 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden gradient-animation">
-      {/* Wave Animations */}
-      <div className="wave"></div>
-      <div className="wave"></div>
-      <div className="wave"></div>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden">
+      {/* Background with subtle gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-background to-secondary opacity-80 -z-10"></div>
+      
+      {/* Animated circles for background interest */}
+      <div className="fixed top-1/4 right-1/4 w-96 h-96 rounded-full bg-primary opacity-5 blur-3xl -z-10 animate-float"></div>
+      <div className="fixed bottom-1/4 left-1/3 w-64 h-64 rounded-full bg-blue-300 opacity-5 blur-3xl -z-10 animate-float" style={{ animationDelay: '2s' }}></div>
       
       {/* Main Content */}
-      <div className={`max-w-6xl w-full transition-all duration-1000 relative z-10 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`max-w-6xl w-full transition-all duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
         {/* Header */}
         <header className="text-center mb-16">
           <div className="inline-block mb-3 px-3 py-1 bg-secondary rounded-full text-sm font-medium text-primary animate-fade-in" style={{ animationDelay: '0.2s' }}>
             Game Collection
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight animate-fade-up text-white" style={{ animationDelay: '0.3s' }}>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight animate-fade-up" style={{ animationDelay: '0.3s' }}>
             Playful Hub
           </h1>
-          <p className="text-white max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: '0.4s' }}>
+          <p className="text-muted-foreground max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: '0.4s' }}>
             Discover a collection of beautifully crafted games designed for your enjoyment.
             Select any game to begin your experience.
           </p>
@@ -82,7 +84,7 @@ const Index = () => {
               key={game.id} 
               className={`
                 relative group rounded-xl overflow-hidden card-transition
-                bg-card/90 backdrop-blur-sm border border-white/20
+                bg-card border border-border shadow-sm  
                 hover:shadow-lg hover:-translate-y-1 
                 animate-fade-up
               `}
@@ -107,10 +109,10 @@ const Index = () => {
                 </div>
                 
                 {/* Game title and description */}
-                <h2 className="text-xl font-semibold mb-2 card-transition group-hover:text-primary text-white">
+                <h2 className="text-xl font-semibold mb-2 card-transition group-hover:text-primary">
                   {game.title}
                 </h2>
-                <p className="text-white/80 text-sm flex-grow mb-4">
+                <p className="text-muted-foreground text-sm flex-grow mb-4">
                   {game.description}
                 </p>
                 
@@ -141,7 +143,7 @@ const Index = () => {
         </div>
         
         {/* Footer */}
-        <footer className="mt-16 text-center text-sm text-white/70 animate-fade-in" style={{ animationDelay: '1s' }}>
+        <footer className="mt-16 text-center text-sm text-muted-foreground animate-fade-in" style={{ animationDelay: '1s' }}>
           <p>Designed with simplicity and elegance in mind</p>
         </footer>
       </div>
