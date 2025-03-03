@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
 
 // Define types for game state and puzzles
 interface GameState {
@@ -75,8 +74,6 @@ const PuzzlePage = () => {
 };
 
 const MindLabyrinth = () => {
-  const { toast } = useToast();
-  
   // Game state using React state
   const [gameState, setGameState] = useState<GameState>({
     level: 1,
@@ -429,25 +426,8 @@ const MindLabyrinth = () => {
     if (gameState.currentPuzzle) {
       const isCorrect = gameState.currentPuzzle.check(answer);
       completePuzzle(isCorrect);
-      
-      // Show toast notification
-      if (gameState.level === 1) {
-        if (answer === '○') {
-          toast({
-            title: "Correct Answer!",
-            description: "You selected the correct pattern element.",
-            variant: "default",
-          });
-        } else {
-          toast({
-            title: "Incorrect Answer",
-            description: "That's not the correct pattern element. Try again!",
-            variant: "destructive",
-          });
-        }
-      }
     }
-  }, [gameState.currentPuzzle, gameState.level, toast]);
+  }, [gameState.currentPuzzle]);
   
   // Function to check pattern answer
   const checkPatternAnswer = useCallback((answer: string) => {
