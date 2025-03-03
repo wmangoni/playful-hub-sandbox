@@ -97,6 +97,7 @@ const SpaceShooterGame = () => {
   const isLeftPressedRef = useRef(false);
   const isRightPressedRef = useRef(false);
   const lastFireTimeRef = useRef(0);
+  const lastSpecialFireTimeRef = useRef(0); // Separado para tiro especial
   const playerXRef = useRef(0);
   const playerYRef = useRef(0);
   const containerWidthRef = useRef(0);
@@ -124,7 +125,6 @@ const SpaceShooterGame = () => {
   }, []);
 
   useEffect(() => {
-    // Sincroniza o elemento DOM com o estado specialShots
     if (specialShotsElementRef.current) {
       specialShotsElementRef.current.textContent = `Special Shots: ${specialShots}`;
     }
@@ -165,9 +165,13 @@ const SpaceShooterGame = () => {
     if (!gameContainer) return;
 
     const currentTime = Date.now();
-    if (currentTime - lastFireTimeRef.current < 150) return;
+    const cooldown = useSpecial ? 300 : 150; // Cooldown maior para tiro especial
+    const lastTimeRef = useSpecial ? lastSpecialFireTimeRef : lastFireTimeRef;
+
+    if (currentTime - lastTimeRef.current < cooldown) return;
 
     if (useSpecial && specialShots > 0) {
+      console.log("Disparando tiro especial, specialShots:", specialShots);
       const bullet1 = document.createElement("div") as BulletElement;
       bullet1.className = "bullet special-bullet";
       bullet1.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
@@ -196,9 +200,10 @@ const SpaceShooterGame = () => {
       bulletsRef.current.push(bullet3);
 
       setSpecialShots((prev) => {
-        console.log("Special shots decreased from", prev, "to", prev - 1);
+        console.log("Special shots diminuído de", prev, "para", prev - 1);
         return prev - 1;
       });
+      lastSpecialFireTimeRef.current = currentTime;
     } else {
       const bullet = document.createElement("div") as BulletElement;
       bullet.className = "bullet";
@@ -208,9 +213,8 @@ const SpaceShooterGame = () => {
       bullet.speedY = -10;
       gameContainer.appendChild(bullet);
       bulletsRef.current.push(bullet);
+      lastFireTimeRef.current = currentTime;
     }
-
-    lastFireTimeRef.current = currentTime;
   };
 
   const enableAutoFire = () => {
@@ -244,7 +248,7 @@ const SpaceShooterGame = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
 
-    if (Math.random() < 0.05) { // Aumentado temporariamente para testes
+    if (Math.random() < 0.05) {
       const powerUp = document.createElement("div") as PowerUpElement;
       powerUp.className = "power-up";
       powerUp.style.left = `${Math.random() * (containerWidthRef.current - 20)}px`;
@@ -275,7 +279,6 @@ const SpaceShooterGame = () => {
         const powerUpRect = powerUp.getBoundingClientRect();
         const containerRect = gameContainer.getBoundingClientRect();
 
-        // Ajustar coordenadas relativas ao gameContainer
         const playerLeft = playerRect.left - containerRect.left;
         const playerRight = playerRect.right - containerRect.left;
         const playerTop = playerRect.top - containerRect.top;
@@ -483,6 +486,7 @@ const SpaceShooterGame = () => {
       if (e.key === "ArrowLeft" || e.key === "a") isLeftPressedRef.current = true;
       if (e.key === "ArrowRight" || e.key === "d") isRightPressedRef.current = true;
       if (e.key === " ") {
+        console.log("Barra de espaço pressionada, specialShots:", specialShots);
         if (specialShots > 0) {
           fireBullet(true);
         } else {
