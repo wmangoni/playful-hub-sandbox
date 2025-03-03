@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 function ComponenteComIframeHTMLInline() {
@@ -491,14 +492,14 @@ function ComponenteComIframeHTMLInline() {
         
         // Narrative text pieces
         const narrativeTexts = [
-            "You find yourself in a mysterious ancient library. The air is thick with dust and mystery. Before you stands a series of puzzles, each protecting a fragment of forgotten knowledge. \"To proceed,\" whispers an unseen voice, \"you must prove your mind worthy...\"",
+            "You find yourself in a mysterious ancient library. The air is thick with dust and mystery. Before you stands a series of puzzles, each protecting a fragment of forgotten knowledge. \\"To proceed,\\" whispers an unseen voice, \\"you must prove your mind worthy...\\"",
             "As you solve the first puzzle, a soft glow illuminates a nearby scroll. It depicts an ancient civilization that discovered patterns within the very fabric of reality.",
             "The second challenge yields another scroll fragment. It speaks of a society that learned to perceive truths beyond the obvious, hidden in plain sight.",
             "With each puzzle solved, you begin to understand that this library was created to preserve knowledge too powerful to be freely shared. The creators feared its misuse.",
             "You've uncovered half of the library's secrets now. The scrolls reveal that the knowledge hidden here could reshape perception itself, allowing minds to transcend ordinary limits.",
-            "The voices grow clearer as you progress. \"Few have made it this far,\" they whisper. \"Continue, and you may join those who see beyond the veil.\"",
+            "The voices grow clearer as you progress. \\"Few have made it this far,\\" they whisper. \\"Continue, and you may join those who see beyond the veil.\\"",
             "Almost there now. The final scrolls reveal why the library was sealed: its creators discovered a truth so fundamental that it changed them forever. They chose to protect it with puzzles that only the worthy could solve.",
-            "You've completed all challenges. The library's purpose is now clear: to find minds capable of handling the responsibility of transcendent knowledge. \"You have proven yourself,\" the voices say. \"The knowledge is now yours to carry forward.\""
+            "You've completed all challenges. The library's purpose is now clear: to find minds capable of handling the responsibility of transcendent knowledge. \\"You have proven yourself,\\" the voices say. \\"The knowledge is now yours to carry forward.\\""
         ];
         
         // Puzzles
@@ -779,7 +780,7 @@ function ComponenteComIframeHTMLInline() {
                                 currentRotation.y += 90;
                             }
                             
-                            cube.style.transform = `rotateX(${currentRotation.x}deg) rotateY(${currentRotation.y}deg)`;
+                            cube.style.transform = "rotateX(" + currentRotation.x + "deg) rotateY(" + currentRotation.y + "deg)";
                         });
                         controls.appendChild(button);
                     });
@@ -866,78 +867,78 @@ function ComponenteComIframeHTMLInline() {
         }
         
         function checkLogicAnswer(answer) {
-                    const isCorrect = gameState.currentPuzzle.check(answer);
-        completePuzzle(isCorrect);
-    }
-    
-    function completePuzzle(success) {
-        feedbackElement.style.display = 'block';
-        if (success) {
-            feedbackElement.textContent = 'Correct! The path forward reveals itself...';
-            feedbackElement.className = 'feedback-message feedback-success';
-            gameState.score += 100;
-            gameState.puzzlesSolved++;
-            updateNarrative();
-        } else {
-            feedbackElement.textContent = 'Incorrect. The walls seem to shift around you...';
-            feedbackElement.className = 'feedback-message feedback-error';
-            gameState.score = Math.max(0, gameState.score - 50);
+            const isCorrect = gameState.currentPuzzle.check(answer);
+            completePuzzle(isCorrect);
         }
         
-        updateGameUI();
-        
-        if (success) {
-            setTimeout(() => {
-                if (gameState.puzzlesSolved < puzzles.length) {
-                    loadPuzzle(gameState.puzzlesSolved);
-                } else {
-                    showCompletion();
-                }
-            }, 2000);
+        function completePuzzle(success) {
+            feedbackElement.style.display = 'block';
+            if (success) {
+                feedbackElement.textContent = 'Correct! The path forward reveals itself...';
+                feedbackElement.className = 'feedback-message feedback-success';
+                gameState.score += 100;
+                gameState.puzzlesSolved++;
+                updateNarrative();
+            } else {
+                feedbackElement.textContent = 'Incorrect. The walls seem to shift around you...';
+                feedbackElement.className = 'feedback-message feedback-error';
+                gameState.score = Math.max(0, gameState.score - 50);
+            }
+            
+            updateGameUI();
+            
+            if (success) {
+                setTimeout(() => {
+                    if (gameState.puzzlesSolved < puzzles.length) {
+                        loadPuzzle(gameState.puzzlesSolved);
+                    } else {
+                        showCompletion();
+                    }
+                }, 2000);
+            }
         }
-    }
-    
-    function updateGameUI() {
-        levelElement.textContent = gameState.level;
-        scoreElement.textContent = gameState.score;
-    }
-    
-    function updateNarrative() {
-        if (gameState.narrativeProgress < narrativeTexts.length - 1) {
-            gameState.narrativeProgress = Math.min(
-                gameState.narrativeProgress + 1,
-                narrativeTexts.length - 1
-            );
-            narrativeElement.textContent = narrativeTexts[gameState.narrativeProgress];
+        
+        function updateGameUI() {
+            levelElement.textContent = gameState.level;
+            scoreElement.textContent = gameState.score;
         }
-    }
-    
-    function showCompletion() {
-        puzzleContainer.innerHTML = '';
-        const completionDiv = document.createElement('div');
-        completionDiv.className = 'completion-container';
         
-        const completionText = document.createElement('div');
-        completionText.className = 'puzzle-title';
-        completionText.textContent = 'Library of Wisdom Unlocked';
+        function updateNarrative() {
+            if (gameState.narrativeProgress < narrativeTexts.length - 1) {
+                gameState.narrativeProgress = Math.min(
+                    gameState.narrativeProgress + 1,
+                    narrativeTexts.length - 1
+                );
+                narrativeElement.textContent = narrativeTexts[gameState.narrativeProgress];
+            }
+        }
         
-        const finalScore = document.createElement('div');
-        finalScore.className = 'score-indicator';
-        finalScore.textContent = `Final Score: ${gameState.score}`;
-        
-        const restartButton = document.createElement('button');
-        restartButton.className = 'btn btn-primary';
-        restartButton.textContent = 'Begin Anew';
-        restartButton.addEventListener('click', () => {
-            startGame();
-        });
-        
-        completionDiv.appendChild(completionText);
-        completionDiv.appendChild(finalScore);
-        completionDiv.appendChild(restartButton);
-        puzzleContainer.appendChild(completionDiv);
-    }
-</script>
+        function showCompletion() {
+            puzzleContainer.innerHTML = '';
+            const completionDiv = document.createElement('div');
+            completionDiv.className = 'completion-container';
+            
+            const completionText = document.createElement('div');
+            completionText.className = 'puzzle-title';
+            completionText.textContent = 'Library of Wisdom Unlocked';
+            
+            const finalScore = document.createElement('div');
+            finalScore.className = 'score-indicator';
+            finalScore.textContent = "Final Score: " + gameState.score;
+            
+            const restartButton = document.createElement('button');
+            restartButton.className = 'btn btn-primary';
+            restartButton.textContent = 'Begin Anew';
+            restartButton.addEventListener('click', () => {
+                startGame();
+            });
+            
+            completionDiv.appendChild(completionText);
+            completionDiv.appendChild(finalScore);
+            completionDiv.appendChild(restartButton);
+            puzzleContainer.appendChild(completionDiv);
+        }
+    </script>
   `;
 
   return (
