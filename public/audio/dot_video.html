@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video to Dot Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .video-container {
+            flex: 1;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        canvas {
+            background: white;
+            border-radius: 8px;
+        }
+
+        input[type="file"] {
+            margin: 20px 0;
+        }
+
+        .controls {
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Video to Dot Converter</h1>
+    
+    <input type="file" id="videoInput" accept="video/*">
+    
+    <div class="controls">
+        <label for="dotSize">Dot Size: <span id="dotSizeValue">5</span>px</label>
+        <input type="range" id="dotSize" min="2" max="40" value="5">
+    </div>
+
+    <div class="container">
+        <div class="video-container">
+            <video id="originalVideo" controls></video>
+        </div>
+        <div class="video-container">
+            <canvas id="transformedCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const videoInput = document.getElementById('videoInput');
+        const originalVideo = document.getElementById('originalVideo');
+        const transformedCanvas = document.getElementById('transformedCanvas');
+        const dotSizeSlider = document.getElementById('dotSize');
+        const dotSizeValue = document.getElementById('dotSizeValue');
+
+        let dotSize = 4;
+        let animationFrameId;
+
+        // Hidden canvas for processing
+        const hiddenCanvas = document.createElement('canvas');
+        const hiddenContext = hiddenCanvas.getContext('2d');
+
+        // Set up transformed canvas context
+        const transformedContext = transformedCanvas.getContext('2d');
+
+        dotSizeSlider.addEventListener('input', (e) => {
+            dotSize = parseInt(e.target.value);
+            dotSizeValue.textContent = dotSize;
+        });
+
+        videoInput.addEventListener('change', function(e) {
+            const file = this.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                originalVideo.src = url;
+            }
+        });
+
+        originalVideo.addEventListener('loadedmetadata', () => {
+            // Set canvas dimensions to match video
+            const width = originalVideo.videoWidth;
+            const height = originalVideo.videoHeight;
+            
+            transformedCanvas.width = width;
+            transformedCanvas.height = height;
+            hiddenCanvas.width = width;
+            hiddenCanvas.height = height;
+
+            // Start processing frames when video plays
+            originalVideo.addEventListener('play', () => {
+                function processFrame() {
+                    if (originalVideo.paused || originalVideo.ended) return;
+
+                    // Draw current video frame to hidden canvas
+                    hiddenContext.drawImage(originalVideo, 0, 0, width, height);
+                    const imageData = hiddenContext.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+
+                    // Clear transformed canvas
+                    transformedContext.fillStyle = 'white';
+                    transformedContext.fillRect(0, 0, width, height);
+
+                    // Draw dots
+                    for (let y = 0; y < height; y += dotSize) {
+                        for (let x = 0; x < width; x += dotSize) {
+                            // Calculate average brightness in current cell
+                            let sum = 0;
+                            let count = 0;
+
+                            for (let dy = 0; dy < dotSize; dy++) {
+                                for (let dx = 0; dx < dotSize; dx++) {
+                                    const pxX = x + dx;
+                                    const pxY = y + dy;
+                                    if (pxX >= width || pxY >= height) continue;
+
+                                    const idx = (pxY * width + pxX) * 4;
+                                    const r = data[idx];
+                                    const g = data[idx + 1];
+                                    const b = data[idx + 2];
+                                    sum += (r + g + b) / 3; // Simple grayscale conversion
+                                    count++;
+                                }
+                            }
+
+                            const avg = sum / count;
+                            transformedContext.fillStyle = avg > 128 ? 'white' : 'black';
+                            
+                            // Draw dot
+                            transformedContext.beginPath();
+                            transformedContext.arc(
+                                x + dotSize/2,
+                                y + dotSize/2,
+                                dotSize/2,
+                                0,
+                                Math.PI * 2
+                            );
+                            transformedContext.fill();
+                        }
+                    }
+
+                    animationFrameId = requestAnimationFrame(processFrame);
+                }
+
+                // Start processing loop
+                animationFrameId = requestAnimationFrame(processFrame);
+            });
+        });
+
+        // Clean up when video changes
+        originalVideo.addEventListener('pause', () => {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        });
+    </script>
+</body>
+</html>
