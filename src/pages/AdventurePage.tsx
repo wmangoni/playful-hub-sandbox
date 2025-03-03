@@ -231,14 +231,14 @@ const AdventurePage = () => {
     addToLog(`Iniciando combate contra ${enemy.name}!`);
     const fightLoop = () => {
       if (gameState.currentEnemy.hp > 0 && gameState.player.health > 0) {
-        fight(gameState.currentEnemy);
+        fight();
         // Use setTimeout to simulate turn-based combat and allow UI updates
         setTimeout(fightLoop, 1500); // Wait 1.5 seconds before next round
       } else {
         if (gameState.currentEnemy.hp <= 0) {
           const xpGain = 50;
           const goldGain = rollingDice(6, 3).reduce((a, b) => a + b, 0);
-          addToLog(`Você derrotou o ${enemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
+          addToLog(`Você derrotou o ${gameState.currentEnemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
           changeXP(xpGain);
           changeGold(goldGain);
           // After combat, load next scene or return to previous
@@ -252,53 +252,53 @@ const AdventurePage = () => {
   }
 
 
-  function fight(enemy) {
-    if (gameState.player.health <= 0 || enemy.hp <= 0) {
+  function fight() {
+    if (gameState.player.health <= 0 || gameState.currentEnemy.hp <= 0) {
       return; // Stop fight if player or enemy is dead
     }
 
     addToLog(`--- Sua vez de atacar ---`);
     let attackRoll = rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10) / 2) + gameState.player.stats.bba;
 
-    addToLog(`Você ataca o ${enemy.name} (AC ${enemy.ac})... Rolagem: ${attackRoll}`);
+    addToLog(`Você ataca o ${gameState.currentEnemy.name} (AC ${gameState.currentEnemy.ac})... Rolagem: ${attackRoll}`);
 
-    if (attackRoll >= enemy.ac) {
+    if (attackRoll >= gameState.currentEnemy.ac) {
       const damage = rollingDice(8)[0] + Math.floor((gameState.player.stats.str - 10) / 2);
       addToLog(`Você acerta ${damage} de dano no inimigo!`);
 
       setGameState(prev => ({
         ...prev,
         currentEnemy: { ...prev.currentEnemy, hp: prev.currentEnemy.hp - damage }
-      }), () => { // Callback to execute after state update
-        if (gameState.currentEnemy.hp <= 0) {
-          // Handled in initFight's fightLoop for scene transition after combat
-          addToLog(`Você derrotou o ${enemy.name}!`);
-        } else {
-          addToLog(`O ${enemy.name} sobreviveu e te ataca!`);
-          enemyAttack(enemy);
-        }
-      });
+      }));
+
+      if (gameState.currentEnemy.hp <= 0) {
+        // Handled in initFight's fightLoop for scene transition after combat
+        addToLog(`Você derrotou o ${gameState.currentEnemy.name}!`);
+      } else {
+        addToLog(`O ${gameState.currentEnemy.name} sobreviveu e te ataca!`);
+        enemyAttack();
+      }
     } else {
       addToLog("Você errou!");
-      addToLog(`O ${enemy.name} te ataca!`);
-      enemyAttack(enemy);
+      addToLog(`O ${gameState.currentEnemy.name} te ataca!`);
+      enemyAttack();
     }
   }
 
-  function enemyAttack(enemy) {
-    if (gameState.player.health <= 0 || enemy.hp <= 0) {
+  function enemyAttack() {
+    if (gameState.player.health <= 0 || gameState.currentEnemy.hp <= 0) {
       return; // Stop attack if player or enemy is dead
     }
-    addToLog(`--- Vez do ${enemy.name} atacar ---`);
-    let attackEnemy = rollingDice(20)[0] + enemy.attackBonus; // Enemy attack bonus
+    addToLog(`--- Vez do ${gameState.currentEnemy.name} atacar ---`);
+    let attackEnemy = rollingDice(20)[0] + gameState.currentEnemy.attackBonus; // Enemy attack bonus
 
     if (attackEnemy >= 10 + Math.floor((gameState.player.stats.dex - 10) / 2) + gameState.player.stats.armor) {
-      addToLog(`O ${enemy.name} acerta você! Rolagem: ${attackEnemy}`);
-      const enemyDamage = rollingDice(enemy.damageDice)[0] + enemy.damageBonus; // Enemy damage dice and bonus
+      addToLog(`O ${gameState.currentEnemy.name} acerta você! Rolagem: ${attackEnemy}`);
+      const enemyDamage = rollingDice(gameState.currentEnemy.damageDice)[0] + gameState.currentEnemy.damageBonus; // Enemy damage dice and bonus
       addToLog(`Você levou ${enemyDamage} de dano!`);
       changeHealth(-enemyDamage);
     } else {
-      addToLog(`${enemy.name} erra! Rolagem: ${attackEnemy}`);
+      addToLog(`${gameState.currentEnemy.name} erra! Rolagem: ${attackEnemy}`);
     }
   }
   // Game scenes
@@ -1624,9 +1624,10 @@ const AdventurePage = () => {
 
       if (mem.checkType === "combat") {
         // Handle combat - not used directly in checks anymore
+        addToLog("Iniciando combate...");
         initFight(gameState.currentEnemy)
         checkSuccess = true;
-        addToLog("Iniciando combate...");
+        
       } else {
         // Handle skill check
         let logMessage = `Resultado da rolagem de dado: ${roll} para o teste.`;
