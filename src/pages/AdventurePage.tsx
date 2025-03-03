@@ -1665,6 +1665,12 @@ const AdventurePage = () => {
 
   return (
     <div className="min-h-screen font-serif bg-[#f5f1e6] text-[#333] p-5">
+
+      <audio controls>
+        <source src="/audio/Medieval-Music-–-Court-Minstrel.mp3" type="audio/mpeg" />
+        Seu navegador não suporta o elemento de áudio.
+      </audio>
+
       <div className="max-w-3xl mx-auto bg-white border-2 border-[#7a5c3d] rounded-lg p-6 shadow-lg">
         <h1 className="text-4xl font-bold text-center text-[#8b0000] mb-2">
           A Masmorra de Drakmor
