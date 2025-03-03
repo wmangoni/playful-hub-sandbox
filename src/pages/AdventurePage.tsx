@@ -2,11 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const AdventurePage = () => {
-  const backgroundMusic: HTMLAudioElement;
-  // Initialize background music
-  backgroundMusic = new Audio('/medieval-music.mp3');
-  backgroundMusic.loop = true;
-  backgroundMusic.volume = 0.3;
   
   const [gameStarted, setGameStarted] = useState(false);
   const [selectedCharacter, setSelectedCharacter] = useState<string | null>(
