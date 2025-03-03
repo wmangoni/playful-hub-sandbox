@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import './App.css'; // Create this file with the provided CSS
+import '../App.css'; // Create this file with the provided CSS
 
 const puzzles = [
             {
