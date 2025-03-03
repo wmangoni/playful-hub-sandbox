@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 
 const ArcadePage = () => {
   const [gameStarted, setGameStarted] = useState(false);
-  const [isSpecialActive, setIsSpecialActive] = useState(false);
   
   const startGame = () => {
     setGameStarted(true);
@@ -98,6 +97,7 @@ const SpaceShooterGame = () => {
   const containerHeightRef = useRef(0);
   const playerWidthRef = useRef(40);
   const playerHeightRef = useRef(40);
+  const [isSpecialActive, setIsSpecialActive] = useState(false);
 
   useEffect(() => {
     if (!gameContainerRef.current) return;
