@@ -16,23 +16,6 @@ const AdventurePage = () => {
   const [showDice, setShowDice] = useState(false);
   const [resultMessage, setResultMessage] = useState({ text: "", type: "" });
 
-  // Initialize background music in useEffect
-  useEffect(() => {
-    backgroundMusic.current = new Audio('/medieval-music.mp3');
-    if (backgroundMusic.current) {
-      backgroundMusic.current.loop = true;
-      backgroundMusic.current.volume = 0.3;
-    }
-    
-    return () => {
-      // Cleanup function
-      if (backgroundMusic.current) {
-        backgroundMusic.current.pause();
-        backgroundMusic.current = null;
-      }
-    };
-  }, []);
-
   // Game state
   const [gameState, setGameState] = useState({
     player: {
@@ -232,7 +215,6 @@ const AdventurePage = () => {
     const fightLoop = () => {
       if (gameState.currentEnemy.hp > 0 && gameState.player.health > 0) {
         fight();
-        // Use setTimeout to simulate turn-based combat and allow UI updates
         setTimeout(fightLoop, 1500); // Wait 1.5 seconds before next round
       } else {
         if (gameState.currentEnemy.hp <= 0) {
@@ -241,10 +223,9 @@ const AdventurePage = () => {
           addToLog(`Você derrotou o ${gameState.currentEnemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
           changeXP(xpGain);
           changeGold(goldGain);
-          // After combat, load next scene or return to previous
           loadScene("corridor_after_fight"); // Example: scene after defeating enemy
         } else if (gameState.player.health <= 0) {
-          // Player is dead, game over is handled by changeHealth
+          // Player death is handled by changeHealth
         }
       }
     };
@@ -256,24 +237,23 @@ const AdventurePage = () => {
     if (gameState.player.health <= 0 || gameState.currentEnemy.hp <= 0) {
       return; // Stop fight if player or enemy is dead
     }
-
+  
     addToLog(`--- Sua vez de atacar ---`);
     let attackRoll = rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10) / 2) + gameState.player.stats.bba;
-
+  
     addToLog(`Você ataca o ${gameState.currentEnemy.name} (AC ${gameState.currentEnemy.ac})... Rolagem: ${attackRoll}`);
-
+  
     if (attackRoll >= gameState.currentEnemy.ac) {
       const damage = rollingDice(8)[0] + Math.floor((gameState.player.stats.str - 10) / 2);
-      addToLog(`Você acerta ${damage} de dano no inimigo!`);
-
+      const newEnemyHp = gameState.currentEnemy.hp - damage; // Calculate new HP before updating state
       setGameState(prev => ({
         ...prev,
-        currentEnemy: { ...prev.currentEnemy, hp: prev.currentEnemy.hp - damage }
+        currentEnemy: { ...prev.currentEnemy, hp: newEnemyHp }
       }));
-
-      if (gameState.currentEnemy.hp <= 0) {
-        // Handled in initFight's fightLoop for scene transition after combat
+      addToLog(`Você acerta ${damage} de dano no inimigo!`);
+      if (newEnemyHp <= 0) {
         addToLog(`Você derrotou o ${gameState.currentEnemy.name}!`);
+        // Combat end is handled by fightLoop in initFight
       } else {
         addToLog(`O ${gameState.currentEnemy.name} sobreviveu e te ataca!`);
         enemyAttack();
@@ -291,16 +271,17 @@ const AdventurePage = () => {
     }
     addToLog(`--- Vez do ${gameState.currentEnemy.name} atacar ---`);
     let attackEnemy = rollingDice(20)[0] + gameState.currentEnemy.attackBonus; // Enemy attack bonus
-
+  
     if (attackEnemy >= 10 + Math.floor((gameState.player.stats.dex - 10) / 2) + gameState.player.stats.armor) {
       addToLog(`O ${gameState.currentEnemy.name} acerta você! Rolagem: ${attackEnemy}`);
-      const enemyDamage = rollingDice(gameState.currentEnemy.damageDice)[0] + gameState.currentEnemy.damageBonus; // Enemy damage dice and bonus
+      const enemyDamage = rollingDice(gameState.currentEnemy.damageDice)[0] + gameState.currentEnemy.damageBonus;
       addToLog(`Você levou ${enemyDamage} de dano!`);
       changeHealth(-enemyDamage);
     } else {
       addToLog(`${gameState.currentEnemy.name} erra! Rolagem: ${attackEnemy}`);
     }
   }
+
   // Game scenes
   const scenes = {
     start: {
