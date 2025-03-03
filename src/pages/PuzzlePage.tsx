@@ -946,10 +946,10 @@ function ComponenteComIframeHTMLInline() {
       <h2>Iframe com HTML Embutido (usando srcDoc)</h2>
       <iframe
         srcDoc={htmlEmbutido} // Usamos srcDoc e passamos a string HTML
-        width="700"
-        height="350"
+        width="1400"
+        height="900"
         title="Iframe com HTML Inline"
-        style={{ border: '1px solid #ccc' }} // Estilo para visualização do iframe
+        style={{ border: '1px solid #eee' }} // Estilo para visualização do iframe
       ></iframe>
     </div>
   );
