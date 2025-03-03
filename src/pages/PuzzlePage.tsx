@@ -10,7 +10,7 @@ function ComponenteComIframeHTMLInline() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mind Labyrinth: A Puzzle Adventure</title>
     <style>
-        :root {
+        .puzzle-page :root {
             --primary-color: #2d2b42;
             --secondary-color: #5a4a7f;
             --accent-color: #8a7fb0;
@@ -19,7 +19,7 @@ function ComponenteComIframeHTMLInline() {
             --error-color: #f44336;
         }
         
-        body {
+        body.puzzle-page  {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--primary-color);
             color: var(--light-color);
@@ -31,21 +31,21 @@ function ComponenteComIframeHTMLInline() {
             overflow-x: hidden;
         }
         
-        header {
+        .puzzle-page  header {
             background-color: rgba(0, 0, 0, 0.3);
             padding: 1rem;
             text-align: center;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
         
-        h1 {
+        .puzzle-page  h1 {
             margin: 0;
             font-size: 2.5rem;
             color: var(--light-color);
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
         
-        main {
+        .puzzle-page  main {
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -53,7 +53,7 @@ function ComponenteComIframeHTMLInline() {
             padding: 2rem;
         }
         
-        .game-container {
+        .puzzle-page  .game-container {
             background-color: rgba(0, 0, 0, 0.2);
             border-radius: 10px;
             padding: 2rem;
@@ -64,7 +64,7 @@ function ComponenteComIframeHTMLInline() {
             overflow: hidden;
         }
         
-        .game-ui {
+        .puzzle-page  .game-ui {
             display: flex;
             justify-content: space-between;
             margin-bottom: 1rem;
@@ -72,14 +72,14 @@ function ComponenteComIframeHTMLInline() {
             border-bottom: 1px solid var(--accent-color);
         }
         
-        .level-indicator, .score-indicator {
+        .puzzle-page  .level-indicator, .score-indicator {
             font-size: 1.2rem;
             background-color: rgba(0, 0, 0, 0.3);
             padding: 0.5rem 1rem;
             border-radius: 5px;
         }
         
-        .puzzle-container {
+        .puzzle-page .puzzle-container {
             margin: 1rem 0;
             min-height: 300px;
             display: flex;
@@ -88,19 +88,19 @@ function ComponenteComIframeHTMLInline() {
             justify-content: center;
         }
         
-        .puzzle-title {
+        .puzzle-page .puzzle-title {
             font-size: 1.5rem;
             margin-bottom: 1rem;
             color: var(--accent-color);
         }
         
-        .puzzle-description {
+        .puzzle-page .puzzle-description {
             margin-bottom: 2rem;
             text-align: center;
             line-height: 1.6;
         }
         
-        .btn {
+        .puzzle-page .btn {
             background-color: var(--secondary-color);
             color: var(--light-color);
             border: none;
@@ -112,40 +112,40 @@ function ComponenteComIframeHTMLInline() {
             margin: 0.5rem;
         }
         
-        .btn:hover {
+        .puzzle-page .btn:hover {
             background-color: var(--accent-color);
             transform: translateY(-2px);
             box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
         }
         
-        .btn:active {
+        .puzzle-page .btn:active {
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
         
-        .btn-primary {
+        .puzzle-page .btn-primary {
             background-color: var(--accent-color);
         }
         
-        .btn-success {
+        .puzzle-page .btn-success {
             background-color: var(--success-color);
         }
         
-        .control-panel {
+        .puzzle-page .control-panel {
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
             margin-top: 1rem;
         }
         
-        .pattern-grid {
+        .puzzle-page .pattern-grid {
             display: grid;
             grid-template-columns: repeat(3, 80px);
             grid-template-rows: repeat(3, 80px);
             gap: 10px;
         }
         
-        .pattern-cell {
+        .puzzle-page .pattern-cell {
             background-color: rgba(255, 255, 255, 0.1);
             border-radius: 5px;
             display: flex;
@@ -156,23 +156,23 @@ function ComponenteComIframeHTMLInline() {
             transition: all 0.3s ease;
         }
         
-        .pattern-cell:hover {
+        .puzzle-page .pattern-cell:hover {
             background-color: rgba(255, 255, 255, 0.2);
         }
         
-        .pattern-cell.selected {
+        .puzzle-page .pattern-cell.selected {
             background-color: var(--accent-color);
             transform: scale(1.05);
             box-shadow: 0 0 10px var(--accent-color);
         }
         
-        .pattern-options {
+        .puzzle-page .pattern-options {
             display: flex;
             margin-top: 20px;
             gap: 15px;
         }
         
-        .pattern-option {
+        .puzzle-page .pattern-option {
             width: 60px;
             height: 60px;
             background-color: rgba(255, 255, 255, 0.1);
@@ -185,30 +185,30 @@ function ComponenteComIframeHTMLInline() {
             transition: all 0.3s ease;
         }
         
-        .pattern-option:hover {
+        .puzzle-page .pattern-option:hover {
             background-color: rgba(255, 255, 255, 0.2);
             transform: scale(1.1);
         }
         
-        .memory-grid {
+        .puzzle-page .memory-grid {
             display: grid;
             grid-template-columns: repeat(4, 80px);
             grid-template-rows: repeat(4, 80px);
             gap: 10px;
         }
         
-        .memory-cell {
+        .puzzle-page .memory-cell {
             background-color: var(--secondary-color);
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         
-        .memory-cell:hover {
+        .puzzle-page .memory-cell:hover {
             background-color: var(--accent-color);
         }
         
-        .memory-cell.revealed {
+        .puzzle-page .memory-cell.revealed {
             background-color: var(--light-color);
             color: var(--primary-color);
             display: flex;
@@ -218,33 +218,33 @@ function ComponenteComIframeHTMLInline() {
             font-weight: bold;
         }
         
-        .memory-cell.matched {
+        .puzzle-page .memory-cell.matched {
             background-color: var(--success-color);
             cursor: default;
         }
         
-        .logic-grid {
+        .puzzle-page .logic-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-gap: 10px;
             margin-bottom: 20px;
         }
         
-        .logic-statement {
+        .puzzle-page .logic-statement {
             background-color: rgba(255, 255, 255, 0.1);
             padding: 10px;
             border-radius: 5px;
             text-align: center;
         }
         
-        .logic-options {
+        .puzzle-page .logic-options {
             display: flex;
             gap: 10px;
             justify-content: center;
             margin-top: 20px;
         }
         
-        .logic-symbol {
+        .puzzle-page .logic-symbol {
             width: 30px;
             height: 30px;
             display: inline-flex;
@@ -255,14 +255,14 @@ function ComponenteComIframeHTMLInline() {
             background-color: var(--accent-color);
         }
         
-        .completion-container {
+        .puzzle-page .completion-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
         }
         
-        .feedback-message {
+        .puzzle-page .feedback-message {
             margin-top: 1rem;
             padding: 1rem;
             border-radius: 5px;
@@ -270,24 +270,24 @@ function ComponenteComIframeHTMLInline() {
             transition: all 0.3s ease;
         }
         
-        .feedback-success {
+        .puzzle-page .feedback-success {
             background-color: rgba(76, 175, 80, 0.3);
             color: #b9f6ca;
         }
         
-        .feedback-error {
+        .puzzle-page .feedback-error {
             background-color: rgba(244, 67, 54, 0.3);
             color: #ffcdd2;
         }
         
-        .hint-text {
+        .puzzle-page .hint-text {
             margin-top: 1rem;
             font-style: italic;
             color: var(--accent-color);
             text-align: center;
         }
         
-        .narrative-text {
+        .puzzle-page .narrative-text {
             background-color: rgba(0, 0, 0, 0.3);
             padding: 1.5rem;
             border-radius: 5px;
@@ -297,19 +297,19 @@ function ComponenteComIframeHTMLInline() {
             line-height: 1.6;
         }
         
-        .sequence-puzzle {
+        .puzzle-page .sequence-puzzle {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
         
-        .sequence-display {
+        .puzzle-page .sequence-display {
             display: flex;
             gap: 15px;
             margin-bottom: 20px;
         }
         
-        .sequence-item {
+        .puzzle-page .sequence-item {
             width: 60px;
             height: 60px;
             background-color: rgba(255, 255, 255, 0.1);
@@ -320,12 +320,12 @@ function ComponenteComIframeHTMLInline() {
             font-size: 1.8rem;
         }
         
-        .sequence-options {
+        .puzzle-page .sequence-options {
             display: flex;
             gap: 15px;
         }
         
-        .sequence-option {
+        .puzzle-page .sequence-option {
             width: 50px;
             height: 50px;
             background-color: rgba(255, 255, 255, 0.1);
@@ -338,16 +338,16 @@ function ComponenteComIframeHTMLInline() {
             transition: all 0.3s ease;
         }
         
-        .sequence-option:hover {
+        .puzzle-page .sequence-option:hover {
             background-color: rgba(255, 255, 255, 0.2);
             transform: scale(1.1);
         }
         
-        .perspective-puzzle {
+        .puzzle-page .perspective-puzzle {
             perspective: 800px;
         }
         
-        .rotating-cube {
+        .puzzle-page .rotating-cube {
             width: 200px;
             height: 200px;
             position: relative;
@@ -356,7 +356,7 @@ function ComponenteComIframeHTMLInline() {
             margin: 50px auto;
         }
         
-        .rotating-cube div {
+        .puzzle-page .rotating-cube div {
             position: absolute;
             width: 200px;
             height: 200px;
@@ -367,44 +367,44 @@ function ComponenteComIframeHTMLInline() {
             opacity: 0.8;
         }
         
-        .rotating-cube .front {
+        .puzzle-page .rotating-cube .front {
             transform: translateZ(100px);
             background-color: rgba(76, 175, 80, 0.5);
         }
         
-        .rotating-cube .back {
+        .puzzle-page .rotating-cube .back {
             transform: rotateY(180deg) translateZ(100px);
             background-color: rgba(244, 67, 54, 0.5);
         }
         
-        .rotating-cube .left {
+        .puzzle-page .rotating-cube .left {
             transform: rotateY(-90deg) translateZ(100px);
             background-color: rgba(33, 150, 243, 0.5);
         }
         
-        .rotating-cube .right {
+        .puzzle-page .puzzle-page .rotating-cube .right {
             transform: rotateY(90deg) translateZ(100px);
             background-color: rgba(255, 235, 59, 0.5);
         }
         
-        .rotating-cube .top {
+        .puzzle-page .rotating-cube .top {
             transform: rotateX(90deg) translateZ(100px);
             background-color: rgba(156, 39, 176, 0.5);
         }
         
-        .rotating-cube .bottom {
+        .puzzle-page .rotating-cube .bottom {
             transform: rotateX(-90deg) translateZ(100px);
             background-color: rgba(255, 152, 0, 0.5);
         }
         
-        .cube-controls {
+        .puzzle-page .cube-controls {
             display: flex;
             justify-content: center;
             gap: 10px;
             margin-top: 20px;
         }
         
-        footer {
+        .puzzle-page footer {
             text-align: center;
             padding: 1rem;
             background-color: rgba(0, 0, 0, 0.3);
@@ -412,33 +412,33 @@ function ComponenteComIframeHTMLInline() {
         }
 
         @media (max-width: 600px) {
-            .game-container {
+            .puzzle-page .game-container {
                 padding: 1rem;
             }
             
-            .pattern-grid {
+            .puzzle-page .pattern-grid {
                 grid-template-columns: repeat(3, 60px);
                 grid-template-rows: repeat(3, 60px);
             }
             
-            .memory-grid {
+            .puzzle-page .memory-grid {
                 grid-template-columns: repeat(4, 60px);
                 grid-template-rows: repeat(4, 60px);
             }
             
-            .pattern-option, .sequence-item {
+            .puzzle-page .pattern-option, .sequence-item {
                 width: 50px;
                 height: 50px;
             }
             
-            .sequence-option {
+            .puzzle-page .sequence-option {
                 width: 40px;
                 height: 40px;
             }
         }
     </style>
 </head>
-<body>
+<body class="puzzle-page">
     <header>
         <h1>Mind Labyrinth</h1>
     </header>
