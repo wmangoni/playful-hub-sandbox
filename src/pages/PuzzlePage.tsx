@@ -10,7 +10,7 @@ function ComponenteComIframeHTMLInline() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mind Labyrinth: A Puzzle Adventure</title>
     <style>
-        .puzzle-page :root {
+        :root {
             --primary-color: #2d2b42;
             --secondary-color: #5a4a7f;
             --accent-color: #8a7fb0;
@@ -941,14 +941,14 @@ function ComponenteComIframeHTMLInline() {
   `;
 
   return (
-    <div>
-      <h2>Iframe com HTML Embutido (usando srcDoc)</h2>
+    <div style={{ width: '100vw', height: '100vh' }}>
       <iframe
         srcDoc={htmlEmbutido} // Usamos srcDoc e passamos a string HTML
-        width="1300"
-        height="800"
-        title="Iframe com HTML Inline"
+        width="100%"
+        height="100%"
+        title="Puzzle game"
         style={{ border: '1px solid #eee' }} // Estilo para visualização do iframe
+        sandbox="allow-scripts allow-same-origin"
       ></iframe>
     </div>
   );
