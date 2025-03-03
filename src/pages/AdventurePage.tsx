@@ -2,6 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const AdventurePage = () => {
+  const backgroundMusic: HTMLAudioElement;
+  // Initialize background music
+  backgroundMusic = new Audio('/medieval-music.mp3');
+  backgroundMusic.loop = true;
+  backgroundMusic.volume = 0.3;
+  
   const [gameStarted, setGameStarted] = useState(false);
   const [selectedCharacter, setSelectedCharacter] = useState<string | null>(
     null
@@ -1595,6 +1601,7 @@ const AdventurePage = () => {
 
       if (mem.checkType === "combat") {
         // Handle combat - not used directly in checks anymore
+        initFight(gameState.currentEnemy)
         checkSuccess = true;
         addToLog("Iniciando combate...");
       } else {
