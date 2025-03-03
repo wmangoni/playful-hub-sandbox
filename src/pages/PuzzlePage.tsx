@@ -1,7 +1,508 @@
-import { useState, useEffect } from 'react';
-import '../Puzzle.css';
+import React from 'react';
 
-const puzzles = [
+function ComponenteComIframeHTMLInline() {
+  // HTML que queremos embutir (como string JavaScript)
+  const htmlEmbutido = `
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mind Labyrinth: A Puzzle Adventure</title>
+    <style>
+        :root {
+            --primary-color: #2d2b42;
+            --secondary-color: #5a4a7f;
+            --accent-color: #8a7fb0;
+            --light-color: #e8e6f0;
+            --success-color: #4caf50;
+            --error-color: #f44336;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--primary-color);
+            color: var(--light-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        header {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            color: var(--light-color);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+        
+        .game-container {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .game-ui {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--accent-color);
+        }
+        
+        .level-indicator, .score-indicator {
+            font-size: 1.2rem;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+        
+        .puzzle-container {
+            margin: 1rem 0;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .puzzle-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--accent-color);
+        }
+        
+        .puzzle-description {
+            margin-bottom: 2rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+        
+        .btn {
+            background-color: var(--secondary-color);
+            color: var(--light-color);
+            border: none;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+        
+        .btn:hover {
+            background-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-color);
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+        }
+        
+        .control-panel {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            grid-template-rows: repeat(3, 80px);
+            gap: 10px;
+        }
+        
+        .pattern-cell {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .pattern-cell:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .pattern-cell.selected {
+            background-color: var(--accent-color);
+            transform: scale(1.05);
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+        
+        .pattern-options {
+            display: flex;
+            margin-top: 20px;
+            gap: 15px;
+        }
+        
+        .pattern-option {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .pattern-option:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+        
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            grid-template-rows: repeat(4, 80px);
+            gap: 10px;
+        }
+        
+        .memory-cell {
+            background-color: var(--secondary-color);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .memory-cell:hover {
+            background-color: var(--accent-color);
+        }
+        
+        .memory-cell.revealed {
+            background-color: var(--light-color);
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        
+        .memory-cell.matched {
+            background-color: var(--success-color);
+            cursor: default;
+        }
+        
+        .logic-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .logic-statement {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .logic-options {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .logic-symbol {
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            margin: 0 5px;
+            background-color: var(--accent-color);
+        }
+        
+        .completion-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .feedback-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 5px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .feedback-success {
+            background-color: rgba(76, 175, 80, 0.3);
+            color: #b9f6ca;
+        }
+        
+        .feedback-error {
+            background-color: rgba(244, 67, 54, 0.3);
+            color: #ffcdd2;
+        }
+        
+        .hint-text {
+            margin-top: 1rem;
+            font-style: italic;
+            color: var(--accent-color);
+            text-align: center;
+        }
+        
+        .narrative-text {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            border-left: 4px solid var(--accent-color);
+            font-style: italic;
+            line-height: 1.6;
+        }
+        
+        .sequence-puzzle {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .sequence-display {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .sequence-item {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+        
+        .sequence-options {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .sequence-option {
+            width: 50px;
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .sequence-option:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+        
+        .perspective-puzzle {
+            perspective: 800px;
+        }
+        
+        .rotating-cube {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s ease;
+            margin: 50px auto;
+        }
+        
+        .rotating-cube div {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            opacity: 0.8;
+        }
+        
+        .rotating-cube .front {
+            transform: translateZ(100px);
+            background-color: rgba(76, 175, 80, 0.5);
+        }
+        
+        .rotating-cube .back {
+            transform: rotateY(180deg) translateZ(100px);
+            background-color: rgba(244, 67, 54, 0.5);
+        }
+        
+        .rotating-cube .left {
+            transform: rotateY(-90deg) translateZ(100px);
+            background-color: rgba(33, 150, 243, 0.5);
+        }
+        
+        .rotating-cube .right {
+            transform: rotateY(90deg) translateZ(100px);
+            background-color: rgba(255, 235, 59, 0.5);
+        }
+        
+        .rotating-cube .top {
+            transform: rotateX(90deg) translateZ(100px);
+            background-color: rgba(156, 39, 176, 0.5);
+        }
+        
+        .rotating-cube .bottom {
+            transform: rotateX(-90deg) translateZ(100px);
+            background-color: rgba(255, 152, 0, 0.5);
+        }
+        
+        .cube-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: rgba(0, 0, 0, 0.3);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 600px) {
+            .game-container {
+                padding: 1rem;
+            }
+            
+            .pattern-grid {
+                grid-template-columns: repeat(3, 60px);
+                grid-template-rows: repeat(3, 60px);
+            }
+            
+            .memory-grid {
+                grid-template-columns: repeat(4, 60px);
+                grid-template-rows: repeat(4, 60px);
+            }
+            
+            .pattern-option, .sequence-item {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .sequence-option {
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Mind Labyrinth</h1>
+    </header>
+    
+    <main>
+        <div class="game-container">
+            <div class="game-ui">
+                <div class="level-indicator">Level: <span id="level">1</span></div>
+                <div class="score-indicator">Score: <span id="score">0</span></div>
+            </div>
+            
+            <div class="narrative-text" id="narrative">
+                You find yourself in a mysterious ancient library. The air is thick with dust and mystery. Before you stands a series of puzzles, each protecting a fragment of forgotten knowledge. "To proceed," whispers an unseen voice, "you must prove your mind worthy..."
+            </div>
+            
+            <div class="puzzle-container" id="puzzle-container">
+                <!-- Puzzle content will be dynamically inserted here -->
+            </div>
+            
+            <div id="feedback" class="feedback-message" style="display: none;"></div>
+            
+            <div class="control-panel" id="control-panel">
+                <button class="btn btn-primary" id="start-button">Begin Journey</button>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        Mind Labyrinth &copy; 2025 - A Puzzle Adventure
+    </footer>
+    
+    <script>
+        // Game state
+        const gameState = {
+            level: 1,
+            score: 0,
+            currentPuzzle: null,
+            puzzlesSolved: 0,
+            narrativeProgress: 0
+        };
+        
+        // DOM elements
+        const levelElement = document.getElementById('level');
+        const scoreElement = document.getElementById('score');
+        const puzzleContainer = document.getElementById('puzzle-container');
+        const controlPanel = document.getElementById('control-panel');
+        const startButton = document.getElementById('start-button');
+        const narrativeElement = document.getElementById('narrative');
+        const feedbackElement = document.getElementById('feedback');
+        
+        // Narrative text pieces
+        const narrativeTexts = [
+            "You find yourself in a mysterious ancient library. The air is thick with dust and mystery. Before you stands a series of puzzles, each protecting a fragment of forgotten knowledge. \"To proceed,\" whispers an unseen voice, \"you must prove your mind worthy...\"",
+            "As you solve the first puzzle, a soft glow illuminates a nearby scroll. It depicts an ancient civilization that discovered patterns within the very fabric of reality.",
+            "The second challenge yields another scroll fragment. It speaks of a society that learned to perceive truths beyond the obvious, hidden in plain sight.",
+            "With each puzzle solved, you begin to understand that this library was created to preserve knowledge too powerful to be freely shared. The creators feared its misuse.",
+            "You've uncovered half of the library's secrets now. The scrolls reveal that the knowledge hidden here could reshape perception itself, allowing minds to transcend ordinary limits.",
+            "The voices grow clearer as you progress. \"Few have made it this far,\" they whisper. \"Continue, and you may join those who see beyond the veil.\"",
+            "Almost there now. The final scrolls reveal why the library was sealed: its creators discovered a truth so fundamental that it changed them forever. They chose to protect it with puzzles that only the worthy could solve.",
+            "You've completed all challenges. The library's purpose is now clear: to find minds capable of handling the responsibility of transcendent knowledge. \"You have proven yourself,\" the voices say. \"The knowledge is now yours to carry forward.\""
+        ];
+        
+        // Puzzles
+        const puzzles = [
             {
                 type: 'sequence',
                 title: 'Sequence Completion',
@@ -308,156 +809,149 @@ const puzzles = [
                 check: () => true // The check is handled inside the setup function
             }
         ];
-
-const narrativeTexts = [
-            "You find yourself in a mysterious ancient library. The air is thick with dust and mystery. Before you stands a series of puzzles, each protecting a fragment of forgotten knowledge. \"To proceed,\" whispers an unseen voice, \"you must prove your mind worthy...\"",
-            "As you solve the first puzzle, a soft glow illuminates a nearby scroll. It depicts an ancient civilization that discovered patterns within the very fabric of reality.",
-            "The second challenge yields another scroll fragment. It speaks of a society that learned to perceive truths beyond the obvious, hidden in plain sight.",
-            "With each puzzle solved, you begin to understand that this library was created to preserve knowledge too powerful to be freely shared. The creators feared its misuse.",
-            "You've uncovered half of the library's secrets now. The scrolls reveal that the knowledge hidden here could reshape perception itself, allowing minds to transcend ordinary limits.",
-            "The voices grow clearer as you progress. \"Few have made it this far,\" they whisper. \"Continue, and you may join those who see beyond the veil.\"",
-            "Almost there now. The final scrolls reveal why the library was sealed: its creators discovered a truth so fundamental that it changed them forever. They chose to protect it with puzzles that only the worthy could solve.",
-            "You've completed all challenges. The library's purpose is now clear: to find minds capable of handling the responsibility of transcendent knowledge. \"You have proven yourself,\" the voices say. \"The knowledge is now yours to carry forward.\""
-        ];
-
-function App() {
-  const [gameState, setGameState] = useState({
-    level: 1,
-    score: 0,
-    currentPuzzleIndex: 0,
-    puzzlesSolved: 0,
-    narrativeProgress: 0,
-    isGameStarted: false,
-    feedback: { message: '', type: '' },
-    isGameCompleted: false
-  });
-
-  const startGame = () => {
-    setGameState(prev => ({
-      ...prev,
-      isGameStarted: true,
-      level: 1,
-      score: 0,
-      puzzlesSolved: 0,
-      narrativeProgress: 0,
-      currentPuzzleIndex: 0,
-      isGameCompleted: false
-    }));
-  };
-
-  const completePuzzle = (success) => {
-    setGameState(prev => {
-      const newState = { ...prev };
-      if (success) {
-        newState.score += 100;
-        newState.puzzlesSolved++;
-        newState.feedback = {
-          message: 'Correct! The path forward reveals itself...',
-          type: 'success'
-        };
         
-        if (newState.puzzlesSolved >= puzzles.length) {
-          newState.isGameCompleted = true;
-        } else {
-          newState.currentPuzzleIndex = newState.puzzlesSolved;
-          newState.level = newState.puzzlesSolved + 1;
-          newState.narrativeProgress = Math.min(
-            newState.narrativeProgress + 1,
-            narrativeTexts.length - 1
-          );
+        // Initialize game
+        startButton.addEventListener('click', startGame);
+        
+        function startGame() {
+            startButton.style.display = 'none';
+            gameState.level = 1;
+            gameState.score = 0;
+            gameState.puzzlesSolved = 0;
+            updateGameUI();
+            loadPuzzle(0);
         }
-      } else {
-        newState.score = Math.max(0, prev.score - 50);
-        newState.feedback = {
-          message: 'Incorrect. The walls seem to shift around you...',
-          type: 'error'
-        };
-      }
-      return newState;
-    });
-  };
+        
+        function loadPuzzle(index) {
+            if (index >= puzzles.length) {
+                // Game completed
+                showCompletion();
+                return;
+            }
+            
+            const puzzle = puzzles[index];
+            gameState.currentPuzzle = puzzle;
+            
+            // Clear puzzle container
+            puzzleContainer.innerHTML = '';
+            
+            // Add puzzle title and description
+            const titleElement = document.createElement('div');
+            titleElement.className = 'puzzle-title';
+            titleElement.textContent = puzzle.title;
+            puzzleContainer.appendChild(titleElement);
+            
+            const descriptionElement = document.createElement('div');
+            descriptionElement.className = 'puzzle-description';
+            descriptionElement.textContent = puzzle.description;
+            puzzleContainer.appendChild(descriptionElement);
+            
+            // Setup puzzle content
+            const puzzleContent = puzzle.setup();
+            puzzleContainer.appendChild(puzzleContent);
+            
+            // Update level display
+            gameState.level = index + 1;
+            updateGameUI();
+        }
+        
+        function checkSequenceAnswer(answer) {
+            const isCorrect = gameState.currentPuzzle.check(answer);
+            completePuzzle(isCorrect);
+        }
+        
+        function checkPatternAnswer(answer) {
+            const isCorrect = gameState.currentPuzzle.check(answer);
+            completePuzzle(isCorrect);
+        }
+        
+        function checkLogicAnswer(answer) {
+                    const isCorrect = gameState.currentPuzzle.check(answer);
+        completePuzzle(isCorrect);
+    }
+    
+    function completePuzzle(success) {
+        feedbackElement.style.display = 'block';
+        if (success) {
+            feedbackElement.textContent = 'Correct! The path forward reveals itself...';
+            feedbackElement.className = 'feedback-message feedback-success';
+            gameState.score += 100;
+            gameState.puzzlesSolved++;
+            updateNarrative();
+        } else {
+            feedbackElement.textContent = 'Incorrect. The walls seem to shift around you...';
+            feedbackElement.className = 'feedback-message feedback-error';
+            gameState.score = Math.max(0, gameState.score - 50);
+        }
+        
+        updateGameUI();
+        
+        if (success) {
+            setTimeout(() => {
+                if (gameState.puzzlesSolved < puzzles.length) {
+                    loadPuzzle(gameState.puzzlesSolved);
+                } else {
+                    showCompletion();
+                }
+            }, 2000);
+        }
+    }
+    
+    function updateGameUI() {
+        levelElement.textContent = gameState.level;
+        scoreElement.textContent = gameState.score;
+    }
+    
+    function updateNarrative() {
+        if (gameState.narrativeProgress < narrativeTexts.length - 1) {
+            gameState.narrativeProgress = Math.min(
+                gameState.narrativeProgress + 1,
+                narrativeTexts.length - 1
+            );
+            narrativeElement.textContent = narrativeTexts[gameState.narrativeProgress];
+        }
+    }
+    
+    function showCompletion() {
+        puzzleContainer.innerHTML = '';
+        const completionDiv = document.createElement('div');
+        completionDiv.className = 'completion-container';
+        
+        const completionText = document.createElement('div');
+        completionText.className = 'puzzle-title';
+        completionText.textContent = 'Library of Wisdom Unlocked';
+        
+        const finalScore = document.createElement('div');
+        finalScore.className = 'score-indicator';
+        finalScore.textContent = `Final Score: ${gameState.score}`;
+        
+        const restartButton = document.createElement('button');
+        restartButton.className = 'btn btn-primary';
+        restartButton.textContent = 'Begin Anew';
+        restartButton.addEventListener('click', () => {
+            startGame();
+        });
+        
+        completionDiv.appendChild(completionText);
+        completionDiv.appendChild(finalScore);
+        completionDiv.appendChild(restartButton);
+        puzzleContainer.appendChild(completionDiv);
+    }
+</script>
+  `;
 
   return (
-    <div className="App">
-      <header>
-        <h1>Mind Labyrinth</h1>
-      </header>
-      
-      <main>
-        <div className="game-container">
-          <div className="game-ui">
-            <div className="level-indicator">Level: <span>{gameState.level}</span></div>
-            <div className="score-indicator">Score: <span>{gameState.score}</span></div>
-          </div>
-          
-          <div className="narrative-text">
-            {narrativeTexts[gameState.narrativeProgress]}
-          </div>
-          
-          {!gameState.isGameCompleted && gameState.isGameStarted && (
-            <PuzzleDisplay 
-              puzzle={puzzles[gameState.currentPuzzleIndex]} 
-              completePuzzle={completePuzzle}
-            />
-          )}
-          
-          {gameState.feedback.message && (
-            <div className={`feedback-message feedback-${gameState.feedback.type}`}>
-              {gameState.feedback.message}
-            </div>
-          )}
-          
-          <div className="control-panel">
-            {!gameState.isGameStarted && (
-              <button className="btn btn-primary" onClick={startGame}>
-                Begin Journey
-              </button>
-            )}
-            {gameState.isGameCompleted && (
-              <CompletionScreen 
-                score={gameState.score} 
-                restartGame={startGame} 
-              />
-            )}
-          </div>
-        </div>
-      </main>
-      
-      <footer>
-        Mind Labyrinth &copy; 2025 - A Puzzle Adventure
-      </footer>
+    <div>
+      <h2>Iframe com HTML Embutido (usando srcDoc)</h2>
+      <iframe
+        srcDoc={htmlEmbutido} // Usamos srcDoc e passamos a string HTML
+        width="700"
+        height="350"
+        title="Iframe com HTML Inline"
+        style={{ border: '1px solid #ccc' }} // Estilo para visualização do iframe
+      ></iframe>
     </div>
   );
 }
 
-const PuzzleDisplay = ({ puzzle, completePuzzle }) => {
-  switch(puzzle.type) {
-    case 'sequence':
-      return <SequencePuzzle puzzle={puzzle} completePuzzle={completePuzzle} />;
-    case 'pattern':
-      return <PatternPuzzle puzzle={puzzle} completePuzzle={completePuzzle} />;
-    case 'memory':
-      return <MemoryPuzzle puzzle={puzzle} completePuzzle={completePuzzle} />;
-    case 'logic':
-      return <LogicPuzzle puzzle={puzzle} completePuzzle={completePuzzle} />;
-    case 'perspective':
-      return <PerspectivePuzzle puzzle={puzzle} completePuzzle={completePuzzle} />;
-    default:
-      return null;
-  }
-};
-
-// Create separate components for each puzzle type (SequencePuzzle, PatternPuzzle, etc.)
-// Implement them using React state and hooks following the original logic
-
-const CompletionScreen = ({ score, restartGame }) => (
-  <div className="completion-container">
-    <div className="puzzle-title">Library of Wisdom Unlocked</div>
-    <div className="score-indicator">Final Score: {score}</div>
-    <button className="btn btn-primary" onClick={restartGame}>
-      Begin Anew
-    </button>
-  </div>
-);
-
-export default App;
+export default ComponenteComIframeHTMLInline;
