@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 const ArcadePage = () => {
   const [gameStarted, setGameStarted] = useState(false);
+  const [isSpecialActive, setIsSpecialActive] = useState(false);
   
   const startGame = () => {
     setGameStarted(true);
@@ -159,16 +160,53 @@ const SpaceShooterGame = () => {
   const fireBullet = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
-    
+  
     const currentTime = Date.now();
     if (currentTime - lastFireTimeRef.current < 150) return; // Faster fire rate (was 300)
-    
-    const bullet = document.createElement('div');
-    bullet.className = 'bullet';
-    bullet.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px'; // Adjusted for wider bullets
-    bullet.style.top = (playerYRef.current - 15) + 'px';
-    gameContainer.appendChild(bullet);
-    bulletsRef.current.push(bullet);
+  
+    if (isSpecialActive) {
+      // Triple special shot (middle, left diagonal, right diagonal)
+      // Middle bullet
+      const bullet1 = document.createElement('div');
+      bullet1.className = 'bullet';
+      bullet1.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
+      bullet1.style.top = (playerYRef.current - 15) + 'px';
+      bullet1.speedX = 0;
+      bullet1.speedY = -10;
+      gameContainer.appendChild(bullet1);
+      bulletsRef.current.push(bullet1);
+  
+      // Left diagonal bullet
+      const bullet2 = document.createElement('div');
+      bullet2.className = 'bullet';
+      bullet2.style.left = (playerXRef.current + playerWidthRef.current / 2 - 15) + 'px';
+      bullet2.style.top = (playerYRef.current - 10) + 'px';
+      bullet2.speedX = -2;
+      bullet2.speedY = -9;
+      gameContainer.appendChild(bullet2);
+      bulletsRef.current.push(bullet2);
+  
+      // Right diagonal bullet
+      const bullet3 = document.createElement('div');
+      bullet3.className = 'bullet';
+      bullet3.style.left = (playerXRef.current + playerWidthRef.current / 2 + 5) + 'px';
+      bullet3.style.top = (playerYRef.current - 10) + 'px';
+      bullet3.speedX = 2;
+      bullet3.speedY = -9;
+      gameContainer.appendChild(bullet3);
+      bulletsRef.current.push(bullet3);
+    } else {
+      // Regular single bullet
+      const bullet = document.createElement('div');
+      bullet.className = 'bullet';
+      bullet.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
+      bullet.style.top = (playerYRef.current - 15) + 'px';
+      bullet.speedX = 0;
+      bullet.speedY = -10;
+      gameContainer.appendChild(bullet);
+      bulletsRef.current.push(bullet);
+    }
+  
     lastFireTimeRef.current = currentTime;
   };
   
@@ -176,18 +214,65 @@ const SpaceShooterGame = () => {
   const updateBullets = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
-    
+  
     for (let i = 0; i < bulletsRef.current.length; i++) {
       const bullet = bulletsRef.current[i];
-      const y = bullet.offsetTop - 10; // Faster bullets
-      
-      if (y < 0) {
+      const y = bullet.offsetTop + (bullet.speedY || -10); // Use speedY if defined
+      const x = bullet.offsetLeft + (bullet.speedX || 0); // Use speedX if defined
+  
+      if (y < 0 || x < 0 || x > containerWidthRef.current) {
         gameContainer.removeChild(bullet);
         bulletsRef.current.splice(i, 1);
         i--;
       } else {
         bullet.style.top = y + 'px';
+        bullet.style.left = x + 'px';
       }
+    }
+  };
+
+  const createPowerUp = () => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+  
+    if (Math.random() < 0.01) { // Adjust spawn rate as needed
+      const powerUp = document.createElement('div');
+      powerUp.className = 'power-up';
+      powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
+      powerUp.style.top = '0px';
+      powerUp.speed = 1; // Adjust speed as needed
+      gameContainer.appendChild(powerUp);
+  
+      // Move power-up
+      const movePowerUp = () => {
+        if (!isGameOverRef.current) {
+          const y = powerUp.offsetTop + powerUp.speed;
+          powerUp.style.top = `${y}px`;
+  
+          if (y < containerHeightRef.current) {
+            requestAnimationFrame(movePowerUp);
+          } else {
+            gameContainer.removeChild(powerUp);
+          }
+  
+          // Check collision with player
+          const playerRect = playerRef.current?.getBoundingClientRect();
+          const powerUpRect = powerUp.getBoundingClientRect();
+          if (
+            playerRect &&
+            powerUpRect.left < playerRect.right &&
+            powerUpRect.right > playerRect.left &&
+            powerUpRect.top < playerRect.bottom &&
+            powerUpRect.bottom > playerRect.top
+          ) {
+            gameContainer.removeChild(powerUp);
+            setIsSpecialActive(true);
+            setTimeout(() => setIsSpecialActive(false), 5000); // Deactivate after 5 seconds
+          }
+        }
+      };
+  
+      movePowerUp();
     }
   };
   
@@ -390,6 +475,7 @@ const SpaceShooterGame = () => {
       updateBullets();
       createEnemy();
       updateEnemies();
+      createPowerUp();
       updateStars();
       checkCollisions();
       gameLoopIdRef.current = requestAnimationFrame(gameLoop);
