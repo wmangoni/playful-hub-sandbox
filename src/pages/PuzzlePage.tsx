@@ -2,7 +2,6 @@
 import React from 'react';
 
 function ComponenteComIframeHTMLInline() {
-  // HTML que queremos embutir (como string)
   const htmlEmbutido = `
     <!DOCTYPE html>
 <html lang="en">
@@ -946,8 +945,8 @@ function ComponenteComIframeHTMLInline() {
       <h2>Iframe com HTML Embutido (usando srcDoc)</h2>
       <iframe
         srcDoc={htmlEmbutido} // Usamos srcDoc e passamos a string HTML
-        width="1400"
-        height="900"
+        width="1300"
+        height="800"
         title="Iframe com HTML Inline"
         style={{ border: '1px solid #eee' }} // Estilo para visualização do iframe
       ></iframe>
