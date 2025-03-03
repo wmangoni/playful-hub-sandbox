@@ -1667,7 +1667,7 @@ const AdventurePage = () => {
     <div className="min-h-screen font-serif bg-[#f5f1e6] text-[#333] p-5">
 
       <audio controls>
-        <source src="/audio/Medieval-Music-–-Court-Minstrel.mp3" type="audio/mpeg" />
+        <source src="/audio/medieval-music.mp3" type="audio/mpeg" />
         Seu navegador não suporta o elemento de áudio.
       </audio>
 
