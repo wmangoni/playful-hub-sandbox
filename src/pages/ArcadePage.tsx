@@ -422,7 +422,7 @@ const SpaceShooterGame = () => {
     playerYRef.current = containerHeightRef.current - playerHeightRef.current - 20;
     scoreRef.current = 0;
     livesRef.current = 5;
-    setSpecialShots(0);
+    setSpecialShots(2);
     isGameOverRef.current = false;
 
     scoreElement.textContent = `Score: ${scoreRef.current}`;
