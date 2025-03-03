@@ -98,6 +98,7 @@ const SpaceShooterGame = () => {
   const playerWidthRef = useRef(40);
   const playerHeightRef = useRef(40);
   const [isSpecialActive, setIsSpecialActive] = useState(false);
+  const [specialShots, setSpecialShots] = useState(0); // Armazena quantos tiros especiais o jogador tem
 
   useEffect(() => {
     if (!gameContainerRef.current) return;
@@ -162,10 +163,10 @@ const SpaceShooterGame = () => {
     if (!gameContainer) return;
   
     const currentTime = Date.now();
-    if (currentTime - lastFireTimeRef.current < 150) return; // Faster fire rate (was 300)
+    if (currentTime - lastFireTimeRef.current < 150) return; // Taxa de disparo
   
-    if (isSpecialActive) {
-      // Triple special shot (middle, left diagonal, right diagonal)
+    if (isFirePressedRef.current && specialShots > 0) {
+      // Tiro especial (triplo)
       // Middle bullet
       const bullet1 = document.createElement('div');
       bullet1.className = 'bullet';
@@ -195,8 +196,10 @@ const SpaceShooterGame = () => {
       bullet3.speedY = -9;
       gameContainer.appendChild(bullet3);
       bulletsRef.current.push(bullet3);
+  
+      setSpecialShots((prev) => prev - 1); // Consome um tiro especial
     } else {
-      // Regular single bullet
+      // Tiro normal
       const bullet = document.createElement('div');
       bullet.className = 'bullet';
       bullet.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
@@ -235,15 +238,15 @@ const SpaceShooterGame = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
   
-    if (Math.random() < 0.2) { // Adjust spawn rate as needed
+    if (Math.random() < 0.03) { // Condição para spawn do power-up
       const powerUp = document.createElement('div');
       powerUp.className = 'power-up';
       powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
       powerUp.style.top = '0px';
-      powerUp.speed = 1; // Adjust speed as needed
+      powerUp.speed = 1; // Velocidade de queda do power-up
       gameContainer.appendChild(powerUp);
   
-      // Move power-up
+      // Lógica para mover o power-up e verificar colisão com o jogador
       const movePowerUp = () => {
         if (!isGameOverRef.current) {
           const y = powerUp.offsetTop + powerUp.speed;
@@ -255,7 +258,7 @@ const SpaceShooterGame = () => {
             gameContainer.removeChild(powerUp);
           }
   
-          // Check collision with player
+          // Verifica colisão com o jogador
           const playerRect = playerRef.current?.getBoundingClientRect();
           const powerUpRect = powerUp.getBoundingClientRect();
           if (
@@ -266,8 +269,7 @@ const SpaceShooterGame = () => {
             powerUpRect.bottom > playerRect.top
           ) {
             gameContainer.removeChild(powerUp);
-            setIsSpecialActive(true);
-            setTimeout(() => setIsSpecialActive(false), 5000); // Deactivate after 5 seconds
+            setSpecialShots((prev) => prev + 1); // Adiciona um tiro especial
           }
         }
       };
@@ -496,7 +498,7 @@ const SpaceShooterGame = () => {
       if (e.key === 'ArrowRight' || e.key === 'd') {
         isRightPressedRef.current = true;
       }
-      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
+      if (e.key === ' ') { // Barra de espaço
         isFirePressedRef.current = true;
       }
     };
@@ -508,7 +510,7 @@ const SpaceShooterGame = () => {
       if (e.key === 'ArrowRight' || e.key === 'd') {
         isRightPressedRef.current = false;
       }
-      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
+      if (e.key === ' ') { // Barra de espaço
         isFirePressedRef.current = false;
       }
     };
