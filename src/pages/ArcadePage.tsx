@@ -235,7 +235,7 @@ const SpaceShooterGame = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
   
-    if (Math.random() < 0.01) { // Adjust spawn rate as needed
+    if (Math.random() < 0.2) { // Adjust spawn rate as needed
       const powerUp = document.createElement('div');
       powerUp.className = 'power-up';
       powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
@@ -598,6 +598,13 @@ const SpaceShooterGame = () => {
       </div>
       
       <style jsx>{`
+        .power-up {
+          position: absolute;
+          width: 20px;
+          height: 20px;
+          background-color: #00ff00;
+          border-radius: 50%;
+        }
         .enemy {
           position: absolute;
           width: 30px;
