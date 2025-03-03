@@ -1,7 +1,7 @@
 import React from 'react';
 
 function ComponenteComIframeHTMLInline() {
-  // HTML que queremos embutir (como string JavaScript)
+  // HTML que queremos embutir (como string)
   const htmlEmbutido = `
     <!DOCTYPE html>
 <html lang="en">
