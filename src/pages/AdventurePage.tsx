@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -26,7 +25,7 @@ const AdventurePage = () => {
     },
     mem: {} as any,
     currentScene: "start",
-    currentEnemy: {
+    currentEnemy: { // Initial enemy, can be changed when combat starts
       name: "Wolf",
       ac: 12,
       hp: 12,
@@ -35,6 +34,9 @@ const AdventurePage = () => {
       dex: 10,
       con: 10,
       bba: 1,
+      damageDice: 6, // Dice type for enemy damage (d6)
+      damageBonus: 0, // Bonus to enemy damage
+      attackBonus: 2, // Bonus to enemy attack roll
     },
     log: [] as string[],
     pendingCheck: null,
@@ -132,12 +134,12 @@ const AdventurePage = () => {
   const changeHealth = (amount: number) => {
     setGameState(prev => {
       let newHealth = prev.player.health + amount;
-      
+
       // Cap health at max health
       if (newHealth > prev.player.maxHealth) {
         newHealth = prev.player.maxHealth;
       }
-      
+
       // Check for death
       if (newHealth <= 0) {
         addToLog("Você morreu!");
@@ -150,7 +152,7 @@ const AdventurePage = () => {
           currentScene: "death"
         };
       }
-      
+
       return {
         ...prev,
         player: {
@@ -192,6 +194,92 @@ const AdventurePage = () => {
     },
   };
 
+  // Dice rolling function (now returns an array of rolls if count > 1)
+  const rollingDice = (sides: number, count: number = 1): number[] => {
+    const rolls = [];
+    for (let i = 0; i < count; i++) {
+      rolls.push(Math.floor(Math.random() * sides) + 1);
+    }
+    return rolls;
+  };
+
+
+  // Combat functions
+  function initFight(enemy) {
+    setGameState(prev => ({ ...prev, currentEnemy: enemy })); // Set the current enemy
+    addToLog(`Iniciando combate contra ${enemy.name}!`);
+    const fightLoop = () => {
+      if (gameState.currentEnemy.hp > 0 && gameState.player.health > 0) {
+        fight(gameState.currentEnemy);
+        // Use setTimeout to simulate turn-based combat and allow UI updates
+        setTimeout(fightLoop, 1500); // Wait 1.5 seconds before next round
+      } else {
+        if (gameState.currentEnemy.hp <= 0) {
+          const xpGain = 50;
+          const goldGain = rollingDice(6, 3).reduce((a, b) => a + b, 0);
+          addToLog(`Você derrotou o ${enemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
+          changeXP(xpGain);
+          changeGold(goldGain);
+          // After combat, load next scene or return to previous
+          loadScene("corridor_after_fight"); // Example: scene after defeating enemy
+        } else if (gameState.player.health <= 0) {
+          // Player is dead, game over is handled by changeHealth
+        }
+      }
+    };
+    fightLoop();
+  }
+
+
+  function fight(enemy) {
+    if (gameState.player.health <= 0 || enemy.hp <= 0) {
+      return; // Stop fight if player or enemy is dead
+    }
+
+    addToLog(`--- Sua vez de atacar ---`);
+    let attackRoll = rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10) / 2) + gameState.player.stats.bba;
+
+    addToLog(`Você ataca o ${enemy.name} (AC ${enemy.ac})... Rolagem: ${attackRoll}`);
+
+    if (attackRoll >= enemy.ac) {
+      const damage = rollingDice(8)[0] + Math.floor((gameState.player.stats.str - 10) / 2);
+      addToLog(`Você acerta ${damage} de dano no inimigo!`);
+
+      setGameState(prev => ({
+        ...prev,
+        currentEnemy: { ...prev.currentEnemy, hp: prev.currentEnemy.hp - damage }
+      }), () => { // Callback to execute after state update
+        if (gameState.currentEnemy.hp <= 0) {
+          // Handled in initFight's fightLoop for scene transition after combat
+          addToLog(`Você derrotou o ${enemy.name}!`);
+        } else {
+          addToLog(`O ${enemy.name} sobreviveu e te ataca!`);
+          enemyAttack(enemy);
+        }
+      });
+    } else {
+      addToLog("Você errou!");
+      addToLog(`O ${enemy.name} te ataca!`);
+      enemyAttack(enemy);
+    }
+  }
+
+  function enemyAttack(enemy) {
+    if (gameState.player.health <= 0 || enemy.hp <= 0) {
+      return; // Stop attack if player or enemy is dead
+    }
+    addToLog(`--- Vez do ${enemy.name} atacar ---`);
+    let attackEnemy = rollingDice(20)[0] + enemy.attackBonus; // Enemy attack bonus
+
+    if (attackEnemy >= 10 + Math.floor((gameState.player.stats.dex - 10) / 2) + gameState.player.stats.armor) {
+      addToLog(`O ${enemy.name} acerta você! Rolagem: ${attackEnemy}`);
+      const enemyDamage = rollingDice(enemy.damageDice)[0] + enemy.damageBonus; // Enemy damage dice and bonus
+      addToLog(`Você levou ${enemyDamage} de dano!`);
+      changeHealth(-enemyDamage);
+    } else {
+      addToLog(`${enemy.name} erra! Rolagem: ${attackEnemy}`);
+    }
+  }
   // Game scenes
   const scenes = {
     start: {
@@ -1445,6 +1533,7 @@ const AdventurePage = () => {
         maxHealth: 20,
       },
       currentScene: "start",
+      log: [], // Clear log on game start
     }));
 
     setGameStarted(true);
@@ -1494,8 +1583,8 @@ const AdventurePage = () => {
     }
   };
 
-  // Roll dice function
-  const rollDice = () => {
+  // Roll dice function (for checks, not combat which uses rollingDice directly)
+  const rollDiceCheck = () => {
     const roll = Math.floor(Math.random() * 20) + 1;
     setDiceResult(roll);
 
@@ -1505,7 +1594,7 @@ const AdventurePage = () => {
       const mem = gameState.mem;
 
       if (mem.checkType === "combat") {
-        // Handle combat
+        // Handle combat - not used directly in checks anymore
         checkSuccess = true;
         addToLog("Iniciando combate...");
       } else {
@@ -1551,7 +1640,7 @@ const AdventurePage = () => {
           A Masmorra de Drakmor
         </h1>
         <p className="text-center italic text-gray-600 mb-8">
-          Uma Aventura Simples de D&D
+          Uma Aventura Simples no melhor estilo D&D
         </p>
 
         {!gameStarted ? (
@@ -1564,53 +1653,26 @@ const AdventurePage = () => {
               {Object.keys(characterStats).map((charClass) => (
                 <div
                   key={charClass}
-                  className={`border-2 border-[#7a5c3d] rounded-md p-4 text-center cursor-pointer w-[180px] transition-all hover:-translate-y-1 hover:shadow-md ${
-                    selectedCharacter === charClass
-                      ? "border-[#8b0000] bg-[#f9e9e9]"
-                      : ""
-                  }`}
+                  className={`border-2 border-[#7a5c3d] rounded-md p-4 text-center cursor-pointer w-[180px] transition-all hover:-translate-y-1 hover:shadow-md ${selectedCharacter === charClass ? "border-[#8b0000] bg-[#f9e9e9]" : ""
+                    }`}
                   onClick={() => handleSelectCharacter(charClass)}
                 >
                   <h3 className="font-bold capitalize mb-2">
-                    {charClass === "warrior"
-                      ? "Guerreiro"
-                      : charClass === "wizard"
-                      ? "Mago"
-                      : charClass === "rogue"
-                      ? "Ladino"
-                      : charClass}
+                    {charClass === "warrior" ? "Guerreiro" : charClass === "wizard" ? "Mago" : charClass === "rogue" ? "Ladino" : charClass}
                   </h3>
                   <p className="text-sm mb-2">
-                    {charClass === "warrior"
-                      ? "Força e saúde elevadas, habilidoso com armas"
-                      : charClass === "wizard"
-                      ? "Mestre em magia arcana com feitiços poderosos"
-                      : charClass === "rogue"
-                      ? "Ágil e astuto, habilidoso em furtividade"
-                      : ""}
+                    {charClass === "warrior" ? "Força e saúde elevadas, habilidoso com armas" : charClass === "wizard" ? "Mestre em magia arcana com feitiços poderosos" : charClass === "rogue" ? "Ágil e astuto, habilidoso em furtividade" : ""}
                   </p>
                   <p className="text-xs">
                     <strong>FOR:</strong>{" "}
-                    {
-                      characterStats[charClass as keyof typeof characterStats]
-                        .str
-                    }{" "}
+                    {characterStats[charClass as keyof typeof characterStats].str}{" "}
                     <strong>DES:</strong>{" "}
-                    {
-                      characterStats[charClass as keyof typeof characterStats]
-                        .dex
-                    }{" "}
+                    {characterStats[charClass as keyof typeof characterStats].dex}{" "}
                     <br />
                     <strong>CON:</strong>{" "}
-                    {
-                      characterStats[charClass as keyof typeof characterStats]
-                        .con
-                    }{" "}
+                    {characterStats[charClass as keyof typeof characterStats].con}{" "}
                     <strong>INT:</strong>{" "}
-                    {
-                      characterStats[charClass as keyof typeof characterStats]
-                        .int
-                    }
+                    {characterStats[charClass as keyof typeof characterStats].int}
                   </p>
                 </div>
               ))}
@@ -1657,7 +1719,7 @@ const AdventurePage = () => {
                   {diceResult !== null ? diceResult : "?"}
                 </div>
                 <button
-                  onClick={rollDice}
+                  onClick={rollDiceCheck}
                   className="bg-[#7a5c3d] text-white px-4 py-2 rounded ml-4 hover:bg-[#8b0000] transition-colors"
                 >
                   Rolar d20
@@ -1668,13 +1730,8 @@ const AdventurePage = () => {
             {/* Result message */}
             {resultMessage.text && (
               <div
-                className={`p-4 my-4 rounded-md font-bold ${
-                  resultMessage.type === "success"
-                    ? "bg-[#d4edda] text-[#155724]"
-                    : resultMessage.type === "failure"
-                    ? "bg-[#f8d7da] text-[#721c24]"
-                    : ""
-                }`}
+                className={`p-4 my-4 rounded-md font-bold ${resultMessage.type === "success" ? "bg-[#d4edda] text-[#155724]" : resultMessage.type === "failure" ? "bg-[#f8d7da] text-[#721c24]" : ""
+                  }`}
               >
                 {resultMessage.text}
               </div>
@@ -1695,13 +1752,13 @@ const AdventurePage = () => {
               {/* Show restart button for victory/death scenes */}
               {(gameState.currentScene === "victory" ||
                 gameState.currentScene === "death") && (
-                <button
-                  onClick={() => setGameStarted(false)}
-                  className="bg-[#7a5c3d] text-white px-4 py-2 rounded hover:bg-[#8b0000] transition-colors mt-4"
-                >
-                  Jogar Novamente
-                </button>
-              )}
+                  <button
+                    onClick={() => setGameStarted(false)}
+                    className="bg-[#7a5c3d] text-white px-4 py-2 rounded hover:bg-[#8b0000] transition-colors mt-4"
+                  >
+                    Jogar Novamente
+                  </button>
+                )}
             </div>
 
             {/* Inventory */}
