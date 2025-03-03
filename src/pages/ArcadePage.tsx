@@ -68,6 +68,19 @@ interface StarElement extends HTMLDivElement {
 // Define a custom type for enemy elements that includes the speed property
 interface EnemyElement extends HTMLDivElement {
   speed: number;
+  movementType: number;
+  movementOffset: number;
+  amplitude: number;
+  frequency: number;
+}
+
+interface Bullet extends HTMLDivElement {
+  speedX: number;
+  speedY: number;
+}
+
+interface PowerUp extends HTMLDivElement {
+  speed: number;
 }
 
 const SpaceShooterGame = () => {
@@ -78,10 +91,11 @@ const SpaceShooterGame = () => {
   const gameOverScreenRef = useRef<HTMLDivElement>(null);
   const finalScoreElementRef = useRef<HTMLDivElement>(null);
   
-  const bulletsRef = useRef<HTMLDivElement[]>([]);
+  const bulletsRef = useRef<Bullet[]>([]);
   const enemiesRef = useRef<EnemyElement[]>([]); // Using EnemyElement instead of HTMLDivElement
   const starsRef = useRef<StarElement[]>([]);
   const scoreRef = useRef(0);
+  const difficultyLevel = useRef(1);
   const livesRef = useRef(5);
   const isGameOverRef = useRef(false);
   const gameLoopIdRef = useRef<number | null>(null);
@@ -168,7 +182,7 @@ const SpaceShooterGame = () => {
     if (isFirePressedRef.current && specialShots > 0) {
       // Tiro especial (triplo)
       // Middle bullet
-      const bullet1 = document.createElement('div');
+      const bullet1 = document.createElement('div') as Bullet;
       bullet1.className = 'bullet';
       bullet1.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
       bullet1.style.top = (playerYRef.current - 15) + 'px';
@@ -178,7 +192,7 @@ const SpaceShooterGame = () => {
       bulletsRef.current.push(bullet1);
   
       // Left diagonal bullet
-      const bullet2 = document.createElement('div');
+      const bullet2 = document.createElement('div') as Bullet;
       bullet2.className = 'bullet';
       bullet2.style.left = (playerXRef.current + playerWidthRef.current / 2 - 15) + 'px';
       bullet2.style.top = (playerYRef.current - 10) + 'px';
@@ -188,7 +202,7 @@ const SpaceShooterGame = () => {
       bulletsRef.current.push(bullet2);
   
       // Right diagonal bullet
-      const bullet3 = document.createElement('div');
+      const bullet3 = document.createElement('div') as Bullet;
       bullet3.className = 'bullet';
       bullet3.style.left = (playerXRef.current + playerWidthRef.current / 2 + 5) + 'px';
       bullet3.style.top = (playerYRef.current - 10) + 'px';
@@ -200,7 +214,7 @@ const SpaceShooterGame = () => {
       setSpecialShots((prev) => prev - 1); // Consome um tiro especial
     } else {
       // Tiro normal
-      const bullet = document.createElement('div');
+      const bullet = document.createElement('div') as Bullet;
       bullet.className = 'bullet';
       bullet.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
       bullet.style.top = (playerYRef.current - 15) + 'px';
@@ -239,7 +253,7 @@ const SpaceShooterGame = () => {
     if (!gameContainer) return;
   
     if (Math.random() < 0.03) { // Condição para spawn do power-up
-      const powerUp = document.createElement('div');
+      const powerUp = document.createElement('div') as PowerUp;
       powerUp.className = 'power-up';
       powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
       powerUp.style.top = '0px';
@@ -280,25 +294,44 @@ const SpaceShooterGame = () => {
   
   // Create an enemy
   const createEnemy = () => {
+    // Increase spawn rate and enemy speed based on difficulty level
+    const spawnRate = 0.02 + (difficultyLevel.current - 1) * 0.005;
+    const maxEnemies = 8 + Math.floor((difficultyLevel.current - 1) / 2);
+
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
     
-    if (Math.random() < 0.02 && enemiesRef.current.length < 8) { // Reduced spawn rate and max enemies
+    if (Math.random() < spawnRate && enemiesRef.current.length < maxEnemies) {
       const enemy = document.createElement('div') as EnemyElement;
       enemy.className = 'enemy';
       
       // Random enemy type
       const enemyType = Math.floor(Math.random() * 3);
       enemy.innerHTML = `<svg viewBox="0 0 100 100">
-        ${enemyType === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c" /><circle cx="30" cy="40" r="10" fill="#000" /><circle cx="70" cy="40" r="10" fill="#000" />' : 
-          enemyType === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6" /><circle cx="35" cy="45" r="8" fill="#000" /><circle cx="65" cy="45" r="8" fill="#000" />' :
-          '<rect x="10" y="10" width="80" height="80" fill="#f39c12" /><rect x="25" y="30" width="15" height="15" fill="#000" /><rect x="60" y="30" width="15" height="15" fill="#000" />'}
+          ${enemyType === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c" /><circle cx="30" cy="40" r="10" fill="#000" /><circle cx="70" cy="40" r="10" fill="#000" />' : 
+            enemyType === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6" /><circle cx="35" cy="45" r="8" fill="#000" /><circle cx="65" cy="45" r="8" fill="#000" />' :
+            '<rect x="10" y="10" width="80" height="80" fill="#f39c12" /><rect x="25" y="30" width="15" height="15" fill="#000" /><rect x="60" y="30" width="15" height="15" fill="#000" />'}
       </svg>`;
       
       const x = Math.random() * (containerWidthRef.current - 30);
       enemy.style.left = x + 'px';
       enemy.style.top = '0px';
-      enemy.speed = Math.random() * 1 + 0.5; // Slower enemies
+      
+      // Base speed is increased with difficulty
+      const baseSpeed = 0.5 + (difficultyLevel.current - 1) * 0.2;
+      enemy.speed = Math.random() * 1 + baseSpeed;
+      
+      // Add special movement pattern for higher levels
+      if (difficultyLevel.current >= 3) {
+          enemy.movementType = Math.floor(Math.random() * 3);
+          enemy.movementOffset = 0;
+          
+          if (enemy.movementType === 1) {
+              // Zigzag movement
+              enemy.amplitude = Math.random() * 30 + 20;
+              enemy.frequency = Math.random() * 0.1 + 0.05;
+          }
+      }
       
       gameContainer.appendChild(enemy);
       enemiesRef.current.push(enemy);
@@ -311,16 +344,48 @@ const SpaceShooterGame = () => {
     if (!gameContainer) return;
     
     for (let i = 0; i < enemiesRef.current.length; i++) {
-      const enemy = enemiesRef.current[i];
-      const y = enemy.offsetTop + enemy.speed;
+      const enemy = enemiesRef[i];
+      let x = parseFloat(enemy.style.left);
+      let y = parseFloat(enemy.style.top) + enemy.speed;
       
-      if (y > containerHeightRef.current) {
-        gameContainer.removeChild(enemy);
-        enemiesRef.current.splice(i, 1);
-        i--;
-        // No life loss when enemy reaches bottom
+      // Apply special movement patterns based on difficulty level
+      if (enemy.movementType === 1) {
+          // Zigzag movement
+          enemy.movementOffset += enemy.frequency;
+          x += Math.sin(enemy.movementOffset) * 2;
+      } else if (enemy.movementType === 2 && difficultyLevel.current >= 4) {
+          // Homing movement (slight tracking of player)
+          const playerCenterX = playerXRef.current + playerWidthRef.current / 2;
+          const enemyCenterX = x + 15;
+          
+          if (playerCenterX < enemyCenterX) {
+              x -= 0.5;
+          } else if (playerCenterX > enemyCenterX) {
+              x += 0.5;
+          }
+      }
+      
+      // Keep enemy within screen bounds
+      if (x < 0) x = 0;
+      if (x > containerWidthRef.current - 30) x = containerWidthRef.current - 30;
+      
+      if (y > containerHeightRef) {
+          gameContainer.removeChild(enemy);
+          enemiesRef.current.splice(i, 1);
+          i--;
+          
+          // After level 2, lose lives when enemies reach bottom
+          if (difficultyLevel.current >= 3) {
+              livesRef.current--;
+              livesElementRef.current.textContent = `Lives: ${livesRef}`;
+              
+              if (livesRef.current <= 0) {
+                  gameOver();
+              }
+          }
       } else {
-        enemy.style.top = y + 'px';
+          enemy.style.left = x + 'px';
+          enemy.style.top = y + 'px';
       }
     }
   };
