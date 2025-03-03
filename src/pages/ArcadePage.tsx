@@ -25,7 +25,7 @@ const ArcadePage = () => {
           <div className="mt-8 text-gray-400 text-sm">
             <p>Controls:</p>
             <p>Arrow Keys/WASD - Move ship</p>
-            <p>Spacebar - Fire (Hold for normal, tap for special if available)</p>
+            <p>Spacebar - Fire (Special fire if available)</p>
             <p>Touch/Drag - Control on mobile</p>
           </div>
         </div>
@@ -71,18 +71,23 @@ interface PowerUpElement extends HTMLDivElement {
   speed: number;
 }
 
+interface BulletElement extends HTMLDivElement {
+  speedX: number;
+  speedY: number;
+}
+
 const SpaceShooterGame = () => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<SVGSVGElement>(null);
   const scoreElementRef = useRef<HTMLDivElement>(null);
   const livesElementRef = useRef<HTMLDivElement>(null);
-  const specialShotsElementRef = useRef<HTMLDivElement>(null); // Added for special shots display
+  const specialShotsElementRef = useRef<HTMLDivElement>(null);
   const gameOverScreenRef = useRef<HTMLDivElement>(null);
   const finalScoreElementRef = useRef<HTMLDivElement>(null);
 
-  const bulletsRef = useRef<HTMLDivElement[]>([]);
+  const bulletsRef = useRef<BulletElement[]>([]);
   const enemiesRef = useRef<EnemyElement[]>([]);
-  const powerUpsRef = useRef<PowerUpElement[]>([]); // Added to track power-ups
+  const powerUpsRef = useRef<PowerUpElement[]>([]);
   const starsRef = useRef<StarElement[]>([]);
   const scoreRef = useRef(0);
   const livesRef = useRef(5);
@@ -91,7 +96,6 @@ const SpaceShooterGame = () => {
 
   const isLeftPressedRef = useRef(false);
   const isRightPressedRef = useRef(false);
-  const isFirePressedRef = useRef(false);
   const lastFireTimeRef = useRef(0);
   const playerXRef = useRef(0);
   const playerYRef = useRef(0);
@@ -146,7 +150,7 @@ const SpaceShooterGame = () => {
       playerXRef.current += 7;
     }
     player.style.left = `${playerXRef.current}px`;
-    player.style.top = `${playerYRef.current}px`; // Ensure vertical position is consistent
+    player.style.top = `${playerYRef.current}px`;
   };
 
   const fireBullet = (useSpecial = false) => {
@@ -157,9 +161,9 @@ const SpaceShooterGame = () => {
     if (currentTime - lastFireTimeRef.current < 150) return;
 
     if (useSpecial && specialShots > 0) {
-      // Special fire (triple shot)
-      const bullet1 = document.createElement("div");
-      bullet1.className = "bullet special-bullet"; // Optional: style special bullets differently
+      // Triple shot (special fire)
+      const bullet1 = document.createElement("div") as BulletElement;
+      bullet1.className = "bullet special-bullet";
       bullet1.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
       bullet1.style.top = `${playerYRef.current - 15}px`;
       bullet1.speedX = 0;
@@ -167,7 +171,7 @@ const SpaceShooterGame = () => {
       gameContainer.appendChild(bullet1);
       bulletsRef.current.push(bullet1);
 
-      const bullet2 = document.createElement("div");
+      const bullet2 = document.createElement("div") as BulletElement;
       bullet2.className = "bullet special-bullet";
       bullet2.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 15}px`;
       bullet2.style.top = `${playerYRef.current - 10}px`;
@@ -176,7 +180,7 @@ const SpaceShooterGame = () => {
       gameContainer.appendChild(bullet2);
       bulletsRef.current.push(bullet2);
 
-      const bullet3 = document.createElement("div");
+      const bullet3 = document.createElement("div") as BulletElement;
       bullet3.className = "bullet special-bullet";
       bullet3.style.left = `${playerXRef.current + playerWidthRef.current / 2 + 5}px`;
       bullet3.style.top = `${playerYRef.current - 10}px`;
@@ -187,8 +191,8 @@ const SpaceShooterGame = () => {
 
       setSpecialShots((prev) => prev - 1);
     } else {
-      // Normal fire
-      const bullet = document.createElement("div");
+      // Normal single shot
+      const bullet = document.createElement("div") as BulletElement;
       bullet.className = "bullet";
       bullet.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
       bullet.style.top = `${playerYRef.current - 15}px`;
@@ -201,14 +205,22 @@ const SpaceShooterGame = () => {
     lastFireTimeRef.current = currentTime;
   };
 
+  const enableAutoFire = () => {
+    setInterval(() => {
+      if (!isGameOverRef.current) {
+        fireBullet(false); // Auto-fire normal bullets only
+      }
+    }, 300);
+  };
+
   const updateBullets = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
 
     for (let i = bulletsRef.current.length - 1; i >= 0; i--) {
       const bullet = bulletsRef.current[i];
-      const y = bullet.offsetTop + (bullet.speedY || -10);
-      const x = bullet.offsetLeft + (bullet.speedX || 0);
+      const y = bullet.offsetTop + bullet.speedY;
+      const x = bullet.offsetLeft + bullet.speedX;
 
       if (y < 0 || x < 0 || x > containerWidthRef.current) {
         gameContainer.removeChild(bullet);
@@ -224,7 +236,7 @@ const SpaceShooterGame = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
 
-    if (Math.random() < 0.03) {
+    if (Math.random() < 0.005) { // Reduced spawn rate
       const powerUp = document.createElement("div") as PowerUpElement;
       powerUp.className = "power-up";
       powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
@@ -441,26 +453,21 @@ const SpaceShooterGame = () => {
     const restartButton = document.getElementById("restart-button");
     if (!gameContainer || !restartButton) return;
 
-    let fireDebounce = false; // To detect fresh spacebar presses for special fire
-
     const handleKeyDown = (e) => {
       if (e.key === "ArrowLeft" || e.key === "a") isLeftPressedRef.current = true;
       if (e.key === "ArrowRight" || e.key === "d") isRightPressedRef.current = true;
-      if (e.key === " " && !fireDebounce) {
-        isFirePressedRef.current = true;
-        fireDebounce = true;
-        if (specialShots > 0) fireBullet(true); // Special fire on tap
-        else fireBullet(false); // Normal fire
+      if (e.key === " ") {
+        if (specialShots > 0) {
+          fireBullet(true); // Special fire if available
+        } else {
+          fireBullet(false); // Normal fire
+        }
       }
     };
 
     const handleKeyUp = (e) => {
       if (e.key === "ArrowLeft" || e.key === "a") isLeftPressedRef.current = false;
       if (e.key === "ArrowRight" || e.key === "d") isRightPressedRef.current = false;
-      if (e.key === " ") {
-        isFirePressedRef.current = false;
-        fireDebounce = false;
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -479,22 +486,12 @@ const SpaceShooterGame = () => {
 
     const handleTouchStart = (e) => {
       e.preventDefault();
-      isFirePressedRef.current = true;
-      if (!fireDebounce) {
-        fireDebounce = true;
-        if (specialShots > 0) fireBullet(true);
-        else fireBullet(false);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      isFirePressedRef.current = false;
-      fireDebounce = false;
+      if (specialShots > 0) fireBullet(true);
+      else fireBullet(false);
     };
 
     gameContainer.addEventListener("touchmove", handleTouchMove);
     gameContainer.addEventListener("touchstart", handleTouchStart);
-    gameContainer.addEventListener("touchend", handleTouchEnd);
     restartButton.addEventListener("click", resetGame);
 
     return () => {
@@ -502,13 +499,13 @@ const SpaceShooterGame = () => {
       window.removeEventListener("keyup", handleKeyUp);
       gameContainer.removeEventListener("touchmove", handleTouchMove);
       gameContainer.removeEventListener("touchstart", handleTouchStart);
-      gameContainer.removeEventListener("touchend", handleTouchEnd);
       restartButton.removeEventListener("click", resetGame);
     };
   };
 
   const startGame = () => {
     setupControls();
+    enableAutoFire(); // Start auto-firing normal bullets
     gameLoopIdRef.current = requestAnimationFrame(gameLoop);
   };
 
@@ -580,7 +577,7 @@ const SpaceShooterGame = () => {
           background-color: yellow;
         }
         .special-bullet {
-          background-color: orange; /* Optional: distinguish special bullets */
+          background-color: orange;
         }
         .star {
           position: absolute;
