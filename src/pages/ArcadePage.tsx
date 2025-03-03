@@ -123,6 +123,13 @@ const SpaceShooterGame = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Sincroniza o elemento DOM com o estado specialShots
+    if (specialShotsElementRef.current) {
+      specialShotsElementRef.current.textContent = `Special Shots: ${specialShots}`;
+    }
+  }, [specialShots]);
+
   const createStars = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
@@ -161,7 +168,6 @@ const SpaceShooterGame = () => {
     if (currentTime - lastFireTimeRef.current < 150) return;
 
     if (useSpecial && specialShots > 0) {
-      // Triple shot (special fire)
       const bullet1 = document.createElement("div") as BulletElement;
       bullet1.className = "bullet special-bullet";
       bullet1.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
@@ -189,9 +195,11 @@ const SpaceShooterGame = () => {
       gameContainer.appendChild(bullet3);
       bulletsRef.current.push(bullet3);
 
-      setSpecialShots((prev) => prev - 1);
+      setSpecialShots((prev) => {
+        console.log("Special shots decreased from", prev, "to", prev - 1);
+        return prev - 1;
+      });
     } else {
-      // Normal single shot
       const bullet = document.createElement("div") as BulletElement;
       bullet.className = "bullet";
       bullet.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
@@ -208,7 +216,7 @@ const SpaceShooterGame = () => {
   const enableAutoFire = () => {
     setInterval(() => {
       if (!isGameOverRef.current) {
-        fireBullet(false); // Auto-fire normal bullets only
+        fireBullet(false);
       }
     }, 300);
   };
@@ -236,14 +244,15 @@ const SpaceShooterGame = () => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
 
-    if (Math.random() < 0.005) { // Reduced spawn rate
+    if (Math.random() < 0.05) { // Aumentado temporariamente para testes
       const powerUp = document.createElement("div") as PowerUpElement;
       powerUp.className = "power-up";
-      powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
+      powerUp.style.left = `${Math.random() * (containerWidthRef.current - 20)}px`;
       powerUp.style.top = "0px";
       powerUp.speed = 1;
       gameContainer.appendChild(powerUp);
       powerUpsRef.current.push(powerUp);
+      console.log("Power-up criado em", powerUp.style.left, powerUp.style.top);
     }
   };
 
@@ -264,15 +273,32 @@ const SpaceShooterGame = () => {
 
         const playerRect = player.getBoundingClientRect();
         const powerUpRect = powerUp.getBoundingClientRect();
+        const containerRect = gameContainer.getBoundingClientRect();
+
+        // Ajustar coordenadas relativas ao gameContainer
+        const playerLeft = playerRect.left - containerRect.left;
+        const playerRight = playerRect.right - containerRect.left;
+        const playerTop = playerRect.top - containerRect.top;
+        const playerBottom = playerRect.bottom - containerRect.top;
+
+        const powerUpLeft = powerUpRect.left - containerRect.left;
+        const powerUpRight = powerUpRect.right - containerRect.left;
+        const powerUpTop = powerUpRect.top - containerRect.top;
+        const powerUpBottom = powerUpRect.bottom - containerRect.top;
+
         if (
-          powerUpRect.left < playerRect.right &&
-          powerUpRect.right > playerRect.left &&
-          powerUpRect.top < playerRect.bottom &&
-          powerUpRect.bottom > playerRect.top
+          powerUpLeft < playerRight &&
+          powerUpRight > playerLeft &&
+          powerUpTop < playerBottom &&
+          powerUpBottom > playerTop
         ) {
+          console.log("Colisão detectada com power-up em", powerUpLeft, powerUpTop);
           gameContainer.removeChild(powerUp);
           powerUpsRef.current.splice(i, 1);
-          setSpecialShots((prev) => prev + 1);
+          setSpecialShots((prev) => {
+            console.log("Special shots aumentado de", prev, "para", prev + 1);
+            return prev + 1;
+          });
         }
       }
     }
@@ -422,7 +448,7 @@ const SpaceShooterGame = () => {
     playerYRef.current = containerHeightRef.current - playerHeightRef.current - 20;
     scoreRef.current = 0;
     livesRef.current = 5;
-    setSpecialShots(2);
+    setSpecialShots(0);
     isGameOverRef.current = false;
 
     scoreElement.textContent = `Score: ${scoreRef.current}`;
@@ -458,9 +484,9 @@ const SpaceShooterGame = () => {
       if (e.key === "ArrowRight" || e.key === "d") isRightPressedRef.current = true;
       if (e.key === " ") {
         if (specialShots > 0) {
-          fireBullet(true); // Special fire if available
+          fireBullet(true);
         } else {
-          fireBullet(false); // Normal fire
+          fireBullet(false);
         }
       }
     };
@@ -505,7 +531,7 @@ const SpaceShooterGame = () => {
 
   const startGame = () => {
     setupControls();
-    enableAutoFire(); // Start auto-firing normal bullets
+    enableAutoFire();
     gameLoopIdRef.current = requestAnimationFrame(gameLoop);
   };
 
