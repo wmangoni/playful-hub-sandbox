@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 
 const AdventurePage = () => {
+  // Use useRef for the audio element instead of const declaration
+  const backgroundMusic = useRef<HTMLAudioElement | null>(null);
   
   const [gameStarted, setGameStarted] = useState(false);
   const [selectedCharacter, setSelectedCharacter] = useState<string | null>(
@@ -12,6 +15,23 @@ const AdventurePage = () => {
   const [diceResult, setDiceResult] = useState<number | null>(null);
   const [showDice, setShowDice] = useState(false);
   const [resultMessage, setResultMessage] = useState({ text: "", type: "" });
+
+  // Initialize background music in useEffect
+  useEffect(() => {
+    backgroundMusic.current = new Audio('/medieval-music.mp3');
+    if (backgroundMusic.current) {
+      backgroundMusic.current.loop = true;
+      backgroundMusic.current.volume = 0.3;
+    }
+    
+    return () => {
+      // Cleanup function
+      if (backgroundMusic.current) {
+        backgroundMusic.current.pause();
+        backgroundMusic.current = null;
+      }
+    };
+  }, []);
 
   // Game state
   const [gameState, setGameState] = useState({
@@ -1521,6 +1541,14 @@ const AdventurePage = () => {
     if (!selectedCharacter) {
       alert("Escolha um personagem antes de iniciar a aventura.");
       return;
+    }
+
+    // Play background music when game starts
+    if (backgroundMusic.current) {
+      backgroundMusic.current.play().catch(err => {
+        console.log("Audio play error:", err);
+        // Browsers often require user interaction before playing audio
+      });
     }
 
     // Initialize game state based on selected character
