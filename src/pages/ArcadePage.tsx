@@ -1,519 +1,633 @@
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+
+const ArcadePage = () => {
+  const [gameStarted, setGameStarted] = useState(false);
+  
+  const startGame = () => {
+    setGameStarted(true);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black">
+      {!gameStarted ? (
+        <div className="text-center bg-gray-900 p-10 rounded-lg shadow-2xl max-w-2xl">
+          <h1 className="text-4xl font-bold mb-4 text-white">Space Shooter</h1>
+          <p className="text-muted-foreground mb-8 text-gray-300">
+            Navigate your spaceship with arrow keys, and shoot with spacebar. Survive as long as possible!
+          </p>
+          <button 
+            onClick={startGame}
+            className="inline-flex items-center px-6 py-3 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors text-lg"
+          >
+            Start Game
+          </button>
+          <div className="mt-8 text-gray-400 text-sm">
+            <p>Controls:</p>
+            <p>Arrow Keys/WASD - Move ship</p>
+            <p>Spacebar - Fire</p>
+            <p>Touch/Drag - Control on mobile</p>
+          </div>
+        </div>
+      ) : (
+        <SpaceShooterGame />
+      )}
+      
+      <div className="mt-8 text-center">
+        <Link 
+          to="/" 
+          className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors"
+        >
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            className="h-4 w-4 mr-2" 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M15 19l-7-7 7-7" 
+            />
+          </svg>
+          Return to Game Hub
+        </Link>
+      </div>
+    </div>
+  );
+};
+
+// Define a custom type for star elements that includes the speed property
+interface StarElement extends HTMLDivElement {
+  speed: number;
+}
+
+// Define a custom type for enemy elements that includes the speed property
+interface EnemyElement extends HTMLDivElement {
+  speed: number;
+}
 
 const SpaceShooterGame = () => {
-  const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(5);
-  const [specialCharges, setSpecialCharges] = useState(3);
-  const [isSpecialActive, setIsSpecialActive] = useState(false);
-  const [difficultyLevel, setDifficultyLevel] = useState(1);
-  const [isGameOver, setIsGameOver] = useState(false);
-
-  const gameContainerRef = useRef(null);
-  const playerRef = useRef(null);
-  const scoreElementRef = useRef(null);
-  const livesElementRef = useRef(null);
-  const specialChargesElementRef = useRef(null);
-  const levelElementRef = useRef(null);
-  const specialActiveElementRef = useRef(null);
-  const specialBarFillRef = useRef(null);
-  const gameOverScreenRef = useRef(null);
-  const finalScoreElementRef = useRef(null);
-
-  const containerWidthRef = useRef(600);
-  const containerHeightRef = useRef(400);
-  const playerWidthRef = useRef(40);
-  const playerHeightRef = useRef(40);
-
-  const playerXRef = useRef(containerWidthRef.current / 2 - playerWidthRef.current / 2);
-  const playerYRef = useRef(containerHeightRef.current - playerHeightRef.current - 20);
-
-  const bulletsRef = useRef([]);
-  const enemiesRef = useRef([]);
-  const starsRef = useRef([]);
-
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<SVGSVGElement>(null); // Changed to SVGSVGElement to match the player element
+  const scoreElementRef = useRef<HTMLDivElement>(null);
+  const livesElementRef = useRef<HTMLDivElement>(null);
+  const gameOverScreenRef = useRef<HTMLDivElement>(null);
+  const finalScoreElementRef = useRef<HTMLDivElement>(null);
+  
+  const bulletsRef = useRef<HTMLDivElement[]>([]);
+  const enemiesRef = useRef<EnemyElement[]>([]); // Using EnemyElement instead of HTMLDivElement
+  const starsRef = useRef<StarElement[]>([]);
+  const scoreRef = useRef(0);
+  const livesRef = useRef(5);
+  const isGameOverRef = useRef(false);
+  const gameLoopIdRef = useRef<number | null>(null);
+  
+  // Controls state
   const isLeftPressedRef = useRef(false);
   const isRightPressedRef = useRef(false);
   const isFirePressedRef = useRef(false);
-  const isSpecialPressedRef = useRef(false);
   const lastFireTimeRef = useRef(0);
-  const specialTimerRef = useRef(null);
-  const specialTimeLeftRef = useRef(0);
+  const playerXRef = useRef(0);
+  const playerYRef = useRef(0);
+  const containerWidthRef = useRef(0);
+  const containerHeightRef = useRef(0);
+  const playerWidthRef = useRef(40);
+  const playerHeightRef = useRef(40);
+  const [isSpecialActive, setIsSpecialActive] = useState(false);
+  const [specialShots, setSpecialShots] = useState(0); // Armazena quantos tiros especiais o jogador tem
 
-  // Initialize stars
+  useEffect(() => {
+    if (!gameContainerRef.current) return;
+
+    const gameContainer = gameContainerRef.current;
+    const player = playerRef.current;
+    const scoreElement = scoreElementRef.current;
+    const livesElement = livesElementRef.current;
+    const gameOverScreen = gameOverScreenRef.current;
+    const finalScoreElement = finalScoreElementRef.current;
+    
+    containerWidthRef.current = gameContainer.offsetWidth;
+    containerHeightRef.current = gameContainer.offsetHeight;
+    playerXRef.current = containerWidthRef.current / 2 - playerWidthRef.current / 2;
+    playerYRef.current = containerHeightRef.current - playerHeightRef.current - 20;
+    
+    // Initialize the game
+    resetGame();
+    
+    return () => {
+      // Cleanup
+      if (gameLoopIdRef.current) {
+        cancelAnimationFrame(gameLoopIdRef.current);
+      }
+    };
+  }, []);
+
+  // Create stars
   const createStars = () => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+    
     for (let i = 0; i < 100; i++) {
-      const star = document.createElement("div");
-      star.className = "star";
+      const star = document.createElement('div') as StarElement;
+      star.className = 'star';
       star.style.left = `${Math.random() * containerWidthRef.current}px`;
       star.style.top = `${Math.random() * containerHeightRef.current}px`;
       star.style.opacity = `${Math.random() * 0.8 + 0.2}`;
       star.speed = Math.random() * 0.5 + 0.1;
-      gameContainerRef.current.appendChild(star);
+      gameContainer.appendChild(star);
       starsRef.current.push(star);
     }
   };
-
-  // Update player position
+  
+  // Update player position based on controls
   const updatePlayer = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    
     if (isLeftPressedRef.current && playerXRef.current > 0) {
-      playerXRef.current -= 7;
+      playerXRef.current -= 7; // Increased player speed
     }
     if (isRightPressedRef.current && playerXRef.current < containerWidthRef.current - playerWidthRef.current) {
-      playerXRef.current += 7;
+      playerXRef.current += 7; // Increased player speed
     }
-    playerRef.current.style.left = `${playerXRef.current}px`;
+    player.style.left = playerXRef.current + 'px';
   };
-
+  
   // Fire a bullet
   const fireBullet = () => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+  
     const currentTime = Date.now();
-    if (currentTime - lastFireTimeRef.current < 150) return;
-
-    if (isSpecialActive) {
-      // Triple special shot
-      const bullet1 = document.createElement("div");
-      bullet1.className = "special-bullet";
-      bullet1.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
-      bullet1.style.top = `${playerYRef.current - 15}px`;
+    if (currentTime - lastFireTimeRef.current < 150) return; // Taxa de disparo
+  
+    if (isFirePressedRef.current && specialShots > 0) {
+      // Tiro especial (triplo)
+      // Middle bullet
+      const bullet1 = document.createElement('div');
+      bullet1.className = 'bullet';
+      bullet1.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
+      bullet1.style.top = (playerYRef.current - 15) + 'px';
       bullet1.speedX = 0;
       bullet1.speedY = -10;
-      gameContainerRef.current.appendChild(bullet1);
+      gameContainer.appendChild(bullet1);
       bulletsRef.current.push(bullet1);
-
-      const bullet2 = document.createElement("div");
-      bullet2.className = "special-bullet";
-      bullet2.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 15}px`;
-      bullet2.style.top = `${playerYRef.current - 10}px`;
+  
+      // Left diagonal bullet
+      const bullet2 = document.createElement('div');
+      bullet2.className = 'bullet';
+      bullet2.style.left = (playerXRef.current + playerWidthRef.current / 2 - 15) + 'px';
+      bullet2.style.top = (playerYRef.current - 10) + 'px';
       bullet2.speedX = -2;
       bullet2.speedY = -9;
-      gameContainerRef.current.appendChild(bullet2);
+      gameContainer.appendChild(bullet2);
       bulletsRef.current.push(bullet2);
-
-      const bullet3 = document.createElement("div");
-      bullet3.className = "special-bullet";
-      bullet3.style.left = `${playerXRef.current + playerWidthRef.current / 2 + 5}px`;
-      bullet3.style.top = `${playerYRef.current - 10}px`;
+  
+      // Right diagonal bullet
+      const bullet3 = document.createElement('div');
+      bullet3.className = 'bullet';
+      bullet3.style.left = (playerXRef.current + playerWidthRef.current / 2 + 5) + 'px';
+      bullet3.style.top = (playerYRef.current - 10) + 'px';
       bullet3.speedX = 2;
       bullet3.speedY = -9;
-      gameContainerRef.current.appendChild(bullet3);
+      gameContainer.appendChild(bullet3);
       bulletsRef.current.push(bullet3);
+  
+      setSpecialShots((prev) => prev - 1); // Consome um tiro especial
     } else {
-      // Regular bullet
-      const bullet = document.createElement("div");
-      bullet.className = "bullet";
-      bullet.style.left = `${playerXRef.current + playerWidthRef.current / 2 - 5}px`;
-      bullet.style.top = `${playerYRef.current - 15}px`;
+      // Tiro normal
+      const bullet = document.createElement('div');
+      bullet.className = 'bullet';
+      bullet.style.left = (playerXRef.current + playerWidthRef.current / 2 - 5) + 'px';
+      bullet.style.top = (playerYRef.current - 15) + 'px';
       bullet.speedX = 0;
       bullet.speedY = -10;
-      gameContainerRef.current.appendChild(bullet);
+      gameContainer.appendChild(bullet);
       bulletsRef.current.push(bullet);
     }
-
+  
     lastFireTimeRef.current = currentTime;
   };
-
-  // Activate special shot
-  const activateSpecial = () => {
-    if (specialCharges > 0 && !isSpecialActive) {
-      setIsSpecialActive(true);
-      setSpecialCharges((prev) => prev - 1);
-      specialActiveElementRef.current.style.display = "block";
-      specialTimeLeftRef.current = 2000;
-
-      if (specialTimerRef.current) {
-        clearInterval(specialTimerRef.current);
-      }
-
-      specialTimerRef.current = setInterval(() => {
-        specialTimeLeftRef.current -= 100;
-        const percentage = (specialTimeLeftRef.current / 2000) * 100;
-        specialBarFillRef.current.style.width = `${percentage}%`;
-
-        if (specialTimeLeftRef.current <= 0) {
-          deactivateSpecial();
-        }
-      }, 100);
-    }
-  };
-
-  // Deactivate special shot
-  const deactivateSpecial = () => {
-    setIsSpecialActive(false);
-    specialActiveElementRef.current.style.display = "none";
-    specialBarFillRef.current.style.width = "0%";
-
-    if (specialTimerRef.current) {
-      clearInterval(specialTimerRef.current);
-      specialTimerRef.current = null;
-    }
-  };
-
+  
   // Update bullets position
   const updateBullets = () => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+  
     for (let i = 0; i < bulletsRef.current.length; i++) {
       const bullet = bulletsRef.current[i];
-      const x = parseFloat(bullet.style.left) + (bullet.speedX || 0);
-      const y = parseFloat(bullet.style.top) + (bullet.speedY || -10);
-
+      const y = bullet.offsetTop + (bullet.speedY || -10); // Use speedY if defined
+      const x = bullet.offsetLeft + (bullet.speedX || 0); // Use speedX if defined
+  
       if (y < 0 || x < 0 || x > containerWidthRef.current) {
-        gameContainerRef.current.removeChild(bullet);
+        gameContainer.removeChild(bullet);
         bulletsRef.current.splice(i, 1);
         i--;
       } else {
-        bullet.style.left = `${x}px`;
-        bullet.style.top = `${y}px`;
+        bullet.style.top = y + 'px';
+        bullet.style.left = x + 'px';
       }
     }
   };
 
+  const createPowerUp = () => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+  
+    if (Math.random() < 0.03) { // Condição para spawn do power-up
+      const powerUp = document.createElement('div');
+      powerUp.className = 'power-up';
+      powerUp.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
+      powerUp.style.top = '0px';
+      powerUp.speed = 1; // Velocidade de queda do power-up
+      gameContainer.appendChild(powerUp);
+  
+      // Lógica para mover o power-up e verificar colisão com o jogador
+      const movePowerUp = () => {
+        if (!isGameOverRef.current) {
+          const y = powerUp.offsetTop + powerUp.speed;
+          powerUp.style.top = `${y}px`;
+  
+          if (y < containerHeightRef.current) {
+            requestAnimationFrame(movePowerUp);
+          } else {
+            gameContainer.removeChild(powerUp);
+          }
+  
+          // Verifica colisão com o jogador
+          const playerRect = playerRef.current?.getBoundingClientRect();
+          const powerUpRect = powerUp.getBoundingClientRect();
+          if (
+            playerRect &&
+            powerUpRect.left < playerRect.right &&
+            powerUpRect.right > playerRect.left &&
+            powerUpRect.top < playerRect.bottom &&
+            powerUpRect.bottom > playerRect.top
+          ) {
+            gameContainer.removeChild(powerUp);
+            setSpecialShots((prev) => prev + 1); // Adiciona um tiro especial
+          }
+        }
+      };
+  
+      movePowerUp();
+    }
+  };
+  
   // Create an enemy
   const createEnemy = () => {
-    const spawnRate = 0.02 + (difficultyLevel - 1) * 0.005;
-    const maxEnemies = 8 + Math.floor((difficultyLevel - 1) / 2);
-
-    if (Math.random() < spawnRate && enemiesRef.current.length < maxEnemies) {
-      const enemy = document.createElement("div");
-      enemy.className = "enemy";
-      enemy.innerHTML = `
-        <svg viewBox="0 0 100 100">
-          ${Math.floor(Math.random() * 3) === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c" /><circle cx="30" cy="40" r="10" fill="#000" /><circle cx="70" cy="40" r="10" fill="#000" />' : 
-           Math.floor(Math.random() * 3) === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6" /><circle cx="35" cy="45" r="8" fill="#000" /><circle cx="65" cy="45" r="8" fill="#000" />' :
-           '<rect x="10" y="10" width="80" height="80" fill="#f39c12" /><rect x="25" y="30" width="15" height="15" fill="#000" /><rect x="60" y="30" width="15" height="15" fill="#000" />'}
-        </svg>
-      `;
-      enemy.style.left = `${Math.random() * (containerWidthRef.current - 30)}px`;
-      enemy.style.top = "0px";
-      enemy.speed = Math.random() * 1 + (0.5 + (difficultyLevel - 1) * 0.2);
-      gameContainerRef.current.appendChild(enemy);
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+    
+    if (Math.random() < 0.02 && enemiesRef.current.length < 8) { // Reduced spawn rate and max enemies
+      const enemy = document.createElement('div') as EnemyElement;
+      enemy.className = 'enemy';
+      
+      // Random enemy type
+      const enemyType = Math.floor(Math.random() * 3);
+      enemy.innerHTML = `<svg viewBox="0 0 100 100">
+        ${enemyType === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c" /><circle cx="30" cy="40" r="10" fill="#000" /><circle cx="70" cy="40" r="10" fill="#000" />' : 
+          enemyType === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6" /><circle cx="35" cy="45" r="8" fill="#000" /><circle cx="65" cy="45" r="8" fill="#000" />' :
+          '<rect x="10" y="10" width="80" height="80" fill="#f39c12" /><rect x="25" y="30" width="15" height="15" fill="#000" /><rect x="60" y="30" width="15" height="15" fill="#000" />'}
+      </svg>`;
+      
+      const x = Math.random() * (containerWidthRef.current - 30);
+      enemy.style.left = x + 'px';
+      enemy.style.top = '0px';
+      enemy.speed = Math.random() * 1 + 0.5; // Slower enemies
+      
+      gameContainer.appendChild(enemy);
       enemiesRef.current.push(enemy);
     }
   };
-
+  
   // Update enemies position
   const updateEnemies = () => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+    
     for (let i = 0; i < enemiesRef.current.length; i++) {
       const enemy = enemiesRef.current[i];
-      let x = parseFloat(enemy.style.left);
-      let y = parseFloat(enemy.style.top) + enemy.speed;
-
+      const y = enemy.offsetTop + enemy.speed;
+      
       if (y > containerHeightRef.current) {
-        gameContainerRef.current.removeChild(enemy);
+        gameContainer.removeChild(enemy);
         enemiesRef.current.splice(i, 1);
         i--;
-
-        if (difficultyLevel >= 3) {
-          setLives((prev) => prev - 1);
-          if (lives <= 1) {
-            gameOver();
-          }
-        }
+        // No life loss when enemy reaches bottom
       } else {
-        enemy.style.left = `${x}px`;
-        enemy.style.top = `${y}px`;
+        enemy.style.top = y + 'px';
       }
     }
   };
-
-  // Update stars position
+  
+  // Update stars position (parallax effect)
   const updateStars = () => {
     for (let i = 0; i < starsRef.current.length; i++) {
       const star = starsRef.current[i];
       let y = parseFloat(star.style.top) + star.speed;
-
+      
       if (y > containerHeightRef.current) {
         y = 0;
       }
-
+      
       star.style.top = `${y}px`;
     }
   };
-
+  
   // Check for collisions
   const checkCollisions = () => {
-    // Bullet-enemy collisions
+    const gameContainer = gameContainerRef.current;
+    const player = playerRef.current;
+    const scoreElement = scoreElementRef.current;
+    const livesElement = livesElementRef.current;
+    
+    if (!gameContainer || !player || !scoreElement || !livesElement) return;
+    
+    // Check bullet-enemy collisions
     for (let i = 0; i < bulletsRef.current.length; i++) {
       const bullet = bulletsRef.current[i];
       const bulletRect = bullet.getBoundingClientRect();
-
+      
       for (let j = 0; j < enemiesRef.current.length; j++) {
         const enemy = enemiesRef.current[j];
         const enemyRect = enemy.getBoundingClientRect();
-
+        
+        // Larger collision area for easier hits
         if (
           bulletRect.left < enemyRect.right + 5 &&
           bulletRect.right > enemyRect.left - 5 &&
           bulletRect.top < enemyRect.bottom + 5 &&
           bulletRect.bottom > enemyRect.top - 5
         ) {
-          gameContainerRef.current.removeChild(bullet);
-          gameContainerRef.current.removeChild(enemy);
+          // Collision detected
+          gameContainer.removeChild(bullet);
+          gameContainer.removeChild(enemy);
           bulletsRef.current.splice(i, 1);
           enemiesRef.current.splice(j, 1);
-          setScore((prev) => prev + 10 * difficultyLevel);
-
-          const newLevel = 1 + Math.floor(score / 150);
-          if (newLevel > difficultyLevel) {
-            setDifficultyLevel(newLevel);
-            if (newLevel % 2 === 0 && specialCharges < 3) {
-              setSpecialCharges((prev) => prev + 1);
-            }
-          }
-
+          scoreRef.current += 10;
+          scoreElement.textContent = `Score: ${scoreRef.current}`;
           i--;
           break;
         }
       }
     }
-
-    // Player-enemy collisions
-    const playerRect = playerRef.current.getBoundingClientRect();
+    
+    // Check player-enemy collisions
+    const playerRect = player.getBoundingClientRect();
     for (let i = 0; i < enemiesRef.current.length; i++) {
       const enemy = enemiesRef.current[i];
       const enemyRect = enemy.getBoundingClientRect();
-
+      
       if (
         playerRect.left < enemyRect.right &&
         playerRect.right > enemyRect.left &&
         playerRect.top < enemyRect.bottom &&
         playerRect.bottom > enemyRect.top
       ) {
-        gameContainerRef.current.removeChild(enemy);
+        // Collision detected
+        gameContainer.removeChild(enemy);
         enemiesRef.current.splice(i, 1);
-        setLives((prev) => prev - 1);
-        if (lives <= 1) {
+        livesRef.current--;
+        livesElement.textContent = `Lives: ${livesRef.current}`;
+        
+        if (livesRef.current <= 0) {
           gameOver();
         }
         break;
       }
     }
   };
-
+  
   // Game over function
   const gameOver = () => {
-    setIsGameOver(true);
-    finalScoreElementRef.current.textContent = `Score: ${score}`;
-    gameOverScreenRef.current.style.display = "flex";
-    deactivateSpecial();
+    const gameOverScreen = gameOverScreenRef.current;
+    const finalScoreElement = finalScoreElementRef.current;
+    
+    if (!gameOverScreen || !finalScoreElement) return;
+    
+    isGameOverRef.current = true;
+    finalScoreElement.textContent = `Score: ${scoreRef.current}`;
+    gameOverScreen.style.display = 'flex';
+    cancelAnimationFrame(gameLoopIdRef.current);
   };
-
+  
   // Reset game state
   const resetGame = () => {
+    const gameContainer = gameContainerRef.current;
+    const scoreElement = scoreElementRef.current;
+    const livesElement = livesElementRef.current;
+    const gameOverScreen = gameOverScreenRef.current;
+    
+    if (!gameContainer || !scoreElement || !livesElement || !gameOverScreen) return;
+    
+    // Clear all game elements
     while (bulletsRef.current.length > 0) {
-      gameContainerRef.current.removeChild(bulletsRef.current[0]);
+      gameContainer.removeChild(bulletsRef.current[0]);
       bulletsRef.current.shift();
     }
     while (enemiesRef.current.length > 0) {
-      gameContainerRef.current.removeChild(enemiesRef.current[0]);
+      gameContainer.removeChild(enemiesRef.current[0]);
       enemiesRef.current.shift();
     }
     while (starsRef.current.length > 0) {
-      gameContainerRef.current.removeChild(starsRef.current[0]);
+      gameContainer.removeChild(starsRef.current[0]);
       starsRef.current.shift();
     }
-
+    
+    // Reset game variables
     playerXRef.current = containerWidthRef.current / 2 - playerWidthRef.current / 2;
     playerYRef.current = containerHeightRef.current - playerHeightRef.current - 20;
-    setScore(0);
-    setLives(5);
-    setDifficultyLevel(1);
-    setSpecialCharges(3);
-    setIsGameOver(false);
-    setIsSpecialActive(false);
-
-    scoreElementRef.current.textContent = "Score: 0";
-    livesElementRef.current.textContent = "Lives: 5";
-    levelElementRef.current.textContent = "Nível: 1";
-    specialChargesElementRef.current.textContent = "Tiro Especial: 3";
-    gameOverScreenRef.current.style.display = "none";
-    specialActiveElementRef.current.style.display = "none";
-    specialBarFillRef.current.style.width = "0%";
-
+    scoreRef.current = 0;
+    livesRef.current = 5; // Increased number of lives
+    isGameOverRef.current = false;
+    
+    // Update UI
+    scoreElement.textContent = `Score: ${scoreRef.current}`;
+    livesElement.textContent = `Lives: ${livesRef.current}`;
+    gameOverScreen.style.display = 'none';
+    
+    // Setup game elements
     createStars();
     startGame();
   };
-
-  // Auto-fire
+  
+  // Auto-fire (to make game easier)
   const enableAutoFire = () => {
-    setInterval(() => {
-      if (!isGameOver) {
+    const interval = setInterval(() => {
+      if (!isGameOverRef.current) {
         fireBullet();
+      } else {
+        clearInterval(interval);
       }
     }, 300);
   };
-
+  
   // Main game loop
   const gameLoop = () => {
-    if (!isGameOver) {
+    if (!isGameOverRef.current) {
       updatePlayer();
       if (isFirePressedRef.current) {
         fireBullet();
       }
-      if (isSpecialPressedRef.current && !isSpecialActive && specialCharges > 0) {
-        activateSpecial();
-        isSpecialPressedRef.current = false;
-      }
       updateBullets();
       createEnemy();
       updateEnemies();
+      createPowerUp();
       updateStars();
       checkCollisions();
-      requestAnimationFrame(gameLoop);
+      gameLoopIdRef.current = requestAnimationFrame(gameLoop);
     }
   };
-
+  
   // Handle keyboard events
   const setupControls = () => {
+    const gameContainer = gameContainerRef.current;
+    const restartButton = document.getElementById('restart-button');
+    
+    if (!gameContainer || !restartButton) return;
+    
     const handleKeyDown = (e) => {
-      if (e.key === "ArrowLeft" || e.key === "a") {
+      if (e.key === 'ArrowLeft' || e.key === 'a') {
         isLeftPressedRef.current = true;
       }
-      if (e.key === "ArrowRight" || e.key === "d") {
+      if (e.key === 'ArrowRight' || e.key === 'd') {
         isRightPressedRef.current = true;
       }
-      if (e.key === "ArrowUp" || e.key === "w") {
+      if (e.key === ' ') { // Barra de espaço
         isFirePressedRef.current = true;
       }
-      if (e.key === " " && !isSpecialPressedRef.current) {
-        isSpecialPressedRef.current = true;
-      }
     };
-
+    
     const handleKeyUp = (e) => {
-      if (e.key === "ArrowLeft" || e.key === "a") {
+      if (e.key === 'ArrowLeft' || e.key === 'a') {
         isLeftPressedRef.current = false;
       }
-      if (e.key === "ArrowRight" || e.key === "d") {
+      if (e.key === 'ArrowRight' || e.key === 'd') {
         isRightPressedRef.current = false;
       }
-      if (e.key === "ArrowUp" || e.key === "w") {
+      if (e.key === ' ') { // Barra de espaço
         isFirePressedRef.current = false;
       }
-      if (e.key === " ") {
-        isSpecialPressedRef.current = false;
-      }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    // Touch controls for mobile
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const containerRect = gameContainer.getBoundingClientRect();
+      const touchX = touch.clientX - containerRect.left;
+      
+      playerXRef.current = touchX - playerWidthRef.current / 2;
+      if (playerXRef.current < 0) playerXRef.current = 0;
+      if (playerXRef.current > containerWidthRef.current - playerWidthRef.current) 
+        playerXRef.current = containerWidthRef.current - playerWidthRef.current;
+    };
+    
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      isFirePressedRef.current = true;
+    };
+    
+    const handleTouchEnd = () => {
+      isFirePressedRef.current = false;
+    };
+    
+    gameContainer.addEventListener('touchmove', handleTouchMove);
+    gameContainer.addEventListener('touchstart', handleTouchStart);
+    gameContainer.addEventListener('touchend', handleTouchEnd);
+    
+    // Restart button
+    restartButton.addEventListener('click', resetGame);
+    
+    // Clean up function
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      gameContainer.removeEventListener('touchmove', handleTouchMove);
+      gameContainer.removeEventListener('touchstart', handleTouchStart);
+      gameContainer.removeEventListener('touchend', handleTouchEnd);
+      restartButton.removeEventListener('click', resetGame);
     };
   };
-
+  
   // Start the game
   const startGame = () => {
     setupControls();
-    enableAutoFire();
-    requestAnimationFrame(gameLoop);
+    enableAutoFire(); // Added auto-fire to make game easier
+    gameLoopIdRef.current = requestAnimationFrame(gameLoop);
   };
 
-  // Initialize the game
-  useEffect(() => {
-    resetGame();
-  }, []);
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black">
-      <div
-        id="game-container"
+    <div className="flex flex-col items-center">
+      <div 
+        id="game-container" 
         ref={gameContainerRef}
         className="relative w-[600px] h-[400px] border-2 border-[#333] bg-black overflow-hidden"
       >
-        <div id="score" ref={scoreElementRef} className="absolute top-2.5 left-2.5 text-white text-lg">
-          Score: 0
-        </div>
-        <div id="lives" ref={livesElementRef} className="absolute top-2.5 right-2.5 text-white text-lg">
-          Lives: 5
-        </div>
-        <div id="special-charges" ref={specialChargesElementRef} className="absolute top-10 right-2.5 text-[#00ffff] text-lg">
-          Tiro Especial: 3
-        </div>
-        <div id="level" ref={levelElementRef} className="absolute top-10 left-2.5 text-[#ff9900] text-lg">
-          Nível: 1
-        </div>
-        <div id="special-active" ref={specialActiveElementRef} className="absolute bottom-20 left-1/2 transform -translate-x-1/2 text-[#00ffff] text-lg hidden">
-          TIRO TRIPLO ATIVO!
-        </div>
-        <div id="special-bar" className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-[100px] h-[10px] bg-[#333] rounded">
-          <div id="special-bar-fill" ref={specialBarFillRef} className="h-full w-0 bg-[#00ffff] rounded transition-all"></div>
-        </div>
-        <svg
-          id="player"
+        <div id="score" ref={scoreElementRef} className="absolute top-2.5 left-2.5 text-white text-lg">Score: 0</div>
+        <div id="lives" ref={livesElementRef} className="absolute top-2.5 right-2.5 text-white text-lg">Lives: 5</div>
+        <svg 
+          id="player" 
           ref={playerRef}
-          className="absolute"
-          style={{
-            left: `${playerXRef.current}px`,
-            top: `${playerYRef.current}px`,
-            width: `${playerWidthRef.current}px`,
-            height: `${playerHeightRef.current}px`,
-          }}
+          className="absolute w-10 h-10 bottom-5 left-[280px]"
           viewBox="0 0 100 100"
-          dangerouslySetInnerHTML={{
-            __html: `
-              <polygon points="50,10 90,90 10,90" fill="#00ff00" />
-              <rect x="40" y="20" width="20" height="40" fill="#009900" />
-              <circle cx="50" cy="90" r="10" fill="#00cc00" />
-            `,
-          }}
-        />
-        <div
-          id="game-over-screen"
-          ref={gameOverScreenRef}
-          className="absolute inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center hidden"
         >
-          <h2 className="text-white text-4xl mb-5">Game Over</h2>
-          <div
-            id="final-score"
-            ref={finalScoreElementRef}
-            className="text-white text-2xl mb-5"
+          <polygon points="50,0 100,100 50,70 0,100" fill="#3498db" />
+          <rect x="45" y="70" width="10" height="20" fill="#e74c3c" />
+        </svg>
+        <div 
+          id="game-over" 
+          ref={gameOverScreenRef}
+          className="absolute top-0 left-0 w-full h-full bg-black/80 text-white hidden flex-col justify-center items-center text-2xl z-10"
+        >
+          <div>Game Over</div>
+          <div id="final-score" ref={finalScoreElementRef}>Score: 0</div>
+          <button 
+            id="restart-button"
+            className="mt-5 px-5 py-2.5 text-lg bg-[#4CAF50] text-white border-none rounded cursor-pointer hover:bg-[#45a049]"
           >
-            Score: {score}
-          </div>
-          <button
-            onClick={resetGame}
-            className="bg-[#00ff00] text-black text-lg px-5 py-2.5 rounded cursor-pointer hover:bg-[#00cc00]"
-          >
-            Jogar Novamente
+            Play Again
           </button>
         </div>
       </div>
-      <style>{`
-        .star {
+      
+      <style jsx>{`
+        .power-up {
           position: absolute;
-          width: 2px;
-          height: 2px;
-          background: white;
+          width: 20px;
+          height: 20px;
+          background-color: #00ff00;
           border-radius: 50%;
-        }
-        .bullet {
-          position: absolute;
-          width: 10px;
-          height: 15px;
-          background: #ff0000;
-          border-radius: 5px;
-        }
-        .special-bullet {
-          position: absolute;
-          width: 12px;
-          height: 18px;
-          background: #00ffff;
-          border-radius: 6px;
-          box-shadow: 0 0 5px #00ffff;
         }
         .enemy {
           position: absolute;
           width: 30px;
           height: 30px;
         }
-        .enemy svg {
-          width: 100%;
-          height: 100%;
+        .bullet {
+          position: absolute;
+          width: 10px;
+          height: 20px;
+          background-color: yellow;
+        }
+        .star {
+          position: absolute;
+          width: 2px;
+          height: 2px;
+          background-color: white;
+          border-radius: 50%;
         }
       `}</style>
     </div>
   );
 };
 
-export default SpaceShooterGame;
+export default ArcadePage;
