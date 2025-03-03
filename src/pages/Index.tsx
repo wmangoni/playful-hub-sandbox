@@ -52,7 +52,7 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden">
+    <div className="home min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden">
       {/* Background with subtle gradient */}
       <div className="fixed inset-0 bg-gradient-to-br from-background to-secondary opacity-80 -z-10"></div>
       
