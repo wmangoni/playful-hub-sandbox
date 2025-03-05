@@ -1,442 +1,19 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Aventura Simples de D&D</title>
-        <style>
-            body {
-                font-family: 'Palatino', serif;
-                background-color: #f5f1e6;
-                color: #333;
-                max-width: 100%;
-                margin: 0 auto;
-                padding: 20px;
-            }
-
-            audio {
-                position: absolute;
-                top: 0px;
-                left: 0px;
-                box-shadow: 4px 1px 12px;
-                border-radius: 30px;
-            }
-
-            .game-container {
-                background-color: #fff;
-                border: 2px solid #7a5c3d;
-                border-radius: 8px;
-                padding: 20px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-                height: 90vh;
-            }
-
-            .game-container2 {
-                display: grid;
-                grid-template-columns: repeat(5, 1fr);
-                grid-template-rows: repeat(5, 1fr);
-                gap: 8px;
-            }
-
-            .col1 {
-                grid-column: span 2 / span 2;
-                grid-row: span 5 / span 5;
-            }
-
-            .col2 {
-                grid-column: span 2 / span 2;
-                grid-row: span 5 / span 5;
-                grid-column-start: 3;
-            }
-            .col3 {
-                grid-row: span 5 / span 5;
-                grid-column-start: 5;
-            }
-
-            h1 {
-                color: #8b0000;
-                text-align: center;
-                font-size: 28px;
-                margin-bottom: 10px;
-            }
-
-            .subtitle {
-                text-align: center;
-                font-style: italic;
-                margin-bottom: 30px;
-                color: #555;
-            }
-
-            .scene-description {
-                border-left: 4px solid #8b0000;
-                padding: 10px 15px;
-                margin: 15px 0;
-                background-color: #f9f5eb;
-                overflow: auto;
-                max-height: 20vh;
-            }
-
-            .stats {
-                display: flex;
-                justify-content: space-between;
-                background-color: #eee8d9;
-                padding: 10px;
-                border-radius: 5px;
-                margin: 15px 0;
-            }
-
-            .stat {
-                text-align: center;
-            }
-
-            .stat-value {
-                font-weight: bold;
-                font-size: 18px;
-            }
-
-            .choices {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                margin-top: 20px;
-            }
-
-            button {
-                background-color: #7a5c3d;
-                color: white;
-                border: none;
-                padding: 10px 15px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Palatino', serif;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-
-            button:hover {
-                background-color: #8b0000;
-            }
-
-            #image-container {
-                padding-top: 16px;
-            }
-
-            #image-container img {
-                max-width: 100%;
-                max-height: 76vh;
-            }
-
-            .inventory {
-                margin-top: 20px;
-                padding: 10px;
-                background-color: #eee8d9;
-                border-radius: 5px;
-            }
-
-            .inventory h3 {
-                margin-top: 0;
-                color: #7a5c3d;
-            }
-
-            .dice-roll {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 20px 0;
-            }
-
-            .dice {
-                width: 60px;
-                height: 60px;
-                background-color: white;
-                border: 2px solid #333;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 24px;
-                font-weight: bold;
-                margin: 0 10px;
-            }
-
-            .roll-button {
-                margin-left: 20px;
-            }
-
-            .log {
-                overflow-y: auto;
-                margin-top: 15px;
-                border: 1px solid #ccc;
-                padding: 10px;
-                font-style: italic;
-                font-size: 14px;
-                color: #555;
-                border-radius: 5px;
-                max-height: 75vh;
-            }
-
-            .hidden {
-                display: none !important;
-            }
-
-            .character-select {
-                display: flex;
-                gap: 15px;
-                justify-content: center;
-                margin-bottom: 30px;
-            }
-
-            .character-card {
-                border: 2px solid #7a5c3d;
-                border-radius: 5px;
-                padding: 15px;
-                text-align: center;
-                cursor: pointer;
-                width: 150px;
-                transition: all 0.3s;
-            }
-
-            .character-card:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            }
-
-            .character-card.selected {
-                border-color: #8b0000;
-                background-color: #f9e9e9;
-            }
-
-            .result-message {
-                padding: 15px;
-                margin: 15px 0;
-                border-radius: 5px;
-                font-weight: bold;
-            }
-
-            .success {
-                background-color: #d4edda;
-                color: #155724;
-            }
-
-            .failure {
-                background-color: #f8d7da;
-                color: #721c24;
-            }
-            .modal {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-
-            .modal-content {
-                background-color: #fff;
-                border: 2px solid #7a5c3d;
-                padding: 20px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-                font-family: 'Palatino', serif;
-                text-align: center;
-            }
-
-            .shop-items {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                margin-bottom: 20px;
-            }
-
-            .shop-item {
-                background-color: #7a5c3d;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Palatino', serif;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-
-            .shop-item:hover {
-                background-color: #8b0000;
-            }
-
-            #close-shop {
-                background-color: #8b0000;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Palatino', serif;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-
-            #close-shop:hover {
-                background-color: #7a5c3d;
-            }
-        </style>
-    </head>
-    <body>
-        <audio controls autoplay loop>
-          <source src="audio/medieval-music.mp3" type="audio/mpeg" />
-          Seu navegador não suporta o elemento de áudio.
-        </audio>
-
-        <div class="game-container">
-            <h1>A Masmorra de Drakmor</h1>
-            <p class="subtitle">Uma Aventura Simples de D&D</p>
-            <div id="character-select">
-                <h2>Escolha o Seu Personagem</h2>
-                <div class="character-select">
-                    <div class="character-card" data-class="warrior" onclick="selectCharacter('warrior')">
-                        <h3>Guerreiro</h3>
-                        <p>Força e saúde elevadas, habilidoso com armas</p>
-                        <p>
-                            <strong>FOR:</strong> 16 <strong>DES:</strong> 12 <br>
-                            <strong>CON:</strong> 15 <strong>INT:</strong> 8
-                        </p>
-                    </div>
-                    <div class="character-card" data-class="wizard" onclick="selectCharacter('wizard')">
-                        <h3>Mago</h3>
-                        <p>Mestre em magia arcana com feitiços poderosos</p>
-                        <p>
-                            <strong>FOR:</strong> 8 <strong>DES:</strong> 14 <br>
-                            <strong>CON:</strong> 10 <strong>INT:</strong> 17
-                        </p>
-                    </div>
-                    <div class="character-card" data-class="rogue" onclick="selectCharacter('rogue')">
-                        <h3>Ladino</h3>
-                        <p>Ágil e astuto, habilidoso em furtividade</p>
-                        <p>
-                            <strong>FOR:</strong> 10 <strong>DES:</strong> 17 <br>
-                            <strong>CON:</strong> 12 <strong>INT:</strong> 14
-                        </p>
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button onclick="startGame()">Começar Aventura</button>
-                </div>
-            </div>
-            <div class="game-container2">
-                <div id="game-screen" class="hidden col1">
-                    <div class="stats">
-                        <div class="stat">
-                            <div>❤️ Vida</div>
-                            <div class="stat-value" id="health">20</div>
-                        </div>
-                        <div class="stat">
-                            <div>🪙 Ouro</div>
-                            <div class="stat-value" id="gold">5</div>
-                        </div>
-                        <div class="stat">
-                            <div>📈 Experiência</div>
-                            <div class="stat-value" id="xp">0</div>
-                        </div>
-                    </div>
-                    <div class="scene-description" id="scene-text"></div>
-                    <div id="dice-container" class="hidden dice-roll">
-                        <div class="dice" id="dice">?</div>
-                        <button id="dice-button" class="roll-button" onclick="rollDice()">🎲 Rolar d20</button>
-                    </div>
-                    <div id="result-message" class="hidden result-message"></div>
-                    <div class=choices id=choices>
-                        <button id="open-shop" class="hidden">Abrir Lojinha</button>
-                    </div>
-                    <div class="inventory">
-                        <h3>🎒 Inventário</h3>
-                        <div id="inventory-items"> Nada ainda </div>
-                    </div>
-                </div>
-                <div id="image-container" class ="col2 hidden">
-                    <img id="image" src="./images/check_supplies.png">
-                </div>
-                <div class="col3 log hidden" id="game-log">📝 Logs do jogo</div>
-            </div>
-        </div>
-        <div id="shop-modal" class="modal hidden">
-            <div class="modal-content">
-                <h2>🏦 Lojinha</h2>
-                <p id="player-gold">🪙 Ouro: 5</p>
-                <div class="shop-items">
-                    <button class="shop-item" data-item="Poção de Vida" data-price="10">🫙 Poção de Vida - 10g</button>
-                    <button class="shop-item" data-item="Espada" data-price="32">⚔️ Espada - 32g</button>
-                    <button class="shop-item" data-item="Machado" data-price="36">🪓 Machado - 36g</button>
-                    <button class="shop-item" data-item="Adaga" data-price="45">� Adaga de osso estranha - 45g</button>
-                    <button class="shop-item" data-item="Escudo" data-price="31">🛡️ Escudo - 31g</button>
-                    <button class="shop-item" data-item="Corda" data-price="5">🪢 Corda - 5g</button>
-                    <button class="shop-item" data-item="Tocha" data-price="2">🔦 Tocha - 2g</button>
-                </div>
-                <button id="close-shop">Fechar</button>
-            </div>
-        </div>
-        <script>
-            // Estado do jogo
-            const gameState = {
-                player: {
-                    class: "",
-                    health: 20,
-                    maxHealth: 20,
-                    gold: 5,
-                    xp: 0,
-                    inventory: [],
-                    stats: {}
-                },
-                mem: {},
-                currentScene: "start",
-                lastScene: "start",
-                currentEnemy: {
-                    name: "Wolf",
-                    ac: 12,
-                    hp: 12,
-                    max_hp: 12,
-                    str: 10,
-                    dex: 10,
-                    con: 10,
-                    bba: 1
-                },
-                log: [],
-                pendingCheck: null,
-                checkDifficulty: 10
-            };
-            // Atributos do personagem
-            const characterStats = {
-                warrior: {
-                    str: 16,
-                    dex: 12,
-                    con: 15,
-                    int: 8,
-                    luck: 8,
-                    bba: 2,
-                    armor: 6
-                },
-                wizard: {
-                    str: 8,
-                    dex: 14,
-                    con: 10,
-                    int: 17,
-                    luck: 12,
-                    bba: 1,
-                    armor: 2
-                },
-                rogue: {
-                    str: 10,
-                    dex: 17,
-                    con: 12,
-                    int: 14,
-                    luck: 10,
-                    bba: 1,
-                    armor: 4
-                }
-            };
-            // Cenas do jogo
-            const scenes = {
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafo de Cenas</title>
+    <style>
+        canvas { border: 1px solid black; }
+    </style>
+</head>
+<body>
+    <h1>Grafo de Transições entre Cenas</h1>
+    <canvas id="graphCanvas" width="1200" height="700"></canvas>
+    <script>
+        // Definindo o JSON com as cenas
+        const scenes = {
                 start: {
                     text: "Você está na entrada da antiga Masmorra de Drakmor. Degraus de pedra esculpida levam para a escuridão. Lendas falam de tesouros dentro, mas também de armadilhas mortais e monstros temíveis. O ar está frio contra sua pele enquanto você observa a penumbra.",
                     choices: [{
@@ -569,13 +146,6 @@
                         changeXP(25);
                     }
                 },
-                goblin_fight_failure: {
-                    text: "Você se não resiste a fúria insana no globin e tomba sob sua adaga enferrujada. Você morreu.",
-                    choices: [],
-                    onEnter: function() {
-                        addToLog("☠️☠️☠️ Você morreu para o goblin ☠️☠️☠️");
-                    }
-                },
                 treasure_room: {
                     text: "O ar fica pesado com o cheiro de madeira envelhecida e metal polido quando você abre a porta rangendo. Diante de você, uma câmara brilha com a luz quente de mil reflexos dourados. Pilhas de moedas caem em cascata como cachoeiras congeladas, suas superfícies captando o brilho de antigas lanternas encantadas. No centro, um pedestal sustenta um único baú ornamentado, sua superfície gravada com runas que pulsam fracamente com energia arcana.",
                     choices: [{
@@ -684,7 +254,7 @@
                     }]
                 },
                 cavern: {
-                    text: "Você caminha por um tempo até a entrada de um corredor muito escuro, não lhe parece seguro seguir sem saber o que tem ali...",
+                    text: "Você caminha por um tempo até a entrada de um corredor escuro",
                     choices: [{
                         text: "Vá em frente e atravesse a caverna",
                         nextScene: "cavern_crossing",
@@ -693,17 +263,7 @@
                     }, {
                         text: "Voltar para a câmara escura",
                         nextScene: "dark_chamber"
-                    }],
-                    onEnter: function() {
-                        if (gameState.player.inventory.includes("Tocha")) {
-                            scenes["cavern"].choices.push({
-                                text: "Acender uma tocha!",
-                                nextScene: "cavern_crossing"
-                            })
-                            addChoiceInCurrentScene(scenes["cavern"]);
-                            addToLog("🕯️ Valeu a pena comprar uma tocha!")
-                        }
-                    }
+                    }]
                 },
                 cavern_crossing_success: {
                     text: "Você navega cuidadosamente pelas pedras escorregadias e pela correnteza rápida do riacho subterrâneo. Você chega ao outro lado, levemente molhado, mas ileso. Uma passagem estreita continua adiante a partir daqui.",
@@ -1146,17 +706,7 @@
                     }, {
                         text: "Aceite a derrota e tente encontrar outra saída",
                         nextScene: "crypt"
-                    }],
-                    onEnter: function() {
-                        if (!gameState.player.inventory.includes("Corda")) {
-                            scenes["final_treasure_open_failure"].choices.push({
-                                text: "Usar a corda para subir",
-                                nextScene: "pit_escape"
-                            })
-                            addChoiceInCurrentScene(scenes["final_treasure_open_failure"]);
-                            addToLog("🪢 Valeu a pena comprar uma corda!");
-                        }
-                    }
+                    }]
                 },
                 pit_escape_success: {
                     text: "Usando toda a sua força, você encontra pontos de apoio nas paredes do poço e consegue subir de volta para o chão da câmara, machucado e ferido, mas determinado.",
@@ -1658,438 +1208,88 @@
                         addToLog("☠️☠️☠️ Você morreu! ☠️☠️☠️");
                     }
                 }
-            }
-            let selectedCharacter = null;
+            };
 
-            function selectCharacter(characterClass) {
-                //Remove previous selection
-                if (selectedCharacter) {
-                    document.querySelector(`.character-card.selected`).classList.remove('selected');
+        // Definindo posições fixas para cada cena (nós) no canvas
+        const nodePositions = {
+            start: { x: 300, y: 50 },
+            buy_supplies: { x: 150, y: 150 },
+            entrance_inspection: { x: 450, y: 150 },
+            check_supplies: { x: 300, y: 250 },
+            corridor: { x: 300, y: 350 }
+        };
+
+        // Configurando o canvas
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        const radius = 30; // Raio dos nós
+
+        // Função para desenhar um nó
+        function drawNode(x, y, label) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#ADD8E6'; // Cor de fundo azul clara
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = 'black';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '12px Arial';
+            ctx.fillText(label, x, y);
+            ctx.closePath();
+        }
+
+        // Função para desenhar uma seta entre dois pontos
+        function drawArrow(fromX, fromY, toX, toY) {
+            const headLength = 10; // Tamanho da ponta da seta
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+
+            // Ajustar início e fim da linha para não sobrepor os nós
+            const startX = fromX + radius * Math.cos(angle);
+            const startY = fromY + radius * Math.sin(angle);
+            const endX = toX - radius * Math.cos(angle);
+            const endY = toY - radius * Math.sin(angle);
+
+            // Desenhar a linha
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Desenhar a ponta da seta
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angle - Math.PI / 6),
+                endY - headLength * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angle + Math.PI / 6),
+                endY - headLength * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.stroke();
+        }
+
+        // Desenhar todos os nós
+        for (const sceneName in nodePositions) {
+            const pos = nodePositions[sceneName];
+            drawNode(pos.x, pos.y, sceneName);
+        }
+
+        // Desenhar as arestas (setas) com base nas escolhas
+        for (const sceneName in scenes) {
+            const scene = scenes[sceneName];
+            const fromPos = nodePositions[sceneName];
+            scene.choices.forEach(choice => {
+                const toPos = nodePositions[choice.nextScene];
+                if (fromPos && toPos) {
+                    drawArrow(fromPos.x, fromPos.y, toPos.x, toPos.y);
                 }
-                selectedCharacter = characterClass;
-                document.querySelector(`.character-card[data-class='${characterClass}']`).classList.add('selected');
-            }
-
-            function startGame() {
-                if (!selectedCharacter) {
-                    alert("⁉️ Escolha um personagem antes de iniciar a aventura.");
-                    return;
-                }
-                //Initialize game state based on selected character
-                gameState.player.class = selectedCharacter;
-                gameState.player.stats = characterStats[selectedCharacter];
-                gameState.player.health = gameState.player.maxHealth = 20; // Reset health for new game
-                // Hide character selection and show game screen
-                document.getElementById('character-select').classList.add('hidden');
-                document.getElementById('game-screen').classList.remove('hidden');
-                document.getElementById('game-log').classList.remove('hidden');
-                document.getElementById('image-container').classList.remove('hidden');
-                //Start the game with the 'start' scene
-                loadScene('start');
-                updateStatsDisplay();
-            }
-
-            function verificarImagem(idImagem, srcAlternativo) {
-                const imagem = document.getElementById(idImagem);
-                const src = imagem.src;
-
-                const testeImagem = new Image();
-                testeImagem.src = src;
-
-                testeImagem.onload = function() {
-                    console.log("Imagem carregada com sucesso!");
-                    gameState.lastImage = src;
-                };
-
-                testeImagem.onerror = function() {
-                    console.log("Erro ao carregar a imagem.");
-                    if (srcAlternativo) {
-                        imagem.src = srcAlternativo;
-                        console.log("Imagem substituída por: " + srcAlternativo);
-
-                        const testeImagem2 = new Image();
-                        testeImagem2.src = srcAlternativo;
-
-                        testeImagem2.onload = function() {
-                            console.log("Imagem carregada com sucesso!");
-                            gameState.lastImage = srcAlternativo;
-                        };
-
-                        testeImagem2.onerror = function() {
-                            console.log("Erro ao carregar a imagem.");
-                            if (srcAlternativo) {
-                                imagem.src = gameState.lastImage;
-                                console.log("Imagem substituída por: " + gameState.lastImage);
-                            }
-                        };
-                    }
-                };
-            }
-
-            function changeImage(sceneName) {
-                const imgElement = document.getElementById("image");
-                const src = "./images/"+sceneName;
-                const extPng = ".png";
-                const extJpg = ".jpeg";
-
-                imgElement.src = src + extPng;
-                verificarImagem("image", src + extJpg);
-            }
-
-            function loadScene(sceneName) {
-                
-                changeImage(sceneName);
-
-                console.log("gameState", JSON.stringify(gameState, undefined, 4));
-                console.log("sceneName", sceneName);
-                
-                gameState.currentScene = sceneName;
-                const scene = scenes[sceneName];
-                
-                console.log("scene", scene);
-                
-                const sceneTextElement = document.getElementById('scene-text');
-                if (!sceneTextElement) {
-                    console.log("o elemento sumiu!");
-                    const sceneTextDiv = document.createElement('div');
-                    sceneTextDiv.id = 'scene-text';
-                    sceneTextDiv.textContent = 'Esta é a cena do jogo!'; // Adiciona um texto de exemplo
-                    // Encontra a div com o id "game-screen"
-                    const gameScreenDiv = document.getElementById('game-screen');
-                    if (gameScreenDiv == null || gameScreenDiv == undefined) {
-                        console.log("cade essa bagaça de div?");
-                    }
-                    // Adiciona a div "scene-text" como filha da div "game-screen"
-                    gameScreenDiv.appendChild(sceneTextDiv);
-                    sceneTextElement = sceneTextDiv;
-                }
-                const diceContainer = document.getElementById('dice-container');
-                const resultMessageElement = document.getElementById('result-message');
-                console.log("sceneTextElement", sceneTextElement);
-                sceneTextElement.textContent = scene.text;
-
-                //Add choices for the current scene
-                const choicesElement = addChoiceInCurrentScene(scene, diceContainer);
-
-                diceContainer.classList.add('hidden'); // Hide dice by default
-                resultMessageElement.classList.add('hidden'); // Hide result message by default
-
-                // Run onEnter function if it exists for the scene
-                if (scene.onEnter) {
-                    scene.onEnter();
-                }
-                // Reset check difficulty after scene load
-                gameState.checkDifficulty = 10;
-            }
-
-            function addChoiceInCurrentScene(scene, diceContainer) {
-
-                const choicesElement = document.getElementById('choices');
-
-                //Clear existing choices
-                choicesElement.innerHTML = '';
-
-                scene.choices.forEach(choice => {
-                    const button = document.createElement('button');
-                    button.textContent = choice.text;
-                    button.onclick = () => {
-                        if (choice.requiresCheck) {
-                            gameState.mem = {
-                                nextSceneSuccess: scenes[`${choice.nextScene}_success`] ? `${choice.nextScene}_success` : choice.nextScene,
-                                nextSceneFailure: scenes[`${choice.nextScene}_failure`] ? `${choice.nextScene}_failure` : choice.nextScene,
-                                checkType: choice.checkType
-                            };
-                            if (!diceContainer) {
-                                diceContainer = document.getElementById('dice-container');
-                            }
-                            diceContainer.classList.remove('hidden');
-                            choicesElement.classList.add('hidden'); // Hide choices during dice roll
-                        } else {
-                            loadScene(choice.nextScene);
-                        }
-                    };
-                    choicesElement.appendChild(button);
-                });
-
-                choicesElement.classList.remove('hidden'); // Ensure choices are visible when scene loads
-            }
-
-            function rollingDice(sides = 6, num = 1) {
-                return Array.from({length: num}, () => Math.floor(Math.random() * sides) + 1);
-            }
-
-            function activeDiceButton() {
-                const diceButton = document.getElementById('dice-button');
-                diceButton.disabled = false;
-            }
-
-            function disactiveDiceButton() {
-                const diceButton = document.getElementById('dice-button');
-                diceButton.disabled = true;
-            }
-
-            function rollDice() {
-                //disabilitar o botão
-                disactiveDiceButton();
-
-                const diceResult = Math.floor(Math.random() * 20) + 1;
-                document.getElementById('dice').textContent = diceResult;
-                const resultMessageElement = document.getElementById('result-message');
-                setTimeout(() => {
-                    const diceContainer = document.getElementById('dice-container');
-                    const choicesElement = document.getElementById('choices');
-                    let checkSuccess = false;
-
-                    if (gameState.mem.checkType === "combat") {
-                        initFight(gameState.currentEnemy);
-                        checkSuccess = true;
-                    } else {
-                        let modifiedRoll = 0;
-
-                        let logMessage = `Resultado da rolagem de dado: ${diceResult} para a categoria de teste: ${gameState.mem.checkType}. `;
-                          
-                        if (gameState.mem.checkType === 'luck') { // No stat modifier for luck checks - raw d20 roll.
-                            modifiedRoll = diceResult; // Luck checks are raw d20 rolls
-                        }
-
-                        const statValue = Math.floor((gameState.player.stats[gameState.mem.checkType] - 10)/2); // Get relevant stat
-                        modifiedRoll = diceResult;
-
-                        if (statValue !== undefined) {
-                            modifiedRoll += statValue;
-                            logMessage += `\nModificador status +${statValue}. resultado da rolagem: ${modifiedRoll}. `;
-                        }
-
-                        if (modifiedRoll >= gameState.checkDifficulty) {
-                            checkSuccess = true;
-                            resultMessageElement.textContent = "Success!";
-                            resultMessageElement.classList.remove('failure');
-                            resultMessageElement.classList.add('success');
-                            logMessage += `\n👍 Sucesso no teste de dificuldade: ${gameState.checkDifficulty}.`;
-                        } else {
-                            resultMessageElement.textContent = "Failure!";
-                            resultMessageElement.classList.remove('success');
-                            resultMessageElement.classList.add('failure');
-                            logMessage += `\n👎 Falha no teste de dificuldade: ${gameState.checkDifficulty}.`;
-                        }
-                        resultMessageElement.classList.remove('hidden');
-                        addToLog(logMessage);
-                    }
-
-                    diceContainer.classList.add('hidden');
-                    choicesElement.classList.remove('hidden'); // Re-enable choices after roll
-                    // Set timeout to load next scene after showing result message (e.g., 1.5 seconds)
-                    setTimeout(() => {
-                        console.log("gameState.mem", gameState.mem);
-                        console.log("gameState.currentScene", gameState.currentScene);
-                        if (checkSuccess) {
-                            if (!gameState.mem.nextSceneSuccess) {
-                                loadScene(gameState.currentScene + "_success");
-                            } else {
-                                loadScene(gameState.mem.nextSceneSuccess);
-                            }
-                        } else {
-                            if (!gameState.mem.nextSceneFailure) {
-                                loadScene(gameState.currentScene + "_failure");
-                            } else {
-                                loadScene(gameState.mem.nextSceneFailure);
-                            }
-                        }
-                    }, 1500); // Wait 1.5 seconds before loading next scene
-                    gameState.pendingCheck = null; //Clear pending check
-                    document.getElementById('dice').textContent = "🎲"
-                    activeDiceButton();
-                }, 1500);
-                
-            }
-
-            function initFight(enemy) {
-                do {
-                    fight(enemy)
-                } while(enemy.hp > 0 && gameState.player.health > 0)
-            }
-
-            function fight(enemy) {
-
-                let atkBonus = 0;
-
-                if (gameState.player.inventory.includes("Adaga")) {
-                    atkBonus = 2;
-                    addToLog(`� A adaga de ossos lhe dá +${atkBonus} de ataque.`);
-                }
-                if (gameState.player.inventory.includes("Espada")) {
-                    atkBonus = 3;
-                    addToLog(`⚔️ A espada lhe dá +${atkBonus} de ataque.`);
-                }
-                if (gameState.player.inventory.includes("Machado")) {
-                    atkBonus = 4;
-                    addToLog(`🪓 O machado lhe dá +${atkBonus} de ataque.`);
-                }
-                
-                let attackRoll = atkBonus + rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10)/2) + gameState.player.stats.bba;
-                
-                addToLog(`Você ataca o ${enemy.name} (AC ${enemy.ac})... Roll: ${attackRoll}`);
-                
-                if (attackRoll >= enemy.ac) {
-                    const damage = rollingDice(8)[0] + Math.floor((gameState.player.stats.str - 10)/2);
-                    addToLog(`🥊 Você acerta ${damage} de dano no inimigo!`);
-
-                    enemy.hp -= damage;
-                    
-                    if (enemy.hp <= 0) {
-                        const xpGain = 50;
-                        const goldGain = rollingDice(6, 3).reduce((a, b) => a + b);
-                        addToLog(`🎊 Você derrotou o ${enemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
-                        gameState.player.xp += xpGain;
-                        gameState.player.gold += goldGain;
-                    } else {
-                        addToLog(`🥊 O ${enemy.name} sobreviveu e te ataca!`);
-                        enemyAttack(enemy)
-                    }
-                } else {
-                    addToLog("Você errou!");
-                    addToLog(`🥊 O ${enemy.name} te ataca!`);
-                    enemyAttack(enemy)
-                }
-            }
-
-            function enemyAttack(enemy) {
-                let attackEnemy = rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10)/2) + gameState.player.stats.bba;
-                let armorBonus = 0;
-                if (gameState.player.inventory.includes("Escudo")) {
-                    armorBonus = 4;
-                    addToLog(`🛡️ O escudo lhe dá +${armorBonus} de armadura.`);
-                }
-                if (attackEnemy >= 10 + Math.floor((gameState.player.stats.dex - 10)/2) + gameState.player.stats.armor + armorBonus) {
-                    addToLog(`🥊 O ${enemy.name} acerta você.`);
-                    const enemyDamage = rollingDice(6)[0];
-                    addToLog(`Você levou ${enemyDamage} de dano!`);
-                    changeHealth(enemyDamage);
-                } else {
-                    addToLog(enemy.name + " miss!");
-                }
-            }
-
-            function changeHealth(amount) {
-                gameState.player.health += amount;
-                if (gameState.player.health > gameState.player.maxHealth) gameState.player.health = gameState.player.maxHealth; // cap health
-                if (gameState.player.health <= 0) {
-                    gameState.player.health = 0;
-                    addToLog("☠️☠️☠️ Você morreu pq perdeu todos os pontos de vida! ☠️☠️☠️");
-                    loadScene('death'); // Load death scene
-                }
-                updateStatsDisplay();
-            }
-
-            function changeGold(amount) {
-                gameState.player.gold += amount;
-                if (gameState.player.gold < 0) gameState.player.gold = 0; // No negative gold
-                if (amount > 0) {
-                    addToLog("Você ganhou " + amount + " 🪙.");
-                } else {
-                    addToLog(amount + " 🪙 foi removido da sua mochila");
-                }
-                updateStatsDisplay();
-            }
-
-            function changeXP(amount) {
-                gameState.player.xp += amount;
-                updateStatsDisplay();
-                addToLog("Você ganhou " + amount + " de XP." );
-            }
-
-            function addToInventory(item) {
-                gameState.player.inventory.push(item);
-                updateInventoryDisplay();
-                addToLog(`Adicionado ${item} ao inventário.`);
-            }
-
-            function removeFromInventory(item) {
-                const index = gameState.player.inventory.indexOf(item);
-                if (index > -1) {
-                    gameState.player.inventory.splice(index, 1);
-                    updateInventoryDisplay();
-                    addToLog(`Removido ${item} ao inventário.`);
-                }
-            }
-
-            function haveMoney(amount) {
-              if (amount < gameState.player.gold) {
-                gameState.player.gold -= amount;
-                addToLog(amount + " 🪙 foram removidas da sua mochila");
-                updateStatsDisplay();
-                return true;
-              }
-
-              return false;
-            }
-
-            function updateStatsDisplay() {
-                document.getElementById('health').textContent = gameState.player.health;
-                document.getElementById('gold').textContent = gameState.player.gold;
-                document.getElementById('xp').textContent = gameState.player.xp;
-            }
-
-            function updateInventoryDisplay() {
-                const inventoryItemsElement = document.getElementById('inventory-items');
-                if (gameState.player.inventory.length === 0) {
-                    inventoryItemsElement.textContent = "Mochila vazia!";
-                } else {
-                    inventoryItemsElement.innerHTML = ''; // Clear existing items
-                    const ul = document.createElement('ul');
-                    gameState.player.inventory.forEach(item => {
-                        const li = document.createElement('li');
-                        li.textContent = item;
-                        ul.appendChild(li);
-                    });
-                    inventoryItemsElement.appendChild(ul);
-                }
-            }
-
-            function addToLog(message) {
-                gameState.log.push(message);
-                const logElement = document.getElementById('game-log');
-                const logMessageElement = document.createElement('p');
-                logMessageElement.textContent = message;
-                logElement.appendChild(logMessageElement);
-                logElement.scrollTop = logElement.scrollHeight; //Auto-scroll to bottom
-            }
-
-            // Selecionar elementos da lojinha
-            const openShopButton = document.getElementById('open-shop');
-            const closeShopButton = document.getElementById('close-shop');
-            const shopModal = document.getElementById('shop-modal');
-            const playerGoldElement = document.getElementById('player-gold');
-            const shopItems = document.querySelectorAll('.shop-item');
-
-            // Abrir a lojinha
-            openShopButton.addEventListener('click', () => {
-                playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
-                shopModal.classList.remove('hidden');
             });
-
-            // Fechar a lojinha
-            closeShopButton.addEventListener('click', () => {
-                shopModal.classList.add('hidden');
-            });
-
-            // Comprar itens
-            shopItems.forEach(item => {
-                item.addEventListener('click', () => {
-                    const itemName = item.getAttribute('data-item');
-                    const itemPrice = parseInt(item.getAttribute('data-price'), 10);
-
-                    if (gameState.player.gold >= itemPrice) {
-                        gameState.player.gold -= itemPrice;
-                        addToInventory(itemName);
-                        playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
-                        addToLog(`Você comprou ${itemName} por ${itemPrice}g.`);
-                        updateStatsDisplay(); // Atualiza o ouro na interface
-                    } else {
-                        addToLog("Ouro insuficiente para comprar este item.");
-                    }
-                });
-            });
-        </script>
-    </body>
+        }
+    </script>
+</body>
 </html>

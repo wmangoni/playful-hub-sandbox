@@ -1,442 +1,54 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Aventura Simples de D&D</title>
-        <style>
-            body {
-                font-family: 'Palatino', serif;
-                background-color: #f5f1e6;
-                color: #333;
-                max-width: 100%;
-                margin: 0 auto;
-                padding: 20px;
-            }
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Grafo de Cenas - Masmorra de Drakmor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            overflow: hidden;
+        }
+        #graph-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .node text {
+            font-size: 10px;
+            pointer-events: none;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            fill: none;
+        }
+        #tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 250px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="tooltip"></div>
+    <div id="graph-container"></div>
 
-            audio {
-                position: absolute;
-                top: 0px;
-                left: 0px;
-                box-shadow: 4px 1px 12px;
-                border-radius: 30px;
-            }
-
-            .game-container {
-                background-color: #fff;
-                border: 2px solid #7a5c3d;
-                border-radius: 8px;
-                padding: 20px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-                height: 90vh;
-            }
-
-            .game-container2 {
-                display: grid;
-                grid-template-columns: repeat(5, 1fr);
-                grid-template-rows: repeat(5, 1fr);
-                gap: 8px;
-            }
-
-            .col1 {
-                grid-column: span 2 / span 2;
-                grid-row: span 5 / span 5;
-            }
-
-            .col2 {
-                grid-column: span 2 / span 2;
-                grid-row: span 5 / span 5;
-                grid-column-start: 3;
-            }
-            .col3 {
-                grid-row: span 5 / span 5;
-                grid-column-start: 5;
-            }
-
-            h1 {
-                color: #8b0000;
-                text-align: center;
-                font-size: 28px;
-                margin-bottom: 10px;
-            }
-
-            .subtitle {
-                text-align: center;
-                font-style: italic;
-                margin-bottom: 30px;
-                color: #555;
-            }
-
-            .scene-description {
-                border-left: 4px solid #8b0000;
-                padding: 10px 15px;
-                margin: 15px 0;
-                background-color: #f9f5eb;
-                overflow: auto;
-                max-height: 20vh;
-            }
-
-            .stats {
-                display: flex;
-                justify-content: space-between;
-                background-color: #eee8d9;
-                padding: 10px;
-                border-radius: 5px;
-                margin: 15px 0;
-            }
-
-            .stat {
-                text-align: center;
-            }
-
-            .stat-value {
-                font-weight: bold;
-                font-size: 18px;
-            }
-
-            .choices {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                margin-top: 20px;
-            }
-
-            button {
-                background-color: #7a5c3d;
-                color: white;
-                border: none;
-                padding: 10px 15px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Palatino', serif;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-
-            button:hover {
-                background-color: #8b0000;
-            }
-
-            #image-container {
-                padding-top: 16px;
-            }
-
-            #image-container img {
-                max-width: 100%;
-                max-height: 76vh;
-            }
-
-            .inventory {
-                margin-top: 20px;
-                padding: 10px;
-                background-color: #eee8d9;
-                border-radius: 5px;
-            }
-
-            .inventory h3 {
-                margin-top: 0;
-                color: #7a5c3d;
-            }
-
-            .dice-roll {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 20px 0;
-            }
-
-            .dice {
-                width: 60px;
-                height: 60px;
-                background-color: white;
-                border: 2px solid #333;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 24px;
-                font-weight: bold;
-                margin: 0 10px;
-            }
-
-            .roll-button {
-                margin-left: 20px;
-            }
-
-            .log {
-                overflow-y: auto;
-                margin-top: 15px;
-                border: 1px solid #ccc;
-                padding: 10px;
-                font-style: italic;
-                font-size: 14px;
-                color: #555;
-                border-radius: 5px;
-                max-height: 75vh;
-            }
-
-            .hidden {
-                display: none !important;
-            }
-
-            .character-select {
-                display: flex;
-                gap: 15px;
-                justify-content: center;
-                margin-bottom: 30px;
-            }
-
-            .character-card {
-                border: 2px solid #7a5c3d;
-                border-radius: 5px;
-                padding: 15px;
-                text-align: center;
-                cursor: pointer;
-                width: 150px;
-                transition: all 0.3s;
-            }
-
-            .character-card:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            }
-
-            .character-card.selected {
-                border-color: #8b0000;
-                background-color: #f9e9e9;
-            }
-
-            .result-message {
-                padding: 15px;
-                margin: 15px 0;
-                border-radius: 5px;
-                font-weight: bold;
-            }
-
-            .success {
-                background-color: #d4edda;
-                color: #155724;
-            }
-
-            .failure {
-                background-color: #f8d7da;
-                color: #721c24;
-            }
-            .modal {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-
-            .modal-content {
-                background-color: #fff;
-                border: 2px solid #7a5c3d;
-                padding: 20px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-                font-family: 'Palatino', serif;
-                text-align: center;
-            }
-
-            .shop-items {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                margin-bottom: 20px;
-            }
-
-            .shop-item {
-                background-color: #7a5c3d;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Palatino', serif;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-
-            .shop-item:hover {
-                background-color: #8b0000;
-            }
-
-            #close-shop {
-                background-color: #8b0000;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Palatino', serif;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-
-            #close-shop:hover {
-                background-color: #7a5c3d;
-            }
-        </style>
-    </head>
-    <body>
-        <audio controls autoplay loop>
-          <source src="audio/medieval-music.mp3" type="audio/mpeg" />
-          Seu navegador não suporta o elemento de áudio.
-        </audio>
-
-        <div class="game-container">
-            <h1>A Masmorra de Drakmor</h1>
-            <p class="subtitle">Uma Aventura Simples de D&D</p>
-            <div id="character-select">
-                <h2>Escolha o Seu Personagem</h2>
-                <div class="character-select">
-                    <div class="character-card" data-class="warrior" onclick="selectCharacter('warrior')">
-                        <h3>Guerreiro</h3>
-                        <p>Força e saúde elevadas, habilidoso com armas</p>
-                        <p>
-                            <strong>FOR:</strong> 16 <strong>DES:</strong> 12 <br>
-                            <strong>CON:</strong> 15 <strong>INT:</strong> 8
-                        </p>
-                    </div>
-                    <div class="character-card" data-class="wizard" onclick="selectCharacter('wizard')">
-                        <h3>Mago</h3>
-                        <p>Mestre em magia arcana com feitiços poderosos</p>
-                        <p>
-                            <strong>FOR:</strong> 8 <strong>DES:</strong> 14 <br>
-                            <strong>CON:</strong> 10 <strong>INT:</strong> 17
-                        </p>
-                    </div>
-                    <div class="character-card" data-class="rogue" onclick="selectCharacter('rogue')">
-                        <h3>Ladino</h3>
-                        <p>Ágil e astuto, habilidoso em furtividade</p>
-                        <p>
-                            <strong>FOR:</strong> 10 <strong>DES:</strong> 17 <br>
-                            <strong>CON:</strong> 12 <strong>INT:</strong> 14
-                        </p>
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button onclick="startGame()">Começar Aventura</button>
-                </div>
-            </div>
-            <div class="game-container2">
-                <div id="game-screen" class="hidden col1">
-                    <div class="stats">
-                        <div class="stat">
-                            <div>❤️ Vida</div>
-                            <div class="stat-value" id="health">20</div>
-                        </div>
-                        <div class="stat">
-                            <div>🪙 Ouro</div>
-                            <div class="stat-value" id="gold">5</div>
-                        </div>
-                        <div class="stat">
-                            <div>📈 Experiência</div>
-                            <div class="stat-value" id="xp">0</div>
-                        </div>
-                    </div>
-                    <div class="scene-description" id="scene-text"></div>
-                    <div id="dice-container" class="hidden dice-roll">
-                        <div class="dice" id="dice">?</div>
-                        <button id="dice-button" class="roll-button" onclick="rollDice()">🎲 Rolar d20</button>
-                    </div>
-                    <div id="result-message" class="hidden result-message"></div>
-                    <div class=choices id=choices>
-                        <button id="open-shop" class="hidden">Abrir Lojinha</button>
-                    </div>
-                    <div class="inventory">
-                        <h3>🎒 Inventário</h3>
-                        <div id="inventory-items"> Nada ainda </div>
-                    </div>
-                </div>
-                <div id="image-container" class ="col2 hidden">
-                    <img id="image" src="./images/check_supplies.png">
-                </div>
-                <div class="col3 log hidden" id="game-log">📝 Logs do jogo</div>
-            </div>
-        </div>
-        <div id="shop-modal" class="modal hidden">
-            <div class="modal-content">
-                <h2>🏦 Lojinha</h2>
-                <p id="player-gold">🪙 Ouro: 5</p>
-                <div class="shop-items">
-                    <button class="shop-item" data-item="Poção de Vida" data-price="10">🫙 Poção de Vida - 10g</button>
-                    <button class="shop-item" data-item="Espada" data-price="32">⚔️ Espada - 32g</button>
-                    <button class="shop-item" data-item="Machado" data-price="36">🪓 Machado - 36g</button>
-                    <button class="shop-item" data-item="Adaga" data-price="45">� Adaga de osso estranha - 45g</button>
-                    <button class="shop-item" data-item="Escudo" data-price="31">🛡️ Escudo - 31g</button>
-                    <button class="shop-item" data-item="Corda" data-price="5">🪢 Corda - 5g</button>
-                    <button class="shop-item" data-item="Tocha" data-price="2">🔦 Tocha - 2g</button>
-                </div>
-                <button id="close-shop">Fechar</button>
-            </div>
-        </div>
-        <script>
-            // Estado do jogo
-            const gameState = {
-                player: {
-                    class: "",
-                    health: 20,
-                    maxHealth: 20,
-                    gold: 5,
-                    xp: 0,
-                    inventory: [],
-                    stats: {}
-                },
-                mem: {},
-                currentScene: "start",
-                lastScene: "start",
-                currentEnemy: {
-                    name: "Wolf",
-                    ac: 12,
-                    hp: 12,
-                    max_hp: 12,
-                    str: 10,
-                    dex: 10,
-                    con: 10,
-                    bba: 1
-                },
-                log: [],
-                pendingCheck: null,
-                checkDifficulty: 10
-            };
-            // Atributos do personagem
-            const characterStats = {
-                warrior: {
-                    str: 16,
-                    dex: 12,
-                    con: 15,
-                    int: 8,
-                    luck: 8,
-                    bba: 2,
-                    armor: 6
-                },
-                wizard: {
-                    str: 8,
-                    dex: 14,
-                    con: 10,
-                    int: 17,
-                    luck: 12,
-                    bba: 1,
-                    armor: 2
-                },
-                rogue: {
-                    str: 10,
-                    dex: 17,
-                    con: 12,
-                    int: 14,
-                    luck: 10,
-                    bba: 1,
-                    armor: 4
-                }
-            };
-            // Cenas do jogo
-            const scenes = {
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Dados da masmorra
+            const dungeonData = {
                 start: {
                     text: "Você está na entrada da antiga Masmorra de Drakmor. Degraus de pedra esculpida levam para a escuridão. Lendas falam de tesouros dentro, mas também de armadilhas mortais e monstros temíveis. O ar está frio contra sua pele enquanto você observa a penumbra.",
                     choices: [{
@@ -506,7 +118,12 @@
                     text: "Ao virar uma esquina, você fica cara a cara com um goblin rosnando! Ele é pequeno, mas cruel, empunhando um punhal enferrujado e vestindo uma armadura de couro esfarrapada. Ele sibila e se prepara para atacar!",
                     choices: [{
                         text: "Lutar contra o goblin",
-                        nextScene: "goblin_fight",
+                        nextScene: "goblin_fight_success",
+                        requiresCheck: true,
+                        checkType: "combat"
+                    },{
+                        text: "Lutar contra o goblin",
+                        nextScene: "goblin_fight_failure",
                         requiresCheck: true,
                         checkType: "combat"
                     }, {
@@ -514,11 +131,6 @@
                         nextScene: "goblin_stealth",
                         requiresCheck: true,
                         checkType: "stealth"
-                    }, {
-                        text: "Tentar argumentar com ele",
-                        nextScene: "goblin_talk",
-                        requiresCheck: true,
-                        checkType: "persuasion"
                     }],
                     onEnter: function() {
                         gameState.mem.nextSceneSuccess = 'goblin_fight_success';
@@ -541,7 +153,12 @@
                         nextScene: "dark_chamber"
                     }, {
                         text: "Voltar e lutar contra o goblin",
-                        nextScene: "goblin_fight",
+                        nextScene: "goblin_fight_success",
+                        requiresCheck: true,
+                        checkType: "combat"
+                    },{
+                        text: "Voltar e lutar contra o goblin",
+                        nextScene: "goblin_fight_failure",
                         requiresCheck: true,
                         checkType: "combat"
                     }],
@@ -592,12 +209,22 @@
                     text: "Depois de pegar todas as coisas e colocar em sua mochila, um rosnado baixo e gutural ressoa atrás de você, enviando um arrepio pela sua espinha. Você se vira lentamente, sua respiração presa enquanto um lobo enorme emerge das sombras, com o pelo eriçado e os dentes à mostra em um rosnado. Seus olhos amarelos penetrantes se fixam nos seus, músculos tensos como molas, prontos para atacar ao menor movimento.",
                     choices: [{
                         text: "Tentar acalmar o lobo",
-                        nextScene: "wolf_calm",
+                        nextScene: "wolf_calm_success",
+                        requiresCheck: true,
+                        checkType: "luck"
+                    },{
+                        text: "Tentar acalmar o lobo",
+                        nextScene: "wolf_calm_failure",
                         requiresCheck: true,
                         checkType: "luck"
                     }, {
                         text: "Lutar contra o lobo",
-                        nextScene: "wolf_fight",
+                        nextScene: "wolf_fight_success",
+                        requiresCheck: true,
+                        checkType: "combat"
+                    },{
+                        text: "Lutar contra o lobo",
+                        nextScene: "wolf_fight_failure",
                         requiresCheck: true,
                         checkType: "combat"
                     }],
@@ -636,7 +263,7 @@
                     text: "Você estende a mão lentamente, falando em tons suaves. O lobo, surpreso com sua falta de agressão, hesita. Você nota o espinho em sua pata e se oferece para ajudar. Cautelosamente, ele permite que você remova o espinho. O alívio toma conta do lobo, e ele lambe sua mão em gratidão antes de recuar para o interior da caverna.",
                     choices: [{
                         text: "Atravessar o riacho agora",
-                        nextScene: "cavern_crossing",
+                        nextScene: "cavern_crossing_success",
                         requiresCheck: true,
                         checkType: "dex"
                     }, {
@@ -651,7 +278,12 @@
                     text: "O lobo não responde às suas tentativas de acalmá-lo. Ele permanece cauteloso e hostil, rosnando profundamente. Parece que ele não está disposto a confiar em você.",
                     choices: [{
                         text: "Lutar contra o lobo",
-                        nextScene: "wolf_fight",
+                        nextScene: "wolf_fight_success",
+                        requiresCheck: true,
+                        checkType: "combat"
+                    },{
+                        text: "Lutar contra o lobo",
+                        nextScene: "wolf_fight_failure",
                         requiresCheck: true,
                         checkType: "combat"
                     }, {
@@ -684,26 +316,16 @@
                     }]
                 },
                 cavern: {
-                    text: "Você caminha por um tempo até a entrada de um corredor muito escuro, não lhe parece seguro seguir sem saber o que tem ali...",
+                    text: "Você caminha por um tempo até a entrada de um corredor escuro",
                     choices: [{
                         text: "Vá em frente e atravesse a caverna",
-                        nextScene: "cavern_crossing",
+                        nextScene: "cavern_crossing_success",
                         requiresCheck: true,
                         checkType: "dex"
                     }, {
                         text: "Voltar para a câmara escura",
                         nextScene: "dark_chamber"
-                    }],
-                    onEnter: function() {
-                        if (gameState.player.inventory.includes("Tocha")) {
-                            scenes["cavern"].choices.push({
-                                text: "Acender uma tocha!",
-                                nextScene: "cavern_crossing"
-                            })
-                            addChoiceInCurrentScene(scenes["cavern"]);
-                            addToLog("🕯️ Valeu a pena comprar uma tocha!")
-                        }
-                    }
+                    }]
                 },
                 cavern_crossing_success: {
                     text: "Você navega cuidadosamente pelas pedras escorregadias e pela correnteza rápida do riacho subterrâneo. Você chega ao outro lado, levemente molhado, mas ileso. Uma passagem estreita continua adiante a partir daqui.",
@@ -738,7 +360,7 @@
                         nextScene: "crystal_examine"
                     }, {
                         text: "Retorne ao riacho da caverna",
-                        nextScene: "cavern_crossing"
+                        nextScene: "cavern_crossing_success"
                     }]
                 },
                 crystal_path: {
@@ -752,7 +374,7 @@
                     text: "Você tira um momento para examinar os cristais mais de perto. Eles são de qualidade excepcional, alguns irradiando uma leve luz interior. Você provavelmente poderia arrancar alguns...",
                     choices: [{
                         text: "Tente coletar alguns cristais",
-                        nextScene: "crystal_collect",
+                        nextScene: "crystal_collect_success",
                         requiresCheck: true,
                         checkType: "dex"
                     }, {
@@ -760,7 +382,7 @@
                         nextScene: "crystal_path"
                     }, {
                         text: "Retorne ao riacho da caverna",
-                        nextScene: "cavern_crossing"
+                        nextScene: "cavern_crossing_success"
                     }]
                 },
                 crystal_collect_success: {
@@ -778,7 +400,12 @@
                     text: "Ao tentar arrancar um cristal, você desaloja um pedaço maior de rocha. Ele cai, por pouco não atingindo seu pé e fazendo um barulho alto pela caverna. O barulho acaba atraindo uma aranha gigante.",
                     choices: [{
                         text: "Lutar contra a aranha",
-                        nextScene: "spider_fight",
+                        nextScene: "spider_fight_success",
+                        requiresCheck: true,
+                        checkType: "combat"
+                    },{
+                        text: "Lutar contra a aranha",
+                        nextScene: "spider_fight_failure",
                         requiresCheck: true,
                         checkType: "combat"
                     }],
@@ -859,7 +486,7 @@
                     text: "O objecto mais próximo é sua própria mochila e é ela que você coloca no tentáculo para ver se ela te solta",
                     choices: [{
                         text: "Remover o tentáculo",
-                        nextScene: "remove_tentacle",
+                        nextScene: "remove_tentacle_success",
                         requiresCheck: true,
                         checkType: "luck"
                     }],
@@ -880,6 +507,9 @@
                     choices: [{
                         text: "Se afastar dos tentáculos",
                         nextScene: "tentacle_result_success"
+                    }, {
+                        text: "Se afastar dos tentáculos",
+                        nextScene: "tentacle_result_failure"
                     }],
                     onEnter: function() {
                       changeXP(50)
@@ -889,7 +519,12 @@
                   text: "Você segura firme o tentáculo e o puxa com toda a sua força na esperança de arrebentá-lo brutalmente.",
                   choices: [{
                       text: "E agora?",
-                      nextScene: "tentacle_result",
+                      nextScene: "tentacle_result_success",
+                      requiresCheck: true,
+                      checkType: "str"
+                  },{
+                      text: "E agora?",
+                      nextScene: "tentacle_result_failure",
                       requiresCheck: true,
                       checkType: "str"
                   }],
@@ -901,7 +536,7 @@
                   text: "Você pega sua arma rapidamente sem pensar duas vezes e acerta o tentáculo na tentativa de corta-lo.",
                   choices: [{
                       text: "E agora?",
-                      nextScene: "tentacle_result",
+                      nextScene: "tentacle_result_success",
                       requiresCheck: true,
                       checkType: "str"
                   }],
@@ -913,7 +548,7 @@
                   text: "Você não pensa duas vezes em cortar seu próprio braço na tentativa de se salvar, pois percebe rapidamente que o tentáculo é absurdamente forte e resistente e tentar golpeá-lo seria perda de tempo e você certamente morreria tentando.",
                   choices : [{
                       text: "E agora?",
-                      nextScene: "tentacle_result",
+                      nextScene: "tentacle_result_success",
                       requiresCheck: true,
                       checkType: "str"
                   }],
@@ -963,7 +598,12 @@
                     text: "A passagem se abre para uma grande caverna dominada por um lago subterrâneo. A água é escura e parada, refletindo a luz fraca do musgo fosforescente no teto. Uma jangada de madeira de aparência instável está amarrada a uma rocha perto da costa.",
                     choices: [{
                         text: "Pegue a jangada para atravessar o lago",
-                        nextScene: "lake_raft",
+                        nextScene: "lake_raft_success",
+                        requiresCheck: true,
+                        checkType: "dex"
+                    },{
+                        text: "Pegue a jangada para atravessar o lago",
+                        nextScene: "lake_raft_failure",
                         requiresCheck: true,
                         checkType: "dex"
                     }, {
@@ -1005,12 +645,17 @@
                     text: "Você procura na beira do lago subterrâneo por outro caminho. Depois de algum tempo, você encontra uma saliência estreita ao longo da parede da caverna, logo acima do nível da água. Parece traiçoeiro.",
                     choices: [{
                         text: "Tente atravessar usando a saliência",
-                        nextScene: "lake_ledge_cross",
+                        nextScene: "lake_ledge_cross_success",
                         requiresCheck: true,
                         checkType: "dex"
                     }, {
                         text: "Volte e pegue a jangada",
-                        nextScene: "lake_raft",
+                        nextScene: "lake_raft_success",
+                        requiresCheck: true,
+                        checkType: "dex"
+                    },{
+                        text: "Volte e pegue a jangada",
+                        nextScene: "lake_raft_failure",
                         requiresCheck: true,
                         checkType: "dex"
                     }]
@@ -1048,7 +693,7 @@
                         nextScene: "final_treasure_approach_careful_failure"
                     }, {
                         text: "Procure armadilhas na câmara primeiro",
-                        nextScene: "final_chamber_search",
+                        nextScene: "final_chamber_search_success",
                         requiresCheck: true,
                         checkType: "int"
                     }]
@@ -1057,7 +702,7 @@
                     text: "Seus olhos atentos notam linhas fracas gravadas no chão ao redor do estrado e pequenos buracos nas paredes perto do cofre. Mecanismos de armadilha, provavelmente placas de pressão e lançadores de dardos. Você anota cuidadosamente suas localizações.",
                     choices: [{
                         text: "Aproxime-se cuidadosamente do cofre",
-                        nextScene: "final_treasure_approach_careful",
+                        nextScene: "final_treasure_approach_careful_success",
                         requiresCheck: true,
                         checkType: "dex"
                     }],
@@ -1086,7 +731,7 @@
                     text: "Respirando fundo, você decide se aproximar do cofre diretamente. Você caminha em direção ao estrado, seus sentidos em alerta máximo...",
                     choices: [{
                             text: "Continue até o cofre",
-                            nextScene: "final_treasure_open",
+                            nextScene: "final_treasure_open_success",
                             requiresCheck: true,
                             checkType: "luck"
                         } // Teste de sorte, pois você está indo às cegas para as armadilhas.
@@ -1140,29 +785,24 @@
                     text: "Ao alcançar o cofre, o estrado abaixo de você cede! Você mergulha na escuridão, caindo com força em um poço escondido. O cofre e o tesouro permanecem tentadoramente fora de alcance acima de você.",
                     choices: [{
                         text: "Tente sair do poço",
-                        nextScene: "pit_escape",
+                        nextScene: "pit_escape_success",
+                        requiresCheck: true,
+                        checkType: "str"
+                    }, {
+                        text: "Tente sair do poço",
+                        nextScene: "pit_escape_failure",
                         requiresCheck: true,
                         checkType: "str"
                     }, {
                         text: "Aceite a derrota e tente encontrar outra saída",
                         nextScene: "crypt"
-                    }],
-                    onEnter: function() {
-                        if (!gameState.player.inventory.includes("Corda")) {
-                            scenes["final_treasure_open_failure"].choices.push({
-                                text: "Usar a corda para subir",
-                                nextScene: "pit_escape"
-                            })
-                            addChoiceInCurrentScene(scenes["final_treasure_open_failure"]);
-                            addToLog("🪢 Valeu a pena comprar uma corda!");
-                        }
-                    }
+                    }]
                 },
                 pit_escape_success: {
                     text: "Usando toda a sua força, você encontra pontos de apoio nas paredes do poço e consegue subir de volta para o chão da câmara, machucado e ferido, mas determinado.",
                     choices: [{
                         text: "Tente abrir o cofre novamente",
-                        nextScene: "final_treasure_open"
+                        nextScene: "final_treasure_open_success"
                     }, {
                         text: "Talvez este tesouro não valha a pena. Recue.",
                         nextScene: "dark_chamber"
@@ -1191,7 +831,7 @@
                         nextScene: "crypt_merchant"
                     }, {
                         text: "Ira até a porta do fundo da cripta",
-                        nextScene: "crypt_door",
+                        nextScene: "crypt_door_success",
                         requiresCheck: true,
                         checkType: "str"
                     }, {
@@ -1210,7 +850,7 @@
                             nextScene: "merchant_question"
                         }, {
                             text: "Ignorar o mercador e seguir para a porta ao fundo da cripta",
-                            nextScene: "crypt_door",
+                            nextScene: "crypt_door_success",
                             requiresCheck: true,
                             checkType: "str"
                         }, {
@@ -1231,7 +871,7 @@
                             nextScene: "merchant_items"
                         }, {
                             text: "Ignorar o mercador e seguir para a porta ao fundo da cripta",
-                            nextScene: "crypt_door",
+                            nextScene: "crypt_door_success",
                             requiresCheck: true,
                             checkType: "str"
                         }, {
@@ -1244,7 +884,7 @@
                     text: "Você pergunta para o mercador: Você não é o carinha que vende coisas no Resident Evil 4? Ao que ele responde: Eu não faço ideia do que você está falando... Sou apenas um viajante vindo da espanha para fugir de uma praga que estava infectando todo mundo.",
                     choices: [{
                         text: "Voltar e tentar abrir a porta de pedra ao fundo da cripta",
-                        nextScene: "crypt_door",
+                        nextScene: "crypt_door_success",
                         requiresCheck: true,
                         checkType: "str"
                     }, {
@@ -1277,7 +917,7 @@
                         nextScene: "merchant_question"
                     }, {
                         text: "Se despedir do mercador e seguir para a porta dos fundos da cripta",
-                        nextScene: "crypt_door",
+                        nextScene: "crypt_door_success",
                         requiresCheck: true,
                         checkType: "str"
                     }]
@@ -1311,12 +951,12 @@
                     text: "Você examina os sarcófagos. Eles são feitos de pedra fria e ásperas, alguns esculpidos com imagens de guerreiros de rosto severo e figuras vestidas com mantos. A tampa de um sarcófago parece ligeiramente torta...",
                     choices: [{
                         text: "Tente abrir o sarcófago torto",
-                        nextScene: "crypt_sarcophagus_open",
+                        nextScene: "crypt_sarcophagus_open_success",
                         requiresCheck: true,
                         checkType: "intelligence"
                     }, {
                         text: "Tente abrir a porta de pedra novamente",
-                        nextScene: "crypt_door",
+                        nextScene: "crypt_door_success",
                         requiresCheck: true,
                         checkType: "str"
                     }, {
@@ -1338,7 +978,7 @@
                     text: "Você tenta abrir o sarcófago, mas ele é mais pesado do que parece. A tampa se move ligeiramente, mas permanece quase totalmente selada. Você não pode forçá-la a abrir sem fazer muito barulho.",
                     choices: [{
                         text: "Tente abrir a porta de pedra novamente",
-                        nextScene: "crypt_door",
+                        nextScene: "crypt_door_success",
                         requiresCheck: true,
                         checkType: "str"
                     }, {
@@ -1398,7 +1038,10 @@
                     choices: [{
                         text: "Tentar uma última vez antes de seja tarde",
                         nextScene: "crypt_parchment_read"
-                    }],
+                    },{
+                                text: "Tomar poção!",
+                                nextScene: "potion_health"
+                            }],
                     "onEnter": function() {
                         if (!gameState.player.inventory.includes("Poção de cura")) {
                             scenes["crypt_riddle_failure"].choices.push({
@@ -1428,7 +1071,12 @@
                     text: "Atrás da pesada porta de pedra ou talvez acionada pela charada, uma seção da parede desliza para abrir, revelando uma câmara oculta. Símbolos estranhos estão gravados nas paredes e um padrão complexo de ladrilhos cobre o chão.",
                     choices: [{
                         text: "Tente resolver o quebra-cabeça de ladrilhos",
-                        nextScene: "crypt_puzzle_result",
+                        nextScene: "crypt_puzzle_result_success",
+                        requiresCheck: true,
+                        checkType: "int"
+                    }, {
+                        text: "Tente resolver o quebra-cabeça de ladrilhos",
+                        nextScene: "crypt_puzzle_result_failure",
                         requiresCheck: true,
                         checkType: "int"
                     }, {
@@ -1457,7 +1105,7 @@
                     text: "Você pisa no ladrilho errado! O chão treme e você ouve um clique. Dardos são disparados das paredes e os ladrilhos sob seus pés se retraem, jogando você em um poço raso! Você está ferido e envenenado!",
                     choices: [{
                         text: "Tente resolver o quebra-cabeça novamente",
-                        nextScene: "crypt_puzzle_result",
+                        nextScene: "crypt_puzzle_result_success",
                         requiresCheck: true,
                         checkType: "int"
                     }],
@@ -1480,7 +1128,7 @@
                         nextScene: "crypt_treasure_gather"
                     }, {
                         text: "Seja cauteloso, verifique se há mais armadilhas",
-                        nextScene: "crypt_treasure_traps",
+                        nextScene: "crypt_treasure_traps_success",
                         requiresCheck: true,
                         checkType: "int"
                     }]
@@ -1499,12 +1147,12 @@
                     text: "Apesar de suas tentativas de encontrar armadilhas, você não vê uma placa de pressão oculta. Ao entrar mais na câmara de tesouro, você ouve um estalo agudo! Uma rede cai do teto, prendendo você!",
                     choices: [{
                         text: "Lute contra a rede",
-                        nextScene: "crypt_net_escape",
+                        nextScene: "crypt_net_escape_success",
                         requiresCheck: true,
                         checkType: "strength"
                     }, {
                         text: "Tente desembaraçar a rede com cuidado",
-                        nextScene: "crypt_net_untangle",
+                        nextScene: "crypt_net_untangle_success",
                         requiresCheck: true,
                         checkType: "dex"
                     }],
@@ -1526,7 +1174,7 @@
                     text: "Você luta contra a rede, mas ela é muito forte. Quanto mais você se debate, mais apertada ela parece prendê-lo. Você está preso, pelo menos por enquanto.",
                     choices: [{
                             text: "Tente desembaraçar a rede com mais cuidado",
-                            nextScene: "crypt_net_untangle",
+                            nextScene: "crypt_net_untangle_success",
                             requiresCheck: true,
                             checkType: "dex"
                         }, {
@@ -1552,7 +1200,7 @@
                     text: "Os nós da rede são muito complexos ou seus dedos são muito desajeitados em sua pressa e pânico. Você parece não conseguir se desembaraçar. A rede permanece firmemente no lugar.",
                     choices: [{
                         text: "Lute novamente com força bruta",
-                        nextScene: "crypt_net_escape",
+                        nextScene: "crypt_net_escape_success",
                         requiresCheck: true,
                         checkType: "str"
                     }, {
@@ -1658,438 +1306,173 @@
                         addToLog("☠️☠️☠️ Você morreu! ☠️☠️☠️");
                     }
                 }
-            }
-            let selectedCharacter = null;
+            };
 
-            function selectCharacter(characterClass) {
-                //Remove previous selection
-                if (selectedCharacter) {
-                    document.querySelector(`.character-card.selected`).classList.remove('selected');
-                }
-                selectedCharacter = characterClass;
-                document.querySelector(`.character-card[data-class='${characterClass}']`).classList.add('selected');
-            }
+            // Preparar dados para o grafo
+            const nodes = Object.keys(dungeonData).map(key => ({ id: key }));
+            const links = [];
 
-            function startGame() {
-                if (!selectedCharacter) {
-                    alert("⁉️ Escolha um personagem antes de iniciar a aventura.");
-                    return;
-                }
-                //Initialize game state based on selected character
-                gameState.player.class = selectedCharacter;
-                gameState.player.stats = characterStats[selectedCharacter];
-                gameState.player.health = gameState.player.maxHealth = 20; // Reset health for new game
-                // Hide character selection and show game screen
-                document.getElementById('character-select').classList.add('hidden');
-                document.getElementById('game-screen').classList.remove('hidden');
-                document.getElementById('game-log').classList.remove('hidden');
-                document.getElementById('image-container').classList.remove('hidden');
-                //Start the game with the 'start' scene
-                loadScene('start');
-                updateStatsDisplay();
-            }
-
-            function verificarImagem(idImagem, srcAlternativo) {
-                const imagem = document.getElementById(idImagem);
-                const src = imagem.src;
-
-                const testeImagem = new Image();
-                testeImagem.src = src;
-
-                testeImagem.onload = function() {
-                    console.log("Imagem carregada com sucesso!");
-                    gameState.lastImage = src;
-                };
-
-                testeImagem.onerror = function() {
-                    console.log("Erro ao carregar a imagem.");
-                    if (srcAlternativo) {
-                        imagem.src = srcAlternativo;
-                        console.log("Imagem substituída por: " + srcAlternativo);
-
-                        const testeImagem2 = new Image();
-                        testeImagem2.src = srcAlternativo;
-
-                        testeImagem2.onload = function() {
-                            console.log("Imagem carregada com sucesso!");
-                            gameState.lastImage = srcAlternativo;
-                        };
-
-                        testeImagem2.onerror = function() {
-                            console.log("Erro ao carregar a imagem.");
-                            if (srcAlternativo) {
-                                imagem.src = gameState.lastImage;
-                                console.log("Imagem substituída por: " + gameState.lastImage);
-                            }
-                        };
-                    }
-                };
-            }
-
-            function changeImage(sceneName) {
-                const imgElement = document.getElementById("image");
-                const src = "./images/"+sceneName;
-                const extPng = ".png";
-                const extJpg = ".jpeg";
-
-                imgElement.src = src + extPng;
-                verificarImagem("image", src + extJpg);
-            }
-
-            function loadScene(sceneName) {
-                
-                changeImage(sceneName);
-
-                console.log("gameState", JSON.stringify(gameState, undefined, 4));
-                console.log("sceneName", sceneName);
-                
-                gameState.currentScene = sceneName;
-                const scene = scenes[sceneName];
-                
-                console.log("scene", scene);
-                
-                const sceneTextElement = document.getElementById('scene-text');
-                if (!sceneTextElement) {
-                    console.log("o elemento sumiu!");
-                    const sceneTextDiv = document.createElement('div');
-                    sceneTextDiv.id = 'scene-text';
-                    sceneTextDiv.textContent = 'Esta é a cena do jogo!'; // Adiciona um texto de exemplo
-                    // Encontra a div com o id "game-screen"
-                    const gameScreenDiv = document.getElementById('game-screen');
-                    if (gameScreenDiv == null || gameScreenDiv == undefined) {
-                        console.log("cade essa bagaça de div?");
-                    }
-                    // Adiciona a div "scene-text" como filha da div "game-screen"
-                    gameScreenDiv.appendChild(sceneTextDiv);
-                    sceneTextElement = sceneTextDiv;
-                }
-                const diceContainer = document.getElementById('dice-container');
-                const resultMessageElement = document.getElementById('result-message');
-                console.log("sceneTextElement", sceneTextElement);
-                sceneTextElement.textContent = scene.text;
-
-                //Add choices for the current scene
-                const choicesElement = addChoiceInCurrentScene(scene, diceContainer);
-
-                diceContainer.classList.add('hidden'); // Hide dice by default
-                resultMessageElement.classList.add('hidden'); // Hide result message by default
-
-                // Run onEnter function if it exists for the scene
-                if (scene.onEnter) {
-                    scene.onEnter();
-                }
-                // Reset check difficulty after scene load
-                gameState.checkDifficulty = 10;
-            }
-
-            function addChoiceInCurrentScene(scene, diceContainer) {
-
-                const choicesElement = document.getElementById('choices');
-
-                //Clear existing choices
-                choicesElement.innerHTML = '';
-
-                scene.choices.forEach(choice => {
-                    const button = document.createElement('button');
-                    button.textContent = choice.text;
-                    button.onclick = () => {
-                        if (choice.requiresCheck) {
-                            gameState.mem = {
-                                nextSceneSuccess: scenes[`${choice.nextScene}_success`] ? `${choice.nextScene}_success` : choice.nextScene,
-                                nextSceneFailure: scenes[`${choice.nextScene}_failure`] ? `${choice.nextScene}_failure` : choice.nextScene,
-                                checkType: choice.checkType
-                            };
-                            if (!diceContainer) {
-                                diceContainer = document.getElementById('dice-container');
-                            }
-                            diceContainer.classList.remove('hidden');
-                            choicesElement.classList.add('hidden'); // Hide choices during dice roll
-                        } else {
-                            loadScene(choice.nextScene);
+            Object.keys(dungeonData).forEach(key => {
+                if (dungeonData[key].choices) {
+                    dungeonData[key].choices.forEach(choice => {
+                        if (choice.nextScene) {
+                            links.push({
+                                source: key,
+                                target: choice.nextScene,
+                                text: choice.text
+                            });
                         }
-                    };
-                    choicesElement.appendChild(button);
-                });
-
-                choicesElement.classList.remove('hidden'); // Ensure choices are visible when scene loads
-            }
-
-            function rollingDice(sides = 6, num = 1) {
-                return Array.from({length: num}, () => Math.floor(Math.random() * sides) + 1);
-            }
-
-            function activeDiceButton() {
-                const diceButton = document.getElementById('dice-button');
-                diceButton.disabled = false;
-            }
-
-            function disactiveDiceButton() {
-                const diceButton = document.getElementById('dice-button');
-                diceButton.disabled = true;
-            }
-
-            function rollDice() {
-                //disabilitar o botão
-                disactiveDiceButton();
-
-                const diceResult = Math.floor(Math.random() * 20) + 1;
-                document.getElementById('dice').textContent = diceResult;
-                const resultMessageElement = document.getElementById('result-message');
-                setTimeout(() => {
-                    const diceContainer = document.getElementById('dice-container');
-                    const choicesElement = document.getElementById('choices');
-                    let checkSuccess = false;
-
-                    if (gameState.mem.checkType === "combat") {
-                        initFight(gameState.currentEnemy);
-                        checkSuccess = true;
-                    } else {
-                        let modifiedRoll = 0;
-
-                        let logMessage = `Resultado da rolagem de dado: ${diceResult} para a categoria de teste: ${gameState.mem.checkType}. `;
-                          
-                        if (gameState.mem.checkType === 'luck') { // No stat modifier for luck checks - raw d20 roll.
-                            modifiedRoll = diceResult; // Luck checks are raw d20 rolls
-                        }
-
-                        const statValue = Math.floor((gameState.player.stats[gameState.mem.checkType] - 10)/2); // Get relevant stat
-                        modifiedRoll = diceResult;
-
-                        if (statValue !== undefined) {
-                            modifiedRoll += statValue;
-                            logMessage += `\nModificador status +${statValue}. resultado da rolagem: ${modifiedRoll}. `;
-                        }
-
-                        if (modifiedRoll >= gameState.checkDifficulty) {
-                            checkSuccess = true;
-                            resultMessageElement.textContent = "Success!";
-                            resultMessageElement.classList.remove('failure');
-                            resultMessageElement.classList.add('success');
-                            logMessage += `\n👍 Sucesso no teste de dificuldade: ${gameState.checkDifficulty}.`;
-                        } else {
-                            resultMessageElement.textContent = "Failure!";
-                            resultMessageElement.classList.remove('success');
-                            resultMessageElement.classList.add('failure');
-                            logMessage += `\n👎 Falha no teste de dificuldade: ${gameState.checkDifficulty}.`;
-                        }
-                        resultMessageElement.classList.remove('hidden');
-                        addToLog(logMessage);
-                    }
-
-                    diceContainer.classList.add('hidden');
-                    choicesElement.classList.remove('hidden'); // Re-enable choices after roll
-                    // Set timeout to load next scene after showing result message (e.g., 1.5 seconds)
-                    setTimeout(() => {
-                        console.log("gameState.mem", gameState.mem);
-                        console.log("gameState.currentScene", gameState.currentScene);
-                        if (checkSuccess) {
-                            if (!gameState.mem.nextSceneSuccess) {
-                                loadScene(gameState.currentScene + "_success");
-                            } else {
-                                loadScene(gameState.mem.nextSceneSuccess);
-                            }
-                        } else {
-                            if (!gameState.mem.nextSceneFailure) {
-                                loadScene(gameState.currentScene + "_failure");
-                            } else {
-                                loadScene(gameState.mem.nextSceneFailure);
-                            }
-                        }
-                    }, 1500); // Wait 1.5 seconds before loading next scene
-                    gameState.pendingCheck = null; //Clear pending check
-                    document.getElementById('dice').textContent = "🎲"
-                    activeDiceButton();
-                }, 1500);
-                
-            }
-
-            function initFight(enemy) {
-                do {
-                    fight(enemy)
-                } while(enemy.hp > 0 && gameState.player.health > 0)
-            }
-
-            function fight(enemy) {
-
-                let atkBonus = 0;
-
-                if (gameState.player.inventory.includes("Adaga")) {
-                    atkBonus = 2;
-                    addToLog(`� A adaga de ossos lhe dá +${atkBonus} de ataque.`);
-                }
-                if (gameState.player.inventory.includes("Espada")) {
-                    atkBonus = 3;
-                    addToLog(`⚔️ A espada lhe dá +${atkBonus} de ataque.`);
-                }
-                if (gameState.player.inventory.includes("Machado")) {
-                    atkBonus = 4;
-                    addToLog(`🪓 O machado lhe dá +${atkBonus} de ataque.`);
-                }
-                
-                let attackRoll = atkBonus + rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10)/2) + gameState.player.stats.bba;
-                
-                addToLog(`Você ataca o ${enemy.name} (AC ${enemy.ac})... Roll: ${attackRoll}`);
-                
-                if (attackRoll >= enemy.ac) {
-                    const damage = rollingDice(8)[0] + Math.floor((gameState.player.stats.str - 10)/2);
-                    addToLog(`🥊 Você acerta ${damage} de dano no inimigo!`);
-
-                    enemy.hp -= damage;
-                    
-                    if (enemy.hp <= 0) {
-                        const xpGain = 50;
-                        const goldGain = rollingDice(6, 3).reduce((a, b) => a + b);
-                        addToLog(`🎊 Você derrotou o ${enemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
-                        gameState.player.xp += xpGain;
-                        gameState.player.gold += goldGain;
-                    } else {
-                        addToLog(`🥊 O ${enemy.name} sobreviveu e te ataca!`);
-                        enemyAttack(enemy)
-                    }
-                } else {
-                    addToLog("Você errou!");
-                    addToLog(`🥊 O ${enemy.name} te ataca!`);
-                    enemyAttack(enemy)
-                }
-            }
-
-            function enemyAttack(enemy) {
-                let attackEnemy = rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10)/2) + gameState.player.stats.bba;
-                let armorBonus = 0;
-                if (gameState.player.inventory.includes("Escudo")) {
-                    armorBonus = 4;
-                    addToLog(`🛡️ O escudo lhe dá +${armorBonus} de armadura.`);
-                }
-                if (attackEnemy >= 10 + Math.floor((gameState.player.stats.dex - 10)/2) + gameState.player.stats.armor + armorBonus) {
-                    addToLog(`🥊 O ${enemy.name} acerta você.`);
-                    const enemyDamage = rollingDice(6)[0];
-                    addToLog(`Você levou ${enemyDamage} de dano!`);
-                    changeHealth(enemyDamage);
-                } else {
-                    addToLog(enemy.name + " miss!");
-                }
-            }
-
-            function changeHealth(amount) {
-                gameState.player.health += amount;
-                if (gameState.player.health > gameState.player.maxHealth) gameState.player.health = gameState.player.maxHealth; // cap health
-                if (gameState.player.health <= 0) {
-                    gameState.player.health = 0;
-                    addToLog("☠️☠️☠️ Você morreu pq perdeu todos os pontos de vida! ☠️☠️☠️");
-                    loadScene('death'); // Load death scene
-                }
-                updateStatsDisplay();
-            }
-
-            function changeGold(amount) {
-                gameState.player.gold += amount;
-                if (gameState.player.gold < 0) gameState.player.gold = 0; // No negative gold
-                if (amount > 0) {
-                    addToLog("Você ganhou " + amount + " 🪙.");
-                } else {
-                    addToLog(amount + " 🪙 foi removido da sua mochila");
-                }
-                updateStatsDisplay();
-            }
-
-            function changeXP(amount) {
-                gameState.player.xp += amount;
-                updateStatsDisplay();
-                addToLog("Você ganhou " + amount + " de XP." );
-            }
-
-            function addToInventory(item) {
-                gameState.player.inventory.push(item);
-                updateInventoryDisplay();
-                addToLog(`Adicionado ${item} ao inventário.`);
-            }
-
-            function removeFromInventory(item) {
-                const index = gameState.player.inventory.indexOf(item);
-                if (index > -1) {
-                    gameState.player.inventory.splice(index, 1);
-                    updateInventoryDisplay();
-                    addToLog(`Removido ${item} ao inventário.`);
-                }
-            }
-
-            function haveMoney(amount) {
-              if (amount < gameState.player.gold) {
-                gameState.player.gold -= amount;
-                addToLog(amount + " 🪙 foram removidas da sua mochila");
-                updateStatsDisplay();
-                return true;
-              }
-
-              return false;
-            }
-
-            function updateStatsDisplay() {
-                document.getElementById('health').textContent = gameState.player.health;
-                document.getElementById('gold').textContent = gameState.player.gold;
-                document.getElementById('xp').textContent = gameState.player.xp;
-            }
-
-            function updateInventoryDisplay() {
-                const inventoryItemsElement = document.getElementById('inventory-items');
-                if (gameState.player.inventory.length === 0) {
-                    inventoryItemsElement.textContent = "Mochila vazia!";
-                } else {
-                    inventoryItemsElement.innerHTML = ''; // Clear existing items
-                    const ul = document.createElement('ul');
-                    gameState.player.inventory.forEach(item => {
-                        const li = document.createElement('li');
-                        li.textContent = item;
-                        ul.appendChild(li);
                     });
-                    inventoryItemsElement.appendChild(ul);
                 }
-            }
-
-            function addToLog(message) {
-                gameState.log.push(message);
-                const logElement = document.getElementById('game-log');
-                const logMessageElement = document.createElement('p');
-                logMessageElement.textContent = message;
-                logElement.appendChild(logMessageElement);
-                logElement.scrollTop = logElement.scrollHeight; //Auto-scroll to bottom
-            }
-
-            // Selecionar elementos da lojinha
-            const openShopButton = document.getElementById('open-shop');
-            const closeShopButton = document.getElementById('close-shop');
-            const shopModal = document.getElementById('shop-modal');
-            const playerGoldElement = document.getElementById('player-gold');
-            const shopItems = document.querySelectorAll('.shop-item');
-
-            // Abrir a lojinha
-            openShopButton.addEventListener('click', () => {
-                playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
-                shopModal.classList.remove('hidden');
             });
 
-            // Fechar a lojinha
-            closeShopButton.addEventListener('click', () => {
-                shopModal.classList.add('hidden');
-            });
+            // Configuração do SVG
+            const container = d3.select("#graph-container");
+            const svg = container.append("svg")
+                .attr("width", "100%")
+                .attr("height", "100%");
 
-            // Comprar itens
-            shopItems.forEach(item => {
-                item.addEventListener('click', () => {
-                    const itemName = item.getAttribute('data-item');
-                    const itemPrice = parseInt(item.getAttribute('data-price'), 10);
+            // Definição da seta
+            svg.append("defs")
+                .append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "-0 -5 10 10")
+                .attr("refX", 23)
+                .attr("refY", 0)
+                .attr("orient", "auto")
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("xoverflow", "visible")
+                .append("svg:path")
+                .attr("d", "M 0,-5 L 10 ,0 L 0,5")
+                .attr("fill", "#999")
+                .style("stroke", "none");
 
-                    if (gameState.player.gold >= itemPrice) {
-                        gameState.player.gold -= itemPrice;
-                        addToInventory(itemName);
-                        playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
-                        addToLog(`Você comprou ${itemName} por ${itemPrice}g.`);
-                        updateStatsDisplay(); // Atualiza o ouro na interface
-                    } else {
-                        addToLog("Ouro insuficiente para comprar este item.");
-                    }
+            // Criar zoom
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on("zoom", (event) => {
+                    g.attr("transform", event.transform);
                 });
+
+            svg.call(zoom);
+
+            // Grupo para elementos do grafo
+            const g = svg.append("g");
+
+            // Criação da simulação de força
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links)
+                    .id(d => {
+                        // Verifica se o ID existe no dungeonData, se não existir, adiciona _success
+                        return dungeonData[d.id] ? d.id : d.id + '_success';
+                    })
+                    .distance(200)
+                )
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2));
+
+            // Criar linhas de link com setas
+            const link = g.append("g")
+                .selectAll("path")
+                .data(links)
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("marker-end", "url(#arrowhead)")
+                .attr("stroke-width", 2);
+
+            // Link labels
+            const linkLabels = g.append("g")
+                .selectAll("text")
+                .data(links)
+                .enter().append("text")
+                .text(d => d.text)
+                .attr("font-size", 8)
+                .attr("fill", "#666");
+
+            // Criar nós
+            const node = g.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip);
+
+            // Círculos para os nós
+            node.append("circle")
+                .attr("r", 20)
+                .attr("fill", "#69b3a2");
+
+            // Textos dos nós
+            node.append("text")
+                .attr("dy", 4)
+                .attr("text-anchor", "middle")
+                .text(d => d.id)
+                .attr("fill", "black");
+
+            // Atualizar posições durante a simulação
+            simulation.on("tick", () => {
+                link.attr("d", d => {
+                    return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
+                });
+
+                linkLabels
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
             });
-        </script>
-    </body>
+
+            // Funções de arrasto
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+
+            // Tooltip
+            const tooltip = d3.select("#tooltip");
+
+            function showTooltip(event, d) {
+                const scene = dungeonData[d.id];
+                tooltip.html(`
+                    <strong>Cena: ${d.id}</strong><br>
+                    ${scene.text}<br>
+                    Escolhas: ${scene.choices ? scene.choices.map(choice => choice.text).join(', ') : 'Sem escolhas'}
+                `)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 10) + "px")
+                .style("opacity", 1);
+            }
+
+            function hideTooltip() {
+                tooltip.style("opacity", 0);
+            }
+
+            // Rotacionar labels de link para legibilidade
+            function rotateLinkLabels() {
+                linkLabels.attr("transform", d => {
+                    const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
+                    return `rotate(${angle}, ${(d.source.x + d.target.x) / 2}, ${(d.source.y + d.target.y) / 2})`;
+                });
+            }
+        });
+    </script>
+</body>
 </html>
