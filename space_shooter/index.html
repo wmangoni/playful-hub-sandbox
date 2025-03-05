@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Shooter Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 400px;
+            border: 2px solid #333;
+            background-color: #000;
+            overflow: hidden;
+        }
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            bottom: 20px;
+            left: 280px;
+        }
+        .enemy {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+        }
+        .bullet {
+            position: absolute;
+            width: 10px;
+            height: 20px;
+            background-color: yellow;
+        }
+        .special-bullet {
+            position: absolute;
+            width: 10px;
+            height: 20px;
+            background-color: #00ffff;
+            box-shadow: 0 0 5px #00ffff;
+        }
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background-color: white;
+            border-radius: 50%;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+        }
+        #lives {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-size: 18px;
+        }
+        #special-charges {
+            position: absolute;
+            top: 40px;
+            right: 10px;
+            color: #00ffff;
+            font-size: 18px;
+        }
+        #level {
+            position: absolute;
+            top: 40px;
+            left: 10px;
+            color: #ff9900;
+            font-size: 18px;
+        }
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            z-index: 10;
+        }
+        #special-active {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00ffff;
+            font-size: 16px;
+            display: none;
+        }
+        #special-bar {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 10px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        #special-bar-fill {
+            height: 100%;
+            width: 100%;
+            background-color: #00ffff;
+            border-radius: 5px;
+            transition: width 0.1s;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="score">Score: 0</div>
+        <div id="lives">Lives: 5</div>
+        <div id="special-charges">Tiro Especial: 3</div>
+        <div id="level">Nível: 1</div>
+        <div id="special-active">TIRO TRIPLO ATIVO!</div>
+        <div id="special-bar"><div id="special-bar-fill"></div></div>
+        <svg id="player" viewBox="0 0 100 100">
+            <polygon points="50,0 100,100 50,70 0,100" fill="#3498db" />
+            <rect x="45" y="70" width="10" height="20" fill="#e74c3c" />
+        </svg>
+        <div id="game-over">
+            <div>Game Over</div>
+            <div id="final-score">Score: 0</div>
+            <button id="restart-button">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const specialChargesElement = document.getElementById('special-charges');
+        const levelElement = document.getElementById('level');
+        const specialActiveElement = document.getElementById('special-active');
+        const specialBarFill = document.getElementById('special-bar-fill');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        const restartButton = document.getElementById('restart-button');
+        
+        const containerWidth = gameContainer.offsetWidth;
+        const containerHeight = gameContainer.offsetHeight;
+        const playerWidth = 40;
+        const playerHeight = 40;
+        
+        let playerX = containerWidth / 2 - playerWidth / 2;
+        let playerY = containerHeight - playerHeight - 20;
+        let bullets = [];
+        let enemies = [];
+        let stars = [];
+        let score = 0;
+        let lives = 5;
+        let isGameOver = false;
+        let gameLoopId;
+        let difficultyLevel = 1;
+        let specialCharges = 3;
+        let isSpecialActive = false;
+        let specialTimer = null;
+        let specialTimeLeft = 0;
+        
+        // Controls state
+        let isLeftPressed = false;
+        let isRightPressed = false;
+        let isFirePressed = false;
+        let isSpecialPressed = false;
+        let lastFireTime = 0;
+        
+        // Initialize stars
+        function createStars() {
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * containerWidth + 'px';
+                star.style.top = Math.random() * containerHeight + 'px';
+                star.style.opacity = Math.random() * 0.8 + 0.2;
+                star.speed = Math.random() * 0.5 + 0.1;
+                gameContainer.appendChild(star);
+                stars.push(star);
+            }
+        }
+        
+        // Update player position based on controls
+        function updatePlayer() {
+            if (isLeftPressed && playerX > 0) {
+                playerX -= 7; // Increased player speed
+            }
+            if (isRightPressed && playerX < containerWidth - playerWidth) {
+                playerX += 7; // Increased player speed
+            }
+            player.style.left = playerX + 'px';
+        }
+        
+        // Fire a bullet
+        function fireBullet() {
+            const currentTime = Date.now();
+            if (currentTime - lastFireTime < 150) return; // Faster fire rate (was 300)
+            
+            if (isSpecialActive) {
+                // Triple special shot (middle, left diagonal, right diagonal)
+                // Middle bullet
+                const bullet1 = document.createElement('div');
+                bullet1.className = 'special-bullet';
+                bullet1.style.left = (playerX + playerWidth / 2 - 5) + 'px';
+                bullet1.style.top = (playerY - 15) + 'px';
+                bullet1.speedX = 0;
+                bullet1.speedY = -10;
+                gameContainer.appendChild(bullet1);
+                bullets.push(bullet1);
+                
+                // Left diagonal bullet
+                const bullet2 = document.createElement('div');
+                bullet2.className = 'special-bullet';
+                bullet2.style.left = (playerX + playerWidth / 2 - 15) + 'px';
+                bullet2.style.top = (playerY - 10) + 'px';
+                bullet2.speedX = -2;
+                bullet2.speedY = -9;
+                gameContainer.appendChild(bullet2);
+                bullets.push(bullet2);
+                
+                // Right diagonal bullet
+                const bullet3 = document.createElement('div');
+                bullet3.className = 'special-bullet';
+                bullet3.style.left = (playerX + playerWidth / 2 + 5) + 'px';
+                bullet3.style.top = (playerY - 10) + 'px';
+                bullet3.speedX = 2;
+                bullet3.speedY = -9;
+                gameContainer.appendChild(bullet3);
+                bullets.push(bullet3);
+            } else {
+                // Regular single bullet
+                const bullet = document.createElement('div');
+                bullet.className = 'bullet';
+                bullet.style.left = (playerX + playerWidth / 2 - 5) + 'px';
+                bullet.style.top = (playerY - 15) + 'px';
+                bullet.speedX = 0;
+                bullet.speedY = -10;
+                gameContainer.appendChild(bullet);
+                bullets.push(bullet);
+            }
+            
+            lastFireTime = currentTime;
+        }
+        
+        // Activate special shot
+        function activateSpecial() {
+            if (specialCharges > 0 && !isSpecialActive) {
+                isSpecialActive = true;
+                specialCharges--;
+                specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
+                specialActiveElement.style.display = 'block';
+                specialTimeLeft = 2000; // 2 seconds
+                
+                // Cancel any existing timer
+                if (specialTimer) {
+                    clearInterval(specialTimer);
+                }
+                
+                // Start countdown
+                specialTimer = setInterval(() => {
+                    specialTimeLeft -= 100;
+                    const percentage = (specialTimeLeft / 2000) * 100;
+                    specialBarFill.style.width = `${percentage}%`;
+                    
+                    if (specialTimeLeft <= 0) {
+                        deactivateSpecial();
+                    }
+                }, 100);
+            }
+        }
+        
+        // Deactivate special shot
+        function deactivateSpecial() {
+            isSpecialActive = false;
+            specialActiveElement.style.display = 'none';
+            specialBarFill.style.width = '0%';
+            
+            if (specialTimer) {
+                clearInterval(specialTimer);
+                specialTimer = null;
+            }
+        }
+        
+        // Update bullets position
+        function updateBullets() {
+            for (let i = 0; i < bullets.length; i++) {
+                const bullet = bullets[i];
+                const x = parseFloat(bullet.style.left) + (bullet.speedX || 0);
+                const y = parseFloat(bullet.style.top) + (bullet.speedY || -10);
+                
+                if (y < 0 || x < 0 || x > containerWidth) {
+                    gameContainer.removeChild(bullet);
+                    bullets.splice(i, 1);
+                    i--;
+                } else {
+                    bullet.style.left = x + 'px';
+                    bullet.style.top = y + 'px';
+                }
+            }
+        }
+        
+        // Create an enemy
+        function createEnemy() {
+            // Increase spawn rate and enemy speed based on difficulty level
+            const spawnRate = 0.02 + (difficultyLevel - 1) * 0.005;
+            const maxEnemies = 8 + Math.floor((difficultyLevel - 1) / 2);
+            
+            if (Math.random() < spawnRate && enemies.length < maxEnemies) {
+                const enemy = document.createElement('div');
+                enemy.className = 'enemy';
+                
+                // Random enemy type
+                const enemyType = Math.floor(Math.random() * 3);
+                enemy.innerHTML = `<svg viewBox="0 0 100 100">
+                    ${enemyType === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c" /><circle cx="30" cy="40" r="10" fill="#000" /><circle cx="70" cy="40" r="10" fill="#000" />' : 
+                      enemyType === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6" /><circle cx="35" cy="45" r="8" fill="#000" /><circle cx="65" cy="45" r="8" fill="#000" />' :
+                      '<rect x="10" y="10" width="80" height="80" fill="#f39c12" /><rect x="25" y="30" width="15" height="15" fill="#000" /><rect x="60" y="30" width="15" height="15" fill="#000" />'}
+                </svg>`;
+                
+                const x = Math.random() * (containerWidth - 30);
+                enemy.style.left = x + 'px';
+                enemy.style.top = '0px';
+                
+                // Base speed is increased with difficulty
+                const baseSpeed = 0.5 + (difficultyLevel - 1) * 0.2;
+                enemy.speed = Math.random() * 1 + baseSpeed;
+                
+                // Add special movement pattern for higher levels
+                if (difficultyLevel >= 3) {
+                    enemy.movementType = Math.floor(Math.random() * 3);
+                    enemy.movementOffset = 0;
+                    
+                    if (enemy.movementType === 1) {
+                        // Zigzag movement
+                        enemy.amplitude = Math.random() * 30 + 20;
+                        enemy.frequency = Math.random() * 0.1 + 0.05;
+                    }
+                }
+                
+                gameContainer.appendChild(enemy);
+                enemies.push(enemy);
+            }
+        }
+        
+        // Update enemies position
+        function updateEnemies() {
+            for (let i = 0; i < enemies.length; i++) {
+                const enemy = enemies[i];
+                let x = parseFloat(enemy.style.left);
+                let y = parseFloat(enemy.style.top) + enemy.speed;
+                
+                // Apply special movement patterns based on difficulty level
+                if (enemy.movementType === 1) {
+                    // Zigzag movement
+                    enemy.movementOffset += enemy.frequency;
+                    x += Math.sin(enemy.movementOffset) * 2;
+                } else if (enemy.movementType === 2 && difficultyLevel >= 4) {
+                    // Homing movement (slight tracking of player)
+                    const playerCenterX = playerX + playerWidth / 2;
+                    const enemyCenterX = x + 15;
+                    
+                    if (playerCenterX < enemyCenterX) {
+                        x -= 0.5;
+                    } else if (playerCenterX > enemyCenterX) {
+                        x += 0.5;
+                    }
+                }
+                
+                // Keep enemy within screen bounds
+                if (x < 0) x = 0;
+                if (x > containerWidth - 30) x = containerWidth - 30;
+                
+                if (y > containerHeight) {
+                    gameContainer.removeChild(enemy);
+                    enemies.splice(i, 1);
+                    i--;
+                    
+                    // After level 2, lose lives when enemies reach bottom
+                    if (difficultyLevel >= 3) {
+                        lives--;
+                        livesElement.textContent = `Lives: ${lives}`;
+                        
+                        if (lives <= 0) {
+                            gameOver();
+                        }
+                    }
+                } else {
+                    enemy.style.left = x + 'px';
+                    enemy.style.top = y + 'px';
+                }
+            }
+        }
+        
+        // Update stars position (parallax effect)
+        function updateStars() {
+            for (let i = 0; i < stars.length; i++) {
+                const star = stars[i];
+                let y = parseFloat(star.style.top) + star.speed;
+                
+                if (y > containerHeight) {
+                    y = 0;
+                }
+                
+                star.style.top = y + 'px';
+            }
+        }
+        
+        // Check for collisions
+        function checkCollisions() {
+            // Check bullet-enemy collisions
+            for (let i = 0; i < bullets.length; i++) {
+                const bullet = bullets[i];
+                const bulletRect = bullet.getBoundingClientRect();
+                
+                for (let j = 0; j < enemies.length; j++) {
+                    const enemy = enemies[j];
+                    const enemyRect = enemy.getBoundingClientRect();
+                    
+                    // Larger collision area for easier hits
+                    if (
+                        bulletRect.left < enemyRect.right + 5 &&
+                        bulletRect.right > enemyRect.left - 5 &&
+                        bulletRect.top < enemyRect.bottom + 5 &&
+                        bulletRect.bottom > enemyRect.top - 5
+                    ) {
+                        // Collision detected
+                        gameContainer.removeChild(bullet);
+                        gameContainer.removeChild(enemy);
+                        bullets.splice(i, 1);
+                        enemies.splice(j, 1);
+                        
+                        // Score points
+                        const points = 10 * difficultyLevel;
+                        score += points;
+                        scoreElement.textContent = `Score: ${score}`;
+                        
+                        // Check if we reached new level
+                        const newLevel = 1 + Math.floor(score / 150);
+                        if (newLevel > difficultyLevel) {
+                            difficultyLevel = newLevel;
+                            levelElement.textContent = `Nível: ${difficultyLevel}`;
+                            
+                            // Award extra special charge every 2 levels
+                            if (difficultyLevel % 2 === 0 && specialCharges < 3) {
+                                specialCharges++;
+                                specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
+                            }
+                        }
+                        
+                        i--;
+                        break;
+                    }
+                }
+            }
+            
+            // Check player-enemy collisions
+            const playerRect = player.getBoundingClientRect();
+            for (let i = 0; i < enemies.length; i++) {
+                const enemy = enemies[i];
+                const enemyRect = enemy.getBoundingClientRect();
+                
+                if (
+                    playerRect.left < enemyRect.right &&
+                    playerRect.right > enemyRect.left &&
+                    playerRect.top < enemyRect.bottom &&
+                    playerRect.bottom > enemyRect.top
+                ) {
+                    // Collision detected
+                    gameContainer.removeChild(enemy);
+                    enemies.splice(i, 1);
+                    lives--;
+                    livesElement.textContent = `Lives: ${lives}`;
+                    
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Game over function
+        function gameOver() {
+            isGameOver = true;
+            finalScoreElement.textContent = `Score: ${score}`;
+            gameOverScreen.style.display = 'flex';
+            cancelAnimationFrame(gameLoopId);
+            deactivateSpecial();
+        }
+        
+        // Reset game state
+        function resetGame() {
+            // Clear all game elements
+            while (bullets.length > 0) {
+                gameContainer.removeChild(bullets[0]);
+                bullets.shift();
+            }
+            while (enemies.length > 0) {
+                gameContainer.removeChild(enemies[0]);
+                enemies.shift();
+            }
+            while (stars.length > 0) {
+                gameContainer.removeChild(stars[0]);
+                stars.shift();
+            }
+            
+            // Reset game variables
+            playerX = containerWidth / 2 - playerWidth / 2;
+            playerY = containerHeight - playerHeight - 20;
+            score = 0;
+            lives = 5;
+            difficultyLevel = 1;
+            specialCharges = 3;
+            isGameOver = false;
+            isSpecialActive = false;
+            
+            // Update UI
+            scoreElement.textContent = `Score: ${score}`;
+            livesElement.textContent = `Lives: ${lives}`;
+            levelElement.textContent = `Nível: ${difficultyLevel}`;
+            specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
+            gameOverScreen.style.display = 'none';
+            specialActiveElement.style.display = 'none';
+            specialBarFill.style.width = '0%';
+            
+            // Setup game elements
+            createStars();
+            startGame();
+        }
+        
+        // Auto-fire (to make game easier)
+        function enableAutoFire() {
+            setInterval(() => {
+                if (!isGameOver) {
+                    fireBullet();
+                }
+            }, 300);
+        }
+        
+        // Main game loop
+        function gameLoop() {
+            if (!isGameOver) {
+                updatePlayer();
+                if (isFirePressed) {
+                    fireBullet();
+                }
+                if (isSpecialPressed && !isSpecialActive && specialCharges > 0) {
+                    activateSpecial();
+                    isSpecialPressed = false; // Reset to prevent continuous activation
+                }
+                updateBullets();
+                createEnemy();
+                updateEnemies();
+                updateStars();
+                checkCollisions();
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // Handle keyboard events
+        function setupControls() {
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'a') {
+                    isLeftPressed = true;
+                }
+                if (e.key === 'ArrowRight' || e.key === 'd') {
+                    isRightPressed = true;
+                }
+                if (e.key === 'ArrowUp' || e.key === 'w') {
+                    isFirePressed = true;
+                }
+                if (e.key === ' ' && !isSpecialPressed) {
+                    isSpecialPressed = true;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'a') {
+                    isLeftPressed = false;
+                }
+                if (e.key === 'ArrowRight' || e.key === 'd') {
+                    isRightPressed = false;
+                }
+                if (e.key === 'ArrowUp' || e.key === 'w') {
+                    isFirePressed = false;
+                }
+                if (e.key === ' ') {
+                    isSpecialPressed = false;
+                }
+            });
+            
+            // Touch controls for mobile
+            let touchStartX = 0;
+            gameContainer.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const containerRect = gameContainer.getBoundingClientRect();
+                touchStartX = touch.clientX - containerRect.left;
+                
+                // Double tap detection for special
+                const now = new Date().getTime();
+                const timeSince = now - (touch.target.lastTouch || 0);
+                
+                if (timeSince < 300 && timeSince > 0) {
+                    // Double tap - activate special
+                    isSpecialPressed = true;
+                }
+                
+                touch.target.lastTouch = now;
+                isFirePressed = true;
+            });
+            
+            gameContainer.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const containerRect = gameContainer.getBoundingClientRect();
+                const touchX = touch.clientX - containerRect.left;
+                
+                // Determine movement based on relative position from touch start
+                if (touchX < touchStartX - 20) {
+                    isLeftPressed = true;
+                    isRightPressed = false;
+                } else if (touchX > touchStartX + 20) {
+                    isLeftPressed = false;
+                    isRightPressed = true;
+                } else {
+                    isLeftPressed = false;
+                    isRightPressed = false;
+                }
+                
+                playerX = touchX - playerWidth / 2;
+                if (playerX < 0) playerX = 0;
+                if (playerX > containerWidth - playerWidth) playerX = containerWidth - playerWidth;
+            });
+            
+            gameContainer.addEventListener('touchend', () => {
+                isFirePressed = false;
+                isLeftPressed = false;
+                isRightPressed = false;
+            });
+            
+            // Restart button
+            restartButton.addEventListener('click', resetGame);
+        }
+        
+        // Start the game
+        function startGame() {
+            setupControls();
+            enableAutoFire(); // Auto-fire still enabled for regular shots
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Initialize the game
+        resetGame();
+    </script>
+</body>
+</html>

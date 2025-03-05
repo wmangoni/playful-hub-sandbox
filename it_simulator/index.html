@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tech Company Management Simulation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    .container {
+      background-color: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+    }
+    
+    .setup {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .game-board {
+      display: flex;
+      gap: 20px;
+    }
+    
+    .stats-panel {
+      flex: 1;
+      background-color: #ecf0f1;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    
+    .actions-panel {
+      flex: 1;
+      background-color: #ecf0f1;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    
+    .message-log {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #ecf0f1;
+      border-radius: 5px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #2980b9;
+    }
+    
+    button:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+    
+    input {
+      padding: 10px;
+      margin: 10px;
+      border-radius: 5px;
+      border: 1px solid #bdc3c7;
+    }
+    
+    #gameStatus {
+      color: #e74c3c;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    #gameStatusV {
+      color: #09a510;
+      font-weight: bold;
+      text-align: center;
+    }
+    
+    .action-button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      text-align: left;
+      padding: 12px;
+    }
+    
+    .action-description {
+      font-size: 0.9em;
+      color: #0d4449;
+      margin-top: 5px;
+    }
+
+    .progress-bar {
+      height: 10px;
+      background-color: #e0e0e0;
+      border-radius: 5px;
+      margin-top: 5px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      border-radius: 5px;
+      background-color: #27ae60;
+    }
+    
+    .security-progress-fill {
+      height: 100%;
+      border-radius: 5px;
+      background-color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tech Company Management Simulation</h1>
+    
+    <div class="setup">
+      <input type="text" id="companyName" placeholder="Enter your company name">
+      <button onclick="startGame()">🎮 Start Game</button>
+    </div>
+    
+    <p id="gameStatus"></p>
+    
+    <div class="game-board">
+      <div class="stats-panel">
+        <h3>Company Stats 📈</h3>
+        <div id="stats">
+          <p>Start a new game to see your company stats</p>
+        </div>
+      </div>
+      
+      <div class="actions-panel">
+        <h3>Actions</h3>
+        <div id="actions">
+          <button class="action-button" onclick="makeDecision('hire')">
+            🙂 Hire Employee
+            <div class="action-description">Cost: $10,000 | +1 Employee, +$5,000 Monthly Expenses</div>
+          </button>
+          
+          <button class="action-button" onclick="makeDecision('develop')">
+            🛠 Develop New Product
+            <div class="action-description">Cost: $20,000 | Requires 3+ Employees | +Revenue, +Reputation</div>
+          </button>
+          
+          <button class="action-button" onclick="makeDecision('marketing')">
+            📢 Run Marketing Campaign
+            <div class="action-description">Cost: $15,000 | +10 Reputation</div>
+          </button>
+          
+          <button class="action-button" onclick="makeDecision('research')">
+            📊 Invest in R&D
+            <div class="action-description">Cost: $25,000 | 50% Chance of Breakthrough</div>
+          </button>
+
+          <button class="action-button" onclick="makeDecision('security')">
+            💻 Invest in Security
+            <div class="action-description">Cost: $12,000 | +10 Security Level | Reduces Hacking Risk</div>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="message-log">
+      <h3>Event Log</h3>
+      <div id="messages">
+        <p>Start a new game to see events</p>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Tech Company Management Simulation
+    // A simple text-based strategy game to run your own tech company
+
+    class TechCompanySimulation {
+      constructor(companyName) {
+        // Company stats
+        this.companyName = companyName;
+        this.money = 100000; // Starting capital
+        this.reputation = 20; // Out of 100
+        this.employees = 5; // Starting with a small team
+        this.products = []; // Products the company has developed
+        this.revenue = 0;
+        this.expenses = 5000; // Monthly burn rate
+        this.securityLevel = 10; // Security level out of 100
+        
+        // Game state
+        this.month = 1;
+        this.year = 1;
+        this.isGameOver = false;
+        this.isVictory = false;
+        this.messages = [];
+        
+        this.messages.push(`${this.companyName} founded with $${this.money.toLocaleString()} capital!`);
+        this.messages.push(`WARNING: Your security level is low (${this.securityLevel}/100). Consider investing in security.`);
+      }
+      
+      // Main game loop
+      playTurn(decision) {
+        if (this.isGameOver) {
+          return "Game Over! Refresh to start a new game.";
+        }
+        
+        // Process the player's decision
+        this.processDecision(decision);
+        
+        // Calculate monthly finances
+        this.calculateFinances();
+        
+        // Random events
+        this.triggerRandomEvent();
+        
+        // Check game over conditions
+        this.checkGameOver();
+        
+        // Increment time
+        this.advanceTime();
+        
+        // Return game state
+        return this.getGameState();
+      }
+      
+      processDecision(decision) {
+        switch(decision) {
+          case 'hire':
+            if (this.money >= 10000) {
+              this.employees += 1;
+              this.money -= 10000;
+              this.expenses += Math.floor(Math.random()*5500) + 4500;
+              this.messages.push("You hired a new employee!");
+            } else {
+              this.messages.push("Not enough money to hire a new employee.");
+            }
+            break;
+            
+          case 'develop':
+            if (this.employees >= 3) {
+              const productQuality = Math.floor(Math.random() * 30) + (this.reputation / 5) + 40;
+              const productName = `Product #${this.products.length + 1}`;
+              this.products.push({
+                name: productName,
+                quality: productQuality,
+                revenue: Math.floor(productQuality * 100)
+              });
+              this.money -= 20000;
+              this.reputation += Math.floor(Math.random()*7) + 2;
+              this.messages.push(`You developed a new product: ${productName} (Quality: ${productQuality}/100)`);
+            } else {
+              this.messages.push("You need at least 3 employees to develop a new product.");
+            }
+            break;
+            
+          case 'marketing':
+            if (this.money >= 15000) {
+              this.money -= 15000;
+              this.reputation += Math.floor(Math.random()*15) + 5;
+              this.messages.push("Marketing campaign completed! Reputation increased.");
+            } else {
+              this.messages.push("Not enough money for a marketing campaign.");
+            }
+            break;
+            
+          case 'research':
+            if (this.money >= 25000) {
+              this.money -= 25000;
+              
+              // 50% chance to discover a breakthrough
+              if (Math.random() > 0.5) {
+                this.reputation += Math.floor(Math.random()*20) + 8;
+                
+                // Improve all existing products
+                this.products.forEach(product => {
+                  product.quality += Math.floor(Math.random()*15) + 5;
+                  product.revenue = Math.floor(product.quality * Math.floor(Math.random()*110) + 70);
+                });
+                
+                this.messages.push("R&D breakthrough! All products improved and reputation increased.");
+              } else {
+                this.messages.push("R&D effort didn't yield immediate results, but knowledge was gained.");
+                this.reputation += 3;
+              }
+            } else {
+              this.messages.push("Not enough money for research and development.");
+            }
+            break;
+
+          case 'security':
+            if (this.money >= 12000) {
+              this.money -= 12000;
+              this.securityLevel = Math.min(100, this.securityLevel + Math.floor(Math.random()*14) + 4);
+              this.messages.push(`Security upgraded! New security level: ${this.securityLevel}/100`);
+              
+              // Small increase in expenses for maintenance
+              this.expenses += Math.floor(Math.random()*780) + 400;
+            } else {
+              this.messages.push("Not enough money to invest in security.");
+            }
+            break;
+        }
+      }
+      
+      calculateFinances() {
+        // Calculate revenue from products
+        this.revenue = this.products.reduce((total, product) => total + product.revenue, 0);
+        
+        // Monthly profit/loss
+        const monthlyChange = this.revenue - this.expenses;
+        this.money += monthlyChange;
+        
+        if (monthlyChange >= 0) {
+          this.messages.push(`Monthly profit: $${monthlyChange.toLocaleString()}`);
+        } else {
+          this.messages.push(`Monthly loss: $${Math.abs(monthlyChange).toLocaleString()}`);
+        }
+      }
+      
+      triggerRandomEvent() {
+        const eventChance = Math.random();
+        
+        // Cyber attack event - more likely with low security
+        const hackChance = 0.1 * (1 - this.securityLevel / 100);
+        if (eventChance < hackChance) {
+          // Cyber attack!
+          const severity = Math.random();
+          let moneyLost = 0;
+          
+          if (severity < 0.3) {
+            // Minor attack
+            moneyLost = Math.floor(this.money * 0.05);
+            this.money -= moneyLost;
+            this.messages.push(`SECURITY BREACH: Minor cyber attack! Lost $${moneyLost.toLocaleString()}.`);
+          } else if (severity < 0.7) {
+            // Medium attack
+            moneyLost = Math.floor(this.money * 0.15);
+            this.money -= moneyLost;
+            this.messages.push(`SECURITY BREACH: Significant cyber attack! Lost $${moneyLost.toLocaleString()}.`);
+            this.reputation -= 5;
+          } else {
+            // Major attack
+            moneyLost = Math.floor(this.money * 0.25);
+            this.money -= moneyLost;
+            this.messages.push(`SECURITY BREACH: Major cyber attack! Lost $${moneyLost.toLocaleString()}.`);
+            this.reputation -= 15;
+            
+            // Damage to a random product
+            if (this.products.length > 0) {
+              const randomProduct = Math.floor(Math.random() * this.products.length);
+              this.products[randomProduct].quality = Math.max(30, this.products[randomProduct].quality - 20);
+              this.products[randomProduct].revenue = Math.floor(this.products[randomProduct].quality * 100);
+              this.messages.push(`${this.products[randomProduct].name} was damaged in the attack!`);
+            }
+          }
+          
+          // Reduce security level after attack
+          this.securityLevel = Math.max(5, this.securityLevel - 10);
+          this.messages.push(`Your security level dropped to ${this.securityLevel}/100.`);
+          return;
+        }
+        
+        // Other random events
+        if (eventChance < 0.15) {
+          // Market crash
+          this.revenue = Math.floor(this.revenue * 0.8);
+          this.reputation -= 5;
+          this.messages.push("Market downturn! Revenue temporarily decreased.");
+        } else if (eventChance < 0.25) {
+          // New competitor
+          this.revenue = Math.floor(this.revenue * 0.9);
+          this.messages.push("A new competitor has entered the market. Revenue slightly affected.");
+        } else if (eventChance < 0.35) {
+          // Industry award
+          this.reputation += 15;
+          this.messages.push("Your company won an industry award! Reputation increased.");
+        } else if (eventChance < 0.45 && this.employees > 2) {
+          // Employee left
+          this.employees -= 1;
+          this.expenses -= 5000;
+          this.messages.push("An employee has left the company.");
+        } else if (eventChance < 0.5) {
+          // Security vulnerability discovered
+          this.securityLevel = Math.max(5, this.securityLevel - 5);
+          this.messages.push(`A security vulnerability was discovered! Security level dropped to ${this.securityLevel}/100.`);
+        }
+      }
+      
+      checkGameOver() {
+        if (this.money <= 0) {
+          this.isGameOver = true;
+          this.messages.push("GAME OVER: Your company has gone bankrupt!");
+        }
+        
+        if (this.money >= 1000000) {
+          this.isGameOver = true;
+          this.isVictory = true;
+          this.messages.push("VICTORY: Your company is now worth over $1 million! You win!");
+        }
+      }
+      
+      advanceTime() {
+        this.month++;
+        if (this.month > 12) {
+          this.month = 1;
+          this.year++;
+        }
+      }
+      
+      getGameState() {
+        return {
+          companyName: this.companyName,
+          money: this.money,
+          reputation: this.reputation,
+          employees: this.employees,
+          productsCount: this.products.length,
+          revenue: this.revenue,
+          expenses: this.expenses,
+          month: this.month,
+          year: this.year,
+          isGameOver: this.isGameOver,
+          messages: this.messages.slice(-3) // Only return the last 3 messages
+        };
+      }
+    }
+
+    // Sample usage
+    function startGame() {
+      const companyName = document.getElementById('companyName').value || "Tech Startup";
+      window.game = new TechCompanySimulation(companyName);
+      updateUI();
+    }
+
+    function makeDecision(decision) {
+      if (!window.game) {
+        alert("Please start a game first!");
+        return;
+      }
+      
+      const result = window.game.playTurn(decision);
+      updateUI();
+    }
+
+    function updateUI() {
+      const game = window.game;
+      if (!game) return;
+      
+      document.getElementById('stats').innerHTML = `
+        <h2>${game.companyName}</h2>
+        <p>Month: ${game.month}, Year: ${game.year}</p>
+        <p>Money: $${game.money.toLocaleString()}</p>
+        <p>Reputation: ${game.reputation}/100</p>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${game.reputation}%;"></div>
+        </div>
+        <p>Security Level: ${game.securityLevel}/100</p>
+        <div class="progress-bar">
+          <div class="security-progress-fill" style="width: ${game.securityLevel}%;"></div>
+        </div>
+        <p>Employees: ${game.employees}</p>
+        <p>Products: ${game.products.length}</p>
+        <p>Monthly Revenue: $${game.revenue.toLocaleString()}</p>
+        <p>Monthly Expenses: $${game.expenses.toLocaleString()}</p>
+      `;
+      
+      // Update message log
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.innerHTML = '';
+      
+      game.messages.slice(-8).forEach(message => {
+        const msgElement = document.createElement('p');
+        msgElement.textContent = message;
+        
+        // Highlight security breach messages
+        if (message.includes("SECURITY BREACH")) {
+          msgElement.style.color = "#e74c3c";
+          msgElement.style.fontWeight = "bold";
+        }
+        
+        messagesDiv.appendChild(msgElement);
+      });
+      
+      // Enable/disable buttons based on game state
+      const buttons = document.querySelectorAll('#actions button');
+      buttons.forEach(button => {
+        button.disabled = game.isGameOver;
+      });
+      
+      if (game.isGameOver && !game.isVictory) {
+        document.getElementById('gameStatus').textContent = "Game Over! Refresh to start a new game.";
+      }
+
+      if (game.isGameOver && game.isVictory) {
+        document.getElementById('gameStatusV').textContent = "Congratulations! Your company is now worth over $1 million! You win!";
+      }
+    }
+  </script>
+</body>
+</html>

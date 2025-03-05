@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realm Builder - Fast Mode</title>
+    <style>
+        :root {
+            --grass: #88aa33;
+            --dirt: #b8864c;
+            --water: #3388aa;
+            --text: #f0f0d8;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #2a2a2a;
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .map {
+            display: grid;
+            grid-template-columns: repeat(20, 30px);
+            grid-template-rows: repeat(15, 30px);
+            gap: 1px;
+            background: var(--dirt);
+            border: 2px solid #666;
+        }
+
+        .tile {
+            width: 30px;
+            height: 30px;
+            background: var(--grass);
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
+        }
+
+        .tile:hover {
+            transform: scale(1.1);
+            z-index: 1;
+        }
+
+        /*.tile[data-type="water"] { background: var(--water); }
+        .tile[data-type="castle"] { background: #aa3333; }
+        .tile[data-type="farm"] { background: #aaff33; }
+        .tile[data-type="barracks"] { background: #666666; }
+        .tile[data-type="wall"] { background: #999999; }*/
+
+        .tile[data-type="water"] { 
+            background: var(--water); 
+        }
+        .tile[data-type="water"]::before {
+            content: "🌊"; /* Ícone de água */
+            font-size: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .tile[data-type="castle"] { 
+            background: #aa3333; 
+        }
+        .tile[data-type="castle"]::before {
+            content: "🏰"; /* Ícone de castelo */
+            font-size: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .tile[data-type="farm"] { 
+            background: #aaff33; 
+        }
+        .tile[data-type="farm"]::before {
+            content: "🌾"; /* Ícone de fazenda */
+            font-size: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .tile[data-type="barracks"] { 
+            background: #666666; 
+        }
+        .tile[data-type="barracks"]::before {
+            content: "⚔️"; /* Ícone de quartel */
+            font-size: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .tile[data-type="wall"] { 
+            background: #999999; 
+        }
+        .tile[data-type="wall"]::before {
+            content: "🧱"; /* Ícone de muro */
+            font-size: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .tile[data-type="water"]::before {
+            animation: wave 2s infinite;
+        }
+
+        @keyframes wave {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+            50% { transform: translate(-50%, -50%) rotate(10deg); }
+        }
+
+        .tile[data-type]::before {
+                font-size: 16px;
+            }
+        }
+
+        .info-panel {
+            background: #333333;
+            padding: 20px;
+            border-radius: 5px;
+            border: 2px solid #666;
+        }
+
+        .resources {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .resource {
+            background: #444;
+            padding: 10px;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        .build-options {
+            margin-top: 20px;
+        }
+
+        .build-button {
+            background: #555;
+            border: none;
+            color: white;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .build-button:hover {
+            background: #666;
+        }
+
+        .event-log {
+            margin-top: 20px;
+            height: 200px;
+            overflow-y: auto;
+            background: #222;
+            padding: 10px;
+            border-radius: 3px;
+        }
+
+        .event {
+            margin: 5px 0;
+            padding: 5px;
+            background: #333;
+            border-radius: 3px;
+        }
+
+        #game-timer {
+            font-weight: bold;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <h1>Realm Builder ⏱️ Speed</h1>
+    <div class="game-container">
+        <div class="map" id="map"></div>
+        <div class="info-panel">
+            <div class="resources">
+                <div class="resource" id="gold">Gold: 100</div>
+                <div class="resource" id="food">Food: 100</div>
+                <div class="resource" id="game-timer">Time: 0:00</div>
+            </div>
+            <div class="build-options">
+                <button class="build-button" data-building="castle">🏰 Castle (100🪙) / (100🍎)</button>
+                <button class="build-button" data-building="farm">🌾 Farm (50🪙) / (0🍎)</button>
+                <button class="build-button" data-building="barracks">⚔️ Barracks (75🪙) / (25🍎)</button>
+                <button class="build-button" data-building="wall">🧱 Wall (25🪙) / (20🍎)</button>
+            </div>
+            <div class="event-log" id="event-log"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedBuilding = null;
+        let gold = 100;
+        let food = 100;
+        let gameTimer;
+        let seconds = 0;
+        let timerInterval;
+
+        var w = []
+        for (let x = 0; x < 25; x++) {
+            w.push(Math.floor(Math.random() * 15*20) + 1);
+        }
+        
+        // Initialize map
+        const map = document.getElementById('map');
+        for (let i = 0; i < 15*20; i++) {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            if (w.includes(i)) {
+                tile.dataset.type = 'water';
+            } else {
+                tile.dataset.type = 'grass';
+            }
+            tile.addEventListener('click', () => placeBuilding(tile));
+            map.appendChild(tile);
+        }
+
+        // Add build button listeners
+        document.querySelectorAll('.build-button').forEach(button => {
+            button.addEventListener('click', () => {
+                selectedBuilding = button.dataset.building;
+                document.querySelectorAll('.build-button').forEach(b => 
+                    b.style.background = '#555');
+                button.style.background = '#777';
+            });
+        });
+
+        function updateTimer() {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            document.getElementById('game-timer').textContent = 
+                `Time: ${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function placeBuilding(tile) {
+            if (!selectedBuilding) return;
+            
+            const costs = {
+                castle: { gold: 100, food: 100 },
+                farm: { gold: 50, food: 0 },
+                barracks: { gold: 75, food: 25 },
+                wall: { gold: 25, food: 20 }
+            };
+
+            if (gold >= costs[selectedBuilding].gold && food >= costs[selectedBuilding].food) {
+                gold -= costs[selectedBuilding].gold;
+                food -= costs[selectedBuilding].food;
+                tile.dataset.type = selectedBuilding;
+                updateResources();
+                addEvent(`Built ${selectedBuilding}`);
+                
+                if (document.querySelectorAll('[data-type="castle"]').length >= 3) {
+                    alert(`You won in ${Math.floor(seconds/60)}m${seconds%60}s!`);
+                    clearInterval(gameTimer);
+                    clearInterval(timerInterval);
+                }
+            }
+        }
+
+        function updateResources() {
+            const farms = document.querySelectorAll('[data-type="farm"]').length;
+            food += farms * 2;
+            
+            document.getElementById('gold').textContent = `Gold: ${gold}`;
+            document.getElementById('food').textContent = `Food: ${food}`;
+        }
+
+        function addEvent(text) {
+            const eventLog = document.getElementById('event-log');
+            const event = document.createElement('div');
+            event.className = 'event';
+            event.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            eventLog.prepend(event);
+        }
+
+        //faster game loop (original 5000ms -> now 1667ms)
+        gameTimer = setInterval(() => {
+            if (Math.random() <= 0.3) {
+                const events = [
+                    { type: 'raid', text: 'Bandits raid your kingdom!' },
+                    { type: 'boom', text: 'Trade caravan brings bonus gold!' },
+                    { type: 'plague', text: 'Crop plague destroys food!' }
+                ];
+                
+                const event = events[Math.floor(Math.random() * events.length)];
+                addEvent(event.text);
+                
+                switch(event.type) {
+                    case 'raid':
+                        const knights = document.querySelectorAll('[data-type="barracks"]').length;
+                        const walls = document.querySelectorAll('[data-type="wall"]').length;
+                        if (knights + walls < Math.floor(Math.random() * 6) + 1) {
+                            gold = Math.max(0, gold - 50);
+                            addEvent('Lost 50 gold to bandits!');
+                        }
+                        break;
+                    case 'boom':
+                        gold += 75;
+                        break;
+                    case 'plague':
+                        food = Math.max(0, food - 30);
+                        break;
+                }
+                updateResources();
+            }
+            
+            gold += document.querySelectorAll('[data-type="castle"]').length * 5;
+            updateResources();
+        }, 2667);
+
+        // Timer updates every second
+        timerInterval = setInterval(() => {
+            seconds++;
+            updateTimer();
+        }, 1000);
+
+        updateResources();
+        addEvent('Game started! Build quickly!');
+    </script>
+</body>
+</html>
