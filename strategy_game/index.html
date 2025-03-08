@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realm Builder - Fast Mode</title>
+    <title>Realm Builder</title>
     <style>
         :root {
             --grass: #88aa33;
@@ -54,11 +54,17 @@
             z-index: 1;
         }
 
-        /*.tile[data-type="water"] { background: var(--water); }
-        .tile[data-type="castle"] { background: #aa3333; }
-        .tile[data-type="farm"] { background: #aaff33; }
-        .tile[data-type="barracks"] { background: #666666; }
-        .tile[data-type="wall"] { background: #999999; }*/
+        .tile[data-type="temple"] { 
+            background: #ffd700; 
+        }
+        .tile[data-type="temple"]::before {
+            content: "🏛️"; /* Ícone de templo */
+            font-size: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
 
         .tile[data-type="water"] { 
             background: var(--water); 
@@ -130,9 +136,9 @@
         }
 
         .tile[data-type]::before {
-                font-size: 16px;
-            }
+            font-size: 16px;
         }
+        
 
         .info-panel {
             background: #333333;
@@ -194,10 +200,28 @@
             font-weight: bold;
             color: #ffd700;
         }
+
+        .hidden {
+            display: none;
+        }
+
+        audio {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            box-shadow: 4px 1px 12px;
+            border-radius: 30px;
+        }
+
     </style>
 </head>
 <body>
+    <audio controls autoplay loop>
+        <source src="../ded/audio/medieval-music.mp3" type="audio/mpeg" />
+        Seu navegador não suporta o elemento de áudio.
+    </audio>
     <h1>Realm Builder ⏱️ Speed</h1>
+    <h3>Build 4 Castle to win! 🎉</h3>
     <div class="game-container">
         <div class="map" id="map"></div>
         <div class="info-panel">
@@ -207,10 +231,11 @@
                 <div class="resource" id="game-timer">Time: 0:00</div>
             </div>
             <div class="build-options">
-                <button class="build-button" data-building="castle">🏰 Castle (100🪙) / (100🍎)</button>
+                <button class="build-button" data-building="castle">🏰 Castle (110🪙) / (100🍎)</button>
                 <button class="build-button" data-building="farm">🌾 Farm (50🪙) / (0🍎)</button>
                 <button class="build-button" data-building="barracks">⚔️ Barracks (75🪙) / (25🍎)</button>
                 <button class="build-button" data-building="wall">🧱 Wall (25🪙) / (20🍎)</button>
+                <button id="temple-button" class="build-button hidden" data-building="temple">🏛️ Temple (10🪙) / (60🍎)</button>
             </div>
             <div class="event-log" id="event-log"></div>
         </div>
@@ -223,6 +248,7 @@
         let gameTimer;
         let seconds = 0;
         let timerInterval;
+        let templeActive = false;
 
         var w = []
         for (let x = 0; x < 25; x++) {
@@ -262,22 +288,35 @@
 
         function placeBuilding(tile) {
             if (!selectedBuilding) return;
+            if (tile.dataset.type !== 'grass') {
+                alert("Please select a tile of grass to build");
+                return;
+            }
             
             const costs = {
-                castle: { gold: 100, food: 100 },
+                castle: { gold: 110, food: 100 },
                 farm: { gold: 50, food: 0 },
                 barracks: { gold: 75, food: 25 },
-                wall: { gold: 25, food: 20 }
+                wall: { gold: 25, food: 20 },
+                temple: { gold: 10, food: 60 }
             };
 
             if (gold >= costs[selectedBuilding].gold && food >= costs[selectedBuilding].food) {
+
                 gold -= costs[selectedBuilding].gold;
                 food -= costs[selectedBuilding].food;
+
                 tile.dataset.type = selectedBuilding;
                 updateResources();
                 addEvent(`Built ${selectedBuilding}`);
-                
-                if (document.querySelectorAll('[data-type="castle"]').length >= 3) {
+
+                if (document.querySelectorAll('[data-type="castle"]').length >= 1 && !templeActive) {
+                    alert(`🏛️ You enabled the temple!`);
+                    document.getElementById('temple-button').classList.remove('hidden');
+                    templeActive = true;
+                }
+
+                if (document.querySelectorAll('[data-type="castle"]').length >= 4) {
                     alert(`You won in ${Math.floor(seconds/60)}m${seconds%60}s!`);
                     clearInterval(gameTimer);
                     clearInterval(timerInterval);
@@ -287,7 +326,13 @@
 
         function updateResources() {
             const farms = document.querySelectorAll('[data-type="farm"]').length;
-            food += farms * 2;
+            const temples = document.querySelectorAll('[data-type="temple"]').length;
+            const castles = document.querySelectorAll('[data-type="castle"]').length;
+            const walls = document.querySelectorAll('[data-type="wall"]').length;
+            const knights = document.querySelectorAll('[data-type="barracks"]').length;
+
+            food += farms * 3 - knights * 1;
+            gold += farms * 1 + castles * 4 + temples * 1 - knights * 1;
             
             document.getElementById('gold').textContent = `Gold: ${gold}`;
             document.getElementById('food').textContent = `Food: ${food}`;
@@ -301,40 +346,193 @@
             eventLog.prepend(event);
         }
 
-        //faster game loop (original 5000ms -> now 1667ms)
         gameTimer = setInterval(() => {
             if (Math.random() <= 0.3) {
                 const events = [
-                    { type: 'raid', text: 'Bandits raid your kingdom!' },
-                    { type: 'boom', text: 'Trade caravan brings bonus gold!' },
-                    { type: 'plague', text: 'Crop plague destroys food!' }
+                    { type: 'raid', text: 'Bandits raid your kingdom!', execute: function() {
+                        const knights = document.querySelectorAll('[data-type="barracks"]').length;
+                        const walls = document.querySelectorAll('[data-type="wall"]').length;
+                        if (knights + walls < Math.floor(Math.random() * 8) + 1) {
+                            value = Math.floor(Math.random() * 20) + 40;
+                            gold = Math.max(0, gold - value);
+                            addEvent('Lost '+value+' gold to bandits!');
+                        }
+                    }},
+                    { type: 'boom', text: 'Trade caravan brings bonus gold!', execute: function() {
+                        let amount = Math.floor(Math.random() * 50) + 50;
+                        gold += amount;
+                        addEvent('Gained '+amount+' gold.');
+                    }},
+                    { type: 'plague', text: 'Crop plague destroys food!', execute: function() {
+                        food = Math.max(0, food - Math.floor(Math.random() * 10) + 25);
+                        const farm = document.querySelectorAll('[data-type="farm"]');
+                        if (farm.length > 0) {
+                            farm[0].dataset.type = 'grass';
+                            addEvent('Lost 1 farm for the earthquake.');
+                        }
+                        addEvent('Lost 30 food.');
+                    }},
+                    { type: 'drought', text: 'A severe drought dries up your rivers, reducing water supplies!', execute: function() {
+                        let lostFood = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length < 1) {
+                            lostFood = Math.floor(Math.random() * 50) + 1;
+                        } else {
+                            lostFood = Math.floor(Math.random() * 10) + 1;
+                        }
+                        food -= Math.max(0,lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
+                    { type: 'festival', text: 'A grand festival boosts the morale of your people!', execute: function() {
+                        let amount = Math.floor(Math.random() * 20) + 30;   
+                        food += amount;
+                        addEvent('Gained '+amount+' food.');
+                    }},
+                    { type: 'rebellion', text: 'Disgruntled peasants start a rebellion in the countryside!', execute: function() {
+                        let lostFood = 5;
+                        const knights = document.querySelectorAll('[data-type="barracks"]').length;
+                        const walls = document.querySelectorAll('[data-type="wall"]').length;
+                        if (knights + walls < Math.floor(Math.random() * 12) + 1) {
+                            if (document.querySelectorAll('[data-type="castle"]').length >= 1) {
+                                lostFood = Math.floor(Math.random() * 20) + 1;
+                            } else {
+                                lostFood = Math.floor(Math.random() * 40) + 20;
+                            }
+                        }
+                        food -= Math.max(0,lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
+                    { type: 'discovery', text: 'Miners uncover a rich vein of rare ore!', execute: function() {
+                        let amount = Math.floor(Math.random() * 50) + 20;
+                        gold += amount;
+                        addEvent('Found '+amount+' gold.');
+                    }},
+                    { type: 'storm', text: 'A violent storm damages your coastal defenses!', execute: function() {
+                        let lostFood = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length < 1) {
+                            lostFood = Math.floor(Math.random() * 50) + 1;
+                        } else {
+                            lostFood = Math.floor(Math.random() * 10) + 1;
+                        }
+                        food = Math.max(0, food - lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
+                    { type: 'alliance', text: 'A neighboring kingdom offers a powerful alliance!', execute: function() {
+                        let amount = Math.floor(Math.random() * 50) + 50;
+                        gold += amount;
+                        addEvent('Gained '+amount+' gold.');
+                    }},
+                    { type: 'betrayal', text: 'A trusted advisor betrays you, leaking secrets to enemies!', execute: function() {
+                        let lostFood = 0;
+                        let lostGold = 0;
+                        if (document.querySelectorAll('[data-type="barracks"]').length < 3) {
+                            lostFood = Math.floor(Math.random() * 50) + 20;
+                            lostGold = Math.floor(Math.random() * 50) + 20;
+                            gold = Math.max(0, gold - lostGold);
+                            food = Math.max(0, food - lostFood);
+                        } else {
+                            lostFood = Math.floor(Math.random() * 20) + 5;
+                            lostGold = Math.floor(Math.random() * 20) + 5;
+                            gold = Math.max(0, gold - lostGold);
+                            food = Math.max(0, food - lostFood);
+                        }
+                        addEvent('Lost '+lostFood+' food and '+lostGold+' gold.');
+                    }},
+                    { type: 'invasion', text: 'A rival kingdom launches a sudden invasion!', execute: function() {
+                        let lostFood = Math.floor(Math.random() * 50) - document.querySelectorAll('[data-type="castle"]').length * 5;
+                        food = Math.max(0, food -lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
+                    { type: 'bumperHarvest', text: 'An unusually bountiful harvest fills your granaries!', execute: function() {
+                        let amount = Math.floor(Math.random() * 50) + document.querySelectorAll('[data-type="farm"]').length * 10;
+                        food += amount;
+                        addEvent('Gained '+amount+' food.');
+                    }},
+                    { type: 'earthquake', text: 'An earthquake topples buildings in your capital!', execute: function() {
+                        let lostFood = Math.floor(Math.random() * 50) + 1;
+                        food = Math.max(0, food - lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                        const walls = document.querySelectorAll('[data-type="wall"]');
+                        if (walls.length > 0) {
+                            walls[0].dataset.type = 'grass';
+                            addEvent('Lost 1 walls for the earthquake.');
+                        }
+                    }},
+                    { type: 'refugees', text: 'Refugees flood your borders, straining resources but offering labor!', execute: function() {
+                        let lostFood = Math.floor(Math.random() * 50) + 1;
+                        food = Math.max(0, food - lostFood);
+                        gold += Math.max(0,lostFood);
+                        addEvent('Lost '+lostFood+' food. But gained '+lostFood+' gold.');
+                    }},
+                    { type: 'spy', text: 'A spy is caught, revealing enemy plans!', execute: function() {
+                        let lostGold = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length <= 0) {
+                            lostGold = Math.floor(Math.random() * 50) + 20;
+                        } else if (document.querySelectorAll('[data-type="temple"]').length == 1) {
+                            lostGold = Math.floor(Math.random() * 20) + 5;
+                        } else {
+                            lostGold = Math.floor(Math.random() * 5) + 1;
+                        }
+                        gold = Math.max(0, gold - lostGold);
+                        addEvent('Lost '+lostGold+' gold.');
+                    }},
+                    { type: 'flood', text: 'Heavy rains flood your farmlands, washing away crops!', execute: function() {
+                        let lostFood = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length <= 0) {
+                            lostFood = Math.floor(Math.random() * 50) + 20;
+                        } else if (document.querySelectorAll('[data-type="temple"]').length == 1) {
+                            lostFood = Math.floor(Math.random() * 20) + 5;
+                        } else {
+                            lostFood = Math.floor(Math.random() * 5) + 1;
+                        }
+                        food = Math.max(0, food - lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
+                    { type: 'innovation', text: 'A brilliant scholar invents a new technology!', execute: function() {
+                        let amount = Math.floor(Math.random() * 50) + 20;
+                        gold += amount;
+                        addEvent('Gained '+amount+' gold.');
+                    }},
+                    { type: 'disease', text: 'A mysterious illness spreads through your cities!', execute: function() {
+                        let lostFood = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length <= 0) {
+                            lostFood = Math.floor(Math.random() * 50) + 20;
+                        } else if (document.querySelectorAll('[data-type="temple"]').length == 1) {
+                            lostFood = Math.floor(Math.random() * 20) + 5;
+                        } else {
+                            lostFood = Math.floor(Math.random() * 5) + 1;
+                        }
+                        food = Math.max(0, food - lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
+                    { type: 'pilgrimage', text: 'Pilgrims visit a holy site, bringing wealth and faith!', execute: function() {
+                        let amount = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length > 0) {
+                            amount = Math.floor(Math.random() * 50) + document.querySelectorAll('[data-type="temple"]').length * 10;
+                        } else {
+                            amount = Math.floor(Math.random() * 20) + 5;
+                        }
+                        gold += amount;
+                        addEvent('Gained '+amount+' gold.');
+                    }},
+                    { type: 'wildfire', text: 'A wildfire rages through your forests, destroying timber!', execute: function() {
+                        let lostFood = 0;
+                        if (document.querySelectorAll('[data-type="temple"]').length <= 0) {
+                            lostFood = Math.floor(Math.random() * 50) + 10;
+                        } else {
+                            lostFood = Math.floor(Math.random() * 10) + 1;
+                        }
+                        food = Math.max(0, food - lostFood);
+                        addEvent('Lost '+lostFood+' food.');
+                    }},
                 ];
                 
                 const event = events[Math.floor(Math.random() * events.length)];
                 addEvent(event.text);
-                
-                switch(event.type) {
-                    case 'raid':
-                        const knights = document.querySelectorAll('[data-type="barracks"]').length;
-                        const walls = document.querySelectorAll('[data-type="wall"]').length;
-                        if (knights + walls < Math.floor(Math.random() * 6) + 1) {
-                            gold = Math.max(0, gold - 50);
-                            addEvent('Lost 50 gold to bandits!');
-                        }
-                        break;
-                    case 'boom':
-                        gold += 75;
-                        break;
-                    case 'plague':
-                        food = Math.max(0, food - 30);
-                        break;
-                }
-                updateResources();
+                event.execute();
             }
             
-            gold += document.querySelectorAll('[data-type="castle"]').length * 5;
             updateResources();
-        }, 2667);
+        }, 4000);
 
         // Timer updates every second
         timerInterval = setInterval(() => {
