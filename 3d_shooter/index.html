@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Doom</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Game map (1 = wall, 0 = empty)
+        const map = [
+            [1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,1],
+            [1,0,1,0,1,0,0,1],
+            [1,0,0,0,0,0,0,1],
+            [1,0,1,0,1,0,0,1],
+            [1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1]
+        ];
+
+        // Player initial state
+        let playerX = 2;
+        let playerY = 2;
+        let playerAngle = 0; // in radians
+
+        // Constants
+        const FOV = 60 * Math.PI / 180; // 60 degrees in radians
+        const screenWidth = canvas.width;
+        const screenHeight = canvas.height;
+        const angleStep = FOV / screenWidth;
+        const moveSpeed = 0.1;
+        const rotSpeed = 0.05;
+
+        // Keyboard input tracking
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false,
+            a: false,
+            d: false,
+            ' ': false
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key in keys) keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key in keys) keys[e.key] = false;
+        });
+
+        // Enemies
+        const enemies = [
+            { x: 3, y: 3, health: 100 },
+            { x: 5, y: 4, health: 100 }
+        ];
+
+        // Ray casting function
+        function castRay(angle) {
+            angle = angle % (2 * Math.PI);
+            if (angle < 0) angle += 2 * Math.PI;
+
+            const dirX = Math.cos(angle);
+            const dirY = Math.sin(angle);
+            let mapX = Math.floor(playerX);
+            let mapY = Math.floor(playerY);
+
+            const deltaDistX = Math.abs(1 / dirX);
+            const deltaDistY = Math.abs(1 / dirY);
+            let stepX, stepY;
+            let sideDistX, sideDistY;
+
+            if (dirX < 0) {
+                stepX = -1;
+                sideDistX = (playerX - mapX) * deltaDistX;
+            } else {
+                stepX = 1;
+                sideDistX = (mapX + 1 - playerX) * deltaDistX;
+            }
+            if (dirY < 0) {
+                stepY = -1;
+                sideDistY = (playerY - mapY) * deltaDistY;
+            } else {
+                stepY = 1;
+                sideDistY = (mapY + 1 - playerY) * deltaDistY;
+            }
+
+            let hit = false;
+            let side;
+            while (!hit) {
+                if (sideDistX < sideDistY) {
+                    sideDistX += deltaDistX;
+                    mapX += stepX;
+                    side = 0; // East-West wall
+                } else {
+                    sideDistY += deltaDistY;
+                    mapY += stepY;
+                    side = 1; // North-South wall
+                }
+                if (map[mapY][mapX] === 1) hit = true;
+            }
+
+            let perpWallDist;
+            if (side === 0) {
+                perpWallDist = (mapX - playerX + (1 - stepX) / 2) / dirX;
+            } else {
+                perpWallDist = (mapY - playerY + (1 - stepY) / 2) / dirY;
+            }
+
+            return { distance: perpWallDist, side };
+        }
+
+        // Update game state
+        function update() {
+            // Movement
+            if (keys.ArrowUp) {
+                const newX = playerX + Math.cos(playerAngle) * moveSpeed;
+                const newY = playerY + Math.sin(playerAngle) * moveSpeed;
+                if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+                    playerX = newX;
+                    playerY = newY;
+                }
+            }
+            if (keys.ArrowDown) {
+                const newX = playerX - Math.cos(playerAngle) * moveSpeed;
+                const newY = playerY - Math.sin(playerAngle) * moveSpeed;
+                if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+                    playerX = newX;
+                    playerY = newY;
+                }
+            }
+            if (keys.a) {
+                const strafeAngle = playerAngle - Math.PI / 2;
+                const newX = playerX + Math.cos(strafeAngle) * moveSpeed;
+                const newY = playerY + Math.sin(strafeAngle) * moveSpeed;
+                if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+                    playerX = newX;
+                    playerY = newY;
+                }
+            }
+            if (keys.d) {
+                const strafeAngle = playerAngle + Math.PI / 2;
+                const newX = playerX + Math.cos(strafeAngle) * moveSpeed;
+                const newY = playerY + Math.sin(strafeAngle) * moveSpeed;
+                if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+                    playerX = newX;
+                    playerY = newY;
+                }
+            }
+            // Rotation
+            if (keys.ArrowLeft) playerAngle -= rotSpeed;
+            if (keys.ArrowRight) playerAngle += rotSpeed;
+            playerAngle = (playerAngle + 2 * Math.PI) % (2 * Math.PI);
+
+            // Shooting
+            if (keys[' ']) {
+                const dirX = Math.cos(playerAngle);
+                const dirY = Math.sin(playerAngle);
+                const wallRay = castRay(playerAngle);
+                const wallDistance = wallRay.distance;
+
+                let minT = wallDistance;
+                let hitEnemy = null;
+
+                enemies.forEach(enemy => {
+                    const dx = enemy.x - playerX;
+                    const dy = enemy.y - playerY;
+                    const t = dx * dirX + dy * dirY;
+                    if (t > 0) {
+                        const closestX = playerX + t * dirX;
+                        const closestY = playerY + t * dirY;
+                        const dist = Math.sqrt((closestX - enemy.x) ** 2 + (closestY - enemy.y) ** 2);
+                        if (dist < 0.5 && t < minT) {
+                            minT = t;
+                            hitEnemy = enemy;
+                        }
+                    }
+                });
+
+                if (hitEnemy) {
+                    hitEnemy.health -= 10;
+                    if (hitEnemy.health <= 0) {
+                        const index = enemies.indexOf(hitEnemy);
+                        enemies.splice(index, 1);
+                    }
+                }
+            }
+        }
+
+        // Render the scene
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+
+            // Draw walls
+            for (let x = 0; x < screenWidth; x++) {
+                const rayAngle = playerAngle + (x - screenWidth / 2) * angleStep;
+                const ray = castRay(rayAngle);
+                const distance = ray.distance;
+                const perpWallDist = distance * Math.cos(rayAngle - playerAngle); // Correct fish-eye
+
+                const lineHeight = screenHeight / perpWallDist;
+                const drawStart = Math.floor((screenHeight - lineHeight) / 2);
+                const drawEnd = Math.floor((screenHeight + lineHeight) / 2);
+
+                const color = ray.side === 0 ? 'red' : 'blue';
+                ctx.fillStyle = color;
+                ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+            }
+
+            // Draw enemies
+            enemies.forEach(enemy => {
+                const dx = enemy.x - playerX;
+                const dy = enemy.y - playerY;
+                const transformX = dx * Math.cos(playerAngle) - dy * Math.sin(playerAngle);
+                const transformY = dx * Math.sin(playerAngle) + dy * Math.cos(playerAngle);
+                if (transformX > 0) {
+                    const screenX = (transformY / transformX) * (screenWidth / 2) + (screenWidth / 2);
+                    const spriteSize = (1 / transformX) * screenHeight;
+                    const drawStartX = Math.floor(screenX - spriteSize / 2);
+                    const drawEndX = Math.floor(screenX + spriteSize / 2);
+                    const drawStartY = Math.floor((screenHeight - spriteSize) / 2);
+                    const drawEndY = Math.floor((screenHeight + spriteSize) / 2);
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(drawStartX, drawStartY, drawEndX - drawStartX, drawEndY - drawStartY);
+                }
+            });
+
+            // Draw crosshair
+            ctx.strokeStyle = 'white';
+            ctx.beginPath();
+            ctx.moveTo(screenWidth / 2 - 10, screenHeight / 2);
+            ctx.lineTo(screenWidth / 2 + 10, screenHeight / 2);
+            ctx.moveTo(screenWidth / 2, screenHeight / 2 - 10);
+            ctx.lineTo(screenWidth / 2, screenHeight / 2 + 10);
+            ctx.stroke();
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
