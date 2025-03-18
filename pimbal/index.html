@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pimbal - Classic Pinball Game</title>
+    <style>
+        body {
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        
+        #gameCanvas {
+            background-color: #000;
+            border: 2px solid #444;
+            border-radius: 10px;
+        }
+        
+        #gameInfo {
+            margin-top: 10px;
+            font-size: 18px;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .multiplier-zone-1 {
+            color: #FF5733;
+        }
+        
+        .multiplier-zone-2 {
+            color: #33FF57;
+        }
+        
+        .multiplier-zone-3 {
+            color: #3357FF;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+            color: #FFD700;
+            text-shadow: 0 0 5px #FF5733;
+        }
+    </style>
+</head>
+<body>
+    <h1>PIMBAL</h1>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <div id="gameInfo">
+        <div>Score: <span id="score">0</span></div>
+        <div>Lives: <span id="lives">3</span></div>
+        <div>Multiplier: <span id="multiplier">1x</span></div>
+    </div>
+
+    <script>
+        // Game Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game variables
+        let score = 0;
+        let lives = 3;
+        let currentMultiplier = 1;
+        let gameActive = true;
+        let gameStarted = false;
+        
+        // Ball properties
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            radius: 8,
+            speedX: 0,
+            speedY: 0,
+            isLaunched: false
+        };
+        
+        // Launcher properties
+        const launcher = {
+            x: canvas.width - 30,
+            y: canvas.height - 50,
+            width: 10,
+            height: 80,
+            power: 0,
+            maxPower: 15,
+            charging: false
+        };
+        
+        // Flippers
+        const leftFlipper = {
+            x: 140,
+            y: canvas.height - 50,
+            width: 80,
+            height: 10,
+            angle: Math.PI / 4,
+            rotation: 0,
+            isUp: false
+        };
+        
+        const rightFlipper = {
+            x: 258,
+            y: canvas.height - 50,
+            width: 80,
+            height: 10,
+            angle: -Math.PI / 4,
+            rotation: 0,
+            isUp: false
+        };
+        
+        // Obstacles - Bumpers, targets, etc.
+        const bumpers = [
+            { x: 100, y: 150, radius: 20, points: 10, color: '#FF5733' },
+            { x: 200, y: 200, radius: 20, points: 10, color: '#FF5733' },
+            { x: 300, y: 150, radius: 20, points: 10, color: '#FF5733' },
+            { x: 150, y: 300, radius: 15, points: 5, color: '#33FF57' },
+            { x: 250, y: 300, radius: 15, points: 5, color: '#33FF57' }
+        ];
+        
+        // Multiplier zones
+        const multiplierZones = [
+            { x: 50, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 87, 51, 0.4)' },
+            { x: 290, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 87, 51, 0.4)' },
+            { x: 170, y: 100, width: 60, height: 60, multiplier: 3, color: 'rgba(51, 255, 87, 0.4)' },
+            { x: 170, y: 250, width: 60, height: 60, multiplier: 5, color: 'rgba(51, 87, 255, 0.4)' }
+        ];
+        
+        // Walls and boundaries
+        const walls = [
+            // Left wall
+            { x: 10, y: 0, width: 5, height: canvas.height - 100 },
+            // Right wall
+            { x: canvas.width - 15, y: 0, width: 5, height: canvas.height - 100 },
+            // Top wall
+            { x: 10, y: 10, width: canvas.width - 20, height: 5 },
+            // Bottom left corner
+            { x: 10, y: canvas.height - 100, width: 100, height: 5, angle: Math.PI / 4 },
+            // Bottom right corner
+            { x: canvas.width - 110, y: canvas.height - 100, width: 100, height: 5, angle: -Math.PI / 4 }
+        ];
+        
+        // Event listeners
+        document.addEventListener('keydown', function(e) {
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                launcher.charging = true;
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'z') {
+                leftFlipper.isUp = true;
+            }
+            if (e.key === 'ArrowRight' || e.key === '/') {
+                rightFlipper.isUp = true;
+            }
+            if (e.key === 'Enter' && !gameActive) {
+                resetGame();
+            }
+        });
+        
+        document.addEventListener('keyup', function(e) {
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                if (launcher.charging && !ball.isLaunched) {
+                    launchBall();
+                    launcher.charging = false;
+                    gameStarted = true;
+                }
+                launcher.charging = false;
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'z') {
+                leftFlipper.isUp = false;
+            }
+            if (e.key === 'ArrowRight' || e.key === '/') {
+                rightFlipper.isUp = false;
+            }
+        });
+        
+        // Game functions
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            currentMultiplier = 1;
+            gameActive = true;
+            gameStarted = false;
+            
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height - 100;
+            ball.speedX = 0;
+            ball.speedY = 0;
+            ball.isLaunched = false;
+            
+            updateScoreDisplay();
+        }
+        
+        function launchBall() {
+            ball.isLaunched = true;
+            ball.speedY = -launcher.power;
+            ball.speedX = -2; // Slight angle
+        }
+        
+        function updateScoreDisplay() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('multiplier').textContent = currentMultiplier + 'x';
+        }
+        
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.closePath();
+        }
+        
+        function drawLauncher() {
+            ctx.save();
+            ctx.translate(launcher.x, launcher.y + launcher.height);
+            
+            // Draw launcher
+            ctx.fillStyle = '#888888';
+            ctx.fillRect(-launcher.width / 2, -launcher.height + (launcher.height - launcher.power * 5), launcher.width, launcher.power * 5);
+            
+            // Draw spring
+            ctx.strokeStyle = '#AAAAAA';
+            ctx.lineWidth = 3;
+            const springHeight = launcher.height - launcher.power * 5;
+            const waves = 8;
+            ctx.beginPath();
+            ctx.moveTo(-launcher.width / 4, -launcher.height);
+            for (let i = 0; i < waves; i++) {
+                ctx.lineTo((i % 2 === 0 ? 1 : -1) * launcher.width / 4, -launcher.height + (i + 1) * springHeight / waves);
+            }
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
+        function drawFlipper(flipper) {
+            ctx.save();
+            ctx.translate(flipper.x, flipper.y);
+            ctx.rotate(flipper.isUp ? flipper.angle : 0);
+            ctx.fillStyle = '#DDDDDD';
+            ctx.fillRect(-flipper.width / 2, -flipper.height / 2, flipper.width, flipper.height);
+            ctx.restore();
+        }
+        
+        function drawBumpers() {
+            bumpers.forEach(bumper => {
+                ctx.beginPath();
+                ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
+                ctx.fillStyle = bumper.color;
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+            });
+        }
+        
+        function drawMultiplierZones() {
+            multiplierZones.forEach(zone => {
+                ctx.beginPath();
+                ctx.rect(zone.x, zone.y, zone.width, zone.height);
+                ctx.fillStyle = zone.color;
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.closePath();
+                
+                // Draw multiplier text
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${zone.multiplier}x`, zone.x + zone.width / 2, zone.y + zone.height / 2 + 6);
+            });
+        }
+        
+        function drawWalls() {
+            walls.forEach(wall => {
+                ctx.save();
+                if (wall.angle) {
+                    // For angled walls
+                    const centerX = wall.x + wall.width / 2;
+                    const centerY = wall.y + wall.height / 2;
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(wall.angle);
+                    ctx.fillStyle = '#555555';
+                    ctx.fillRect(-wall.width / 2, -wall.height / 2, wall.width, wall.height);
+                } else {
+                    // For straight walls
+                    ctx.fillStyle = '#555555';
+                    ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+                }
+                ctx.restore();
+            });
+        }
+        
+        function checkCollisions() {
+            // Wall collisions
+            if (ball.x - ball.radius < 10) {
+                ball.x = 10 + ball.radius;
+                ball.speedX = -ball.speedX * 0.9;
+            }
+            if (ball.x + ball.radius > canvas.width - 15) {
+                ball.x = canvas.width - 15 - ball.radius;
+                ball.speedX = -ball.speedX * 0.9;
+            }
+            if (ball.y - ball.radius < 10) {
+                ball.y = 10 + ball.radius;
+                ball.speedY = -ball.speedY * 0.9;
+            }
+            
+            // Check if ball fell out
+            if (ball.y > canvas.height) {
+                if (lives > 1) {
+                    lives--;
+                    ball.x = canvas.width / 2;
+                    ball.y = canvas.height - 100;
+                    ball.speedX = 0;
+                    ball.speedY = 0;
+                    ball.isLaunched = false;
+                    currentMultiplier = 1;
+                } else {
+                    lives = 0;
+                    gameActive = false;
+                }
+                updateScoreDisplay();
+            }
+            
+            // Check bumper collisions
+            bumpers.forEach(bumper => {
+                const dx = ball.x - bumper.x;
+                const dy = ball.y - bumper.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < ball.radius + bumper.radius) {
+                    // Calculate bounce angle
+                    const angle = Math.atan2(dy, dx);
+                    const sin = Math.sin(angle);
+                    const cos = Math.cos(angle);
+                    
+                    // Increase speed slightly for an exciting bounce
+                    const speed = Math.sqrt(ball.speedX * ball.speedX + ball.speedY * ball.speedY);
+                    ball.speedX = cos * speed * 1.1;
+                    ball.speedY = sin * speed * 1.1;
+                    
+                    // Move ball outside of bumper
+                    const newX = bumper.x + (ball.radius + bumper.radius) * cos;
+                    const newY = bumper.y + (ball.radius + bumper.radius) * sin;
+                    ball.x = newX;
+                    ball.y = newY;
+                    
+                    // Add points
+                    score += bumper.points * currentMultiplier;
+                    updateScoreDisplay();
+                    
+                    // Visual feedback (could add animation here)
+                }
+            });
+            
+            // Check multiplier zones
+            multiplierZones.forEach(zone => {
+                if (ball.x > zone.x && ball.x < zone.x + zone.width &&
+                    ball.y > zone.y && ball.y < zone.y + zone.height) {
+                    currentMultiplier = zone.multiplier;
+                    updateScoreDisplay();
+                }
+            });
+            
+            // Flipper collision detection (simplified)
+            checkFlipperCollision(leftFlipper);
+            checkFlipperCollision(rightFlipper);
+        }
+        
+        function checkFlipperCollision(flipper) {
+            // Simple rectangular collision for flippers
+            // In a real game, this would be more sophisticated with proper angular physics
+            
+            const flipperAngle = flipper.isUp ? flipper.angle : 0;
+            
+            // Create a bounding box for the flipper
+            const flipperLeft = flipper.x - flipper.width / 2;
+            const flipperRight = flipper.x + flipper.width / 2;
+            const flipperTop = flipper.y - flipper.height / 2;
+            const flipperBottom = flipper.y + flipper.height / 2;
+            
+            // Basic collision check
+            if (ball.x + ball.radius > flipperLeft && 
+                ball.x - ball.radius < flipperRight && 
+                ball.y + ball.radius > flipperTop && 
+                ball.y - ball.radius < flipperBottom) {
+                
+                // Push the ball up and away from the flipper
+                ball.speedY = -Math.abs(ball.speedY) - (flipper.isUp ? 5 : 0);
+                
+                // Push left or right depending on which flipper
+                if (flipper === leftFlipper) {
+                    ball.speedX += flipper.isUp ? 3 : 0;
+                } else {
+                    ball.speedX -= flipper.isUp ? 3 : 0;
+                }
+                
+                // Add points for flipper hit
+                score += 1 * currentMultiplier;
+                updateScoreDisplay();
+            }
+        }
+        
+        function update() {
+            if (gameActive) {
+                // Update launcher power
+                if (launcher.charging && !ball.isLaunched) {
+                    launcher.power += 0.2;
+                    if (launcher.power > launcher.maxPower) {
+                        launcher.power = launcher.maxPower;
+                    }
+                }
+                
+                // Update ball position
+                if (ball.isLaunched) {
+                    ball.speedY += 0.2; // Gravity
+                    ball.x += ball.speedX;
+                    ball.y += ball.speedY;
+                    
+                    // Add friction/air resistance
+                    ball.speedX *= 0.995;
+                    ball.speedY *= 0.995;
+                    
+                    checkCollisions();
+                }
+            }
+        }
+        
+        function drawGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#FF5733';
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '24px Arial';
+            ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+            
+            ctx.font = '18px Arial';
+            ctx.fillText('Press ENTER to play again', canvas.width / 2, canvas.height / 2 + 50);
+        }
+        
+        function drawInstructions() {
+            if (!gameStarted) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#FFD700';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('PIMBAL', canvas.width / 2, canvas.height / 2 - 100);
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '18px Arial';
+                ctx.fillText('Controls:', canvas.width / 2, canvas.height / 2 - 40);
+                
+                ctx.font = '16px Arial';
+                ctx.fillText('SPACE - Launch ball / Charge power', canvas.width / 2, canvas.height / 2);
+                ctx.fillText('LEFT ARROW or Z - Left flipper', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.fillText('RIGHT ARROW or / - Right flipper', canvas.width / 2, canvas.height / 2 + 60);
+                
+                ctx.fillStyle = '#33FF57';
+                ctx.fillText('Get higher scores with multiplier zones!', canvas.width / 2, canvas.height / 2 + 100);
+                
+                ctx.fillStyle = '#FF5733';
+                ctx.font = '16px Arial';
+                ctx.fillText('Press SPACE to start!', canvas.width / 2, canvas.height / 2 + 150);
+            }
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw game elements
+            drawWalls();
+            drawMultiplierZones();
+            drawBumpers();
+            drawFlipper(leftFlipper);
+            drawFlipper(rightFlipper);
+            drawLauncher();
+            drawBall();
+            
+            // If game over, show message
+            if (!gameActive) {
+                drawGameOver();
+            }
+            
+            // Show instructions if game hasn't started
+            drawInstructions();
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Start the game
+        updateScoreDisplay();
+        gameLoop();
+    </script>
+</body>
+</html> 
