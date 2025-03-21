@@ -20,20 +20,29 @@
 
         // Game map (1 = wall, 0 = empty)
         const map = [
-            [1,1,1,1,1,1,1,1],
-            [1,0,0,0,0,0,0,1],
-            [1,0,1,0,1,0,0,1],
-            [1,0,0,0,0,0,0,1],
-            [1,0,1,0,1,0,0,1],
-            [1,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,1],
-            [1,1,1,1,1,1,1,1]
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,3,3,0,0,0,0,0,0,0,0,2,0,0,1],
+            [1,0,3,0,0,0,2,2,2,2,0,0,2,0,0,1],
+            [1,0,0,0,0,0,2,0,0,2,0,0,0,0,0,1],
+            [1,0,0,0,0,0,2,0,0,2,0,0,0,0,0,1],
+            [1,0,0,0,0,0,2,2,0,2,0,0,0,0,0,1],
+            [1,0,2,2,0,0,0,0,0,2,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,0,0,0,0,0,1,1,1,1,0,0,1,0,0,1],
+            [1,0,2,0,0,0,1,0,0,0,0,0,1,0,0,1],
+            [1,0,2,0,0,0,1,0,0,0,0,0,0,0,0,1],
+            [1,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,2,2,0,0,0,0,0,0,3,3,3,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
         ];
 
         // Player initial state
         let playerX = 2;
         let playerY = 2;
         let playerAngle = 0; // in radians
+        let isMoving = true; // Adicionar esta variável para rastrear movimento
 
         // Constants
         const FOV = 60 * Math.PI / 180; // 60 degrees in radians
@@ -56,17 +65,103 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key in keys) keys[e.key] = true;
+            
+            // Tecla ESC para pausar/despausar
+            if (e.key === 'Escape') {
+                togglePause();
+            }
+            
+            // Tecla ESPAÇO para reiniciar quando estiver em game over
+            if (e.key === ' ' && isGameOver) {
+                restartGame();
+            }
         });
 
         document.addEventListener('keyup', (e) => {
             if (e.key in keys) keys[e.key] = false;
         });
 
-        // Enemies
+        // Definir tipos de inimigos
+        const enemyTypes = {
+            grunt: {
+                health: 50,
+                speed: 0.03,
+                damage: 10,
+                size: 0.6,
+                color: '#8B0000',
+                scoreValue: 100
+            },
+            demon: {
+                health: 150,
+                speed: 0.02,
+                damage: 25,
+                size: 0.8,
+                color: '#FF4500',
+                scoreValue: 250
+            }
+        };
+
+        // Criar uma variedade maior de inimigos
         const enemies = [
-            { x: 3, y: 3, health: 100 },
-            { x: 5, y: 4, health: 100 }
+            { x: 3, y: 3, type: 'grunt', health: 50, state: 'idle', target: null, lastAttack: 0, dead: false },
+            { x: 5, y: 4, type: 'grunt', health: 50, state: 'idle', target: null, lastAttack: 0, dead: false },
+            { x: 10, y: 10, type: 'demon', health: 150, state: 'idle', target: null, lastAttack: 0, dead: false },
+            { x: 14, y: 3, type: 'grunt', health: 50, state: 'idle', target: null, lastAttack: 0, dead: false },
+            { x: 6, y: 12, type: 'grunt', health: 50, state: 'idle', target: null, lastAttack: 0, dead: false },
+            { x: 12, y: 13, type: 'demon', health: 150, state: 'idle', target: null, lastAttack: 0, dead: false }
         ];
+
+        // Adicionar paleta de cores mais variada para as paredes
+        const wallColors = {
+            1: '#8B4513', // Marrom (parede normal)
+            2: '#696969', // Cinza (parede metálica)
+            3: '#A52A2A'  // Vermelho escuro (parede especial)
+        };
+
+        // Sistema de armas - MOVER ESTA DEFINIÇÃO PARA ANTES DO OBJETO PLAYER
+        const weapons = {
+            pistol: {
+                damage: 20,
+                fireRate: 500, // ms entre tiros
+                ammo: 50,
+                maxAmmo: 100,
+                reloadTime: 1000,
+                spread: 0.05, // imprecisão do tiro
+                name: "Pistola"
+            },
+            shotgun: {
+                damage: 60,
+                fireRate: 900,
+                ammo: 20,
+                maxAmmo: 40,
+                reloadTime: 1500,
+                spread: 0.2,
+                projectiles: 5, // número de projéteis por tiro
+                name: "Shotgun"
+            }
+        };
+
+        // Variáveis de estado do jogo
+        let impacts = []; // Array para armazenar impactos de tiros
+        let isGameOver = false; // Estado de game over
+        let isPaused = false; // Adicionar variável para controlar o estado de pausa
+
+        // Atualizar o objeto player para incluir pontuação
+        const player = {
+            x: 2,
+            y: 2,
+            angle: 0,
+            health: 100,
+            maxHealth: 100,
+            currentWeapon: 'pistol',
+            lastShot: 0,
+            isReloading: false,
+            weapons: weapons,
+            score: 0 // Adicionar pontuação inicial
+        };
+
+        // Adicionar um z-buffer para armazenar a distância das paredes
+        let zBuffer = new Array(screenWidth).fill(Infinity);
 
         // Ray casting function
         function castRay(angle) {
@@ -75,8 +170,8 @@
 
             const dirX = Math.cos(angle);
             const dirY = Math.sin(angle);
-            let mapX = Math.floor(playerX);
-            let mapY = Math.floor(playerY);
+            let mapX = Math.floor(player.x);
+            let mapY = Math.floor(player.y);
 
             const deltaDistX = Math.abs(1 / dirX);
             const deltaDistY = Math.abs(1 / dirY);
@@ -85,21 +180,23 @@
 
             if (dirX < 0) {
                 stepX = -1;
-                sideDistX = (playerX - mapX) * deltaDistX;
+                sideDistX = (player.x - mapX) * deltaDistX;
             } else {
                 stepX = 1;
-                sideDistX = (mapX + 1 - playerX) * deltaDistX;
+                sideDistX = (mapX + 1 - player.x) * deltaDistX;
             }
             if (dirY < 0) {
                 stepY = -1;
-                sideDistY = (playerY - mapY) * deltaDistY;
+                sideDistY = (player.y - mapY) * deltaDistY;
             } else {
                 stepY = 1;
-                sideDistY = (mapY + 1 - playerY) * deltaDistY;
+                sideDistY = (mapY + 1 - player.y) * deltaDistY;
             }
 
             let hit = false;
             let side;
+            let wallType;
+            
             while (!hit) {
                 if (sideDistX < sideDistY) {
                     sideDistX += deltaDistX;
@@ -110,133 +207,415 @@
                     mapY += stepY;
                     side = 1; // North-South wall
                 }
-                if (map[mapY][mapX] === 1) hit = true;
+                
+                // Verificar o tipo de parede (1, 2, 3, etc.)
+                const cell = map[mapY][mapX];
+                if (cell > 0) {
+                    hit = true;
+                    wallType = cell;
+                }
             }
 
             let perpWallDist;
             if (side === 0) {
-                perpWallDist = (mapX - playerX + (1 - stepX) / 2) / dirX;
+                perpWallDist = (mapX - player.x + (1 - stepX) / 2) / dirX;
             } else {
-                perpWallDist = (mapY - playerY + (1 - stepY) / 2) / dirY;
+                perpWallDist = (mapY - player.y + (1 - stepY) / 2) / dirY;
             }
 
-            return { distance: perpWallDist, side };
+            return { 
+                distance: perpWallDist, 
+                side, 
+                wallType,
+                mapX,
+                mapY,
+                angle
+            };
+        }
+
+        // Função de tiro melhorada
+        function shoot() {
+            const now = Date.now();
+            const weapon = player.weapons[player.currentWeapon];
+            
+            if (player.isReloading) return;
+            
+            if (now - player.lastShot < weapon.fireRate) return;
+            
+            if (weapon.ammo <= 0) {
+                // Som de "click" - sem munição
+                console.log("Click! Sem munição.");
+                return;
+            }
+            
+            player.lastShot = now;
+            weapon.ammo--;
+            
+            // Efeito visual do tiro
+            drawMuzzleFlash();
+            
+            // Determinar número de projéteis (para shotgun)
+            const projectiles = weapon.projectiles || 1;
+            
+            for (let i = 0; i < projectiles; i++) {
+                const spreadAngle = (Math.random() - 0.5) * weapon.spread;
+                const shotAngle = player.angle + spreadAngle;
+                
+                // Raycasting para detectar colisão
+                const ray = castRay(shotAngle);
+                
+                // Verificar se atingiu inimigo
+                let hitEnemy = false;
+                
+                enemies.forEach(enemy => {
+                    // Ignorar inimigos já mortos
+                    if (enemy.dead) return;
+                    
+                    const dx = enemy.x - player.x;
+                    const dy = enemy.y - player.y;
+                    const dirX = Math.cos(shotAngle);
+                    const dirY = Math.sin(shotAngle);
+                    const dotProduct = dx * dirX + dy * dirY;
+                    
+                    if (dotProduct > 0) {
+                        const perpDist = Math.sqrt(dx * dx + dy * dy - dotProduct * dotProduct);
+                        
+                        if (perpDist < 0.5 && dotProduct < ray.distance) {
+                            // Acertou o inimigo
+                            hitEnemy = true;
+                            enemy.health -= weapon.damage;
+                            enemy.lastHit = now;
+                            
+                            // Efeito de dano
+                            enemy.isHit = true;
+                            setTimeout(() => { enemy.isHit = false; }, 150);
+                            
+                            if (enemy.health <= 0) {
+                                // Inimigo eliminado
+                                enemy.dead = true;
+                                // Adicionar pontuação baseada no tipo de inimigo
+                                const enemyType = enemyTypes[enemy.type];
+                                player.score += enemyType.scoreValue;
+                                
+                                console.log(`Inimigo eliminado! Pontuação: ${player.score}`);
+                            }
+                        }
+                    }
+                });
+                
+                // Efeito visual do impacto na parede (se não atingiu inimigo)
+                if (!hitEnemy) {
+                    createImpact(ray);
+                }
+            }
+        }
+
+        function drawMuzzleFlash() {
+            const weaponX = screenWidth / 2;
+            const weaponY = screenHeight - 100;
+            
+            // Desenhar flash de tiro
+            ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
+            ctx.beginPath();
+            ctx.arc(weaponX, weaponY - 15, 15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Adicionar brilho ao redor
+            ctx.fillStyle = 'rgba(255, 255, 200, 0.5)';
+            ctx.beginPath();
+            ctx.arc(weaponX, weaponY - 15, 25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Fazer o flash desaparecer
+            setTimeout(() => {
+                // Não precisamos limpar explicitamente, pois o próximo frame vai redesenhar tudo
+            }, 50);
+        }
+
+        function createImpact(ray) {
+            // Posição do impacto
+            const impactX = player.x + Math.cos(ray.angle) * ray.distance;
+            const impactY = player.y + Math.sin(ray.angle) * ray.distance;
+            
+            // Adicionar à lista de impactos
+            impacts.push({
+                x: impactX,
+                y: impactY,
+                time: Date.now(),
+                lifespan: 2000
+            });
         }
 
         // Update game state
         function update() {
+            // Resetar o estado de movimento
+            isMoving = false;
+            
             // Movement
             if (keys.ArrowUp) {
-                const newX = playerX + Math.cos(playerAngle) * moveSpeed;
-                const newY = playerY + Math.sin(playerAngle) * moveSpeed;
+                const newX = player.x + Math.cos(player.angle) * moveSpeed;
+                const newY = player.y + Math.sin(player.angle) * moveSpeed;
                 if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
-                    playerX = newX;
-                    playerY = newY;
+                    player.x = newX;
+                    player.y = newY;
+                    isMoving = true;
                 }
             }
             if (keys.ArrowDown) {
-                const newX = playerX - Math.cos(playerAngle) * moveSpeed;
-                const newY = playerY - Math.sin(playerAngle) * moveSpeed;
+                const newX = player.x - Math.cos(player.angle) * moveSpeed;
+                const newY = player.y - Math.sin(player.angle) * moveSpeed;
                 if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
-                    playerX = newX;
-                    playerY = newY;
+                    player.x = newX;
+                    player.y = newY;
+                    isMoving = true;
                 }
             }
             if (keys.a) {
-                const strafeAngle = playerAngle - Math.PI / 2;
-                const newX = playerX + Math.cos(strafeAngle) * moveSpeed;
-                const newY = playerY + Math.sin(strafeAngle) * moveSpeed;
+                const strafeAngle = player.angle - Math.PI / 2;
+                const newX = player.x + Math.cos(strafeAngle) * moveSpeed;
+                const newY = player.y + Math.sin(strafeAngle) * moveSpeed;
                 if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
-                    playerX = newX;
-                    playerY = newY;
+                    player.x = newX;
+                    player.y = newY;
+                    isMoving = true;
                 }
             }
             if (keys.d) {
-                const strafeAngle = playerAngle + Math.PI / 2;
-                const newX = playerX + Math.cos(strafeAngle) * moveSpeed;
-                const newY = playerY + Math.sin(strafeAngle) * moveSpeed;
+                const strafeAngle = player.angle + Math.PI / 2;
+                const newX = player.x + Math.cos(strafeAngle) * moveSpeed;
+                const newY = player.y + Math.sin(strafeAngle) * moveSpeed;
                 if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
-                    playerX = newX;
-                    playerY = newY;
+                    player.x = newX;
+                    player.y = newY;
+                    isMoving = true;
                 }
             }
+            
             // Rotation
-            if (keys.ArrowLeft) playerAngle -= rotSpeed;
-            if (keys.ArrowRight) playerAngle += rotSpeed;
-            playerAngle = (playerAngle + 2 * Math.PI) % (2 * Math.PI);
-
+            if (keys.ArrowLeft) player.angle -= rotSpeed;
+            if (keys.ArrowRight) player.angle += rotSpeed;
+            player.angle = (player.angle + 2 * Math.PI) % (2 * Math.PI);
+            
             // Shooting
             if (keys[' ']) {
-                const dirX = Math.cos(playerAngle);
-                const dirY = Math.sin(playerAngle);
-                const wallRay = castRay(playerAngle);
-                const wallDistance = wallRay.distance;
-
-                let minT = wallDistance;
-                let hitEnemy = null;
-
-                enemies.forEach(enemy => {
-                    const dx = enemy.x - playerX;
-                    const dy = enemy.y - playerY;
-                    const t = dx * dirX + dy * dirY;
-                    if (t > 0) {
-                        const closestX = playerX + t * dirX;
-                        const closestY = playerY + t * dirY;
-                        const dist = Math.sqrt((closestX - enemy.x) ** 2 + (closestY - enemy.y) ** 2);
-                        if (dist < 0.5 && t < minT) {
-                            minT = t;
-                            hitEnemy = enemy;
-                        }
-                    }
-                });
-
-                if (hitEnemy) {
-                    hitEnemy.health -= 10;
-                    if (hitEnemy.health <= 0) {
-                        const index = enemies.indexOf(hitEnemy);
-                        enemies.splice(index, 1);
-                    }
-                }
+                shoot();
             }
+            
+            // Atualizar impactos (remover os antigos)
+            impacts = impacts.filter(impact => {
+                return Date.now() - impact.time < impact.lifespan;
+            });
         }
 
         // Render the scene
         function render() {
-            // Clear canvas
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, screenWidth, screenHeight);
-
+            // Resetar o z-buffer
+            zBuffer.fill(Infinity);
+            
+            // Renderizar fundo primeiro
+            renderBackground();
+            
             // Draw walls
             for (let x = 0; x < screenWidth; x++) {
-                const rayAngle = playerAngle + (x - screenWidth / 2) * angleStep;
+                const rayAngle = player.angle + (x - screenWidth / 2) * angleStep;
                 const ray = castRay(rayAngle);
                 const distance = ray.distance;
-                const perpWallDist = distance * Math.cos(rayAngle - playerAngle); // Correct fish-eye
-
+                const perpWallDist = distance * Math.cos(rayAngle - player.angle); // Correct fish-eye
+                
+                // Armazenar a distância no z-buffer
+                zBuffer[x] = perpWallDist;
+                
                 const lineHeight = screenHeight / perpWallDist;
                 const drawStart = Math.floor((screenHeight - lineHeight) / 2);
                 const drawEnd = Math.floor((screenHeight + lineHeight) / 2);
-
-                const color = ray.side === 0 ? 'red' : 'blue';
+                
+                // Usar o tipo de parede para determinar a cor
+                let wallType = ray.wallType || 1; // Fallback para tipo 1 se não definido
+                let baseColor = wallColors[wallType] || '#8B4513';
+                
+                // Aplicar sombreamento baseado na distância e lado
+                let color = getWallColor(baseColor, distance);
+                if (ray.side === 1) {
+                    // Escurecer paredes norte-sul para dar efeito 3D
+                    color = shadeColor(color, -20);
+                }
+                
+                // Desenhar a parede principal
                 ctx.fillStyle = color;
                 ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+                
+                // Adicionar contorno à parede - CORRIGIDO
+                // Desenhar linhas mais escuras nas bordas superior e inferior
+                const outlineColor = shadeColor(color, -50); // Versão mais escura da cor da parede
+                ctx.fillStyle = outlineColor;
+                
+                // Garantir que os contornos sejam desenhados mesmo com valores pequenos
+                const outlineThickness = Math.max(1, Math.min(2, lineHeight / 30));
+                
+                // Contorno superior
+                ctx.fillRect(x, drawStart, 1, Math.ceil(outlineThickness));
+                
+                // Contorno inferior
+                ctx.fillRect(x, drawEnd - Math.ceil(outlineThickness), 1, Math.ceil(outlineThickness));
+                
+                // Adicionar efeito de textura simples (linhas verticais)
+                if (x % 8 === 0) {
+                    ctx.fillStyle = shadeColor(color, -15);
+                    ctx.fillRect(x, drawStart + Math.ceil(outlineThickness), 1, drawEnd - drawStart - Math.ceil(outlineThickness) * 2);
+                }
             }
-
-            // Draw enemies
+            
+            // Renderizar impactos de tiros
+            impacts.forEach(impact => {
+                // Converter posição do mundo para posição na tela
+                const dx = impact.x - player.x;
+                const dy = impact.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Só renderizar se estiver no campo de visão
+                const angle = Math.atan2(dy, dx);
+                const angleDiff = (angle - player.angle + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+                
+                if (Math.abs(angleDiff) < FOV / 2) {
+                    const screenX = (angleDiff / (FOV / 2)) * (screenWidth / 2) + (screenWidth / 2);
+                    const size = 5 / dist * 100;
+                    
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenHeight / 2, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            
+            // Draw enemies - versão corrigida com oclusão
             enemies.forEach(enemy => {
-                const dx = enemy.x - playerX;
-                const dy = enemy.y - playerY;
-                const transformX = dx * Math.cos(playerAngle) - dy * Math.sin(playerAngle);
-                const transformY = dx * Math.sin(playerAngle) + dy * Math.cos(playerAngle);
-                if (transformX > 0) {
-                    const screenX = (transformY / transformX) * (screenWidth / 2) + (screenWidth / 2);
-                    const spriteSize = (1 / transformX) * screenHeight;
-                    const drawStartX = Math.floor(screenX - spriteSize / 2);
-                    const drawEndX = Math.floor(screenX + spriteSize / 2);
+                // Não renderizar inimigos mortos
+                if (enemy.dead) return;
+                
+                // Calcular posição relativa do inimigo em relação ao jogador
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                
+                // Calcular distância
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Calcular ângulo do inimigo em relação ao jogador
+                let enemyAngle = Math.atan2(dy, dx);
+                
+                // Normalizar o ângulo para o intervalo [0, 2π]
+                enemyAngle = (enemyAngle + 2 * Math.PI) % (2 * Math.PI);
+                
+                // Calcular o ângulo relativo à direção do jogador
+                let relativeAngle = enemyAngle - player.angle;
+                
+                // Normalizar para o intervalo [-π, π]
+                while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
+                while (relativeAngle < -Math.PI) relativeAngle += 2 * Math.PI;
+                
+                // Verificar se o inimigo está no campo de visão
+                if (Math.abs(relativeAngle) < FOV / 2) {
+                    // Calcular posição X na tela
+                    const screenX = Math.floor((relativeAngle / (FOV / 2)) * (screenWidth / 2) + (screenWidth / 2));
+                    
+                    // Calcular tamanho baseado na distância
+                    const spriteSize = Math.min(screenHeight, (1 / distance) * screenHeight * 0.8);
+                    
+                    // Verificar se o inimigo está atrás de uma parede
+                    // Usamos a distância perpendicular para comparação correta
+                    const perpDistance = distance * Math.cos(relativeAngle);
+                    
+                    // Determinar a faixa de colunas da tela que o inimigo ocupa
+                    const drawStartX = Math.max(0, Math.floor(screenX - spriteSize / 2));
+                    const drawEndX = Math.min(screenWidth - 1, Math.floor(screenX + spriteSize / 2));
+                    
+                    // Verificar se alguma parte do inimigo está visível
+                    let isVisible = false;
+                    for (let x = drawStartX; x <= drawEndX; x++) {
+                        if (perpDistance < zBuffer[x]) {
+                            isVisible = true;
+                            break;
+                        }
+                    }
+                    
+                    // Se o inimigo não estiver visível, não renderizá-lo
+                    if (!isVisible) return;
+                    
                     const drawStartY = Math.floor((screenHeight - spriteSize) / 2);
                     const drawEndY = Math.floor((screenHeight + spriteSize) / 2);
-                    ctx.fillStyle = 'green';
-                    ctx.fillRect(drawStartX, drawStartY, drawEndX - drawStartX, drawEndY - drawStartY);
+                    
+                    // Determinar cor do inimigo (vermelho quando atingido)
+                    let enemyColor = enemy.type === 'grunt' ? 'green' : 'orange';
+                    if (enemy.isHit) {
+                        enemyColor = 'red'; // Mudar para vermelho quando atingido
+                    }
+                    
+                    // Desenhar o inimigo coluna por coluna, verificando a oclusão em cada coluna
+                    for (let x = drawStartX; x <= drawEndX; x++) {
+                        // Verificar se esta coluna do inimigo está visível
+                        if (perpDistance < zBuffer[x]) {
+                            // Calcular a posição relativa dentro do sprite
+                            const texX = Math.floor((x - (screenX - spriteSize / 2)) / spriteSize * 64);
+                            
+                            // Desenhar a coluna do inimigo
+                            // Desenhar contorno do inimigo
+                            ctx.fillStyle = 'black';
+                            ctx.fillRect(x, drawStartY - 2, 1, spriteSize + 4);
+                            
+                            // Desenhar o inimigo
+                            ctx.fillStyle = enemyColor;
+                            ctx.fillRect(x, drawStartY, 1, spriteSize);
+                        }
+                    }
+                    
+                    // Adicionar detalhes ao inimigo (olhos, etc.) apenas se estiver bem visível
+                    if (isVisible && spriteSize > 20) {
+                        const eyeSize = Math.max(3, spriteSize / 15);
+                        const eyeOffsetX = spriteSize / 6;
+                        const eyeOffsetY = -spriteSize / 8;
+                        
+                        // Olhos - verificar se estão visíveis
+                        const leftEyeX = Math.floor(screenX - eyeOffsetX);
+                        const rightEyeX = Math.floor(screenX + eyeOffsetX);
+                        const eyeY = Math.floor(drawStartY + spriteSize/3 + eyeOffsetY);
+                        
+                        if (perpDistance < zBuffer[leftEyeX]) {
+                            ctx.fillStyle = 'white';
+                            ctx.fillRect(
+                                leftEyeX - eyeSize/2, 
+                                eyeY, 
+                                eyeSize, eyeSize
+                            );
+                            
+                            // Pupila
+                            if (distance < 5) {
+                                ctx.fillStyle = 'black';
+                                ctx.fillRect(
+                                    leftEyeX - eyeSize/4, 
+                                    eyeY + eyeSize/4, 
+                                    eyeSize/2, eyeSize/2
+                                );
+                            }
+                        }
+                        
+                        if (perpDistance < zBuffer[rightEyeX]) {
+                            ctx.fillStyle = 'white';
+                            ctx.fillRect(
+                                rightEyeX - eyeSize/2, 
+                                eyeY, 
+                                eyeSize, eyeSize
+                            );
+                            
+                            // Pupila
+                            if (distance < 5) {
+                                ctx.fillStyle = 'black';
+                                ctx.fillRect(
+                                    rightEyeX - eyeSize/4, 
+                                    eyeY + eyeSize/4, 
+                                    eyeSize/2, eyeSize/2
+                                );
+                            }
+                        }
+                    }
                 }
             });
 
@@ -250,13 +629,624 @@
             ctx.stroke();
         }
 
-        // Game loop
+        // Adicionar gradiente para céu e chão
+        function renderBackground() {
+            // Renderizar céu com gradiente
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, screenHeight / 2);
+            skyGradient.addColorStop(0, '#000033');
+            skyGradient.addColorStop(1, '#3366CC');
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, screenWidth, screenHeight / 2);
+            
+            // Renderizar chão com gradiente
+            const floorGradient = ctx.createLinearGradient(0, screenHeight / 2, 0, screenHeight);
+            floorGradient.addColorStop(0, '#663300');
+            floorGradient.addColorStop(1, '#331a00');
+            ctx.fillStyle = floorGradient;
+            ctx.fillRect(0, screenHeight / 2, screenWidth, screenHeight / 2);
+        }
+
+        // Adicionar sombreamento baseado na distância
+        function getWallColor(baseColor, distance) {
+            // Escurecer cor baseado na distância (fog effect)
+            const fogFactor = Math.min(1, distance / 10);
+            return shadeColor(baseColor, -fogFactor * 60);
+        }
+
+        // Função auxiliar para escurecer/clarear cores
+        function shadeColor(color, percent) {
+            let R = parseInt(color.substring(1,3), 16);
+            let G = parseInt(color.substring(3,5), 16);
+            let B = parseInt(color.substring(5,7), 16);
+
+            R = Math.min(255, Math.max(0, R + percent));
+            G = Math.min(255, Math.max(0, G + percent));
+            B = Math.min(255, Math.max(0, B + percent));
+
+            return `#${R.toString(16).padStart(2,'0')}${G.toString(16).padStart(2,'0')}${B.toString(16).padStart(2,'0')}`;
+        }
+
+        // Atualizar comportamento dos inimigos
+        function updateEnemies() {
+            const now = Date.now();
+            
+            enemies.forEach(enemy => {
+                if (enemy.dead) return;
+                
+                const type = enemyTypes[enemy.type];
+                
+                // Calcular distância até o jogador
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+                
+                // Determinar estado do inimigo baseado na distância
+                if (distanceToPlayer < 8) {
+                    if (distanceToPlayer < 1) {
+                        enemy.state = 'attack';
+                    } else {
+                        enemy.state = 'chase';
+                    }
+                } else {
+                    enemy.state = 'idle';
+                }
+                
+                // Agir com base no estado
+                switch (enemy.state) {
+                    case 'chase':
+                        // Mover em direção ao jogador
+                        const moveSpeed = type.speed;
+                        const angle = Math.atan2(dy, dx);
+                        
+                        // Verificar movimento em X e Y separadamente para melhor colisão
+                        const newX = enemy.x + Math.cos(angle) * moveSpeed;
+                        const newY = enemy.y;
+                        
+                        // Verificar colisão em X
+                        if (map[Math.floor(newY)][Math.floor(newX)] === 0 && 
+                            map[Math.floor(newY)][Math.ceil(newX)] === 0) {
+                            enemy.x = newX;
+                        }
+                        
+                        // Verificar movimento em Y
+                        const finalX = enemy.x;
+                        const finalY = enemy.y + Math.sin(angle) * moveSpeed;
+                        
+                        // Verificar colisão em Y
+                        if (map[Math.floor(finalY)][Math.floor(finalX)] === 0 && 
+                            map[Math.ceil(finalY)][Math.floor(finalX)] === 0) {
+                            enemy.y = finalY;
+                        }
+                        
+                        break;
+                        
+                    case 'attack':
+                        // Atacar o jogador em intervalos regulares
+                        if (now - enemy.lastAttack > 1000) {
+                            player.health -= type.damage;
+                            enemy.lastAttack = now;
+                            
+                            // Feedback visual de dano no jogador
+                            takeDamage();
+                            
+                            if (player.health <= 0) {
+                                gameOver();
+                            }
+                        }
+                        break;
+                        
+                    case 'idle':
+                        // Ficar parado ou movimentar aleatoriamente
+                        break;
+                }
+            });
+        }
+
+        function takeDamage() {
+            // Efeito visual de dano
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+            
+            setTimeout(() => {
+                ctx.clearRect(0, 0, screenWidth, screenHeight);
+            }, 200);
+        }
+
+        // Função para alternar o estado de pausa
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                // Pausar o som do inimigo quando o jogo estiver pausado
+                if (isAudioInitialized) {
+                    enemySound.setVolume(0);
+                }
+            }
+        }
+
+        // Função para desenhar a tela de pausa
+        function drawPauseScreen() {
+            // Fundo semi-transparente
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+            
+            // Título
+            ctx.fillStyle = 'white';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('JOGO PAUSADO', screenWidth / 2, screenHeight / 2 - 50);
+            
+            // Instruções
+            ctx.font = '24px Arial';
+            ctx.fillText('Pressione ESC para continuar', screenWidth / 2, screenHeight / 2 + 20);
+            
+            // Controles
+            ctx.font = '18px Arial';
+            ctx.fillText('Controles:', screenWidth / 2, screenHeight / 2 + 80);
+            ctx.fillText('Setas: Movimento | Espaço: Atirar', screenWidth / 2, screenHeight / 2 + 110);
+            ctx.fillText('A/D: Movimento lateral', screenWidth / 2, screenHeight / 2 + 140);
+        }
+
+        // Melhorar a função gameOver
+        function gameOver() {
+            isGameOver = true;
+            
+            // Silenciar o som do inimigo
+            if (isAudioInitialized) {
+                enemySound.setVolume(0);
+            }
+            
+            // Desenhar tela de game over
+            drawGameOverScreen();
+        }
+
+        // Função para desenhar a tela de game over
+        function drawGameOverScreen() {
+            // Fundo semi-transparente
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+            
+            // Título
+            ctx.fillStyle = 'red';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', screenWidth / 2, screenHeight / 2 - 50);
+            
+            // Pontuação
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.fillText(`Pontuação final: ${player.score}`, screenWidth / 2, screenHeight / 2);
+            
+            // Botão de reiniciar
+            const buttonWidth = 200;
+            const buttonHeight = 50;
+            const buttonX = screenWidth / 2 - buttonWidth / 2;
+            const buttonY = screenHeight / 2 + 50;
+            
+            // Desenhar botão
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+            
+            // Texto do botão
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.fillText('Reiniciar Jogo', screenWidth / 2, buttonY + 32);
+            
+            // Adicionar evento de clique para o botão
+            canvas.addEventListener('click', function checkRestart(e) {
+                // Converter coordenadas do clique para coordenadas do canvas
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                
+                // Verificar se o clique foi no botão
+                if (clickX >= buttonX && clickX <= buttonX + buttonWidth &&
+                    clickY >= buttonY && clickY <= buttonY + buttonHeight) {
+                    restartGame();
+                    canvas.removeEventListener('click', checkRestart);
+                }
+            });
+            
+            // Também mostrar instrução para usar espaço
+            ctx.fillStyle = 'white';
+            ctx.font = '18px Arial';
+            ctx.fillText('ou pressione ESPAÇO para reiniciar', screenWidth / 2, buttonY + 80);
+        }
+
+        // Função para reiniciar o jogo
+        function restartGame() {
+            // Resetar estado do jogador
+            player.x = 2;
+            player.y = 2;
+            player.angle = 0;
+            player.health = 100;
+            player.score = 0;
+            player.lastShot = 0;
+            player.isReloading = false;
+            
+            // Resetar munição
+            player.weapons.pistol.ammo = 50;
+            player.weapons.shotgun.ammo = 20;
+            
+            // Resetar inimigos
+            enemies.forEach((enemy, index) => {
+                // Posições iniciais dos inimigos
+                const positions = [
+                    { x: 3, y: 3 },
+                    { x: 5, y: 4 },
+                    { x: 10, y: 10 },
+                    { x: 14, y: 3 },
+                    { x: 6, y: 12 },
+                    { x: 12, y: 13 }
+                ];
+                
+                // Resetar propriedades do inimigo
+                enemy.x = positions[index].x;
+                enemy.y = positions[index].y;
+                enemy.health = enemy.type === 'grunt' ? 50 : 150;
+                enemy.state = 'idle';
+                enemy.lastAttack = 0;
+                enemy.dead = false;
+                enemy.isHit = false;
+            });
+            
+            // Limpar impactos
+            impacts = [];
+            
+            // Resetar estado do jogo
+            isGameOver = false;
+            
+            console.log("Jogo reiniciado!");
+        }
+
+        // Renderizar HUD
+        function renderHUD() {
+            const weapon = player.weapons[player.currentWeapon];
+            
+            // Barra de saúde
+            ctx.fillStyle = 'black';
+            ctx.fillRect(20, screenHeight - 60, 200, 20);
+            
+            // Determinar cor da barra de saúde
+            let healthColor = '#00FF00'; // Verde
+            if (player.health < 25) {
+                healthColor = '#FF0000'; // Vermelho
+            } else if (player.health < 50) {
+                healthColor = '#FFFF00'; // Amarelo
+            }
+            
+            ctx.fillStyle = healthColor;
+            ctx.fillRect(20, screenHeight - 60, player.health / player.maxHealth * 200, 20);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '14px Arial';
+            ctx.fillText(`Saúde: ${player.health}/${player.maxHealth}`, 25, screenHeight - 45);
+            
+            // Munição
+            ctx.fillStyle = 'black';
+            ctx.fillRect(20, screenHeight - 30, 200, 20);
+            
+            ctx.fillStyle = '#3399FF';
+            ctx.fillRect(20, screenHeight - 30, weapon.ammo / weapon.maxAmmo * 200, 20);
+            
+            ctx.fillStyle = 'white';
+            ctx.fillText(`${weapon.name}: ${weapon.ammo}/${weapon.maxAmmo}`, 25, screenHeight - 15);
+            
+            // Pontuação
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Pontuação: ${player.score}`, screenWidth - 20, 30);
+            
+            // Inimigos restantes
+            const remainingEnemies = enemies.filter(e => !e.dead).length;
+            ctx.fillText(`Inimigos: ${remainingEnemies}`, screenWidth - 20, 60);
+        }
+
+        // Desenhar arma
+        function drawWeapon() {
+            // Simulação simples de arma
+            const weaponX = screenWidth / 2;
+            let weaponY = screenHeight - 100;
+            
+            // Efeito de movimento da arma ao andar
+            if (isMoving) {
+                weaponY += Math.sin(Date.now() / 150) * 5;
+            }
+            
+            // Pistola
+            if (player.currentWeapon === 'pistol') {
+                // Contorno da arma
+                ctx.fillStyle = 'black';
+                ctx.fillRect(weaponX - 12, weaponY - 2, 24, 64);
+                ctx.fillRect(weaponX - 17, weaponY + 38, 34, 24);
+                
+                // Corpo da arma
+                ctx.fillStyle = '#444444';
+                ctx.fillRect(weaponX - 10, weaponY, 20, 60);
+                ctx.fillRect(weaponX - 15, weaponY + 40, 30, 20);
+                
+                // Detalhes da arma
+                ctx.fillStyle = '#222222';
+                ctx.fillRect(weaponX - 8, weaponY + 10, 16, 25); // Empunhadura
+                ctx.fillStyle = '#666666';
+                ctx.fillRect(weaponX - 5, weaponY, 10, 8); // Mira
+            } 
+            // Shotgun
+            else if (player.currentWeapon === 'shotgun') {
+                // Contorno da arma
+                ctx.fillStyle = 'black';
+                ctx.fillRect(weaponX - 10, weaponY - 12, 20, 74);
+                ctx.fillRect(weaponX - 17, weaponY + 33, 34, 29);
+                
+                // Corpo da arma
+                ctx.fillStyle = '#444444';
+                ctx.fillRect(weaponX - 8, weaponY - 10, 16, 70);
+                ctx.fillRect(weaponX - 15, weaponY + 35, 30, 25);
+                
+                // Detalhes da arma
+                ctx.fillStyle = '#222222';
+                ctx.fillRect(weaponX - 6, weaponY + 15, 12, 30); // Empunhadura
+                ctx.fillStyle = '#666666';
+                ctx.fillRect(weaponX - 4, weaponY - 10, 8, 8); // Mira
+            }
+        }
+
+        // Sistema de áudio
+        let audioContext;
+        let enemySound;
+        let isAudioInitialized = false;
+
+        // Inicializar áudio (precisa ser chamado após interação do usuário)
+        function initAudio() {
+            if (isAudioInitialized) return;
+            
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Criar oscilador para som de inimigo
+                function createEnemySound() {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.value = 150; // Frequência base
+                    
+                    gainNode.gain.value = 0; // Iniciar mudo
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.start();
+                    
+                    return {
+                        oscillator: oscillator,
+                        gainNode: gainNode,
+                        setVolume: function(volume) {
+                            gainNode.gain.value = Math.max(0, Math.min(0.2, volume)); // Limitar volume máximo
+                        },
+                        setFrequency: function(freq) {
+                            oscillator.frequency.value = freq;
+                        }
+                    };
+                }
+                
+                enemySound = createEnemySound();
+                isAudioInitialized = true;
+                
+                console.log("Sistema de áudio inicializado");
+            } catch (e) {
+                console.error("Erro ao inicializar áudio:", e);
+            }
+        }
+
+        // Adicionar event listener para inicializar áudio após interação do usuário
+        document.addEventListener('click', initAudio, { once: true });
+        document.addEventListener('keydown', initAudio, { once: true });
+
+        // Atualizar o som dos inimigos com base na proximidade
+        function updateEnemySounds() {
+            if (!isAudioInitialized) return;
+            
+            // Encontrar o inimigo mais próximo que não está morto
+            let closestEnemy = null;
+            let minDistance = Infinity;
+            
+            enemies.forEach(enemy => {
+                if (enemy.dead) return;
+                
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestEnemy = enemy;
+                }
+            });
+            
+            // Ajustar o som com base na distância do inimigo mais próximo
+            if (closestEnemy && minDistance < 5) {
+                // Volume inversamente proporcional à distância
+                const volume = 0.2 * (1 - minDistance / 5);
+                
+                // Frequência aumenta quando o inimigo está mais próximo
+                const frequency = 150 + (5 - minDistance) * 30;
+                
+                // Pulsar mais rápido quando mais próximo
+                const pulseRate = 200 + (5 - minDistance) * 100;
+                
+                // Aplicar pulsação ao som
+                const pulseAmount = 0.5 + (5 - minDistance) * 0.1;
+                const currentTime = Date.now();
+                const pulseVolume = volume * (0.5 + Math.sin(currentTime / pulseRate) * pulseAmount);
+                
+                enemySound.setVolume(pulseVolume);
+                enemySound.setFrequency(frequency);
+            } else {
+                // Nenhum inimigo próximo, silenciar o som
+                enemySound.setVolume(0);
+            }
+        }
+
+        // Adicionar variável para controlar o estado inicial do jogo
+        let gameStarted = false;
+
+        // Modificar a função gameLoop para verificar se o jogo começou
         function gameLoop() {
-            update();
-            render();
+            if (!gameStarted) {
+                // Se o jogo não começou, mostrar tela inicial
+                drawStartScreen();
+            } else if (!isPaused && !isGameOver) {
+                // Atualizar estado do jogo apenas se não estiver pausado ou em game over
+                update();
+                updateEnemies();
+                updateEnemySounds();
+                render();
+                renderHUD();
+                drawWeapon();
+            } else if (isPaused) {
+                // Se estiver pausado, desenhar a tela de pausa
+                drawPauseScreen();
+            } else if (isGameOver) {
+                // Se estiver em game over, desenhar a tela de game over
+                drawGameOverScreen();
+            }
+            
+            // Continuar o loop de jogo
             requestAnimationFrame(gameLoop);
         }
 
+        // Função para desenhar a tela inicial
+        function drawStartScreen() {
+            // Fundo escuro com gradiente
+            const gradient = ctx.createLinearGradient(0, 0, 0, screenHeight);
+            gradient.addColorStop(0, '#000000');
+            gradient.addColorStop(1, '#300000');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+            
+            // Título do jogo
+            ctx.fillStyle = '#FF0000';
+            ctx.font = 'bold 60px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('3D SHOOTER', screenWidth / 2, screenHeight / 4);
+            
+            // Subtítulo
+            ctx.fillStyle = '#AAAAAA';
+            ctx.font = '24px Arial';
+            ctx.fillText('Doom-style FPS', screenWidth / 2, screenHeight / 4 + 40);
+            
+            // Seção de instruções
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('INSTRUÇÕES', screenWidth / 2, screenHeight / 2 - 40);
+            
+            ctx.font = '20px Arial';
+            ctx.fillText('Elimine todos os inimigos e sobreviva o máximo possível', screenWidth / 2, screenHeight / 2);
+            
+            // Seção de controles
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('CONTROLES', screenWidth / 2, screenHeight / 2 + 60);
+            
+            ctx.font = '20px Arial';
+            const controlsY = screenHeight / 2 + 100;
+            const controlsX = screenWidth / 2 - 150;
+            
+            // Desenhar caixas de controle
+            drawControlBox('↑', 'Mover para frente', controlsX, controlsY);
+            drawControlBox('↓', 'Mover para trás', controlsX, controlsY + 40);
+            drawControlBox('←', 'Girar para esquerda', controlsX, controlsY + 80);
+            drawControlBox('→', 'Girar para direita', controlsX, controlsY + 120);
+            drawControlBox('A', 'Mover para esquerda', controlsX + 300, controlsY);
+            drawControlBox('D', 'Mover para direita', controlsX + 300, controlsY + 40);
+            drawControlBox('ESPAÇO', 'Atirar', controlsX + 300, controlsY + 80);
+            drawControlBox('ESC', 'Pausar jogo', controlsX + 300, controlsY + 120);
+            
+            // Botão de iniciar
+            const buttonWidth = 200;
+            const buttonHeight = 60;
+            const buttonX = screenWidth / 2 - buttonWidth / 2;
+            const buttonY = screenHeight - 120;
+            
+            // Verificar se o mouse está sobre o botão
+            let isHovering = false;
+            if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+                mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+                isHovering = true;
+            }
+            
+            // Desenhar botão com efeito hover
+            ctx.fillStyle = isHovering ? '#FF3333' : '#CC0000';
+            ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+            
+            // Borda do botão
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+            
+            // Texto do botão
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('INICIAR JOGO', screenWidth / 2, buttonY + 38);
+        }
+
+        // Função auxiliar para desenhar caixas de controle
+        function drawControlBox(key, description, x, y) {
+            // Caixa para a tecla
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(x, y, 40, 30);
+            
+            // Borda da caixa
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, 40, 30);
+            
+            // Texto da tecla
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(key, x + 20, y + 20);
+            
+            // Descrição
+            ctx.textAlign = 'left';
+            ctx.fillText(description, x + 50, y + 20);
+        }
+
+        // Variáveis para rastrear a posição do mouse
+        let mouseX = 0;
+        let mouseY = 0;
+
+        // Event listeners para o mouse
+        canvas.addEventListener('mousemove', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // Se o jogo não começou, verificar se clicou no botão de iniciar
+            if (!gameStarted) {
+                const buttonWidth = 200;
+                const buttonHeight = 60;
+                const buttonX = screenWidth / 2 - buttonWidth / 2;
+                const buttonY = screenHeight - 120;
+                
+                if (clickX >= buttonX && clickX <= buttonX + buttonWidth &&
+                    clickY >= buttonY && clickY <= buttonY + buttonHeight) {
+                    // Iniciar o jogo
+                    gameStarted = true;
+                    // Inicializar áudio quando o jogo começar
+                    initAudio();
+                }
+            }
+        });
+
+        // Iniciar o loop do jogo
         gameLoop();
     </script>
 </body>
