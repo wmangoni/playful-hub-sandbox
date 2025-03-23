@@ -1,2172 +1,2184 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tech Company Management Simulation</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-    
-    .container {
-      background-color: white;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    h1 {
-      color: #2c3e50;
-      text-align: center;
-    }
-    
-    .setup {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    
-    .game-board {
-      display: flex;
-      gap: 20px;
-    }
-    
-    .stats-panel {
-      flex: 1;
-      background-color: #ecf0f1;
-      padding: 15px;
-      border-radius: 5px;
-    }
-    
-    .actions-panel {
-      flex: 1;
-      background-color: #ecf0f1;
-      padding: 15px;
-      border-radius: 5px;
-    }
-    
-    .message-log {
-      margin-top: 20px;
-      padding: 15px;
-      background-color: #ecf0f1;
-      border-radius: 5px;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    
-    button:hover {
-      background-color: #2980b9;
-    }
-    
-    button:disabled {
-      background-color: #95a5a6;
-      cursor: not-allowed;
-    }
-    
-    input {
-      padding: 10px;
-      margin: 10px;
-      border-radius: 5px;
-      border: 1px solid #bdc3c7;
-    }
-    
-    #gameStatus {
-      color: #e74c3c;
-      font-weight: bold;
-      text-align: center;
-    }
-
-    #gameStatusV {
-      color: #09a510;
-      font-weight: bold;
-      text-align: center;
-    }
-    
-    .action-button {
-      display: block;
-      width: 100%;
-      margin-bottom: 10px;
-      text-align: left;
-      padding: 12px;
-    }
-    
-    .action-description {
-      font-size: 0.9em;
-      color: #0d4449;
-      margin-top: 5px;
-    }
-
-    .progress-bar {
-      height: 10px;
-      background-color: #e0e0e0;
-      border-radius: 5px;
-      margin-top: 5px;
-    }
-    
-    .progress-fill {
-      height: 100%;
-      border-radius: 5px;
-      background-color: #27ae60;
-    }
-    
-    .security-progress-fill {
-      height: 100%;
-      border-radius: 5px;
-      background-color: #e74c3c;
-    }
-
-    /* Estilos para o sistema de progressão */
-    .skill-tree-container {
-        background-color: #2c3e50;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 15px 0;
-        color: #ecf0f1;
-    }
-    
-    .skill-category {
-        margin-bottom: 15px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-    }
-    
-    @media (max-width: 768px) {
-        .skill-category {
-            grid-template-columns: 1fr;
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-KM6SHZXP');</script>
+    <!-- End Google Tag Manager -->
+    <title>Tech Company Management Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
-    }
-    
-    .skill-category h3 {
-        grid-column: 1 / -1;
-        color: #3498db;
-        border-bottom: 1px solid #3498db;
-        padding-bottom: 5px;
-        margin-bottom: 10px;
-    }
-    
-    .skill-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px;
-        margin: 5px 0;
-        background-color: #34495e;
-        border-radius: 4px;
-        transition: all 0.3s ease;
-    }
-    
-    .skill-item:hover {
-        background-color: #2980b9;
-    }
-    
-    .skill-name {
-        font-weight: bold;
-    }
-    
-    .skill-level {
-        display: flex;
-        align-items: center;
-    }
-    
-    .level-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background-color: #7f8c8d;
-        margin: 0 2px;
-        transition: background-color 0.3s ease;
-    }
-    
-    .level-dot.active {
-        background-color: #2ecc71;
-    }
-    
-    .skill-upgrade-btn {
-        background-color: #27ae60;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 4px 8px;
-        margin-left: 10px;
-        cursor: pointer;
-        font-size: 12px;
-        transition: all 0.3s ease;
-    }
-    
-    .skill-upgrade-btn:hover:not(:disabled) {
-        background-color: #2ecc71;
-        transform: scale(1.05);
-    }
-    
-    .skill-upgrade-btn:disabled {
-        background-color: #95a5a6;
-        cursor: not-allowed;
-    }
-    
-    .career-progress {
-        background-color: #2c3e50;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 15px 0;
-        color: #ecf0f1;
-    }
-    
-    .career-level {
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 10px;
-        color: #f1c40f;
-    }
-    
-    .xp-bar {
-        height: 20px;
-        background-color: #34495e;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 10px;
-    }
-    
-    .xp-fill {
-        height: 100%;
-        background: linear-gradient(to right, #3498db, #2ecc71);
-        width: 0%;
-        transition: width 0.5s ease-out;
-    }
-    
-    .xp-text {
-        font-size: 14px;
-        text-align: center;
-        margin-top: 5px;
-    }
-    
-    .salary-info {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 15px;
-    }
-    
-    .salary-amount {
-        font-size: 20px;
-        font-weight: bold;
-        color: #2ecc71;
-    }
-    
-    .certification-container {
-        background-color: #2c3e50;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 15px 0;
-        color: #ecf0f1;
-    }
-    
-    .certification-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
-        margin-top: 15px;
-    }
-    
-    .certification-item {
-        background-color: #34495e;
-        border-radius: 8px;
-        padding: 15px;
-        text-align: center;
-        position: relative;
-        transition: all 0.3s ease;
-    }
-    
-    .certification-item:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    }
-    
-    .certification-locked {
-        opacity: 0.6;
-    }
-    
-    .certification-locked::after {
-        content: '🔒';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 30px;
-    }
-    
-    .certification-name {
-        font-weight: bold;
-        margin-bottom: 10px;
-        color: #3498db;
-    }
-    
-    .certification-desc {
-        font-size: 12px;
-        margin-bottom: 15px;
-        color: #bdc3c7;
-    }
-    
-    .certification-btn {
-        background-color: #e74c3c;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px;
-        width: 100%;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    
-    .certification-btn:hover:not(:disabled) {
-        background-color: #c0392b;
-    }
-    
-    .certification-btn:disabled {
-        background-color: #95a5a6;
-        cursor: not-allowed;
-    }
-    
-    .certification-complete {
-        background-color: #27ae60;
-        position: relative;
-    }
-    
-    .certification-complete::after {
-        content: '✓';
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        font-size: 20px;
-        color: white;
-    }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        .setup {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .game-board {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stats-panel {
+            flex: 1;
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .actions-panel {
+            flex: 1;
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .message-log {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        input {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            border: 1px solid #bdc3c7;
+        }
+        
+        #gameStatus {
+            color: #e74c3c;
+            font-weight: bold;
+            text-align: center;
+        }
 
-    /* Layout responsivo para o jogo */
-    .game-layout {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-    
-    .company-section {
-        width: 100%;
-    }
-    
-    .employee-section {
-        width: 100%;
-    }
-    
-    /* Em telas maiores que 1200px, colocar lado a lado */
-    @media (min-width: 1200px) {
+        #gameStatusV {
+            color: #09a510;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .action-button {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            text-align: left;
+            padding: 12px;
+        }
+        
+        .action-description {
+            font-size: 0.9em;
+            color: #0d4449;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            background-color: #27ae60;
+        }
+        
+        .security-progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            background-color: #e74c3c;
+        }
+
+        /* Estilos para o sistema de progressão */
+        .skill-tree-container {
+            background-color: #2c3e50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #ecf0f1;
+        }
+        
+        .skill-category {
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .skill-category {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .skill-category h3 {
+            grid-column: 1 / -1;
+            color: #3498db;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .skill-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #34495e;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .skill-item:hover {
+            background-color: #2980b9;
+        }
+        
+        .skill-name {
+            font-weight: bold;
+        }
+        
+        .skill-level {
+            display: flex;
+            align-items: center;
+        }
+        
+        .level-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #7f8c8d;
+            margin: 0 2px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .level-dot.active {
+            background-color: #2ecc71;
+        }
+        
+        .skill-upgrade-btn {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .skill-upgrade-btn:hover:not(:disabled) {
+            background-color: #2ecc71;
+            transform: scale(1.05);
+        }
+        
+        .skill-upgrade-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .career-progress {
+            background-color: #2c3e50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #ecf0f1;
+        }
+        
+        .career-level {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #f1c40f;
+        }
+        
+        .xp-bar {
+            height: 20px;
+            background-color: #34495e;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .xp-fill {
+            height: 100%;
+            background: linear-gradient(to right, #3498db, #2ecc71);
+            width: 0%;
+            transition: width 0.5s ease-out;
+        }
+        
+        .xp-text {
+            font-size: 14px;
+            text-align: center;
+            margin-top: 5px;
+        }
+        
+        .salary-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .salary-amount {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        
+        .certification-container {
+            background-color: #2c3e50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #ecf0f1;
+        }
+        
+        .certification-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .certification-item {
+            background-color: #34495e;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .certification-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .certification-locked {
+            opacity: 0.6;
+        }
+        
+        .certification-locked::after {
+            content: '🔒';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30px;
+        }
+        
+        .certification-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #3498db;
+        }
+        
+        .certification-desc {
+            font-size: 12px;
+            margin-bottom: 15px;
+            color: #bdc3c7;
+        }
+        
+        .certification-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .certification-btn:hover:not(:disabled) {
+            background-color: #c0392b;
+        }
+        
+        .certification-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .certification-complete {
+            background-color: #27ae60;
+            position: relative;
+        }
+        
+        .certification-complete::after {
+            content: '✓';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            color: white;
+        }
+
+        /* Layout responsivo para o jogo */
         .game-layout {
-            flex-direction: row;
-            align-items: flex-start;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .company-section {
-            width: 48%;
-            position: sticky;
-            top: 20px;
+            width: 100%;
         }
         
         .employee-section {
-            width: 48%;
+            width: 100%;
         }
-    }
-    
-    /* Ajustes visuais para melhorar a aparência */
-    .section-title {
-        background-color: #2c3e50;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 5px;
-        margin-bottom: 15px;
-        font-size: 18px;
-        font-weight: bold;
-    }
-    
-    .container {
-        max-width: 2200px;
-    }
+        
+        /* Em telas maiores que 1200px, colocar lado a lado */
+        @media (min-width: 1200px) {
+            .game-layout {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+            
+            .company-section {
+                width: 48%;
+                position: sticky;
+                top: 20px;
+            }
+            
+            .employee-section {
+                width: 48%;
+            }
+        }
+        
+        /* Ajustes visuais para melhorar a aparência */
+        .section-title {
+            background-color: #2c3e50;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .container {
+            max-width: 2200px;
+        }
 
-    /* Layout para stats e actions em duas colunas */
-    .company-dashboard {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 20px;
-    }
-    
-    .stats-panel, .actions-panel {
-        flex: 1;
-        min-width: 0; /* Evita overflow em containers flex */
-    }
-    
-    /* Em telas menores, voltar para layout vertical */
-    @media (max-width: 768px) {
+        /* Layout para stats e actions em duas colunas */
         .company-dashboard {
-            flex-direction: column;
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
         }
-    }
-    
-    /* Ajuste para melhorar a aparência das estatísticas */
-    .stats-panel p {
-        margin: 8px 0;
-        display: flex;
-        justify-content: space-between;
-    }
-    
-    .stats-panel p span {
-        font-weight: bold;
-    }
-    
-    .stats-value {
-        text-align: right;
-    }
+        
+        .stats-panel, .actions-panel {
+            flex: 1;
+            min-width: 0; /* Evita overflow em containers flex */
+        }
+        
+        /* Em telas menores, voltar para layout vertical */
+        @media (max-width: 768px) {
+            .company-dashboard {
+                flex-direction: column;
+            }
+        }
+        
+        /* Ajuste para melhorar a aparência das estatísticas */
+        .stats-panel p {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .stats-panel p span {
+            font-weight: bold;
+        }
+        
+        .stats-value {
+            text-align: right;
+        }
 
-    /* Estilos para o sistema de medalhas */
-    .achievements-container {
-        background-color: #2c3e50;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 15px 0;
-        color: #ecf0f1;
-    }
-    
-    .achievements-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-    }
-    
-    .achievements-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 15px;
-    }
-    
-    .achievement {
-        background-color: #34495e;
-        border-radius: 8px;
-        padding: 10px;
-        text-align: center;
-        transition: all 0.3s ease;
-        opacity: 0.4;
-        filter: grayscale(100%);
-    }
-    
-    .achievement.unlocked {
-        opacity: 1;
-        filter: grayscale(0%);
-        transform: scale(1.05);
-        box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
-    }
-    
-    .achievement-icon {
-        font-size: 32px;
-        margin-bottom: 8px;
-    }
-    
-    .achievement-name {
-        font-weight: bold;
-        font-size: 12px;
-        margin-bottom: 5px;
-    }
-    
-    .achievement-desc {
-        font-size: 10px;
-        color: #bdc3c7;
-    }
-    
-    /* Estilos para os confetes */
-    .confetti-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 9999;
-        overflow: hidden;
-    }
-    
-    .confetti {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        background-color: #f00;
-        opacity: 0.7;
-        animation: fall linear forwards;
-    }
-    
-    @keyframes fall {
-        to {
-            transform: translateY(100vh) rotate(720deg);
+        /* Estilos para o sistema de medalhas */
+        .achievements-container {
+            background-color: #2c3e50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #ecf0f1;
         }
-    }
-    
-    /* Estilos para o modal de conquista */
-    .achievement-modal {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: #2c3e50;
-        border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0 0 30px rgba(46, 204, 113, 0.8);
-        z-index: 10000;
-        text-align: center;
-        color: white;
-        max-width: 400px;
-        animation: modal-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    
-    @keyframes modal-pop {
-        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-        100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-    
-    .achievement-modal-icon {
-        font-size: 60px;
-        margin-bottom: 15px;
-        animation: bounce 1s infinite alternate;
-    }
-    
-    @keyframes bounce {
-        from { transform: scale(1); }
-        to { transform: scale(1.1); }
-    }
-    
-    .achievement-modal-title {
-        font-size: 24px;
-        margin-bottom: 10px;
-        color: #2ecc71;
-    }
-    
-    .achievement-modal-desc {
-        margin-bottom: 20px;
-    }
-    
-    .achievement-modal-button {
-        background-color: #2ecc71;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        transition: all 0.3s ease;
-    }
-    
-    .achievement-modal-button:hover {
-        background-color: #27ae60;
-        transform: scale(1.05);
-    }
-    
-    .achievement-modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        z-index: 9999;
-    }
-  </style>
+        
+        .achievements-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .achievement {
+            background-color: #34495e;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+            opacity: 0.4;
+            filter: grayscale(100%);
+        }
+        
+        .achievement.unlocked {
+            opacity: 1;
+            filter: grayscale(0%);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
+        }
+        
+        .achievement-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .achievement-name {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .achievement-desc {
+            font-size: 10px;
+            color: #bdc3c7;
+        }
+        
+        /* Estilos para os confetes */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            opacity: 0.7;
+            animation: fall linear forwards;
+        }
+        
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(720deg);
+            }
+        }
+        
+        /* Estilos para o modal de conquista */
+        .achievement-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #2c3e50;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(46, 204, 113, 0.8);
+            z-index: 10000;
+            text-align: center;
+            color: white;
+            max-width: 400px;
+            animation: modal-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes modal-pop {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        
+        .achievement-modal-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+            animation: bounce 1s infinite alternate;
+        }
+        
+        @keyframes bounce {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+        
+        .achievement-modal-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #2ecc71;
+        }
+        
+        .achievement-modal-desc {
+            margin-bottom: 20px;
+        }
+        
+        .achievement-modal-button {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .achievement-modal-button:hover {
+            background-color: #27ae60;
+            transform: scale(1.05);
+        }
+        
+        .achievement-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Tech Company Management Simulation</h1>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
     
-    <div class="setup" id="setupScreen">
-      <h2>Start Your Tech Company</h2>
-      <input type="text" id="companyName" placeholder="Enter Company Name">
-      <button id="startButton">Start Company</button>
+    <div class="container">
+        <h1>Tech Company Management Simulation</h1>
+        
+        <div class="setup" id="setupScreen">
+            <h2>Start Your Tech Company</h2>
+            <input type="text" id="companyName" placeholder="Enter Company Name">
+            <button id="startButton">Start Company</button>
+        </div>
+        
+        <div id="gameScreen" style="display: none;">
+            <div class="game-layout">
+                <!-- Seção da Empresa (Esquerda) -->
+                <div class="company-section">
+                    <div class="section-title">Empresa: <span id="companyNameDisplay"></span></div>
+                    
+                    <div class="company-dashboard">
+                        <!-- Coluna da esquerda: Stats -->
+                        <div class="stats-panel">
+                            <h3>Company Stats</h3>
+                            <p>Month: <span id="month" class="stats-value"></span></p>
+                            <p>Year: <span id="year" class="stats-value"></span></p>
+                            <p>Money: $<span id="money" class="stats-value"></span></p>
+                            <p>Reputation: <span id="reputation" class="stats-value">/100</span></p>
+                            <p>Employees: <span id="employees" class="stats-value"></span></p>
+                            <p>Products: <span id="products" class="stats-value"></span></p>
+                            <p>Monthly Revenue: $<span id="revenue" class="stats-value"></span></p>
+                            <p>Monthly Expenses: $<span id="expenses" class="stats-value"></span></p>
+                            
+                            <div>
+                                <p>Security Level: <span id="securityLevel" class="stats-value">/100</span></p>
+                                <div class="progress-bar">
+                                    <div class="security-progress-fill" id="securityBar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Coluna da direita: Actions -->
+                        <div class="actions-panel">
+                            <h3>Actions</h3>
+                            <div id="actions">
+                                <button class="action-button" data-action="hire">
+                                    🧑‍💼 Hire Employee ($10,000)
+                                    <div class="action-description">Increase your workforce to handle more projects.</div>
+                                </button>
+                                
+                                <button class="action-button" data-action="develop">
+                                    🛠️ Develop Product ($20,000)
+                                    <div class="action-description">Create a new product to generate revenue.</div>
+                                </button>
+                                
+                                <button class="action-button" data-action="marketing">
+                                    📢 Marketing Campaign ($15,000)
+                                    <div class="action-description">Increase company reputation.</div>
+                                </button>
+                                
+                                <button class="action-button" data-action="research">
+                                    🔬 Research & Development ($25,000)
+                                    <div class="action-description">Improve existing products and potentially increase reputation.</div>
+                                </button>
+                                
+                                <button class="action-button" data-action="security">
+                                    🔒 Improve Security ($25,000)
+                                    <div class="action-description">Reduce risk of security breaches and hacking.</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="gameStatus"></div>
+                    <div id="gameStatusV"></div>
+                    
+                    <div class="message-log">
+                        <h3>Message Log</h3>
+                        <div id="messages"></div>
+                    </div>
+                </div>
+                
+                <!-- Seção do Funcionário (Direita) -->
+                <div class="employee-section">
+                    <div class="section-title">Your Professional Career</div>
+                    
+                    <div class="career-progress">
+                        <div class="career-level">Career Level: <span id="careerLevelText">Intern</span></div>
+                        <div class="xp-bar">
+                            <div class="xp-fill" id="xpFill"></div>
+                        </div>
+                        <div class="xp-text">XP: <span id="currentXP">0</span>/<span id="neededXP">100</span></div>
+                        
+                        <div class="salary-info">
+                            <div>Monthly Salary:</div>
+                            <div class="salary-amount">$ <span id="salaryAmount">1500.00</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="skill-tree-container">
+                        <h2>Technical Skills</h2>
+                        
+                        <div class="skill-category">
+                            <h3>Development</h3>
+                            <div class="skill-item" data-skill="javascript">
+                                <div class="skill-name">JavaScript</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="javascript">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                            
+                            <div class="skill-item" data-skill="html_css">
+                                <div class="skill-name">HTML/CSS</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="html_css">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                            
+                            <div class="skill-item" data-skill="backend">
+                                <div class="skill-name">Backend</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="backend">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="skill-category">
+                            <h3>Infrastructure</h3>
+                            <div class="skill-item" data-skill="networks">
+                                <div class="skill-name">Networks</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="networks">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                            
+                            <div class="skill-item" data-skill="servers">
+                                <div class="skill-name">Servers</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="servers">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="skill-category">
+                            <h3>Soft Skills</h3>
+                            <div class="skill-item" data-skill="communication">
+                                <div class="skill-name">Communication</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="communication">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                            
+                            <div class="skill-item" data-skill="teamwork">
+                                <div class="skill-name">Teamwork</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="teamwork">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                            
+                            <div class="skill-item" data-skill="problem_solving">
+                                <div class="skill-name">Problem Solving</div>
+                                <div class="skill-level">
+                                    <div class="level-dot" data-level="1"></div>
+                                    <div class="level-dot" data-level="2"></div>
+                                    <div class="level-dot" data-level="3"></div>
+                                    <div class="level-dot" data-level="4"></div>
+                                    <div class="level-dot" data-level="5"></div>
+                                    <button class="skill-upgrade-btn" data-skill="problem_solving">Improve (20 XP)</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="certification-container">
+                        <h2>Certifications</h2>
+                        <div class="certification-list">
+                            <div class="certification-item" id="cert-html">
+                                <div class="certification-name">HTML5 Certified</div>
+                                <div class="certification-desc">Prove your advanced HTML5 skills and earn a salary bonus.</div>
+                                <button class="certification-btn" data-cert="html">Study (50 XP)</button>
+                            </div>
+                            
+                            <div class="certification-item certification-locked" id="cert-js">
+                                <div class="certification-name">JavaScript Pro</div>
+                                <div class="certification-desc">Master JavaScript and modern frameworks. Requires JavaScript level 3.</div>
+                                <button class="certification-btn" data-cert="js" disabled>Locked</button>
+                            </div>
+                            
+                            <div class="certification-item certification-locked" id="cert-backend">
+                                <div class="certification-name">Backend Master</div>
+                                <div class="certification-desc">Specialization in backend technologies. Requires Backend level 4.</div>
+                                <button class="certification-btn" data-cert="backend" disabled>Locked</button>
+                            </div>
+                            
+                            <div class="certification-item certification-locked" id="cert-networking">
+                                <div class="certification-name">Network Professional</div>
+                                <div class="certification-desc">Advanced networking certification. Requires Networks level 3.</div>
+                                <button class="certification-btn" data-cert="networking" disabled>Locked</button>
+                            </div>
+                            
+                            <div class="certification-item certification-locked" id="cert-cloud">
+                                <div class="certification-name">Cloud Computing</div>
+                                <div class="certification-desc">Specialization in cloud services. Reduces security investment costs. Requires Servers level 3.</div>
+                                <button class="certification-btn" data-cert="cloud" disabled>Locked</button>
+                            </div>
+                            
+                            <div class="certification-item certification-locked" id="cert-dba">
+                                <div class="certification-name">Database Administrator</div>
+                                <div class="certification-desc">Database specialization. Reduces data breach chances. Requires Backend level 3.</div>
+                                <button class="certification-btn" data-cert="dba" disabled>Locked</button>
+                            </div>
+                            
+                            <div class="certification-item certification-locked" id="cert-ml">
+                                <div class="certification-name">Machine Learning</div>
+                                <div class="certification-desc">Specialization in AI and machine learning. Increases product quality. Requires JavaScript level 4.</div>
+                                <button class="certification-btn" data-cert="ml" disabled>Locked</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
-    <div id="gameScreen" style="display: none;">
-      <div class="game-layout">
-        <!-- Seção da Empresa (Esquerda) -->
-        <div class="company-section">
-          <div class="section-title">Empresa: <span id="companyNameDisplay"></span></div>
-          
-          <div class="company-dashboard">
-            <!-- Coluna da esquerda: Stats -->
-            <div class="stats-panel">
-              <h3>Company Stats</h3>
-              <p>Month: <span id="month" class="stats-value"></span></p>
-              <p>Year: <span id="year" class="stats-value"></span></p>
-              <p>Money: $<span id="money" class="stats-value"></span></p>
-              <p>Reputation: <span id="reputation" class="stats-value">/100</span></p>
-              <p>Employees: <span id="employees" class="stats-value"></span></p>
-              <p>Products: <span id="products" class="stats-value"></span></p>
-              <p>Monthly Revenue: $<span id="revenue" class="stats-value"></span></p>
-              <p>Monthly Expenses: $<span id="expenses" class="stats-value"></span></p>
-              
-              <div>
-                <p>Security Level: <span id="securityLevel" class="stats-value">/100</span></p>
-                <div class="progress-bar">
-                  <div class="security-progress-fill" id="securityBar"></div>
-                </div>
-              </div>
+    <div class="achievements-container">
+        <div class="achievements-title">
+            <h2>Achievements</h2>
+            <span id="achievements-count">0/8 Unlocked</span>
+        </div>
+        
+        <div class="achievements-grid">
+            <div class="achievement" id="achievement-millionaire">
+                <div class="achievement-icon">💰</div>
+                <div class="achievement-name">Millionaire</div>
+                <div class="achievement-desc">Reach $1 million in company value</div>
             </div>
             
-            <!-- Coluna da direita: Actions -->
-            <div class="actions-panel">
-              <h3>Actions</h3>
-              <div id="actions">
-                <button class="action-button" data-action="hire">
-                  🧑‍💼 Hire Employee ($10,000)
-                  <div class="action-description">Increase your workforce to handle more projects.</div>
-                </button>
-                
-                <button class="action-button" data-action="develop">
-                  🛠️ Develop Product ($20,000)
-                  <div class="action-description">Create a new product to generate revenue.</div>
-                </button>
-                
-                <button class="action-button" data-action="marketing">
-                  📢 Marketing Campaign ($15,000)
-                  <div class="action-description">Increase company reputation.</div>
-                </button>
-                
-                <button class="action-button" data-action="research">
-                  🔬 Research & Development ($25,000)
-                  <div class="action-description">Improve existing products and potentially increase reputation.</div>
-                </button>
-                
-                <button class="action-button" data-action="security">
-                  🔒 Improve Security ($25,000)
-                  <div class="action-description">Reduce risk of security breaches and hacking.</div>
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div id="gameStatus"></div>
-          <div id="gameStatusV"></div>
-          
-          <div class="message-log">
-            <h3>Message Log</h3>
-            <div id="messages"></div>
-          </div>
-        </div>
-        
-        <!-- Seção do Funcionário (Direita) -->
-        <div class="employee-section">
-          <div class="section-title">Your Professional Career</div>
-          
-          <div class="career-progress">
-            <div class="career-level">Career Level: <span id="careerLevelText">Intern</span></div>
-            <div class="xp-bar">
-              <div class="xp-fill" id="xpFill"></div>
-            </div>
-            <div class="xp-text">XP: <span id="currentXP">0</span>/<span id="neededXP">100</span></div>
-            
-            <div class="salary-info">
-              <div>Monthly Salary:</div>
-              <div class="salary-amount">$ <span id="salaryAmount">1500.00</span></div>
-            </div>
-          </div>
-          
-          <div class="skill-tree-container">
-            <h2>Technical Skills</h2>
-            
-            <div class="skill-category">
-              <h3>Development</h3>
-              <div class="skill-item" data-skill="javascript">
-                <div class="skill-name">JavaScript</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="javascript">Improve (20 XP)</button>
-                </div>
-              </div>
-              
-              <div class="skill-item" data-skill="html_css">
-                <div class="skill-name">HTML/CSS</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="html_css">Improve (20 XP)</button>
-                </div>
-              </div>
-              
-              <div class="skill-item" data-skill="backend">
-                <div class="skill-name">Backend</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="backend">Improve (20 XP)</button>
-                </div>
-              </div>
+            <div class="achievement" id="achievement-multimillionaire">
+                <div class="achievement-icon">💎</div>
+                <div class="achievement-name">Multi-Millionaire</div>
+                <div class="achievement-desc">Reach $5 million in company value</div>
             </div>
             
-            <div class="skill-category">
-              <h3>Infrastructure</h3>
-              <div class="skill-item" data-skill="networks">
-                <div class="skill-name">Networks</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="networks">Improve (20 XP)</button>
-                </div>
-              </div>
-              
-              <div class="skill-item" data-skill="servers">
-                <div class="skill-name">Servers</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="servers">Improve (20 XP)</button>
-                </div>
-              </div>
+            <div class="achievement" id="achievement-tycoon">
+                <div class="achievement-icon">🏆</div>
+                <div class="achievement-name">Tech Tycoon</div>
+                <div class="achievement-desc">Reach $10 million in company value</div>
             </div>
             
-            <div class="skill-category">
-              <h3>Soft Skills</h3>
-              <div class="skill-item" data-skill="communication">
-                <div class="skill-name">Communication</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="communication">Improve (20 XP)</button>
-                </div>
-              </div>
-              
-              <div class="skill-item" data-skill="teamwork">
-                <div class="skill-name">Teamwork</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="teamwork">Improve (20 XP)</button>
-                </div>
-              </div>
-              
-              <div class="skill-item" data-skill="problem_solving">
-                <div class="skill-name">Problem Solving</div>
-                <div class="skill-level">
-                  <div class="level-dot" data-level="1"></div>
-                  <div class="level-dot" data-level="2"></div>
-                  <div class="level-dot" data-level="3"></div>
-                  <div class="level-dot" data-level="4"></div>
-                  <div class="level-dot" data-level="5"></div>
-                  <button class="skill-upgrade-btn" data-skill="problem_solving">Improve (20 XP)</button>
-                </div>
-              </div>
+            <div class="achievement" id="achievement-masterSkill">
+                <div class="achievement-icon">⭐</div>
+                <div class="achievement-name">Skill Master</div>
+                <div class="achievement-desc">Reach level 5 in any skill</div>
             </div>
-          </div>
-          
-          <div class="certification-container">
-            <h2>Certifications</h2>
-            <div class="certification-list">
-              <div class="certification-item" id="cert-html">
-                <div class="certification-name">HTML5 Certified</div>
-                <div class="certification-desc">Prove your advanced HTML5 skills and earn a salary bonus.</div>
-                <button class="certification-btn" data-cert="html">Study (50 XP)</button>
-              </div>
-              
-              <div class="certification-item certification-locked" id="cert-js">
-                <div class="certification-name">JavaScript Pro</div>
-                <div class="certification-desc">Master JavaScript and modern frameworks. Requires JavaScript level 3.</div>
-                <button class="certification-btn" data-cert="js" disabled>Locked</button>
-              </div>
-              
-              <div class="certification-item certification-locked" id="cert-backend">
-                <div class="certification-name">Backend Master</div>
-                <div class="certification-desc">Specialization in backend technologies. Requires Backend level 4.</div>
-                <button class="certification-btn" data-cert="backend" disabled>Locked</button>
-              </div>
-              
-              <div class="certification-item certification-locked" id="cert-networking">
-                <div class="certification-name">Network Professional</div>
-                <div class="certification-desc">Advanced networking certification. Requires Networks level 3.</div>
-                <button class="certification-btn" data-cert="networking" disabled>Locked</button>
-              </div>
-              
-              <div class="certification-item certification-locked" id="cert-cloud">
-                <div class="certification-name">Cloud Computing</div>
-                <div class="certification-desc">Specialization in cloud services. Reduces security investment costs. Requires Servers level 3.</div>
-                <button class="certification-btn" data-cert="cloud" disabled>Locked</button>
-              </div>
-              
-              <div class="certification-item certification-locked" id="cert-dba">
-                <div class="certification-name">Database Administrator</div>
-                <div class="certification-desc">Database specialization. Reduces data breach chances. Requires Backend level 3.</div>
-                <button class="certification-btn" data-cert="dba" disabled>Locked</button>
-              </div>
-              
-              <div class="certification-item certification-locked" id="cert-ml">
-                <div class="certification-name">Machine Learning</div>
-                <div class="certification-desc">Specialization in AI and machine learning. Increases product quality. Requires JavaScript level 4.</div>
-                <button class="certification-btn" data-cert="ml" disabled>Locked</button>
-              </div>
+            
+            <div class="achievement" id="achievement-certified">
+                <div class="achievement-icon">📜</div>
+                <div class="achievement-name">Certified</div>
+                <div class="achievement-desc">Obtain any certification</div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-  <div class="achievements-container">
-    <div class="achievements-title">
-        <h2>Achievements</h2>
-        <span id="achievements-count">0/8 Unlocked</span>
-    </div>
-    
-    <div class="achievements-grid">
-        <div class="achievement" id="achievement-millionaire">
-            <div class="achievement-icon">💰</div>
-            <div class="achievement-name">Millionaire</div>
-            <div class="achievement-desc">Reach $1 million in company value</div>
-        </div>
-        
-        <div class="achievement" id="achievement-multimillionaire">
-            <div class="achievement-icon">💎</div>
-            <div class="achievement-name">Multi-Millionaire</div>
-            <div class="achievement-desc">Reach $5 million in company value</div>
-        </div>
-        
-        <div class="achievement" id="achievement-tycoon">
-            <div class="achievement-icon">🏆</div>
-            <div class="achievement-name">Tech Tycoon</div>
-            <div class="achievement-desc">Reach $10 million in company value</div>
-        </div>
-        
-        <div class="achievement" id="achievement-masterSkill">
-            <div class="achievement-icon">⭐</div>
-            <div class="achievement-name">Skill Master</div>
-            <div class="achievement-desc">Reach level 5 in any skill</div>
-        </div>
-        
-        <div class="achievement" id="achievement-certified">
-            <div class="achievement-icon">📜</div>
-            <div class="achievement-name">Certified</div>
-            <div class="achievement-desc">Obtain any certification</div>
-        </div>
-        
-        <div class="achievement" id="achievement-fullyCertified">
-            <div class="achievement-icon">🎓</div>
-            <div class="achievement-name">Fully Certified</div>
-            <div class="achievement-desc">Complete all certifications</div>
-        </div>
-        
-        <div class="achievement" id="achievement-skillLegend">
-            <div class="achievement-icon">🌟</div>
-            <div class="achievement-name">Skill Legend</div>
-            <div class="achievement-desc">Max out all skills</div>
-        </div>
-        
-        <div class="achievement" id="achievement-cto">
-            <div class="achievement-icon">👑</div>
-            <div class="achievement-name">The Boss</div>
-            <div class="achievement-desc">Reach CTO level</div>
+            
+            <div class="achievement" id="achievement-fullyCertified">
+                <div class="achievement-icon">🎓</div>
+                <div class="achievement-name">Fully Certified</div>
+                <div class="achievement-desc">Complete all certifications</div>
+            </div>
+            
+            <div class="achievement" id="achievement-skillLegend">
+                <div class="achievement-icon">🌟</div>
+                <div class="achievement-name">Skill Legend</div>
+                <div class="achievement-desc">Max out all skills</div>
+            </div>
+            
+            <div class="achievement" id="achievement-cto">
+                <div class="achievement-icon">👑</div>
+                <div class="achievement-name">The Boss</div>
+                <div class="achievement-desc">Reach CTO level</div>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="restart-game-container" style="text-align: center; margin-top: 30px;">
-    <button id="restartGameBtn" style="background-color: #e74c3c; padding: 12px 20px; font-size: 16px;">
-        🔄 Restart Game (Delete All Progress)
-    </button>
-</div>
+    <div class="restart-game-container" style="text-align: center; margin-top: 30px;">
+        <button id="restartGameBtn" style="background-color: #e74c3c; padding: 12px 20px; font-size: 16px;">
+            🔄 Restart Game (Delete All Progress)
+        </button>
+    </div>
 
-<div class="confetti-container" id="confetti-container" style="display: none;"></div>
-<div class="achievement-modal-overlay" id="achievement-modal-overlay" style="display: none;"></div>
-<div class="achievement-modal" id="achievement-modal" style="display: none;">
-    <div class="achievement-modal-icon" id="achievement-modal-icon">🏆</div>
-    <div class="achievement-modal-title" id="achievement-modal-title">Achievement Unlocked!</div>
-    <div class="achievement-modal-desc" id="achievement-modal-desc">You've reached a significant milestone!</div>
-    <button class="achievement-modal-button" id="achievement-modal-button">Awesome!</button>
-</div>
+    <div class="confetti-container" id="confetti-container" style="display: none;"></div>
+    <div class="achievement-modal-overlay" id="achievement-modal-overlay" style="display: none;"></div>
+    <div class="achievement-modal" id="achievement-modal" style="display: none;">
+        <div class="achievement-modal-icon" id="achievement-modal-icon">🏆</div>
+        <div class="achievement-modal-title" id="achievement-modal-title">Achievement Unlocked!</div>
+        <div class="achievement-modal-desc" id="achievement-modal-desc">You've reached a significant milestone!</div>
+        <button class="achievement-modal-button" id="achievement-modal-button">Awesome!</button>
+    </div>
 
-  <script>
-    // Tech Company Management Simulation
-    // A simple text-based strategy game to run your own tech company
+    <script>
+        // Tech Company Management Simulation
+        // A simple text-based strategy game to run your own tech company
 
-    class TechCompanySimulation {
-      constructor(companyName) {
-        // Company stats
-        this.companyName = companyName;
-        this.money = 100000; // Starting capital
-        this.reputation = 20; // Out of 100
-        this.employees = 5; // Starting with a small team
-        this.products = []; // Products the company has developed
-        this.revenue = 0;
-        this.expenses = 5000; // Monthly burn rate
-        this.securityLevel = 10; // Security level out of 100
-        
-        // Game state
-        this.month = 1;
-        this.year = 1;
-        this.isGameOver = false;
-        this.isVictory = false;
-        this.messages = [];
-        
-        this.messages.push(`${this.companyName} founded with $${this.money.toLocaleString()} capital!`);
-        this.messages.push(`WARNING: Your security level is low (${this.securityLevel}/100). Consider investing in security.`);
-      }
-      
-      // Main game loop
-      playTurn(decision) {
-        if (this.isGameOver) {
-          return "Game Over! Refresh to start a new game.";
-        }
-        
-        // Process the player's decision
-        this.processDecision(decision);
-        
-        // Calculate monthly finances
-        this.calculateFinances();
-        
-        // Random events
-        this.triggerRandomEvent();
-        
-        // Check game over conditions
-        this.checkGameOver();
-        
-        // Increment time
-        this.advanceTime();
-        
-        // Return game state
-        return this.getGameState();
-      }
-      
-      processDecision(decision) {
-        switch(decision) {
-          case 'hire':
-            if (this.money >= 10000) {
-              this.employees += 1;
-              this.money -= 10000;
-              this.expenses += Math.floor(Math.random()*5500) + 4500;
-              this.messages.push("You hired a new employee!");
-            } else {
-              this.messages.push("Not enough money to hire a new employee.");
-            }
-            break;
-            
-          case 'develop':
-            if (this.employees >= 3) {
-              let productQuality = Math.floor(Math.random() * 30) + (this.reputation / 5) + 40;
-              
-              // Aumentar qualidade do produto se tiver certificação ML
-              if (player && player.certifications && player.certifications.ml) {
-                  productQuality = Math.floor(productQuality * 1.3); // 30% de aumento na qualidade
-              }
-              
-              const productName = `Product #${this.products.length + 1}`;
-              this.products.push({
-                name: productName,
-                quality: productQuality,
-                revenue: Math.floor(productQuality * 100)
-              });
-              this.money -= 20000;
-              this.reputation += Math.floor(Math.random()*7) + 2;
-              this.messages.push(`You developed a new product: ${productName} (Quality: ${productQuality}/100)`);
-              
-              // Integração com habilidades do jogador
-              if (player) {
-                  // Qualidade adicional baseada nas habilidades
-                  const skillBonus = (player.skills.javascript * 0.1) + (player.skills.backend * 0.1);
-                  
-                  // Dar XP ao jogador por desenvolver produto
-                  const projectSize = this.products.length <= 2 ? 'small' : (this.products.length <= 5 ? 'medium' : 'large');
-                  rewardProject(projectSize);
-              }
-            } else {
-              this.messages.push("You need at least 3 employees to develop a new product.");
-            }
-            break;
-            
-          case 'marketing':
-            if (this.money >= 15000) {
-              this.money -= 15000;
-              this.reputation += Math.floor(Math.random()*15) + 5;
-              this.messages.push("Marketing campaign completed! Reputation increased.");
-            } else {
-              this.messages.push("Not enough money for a marketing campaign.");
-            }
-            break;
-            
-          case 'research':
-            if (this.money >= 25000) {
-              this.money -= 25000;
-              
-              // 50% chance to discover a breakthrough
-              if (Math.random() > 0.5) {
-                this.reputation += Math.floor(Math.random()*20) + 8;
+        class TechCompanySimulation {
+            constructor(companyName) {
+                // Company stats
+                this.companyName = companyName;
+                this.money = 100000; // Starting capital
+                this.reputation = 20; // Out of 100
+                this.employees = 5; // Starting with a small team
+                this.products = []; // Products the company has developed
+                this.revenue = 0;
+                this.expenses = 5000; // Monthly burn rate
+                this.securityLevel = 10; // Security level out of 100
                 
-                // Improve all existing products
-                this.products.forEach(product => {
-                  product.quality += Math.floor(Math.random()*15) + 5;
-                  product.revenue = Math.floor(product.quality * Math.floor(Math.random()*110) + 70);
-                });
+                // Game state
+                this.month = 1;
+                this.year = 1;
+                this.isGameOver = false;
+                this.isVictory = false;
+                this.messages = [];
                 
-                this.messages.push("R&D breakthrough! All products improved and reputation increased.");
-              } else {
-                this.messages.push("R&D effort didn't yield immediate results, but knowledge was gained.");
-                this.reputation += 3;
-              }
-            } else {
-              this.messages.push("Not enough money for research and development.");
-            }
-            break;
-
-          case 'security':
-            let securityCost = 25000;
-            
-            // Reduzir custo de segurança se tiver certificação Cloud
-            if (player && player.certifications && player.certifications.cloud) {
-                securityCost = Math.floor(securityCost * 0.7); // 30% de desconto
+                this.messages.push(`${this.companyName} founded with $${this.money.toLocaleString()} capital!`);
+                this.messages.push(`WARNING: Your security level is low (${this.securityLevel}/100). Consider investing in security.`);
             }
             
-            if (this.money >= securityCost) {
-                this.money -= securityCost;
-                const securityIncrease = Math.floor(Math.random()*15) + 10;
-                this.securityLevel = Math.min(100, this.securityLevel + securityIncrease);
-                this.messages.push(`Security level increased to ${this.securityLevel}/100.`);
-                
-                // Dar XP ao jogador por investir em segurança
-                if (player) {
-                    const securityXP = Math.floor(Math.random() * 8) + 5;
-                    addXP(securityXP);
-                    showNotification(`Security improved! +${securityXP} XP.`);
+            // Main game loop
+            playTurn(decision) {
+                if (this.isGameOver) {
+                    return "Game Over! Refresh to start a new game.";
                 }
-            } else {
-                this.messages.push(`Not enough money to invest in security. Needed: $${securityCost.toLocaleString()}`);
-            }
-            break;
-        }
-        
-        // Avançar o tempo após cada decisão
-        this.advanceTime();
-      }
-      
-      calculateFinances() {
-        // Calculate revenue from products
-        this.revenue = this.products.reduce((total, product) => total + product.revenue, 0);
-        
-        // Monthly profit/loss
-        const monthlyChange = this.revenue - this.expenses;
-        this.money += monthlyChange;
-        
-        if (monthlyChange >= 0) {
-          this.messages.push(`Monthly profit: $${monthlyChange.toLocaleString()}`);
-        } else {
-          this.messages.push(`Monthly loss: $${Math.abs(monthlyChange).toLocaleString()}`);
-        }
-      }
-      
-      triggerRandomEvent() {
-        const eventChance = Math.random() * 100;
-        
-        // Evento de vazamento de dados (10% de chance base)
-        let dataBreachChance = 10;
-        
-        // Reduzir chance de vazamento se tiver certificação DBA
-        if (player && player.certifications && player.certifications.dba) {
-            dataBreachChance *= 0.5; // Reduz pela metade a chance de vazamento
-        }
-        
-        if (eventChance < dataBreachChance) {
-            const reputationLoss = Math.floor(Math.random() * 20) + 10;
-            const moneyLoss = Math.floor(this.money * 0.15); // Perde 15% do dinheiro
-            
-            this.reputation = Math.max(0, this.reputation - reputationLoss);
-            this.money = Math.max(0, this.money - moneyLoss);
-            
-            this.messages.push(`DATA BREACH! Your company lost ${reputationLoss} reputation points and $${moneyLoss.toLocaleString()} in fines and compensations.`);
-            
-            // Penalidade de XP para o jogador
-            if (player) {
-                const xpPenalty = Math.floor(Math.random() * 10) + 5;
-                player.xp = Math.max(0, player.xp - xpPenalty);
-                updateCareerDisplay();
-                showNotification(`Data breach! -${xpPenalty} XP penalty.`);
-            }
-            return;
-        }
-        
-        // Eventos positivos (15% de chance)
-        if (eventChance < 25) {
-            // Parceria inesperada
-            const moneyGain = Math.floor(Math.random() * 30000) + 20000;
-            const reputationGain = Math.floor(Math.random() * 10) + 5;
-            
-            this.money += moneyGain;
-            this.reputation += reputationGain;
-            
-            this.messages.push(`STRATEGIC PARTNERSHIP! A large company proposed a partnership. You gained $${moneyGain.toLocaleString()} and ${reputationGain} reputation points.`);
-            
-            // Bônus de XP para o jogador
-            if (player) {
-                const xpBonus = Math.floor(Math.random() * 15) + 10;
-                addXP(xpBonus);
-                showNotification(`Strategic partnership! +${xpBonus} XP from networking.`);
-            }
-            return;
-        }
-        
-        // Evento de investidor (10% de chance)
-        if (eventChance < 35) {
-            const investmentAmount = Math.floor(Math.random() * 50000) + 30000;
-            this.money += investmentAmount;
-            this.messages.push(`An investor was impressed with your company and invested $${investmentAmount.toLocaleString()}!`);
-            
-            // Bônus de XP para o jogador
-            if (player) {
-                const xpBonus = Math.floor(Math.random() * 12) + 8;
-                addXP(xpBonus);
-                showNotification(`New investor! +${xpBonus} XP from presentation.`);
-            }
-            return;
-        }
-        
-        // Eventos negativos originais
-        if (eventChance < 45 && this.securityLevel < 50) {
-            const hackAmount = Math.floor(this.money * 0.1);
-            this.money -= hackAmount;
-            this.messages.push(`Your company was hacked! You lost $${hackAmount.toLocaleString()}.`);
-            this.securityLevel = Math.max(0, this.securityLevel - 10);
-        } else if (eventChance < 55 && this.employees > 2) {
-            this.employees -= 1;
-            this.expenses -= Math.floor(Math.random()*5000) + 4000;
-            this.messages.push("An employee quit unexpectedly!");
-        }
-      }
-      
-      checkGameOver() {
-        if (this.money <= 0) {
-          this.isGameOver = true;
-          this.messages.push("GAME OVER: Your company has gone bankrupt!");
-        }
-        
-        if (this.money >= 1000000) {
-          this.isGameOver = true;
-          this.isVictory = true;
-          this.messages.push("VICTORY: Your company is now worth over $1 million! You win!");
-        }
-      }
-      
-      advanceTime() {
-        this.month++;
-        if (this.month > 12) {
-          this.month = 1;
-          this.year++;
-        }
-        
-        // Calcular receita e despesas mensais
-        this.calculateFinances();
-        
-        // Verificar falência
-        if (this.money <= 0) {
-            this.isGameOver = true;
-            this.messages.push("GAME OVER: Your company went bankrupt!");
-        }
-        
-        // Verificar conquistas de valor da empresa (não encerra o jogo até 10 milhões)
-        checkAchievements();
-        
-        // Chance de evento aleatório
-        this.triggerRandomEvent();
-        
-        // Ganho de XP mensal para o funcionário
-        if (typeof addXP === 'function' && !this.isGameOver) {
-            const baseXP = 3;
-            const companyBonus = Math.floor((this.employees + this.products.length) / 2);
-            const monthlyXP = baseXP + companyBonus;
-            
-            // Adicionar XP ao jogador
-            addXP(monthlyXP);
-            showNotification(`New month! +${monthlyXP} XP for experience gained.`);
-        }
-      }
-      
-      getGameState() {
-        return {
-          companyName: this.companyName,
-          money: this.money,
-          reputation: this.reputation,
-          employees: this.employees,
-          productsCount: this.products.length,
-          revenue: this.revenue,
-          expenses: this.expenses,
-          month: this.month,
-          year: this.year,
-          isGameOver: this.isGameOver,
-          messages: this.messages.slice(-3) // Only return the last 3 messages
-        };
-      }
-    }
-
-    // Sample usage
-    function startGame() {
-      const companyName = document.getElementById('companyName').value || "Tech Startup";
-      window.game = new TechCompanySimulation(companyName);
-      updateUI();
-    }
-
-    function makeDecision(decision) {
-      if (!window.game) {
-        alert("Please start a game first!");
-        return;
-      }
-      
-      const result = window.game.playTurn(decision);
-      updateUI();
-    }
-
-    function updateUI() {
-      const game = window.game;
-      if (!game) return;
-      
-      document.getElementById('stats').innerHTML = `
-        <h2>${game.companyName}</h2>
-        <p>Month: ${game.month}, Year: ${game.year}</p>
-        <p>Money: $${game.money.toLocaleString()}</p>
-        <p>Reputation: ${game.reputation}/100</p>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: ${game.reputation}%;"></div>
-        </div>
-        <p>Security Level: ${game.securityLevel}/100</p>
-        <div class="progress-bar">
-          <div class="security-progress-fill" style="width: ${game.securityLevel}%;"></div>
-        </div>
-        <p>Employees: ${game.employees}</p>
-        <p>Products: ${game.products.length}</p>
-        <p>Monthly Revenue: $${game.revenue.toLocaleString()}</p>
-        <p>Monthly Expenses: $${game.expenses.toLocaleString()}</p>
-      `;
-      
-      // Update message log
-      const messagesDiv = document.getElementById('messages');
-      messagesDiv.innerHTML = '';
-      
-      game.messages.slice(-8).forEach(message => {
-        const msgElement = document.createElement('p');
-        msgElement.textContent = message;
-        
-        // Highlight security breach messages
-        if (message.includes("DATA BREACH")) {
-          msgElement.style.color = "#e74c3c";
-          msgElement.style.fontWeight = "bold";
-        }
-        
-        messagesDiv.appendChild(msgElement);
-      });
-      
-      // Enable/disable buttons based on game state
-      const buttons = document.querySelectorAll('#actions button');
-      buttons.forEach(button => {
-        button.disabled = game.isGameOver;
-      });
-      
-      if (game.isGameOver && !game.isVictory) {
-        document.getElementById('gameStatus').textContent = "Game Over! Refresh to start a new game.";
-      }
-
-      if (game.isGameOver && game.isVictory) {
-        document.getElementById('gameStatusV').textContent = "Congratulations! Your company is now worth over $1 million! You win!";
-      }
-    }
-
-    // Sistema de Progressão
-    const player = {
-        xp: 0,
-        xpNeeded: 100,
-        careerLevel: 0,
-        salary: 1500,
-        skills: {
-            javascript: 0,
-            html_css: 0,
-            backend: 0,
-            networks: 0,
-            servers: 0,
-            communication: 0,
-            teamwork: 0,
-            problem_solving: 0
-        },
-        certifications: {
-            html: false,
-            js: false,
-            backend: false,
-            networking: false,
-            cloud: false,
-            dba: false,
-            ml: false
-        }
-    };
-    
-    // Definições de carreira
-    const careerLevels = [
-        { name: "Intern", baseSalary: 1500 },
-        { name: "Junior", baseSalary: 3000 },
-        { name: "Mid-level", baseSalary: 5500 },
-        { name: "Senior", baseSalary: 9000 },
-        { name: "Tech Lead", baseSalary: 12000 },
-        { name: "Architect", baseSalary: 18000 },
-        { name: "CTO", baseSalary: 26000 }
-    ];
-    
-    // Custo de XP para melhorar habilidades por nível
-    const skillUpgradeCost = [20, 40, 80, 160, 320];
-    
-    // Inicialização
-    function initProgressionSystem() {
-        updateSkillsDisplay();
-        updateCareerDisplay();
-        updateCertificationDisplay();
-        setupEventListeners();
-        
-        // Para fins de teste, adicionamos XP
-        addXP(50);
-    }
-    
-    // Atualizar display de habilidades
-    function updateSkillsDisplay() {
-        for (const skill in player.skills) {
-            const level = player.skills[skill];
-            const skillElement = document.querySelector(`.skill-item[data-skill="${skill}"]`);
-            
-            if (skillElement) {
-                // Atualizar os dots
-                const dots = skillElement.querySelectorAll('.level-dot');
-                dots.forEach((dot, index) => {
-                    if (index < level) {
-                        dot.classList.add('active');
-                    } else {
-                        dot.classList.remove('active');
-                    }
-                });
                 
-                // Atualizar o botão
-                const upgradeBtn = skillElement.querySelector('.skill-upgrade-btn');
-                if (level < 5) {
-                    const cost = skillUpgradeCost[level];
-                    upgradeBtn.textContent = `Improve (${cost} XP)`;
-                    upgradeBtn.disabled = player.xp < cost;
+                // Process the player's decision
+                this.processDecision(decision);
+                
+                // Calculate monthly finances
+                this.calculateFinances();
+                
+                // Random events
+                this.triggerRandomEvent();
+                
+                // Check game over conditions
+                this.checkGameOver();
+                
+                // Increment time
+                this.advanceTime();
+                
+                // Return game state
+                return this.getGameState();
+            }
+            
+            processDecision(decision) {
+                switch(decision) {
+                    case 'hire':
+                        if (this.money >= 10000) {
+                            this.employees += 1;
+                            this.money -= 10000;
+                            this.expenses += Math.floor(Math.random()*5500) + 4500;
+                            this.messages.push("You hired a new employee!");
+                        } else {
+                            this.messages.push("Not enough money to hire a new employee.");
+                        }
+                        break;
+                        
+                    case 'develop':
+                        if (this.employees >= 3) {
+                            let productQuality = Math.floor(Math.random() * 30) + (this.reputation / 5) + 40;
+                            
+                            // Aumentar qualidade do produto se tiver certificação ML
+                            if (player && player.certifications && player.certifications.ml) {
+                                productQuality = Math.floor(productQuality * 1.3); // 30% de aumento na qualidade
+                            }
+                            
+                            const productName = `Product #${this.products.length + 1}`;
+                            this.products.push({
+                                name: productName,
+                                quality: productQuality,
+                                revenue: Math.floor(productQuality * 100)
+                            });
+                            this.money -= 20000;
+                            this.reputation += Math.floor(Math.random()*7) + 2;
+                            this.messages.push(`You developed a new product: ${productName} (Quality: ${productQuality}/100)`);
+                            
+                            // Integração com habilidades do jogador
+                            if (player) {
+                                // Qualidade adicional baseada nas habilidades
+                                const skillBonus = (player.skills.javascript * 0.1) + (player.skills.backend * 0.1);
+                                
+                                // Dar XP ao jogador por desenvolver produto
+                                const projectSize = this.products.length <= 2 ? 'small' : (this.products.length <= 5 ? 'medium' : 'large');
+                                rewardProject(projectSize);
+                            }
+                        } else {
+                            this.messages.push("You need at least 3 employees to develop a new product.");
+                        }
+                        break;
+                        
+                    case 'marketing':
+                        if (this.money >= 15000) {
+                            this.money -= 15000;
+                            this.reputation += Math.floor(Math.random()*15) + 5;
+                            this.messages.push("Marketing campaign completed! Reputation increased.");
+                        } else {
+                            this.messages.push("Not enough money for a marketing campaign.");
+                        }
+                        break;
+                        
+                    case 'research':
+                        if (this.money >= 25000) {
+                            this.money -= 25000;
+                            
+                            // 50% chance to discover a breakthrough
+                            if (Math.random() > 0.5) {
+                                this.reputation += Math.floor(Math.random()*20) + 8;
+                                
+                                // Improve all existing products
+                                this.products.forEach(product => {
+                                    product.quality += Math.floor(Math.random()*15) + 5;
+                                    product.revenue = Math.floor(product.quality * Math.floor(Math.random()*110) + 70);
+                                });
+                                
+                                this.messages.push("R&D breakthrough! All products improved and reputation increased.");
+                            } else {
+                                this.messages.push("R&D effort didn't yield immediate results, but knowledge was gained.");
+                                this.reputation += 3;
+                            }
+                        } else {
+                            this.messages.push("Not enough money for research and development.");
+                        }
+                        break;
+
+                    case 'security':
+                        let securityCost = 25000;
+                        
+                        // Reduzir custo de segurança se tiver certificação Cloud
+                        if (player && player.certifications && player.certifications.cloud) {
+                            securityCost = Math.floor(securityCost * 0.7); // 30% de desconto
+                        }
+                        
+                        if (this.money >= securityCost) {
+                            this.money -= securityCost;
+                            const securityIncrease = Math.floor(Math.random()*15) + 10;
+                            this.securityLevel = Math.min(100, this.securityLevel + securityIncrease);
+                            this.messages.push(`Security level increased to ${this.securityLevel}/100.`);
+                            
+                            // Dar XP ao jogador por investir em segurança
+                            if (player) {
+                                const securityXP = Math.floor(Math.random() * 8) + 5;
+                                addXP(securityXP);
+                                showNotification(`Security improved! +${securityXP} XP.`);
+                            }
+                        } else {
+                            this.messages.push(`Not enough money to invest in security. Needed: $${securityCost.toLocaleString()}`);
+                        }
+                        break;
+                }
+                
+                // Avançar o tempo após cada decisão
+                this.advanceTime();
+            }
+            
+            calculateFinances() {
+                // Calculate revenue from products
+                this.revenue = this.products.reduce((total, product) => total + product.revenue, 0);
+                
+                // Monthly profit/loss
+                const monthlyChange = this.revenue - this.expenses;
+                this.money += monthlyChange;
+                
+                if (monthlyChange >= 0) {
+                    this.messages.push(`Monthly profit: $${monthlyChange.toLocaleString()}`);
                 } else {
-                    upgradeBtn.textContent = "Max Level";
-                    upgradeBtn.disabled = true;
+                    this.messages.push(`Monthly loss: $${Math.abs(monthlyChange).toLocaleString()}`);
                 }
             }
-        }
-    }
-    
-    // Atualizar display de carreira
-    function updateCareerDisplay() {
-        document.getElementById('careerLevelText').textContent = careerLevels[player.careerLevel].name;
-        document.getElementById('currentXP').textContent = player.xp;
-        document.getElementById('neededXP').textContent = player.xpNeeded;
-        document.getElementById('salaryAmount').textContent = player.salary.toLocaleString('en-US', {minimumFractionDigits: 2});
-        
-        // Atualizar a barra de XP
-        const percentage = (player.xp / player.xpNeeded) * 100;
-        document.getElementById('xpFill').style.width = `${percentage}%`;
-    }
-    
-    // Atualizar display de certificações
-    function updateCertificationDisplay() {
-        // HTML Cert
-        updateCertificationItem('html', player.skills.html_css >= 2);
-        
-        // JS Cert
-        updateCertificationItem('js', player.skills.javascript >= 3);
-        
-        // Backend Cert
-        updateCertificationItem('backend', player.skills.backend >= 4);
-        
-        // Network Cert
-        updateCertificationItem('networking', player.skills.networks >= 3);
-        
-        // Cloud Computing Cert
-        updateCertificationItem('cloud', player.skills.servers >= 3);
-        
-        // DBA Cert
-        updateCertificationItem('dba', player.skills.backend >= 3);
-        
-        // Machine Learning Cert
-        updateCertificationItem('ml', player.skills.javascript >= 4);
-    }
-    
-    function updateCertificationItem(certId, isUnlocked) {
-        const certElement = document.getElementById(`cert-${certId}`);
-        const certButton = certElement.querySelector('.certification-btn');
-        
-        if (player.certifications[certId]) {
-            // Já possui a certificação
-            certElement.classList.add('certification-complete');
-            certElement.classList.remove('certification-locked');
-            certButton.textContent = "Completed";
-            certButton.disabled = true;
-        } else if (isUnlocked) {
-            // Pode obter a certificação
-            certElement.classList.remove('certification-locked');
-            certElement.classList.remove('certification-complete');
-            certButton.textContent = "Study (200 XP)";
-            certButton.disabled = false;
-            certButton.style.backgroundColor = "#27ae60"; // Verde
-        } else {
-            // Certificação bloqueada
-            certElement.classList.add('certification-locked');
-            certElement.classList.remove('certification-complete');
-            certButton.textContent = "Locked";
-            certButton.disabled = true;
-            certButton.style.backgroundColor = "#95a5a6"; // Cinza
-        }
-    }
-    
-    // Configurar event listeners
-    function setupEventListeners() {
-        // Remover event listeners existentes para evitar duplicação
-        document.querySelectorAll('.skill-upgrade-btn').forEach(button => {
-            button.replaceWith(button.cloneNode(true));
-        });
-        document.querySelectorAll('.certification-btn').forEach(button => {
-            button.replaceWith(button.cloneNode(true));
-        });
-
-        // Event listeners para os botões de melhoria de habilidades
-        document.querySelectorAll('.skill-upgrade-btn').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault(); // Previne múltiplos disparos
-                const skill = this.getAttribute('data-skill');
-                upgradeSkill(skill);
-            });
-        });
-        
-        // Event listeners para os botões de certificação 
-        document.querySelectorAll('.certification-btn').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault(); // Previne múltiplos disparos
-                const cert = this.getAttribute('data-cert');
-                studyCertification(cert);
-            });
-        });
-    }
-    
-    // Funcionalidade para adicionar XP
-    function addXP(amount) {
-        player.xp += amount;
-        
-        // Verificar se subiu de nível
-        if (player.xp >= player.xpNeeded && player.careerLevel < careerLevels.length - 1) {
-            levelUp();
-        }
-        
-        updateCareerDisplay();
-        updateSkillsDisplay();
-    }
-    
-    // Subir de nível na carreira
-    function levelUp() {
-        player.careerLevel++;
-        player.xp -= player.xpNeeded;
-        
-        // Aumentar significativamente o XP necessário para o próximo nível
-        const levelFactor = 1.5 + (player.careerLevel * 0.2);
-        player.xpNeeded = Math.floor(player.xpNeeded * levelFactor);
-        
-        // Atualizar salário base de acordo com o nível de carreira
-        updateSalary();
-        
-        // Verificar conquistas
-        checkAchievements();
-        
-        // Mensagem de parabéns
-        showNotification(`Congratulations! You've been promoted to ${careerLevels[player.careerLevel].name}!`);
-    }
-    
-    // Melhorar uma habilidade
-    function upgradeSkill(skill) {
-      console.log('skill: ', skill);
-        const currentLevel = player.skills[skill];
-        const cost = skillUpgradeCost[currentLevel];
-        
-        if (player.xp >= cost && currentLevel < 5) {
-            player.xp -= cost;
-            player.skills[skill]++;
             
-            // Atualizar displays
+            triggerRandomEvent() {
+                const eventChance = Math.random() * 100;
+                
+                // Evento de vazamento de dados (10% de chance base)
+                let dataBreachChance = 10;
+                
+                // Reduzir chance de vazamento se tiver certificação DBA
+                if (player && player.certifications && player.certifications.dba) {
+                    dataBreachChance *= 0.5; // Reduz pela metade a chance de vazamento
+                }
+                
+                if (eventChance < dataBreachChance) {
+                    const reputationLoss = Math.floor(Math.random() * 20) + 10;
+                    const moneyLoss = Math.floor(this.money * 0.15); // Perde 15% do dinheiro
+                    
+                    this.reputation = Math.max(0, this.reputation - reputationLoss);
+                    this.money = Math.max(0, this.money - moneyLoss);
+                    
+                    this.messages.push(`DATA BREACH! Your company lost ${reputationLoss} reputation points and $${moneyLoss.toLocaleString()} in fines and compensations.`);
+                    
+                    // Penalidade de XP para o jogador
+                    if (player) {
+                        const xpPenalty = Math.floor(Math.random() * 10) + 5;
+                        player.xp = Math.max(0, player.xp - xpPenalty);
+                        updateCareerDisplay();
+                        showNotification(`Data breach! -${xpPenalty} XP penalty.`);
+                    }
+                    return;
+                }
+                
+                // Eventos positivos (15% de chance)
+                if (eventChance < 25) {
+                    // Parceria inesperada
+                    const moneyGain = Math.floor(Math.random() * 30000) + 20000;
+                    const reputationGain = Math.floor(Math.random() * 10) + 5;
+                    
+                    this.money += moneyGain;
+                    this.reputation += reputationGain;
+                    
+                    this.messages.push(`STRATEGIC PARTNERSHIP! A large company proposed a partnership. You gained $${moneyGain.toLocaleString()} and ${reputationGain} reputation points.`);
+                    
+                    // Bônus de XP para o jogador
+                    if (player) {
+                        const xpBonus = Math.floor(Math.random() * 15) + 10;
+                        addXP(xpBonus);
+                        showNotification(`Strategic partnership! +${xpBonus} XP from networking.`);
+                    }
+                    return;
+                }
+                
+                // Evento de investidor (10% de chance)
+                if (eventChance < 35) {
+                    const investmentAmount = Math.floor(Math.random() * 50000) + 30000;
+                    this.money += investmentAmount;
+                    this.messages.push(`An investor was impressed with your company and invested $${investmentAmount.toLocaleString()}!`);
+                    
+                    // Bônus de XP para o jogador
+                    if (player) {
+                        const xpBonus = Math.floor(Math.random() * 12) + 8;
+                        addXP(xpBonus);
+                        showNotification(`New investor! +${xpBonus} XP from presentation.`);
+                    }
+                    return;
+                }
+                
+                // Eventos negativos originais
+                if (eventChance < 45 && this.securityLevel < 50) {
+                    const hackAmount = Math.floor(this.money * 0.1);
+                    this.money -= hackAmount;
+                    this.messages.push(`Your company was hacked! You lost $${hackAmount.toLocaleString()}.`);
+                    this.securityLevel = Math.max(0, this.securityLevel - 10);
+                } else if (eventChance < 55 && this.employees > 2) {
+                    this.employees -= 1;
+                    this.expenses -= Math.floor(Math.random()*5000) + 4000;
+                    this.messages.push("An employee quit unexpectedly!");
+                }
+            }
+            
+            checkGameOver() {
+                if (this.money <= 0) {
+                    this.isGameOver = true;
+                    this.messages.push("GAME OVER: Your company has gone bankrupt!");
+                }
+                
+                if (this.money >= 1000000) {
+                    this.isGameOver = true;
+                    this.isVictory = true;
+                    this.messages.push("VICTORY: Your company is now worth over $1 million! You win!");
+                }
+            }
+            
+            advanceTime() {
+                this.month++;
+                if (this.month > 12) {
+                    this.month = 1;
+                    this.year++;
+                }
+                
+                // Calcular receita e despesas mensais
+                this.calculateFinances();
+                
+                // Verificar falência
+                if (this.money <= 0) {
+                    this.isGameOver = true;
+                    this.messages.push("GAME OVER: Your company went bankrupt!");
+                }
+                
+                // Verificar conquistas de valor da empresa (não encerra o jogo até 10 milhões)
+                checkAchievements();
+                
+                // Chance de evento aleatório
+                this.triggerRandomEvent();
+                
+                // Ganho de XP mensal para o funcionário
+                if (typeof addXP === 'function' && !this.isGameOver) {
+                    const baseXP = 3;
+                    const companyBonus = Math.floor((this.employees + this.products.length) / 2);
+                    const monthlyXP = baseXP + companyBonus;
+                    
+                    // Adicionar XP ao jogador
+                    addXP(monthlyXP);
+                    showNotification(`New month! +${monthlyXP} XP for experience gained.`);
+                }
+            }
+            
+            getGameState() {
+                return {
+                    companyName: this.companyName,
+                    money: this.money,
+                    reputation: this.reputation,
+                    employees: this.employees,
+                    productsCount: this.products.length,
+                    revenue: this.revenue,
+                    expenses: this.expenses,
+                    month: this.month,
+                    year: this.year,
+                    isGameOver: this.isGameOver,
+                    messages: this.messages.slice(-3) // Only return the last 3 messages
+                };
+            }
+        }
+
+        // Sample usage
+        function startGame() {
+            const companyName = document.getElementById('companyName').value || "Tech Startup";
+            window.game = new TechCompanySimulation(companyName);
+            updateUI();
+        }
+
+        function makeDecision(decision) {
+            if (!window.game) {
+                alert("Please start a game first!");
+                return;
+            }
+            
+            const result = window.game.playTurn(decision);
+            updateUI();
+        }
+
+        function updateUI() {
+            const game = window.game;
+            if (!game) return;
+            
+            document.getElementById('stats').innerHTML = `
+                <h2>${game.companyName}</h2>
+                <p>Month: ${game.month}, Year: ${game.year}</p>
+                <p>Money: $${game.money.toLocaleString()}</p>
+                <p>Reputation: ${game.reputation}/100</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${game.reputation}%;"></div>
+                </div>
+                <p>Security Level: ${game.securityLevel}/100</p>
+                <div class="progress-bar">
+                    <div class="security-progress-fill" style="width: ${game.securityLevel}%;"></div>
+                </div>
+                <p>Employees: ${game.employees}</p>
+                <p>Products: ${game.products.length}</p>
+                <p>Monthly Revenue: $${game.revenue.toLocaleString()}</p>
+                <p>Monthly Expenses: $${game.expenses.toLocaleString()}</p>
+            `;
+            
+            // Update message log
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '';
+            
+            game.messages.slice(-8).forEach(message => {
+                const msgElement = document.createElement('p');
+                msgElement.textContent = message;
+                
+                // Highlight security breach messages
+                if (message.includes("DATA BREACH")) {
+                    msgElement.style.color = "#e74c3c";
+                    msgElement.style.fontWeight = "bold";
+                }
+                
+                messagesDiv.appendChild(msgElement);
+            });
+            
+            // Enable/disable buttons based on game state
+            const buttons = document.querySelectorAll('#actions button');
+            buttons.forEach(button => {
+                button.disabled = game.isGameOver;
+            });
+            
+            if (game.isGameOver && !game.isVictory) {
+                document.getElementById('gameStatus').textContent = "Game Over! Refresh to start a new game.";
+            }
+
+            if (game.isGameOver && game.isVictory) {
+                document.getElementById('gameStatusV').textContent = "Congratulations! Your company is now worth over $1 million! You win!";
+            }
+        }
+
+        // Sistema de Progressão
+        const player = {
+            xp: 0,
+            xpNeeded: 100,
+            careerLevel: 0,
+            salary: 1500,
+            skills: {
+                javascript: 0,
+                html_css: 0,
+                backend: 0,
+                networks: 0,
+                servers: 0,
+                communication: 0,
+                teamwork: 0,
+                problem_solving: 0
+            },
+            certifications: {
+                html: false,
+                js: false,
+                backend: false,
+                networking: false,
+                cloud: false,
+                dba: false,
+                ml: false
+            }
+        };
+        
+        // Definições de carreira
+        const careerLevels = [
+            { name: "Intern", baseSalary: 1500 },
+            { name: "Junior", baseSalary: 3000 },
+            { name: "Mid-level", baseSalary: 5500 },
+            { name: "Senior", baseSalary: 9000 },
+            { name: "Tech Lead", baseSalary: 12000 },
+            { name: "Architect", baseSalary: 18000 },
+            { name: "CTO", baseSalary: 26000 }
+        ];
+        
+        // Custo de XP para melhorar habilidades por nível
+        const skillUpgradeCost = [20, 40, 80, 160, 320];
+        
+        // Inicialização
+        function initProgressionSystem() {
             updateSkillsDisplay();
             updateCareerDisplay();
             updateCertificationDisplay();
+            setupEventListeners();
             
-            // Verificar conquistas
-            checkAchievements();
-            
-            setTimeout(() => {
-                //addXP(Math.floor(cost * 0.5));
-                showNotification(`${skill} skill improved to level ${player.skills[skill]}!`);
-            }, 200);
-            
-            // Atualizar salário considerando todas as skills
-            updateSalary();
+            // Para fins de teste, adicionamos XP
+            addXP(50);
         }
-    }
-    
-    // Estudar para uma certificação
-    function studyCertification(cert) {
-        // Aumentar o custo dos certificados para 200 XP (era 50)
-        const certCost = 200;
         
-        if (player.xp >= certCost && !player.certifications[cert]) {
-            player.xp -= certCost;
-            player.certifications[cert] = true;
-            
-            // Atualizar displays
-            updateCertificationDisplay();
-            updateCareerDisplay();
-            
-            // Verificar conquistas
-            checkAchievements();
-            
-            // Bônus por certificação
-            setTimeout(() => {
-                addXP(50); // Aumentar o bônus para 50 (era 25)
-                showNotification(`Congratulations! You obtained the ${cert.toUpperCase()} certification!`);
+        // Atualizar display de habilidades
+        function updateSkillsDisplay() {
+            for (const skill in player.skills) {
+                const level = player.skills[skill];
+                const skillElement = document.querySelector(`.skill-item[data-skill="${skill}"]`);
                 
-                // Aumentar salário por certificação
-                player.salary += 1000; // Aumentar o bônus salarial para 1000 (era 500)
-                updateCareerDisplay();
-            }, 200);
-        }
-    }
-    
-    // Atualizar salário baseado em carreira, habilidades e certificações
-    function updateSalary() {
-        // Salário base pelo nível de carreira
-        let newSalary = careerLevels[player.careerLevel].baseSalary;
-        
-        // Bônus por habilidades técnicas
-        let skillsSum = 0;
-        for (const skill in player.skills) {
-            skillsSum += player.skills[skill];
-        }
-        
-        // Adiciona 2% por nível de habilidade
-        newSalary *= (1 + (skillsSum * 0.02));
-        
-        // Bônus por certificações (500 por certificação já está sendo adicionado em studyCertification)
-        
-        player.salary = Math.round(newSalary);
-        updateCareerDisplay();
-    }
-    
-    // Inicializar o sistema quando a página carrega
-    window.addEventListener('load', initProgressionSystem);
-
-    // Função para recompensar o jogador após completar tarefas
-    function rewardTask(taskDifficulty) {
-        let xpReward;
-        
-        // Recompensa baseada na dificuldade
-        switch(taskDifficulty) {
-            case 'easy':
-                xpReward = 5 + Math.floor(Math.random() * 5); // 5-9 XP
-                break;
-            case 'medium':
-                xpReward = 10 + Math.floor(Math.random() * 10); // 10-19 XP
-                break;
-            case 'hard':
-                xpReward = 20 + Math.floor(Math.random() * 15); // 20-34 XP
-                break;
-            default:
-                xpReward = 5;
-        }
-        
-        // Aplicar bônus baseado nas habilidades relevantes
-        // (Isto deve ser adaptado dependendo do tipo de tarefa)
-        if (taskType === 'frontend') {
-            xpReward *= (1 + (player.skills.html_css * 0.05));
-        } else if (taskType === 'backend') {
-            xpReward *= (1 + (player.skills.backend * 0.05));
-        }
-        
-        // Arredondar para inteiro
-        xpReward = Math.floor(xpReward);
-        
-        // Adicionar XP
-        addXP(xpReward);
-        
-        // Atualizar interface com feedback
-        showNotification(`Task completed! +${xpReward} XP`);
-    }
-    
-    // Função para recompensar projetos completos
-    function rewardProject(projectSize) {
-        let xpReward;
-        let cashBonus;
-        
-        // Recompensas baseadas no tamanho do projeto
-        switch(projectSize) {
-            case 'small':
-                xpReward = 30 + Math.floor(Math.random() * 20); // 30-49 XP
-                cashBonus = 200 + Math.floor(Math.random() * 300); // R$200-499
-                break;
-            case 'medium':
-                xpReward = 50 + Math.floor(Math.random() * 30); // 50-79 XP
-                cashBonus = 500 + Math.floor(Math.random() * 500); // R$500-999
-                break;
-            case 'large':
-                xpReward = 80 + Math.floor(Math.random() * 50); // 80-129 XP
-                cashBonus = 1000 + Math.floor(Math.random() * 1000); // R$1000-1999
-                break;
-            default:
-                xpReward = 30;
-                cashBonus = 200;
-        }
-        
-        // Adicionar bônus por trabalho em equipe e comunicação
-        xpReward *= (1 + ((player.skills.teamwork + player.skills.communication) * 0.03));
-        xpReward = Math.floor(xpReward);
-        
-        // Adicionar XP e bônus em dinheiro
-        addXP(xpReward);
-        player.salary += cashBonus; // Bônus temporário no salário
-        updateCareerDisplay();
-        
-        // Feedback
-        showNotification(`Project completed! +${xpReward} XP and Bonus of R$${cashBonus.toLocaleString('en-US')}`);
-    }
-    
-    // Função para exibir notificações
-    function showNotification(message) {
-        // Verificar se o elemento de notificação já existe
-        let notification = document.getElementById('notification');
-        
-        if (!notification) {
-            // Criar elemento de notificação se não existir
-            notification = document.createElement('div');
-            notification.id = 'notification';
-            notification.style.position = 'fixed';
-            notification.style.bottom = '20px';
-            notification.style.right = '20px';
-            notification.style.padding = '15px 20px';
-            notification.style.backgroundColor = '#2ecc71';
-            notification.style.color = 'white';
-            notification.style.borderRadius = '5px';
-            notification.style.boxShadow = '0 3px 10px rgba(0,0,0,0.2)';
-            notification.style.zIndex = '1000';
-            notification.style.transition = 'all 0.3s ease';
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateY(20px)';
-            document.body.appendChild(notification);
-        }
-        
-        // Atualizar mensagem e exibir
-        notification.textContent = message;
-        notification.style.opacity = '1';
-        notification.style.transform = 'translateY(0)';
-        
-        // Esconder após 3 segundos
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateY(20px)';
-        }, 3000);
-    }
-
-    // Sistema de salvamento de progresso
-    
-    // Salvar progresso
-    function saveProgress() {
-        const saveData = {
-            player: player,
-            achievements: achievements,
-            // Adicionar dados da empresa
-            company: game ? {
-                name: game.companyName,
-                money: game.money,
-                reputation: game.reputation,
-                employees: game.employees,
-                products: game.products,
-                month: game.month,
-                year: game.year,
-                securityLevel: game.securityLevel,
-                revenue: game.revenue,
-                expenses: game.expenses,
-                isGameOver: game.isGameOver,
-                isVictory: game.isVictory
-            } : null,
-            timestamp: new Date().toISOString()
-        };
-        
-        localStorage.setItem('itSimulatorSave', JSON.stringify(saveData));
-        showNotification('Progress saved');
-    }
-
-    // Adicionar uma função para forçar a atualização visual de todos os achievements
-    function refreshAchievementsDisplay() {
-        for (const achievementId in achievements) {
-            const element = document.getElementById(`achievement-${achievementId}`);
-            if (element) {
-                if (achievements[achievementId].unlocked) {
-                    element.classList.add('unlocked');
-                } else {
-                    element.classList.remove('unlocked');
+                if (skillElement) {
+                    // Atualizar os dots
+                    const dots = skillElement.querySelectorAll('.level-dot');
+                    dots.forEach((dot, index) => {
+                        if (index < level) {
+                            dot.classList.add('active');
+                        } else {
+                            dot.classList.remove('active');
+                        }
+                    });
+                    
+                    // Atualizar o botão
+                    const upgradeBtn = skillElement.querySelector('.skill-upgrade-btn');
+                    if (level < 5) {
+                        const cost = skillUpgradeCost[level];
+                        upgradeBtn.textContent = `Improve (${cost} XP)`;
+                        upgradeBtn.disabled = player.xp < cost;
+                    } else {
+                        upgradeBtn.textContent = "Max Level";
+                        upgradeBtn.disabled = true;
+                    }
                 }
             }
         }
-        updateAchievementCount();
-    }
-    
-    // Carregar progresso
-    function loadProgress() {
-        const saveData = localStorage.getItem('itSimulatorSave');
         
-        if (saveData) {
-            try {
-                const parsedData = JSON.parse(saveData);
-                
-                // Carregar dados do jogador
-                if (parsedData.player) {
-                    Object.assign(player, parsedData.player);
-                    
-                    // Garantir que todas as propriedades necessárias existam
-                    if (!player.certifications) {
-                        player.certifications = {
-                            html: false,
-                            js: false,
-                            backend: false,
-                            networking: false,
-                            cloud: false,
-                            dba: false,
-                            ml: false
-                        };
-                    } else {
-                        // Adicionar novas certificações se não existirem
-                        if (player.certifications.cloud === undefined) player.certifications.cloud = false;
-                        if (player.certifications.dba === undefined) player.certifications.dba = false;
-                        if (player.certifications.ml === undefined) player.certifications.ml = false;
-                    }
-                }
-                
-                // Carregar conquistas
-                if (parsedData.achievements) {
-                    Object.assign(achievements, parsedData.achievements);
-                    
-                    // Atualizar visual das conquistas
-                    for (const [id, achievement] of Object.entries(achievements)) {
-                        if (achievement.unlocked) {
-                            const element = document.getElementById(`achievement-${id}`);
-                            if (element) element.classList.add('unlocked');
-                        }
-                    }
-                    
-                    updateAchievementCount();
-                }
-                
-                // Carregar dados da empresa
-                if (parsedData.company && game) {
-                    game.companyName = parsedData.company.name;
-                    game.money = parsedData.company.money;
-                    game.reputation = parsedData.company.reputation;
-                    game.employees = parsedData.company.employees;
-                    game.products = parsedData.company.products || [];
-                    game.month = parsedData.company.month;
-                    game.year = parsedData.company.year;
-                    game.securityLevel = parsedData.company.securityLevel;
-                    game.revenue = parsedData.company.revenue;
-                    game.expenses = parsedData.company.expenses;
-                    game.isGameOver = parsedData.company.isGameOver;
-                    game.isVictory = parsedData.company.isVictory;
-                    
-                    // Atualizar display da empresa
-                    document.getElementById('companyNameDisplay').textContent = game.companyName;
-                    updateGameDisplay();
-                }
+        // Atualizar display de carreira
+        function updateCareerDisplay() {
+            document.getElementById('careerLevelText').textContent = careerLevels[player.careerLevel].name;
+            document.getElementById('currentXP').textContent = player.xp;
+            document.getElementById('neededXP').textContent = player.xpNeeded;
+            document.getElementById('salaryAmount').textContent = player.salary.toLocaleString('en-US', {minimumFractionDigits: 2});
+            
+            // Atualizar a barra de XP
+            const percentage = (player.xp / player.xpNeeded) * 100;
+            document.getElementById('xpFill').style.width = `${percentage}%`;
+        }
+        
+        // Atualizar display de certificações
+        function updateCertificationDisplay() {
+            // HTML Cert
+            updateCertificationItem('html', player.skills.html_css >= 2);
+            
+            // JS Cert
+            updateCertificationItem('js', player.skills.javascript >= 3);
+            
+            // Backend Cert
+            updateCertificationItem('backend', player.skills.backend >= 4);
+            
+            // Network Cert
+            updateCertificationItem('networking', player.skills.networks >= 3);
+            
+            // Cloud Computing Cert
+            updateCertificationItem('cloud', player.skills.servers >= 3);
+            
+            // DBA Cert
+            updateCertificationItem('dba', player.skills.backend >= 3);
+            
+            // Machine Learning Cert
+            updateCertificationItem('ml', player.skills.javascript >= 4);
+        }
+        
+        function updateCertificationItem(certId, isUnlocked) {
+            const certElement = document.getElementById(`cert-${certId}`);
+            const certButton = certElement.querySelector('.certification-btn');
+            
+            if (player.certifications[certId]) {
+                // Já possui a certificação
+                certElement.classList.add('certification-complete');
+                certElement.classList.remove('certification-locked');
+                certButton.textContent = "Completed";
+                certButton.disabled = true;
+            } else if (isUnlocked) {
+                // Pode obter a certificação
+                certElement.classList.remove('certification-locked');
+                certElement.classList.remove('certification-complete');
+                certButton.textContent = "Study (200 XP)";
+                certButton.disabled = false;
+                certButton.style.backgroundColor = "#27ae60"; // Verde
+            } else {
+                // Certificação bloqueada
+                certElement.classList.add('certification-locked');
+                certElement.classList.remove('certification-complete');
+                certButton.textContent = "Locked";
+                certButton.disabled = true;
+                certButton.style.backgroundColor = "#95a5a6"; // Cinza
+            }
+        }
+        
+        // Configurar event listeners
+        function setupEventListeners() {
+            // Remover event listeners existentes para evitar duplicação
+            document.querySelectorAll('.skill-upgrade-btn').forEach(button => {
+                button.replaceWith(button.cloneNode(true));
+            });
+            document.querySelectorAll('.certification-btn').forEach(button => {
+                button.replaceWith(button.cloneNode(true));
+            });
+
+            // Event listeners para os botões de melhoria de habilidades
+            document.querySelectorAll('.skill-upgrade-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault(); // Previne múltiplos disparos
+                    const skill = this.getAttribute('data-skill');
+                    upgradeSkill(skill);
+                });
+            });
+            
+            // Event listeners para os botões de certificação 
+            document.querySelectorAll('.certification-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault(); // Previne múltiplos disparos
+                    const cert = this.getAttribute('data-cert');
+                    studyCertification(cert);
+                });
+            });
+        }
+        
+        // Funcionalidade para adicionar XP
+        function addXP(amount) {
+            player.xp += amount;
+            
+            // Verificar se subiu de nível
+            if (player.xp >= player.xpNeeded && player.careerLevel < careerLevels.length - 1) {
+                levelUp();
+            }
+            
+            updateCareerDisplay();
+            updateSkillsDisplay();
+        }
+        
+        // Subir de nível na carreira
+        function levelUp() {
+            player.careerLevel++;
+            player.xp -= player.xpNeeded;
+            
+            // Aumentar significativamente o XP necessário para o próximo nível
+            const levelFactor = 1.5 + (player.careerLevel * 0.2);
+            player.xpNeeded = Math.floor(player.xpNeeded * levelFactor);
+            
+            // Atualizar salário base de acordo com o nível de carreira
+            updateSalary();
+            
+            // Verificar conquistas
+            checkAchievements();
+            
+            // Mensagem de parabéns
+            showNotification(`Congratulations! You've been promoted to ${careerLevels[player.careerLevel].name}!`);
+        }
+        
+        // Melhorar uma habilidade
+        function upgradeSkill(skill) {
+            console.log('skill: ', skill);
+            const currentLevel = player.skills[skill];
+            const cost = skillUpgradeCost[currentLevel];
+            
+            if (player.xp >= cost && currentLevel < 5) {
+                player.xp -= cost;
+                player.skills[skill]++;
                 
                 // Atualizar displays
                 updateSkillsDisplay();
                 updateCareerDisplay();
                 updateCertificationDisplay();
                 
-                showNotification('Progress loaded');
-                return true;
-            } catch (error) {
-                console.error("Error loading progress:", error);
-                showNotification('Error loading progress. Starting new game.');
-                localStorage.removeItem('itSimulatorSave');
+                // Verificar conquistas
+                checkAchievements();
+                
+                setTimeout(() => {
+                    //addXP(Math.floor(cost * 0.5));
+                    showNotification(`${skill} skill improved to level ${player.skills[skill]}!`);
+                }, 200);
+                
+                // Atualizar salário considerando todas as skills
+                updateSalary();
             }
         }
-
-        refreshAchievementsDisplay();
         
-        return false;
-    }
-    
-    // Resetar progresso
-    function resetProgress() {
-        if (confirm('Are you sure you want to reset your progress? This action cannot be undone.')) {
-            localStorage.removeItem('itSimulatorSave');
-            location.reload();
+        // Estudar para uma certificação
+        function studyCertification(cert) {
+            // Aumentar o custo dos certificados para 200 XP (era 50)
+            const certCost = 200;
+            
+            if (player.xp >= certCost && !player.certifications[cert]) {
+                player.xp -= certCost;
+                player.certifications[cert] = true;
+                
+                // Atualizar displays
+                updateCertificationDisplay();
+                updateCareerDisplay();
+                
+                // Verificar conquistas
+                checkAchievements();
+                
+                // Bônus por certificação
+                setTimeout(() => {
+                    addXP(50); // Aumentar o bônus para 50 (era 25)
+                    showNotification(`Congratulations! You obtained the ${cert.toUpperCase()} certification!`);
+                    
+                    // Aumentar salário por certificação
+                    player.salary += 1000; // Aumentar o bônus salarial para 1000 (era 500)
+                    updateCareerDisplay();
+                }, 200);
+            }
         }
-    }
-    
-    // Auto-save a cada 2 minutos
-    setInterval(saveProgress, 120000);
-    
-    // Adicionar botões de gerenciamento de progresso na interface
-    function addProgressManagementButtons() {
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'progress-controls';
-        controlsDiv.style.margin = '20px 0';
-        controlsDiv.style.textAlign = 'center';
         
-        const saveButton = document.createElement('button');
-        saveButton.textContent = 'Save Progress';
-        saveButton.style.marginRight = '10px';
-        saveButton.style.padding = '8px 15px';
-        saveButton.style.backgroundColor = '#3498db';
-        saveButton.style.color = 'white';
-        saveButton.style.border = 'none';
-        saveButton.style.borderRadius = '4px';
-        saveButton.style.cursor = 'pointer';
-        saveButton.onclick = saveProgress;
+        // Atualizar salário baseado em carreira, habilidades e certificações
+        function updateSalary() {
+            // Salário base pelo nível de carreira
+            let newSalary = careerLevels[player.careerLevel].baseSalary;
+            
+            // Bônus por habilidades técnicas
+            let skillsSum = 0;
+            for (const skill in player.skills) {
+                skillsSum += player.skills[skill];
+            }
+            
+            // Adiciona 2% por nível de habilidade
+            newSalary *= (1 + (skillsSum * 0.02));
+            
+            // Bônus por certificações (500 por certificação já está sendo adicionado em studyCertification)
+            
+            player.salary = Math.round(newSalary);
+            updateCareerDisplay();
+        }
         
-        const resetButton = document.createElement('button');
-        resetButton.textContent = 'Reset Progress';
-        resetButton.style.padding = '8px 15px';
-        resetButton.style.backgroundColor = '#e74c3c';
-        resetButton.style.color = 'white';
-        resetButton.style.border = 'none';
-        resetButton.style.borderRadius = '4px';
-        resetButton.style.cursor = 'pointer';
-        resetButton.onclick = resetProgress;
+        // Inicializar o sistema quando a página carrega
+        window.addEventListener('load', initProgressionSystem);
+
+        // Função para recompensar o jogador após completar tarefas
+        function rewardTask(taskDifficulty) {
+            let xpReward;
+            
+            // Recompensa baseada na dificuldade
+            switch(taskDifficulty) {
+                case 'easy':
+                    xpReward = 5 + Math.floor(Math.random() * 5); // 5-9 XP
+                    break;
+                case 'medium':
+                    xpReward = 10 + Math.floor(Math.random() * 10); // 10-19 XP
+                    break;
+                case 'hard':
+                    xpReward = 20 + Math.floor(Math.random() * 15); // 20-34 XP
+                    break;
+                default:
+                    xpReward = 5;
+            }
+            
+            // Aplicar bônus baseado nas habilidades relevantes
+            // (Isto deve ser adaptado dependendo do tipo de tarefa)
+            if (taskType === 'frontend') {
+                xpReward *= (1 + (player.skills.html_css * 0.05));
+            } else if (taskType === 'backend') {
+                xpReward *= (1 + (player.skills.backend * 0.05));
+            }
+            
+            // Arredondar para inteiro
+            xpReward = Math.floor(xpReward);
+            
+            // Adicionar XP
+            addXP(xpReward);
+            
+            // Atualizar interface com feedback
+            showNotification(`Task completed! +${xpReward} XP`);
+        }
         
-        controlsDiv.appendChild(saveButton);
-        controlsDiv.appendChild(resetButton);
+        // Função para recompensar projetos completos
+        function rewardProject(projectSize) {
+            let xpReward;
+            let cashBonus;
+            
+            // Recompensas baseadas no tamanho do projeto
+            switch(projectSize) {
+                case 'small':
+                    xpReward = 30 + Math.floor(Math.random() * 20); // 30-49 XP
+                    cashBonus = 200 + Math.floor(Math.random() * 300); // R$200-499
+                    break;
+                case 'medium':
+                    xpReward = 50 + Math.floor(Math.random() * 30); // 50-79 XP
+                    cashBonus = 500 + Math.floor(Math.random() * 500); // R$500-999
+                    break;
+                case 'large':
+                    xpReward = 80 + Math.floor(Math.random() * 50); // 80-129 XP
+                    cashBonus = 1000 + Math.floor(Math.random() * 1000); // R$1000-1999
+                    break;
+                default:
+                    xpReward = 30;
+                    cashBonus = 200;
+            }
+            
+            // Adicionar bônus por trabalho em equipe e comunicação
+            xpReward *= (1 + ((player.skills.teamwork + player.skills.communication) * 0.03));
+            xpReward = Math.floor(xpReward);
+            
+            // Adicionar XP e bônus em dinheiro
+            addXP(xpReward);
+            player.salary += cashBonus; // Bônus temporário no salário
+            updateCareerDisplay();
+            
+            // Feedback
+            showNotification(`Project completed! +${xpReward} XP and Bonus of R$${cashBonus.toLocaleString('en-US')}`);
+        }
         
-        // Adicionar após a última seção de certificações
-        const certContainer = document.querySelector('.certification-container');
-        certContainer.parentNode.insertBefore(controlsDiv, certContainer.nextSibling);
-    }
-    
-    // Inicialização do jogo
-    document.addEventListener('DOMContentLoaded', function() {
-        // Configurar botão de início
-        const startButton = document.getElementById('startButton');
-        const setupScreen = document.getElementById('setupScreen');
-        const gameScreen = document.getElementById('gameScreen');
-        const companyNameInput = document.getElementById('companyName');
-        const companyNameDisplay = document.getElementById('companyNameDisplay');
+        // Função para exibir notificações
+        function showNotification(message) {
+            // Verificar se o elemento de notificação já existe
+            let notification = document.getElementById('notification');
+            
+            if (!notification) {
+                // Criar elemento de notificação se não existir
+                notification = document.createElement('div');
+                notification.id = 'notification';
+                notification.style.position = 'fixed';
+                notification.style.bottom = '20px';
+                notification.style.right = '20px';
+                notification.style.padding = '15px 20px';
+                notification.style.backgroundColor = '#2ecc71';
+                notification.style.color = 'white';
+                notification.style.borderRadius = '5px';
+                notification.style.boxShadow = '0 3px 10px rgba(0,0,0,0.2)';
+                notification.style.zIndex = '1000';
+                notification.style.transition = 'all 0.3s ease';
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(20px)';
+                document.body.appendChild(notification);
+            }
+            
+            // Atualizar mensagem e exibir
+            notification.textContent = message;
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateY(0)';
+            
+            // Esconder após 3 segundos
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(20px)';
+            }, 3000);
+        }
+
+        // Sistema de salvamento de progresso
         
-        if (startButton) {
-            startButton.addEventListener('click', function() {
-                const companyName = companyNameInput.value.trim() || "Tech Startup";
-                companyNameDisplay.textContent = companyName;
-                
-                // Iniciar o jogo
-                setupScreen.style.display = 'none';
-                gameScreen.style.display = 'block';
-                
-                // Inicializar a simulação
-                game = new TechCompanySimulation(companyName);
-                updateGameDisplay();
-                
-                // Inicializar sistema de progressão
-                const progressLoaded = loadProgress();
-                if (!progressLoaded) {
-                    initProgressionSystem();
+        // Salvar progresso
+        function saveProgress() {
+            const saveData = {
+                player: player,
+                achievements: achievements,
+                // Adicionar dados da empresa
+                company: game ? {
+                    name: game.companyName,
+                    money: game.money,
+                    reputation: game.reputation,
+                    employees: game.employees,
+                    products: game.products,
+                    month: game.month,
+                    year: game.year,
+                    securityLevel: game.securityLevel,
+                    revenue: game.revenue,
+                    expenses: game.expenses,
+                    isGameOver: game.isGameOver,
+                    isVictory: game.isVictory
+                } : null,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('itSimulatorSave', JSON.stringify(saveData));
+            showNotification('Progress saved');
+        }
+
+        // Adicionar uma função para forçar a atualização visual de todos os achievements
+        function refreshAchievementsDisplay() {
+            for (const achievementId in achievements) {
+                const element = document.getElementById(`achievement-${achievementId}`);
+                if (element) {
+                    if (achievements[achievementId].unlocked) {
+                        element.classList.add('unlocked');
+                    } else {
+                        element.classList.remove('unlocked');
+                    }
                 }
-                
-                addProgressManagementButtons();
-            });
-        }
-        
-        // Configurar botões de ação
-        document.querySelectorAll('.action-button').forEach(button => {
-            button.addEventListener('click', function() {
-                const action = this.getAttribute('data-action');
-                if (action && game) {
-                    game.processDecision(action);
-                    updateGameDisplay();
-                }
-            });
-        });
-
-        // Adicionar listener para o botão de reiniciar jogo
-        const restartGameBtn = document.getElementById('restartGameBtn');
-        if (restartGameBtn) {
-            restartGameBtn.addEventListener('click', restartGame);
-        }
-    });
-    
-    // Atualizar exibição do jogo
-    function updateGameDisplay() {
-        if (!game) return;
-        
-        // Atualizar estatísticas
-        document.getElementById('month').textContent = game.month;
-        document.getElementById('year').textContent = game.year;
-        document.getElementById('money').textContent = game.money.toLocaleString();
-        document.getElementById('reputation').textContent = game.reputation;
-        document.getElementById('employees').textContent = game.employees;
-        document.getElementById('products').textContent = game.products.length;
-        document.getElementById('revenue').textContent = game.revenue.toLocaleString();
-        document.getElementById('expenses').textContent = game.expenses.toLocaleString();
-        
-        // Atualizar barra de segurança
-        document.getElementById('securityLevel').textContent = game.securityLevel;
-        document.getElementById('securityBar').style.width = `${game.securityLevel}%`;
-        
-        // Atualizar mensagens
-        const messagesDiv = document.getElementById('messages');
-        messagesDiv.innerHTML = '';
-        
-        game.messages.slice(-8).forEach(message => {
-            const msgElement = document.createElement('p');
-            msgElement.textContent = message;
-            
-            // Destacar mensagens importantes
-            if (message.includes("DATA BREACH") || message.includes("SECURITY BREACH")) {
-                msgElement.style.color = "#e74c3c";
-                msgElement.style.fontWeight = "bold";
-            } else if (message.includes("STRATEGIC PARTNERSHIP") || message.includes("investor")) {
-                msgElement.style.color = "#27ae60";
-                msgElement.style.fontWeight = "bold";
             }
-            
-            messagesDiv.appendChild(msgElement);
-        });
-        
-        // Status do jogo
-        if (game.isGameOver && !game.isVictory) {
-            document.getElementById('gameStatus').textContent = "Game Over! Your company went bankrupt.";
-            document.getElementById('gameStatus').style.display = 'block';
-        } else if (game.isGameOver && game.isVictory) {
-            document.getElementById('gameStatusV').textContent = "Congratulations! Your company is now worth over $1 million!";
-            document.getElementById('gameStatusV').style.display = 'block';
-        } else {
-            document.getElementById('gameStatus').style.display = 'none';
-            document.getElementById('gameStatusV').style.display = 'none';
-        }
-        
-        // Habilitar/desabilitar botões
-        document.querySelectorAll('.action-button').forEach(button => {
-            button.disabled = game.isGameOver;
-        });
-    }
-
-    // Adicionar função para reiniciar o jogo completamente
-    function restartGame() {
-        if (confirm('WARNING: This will delete ALL saved data and restart the game from scratch. Are you sure?')) {
-            // Limpar todos os dados salvos
-            localStorage.removeItem('itSimulatorSave');
-            
-            // Recarregar a página para iniciar um novo jogo
-            window.location.href = window.location.pathname;
-        }
-    }
-
-    // Sistema de conquistas
-    const achievements = {
-        millionaire: { unlocked: false, icon: '💰', title: 'Millionaire', desc: 'Your company reached $1 million in value!' },
-        multimillionaire: { unlocked: false, icon: '💎', title: 'Multi-Millionaire', desc: 'Your company reached $5 million in value!' },
-        tycoon: { unlocked: false, icon: '🏆', title: 'Tech Tycoon', desc: 'Your company reached $10 million in value!' },
-        masterSkill: { unlocked: false, icon: '⭐', title: 'Skill Master', desc: 'You reached level 5 in a skill!' },
-        certified: { unlocked: false, icon: '📜', title: 'Certified Professional', desc: 'You obtained your first certification!' },
-        fullyCertified: { unlocked: false, icon: '🎓', title: 'Fully Certified', desc: 'You completed all available certifications!' },
-        skillLegend: { unlocked: false, icon: '🌟', title: 'Skill Legend', desc: 'You mastered all skills at level 5!' },
-        cto: { unlocked: false, icon: '👑', title: 'The Boss', desc: 'You reached the prestigious CTO position!' }
-    };
-    
-    // Função para desbloquear conquista
-    function unlockAchievement(achievementId) {
-        if (achievements[achievementId] && !achievements[achievementId].unlocked) {
-            achievements[achievementId].unlocked = true;
-            
-            // Atualizar visual
-            const achievementElement = document.getElementById(`achievement-${achievementId}`);
-            if (achievementElement) {
-                achievementElement.classList.add('unlocked');
-            }
-            
-            // Atualizar contador
             updateAchievementCount();
-            
-            // Mostrar modal e confetes
-            showAchievementModal(achievementId);
-            
-            // Salvar progresso
-            saveProgress();
-            
-            return true;
-        }
-        return false;
-    }
-    
-    // Atualizar contador de conquistas
-    function updateAchievementCount() {
-        const unlockedCount = Object.values(achievements).filter(a => a.unlocked).length;
-        const totalCount = Object.keys(achievements).length;
-        document.getElementById('achievements-count').textContent = `${unlockedCount}/${totalCount} Unlocked`;
-    }
-    
-    // Mostrar modal de conquista
-    function showAchievementModal(achievementId) {
-        const achievement = achievements[achievementId];
-        
-        // Configurar modal
-        document.getElementById('achievement-modal-icon').textContent = achievement.icon;
-        document.getElementById('achievement-modal-title').textContent = achievement.title;
-        document.getElementById('achievement-modal-desc').textContent = achievement.desc;
-        
-        // Mostrar modal e overlay
-        document.getElementById('achievement-modal-overlay').style.display = 'block';
-        document.getElementById('achievement-modal').style.display = 'block';
-        
-        // Mostrar confetes para conquistas especiais
-        if (['millionaire', 'multimillionaire', 'tycoon', 'fullyCertified', 'skillLegend', 'cto'].includes(achievementId)) {
-            showConfetti();
         }
         
-        // Configurar botão de fechar
-        document.getElementById('achievement-modal-button').onclick = function() {
-            document.getElementById('achievement-modal-overlay').style.display = 'none';
-            document.getElementById('achievement-modal').style.display = 'none';
-        };
-    }
-    
-    // Função para mostrar confetes
-    function showConfetti() {
-        const confettiContainer = document.getElementById('confetti-container');
-        confettiContainer.style.display = 'block';
-        confettiContainer.innerHTML = '';
+        // Carregar progresso
+        function loadProgress() {
+            const saveData = localStorage.getItem('itSimulatorSave');
+            
+            if (saveData) {
+                try {
+                    const parsedData = JSON.parse(saveData);
+                    
+                    // Carregar dados do jogador
+                    if (parsedData.player) {
+                        Object.assign(player, parsedData.player);
+                        
+                        // Garantir que todas as propriedades necessárias existam
+                        if (!player.certifications) {
+                            player.certifications = {
+                                html: false,
+                                js: false,
+                                backend: false,
+                                networking: false,
+                                cloud: false,
+                                dba: false,
+                                ml: false
+                            };
+                        } else {
+                            // Adicionar novas certificações se não existirem
+                            if (player.certifications.cloud === undefined) player.certifications.cloud = false;
+                            if (player.certifications.dba === undefined) player.certifications.dba = false;
+                            if (player.certifications.ml === undefined) player.certifications.ml = false;
+                        }
+                    }
+                    
+                    // Carregar conquistas
+                    if (parsedData.achievements) {
+                        Object.assign(achievements, parsedData.achievements);
+                        
+                        // Atualizar visual das conquistas
+                        for (const [id, achievement] of Object.entries(achievements)) {
+                            if (achievement.unlocked) {
+                                const element = document.getElementById(`achievement-${id}`);
+                                if (element) element.classList.add('unlocked');
+                            }
+                        }
+                        
+                        updateAchievementCount();
+                    }
+                    
+                    // Carregar dados da empresa
+                    if (parsedData.company && game) {
+                        game.companyName = parsedData.company.name;
+                        game.money = parsedData.company.money;
+                        game.reputation = parsedData.company.reputation;
+                        game.employees = parsedData.company.employees;
+                        game.products = parsedData.company.products || [];
+                        game.month = parsedData.company.month;
+                        game.year = parsedData.company.year;
+                        game.securityLevel = parsedData.company.securityLevel;
+                        game.revenue = parsedData.company.revenue;
+                        game.expenses = parsedData.company.expenses;
+                        game.isGameOver = parsedData.company.isGameOver;
+                        game.isVictory = parsedData.company.isVictory;
+                        
+                        // Atualizar display da empresa
+                        document.getElementById('companyNameDisplay').textContent = game.companyName;
+                        updateGameDisplay();
+                    }
+                    
+                    // Atualizar displays
+                    updateSkillsDisplay();
+                    updateCareerDisplay();
+                    updateCertificationDisplay();
+                    
+                    showNotification('Progress loaded');
+                    return true;
+                } catch (error) {
+                    console.error("Error loading progress:", error);
+                    showNotification('Error loading progress. Starting new game.');
+                    localStorage.removeItem('itSimulatorSave');
+                }
+            }
+
+            refreshAchievementsDisplay();
+            
+            return false;
+        }
         
-        // Cores dos confetes
-        const colors = ['#f94144', '#f3722c', '#f8961e', '#f9c74f', '#90be6d', '#43aa8b', '#577590', '#277da1'];
+        // Resetar progresso
+        function resetProgress() {
+            if (confirm('Are you sure you want to reset your progress? This action cannot be undone.')) {
+                localStorage.removeItem('itSimulatorSave');
+                location.reload();
+            }
+        }
         
-        // Criar 150 confetes
-        for (let i = 0; i < 150; i++) {
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
+        // Auto-save a cada 2 minutos
+        setInterval(saveProgress, 120000);
+        
+        // Adicionar botões de gerenciamento de progresso na interface
+        function addProgressManagementButtons() {
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'progress-controls';
+            controlsDiv.style.margin = '20px 0';
+            controlsDiv.style.textAlign = 'center';
             
-            // Posição aleatória
-            const startX = Math.random() * 100;
-            confetti.style.left = `${startX}%`;
-            confetti.style.top = '-10px';
+            const saveButton = document.createElement('button');
+            saveButton.textContent = 'Save Progress';
+            saveButton.style.marginRight = '10px';
+            saveButton.style.padding = '8px 15px';
+            saveButton.style.backgroundColor = '#3498db';
+            saveButton.style.color = 'white';
+            saveButton.style.border = 'none';
+            saveButton.style.borderRadius = '4px';
+            saveButton.style.cursor = 'pointer';
+            saveButton.onclick = saveProgress;
             
-            // Cor aleatória
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            confetti.style.backgroundColor = color;
+            const resetButton = document.createElement('button');
+            resetButton.textContent = 'Reset Progress';
+            resetButton.style.padding = '8px 15px';
+            resetButton.style.backgroundColor = '#e74c3c';
+            resetButton.style.color = 'white';
+            resetButton.style.border = 'none';
+            resetButton.style.borderRadius = '4px';
+            resetButton.style.cursor = 'pointer';
+            resetButton.onclick = resetProgress;
             
-            // Tamanho aleatório
-            const size = Math.random() * 10 + 5;
-            confetti.style.width = `${size}px`;
-            confetti.style.height = `${size}px`;
+            controlsDiv.appendChild(saveButton);
+            controlsDiv.appendChild(resetButton);
             
-            // Forma aleatória
-            const shapes = ['circle', 'square', 'triangle'];
-            const shape = shapes[Math.floor(Math.random() * shapes.length)];
-            if (shape === 'circle') {
-                confetti.style.borderRadius = '50%';
-            } else if (shape === 'triangle') {
-                confetti.style.width = '0';
-                confetti.style.height = '0';
-                confetti.style.backgroundColor = 'transparent';
-                confetti.style.borderLeft = `${size/2}px solid transparent`;
-                confetti.style.borderRight = `${size/2}px solid transparent`;
-                confetti.style.borderBottom = `${size}px solid ${color}`;
+            // Adicionar após a última seção de certificações
+            const certContainer = document.querySelector('.certification-container');
+            certContainer.parentNode.insertBefore(controlsDiv, certContainer.nextSibling);
+        }
+        
+        // Inicialização do jogo
+        document.addEventListener('DOMContentLoaded', function() {
+            // Configurar botão de início
+            const startButton = document.getElementById('startButton');
+            const setupScreen = document.getElementById('setupScreen');
+            const gameScreen = document.getElementById('gameScreen');
+            const companyNameInput = document.getElementById('companyName');
+            const companyNameDisplay = document.getElementById('companyNameDisplay');
+            
+            if (startButton) {
+                startButton.addEventListener('click', function() {
+                    const companyName = companyNameInput.value.trim() || "Tech Startup";
+                    companyNameDisplay.textContent = companyName;
+                    
+                    // Iniciar o jogo
+                    setupScreen.style.display = 'none';
+                    gameScreen.style.display = 'block';
+                    
+                    // Inicializar a simulação
+                    game = new TechCompanySimulation(companyName);
+                    updateGameDisplay();
+                    
+                    // Inicializar sistema de progressão
+                    const progressLoaded = loadProgress();
+                    if (!progressLoaded) {
+                        initProgressionSystem();
+                    }
+                    
+                    addProgressManagementButtons();
+                });
             }
             
-            // Animação
-            const duration = Math.random() * 3 + 2;
-            confetti.style.animationDuration = `${duration}s`;
-            
-            confettiContainer.appendChild(confetti);
-        }
-        
-        // Remover confetes após a animação
-        setTimeout(() => {
-            confettiContainer.style.display = 'none';
-        }, 5000);
-    }
+            // Configurar botões de ação
+            document.querySelectorAll('.action-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const action = this.getAttribute('data-action');
+                    if (action && game) {
+                        game.processDecision(action);
+                        updateGameDisplay();
+                    }
+                });
+            });
 
-    // Verificar conquistas baseadas no estado do jogo
-    function checkAchievements() {
-        // Verificar conquistas de dinheiro da empresa
-        if (game && game.money >= 1000000 && !achievements.millionaire.unlocked) {
-            unlockAchievement('millionaire');
-        }
+            // Adicionar listener para o botão de reiniciar jogo
+            const restartGameBtn = document.getElementById('restartGameBtn');
+            if (restartGameBtn) {
+                restartGameBtn.addEventListener('click', restartGame);
+            }
+        });
         
-        if (game && game.money >= 5000000 && !achievements.multimillionaire.unlocked) {
-            unlockAchievement('multimillionaire');
-        }
-        
-        if (game && game.money >= 10000000 && !achievements.tycoon.unlocked) {
-            unlockAchievement('tycoon');
+        // Atualizar exibição do jogo
+        function updateGameDisplay() {
+            if (!game) return;
             
-            // Vitória final
-            game.isGameOver = true;
-            game.isVictory = true;
-            game.messages.push("ULTIMATE VICTORY: Your company is now worth over $10 million!");
-            updateGameDisplay();
+            // Atualizar estatísticas
+            document.getElementById('month').textContent = game.month;
+            document.getElementById('year').textContent = game.year;
+            document.getElementById('money').textContent = game.money.toLocaleString();
+            document.getElementById('reputation').textContent = game.reputation;
+            document.getElementById('employees').textContent = game.employees;
+            document.getElementById('products').textContent = game.products.length;
+            document.getElementById('revenue').textContent = game.revenue.toLocaleString();
+            document.getElementById('expenses').textContent = game.expenses.toLocaleString();
+            
+            // Atualizar barra de segurança
+            document.getElementById('securityLevel').textContent = game.securityLevel;
+            document.getElementById('securityBar').style.width = `${game.securityLevel}%`;
+            
+            // Atualizar mensagens
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '';
+            
+            game.messages.slice(-8).forEach(message => {
+                const msgElement = document.createElement('p');
+                msgElement.textContent = message;
+                
+                // Destacar mensagens importantes
+                if (message.includes("DATA BREACH") || message.includes("SECURITY BREACH")) {
+                    msgElement.style.color = "#e74c3c";
+                    msgElement.style.fontWeight = "bold";
+                } else if (message.includes("STRATEGIC PARTNERSHIP") || message.includes("investor")) {
+                    msgElement.style.color = "#27ae60";
+                    msgElement.style.fontWeight = "bold";
+                }
+                
+                messagesDiv.appendChild(msgElement);
+            });
+            
+            // Status do jogo
+            if (game.isGameOver && !game.isVictory) {
+                document.getElementById('gameStatus').textContent = "Game Over! Your company went bankrupt.";
+                document.getElementById('gameStatus').style.display = 'block';
+            } else if (game.isGameOver && game.isVictory) {
+                document.getElementById('gameStatusV').textContent = "Congratulations! Your company is now worth over $1 million!";
+                document.getElementById('gameStatusV').style.display = 'block';
+            } else {
+                document.getElementById('gameStatus').style.display = 'none';
+                document.getElementById('gameStatusV').style.display = 'none';
+            }
+            
+            // Habilitar/desabilitar botões
+            document.querySelectorAll('.action-button').forEach(button => {
+                button.disabled = game.isGameOver;
+            });
+        }
+
+        // Adicionar função para reiniciar o jogo completamente
+        function restartGame() {
+            if (confirm('WARNING: This will delete ALL saved data and restart the game from scratch. Are you sure?')) {
+                // Limpar todos os dados salvos
+                localStorage.removeItem('itSimulatorSave');
+                
+                // Recarregar a página para iniciar um novo jogo
+                window.location.href = window.location.pathname;
+            }
+        }
+
+        // Sistema de conquistas
+        const achievements = {
+            millionaire: { unlocked: false, icon: '💰', title: 'Millionaire', desc: 'Your company reached $1 million in value!' },
+            multimillionaire: { unlocked: false, icon: '💎', title: 'Multi-Millionaire', desc: 'Your company reached $5 million in value!' },
+            tycoon: { unlocked: false, icon: '🏆', title: 'Tech Tycoon', desc: 'Your company reached $10 million in value!' },
+            masterSkill: { unlocked: false, icon: '⭐', title: 'Skill Master', desc: 'You reached level 5 in a skill!' },
+            certified: { unlocked: false, icon: '📜', title: 'Certified Professional', desc: 'You obtained your first certification!' },
+            fullyCertified: { unlocked: false, icon: '🎓', title: 'Fully Certified', desc: 'You completed all available certifications!' },
+            skillLegend: { unlocked: false, icon: '🌟', title: 'Skill Legend', desc: 'You mastered all skills at level 5!' },
+            cto: { unlocked: false, icon: '👑', title: 'The Boss', desc: 'You reached the prestigious CTO position!' }
+        };
+        
+        // Função para desbloquear conquista
+        function unlockAchievement(achievementId) {
+            if (achievements[achievementId] && !achievements[achievementId].unlocked) {
+                achievements[achievementId].unlocked = true;
+                
+                // Atualizar visual
+                const achievementElement = document.getElementById(`achievement-${achievementId}`);
+                if (achievementElement) {
+                    achievementElement.classList.add('unlocked');
+                }
+                
+                // Atualizar contador
+                updateAchievementCount();
+                
+                // Mostrar modal e confetes
+                showAchievementModal(achievementId);
+                
+                // Salvar progresso
+                saveProgress();
+                
+                return true;
+            }
+            return false;
         }
         
-        // Verificar conquista de skill máxima
-        const hasMaxSkill = Object.values(player.skills).some(level => level >= 5);
-        if (hasMaxSkill && !achievements.masterSkill.unlocked) {
-            unlockAchievement('masterSkill');
+        // Atualizar contador de conquistas
+        function updateAchievementCount() {
+            const unlockedCount = Object.values(achievements).filter(a => a.unlocked).length;
+            const totalCount = Object.keys(achievements).length;
+            document.getElementById('achievements-count').textContent = `${unlockedCount}/${totalCount} Unlocked`;
         }
         
-        // Verificar conquista de todas as skills no máximo
-        const allSkillsMax = Object.values(player.skills).every(level => level >= 5);
-        if (allSkillsMax && !achievements.skillLegend.unlocked) {
-            unlockAchievement('skillLegend');
+        // Mostrar modal de conquista
+        function showAchievementModal(achievementId) {
+            const achievement = achievements[achievementId];
+            
+            // Configurar modal
+            document.getElementById('achievement-modal-icon').textContent = achievement.icon;
+            document.getElementById('achievement-modal-title').textContent = achievement.title;
+            document.getElementById('achievement-modal-desc').textContent = achievement.desc;
+            
+            // Mostrar modal e overlay
+            document.getElementById('achievement-modal-overlay').style.display = 'block';
+            document.getElementById('achievement-modal').style.display = 'block';
+            
+            // Mostrar confetes para conquistas especiais
+            if (['millionaire', 'multimillionaire', 'tycoon', 'fullyCertified', 'skillLegend', 'cto'].includes(achievementId)) {
+                showConfetti();
+            }
+            
+            // Configurar botão de fechar
+            document.getElementById('achievement-modal-button').onclick = function() {
+                document.getElementById('achievement-modal-overlay').style.display = 'none';
+                document.getElementById('achievement-modal').style.display = 'none';
+            };
         }
         
-        // Verificar conquista de certificação
-        const hasCertification = Object.values(player.certifications).some(cert => cert);
-        if (hasCertification && !achievements.certified.unlocked) {
-            unlockAchievement('certified');
+        // Função para mostrar confetes
+        function showConfetti() {
+            const confettiContainer = document.getElementById('confetti-container');
+            confettiContainer.style.display = 'block';
+            confettiContainer.innerHTML = '';
+            
+            // Cores dos confetes
+            const colors = ['#f94144', '#f3722c', '#f8961e', '#f9c74f', '#90be6d', '#43aa8b', '#577590', '#277da1'];
+            
+            // Criar 150 confetes
+            for (let i = 0; i < 150; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                
+                // Posição aleatória
+                const startX = Math.random() * 100;
+                confetti.style.left = `${startX}%`;
+                confetti.style.top = '-10px';
+                
+                // Cor aleatória
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.backgroundColor = color;
+                
+                // Tamanho aleatório
+                const size = Math.random() * 10 + 5;
+                confetti.style.width = `${size}px`;
+                confetti.style.height = `${size}px`;
+                
+                // Forma aleatória
+                const shapes = ['circle', 'square', 'triangle'];
+                const shape = shapes[Math.floor(Math.random() * shapes.length)];
+                if (shape === 'circle') {
+                    confetti.style.borderRadius = '50%';
+                } else if (shape === 'triangle') {
+                    confetti.style.width = '0';
+                    confetti.style.height = '0';
+                    confetti.style.backgroundColor = 'transparent';
+                    confetti.style.borderLeft = `${size/2}px solid transparent`;
+                    confetti.style.borderRight = `${size/2}px solid transparent`;
+                    confetti.style.borderBottom = `${size}px solid ${color}`;
+                }
+                
+                // Animação
+                const duration = Math.random() * 3 + 2;
+                confetti.style.animationDuration = `${duration}s`;
+                
+                confettiContainer.appendChild(confetti);
+            }
+            
+            // Remover confetes após a animação
+            setTimeout(() => {
+                confettiContainer.style.display = 'none';
+            }, 5000);
         }
-        
-        // Verificar conquista de todas as certificações
-        const allCertifications = Object.values(player.certifications).every(cert => cert);
-        if (allCertifications && !achievements.fullyCertified.unlocked) {
-            unlockAchievement('fullyCertified');
+
+        // Verificar conquistas baseadas no estado do jogo
+        function checkAchievements() {
+            // Verificar conquistas de dinheiro da empresa
+            if (game && game.money >= 1000000 && !achievements.millionaire.unlocked) {
+                unlockAchievement('millionaire');
+            }
+            
+            if (game && game.money >= 5000000 && !achievements.multimillionaire.unlocked) {
+                unlockAchievement('multimillionaire');
+            }
+            
+            if (game && game.money >= 10000000 && !achievements.tycoon.unlocked) {
+                unlockAchievement('tycoon');
+                
+                // Vitória final
+                game.isGameOver = true;
+                game.isVictory = true;
+                game.messages.push("ULTIMATE VICTORY: Your company is now worth over $10 million!");
+                updateGameDisplay();
+            }
+            
+            // Verificar conquista de skill máxima
+            const hasMaxSkill = Object.values(player.skills).some(level => level >= 5);
+            if (hasMaxSkill && !achievements.masterSkill.unlocked) {
+                unlockAchievement('masterSkill');
+            }
+            
+            // Verificar conquista de todas as skills no máximo
+            const allSkillsMax = Object.values(player.skills).every(level => level >= 5);
+            if (allSkillsMax && !achievements.skillLegend.unlocked) {
+                unlockAchievement('skillLegend');
+            }
+            
+            // Verificar conquista de certificação
+            const hasCertification = Object.values(player.certifications).some(cert => cert);
+            if (hasCertification && !achievements.certified.unlocked) {
+                unlockAchievement('certified');
+            }
+            
+            // Verificar conquista de todas as certificações
+            const allCertifications = Object.values(player.certifications).every(cert => cert);
+            if (allCertifications && !achievements.fullyCertified.unlocked) {
+                unlockAchievement('fullyCertified');
+            }
+            
+            // Verificar conquista de CTO
+            if (player.careerLevel >= 6 && !achievements.cto.unlocked) { // 6 = CTO
+                unlockAchievement('cto');
+            }
         }
-        
-        // Verificar conquista de CTO
-        if (player.careerLevel >= 6 && !achievements.cto.unlocked) { // 6 = CTO
-            unlockAchievement('cto');
-        }
-    }
-  </script>
+    </script>
 </body>
 </html>
