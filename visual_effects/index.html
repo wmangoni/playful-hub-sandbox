@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-KM6SHZXP');</script>
+    <!-- End Google Tag Manager -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibrating Strings Effect</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background-color: #111;
+            font-family: Arial, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+            z-index: 100;
+            width: 250px;
+        }
+        
+        .control-group {
+            margin-bottom: 12px;
+        }
+        
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .value-display {
+            font-weight: bold;
+            color: #4caf50;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #333;
+            outline: none;
+            border-radius: 4px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #4caf50;
+            cursor: pointer;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #4caf50;
+            cursor: pointer;
+        }
+        
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+        }
+        
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 4px;
+        }
+        
+        .color-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .toggle-controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 101;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    
+    <canvas id="canvas"></canvas>
+    
+    <button class="toggle-controls" id="toggleControls">Show Controls</button>
+    
+    <div class="controls" id="controls">
+        <h3 style="margin-bottom: 15px; text-align: center;">String Parameters</h3>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>Number of Strings:</span>
+                <span class="value-display" id="stringCountValue">40</span>
+            </div>
+            <input type="range" id="stringCount" min="10" max="100" value="40">
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>Vibration Speed:</span>
+                <span class="value-display" id="vibrationSpeedValue">5</span>
+            </div>
+            <input type="range" id="vibrationSpeed" min="1" max="20" value="5">
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>Vibration Amplitude:</span>
+                <span class="value-display" id="vibrationAmplitudeValue">50</span>
+            </div>
+            <input type="range" id="vibrationAmplitude" min="10" max="200" value="50">
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>Influence Radius:</span>
+                <span class="value-display" id="influenceRadiusValue">200</span>
+            </div>
+            <input type="range" id="influenceRadius" min="50" max="500" value="200">
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>String Thickness:</span>
+                <span class="value-display" id="stringThicknessValue">2</span>
+            </div>
+            <input type="range" id="stringThickness" min="1" max="10" value="2" step="0.5">
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>String Color:</span>
+            </div>
+            <div class="color-control">
+                <input type="color" id="stringColor" value="#4caf50">
+                <span>Base Color</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>Background Color:</span>
+            </div>
+            <div class="color-control">
+                <input type="color" id="backgroundColor" value="#111111">
+                <span>Background</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="rainbowMode"> Rainbow Mode
+            </label>
+        </div>
+        
+        <div class="preset-buttons">
+            <button id="presetCalm">Calm</button>
+            <button id="presetEnergetic">Energetic</button>
+            <button id="presetWild">Wild</button>
+            <button id="presetReset">Reset</button>
+        </div>
+        
+        <button id="hideControls" style="width: 100%; margin-top: 15px;">Hide Controls</button>
+    </div>
+
+    <script>
+        // Get canvas and context
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas dimensions
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        // Initialize parameters
+        let params = {
+            stringCount: 40,
+            vibrationSpeed: 5,
+            vibrationAmplitude: 50,
+            influenceRadius: 200,
+            stringThickness: 2,
+            stringColor: '#4caf50',
+            backgroundColor: '#111111',
+            rainbowMode: false
+        };
+        
+        // Mouse position
+        let mouse = {
+            x: 0,
+            y: 0,
+            isMoving: false,
+            lastMoveTime: 0
+        };
+        
+        // Renomear a classe String para VibratingString
+        class VibratingString {
+            constructor(y, index) {
+                this.index = index;
+                this.points = [];
+                this.offset = Math.random() * 10;
+                
+                // Create points along the string
+                const pointCount = 100;
+                for (let i = 0; i < pointCount; i++) {
+                    const x = (canvas.width / (pointCount - 1)) * i;
+                    this.points.push({
+                        x: x,
+                        y: y,
+                        originalY: y,
+                        velocity: 0
+                    });
+                }
+            }
+            
+            update() {
+                const time = Date.now() * 0.001;
+                const speed = params.vibrationSpeed * 0.1;
+                
+                for (let i = 0; i < this.points.length; i++) {
+                    const point = this.points[i];
+                    
+                    // Calculate distance from mouse
+                    const dx = point.x - mouse.x;
+                    const dy = point.originalY - mouse.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Apply mouse influence
+                    if (distance < params.influenceRadius && mouse.isMoving) {
+                        const force = (1 - distance / params.influenceRadius) * params.vibrationAmplitude;
+                        point.velocity += force * (Math.random() * 0.2 - 0.1);
+                    }
+                    
+                    // Natural vibration
+                    const naturalVibration = Math.sin(time * speed + i * 0.1 + this.offset) * 2;
+                    point.velocity += naturalVibration;
+                    
+                    // Apply physics
+                    point.velocity *= 0.95; // Damping
+                    point.y = point.originalY + point.velocity;
+                }
+            }
+            
+            draw() {
+                ctx.beginPath();
+                
+                // Set string color
+                if (params.rainbowMode) {
+                    const hue = (this.index / params.stringCount * 360 + Date.now() * 0.05) % 360;
+                    ctx.strokeStyle = `hsl(${hue}, 80%, 60%)`;
+                } else {
+                    ctx.strokeStyle = params.stringColor;
+                }
+                
+                ctx.lineWidth = params.stringThickness;
+                
+                // Draw the string
+                ctx.moveTo(this.points[0].x, this.points[0].y);
+                
+                for (let i = 1; i < this.points.length; i++) {
+                    const point = this.points[i];
+                    const prevPoint = this.points[i - 1];
+                    
+                    // Use quadratic curves for smoother lines
+                    const cpX = (prevPoint.x + point.x) / 2;
+                    const cpY = (prevPoint.y + point.y) / 2;
+                    
+                    ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
+                }
+                
+                ctx.stroke();
+            }
+        }
+        
+        // Create strings
+        let strings = [];
+        
+        function createStrings() {
+            strings = [];
+            const spacing = canvas.height / (params.stringCount + 1);
+            
+            for (let i = 0; i < params.stringCount; i++) {
+                const y = spacing * (i + 1);
+                strings.push(new VibratingString(y, i));
+            }
+        }
+        
+        // Variáveis do jogo
+        let gameActive = false;
+        let score = 0;
+        let combo = 0;
+        let lives = 3;
+        let level = 1;
+        let notes = [];
+        let obstacles = [];
+        let captureZones = [];
+        
+        // Animation loop
+        function animate() {
+            // Clear canvas
+            ctx.fillStyle = params.backgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Check if mouse has been inactive
+            if (Date.now() - mouse.lastMoveTime > 100) {
+                mouse.isMoving = false;
+            }
+            
+            // Update and draw strings
+            strings.forEach(string => {
+                string.update();
+                string.draw();
+            });
+            
+            // Adicionar elementos do jogo se estiver ativo
+            if (gameActive) {
+                updateNotes();
+                updateObstacles();
+                drawCaptureZones();
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Event listeners
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            createStrings();
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            mouse.isMoving = true;
+            mouse.lastMoveTime = Date.now();
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+            mouse.isMoving = true;
+            mouse.lastMoveTime = Date.now();
+        });
+        
+        // Controls
+        const controls = {
+            stringCount: document.getElementById('stringCount'),
+            vibrationSpeed: document.getElementById('vibrationSpeed'),
+            vibrationAmplitude: document.getElementById('vibrationAmplitude'),
+            influenceRadius: document.getElementById('influenceRadius'),
+            stringThickness: document.getElementById('stringThickness'),
+            stringColor: document.getElementById('stringColor'),
+            backgroundColor: document.getElementById('backgroundColor'),
+            rainbowMode: document.getElementById('rainbowMode'),
+            
+            stringCountValue: document.getElementById('stringCountValue'),
+            vibrationSpeedValue: document.getElementById('vibrationSpeedValue'),
+            vibrationAmplitudeValue: document.getElementById('vibrationAmplitudeValue'),
+            influenceRadiusValue: document.getElementById('influenceRadiusValue'),
+            stringThicknessValue: document.getElementById('stringThicknessValue'),
+            
+            presetCalm: document.getElementById('presetCalm'),
+            presetEnergetic: document.getElementById('presetEnergetic'),
+            presetWild: document.getElementById('presetWild'),
+            presetReset: document.getElementById('presetReset'),
+            
+            hideControls: document.getElementById('hideControls'),
+            toggleControls: document.getElementById('toggleControls'),
+            controlsPanel: document.getElementById('controls')
+        };
+        
+        // Update controls display
+        function updateControlsDisplay() {
+            controls.stringCountValue.textContent = params.stringCount;
+            controls.vibrationSpeedValue.textContent = params.vibrationSpeed;
+            controls.vibrationAmplitudeValue.textContent = params.vibrationAmplitude;
+            controls.influenceRadiusValue.textContent = params.influenceRadius;
+            controls.stringThicknessValue.textContent = params.stringThickness;
+            
+            controls.stringCount.value = params.stringCount;
+            controls.vibrationSpeed.value = params.vibrationSpeed;
+            controls.vibrationAmplitude.value = params.vibrationAmplitude;
+            controls.influenceRadius.value = params.influenceRadius;
+            controls.stringThickness.value = params.stringThickness;
+            controls.stringColor.value = params.stringColor;
+            controls.backgroundColor.value = params.backgroundColor;
+            controls.rainbowMode.checked = params.rainbowMode;
+        }
+        
+        // Setup control event listeners
+        controls.stringCount.addEventListener('input', () => {
+            params.stringCount = parseInt(controls.stringCount.value);
+            controls.stringCountValue.textContent = params.stringCount;
+            createStrings();
+        });
+        
+        controls.vibrationSpeed.addEventListener('input', () => {
+            params.vibrationSpeed = parseInt(controls.vibrationSpeed.value);
+            controls.vibrationSpeedValue.textContent = params.vibrationSpeed;
+        });
+        
+        controls.vibrationAmplitude.addEventListener('input', () => {
+            params.vibrationAmplitude = parseInt(controls.vibrationAmplitude.value);
+            controls.vibrationAmplitudeValue.textContent = params.vibrationAmplitude;
+        });
+        
+        controls.influenceRadius.addEventListener('input', () => {
+            params.influenceRadius = parseInt(controls.influenceRadius.value);
+            controls.influenceRadiusValue.textContent = params.influenceRadius;
+        });
+        
+        controls.stringThickness.addEventListener('input', () => {
+            params.stringThickness = parseFloat(controls.stringThickness.value);
+            controls.stringThicknessValue.textContent = params.stringThickness;
+        });
+        
+        controls.stringColor.addEventListener('input', () => {
+            params.stringColor = controls.stringColor.value;
+        });
+        
+        controls.backgroundColor.addEventListener('input', () => {
+            params.backgroundColor = controls.backgroundColor.value;
+        });
+        
+        controls.rainbowMode.addEventListener('change', () => {
+            params.rainbowMode = controls.rainbowMode.checked;
+        });
+        
+        // Presets
+        controls.presetCalm.addEventListener('click', () => {
+            params = {
+                ...params,
+                vibrationSpeed: 3,
+                vibrationAmplitude: 20,
+                influenceRadius: 150,
+                stringThickness: 1.5,
+                stringColor: '#4a90e2',
+                backgroundColor: '#0a192f'
+            };
+            updateControlsDisplay();
+        });
+        
+        controls.presetEnergetic.addEventListener('click', () => {
+            params = {
+                ...params,
+                vibrationSpeed: 8,
+                vibrationAmplitude: 70,
+                influenceRadius: 250,
+                stringThickness: 2.5,
+                stringColor: '#ff5722',
+                backgroundColor: '#1a1a1a'
+            };
+            updateControlsDisplay();
+        });
+        
+        controls.presetWild.addEventListener('click', () => {
+            params = {
+                ...params,
+                vibrationSpeed: 15,
+                vibrationAmplitude: 120,
+                influenceRadius: 350,
+                stringThickness: 3,
+                stringColor: '#9c27b0',
+                backgroundColor: '#000000',
+                rainbowMode: true
+            };
+            updateControlsDisplay();
+        });
+        
+        controls.presetReset.addEventListener('click', () => {
+            params = {
+                stringCount: 40,
+                vibrationSpeed: 5,
+                vibrationAmplitude: 50,
+                influenceRadius: 200,
+                stringThickness: 2,
+                stringColor: '#4caf50',
+                backgroundColor: '#111111',
+                rainbowMode: false
+            };
+            updateControlsDisplay();
+            createStrings();
+        });
+        
+        // Hide/Show controls
+        controls.hideControls.addEventListener('click', () => {
+            controls.controlsPanel.style.display = 'none';
+            controls.toggleControls.style.display = 'block';
+        });
+        
+        controls.toggleControls.addEventListener('click', () => {
+            controls.controlsPanel.style.display = 'block';
+            controls.toggleControls.style.display = 'none';
+        });
+        
+        // Initialize
+        resizeCanvas();
+        createStrings();
+        animate();
+
+        // Função para gerar obstáculos
+        function startObstacleGenerator() {
+            const obstacleInterval = setInterval(() => {
+                if (!gameActive) {
+                    clearInterval(obstacleInterval);
+                    return;
+                }
+                
+                // Lógica para gerar obstáculos...
+                if (Math.random() < 0.1 + (level * 0.02)) {
+                    createObstacle();
+                }
+            }, 2000 - (level * 100));
+        }
+        
+        // Função para atualizar obstáculos
+        function updateObstacles() {
+            obstacles.forEach(obstacle => {
+                if (!obstacle.active) return;
+                
+                // Mover obstáculo
+                obstacle.x += obstacle.speed;
+                
+                // Verificar se passou da tela
+                if (obstacle.x > canvas.width) {
+                    obstacle.active = false;
+                }
+                
+                // Desenhar obstáculo
+                ctx.beginPath();
+                ctx.arc(obstacle.x, strings[obstacle.stringIndex].points[0].y, obstacle.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+                ctx.strokeStyle = 'darkred';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            // Remover obstáculos inativos
+            obstacles = obstacles.filter(obstacle => obstacle.active);
+        }
+        
+        // Função para criar obstáculo
+        function createObstacle() {
+            const stringIndex = Math.floor(Math.random() * strings.length);
+            
+            obstacles.push({
+                stringIndex,
+                x: 0,
+                speed: 3 + (level * 0.3),
+                radius: 12,
+                active: true
+            });
+        }
+        
+        // Substituir a função checkNoteCapture por uma versão mais simples
+        function checkNoteCapture(x, y) {
+            // Verificar cliques em notas
+            for (let i = 0; i < notes.length; i++) {
+                const note = notes[i];
+                if (!note.active) continue;
+                
+                // Obter a posição Y da corda
+                const stringY = strings[note.stringIndex].points[0].y;
+                
+                // Calcular a distância entre o clique e a nota
+                const distance = Math.sqrt(Math.pow(x - note.x, 2) + Math.pow(y - stringY, 2));
+                
+                // Verificar se o clique foi próximo o suficiente da nota
+                if (distance <= note.radius * 2) {
+                    // Verificar se a nota está na zona de captura
+                    const zone = captureZones[note.stringIndex];
+                    if (Math.abs(note.x - zone.x) <= zone.width / 2) {
+                        // Capturar nota
+                        captureNote(note, Math.abs(note.x - zone.x) / (zone.width / 2));
+                        return;
+                    } else {
+                        // Nota clicada fora da zona de captura
+                        showFeedback("TOO EARLY!", note.x, stringY, "yellow");
+                        return;
+                    }
+                }
+            }
+            
+            // Verificar cliques em obstáculos
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                if (!obstacle.active) continue;
+                
+                // Obter a posição Y da corda
+                const stringY = strings[obstacle.stringIndex].points[0].y;
+                
+                // Calcular a distância entre o clique e o obstáculo
+                const distance = Math.sqrt(Math.pow(x - obstacle.x, 2) + Math.pow(y - stringY, 2));
+                
+                // Verificar se o clique foi próximo o suficiente do obstáculo
+                if (distance <= obstacle.radius * 2) {
+                    // Atingiu obstáculo
+                    hitObstacle(obstacle);
+                    return;
+                }
+            }
+            
+            // Verificar se o clique foi dentro de alguma zona de captura
+            let clickedInZone = false;
+            for (let i = 0; i < captureZones.length; i++) {
+                const zone = captureZones[i];
+                const stringY = strings[i].points[0].y;
+                
+                // Verificar se o clique está dentro da zona de captura
+                if (Math.abs(x - zone.x) <= zone.width / 2 && Math.abs(y - stringY) <= 40) {
+                    clickedInZone = true;
+                    break;
+                }
+            }
+            
+            // Se clicou em uma zona de captura mas não acertou nada
+            if (clickedInZone) {
+                showFeedback("MISS!", x, y, "yellow");
+            }
+        }
+
+        // Adicionar evento de clique para o jogo
+        canvas.addEventListener('click', (e) => {
+            if (!gameActive) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            checkNoteCapture(x, y);
+        });
+
+        // Adicionar botão para iniciar o jogo
+        function addStartGameButton() {
+            // Criar container para instruções e botão
+            const startScreen = document.createElement('div');
+            startScreen.style.position = 'absolute';
+            startScreen.style.left = '0';
+            startScreen.style.top = '0';
+            startScreen.style.width = '100%';
+            startScreen.style.height = '100%';
+            startScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+            startScreen.style.display = 'flex';
+            startScreen.style.flexDirection = 'column';
+            startScreen.style.justifyContent = 'center';
+            startScreen.style.alignItems = 'center';
+            startScreen.style.zIndex = '1000';
+            startScreen.style.padding = '20px';
+            startScreen.style.textAlign = 'center';
+            
+            // Título do jogo
+            const gameTitle = document.createElement('h1');
+            gameTitle.textContent = 'String Catcher';
+            gameTitle.style.color = '#4caf50';
+            gameTitle.style.fontSize = '48px';
+            gameTitle.style.marginBottom = '20px';
+            gameTitle.style.textShadow = '0 0 10px rgba(76, 175, 80, 0.5)';
+            
+            // Instruções
+            const instructions = document.createElement('div');
+            instructions.style.color = 'white';
+            instructions.style.fontSize = '18px';
+            instructions.style.maxWidth = '600px';
+            instructions.style.marginBottom = '30px';
+            instructions.style.lineHeight = '1.5';
+            instructions.innerHTML = `
+                <h2 style="margin-bottom: 15px; color: #4caf50;">Como Jogar</h2>
+                <p style="margin-bottom: 10px;"><strong>Objetivo:</strong> Capture as notas musicais clicando diretamente nelas quando estiverem na zona de captura.</p>
+                
+                <div style="display: flex; justify-content: space-around; margin: 20px 0;">
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: cyan; border-radius: 50%; margin: 0 auto;"></div>
+                        <p>Azul: 10 pontos</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: lime; border-radius: 50%; margin: 0 auto;"></div>
+                        <p>Verde: 20 pontos</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: gold; border-radius: 50%; margin: 0 auto;"></div>
+                        <p>Dourado: 50 pontos</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: red; border-radius: 50%; margin: 0 auto;"></div>
+                        <p>Vermelho: Obstáculo!</p>
+                    </div>
+                </div>
+                
+                <p style="margin-bottom: 10px;"><strong>Controles:</strong> Clique diretamente nas notas quando estiverem na zona de captura (área destacada).</p>
+                <p style="margin-bottom: 10px;"><strong>Combo:</strong> Acerte notas consecutivas para aumentar seu multiplicador (até 5x).</p>
+                <p style="margin-bottom: 10px;"><strong>Vidas:</strong> Você tem 3 vidas. Você perde uma vida quando uma nota passa sem ser capturada ou quando acerta um obstáculo.</p>
+                <p><strong>Dica:</strong> As notas brilham mais intensamente quando estão na zona de captura!</p>
+            `;
+            
+            // Botão de início
+            const startButton = document.createElement('button');
+            startButton.textContent = 'Começar Jogo';
+            startButton.style.padding = '15px 30px';
+            startButton.style.fontSize = '24px';
+            startButton.style.backgroundColor = '#4caf50';
+            startButton.style.color = 'white';
+            startButton.style.border = 'none';
+            startButton.style.borderRadius = '5px';
+            startButton.style.cursor = 'pointer';
+            startButton.style.boxShadow = '0 0 10px rgba(76, 175, 80, 0.5)';
+            startButton.style.transition = 'all 0.3s ease';
+            
+            startButton.addEventListener('mouseover', () => {
+                startButton.style.backgroundColor = '#45a049';
+                startButton.style.transform = 'scale(1.05)';
+            });
+            
+            startButton.addEventListener('mouseout', () => {
+                startButton.style.backgroundColor = '#4caf50';
+                startButton.style.transform = 'scale(1)';
+            });
+            
+            startButton.addEventListener('click', () => {
+                document.body.removeChild(startScreen);
+                initGame();
+            });
+            
+            // Adicionar elementos ao container
+            startScreen.appendChild(gameTitle);
+            startScreen.appendChild(instructions);
+            startScreen.appendChild(startButton);
+            
+            // Adicionar à página
+            document.body.appendChild(startScreen);
+        }
+
+        // Inicializar o jogo
+        function initGame() {
+            // Configurar zonas de captura
+            setupCaptureZones();
+            
+            // Resetar variáveis
+            score = 0;
+            combo = 0;
+            lives = 3;
+            level = 1;
+            notes = [];
+            obstacles = [];
+            
+            // Iniciar geradores de notas e obstáculos
+            startNoteGenerator();
+            startObstacleGenerator();
+            
+            // Atualizar UI
+            updateScoreDisplay();
+            
+            // Ativar o jogo
+            gameActive = true;
+        }
+
+        // Configurar zonas de captura
+        function setupCaptureZones() {
+            captureZones = [];
+            
+            // Criar uma zona de captura para cada corda
+            strings.forEach((string, index) => {
+                captureZones.push({
+                    stringIndex: index,
+                    x: canvas.width * 0.8, // Posição horizontal da zona
+                    width: 80, // Aumentar a largura da zona de 50 para 80
+                    active: true
+                });
+            });
+        }
+
+        // Gerar notas musicais
+        function startNoteGenerator() {
+            const noteInterval = setInterval(() => {
+                if (!gameActive) {
+                    clearInterval(noteInterval);
+                    return;
+                }
+                
+                // Aumentar frequência baseado no nível
+                if (Math.random() < 0.3 + (level * 0.05)) {
+                    createNote();
+                }
+            }, 1000 - (level * 50)); // Intervalo diminui com o nível
+        }
+
+        // Criar uma nova nota
+        function createNote() {
+            const stringIndex = Math.floor(Math.random() * strings.length);
+            const noteType = Math.random();
+            
+            let color, points;
+            
+            if (noteType > 0.95) { // 5% de chance para notas douradas
+                color = 'gold';
+                points = 50;
+            } else if (noteType > 0.6) { // 35% de chance para notas verdes
+                color = 'lime';
+                points = 20;
+            } else { // 60% de chance para notas azuis
+                color = 'cyan';
+                points = 10;
+            }
+            
+            notes.push({
+                stringIndex,
+                x: 0, // Começa na esquerda
+                speed: 2 + (level * 0.5), // Velocidade aumenta com o nível
+                color,
+                points,
+                radius: 15,
+                active: true
+            });
+        }
+
+        // Modificar a função drawNotes para destacar melhor as notas
+        function drawNotes() {
+            notes.forEach(note => {
+                if (!note.active) return;
+                
+                const stringY = strings[note.stringIndex].points[0].y;
+                
+                // Desenhar círculo da nota
+                ctx.beginPath();
+                ctx.arc(note.x, stringY, note.radius, 0, Math.PI * 2);
+                ctx.fillStyle = note.color;
+                ctx.fill();
+                
+                // Adicionar brilho
+                ctx.beginPath();
+                ctx.arc(note.x, stringY, note.radius + 3, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Verificar se está na zona de captura
+                const zone = captureZones[note.stringIndex];
+                if (Math.abs(note.x - zone.x) <= zone.width / 2) {
+                    // Destacar nota na zona de captura
+                    ctx.beginPath();
+                    ctx.arc(note.x, stringY, note.radius + 6, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        // Modificar a função updateNotes para incluir a função drawNotes
+        function updateNotes() {
+            notes.forEach((note, index) => {
+                if (!note.active) return;
+                
+                // Mover nota
+                note.x += note.speed;
+                
+                // Verificar se passou da tela
+                if (note.x > canvas.width) {
+                    note.active = false;
+                    notePassed(note);
+                }
+            });
+            
+            // Remover notas inativas
+            notes = notes.filter(note => note.active);
+            
+            // Desenhar notas
+            drawNotes();
+        }
+
+        // Desenhar zonas de captura
+        function drawCaptureZones() {
+            captureZones.forEach(zone => {
+                const y = strings[zone.stringIndex].points[0].y;
+                
+                // Desenhar zona de captura mais visível
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(zone.x - zone.width/2, y - 40, zone.width, 80);
+                
+                // Adicionar borda para melhor visibilidade
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(zone.x - zone.width/2, y - 40, zone.width, 80);
+                
+                // Adicionar linha central para indicar o ponto ideal de captura
+                ctx.beginPath();
+                ctx.moveTo(zone.x, y - 40);
+                ctx.lineTo(zone.x, y + 40);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+        }
+
+        // Capturar uma nota
+        function captureNote(note, precision) {
+            // Pontos base + bônus de precisão
+            let earnedPoints = note.points;
+            
+            if (precision > 0.9) {
+                earnedPoints += 5; // Perfect timing
+                showFeedback("PERFECT!", note.x, strings[note.stringIndex].points[0].y, "gold");
+            } else if (precision > 0.7) {
+                showFeedback("GREAT!", note.x, strings[note.stringIndex].points[0].y, "lime");
+            } else {
+                showFeedback("GOOD", note.x, strings[note.stringIndex].points[0].y, "white");
+            }
+            
+            // Aplicar multiplicador de combo
+            combo++;
+            let multiplier = 1;
+            
+            if (combo >= 20) multiplier = 5;
+            else if (combo >= 10) multiplier = 3;
+            else if (combo >= 5) multiplier = 2;
+            
+            score += earnedPoints * multiplier;
+            
+            // Atualizar UI
+            updateScoreDisplay();
+            
+            // Criar efeito visual
+            createCaptureEffect(note);
+            
+            // Desativar a nota
+            note.active = false;
+            
+            // Verificar aumento de nível
+            checkLevelUp();
+        }
+
+        // Mostrar feedback visual
+        function showFeedback(text, x, y, color) {
+            const feedback = document.createElement('div');
+            feedback.textContent = text;
+            feedback.style.position = 'absolute';
+            feedback.style.left = `${x}px`;
+            feedback.style.top = `${y - 30}px`;
+            feedback.style.color = color;
+            feedback.style.fontWeight = 'bold';
+            feedback.style.fontSize = '18px';
+            feedback.style.textShadow = '0 0 5px black';
+            feedback.style.pointerEvents = 'none';
+            feedback.style.zIndex = '1000';
+            feedback.style.transition = 'transform 0.5s, opacity 0.5s';
+            
+            document.body.appendChild(feedback);
+            
+            // Animação
+            setTimeout(() => {
+                feedback.style.transform = 'translateY(-30px)';
+                feedback.style.opacity = '0';
+            }, 10);
+            
+            // Remover após animação
+            setTimeout(() => {
+                document.body.removeChild(feedback);
+            }, 500);
+        }
+
+        // Criar efeito visual para captura
+        function createCaptureEffect(note) {
+            // Intensificar vibração da corda
+            const string = strings[note.stringIndex];
+            string.amplitude = params.vibrationAmplitude * 2;
+            
+            // Restaurar amplitude normal após um tempo
+            setTimeout(() => {
+                string.amplitude = params.vibrationAmplitude;
+            }, 300);
+        }
+
+        // Quando o jogador erra uma nota
+        function missedNote() {
+            combo = 0;
+            
+            showFeedback("MISS!", mouse.x, mouse.y, "yellow");
+            
+            updateScoreDisplay();
+        }
+
+        // Adicionar função para quando uma nota passa da tela sem ser capturada
+        function notePassed(note) {
+            // Reduzir vida
+            lives--;
+            
+            // Resetar combo
+            combo = 0;
+            
+            // Mostrar feedback visual
+            showFeedback("LOST!", canvas.width, strings[note.stringIndex].points[0].y, "red");
+            
+            // Atualizar UI
+            updateScoreDisplay();
+            
+            // Verificar game over
+            if (lives <= 0) {
+                gameOver();
+            }
+        }
+
+        // Verificar aumento de nível
+        function checkLevelUp() {
+            // Aumentar nível a cada 500 pontos
+            const newLevel = Math.floor(score / 500) + 1;
+            
+            if (newLevel > level) {
+                level = newLevel;
+                showLevelUp();
+            }
+        }
+
+        // Mostrar animação de aumento de nível
+        function showLevelUp() {
+            const levelUpText = document.createElement('div');
+            levelUpText.textContent = `LEVEL ${level}`;
+            levelUpText.style.position = 'absolute';
+            levelUpText.style.left = '50%';
+            levelUpText.style.top = '50%';
+            levelUpText.style.transform = 'translate(-50%, -50%)';
+            levelUpText.style.color = 'gold';
+            levelUpText.style.fontWeight = 'bold';
+            levelUpText.style.fontSize = '48px';
+            levelUpText.style.textShadow = '0 0 10px black';
+            levelUpText.style.zIndex = '1000';
+            
+            document.body.appendChild(levelUpText);
+            
+            // Remover após animação
+            setTimeout(() => {
+                document.body.removeChild(levelUpText);
+            }, 2000);
+        }
+
+        // Game over
+        function gameOver() {
+            gameActive = false;
+            
+            // Verificar se a pontuação atual é um high score
+            const isHighScore = checkHighScore(score);
+            
+            // Mostrar tela de game over
+            const gameOverScreen = document.createElement('div');
+            gameOverScreen.style.position = 'absolute';
+            gameOverScreen.style.left = '0';
+            gameOverScreen.style.top = '0';
+            gameOverScreen.style.width = '100%';
+            gameOverScreen.style.height = '100%';
+            gameOverScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+            gameOverScreen.style.display = 'flex';
+            gameOverScreen.style.flexDirection = 'column';
+            gameOverScreen.style.justifyContent = 'center';
+            gameOverScreen.style.alignItems = 'center';
+            gameOverScreen.style.zIndex = '2000';
+            
+            const gameOverText = document.createElement('h1');
+            gameOverText.textContent = 'GAME OVER';
+            gameOverText.style.color = 'red';
+            gameOverText.style.fontSize = '48px';
+            gameOverText.style.marginBottom = '20px';
+            
+            const scoreText = document.createElement('h2');
+            scoreText.textContent = `Final Score: ${score}`;
+            scoreText.style.color = 'white';
+            scoreText.style.fontSize = '36px';
+            scoreText.style.marginBottom = '30px';
+            
+            gameOverScreen.appendChild(gameOverText);
+            gameOverScreen.appendChild(scoreText);
+            
+            // Criar o botão de reinício antecipadamente para referência
+            const restartButton = document.createElement('button');
+            restartButton.textContent = 'Jogar Novamente';
+            restartButton.style.padding = '10px 20px';
+            restartButton.style.fontSize = '24px';
+            restartButton.style.backgroundColor = '#4caf50';
+            restartButton.style.color = 'white';
+            restartButton.style.border = 'none';
+            restartButton.style.borderRadius = '5px';
+            restartButton.style.cursor = 'pointer';
+            restartButton.style.marginTop = '20px';
+            
+            // Declarar nameInput no escopo da função principal
+            let nameInput = null;
+            
+            // Se for um high score, mostrar formulário para nome
+            if (isHighScore) {
+                const highScoreMessage = document.createElement('p');
+                highScoreMessage.textContent = 'Novo recorde! Digite seu nome:';
+                highScoreMessage.style.color = 'gold';
+                highScoreMessage.style.fontSize = '24px';
+                highScoreMessage.style.marginBottom = '10px';
+                
+                nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.maxLength = 15;
+                nameInput.placeholder = 'Seu nome';
+                nameInput.style.padding = '10px';
+                nameInput.style.fontSize = '18px';
+                nameInput.style.marginBottom = '20px';
+                nameInput.style.width = '250px';
+                nameInput.style.textAlign = 'center';
+                nameInput.style.borderRadius = '5px';
+                nameInput.style.border = '2px solid #4caf50';
+                
+                const submitButton = document.createElement('button');
+                submitButton.textContent = 'Salvar Pontuação';
+                submitButton.style.padding = '10px 20px';
+                submitButton.style.fontSize = '18px';
+                submitButton.style.backgroundColor = '#4caf50';
+                submitButton.style.color = 'white';
+                submitButton.style.border = 'none';
+                submitButton.style.borderRadius = '5px';
+                submitButton.style.cursor = 'pointer';
+                submitButton.style.marginBottom = '30px';
+                
+                submitButton.addEventListener('click', () => {
+                    const playerName = nameInput.value.trim() || 'Anônimo';
+                    saveHighScore(playerName, score);
+                    
+                    // Remover formulário e mostrar high scores
+                    gameOverScreen.removeChild(highScoreMessage);
+                    gameOverScreen.removeChild(nameInput);
+                    gameOverScreen.removeChild(submitButton);
+                    
+                    // Mostrar tabela de high scores
+                    const highScoresTable = createHighScoresTable();
+                    gameOverScreen.insertBefore(highScoresTable, restartButton);
+                });
+                
+                gameOverScreen.appendChild(highScoreMessage);
+                gameOverScreen.appendChild(nameInput);
+                gameOverScreen.appendChild(submitButton);
+            } else {
+                // Mostrar tabela de high scores diretamente
+                const highScoresTable = createHighScoresTable();
+                gameOverScreen.appendChild(highScoresTable);
+            }
+            
+            restartButton.addEventListener('click', () => {
+                document.body.removeChild(gameOverScreen);
+                initGame();
+            });
+            
+            gameOverScreen.appendChild(restartButton);
+            document.body.appendChild(gameOverScreen);
+            
+            // Focar no campo de entrada se for high score
+            if (isHighScore && nameInput) {
+                setTimeout(() => nameInput.focus(), 100);
+            }
+        }
+
+        // Verificar se a pontuação atual é um high score
+        function checkHighScore(score) {
+            const highScores = getHighScores();
+            
+            // Se temos menos de 5 pontuações, é automaticamente um high score
+            if (highScores.length < 5) {
+                return true;
+            }
+            
+            // Verificar se a pontuação é maior que a menor pontuação na lista
+            const lowestScore = highScores[highScores.length - 1].score;
+            return score > lowestScore;
+        }
+        
+        // Obter high scores do localStorage
+        function getHighScores() {
+            const highScores = localStorage.getItem('stringCatcherHighScores');
+            return highScores ? JSON.parse(highScores) : [];
+        }
+        
+        // Salvar high score
+        function saveHighScore(name, score) {
+            let highScores = getHighScores();
+            
+            // Adicionar nova pontuação
+            highScores.push({ name, score, date: new Date().toLocaleDateString() });
+            
+            // Ordenar por pontuação (decrescente)
+            highScores.sort((a, b) => b.score - a.score);
+            
+            // Manter apenas os 5 melhores
+            highScores = highScores.slice(0, 5);
+            
+            // Salvar no localStorage
+            localStorage.setItem('stringCatcherHighScores', JSON.stringify(highScores));
+        }
+        
+        // Criar tabela de high scores
+        function createHighScoresTable() {
+            const highScores = getHighScores();
+            const currentScore = score; // Capturar a pontuação atual
+            const currentDate = new Date().toLocaleDateString();
+            
+            const container = document.createElement('div');
+            container.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            container.style.padding = '20px';
+            container.style.borderRadius = '10px';
+            container.style.marginTop = '20px';
+            container.style.marginBottom = '20px';
+            container.style.width = '80%';
+            container.style.maxWidth = '500px';
+            
+            const title = document.createElement('h3');
+            title.textContent = 'Melhores Pontuações';
+            title.style.color = 'gold';
+            title.style.fontSize = '24px';
+            title.style.marginBottom = '15px';
+            title.style.textAlign = 'center';
+            
+            container.appendChild(title);
+            
+            if (highScores.length === 0) {
+                const noScores = document.createElement('p');
+                noScores.textContent = 'Ainda não há pontuações registradas.';
+                noScores.style.color = 'white';
+                noScores.style.textAlign = 'center';
+                container.appendChild(noScores);
+                return container;
+            }
+            
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            table.style.color = 'white';
+            
+            // Cabeçalho da tabela
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            
+            const headers = ['Posição', 'Nome', 'Pontuação', 'Data'];
+            headers.forEach(headerText => {
+                const header = document.createElement('th');
+                header.textContent = headerText;
+                header.style.padding = '8px';
+                header.style.borderBottom = '2px solid #4caf50';
+                header.style.textAlign = 'left';
+                headerRow.appendChild(header);
+            });
+            
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Corpo da tabela
+            const tbody = document.createElement('tbody');
+            
+            highScores.forEach((score, index) => {
+                const row = document.createElement('tr');
+                
+                // Destacar a linha se for a pontuação atual
+                if (score.score === currentScore && score.date === currentDate) {
+                    row.style.backgroundColor = 'rgba(76, 175, 80, 0.3)';
+                }
+                
+                // Posição
+                const positionCell = document.createElement('td');
+                positionCell.textContent = `${index + 1}º`;
+                positionCell.style.padding = '8px';
+                positionCell.style.borderBottom = '1px solid #555';
+                
+                // Nome
+                const nameCell = document.createElement('td');
+                nameCell.textContent = score.name;
+                nameCell.style.padding = '8px';
+                nameCell.style.borderBottom = '1px solid #555';
+                
+                // Pontuação
+                const scoreCell = document.createElement('td');
+                scoreCell.textContent = score.score;
+                scoreCell.style.padding = '8px';
+                scoreCell.style.borderBottom = '1px solid #555';
+                
+                // Data
+                const dateCell = document.createElement('td');
+                dateCell.textContent = score.date;
+                dateCell.style.padding = '8px';
+                dateCell.style.borderBottom = '1px solid #555';
+                
+                row.appendChild(positionCell);
+                row.appendChild(nameCell);
+                row.appendChild(scoreCell);
+                row.appendChild(dateCell);
+                
+                tbody.appendChild(row);
+            });
+            
+            table.appendChild(tbody);
+            container.appendChild(table);
+            
+            return container;
+        }
+
+        // Atualizar display de pontuação
+        function updateScoreDisplay() {
+            // Criar ou atualizar o elemento de pontuação
+            let scoreDisplay = document.getElementById('score-display');
+            
+            if (!scoreDisplay) {
+                scoreDisplay = document.createElement('div');
+                scoreDisplay.id = 'score-display';
+                scoreDisplay.style.position = 'absolute';
+                scoreDisplay.style.top = '20px';
+                scoreDisplay.style.right = '20px';
+                scoreDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                scoreDisplay.style.color = 'white';
+                scoreDisplay.style.padding = '10px';
+                scoreDisplay.style.borderRadius = '5px';
+                scoreDisplay.style.fontFamily = 'Arial, sans-serif';
+                scoreDisplay.style.zIndex = '1000';
+                
+                document.body.appendChild(scoreDisplay);
+            }
+            
+            // Determinar multiplicador atual
+            let multiplier = 1;
+            if (combo >= 20) multiplier = 5;
+            else if (combo >= 10) multiplier = 3;
+            else if (combo >= 5) multiplier = 2;
+            
+            // Atualizar conteúdo
+            scoreDisplay.innerHTML = `
+                <div style="font-size: 24px; font-weight: bold;">Score: ${score}</div>
+                <div>Combo: ${combo} (x${multiplier})</div>
+                <div>Lives: ${'❤️'.repeat(lives)}</div>
+                <div>Level: ${level}</div>
+            `;
+        }
+
+        // Função para quando o jogador atinge um obstáculo
+        function hitObstacle(obstacle) {
+            // Reduzir vida
+            lives--;
+            
+            // Resetar combo
+            combo = 0;
+            
+            // Desativar o obstáculo
+            obstacle.active = false;
+            
+            // Efeito visual
+            const string = strings[obstacle.stringIndex];
+            
+            // Flash vermelho na tela
+            const flash = document.createElement('div');
+            flash.style.position = 'absolute';
+            flash.style.left = '0';
+            flash.style.top = '0';
+            flash.style.width = '100%';
+            flash.style.height = '100%';
+            flash.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+            flash.style.pointerEvents = 'none';
+            flash.style.zIndex = '999';
+            document.body.appendChild(flash);
+            
+            // Remover o flash após um curto período
+            setTimeout(() => {
+                document.body.removeChild(flash);
+            }, 200);
+            
+            // Mostrar feedback
+            showFeedback("OUCH!", obstacle.x, strings[obstacle.stringIndex].points[0].y, "red");
+            
+            // Atualizar UI
+            updateScoreDisplay();
+            
+            // Verificar game over
+            if (lives <= 0) {
+                gameOver();
+            }
+        }
+
+        // Inicializar o jogo
+        addStartGameButton();
+    </script>
+</body>
+</html> 
