@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-KM6SHZXP');</script>
+    <!-- End Google Tag Manager -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Game Museum - PlayfulHub</title>
+    <style>
+        @font-face {
+            font-family: 'PixelFont';
+            src: url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'PixelFont', monospace;
+            image-rendering: pixelated;
+        }
+        
+        body {
+            background-color: #111;
+            color: #8F8F8F;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas {
+            background-color: #000;
+            border: 4px solid #333;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        #game-container {
+            position: relative;
+        }
+        
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+        
+        #top-bar {
+            display: flex;
+            justify-content: space-between;
+            color: #00FF66;
+            font-size: 12px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        #bottom-bar {
+            color: #00FF66;
+            font-size: 12px;
+            text-shadow: 2px 2px 0 #000;
+            text-align: center;
+        }
+        
+        #info-panel {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00FF66;
+            padding: 15px;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+            color: #00FF66;
+            display: none;
+            text-align: center;
+        }
+        
+        #info-panel h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        #info-panel p {
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        #info-panel button {
+            background-color: #00FF66;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'PixelFont', monospace;
+        }
+        
+        #info-panel button:hover {
+            background-color: #00CC33;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #00FF66;
+            font-size: 24px;
+        }
+        
+        #loading-bar {
+            width: 200px;
+            height: 20px;
+            border: 2px solid #00FF66;
+            margin-top: 20px;
+        }
+        
+        #loading-progress {
+            height: 100%;
+            background-color: #00FF66;
+            width: 0%;
+            transition: width 0.5s;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00FF66;
+            font-size: 12px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #00FF66;
+        }
+    </style>
+</head>
+<body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        
+        <div id="ui-layer">
+            <div id="top-bar">
+                <div id="location">RETRO MUSEUM</div>
+                <div id="game-count">GAMES: 0/0</div>
+            </div>
+            <div id="bottom-bar">ARROW KEYS TO MOVE | SPACE TO INTERACT</div>
+        </div>
+        
+        <div id="info-panel">
+            <h3>Game Title</h3>
+            <p>Game description goes here.</p>
+            <button id="play-button">PLAY GAME</button>
+        </div>
+        
+        <div id="instructions">
+            <p>↑↓←→: Move around</p>
+            <p>SPACE: Interact with exhibits</p>
+            <p>ESC: Hide info panel</p>
+        </div>
+        
+        <div id="loading">
+            <div>LOADING MUSEUM...</div>
+            <div id="loading-bar">
+                <div id="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Museum and game setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const infoPanel = document.getElementById('info-panel');
+        const playButton = document.getElementById('play-button');
+        const gameCountDisplay = document.getElementById('game-count');
+        const loadingScreen = document.getElementById('loading');
+        const loadingProgress = document.getElementById('loading-progress');
+        
+        // Pixel size for rendering (makes everything more pixelated)
+        const PIXEL_SIZE = 4;
+        
+        // Player settings
+        const player = {
+            x: 400,
+            y: 400,
+            width: 20,
+            height: 30,
+            speed: 3,
+            direction: 'down',
+            frameCount: 0,
+            animationFrame: 0
+        };
+        
+        // Camera settings
+        const camera = {
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height
+        };
+        
+        // Museum settings
+        const museum = {
+            width: 1600,
+            height: 1200,
+            tileSize: 32
+        };
+        
+        // Controls
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false,
+            ' ': false, // Space
+            Escape: false
+        };
+        
+        // List of games from the original index.html
+        const games = [
+            {
+                title: "Tetris",
+                description: "The classic block-stacking puzzle game. Arrange falling blocks to create complete rows and earn points.",
+                path: "./tetris/index.html",
+                icon: "🎮",
+                x: 200,
+                y: 150,
+                color: "#FF5733"
+            },
+            {
+                title: "String Catcher",
+                description: "Capture musical notes on vibrating strings in this rhythmic arcade game.",
+                path: "./visual_effects/index.html",
+                icon: "🎵",
+                x: 400,
+                y: 150,
+                color: "#33FF57"
+            },
+            {
+                title: "Snake",
+                description: "Control a snake as it grows by eating food, but don't hit the walls or your own tail!",
+                path: "./snake/index.html",
+                icon: "🐍",
+                x: 600,
+                y: 150,
+                color: "#3357FF"
+            },
+            {
+                title: "Space Shooter",
+                description: "Defend Earth from alien invaders in this fast-paced space arcade game.",
+                path: "./space_shooter/index.html",
+                icon: "🚀",
+                x: 200,
+                y: 300,
+                color: "#FF33A8"
+            },
+            {
+                title: "Pinball",
+                description: "Classic pinball arcade experience with flippers, bumpers and targets.",
+                path: "./pinball/index.html",
+                icon: "🎯",
+                x: 400,
+                y: 300,
+                color: "#FF9933"
+            },
+            {
+                title: "Archer",
+                description: "Try to hit the red balloon with your bow and arrow!",
+                path: "./archer/index.html",
+                icon: "🏹",
+                x: 600,
+                y: 300,
+                color: "#33FFCF"
+            },
+            {
+                title: "Poker",
+                description: "Play Texas Hold'em Poker against AI opponents.",
+                path: "./poker/index.html",
+                icon: "♠️",
+                x: 200,
+                y: 450,
+                color: "#DD33FF"
+            },
+            {
+                title: "3D Shooter",
+                description: "First-person shooter in the style of classic Doom.",
+                path: "./3d_shooter/index.html",
+                icon: "🔫",
+                x: 400,
+                y: 450,
+                color: "#FFDD33"
+            },
+            {
+                title: "Mind Labyrinth",
+                description: "Solve puzzles and navigate through a mysterious labyrinth.",
+                path: "./puzzle/index.html",
+                icon: "🧩",
+                x: 600,
+                y: 450,
+                color: "#33A8FF"
+            },
+            {
+                title: "Realm Builder",
+                description: "Build and manage your own kingdom in this strategy game.",
+                path: "./strategy_game/index.html",
+                icon: "👑",
+                x: 300,
+                y: 600,
+                color: "#FF3366"
+            },
+            {
+                title: "IT Simulator",
+                description: "Build your tech company from scratch in this business simulation.",
+                path: "./it_simulator/index.html",
+                icon: "💻",
+                x: 500,
+                y: 600,
+                color: "#8833FF"
+            }
+        ];
+        
+        // Exhibit displays for games
+        const exhibits = [];
+        
+        // Museum walls and decorations
+        const walls = [
+            // Outer walls
+            {x: 0, y: 0, width: museum.width, height: 30}, // Top
+            {x: 0, y: 0, width: 30, height: museum.height}, // Left
+            {x: 0, y: museum.height - 30, width: museum.width, height: 30}, // Bottom
+            {x: museum.width - 30, y: 0, width: 30, height: museum.height}, // Right
+            
+            // Inner walls/dividers
+            {x: 100, y: 100, width: 30, height: 400}, // Left gallery wall
+            {x: museum.width - 130, y: 100, width: 30, height: 400}, // Right gallery wall
+            {x: 130, y: 100, width: 640, height: 30}, // Top gallery wall
+            {x: 130, y: 500, width: 640, height: 30}, // Bottom gallery wall
+            
+            // Display stands
+            {x: 150, y: 200, width: 100, height: 30},
+            {x: 350, y: 200, width: 100, height: 30},
+            {x: 550, y: 200, width: 100, height: 30},
+            {x: 150, y: 350, width: 100, height: 30},
+            {x: 350, y: 350, width: 100, height: 30},
+            {x: 550, y: 350, width: 100, height: 30},
+            {x: 150, y: 500, width: 100, height: 30},
+            {x: 350, y: 500, width: 100, height: 30},
+            {x: 550, y: 500, width: 100, height: 30},
+            {x: 250, y: 650, width: 100, height: 30},
+            {x: 450, y: 650, width: 100, height: 30}
+        ];
+        
+        // Create exhibit displays for each game
+        games.forEach(game => {
+            exhibits.push({
+                x: game.x,
+                y: game.y,
+                width: 60,
+                height: 60,
+                game: game,
+                isInteracting: false
+            });
+        });
+        
+        // Update the game counter
+        gameCountDisplay.textContent = `GAMES: ${games.length}`;
+        
+        // Current game being viewed
+        let currentGame = null;
+        
+        // Main game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Update game state
+        function update() {
+            // Move player
+            if (keys.ArrowUp) {
+                player.y -= player.speed;
+                player.direction = 'up';
+                player.frameCount++;
+            }
+            if (keys.ArrowDown) {
+                player.y += player.speed;
+                player.direction = 'down';
+                player.frameCount++;
+            }
+            if (keys.ArrowLeft) {
+                player.x -= player.speed;
+                player.direction = 'left';
+                player.frameCount++;
+            }
+            if (keys.ArrowRight) {
+                player.x += player.speed;
+                player.direction = 'right';
+                player.frameCount++;
+            }
+            
+            // Animate player
+            if (player.frameCount > 5) {
+                player.animationFrame = (player.animationFrame + 1) % 4;
+                player.frameCount = 0;
+            }
+            
+            // Collision with walls
+            walls.forEach(wall => {
+                if (checkCollision(player, wall)) {
+                    // Revert movement
+                    if (keys.ArrowUp) player.y += player.speed;
+                    if (keys.ArrowDown) player.y -= player.speed;
+                    if (keys.ArrowLeft) player.x += player.speed;
+                    if (keys.ArrowRight) player.x -= player.speed;
+                }
+            });
+            
+            // Keep player within museum bounds
+            player.x = Math.max(30, Math.min(museum.width - 30 - player.width, player.x));
+            player.y = Math.max(30, Math.min(museum.height - 30 - player.height, player.y));
+            
+            // Update camera to follow player
+            camera.x = player.x - camera.width / 2 + player.width / 2;
+            camera.y = player.y - camera.height / 2 + player.height / 2;
+            
+            // Clamp camera to museum bounds
+            camera.x = Math.max(0, Math.min(museum.width - camera.width, camera.x));
+            camera.y = Math.max(0, Math.min(museum.height - camera.height, camera.y));
+            
+            // Check for interaction with exhibits
+            let nearExhibit = null;
+            
+            exhibits.forEach(exhibit => {
+                // Check if player is near the exhibit
+                const distance = Math.sqrt(
+                    Math.pow(player.x + player.width/2 - (exhibit.x + exhibit.width/2), 2) +
+                    Math.pow(player.y + player.height/2 - (exhibit.y + exhibit.height/2), 2)
+                );
+                
+                if (distance < 80) {
+                    nearExhibit = exhibit;
+                }
+            });
+            
+            // Update current game and info panel
+            if (nearExhibit && nearExhibit !== currentGame) {
+                currentGame = nearExhibit;
+                updateInfoPanel(nearExhibit.game);
+            } else if (!nearExhibit && currentGame) {
+                currentGame = null;
+                infoPanel.style.display = 'none';
+            }
+            
+            // Handle interaction with space key
+            if (keys[' '] && currentGame) {
+                keys[' '] = false; // Reset the key
+                if (infoPanel.style.display === 'none') {
+                    infoPanel.style.display = 'block';
+                } else {
+                    // Open the game
+                    window.location.href = currentGame.game.path;
+                }
+            }
+            
+            // Close info panel with ESC
+            if (keys.Escape) {
+                keys.Escape = false;
+                infoPanel.style.display = 'none';
+            }
+        }
+        
+        // Check collision between two rectangles
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+        
+        // Render the game
+        function render() {
+            // Clear the canvas
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw the museum floor (tile pattern)
+            drawMuseumFloor();
+            
+            // Draw walls
+            drawWalls();
+            
+            // Draw exhibits
+            drawExhibits();
+            
+            // Draw player
+            drawPlayer();
+        }
+        
+        // Draw the museum floor with a tile pattern
+        function drawMuseumFloor() {
+            // Calculate visible tile range
+            const startX = Math.floor(camera.x / museum.tileSize);
+            const startY = Math.floor(camera.y / museum.tileSize);
+            const endX = Math.ceil((camera.x + camera.width) / museum.tileSize);
+            const endY = Math.ceil((camera.y + camera.height) / museum.tileSize);
+            
+            // Draw each visible tile
+            for (let y = startY; y < endY; y++) {
+                for (let x = startX; x < endX; x++) {
+                    const tileX = x * museum.tileSize - camera.x;
+                    const tileY = y * museum.tileSize - camera.y;
+                    
+                    // Alternating pattern
+                    if ((x + y) % 2 === 0) {
+                        ctx.fillStyle = '#1a1a1a';
+                    } else {
+                        ctx.fillStyle = '#222222';
+                    }
+                    
+                    ctx.fillRect(tileX, tileY, museum.tileSize, museum.tileSize);
+                }
+            }
+        }
+        
+        // Draw the walls of the museum
+        function drawWalls() {
+            walls.forEach(wall => {
+                const drawX = wall.x - camera.x;
+                const drawY = wall.y - camera.y;
+                
+                // Only draw if visible on screen
+                if (drawX + wall.width >= 0 && drawX <= camera.width &&
+                    drawY + wall.height >= 0 && drawY <= camera.height) {
+                    
+                    // Create pixel art effect for walls
+                    ctx.fillStyle = '#555';
+                    ctx.fillRect(drawX, drawY, wall.width, wall.height);
+                    
+                    // Add highlight to top/left edges
+                    ctx.fillStyle = '#777';
+                    ctx.fillRect(drawX, drawY, wall.width, 2);
+                    ctx.fillRect(drawX, drawY, 2, wall.height);
+                    
+                    // Add shadow to bottom/right edges
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(drawX, drawY + wall.height - 2, wall.width, 2);
+                    ctx.fillRect(drawX + wall.width - 2, drawY, 2, wall.height);
+                }
+            });
+        }
+        
+        // Draw the museum exhibits
+        function drawExhibits() {
+            exhibits.forEach(exhibit => {
+                const drawX = exhibit.x - camera.x;
+                const drawY = exhibit.y - camera.y;
+                
+                // Only draw if visible on screen
+                if (drawX + exhibit.width >= 0 && drawX <= camera.width &&
+                    drawY + exhibit.height >= 0 && drawY <= camera.height) {
+                    
+                    // Draw exhibit stand
+                    ctx.fillStyle = exhibit.game.color;
+                    ctx.fillRect(drawX, drawY, exhibit.width, exhibit.height);
+                    
+                    // Draw exhibit frame
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(drawX, drawY, exhibit.width, exhibit.height);
+                    
+                    // Draw game icon
+                    ctx.font = '24px Arial';
+                    ctx.fillStyle = '#FFF';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(exhibit.game.icon, drawX + exhibit.width / 2, drawY + exhibit.height / 2);
+                    
+                    // Add glow effect if this is the current exhibit
+                    if (exhibit === currentGame) {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                        const glowSize = 10;
+                        ctx.fillRect(
+                            drawX - glowSize, 
+                            drawY - glowSize, 
+                            exhibit.width + glowSize * 2, 
+                            exhibit.height + glowSize * 2
+                        );
+                        
+                        // Draw interaction hint
+                        ctx.font = '12px Arial';
+                        ctx.fillStyle = '#00FF66';
+                        ctx.fillText('SPACE to view', drawX + exhibit.width / 2, drawY + exhibit.height + 20);
+                    }
+                }
+            });
+        }
+        
+        // Draw the player character
+        function drawPlayer() {
+            const drawX = player.x - camera.x;
+            const drawY = player.y - camera.y;
+            
+            // Draw player body
+            ctx.fillStyle = '#00FF66';
+            ctx.fillRect(drawX, drawY, player.width, player.height);
+            
+            // Draw player features to create a simple pixel character
+            ctx.fillStyle = '#000';
+            
+            // Draw direction-based features (eyes, etc.)
+            if (player.direction === 'down') {
+                // Eyes
+                ctx.fillRect(drawX + 5, drawY + 8, 3, 3);
+                ctx.fillRect(drawX + 12, drawY + 8, 3, 3);
+                // Mouth
+                ctx.fillRect(drawX + 7, drawY + 15, 6, 2);
+            } else if (player.direction === 'up') {
+                // Eyes
+                ctx.fillRect(drawX + 5, drawY + 8, 3, 3);
+                ctx.fillRect(drawX + 12, drawY + 8, 3, 3);
+                // Hair
+                ctx.fillRect(drawX + 3, drawY + 2, 14, 3);
+            } else if (player.direction === 'left') {
+                // Eye
+                ctx.fillRect(drawX + 5, drawY + 8, 3, 3);
+                // Ear
+                ctx.fillRect(drawX + 2, drawY + 10, 2, 5);
+            } else if (player.direction === 'right') {
+                // Eye
+                ctx.fillRect(drawX + 12, drawY + 8, 3, 3);
+                // Ear
+                ctx.fillRect(drawX + 16, drawY + 10, 2, 5);
+            }
+            
+            // Animate legs/movement
+            if (player.animationFrame % 2 === 0) {
+                ctx.fillRect(drawX + 4, drawY + player.height - 8, 4, 8);
+                ctx.fillRect(drawX + player.width - 8, drawY + player.height - 5, 4, 5);
+            } else {
+                ctx.fillRect(drawX + 4, drawY + player.height - 5, 4, 5);
+                ctx.fillRect(drawX + player.width - 8, drawY + player.height - 8, 4, 8);
+            }
+        }
+        
+        // Update the info panel with game details
+        function updateInfoPanel(game) {
+            const title = infoPanel.querySelector('h3');
+            const description = infoPanel.querySelector('p');
+            
+            title.textContent = game.title;
+            description.textContent = game.description;
+            
+            // Set up the play button
+            playButton.onclick = () => {
+                window.location.href = game.path;
+            };
+            
+            // Show the panel
+            infoPanel.style.display = 'block';
+        }
+        
+        // Set up the event listeners for keyboard
+        document.addEventListener('keydown', e => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = true;
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('keyup', e => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = false;
+                e.preventDefault();
+            }
+        });
+        
+        // Loading simulation
+        let progress = 0;
+        const loadingInterval = setInterval(() => {
+            progress += Math.random() * 10;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(loadingInterval);
+                
+                // Hide loading screen and start game
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    gameLoop();
+                }, 500);
+            }
+            loadingProgress.style.width = `${progress}%`;
+        }, 200);
+    </script>
+</body>
+</html> 
