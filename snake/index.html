@@ -10,36 +10,234 @@
     <!-- End Google Tag Manager -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classic Snake Game</title>
+    <title>Enhanced Snake Game with High Scores</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@700&display=swap" rel="stylesheet">
     <style>
+        :root {
+             /* Define theme colors */
+             --bg-gradient-start: #1a1a2e;
+             --bg-gradient-mid: #16213e;
+             --bg-gradient-end: #0f3460;
+             --canvas-bg: #1f2833;
+             --snake-head: #53dd6c;
+             --snake-body1: #45a29e;
+             --snake-body2: #66fcf1;
+             --food-color: #ff4757;
+             --food-glow: rgba(255, 71, 87, 0.7);
+             --score-color: #53dd6c;
+             --text-primary: #e94560;
+             --grid-color: rgba(255, 255, 255, 0.05);
+             --overlay-bg: rgba(0, 0, 0, 0.85);
+             --button-bg: #4CAF50;
+             --button-text: white;
+             --input-border: #ccc;
+             --input-bg: #fff;
+             --font-pixel: 'Press Start 2P', cursive;
+             --font-sans: 'Roboto', sans-serif;
+         }
+
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-mid), var(--bg-gradient-end));
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            padding: 20px 0; /* Add some padding for smaller screens */
+             box-sizing: border-box;
         }
+
+        #gameContainer {
+            position: relative;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            margin-bottom: 20px;
+            width: 400px; /* Fixed width */
+             height: 400px; /* Fixed height */
+        }
+
         #gameCanvas {
-            border: 2px solid #333;
-            background-color: #fff;
+            display: block;
+            background-color: var(--canvas-bg);
+             width: 100%;
+             height: 100%;
         }
+
+        #uiContainer {
+             display: flex;
+             justify-content: space-around; /* Space out score and high scores */
+             align-items: flex-start;
+             width: 90%; /* Adjust width as needed */
+             max-width: 600px; /* Max width for UI section */
+             gap: 20px; /* Space between score and high scores list */
+        }
+
+        #scoreDisplay {
+             text-align: center;
+        }
+
         #score {
-            font-size: 24px;
-            font-family: Arial, sans-serif;
+            font-size: 22px; /* Adjusted size */
+            font-family: var(--font-pixel);
+            color: var(--score-color);
+            text-shadow: 2px 2px 0px var(--canvas-bg);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 8px 15px; /* Adjusted padding */
+            border-radius: 8px;
+            border: 2px solid var(--score-color);
+             margin-bottom: 15px; /* Space below score */
+        }
+
+         /* --- High Score Display --- */
+         #highScores {
+            font-family: var(--font-sans);
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+             border: 1px solid rgba(255,255,255,0.2);
+             color: #fff; /* White text for list */
+             max-width: 250px; /* Limit width */
+             min-width: 180px;
+         }
+          #highScores h2 {
+            font-family: var(--font-pixel);
+            font-size: 14px;
+             margin: 0 0 10px 0;
+             color: var(--score-color);
+             text-align: center;
+         }
+          #highScoreList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 14px;
+             line-height: 1.6;
+         }
+          #highScoreList li {
+            display: flex;
+            justify-content: space-between;
+             border-bottom: 1px dashed rgba(255,255,255,0.2);
+             padding: 2px 0;
+         }
+          #highScoreList li:last-child {
+            border-bottom: none;
+         }
+         #highScoreList .rank {
+            color: #aaa;
+            margin-right: 10px;
+         }
+          #highScoreList .name {
+            flex-grow: 1;
+            white-space: nowrap;
+             overflow: hidden;
+             text-overflow: ellipsis;
+             margin-right: 10px;
+         }
+          #highScoreList .scoreVal {
+            font-weight: bold;
+             color: var(--score-color);
+         }
+
+
+        /* --- Game Over Overlay Improvements --- */
+         #gameOverOverlay {
+             display: flex;
+             flex-direction: column; /* Stack elements vertically */
+             justify-content: center;
+             align-items: center;
+             position: absolute;
+             top: 0;
+             left: 0;
+             width: 100%;
+             height: 100%;
+             background-color: var(--overlay-bg);
+             opacity: 0;
+             visibility: hidden;
+             transition: opacity 0.5s ease-in-out, visibility 0s linear 0.5s;
+             z-index: 10;
+             text-align: center;
+             padding: 20px;
+             box-sizing: border-box;
+        }
+         #gameOverOverlay.show {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.5s ease-in-out;
+         }
+
+         #gameOverText, #highScorePrompt {
+            font-size: 28px; /* Smaller than before */
+            font-family: var(--font-pixel);
+            color: var(--food-color);
+            text-shadow: 2px 2px 0px #000;
+             margin-bottom: 20px;
+             line-height: 1.4;
+         }
+
+         #highScorePrompt {
+             color: var(--score-color); /* Green for prompt */
+              font-size: 18px; /* Smaller prompt */
+         }
+
+         #playerNameInput {
+            font-family: var(--font-sans);
+            font-size: 18px;
+            padding: 10px;
+            margin-bottom: 15px;
+             border: 2px solid var(--input-border);
+             border-radius: 5px;
+            text-align: center;
+            background-color: var(--input-bg);
             color: #333;
-            margin-top: 10px;
-        }
-        #gameOver {
-            display: none;
-            font-size: 32px;
-            color: red;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
+            width: 70%;
+            max-width: 200px;
+             display: none; /* Hide initially */
+         }
+
+          .gameOverButton {
+            font-family: var(--font-pixel);
+             font-size: 16px;
+             padding: 12px 25px;
+             background-color: var(--button-bg);
+             color: var(--button-text);
+             border: none;
+             border-radius: 5px;
+             cursor: pointer;
+             text-shadow: 1px 1px 0px rgba(0,0,0,0.4);
+             transition: background-color 0.2s ease;
+             margin-top: 10px;
+             display: none; /* Hide initially */
+         }
+          .gameOverButton:hover {
+            background-color: darken(var(--button-bg), 10%);
+         }
+
+         #saveScoreButton {
+            background-color: #3498db; /* Blue for save */
+         }
+         #saveScoreButton:hover {
+             background-color: #2980b9;
+         }
+         #restartButton {
+            background-color: var(--score-color); /* Green for restart */
+            color: var(--canvas-bg);
+         }
+          #restartButton:hover {
+             background-color: darken(var(--score-color), 10%);
+         }
+
+         /* CSS for shake animation */
+          @keyframes shake {
+              0%, 100% { transform: translate(0, 0) rotate(0deg); }
+              10%, 30%, 50%, 70%, 90% { transform: translate(-1px, 1px) rotate(-0.1deg); }
+              20%, 40%, 60%, 80% { transform: translate(1px, -1px) rotate(0.1deg); }
+          }
     </style>
 </head>
 <body>
@@ -47,133 +245,386 @@
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
-    
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
-    <div id="score">Score: 0</div>
-    <div id="gameOver">Game Over!</div>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <!-- Game Over Overlay -->
+        <div id="gameOverOverlay">
+             <div id="gameOverText">Game Over!</div>
+             <div id="highScorePrompt">New High Score! Enter Name:</div>
+             <input type="text" id="playerNameInput" maxlength="10" placeholder="AAA">
+             <button id="saveScoreButton" class="gameOverButton">Save Score</button>
+             <button id="restartButton" class="gameOverButton">Restart Game</button>
+        </div>
+    </div>
+
+    <div id="uiContainer">
+         <div id="scoreDisplay">
+             <div id="score">Score: 0</div>
+         </div>
+         <div id="highScores">
+            <h2>Top Scores</h2>
+            <ul id="highScoreList">
+                <!-- High scores will be loaded here -->
+                <li>Loading...</li>
+            </ul>
+        </div>
+    </div>
+
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        // Game Over UI Elements
+         const gameOverOverlay = document.getElementById('gameOverOverlay');
+         const gameOverTextElement = document.getElementById('gameOverText');
+         const highScorePromptElement = document.getElementById('highScorePrompt');
+         const playerNameInput = document.getElementById('playerNameInput');
+         const saveScoreButton = document.getElementById('saveScoreButton');
+         const restartButton = document.getElementById('restartButton');
+
+        // High Score UI
+         const highScoreListElement = document.getElementById('highScoreList');
+         const HIGH_SCORES_KEY = 'snakeHighScores';
+         const MAX_HIGH_SCORES = 5;
+
         const gridSize = 20;
         const tileCount = canvas.width / gridSize;
 
+        // Colors from CSS variables (optional, but good practice if needed in JS)
+         const snakeHeadColor = getComputedStyle(document.documentElement).getPropertyValue('--snake-head').trim();
+         const snakeBodyColorStart = getComputedStyle(document.documentElement).getPropertyValue('--snake-body1').trim();
+         const snakeBodyColorEnd = getComputedStyle(document.documentElement).getPropertyValue('--snake-body2').trim();
+         const foodColor = getComputedStyle(document.documentElement).getPropertyValue('--food-color').trim();
+         const foodGlowColor = getComputedStyle(document.documentElement).getPropertyValue('--food-glow').trim();
+         const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
+         const canvasBgColor = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+
         let snake = [{x: 10, y: 10}];
         let direction = 'right';
+        let requestedDirection = 'right';
         let food = generateFood();
         let score = 0;
         let isGameOver = false;
+        let gameLoopTimeout;
 
-        document.addEventListener('keydown', handleKeyPress);
+        // --- High Score Functions ---
+
+        function loadHighScores() {
+             const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+             // Parse JSON or return empty array if null/invalid
+             try {
+                 return JSON.parse(scoresJSON) || [];
+             } catch (e) {
+                 console.error("Error parsing high scores from localStorage", e);
+                 return [];
+             }
+         }
+
+        function saveHighScores(scores) {
+             // Sort before saving (belt and suspenders)
+             scores.sort((a, b) => b.score - a.score);
+             // Keep only top MAX_HIGH_SCORES
+             const scoresToSave = scores.slice(0, MAX_HIGH_SCORES);
+             localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scoresToSave));
+         }
+
+        function isHighScore(currentScore) {
+             if (currentScore <= 0) return false; // Don't save 0 scores
+             const highScores = loadHighScores();
+             const lowestHighScore = highScores[MAX_HIGH_SCORES - 1]?.score ?? 0; // Get score of last element, or 0 if list < 5
+
+            return highScores.length < MAX_HIGH_SCORES || currentScore > lowestHighScore;
+         }
+
+         function addHighScore(name, score) {
+            if (score <= 0) return; // Should be checked before calling, but good failsafe
+
+            const highScores = loadHighScores();
+            const newScoreEntry = { name: name || "AAA", score: score }; // Default name
+
+            highScores.push(newScoreEntry);
+            // Sort and save handles truncation
+            saveHighScores(highScores);
+            displayHighScores(); // Update the list UI
+         }
+
+         function displayHighScores() {
+            const highScores = loadHighScores();
+             highScoreListElement.innerHTML = ''; // Clear previous list
+
+             if (highScores.length === 0) {
+                highScoreListElement.innerHTML = '<li>No scores yet!</li>';
+                 return;
+             }
+
+             highScores.forEach((scoreEntry, index) => {
+                const li = document.createElement('li');
+                const rankSpan = document.createElement('span');
+                 rankSpan.className = 'rank';
+                 rankSpan.textContent = `${index + 1}.`;
+
+                const nameSpan = document.createElement('span');
+                 nameSpan.className = 'name';
+                 nameSpan.textContent = scoreEntry.name;
+                 nameSpan.title = scoreEntry.name; // Show full name on hover if clipped
+
+                const scoreSpan = document.createElement('span');
+                 scoreSpan.className = 'scoreVal';
+                 scoreSpan.textContent = scoreEntry.score;
+
+                 li.appendChild(rankSpan);
+                 li.appendChild(nameSpan);
+                 li.appendChild(scoreSpan);
+                highScoreListElement.appendChild(li);
+             });
+         }
+
+        // --- Game Logic ---
 
         function generateFood() {
-            let foodX, foodY;
-            do {
-                foodX = Math.floor(Math.random() * tileCount);
-                foodY = Math.floor(Math.random() * tileCount);
-            } while (snake.some(segment => segment.x === foodX && segment.y === foodY));
-            return {x: foodX, y: foodY};
-        }
+             // (Same as before)
+             let foodX, foodY;
+             let validPosition = false;
+             while (!validPosition) {
+                 foodX = Math.floor(Math.random() * tileCount);
+                 foodY = Math.floor(Math.random() * tileCount);
+                 if (!snake.some(segment => segment.x === foodX && segment.y === foodY)) {
+                     validPosition = true;
+                 }
+             }
+             return {x: foodX, y: foodY};
+         }
 
         function handleKeyPress(event) {
+             if (isGameOver) {
+                 // Special handling during game over screen
+                 if (playerNameInput.style.display !== 'none' && event.key === 'Enter') {
+                    handleSaveScore(); // Trigger save on Enter in input field
+                } else if (restartButton.style.display !== 'none' && (event.key === 'Enter' || event.key === ' ')) {
+                    restartGame(); // Trigger restart if restart button is visible
+                 }
+                return; // Ignore snake movement keys
+             }
+
+             // In-game controls
             switch (event.key) {
                 case 'ArrowUp':
-                    if (direction !== 'down') direction = 'up';
+                    if (direction !== 'down') requestedDirection = 'up';
                     break;
                 case 'ArrowDown':
-                    if (direction !== 'up') direction = 'down';
+                    if (direction !== 'up') requestedDirection = 'down';
                     break;
                 case 'ArrowLeft':
-                    if (direction !== 'right') direction = 'left';
+                    if (direction !== 'right') requestedDirection = 'left';
                     break;
                 case 'ArrowRight':
-                    if (direction !== 'left') direction = 'right';
+                    if (direction !== 'left') requestedDirection = 'right';
                     break;
             }
         }
 
         function update() {
+            // (Most logic is the same as before)
             if (isGameOver) return;
+            direction = requestedDirection;
             let head = { ...snake[0] };
-            switch (direction) {
+            switch (direction) { /* ... move head ... */
                 case 'up': head.y--; break;
                 case 'down': head.y++; break;
                 case 'left': head.x--; break;
                 case 'right': head.x++; break;
             }
-
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                gameOver();
-                return;
+                triggerGameOver(); return;
             }
-
-            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
-                gameOver();
-                return;
+            if (snake.length > 1 && snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
+                triggerGameOver(); return;
             }
-
             snake.unshift(head);
-
             if (head.x === food.x && head.y === food.y) {
-                food = generateFood();
                 score++;
-                document.getElementById('score').textContent = `Score: ${score}`;
+                scoreElement.textContent = `Score: ${score}`;
+                food = generateFood();
+                scoreElement.style.transform = 'scale(1.1)';
+                setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
             } else {
                 snake.pop();
             }
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function drawRoundedRect(ctx, x, y, width, height, radius) { /* ... Same as before ... */
+             ctx.beginPath();
+             ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+             ctx.lineTo(x + width, y + height - radius); ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+             ctx.lineTo(x + radius, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+             ctx.lineTo(x, y + radius); ctx.quadraticCurveTo(x, y, x + radius, y);
+             ctx.closePath(); ctx.fill();
+        }
 
-            // Draw grid
-            ctx.strokeStyle = '#ddd';
-            for (let i = 0; i <= tileCount; i++) {
-                ctx.beginPath();
-                ctx.moveTo(i * gridSize, 0);
-                ctx.lineTo(i * gridSize, canvas.height);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(0, i * gridSize);
-                ctx.lineTo(canvas.width, i * gridSize);
-                ctx.stroke();
+         function drawEyes(ctx, headX, headY, segmentSize) { /* ... Same as before ... */
+             ctx.fillStyle = canvasBgColor; // Pupil color matching background
+             const eyeSize = segmentSize / 5;
+             const eyeOffset = segmentSize / 4;
+             let eye1X, eye1Y, eye2X, eye2Y;
+             switch(direction) { /* ... calculate positions based on direction ... */
+                case 'up': eye1X = headX + eyeOffset; eye1Y = headY + eyeOffset; eye2X = headX + segmentSize - eyeOffset; eye2Y = headY + eyeOffset; break;
+                case 'down': eye1X = headX + eyeOffset; eye1Y = headY + segmentSize - eyeOffset; eye2X = headX + segmentSize - eyeOffset; eye2Y = headY + segmentSize - eyeOffset; break;
+                case 'left': eye1X = headX + eyeOffset; eye1Y = headY + eyeOffset; eye2X = headX + eyeOffset; eye2Y = headY + segmentSize - eyeOffset; break;
+                case 'right': eye1X = headX + segmentSize - eyeOffset; eye1Y = headY + eyeOffset; eye2X = headX + segmentSize - eyeOffset; eye2Y = headY + segmentSize - eyeOffset; break;
+            }
+             ctx.beginPath(); ctx.arc(eye1X, eye1Y, eyeSize / 2, 0, Math.PI * 2); ctx.fill();
+             ctx.beginPath(); ctx.arc(eye2X, eye2Y, eyeSize / 2, 0, Math.PI * 2); ctx.fill();
+         }
+
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = canvasBgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw subtle grid
+            ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
+            for (let i = 1; i < tileCount; i++) { /* ... draw lines ... */
+                ctx.beginPath(); ctx.moveTo(i * gridSize, 0); ctx.lineTo(i * gridSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * gridSize); ctx.lineTo(canvas.width, i * gridSize); ctx.stroke();
             }
 
-            // Draw snake
-            snake.forEach((segment, index) => {
+            // Draw food with glow and gradient
+            const foodX = (food.x + 0.5) * gridSize; const foodY = (food.y + 0.5) * gridSize;
+            const baseFoodRadius = gridSize / 2.5; const pulse = 0.1 * Math.sin(Date.now() / 150);
+            const foodRadius = baseFoodRadius * (1 + pulse);
+            ctx.shadowBlur = 15; ctx.shadowColor = foodGlowColor;
+            const gradient = ctx.createRadialGradient(foodX - foodRadius * 0.2, foodY - foodRadius * 0.2, foodRadius * 0.1, foodX, foodY, foodRadius * 1.2);
+            gradient.addColorStop(0, 'white'); gradient.addColorStop(0.7, foodColor); gradient.addColorStop(1, foodColor);
+            ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(foodX, foodY, foodRadius, 0, 2 * Math.PI); ctx.fill();
+            ctx.shadowBlur = 0; // Reset shadow
+
+            // Draw snake with gradient and rounded corners
+             const cornerRadius = gridSize * 0.3;
+             const bodyGradient = ctx.createLinearGradient(0, 0, gridSize, gridSize); // Reusable
+             bodyGradient.addColorStop(0, snakeBodyColorStart); bodyGradient.addColorStop(1, snakeBodyColorEnd);
+
+             snake.forEach((segment, index) => { /* ... Draw head and body (same as before)... */
+                const segmentX = segment.x * gridSize; const segmentY = segment.y * gridSize;
                 if (index === 0) {
-                    ctx.fillStyle = '#333'; // Head
+                    ctx.fillStyle = snakeHeadColor;
+                    drawRoundedRect(ctx, segmentX, segmentY, gridSize, gridSize, cornerRadius * 1.2);
+                    drawEyes(ctx, segmentX, segmentY, gridSize);
                 } else {
-                    ctx.fillStyle = index % 2 === 0 ? '#666' : '#999'; // Alternating colors
+                     ctx.fillStyle = bodyGradient;
+                     drawRoundedRect(ctx, segmentX, segmentY, gridSize, gridSize, cornerRadius);
+                     const connectorSize = gridSize - cornerRadius * 2;
+                     ctx.fillRect(segmentX + cornerRadius, segmentY + cornerRadius, connectorSize, connectorSize);
+                     const prevSegment = snake[index - 1];
+                      if (prevSegment) { // Smooth turns visually
+                        if (prevSegment.x === segment.x) { // Vertical connection
+                            const connectorY = (prevSegment.y > segment.y) ? segmentY : segmentY + connectorSize + cornerRadius;
+                             ctx.fillRect(segmentX + cornerRadius, connectorY , connectorSize, cornerRadius);
+                         } else { // Horizontal connection
+                           const connectorX = (prevSegment.x > segment.x) ? segmentX : segmentX + connectorSize + cornerRadius;
+                            ctx.fillRect(connectorX, segmentY + cornerRadius, cornerRadius, connectorSize);
+                        }
+                      }
                 }
-                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
             });
-
-            // Draw food with pulsing effect
-            ctx.fillStyle = 'red';
-            const foodRadius = gridSize / 2 * (1 + 0.1 * Math.sin(Date.now() / 200));
-            ctx.beginPath();
-            ctx.arc((food.x + 0.5) * gridSize, (food.y + 0.5) * gridSize, foodRadius, 0, 2 * Math.PI);
-            ctx.fill();
         }
 
-        function gameOver() {
+        function triggerGameOver() {
             isGameOver = true;
-            document.getElementById('gameOver').style.display = 'block';
-            setTimeout(() => {
-                document.getElementById('gameOver').style.display = 'none';
-                snake = [{x: 10, y: 10}];
-                direction = 'right';
-                food = generateFood();
-                score = 0;
-                document.getElementById('score').textContent = `Score: ${score}`;
-                isGameOver = false;
-            }, 2000);
+            clearTimeout(gameLoopTimeout);
+            canvas.style.animation = 'shake 0.5s';
+             setTimeout(() => { canvas.style.animation = ''; }, 500);
+
+            // Check if it's a high score
+            if (isHighScore(score)) {
+                // Show high score prompt UI
+                 gameOverTextElement.style.display = 'none';
+                 highScorePromptElement.style.display = 'block';
+                 playerNameInput.style.display = 'block';
+                 saveScoreButton.style.display = 'block';
+                 restartButton.style.display = 'none'; // Hide restart until saved
+                 playerNameInput.value = ''; // Clear previous input
+                 playerNameInput.focus(); // Focus input field
+             } else {
+                // Show standard game over UI
+                 gameOverTextElement.style.display = 'block';
+                 highScorePromptElement.style.display = 'none';
+                 playerNameInput.style.display = 'none';
+                 saveScoreButton.style.display = 'none';
+                 restartButton.style.display = 'block'; // Show restart immediately
+             }
+
+             gameOverOverlay.classList.add('show');
+         }
+
+         function handleSaveScore() {
+             const playerName = playerNameInput.value.trim() || "AAA"; // Get name or use default
+             addHighScore(playerName, score);
+
+            // Update UI after saving
+            highScorePromptElement.style.display = 'none';
+             playerNameInput.style.display = 'none';
+             saveScoreButton.style.display = 'none';
+
+             // Show game over text again and restart button
+             gameOverTextElement.textContent = `Score Saved! ${playerName} - ${score}`;
+             gameOverTextElement.style.display = 'block';
+             restartButton.style.display = 'block';
+         }
+
+        function restartGame() {
+             // Reset game state
+             snake = [{x: 10, y: 10}];
+             direction = 'right';
+             requestedDirection = 'right';
+             food = generateFood();
+             score = 0;
+             scoreElement.textContent = `Score: ${score}`;
+             isGameOver = false;
+
+             // Hide game over overlay and reset its elements
+             gameOverOverlay.classList.remove('show');
+             gameOverTextElement.textContent = 'Game Over!'; // Reset text
+             // Ensure all conditional elements are hidden
+             highScorePromptElement.style.display = 'none';
+             playerNameInput.style.display = 'none';
+             saveScoreButton.style.display = 'none';
+             restartButton.style.display = 'none';
+
+
+             // Restart game loop
+             gameLoop();
+         }
+
+        function gameLoop() {
+             if (isGameOver) return;
+             update();
+             draw();
+             let speed = 150 - Math.min(score * 2, 80); // Dynamic speed
+             gameLoopTimeout = setTimeout(gameLoop, speed);
         }
 
-        setInterval(() => {
-            update();
-            draw();
-        }, 100);
+        // --- Initialization ---
+
+         // Add CSS for shake animation
+         const styleSheet = document.createElement("style");
+         styleSheet.type = "text/css";
+         styleSheet.innerText = `@keyframes shake { /* ... keyframes same as before ... */ }`;
+         document.head.appendChild(styleSheet);
+
+         // Add event listeners for buttons
+         saveScoreButton.addEventListener('click', handleSaveScore);
+         restartButton.addEventListener('click', restartGame);
+
+         // Add keydown listener for global input
+         document.addEventListener('keydown', handleKeyPress);
+
+         // Initial setup
+         displayHighScores(); // Load and display scores on page load
+         gameLoop(); // Start the game
+
     </script>
 </body>
 </html>
