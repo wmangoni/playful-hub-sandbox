@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Rubik's Cube</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #333;
+        }
+        #container {
+            width: 90vmin; /* Use viewport units for responsiveness */
+            height: 75vmin;
+            max-width: 600px;
+            max-height: 500px;
+            position: relative;
+            background-color: #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+         button:active {
+            background-color: #3e8e41;
+        }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none; /* Don't interfere with canvas interaction */
+        }
+    </style>
+</head>
+<body>
+    <h1>HTML Rubik's Cube</h1>
+    <div id="container">
+        <div id="instructions">Click & Drag a face piece to rotate.<br>Right-Click/Middle-Click & Drag to orbit camera.</div>
+    </div>
+    <div id="controls">
+        <button id="scrambleBtn">Scramble</button>
+        <button id="resetBtn">Reset</button>
+    </div>
+
+    <!-- Libraries via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.min.js"></script>
+    <!-- OrbitControls needs to be loaded AFTER three.js -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- Global Variables ---
+        let scene, camera, renderer, controls;
+        let cubeGroup; // Group to hold all cubies
+        let cubies = []; // Array to store individual cubie meshes
+        const CUBE_SIZE = 3; // 3x3x3
+        const CUBIE_SIZE = 1;
+        const CUBIE_SPACING = 0.05;
+        const TOTAL_CUBIE_SIZE = CUBIE_SIZE + CUBIE_SPACING;
+        const CUBE_CENTER_OFFSET = (CUBE_SIZE - 1) / 2 * TOTAL_CUBIE_SIZE; // Offset from origin to center of a cubie at [0,0,0] index
+
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let intersectedObject = null; // The specific cubie mesh clicked
+        let selectedIntersection = null; // Store the full intersection data on mouse down
+        let startPoint = null; // Mouse down point on the face (world coords)
+        let currentPoint = null; // Mouse move point on the face (world coords) - might be less reliable
+        let isDragging = false;
+        let isRotating = false; // Flag to prevent multiple inputs during animation
+        let moveQueue = [];
+
+        const colors = { front: 0xFF0000, back: 0xFF8000, up: 0xFFFFFF, down: 0xFFFF00, left: 0x0000FF, right: 0x00FF00 };
+        const innerColor = 0x1a1a1a;
+
+        // --- Initialization ---
+        function init() {
+            const container = document.getElementById('container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xdddddd);
+
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(5, 5, 7);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enablePan = false;
+            controls.minDistance = 5;
+            controls.maxDistance = 20;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+
+            createCube();
+
+            // --- Event Listeners ---
+            renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+            renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+            renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+            renderer.domElement.addEventListener('mouseleave', onMouseLeave, false);
+            window.addEventListener('resize', onWindowResize, false);
+            // --- Keyboard Listener ---
+            window.addEventListener('keydown', onKeyDown, false);
+
+            document.getElementById('scrambleBtn').addEventListener('click', scrambleCube);
+            document.getElementById('resetBtn').addEventListener('click', resetCubeState);
+
+            // Update instructions
+            document.getElementById('instructions').innerHTML = `
+                Click & Drag face piece to rotate.<br>
+                Right/Middle Click & Drag to orbit.<br>
+                Keys: U, D, L, R, F, B (Shift for reverse)
+            `;
+
+            animate();
+        }
+
+        // --- Cube Creation ---
+        function createCube() {
+            if (cubeGroup) {
+                scene.remove(cubeGroup);
+                cubies.forEach(cubie => {
+                    if (cubie.geometry) cubie.geometry.dispose();
+                    if (Array.isArray(cubie.material)) cubie.material.forEach(mat => mat.dispose());
+                    else if (cubie.material) cubie.material.dispose();
+                });
+            }
+            cubeGroup = new THREE.Group();
+            cubies = [];
+            const offset = (CUBE_SIZE - 1) / 2;
+
+            for (let x = 0; x < CUBE_SIZE; x++) {
+                for (let y = 0; y < CUBE_SIZE; y++) {
+                    for (let z = 0; z < CUBE_SIZE; z++) {
+                        if (x > 0 && x < CUBE_SIZE - 1 && y > 0 && y < CUBE_SIZE - 1 && z > 0 && z < CUBE_SIZE - 1) continue;
+
+                        const geometry = new THREE.BoxGeometry(CUBIE_SIZE, CUBIE_SIZE, CUBIE_SIZE);
+                        const materials = [
+                            new THREE.MeshStandardMaterial({ color: (x === CUBE_SIZE - 1) ? colors.right : innerColor }), // +X
+                            new THREE.MeshStandardMaterial({ color: (x === 0) ? colors.left : innerColor }),   // -X
+                            new THREE.MeshStandardMaterial({ color: (y === CUBE_SIZE - 1) ? colors.up : innerColor }),    // +Y
+                            new THREE.MeshStandardMaterial({ color: (y === 0) ? colors.down : innerColor }),  // -Y
+                            new THREE.MeshStandardMaterial({ color: (z === CUBE_SIZE - 1) ? colors.front : innerColor }), // +Z
+                            new THREE.MeshStandardMaterial({ color: (z === 0) ? colors.back : innerColor })   // -Z
+                        ];
+                        const cubie = new THREE.Mesh(geometry, materials);
+                        const positionX = (x - offset) * TOTAL_CUBIE_SIZE;
+                        const positionY = (y - offset) * TOTAL_CUBIE_SIZE;
+                        const positionZ = (z - offset) * TOTAL_CUBIE_SIZE;
+                        cubie.position.set(positionX, positionY, positionZ);
+                        // Store original grid index (useful for keyboard moves)
+                        cubie.userData.gridIndex = { x, y, z };
+                        cubeGroup.add(cubie);
+                        cubies.push(cubie);
+                    }
+                }
+            }
+            scene.add(cubeGroup);
+        }
+
+        // --- Interaction Logic ---
+        function getIntersectedObject(event) {
+            const containerBounds = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - containerBounds.left) / containerBounds.width) * 2 - 1;
+            mouse.y = -((event.clientY - containerBounds.top) / containerBounds.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cubies);
+
+            for (let i = 0; i < intersects.length; i++) {
+                const intersection = intersects[i];
+                if (intersection.face && intersection.object.material[intersection.face.materialIndex].color.getHex() !== innerColor) {
+                    // console.log("Intersection found:", intersection.object.userData.gridIndex, "Face normal (local):", intersection.face.normal);
+                    return intersection;
+                }
+            }
+            // console.log("No valid intersection found.");
+            return null;
+        }
+
+        function onMouseDown(event) {
+            if (isRotating || event.button !== 0) return;
+
+            const intersection = getIntersectedObject(event);
+            // console.log("onMouseDown - Intersection:", intersection);
+
+            if (intersection) {
+                isDragging = true;
+                selectedIntersection = intersection; // Store the whole intersection object
+                intersectedObject = intersection.object;
+                startPoint = intersection.point.clone();
+                controls.enabled = false;
+                // console.log("onMouseDown - Drag started on cubie:", intersectedObject.userData.gridIndex, "at point:", startPoint);
+            } else {
+                // console.log("onMouseDown - No intersection, drag not started.");
+                // Reset just in case
+                isDragging = false;
+                intersectedObject = null;
+                selectedIntersection = null;
+                startPoint = null;
+                controls.enabled = true; // Re-enable if click was off-cube
+            }
+        }
+
+        function onMouseMove(event) {
+            // Don't do heavy calculation if not dragging or if rotating
+            if (!isDragging || isRotating || event.button !== 0) return;
+
+            // We mainly need the *direction* of the drag, less so the precise point on the cube surface during move.
+            // Let's track the latest mouse position to calculate the overall drag vector on mouseUp.
+            // Getting intersection here is possible but can be jerky.
+            // Update currentPoint using raycaster just to have a comparison point (optional)
+            const intersection = getIntersectedObject(event);
+            if (intersection) {
+                currentPoint = intersection.point.clone();
+                // console.log("onMouseMove - Current intersect point:", currentPoint);
+            } else {
+                // If we move off the cube, currentPoint might become null.
+                // The drag vector calculation on mouseUp will handle this.
+                currentPoint = null; // Indicate we are off the cube face now
+                // console.log("onMouseMove - Off cube");
+            }
+        }
+
+        function onMouseUp(event) {
+            // console.log("onMouseUp - button:", event.button, "isDragging:", isDragging, "isRotating:", isRotating);
+            if (event.button !== 0) {
+                controls.enabled = true; // Ensure controls are enabled if right/middle mouse up
+                return;
+            }
+
+            if (isDragging && !isRotating && selectedIntersection && startPoint) {
+                // Need to calculate the drag vector RELATIVE TO THE STARTING POINT
+                // Use the final mouse position to determine drag direction robustly
+                // Project screen coordinates onto the plane of the clicked face.
+
+                const endMouse = new THREE.Vector2();
+                const containerBounds = renderer.domElement.getBoundingClientRect();
+                endMouse.x = ((event.clientX - containerBounds.left) / containerBounds.width) * 2 - 1;
+                endMouse.y = -((event.clientY - containerBounds.top) / containerBounds.height) * 2 + 1;
+
+                // Use the initial mouse down position as well for screen space drag vector
+                const startMouse = new THREE.Vector2();
+                // Need to store this on mouse down if not already available easily
+                // For now, approximate using the initial intersection logic's mouse coords (might be slightly off if init used different event)
+                // Let's re-evaluate: we have startPoint (world). We need a drag vector.
+                // Using currentPoint (world) if available is best.
+                // If currentPoint is null (dragged off cube), use screen space drag vector projection.
+
+                let dragVectorWorld;
+
+                if (currentPoint) {
+                    dragVectorWorld = currentPoint.clone().sub(startPoint);
+                    // console.log("onMouseUp - Drag vector (world, from currentPoint):", dragVectorWorld);
+                } else {
+                    // Fallback: Estimate world drag vector from screen drag vector
+                    // This is more complex, involves projecting screen vector onto face plane
+                    // Let's keep it simpler: if currentPoint is null, maybe abort drag.
+                    console.log("onMouseUp - Drag ended off cube, rotation aborted.");
+                    dragVectorWorld = new THREE.Vector3(); // Effectively zero length
+                }
+
+
+                if (dragVectorWorld.lengthSq() > 0.01) { // Threshold for minimum drag distance
+                    // console.log("onMouseUp - Drag sufficient, determining rotation.");
+                    determineMouseRotation(dragVectorWorld, selectedIntersection);
+                } else {
+                    console.log("onMouseUp - Drag too short or aborted, rotation ignored. LengthSq:", dragVectorWorld.lengthSq());
+                }
+            } else {
+                // console.log("onMouseUp - Conditions not met for rotation check.");
+            }
+
+            // Reset dragging state and re-enable controls
+            isDragging = false;
+            intersectedObject = null;
+            selectedIntersection = null;
+            startPoint = null;
+            currentPoint = null;
+            if (!isRotating) { // Only enable controls if no rotation was triggered / is ongoing
+                controls.enabled = true;
+            }
+            // console.log("onMouseUp - Drag state reset. Controls enabled:", controls.enabled);
+        }
+
+        function onMouseLeave(event) {
+            // console.log("onMouseLeave - isDragging:", isDragging);
+            if (isDragging) {
+                // Treat leaving the canvas like a mouse up to cancel the drag cleanly
+                onMouseUp({ button: 0, clientX: event.clientX, clientY: event.clientY }); // Simulate left mouse up
+                // console.log("onMouseLeave - Drag cancelled.");
+            }
+        }
+
+        // --- Rotation Logic ---
+
+        // Revised function specifically for mouse drag
+        function determineMouseRotation(dragVectorWorld, intersectionData) {
+            if (!intersectionData || !intersectionData.face || !intersectionData.object) {
+                console.error("determineMouseRotation: Missing intersection data.");
+                return;
+            }
+
+            const faceNormalLocal = intersectionData.face.normal;
+            const clickedObject = intersectionData.object;
+
+            // Get face normal in World Space
+            const faceNormalWorld = faceNormalLocal.clone().transformDirection(clickedObject.matrixWorld).round();
+            // console.log("determineMouseRotation - Face Normal (World):", faceNormalWorld);
+
+            // Project drag vector onto the plane defined by the world face normal
+            const dragOnPlane = dragVectorWorld.clone().projectOnPlane(faceNormalWorld);
+            // console.log("determineMouseRotation - Drag on Plane:", dragOnPlane);
+            if (dragOnPlane.lengthSq() < 1e-6) { // Check if drag is perpendicular to face (unlikely but possible)
+                console.log("determineMouseRotation - Drag is ~perpendicular to face plane, ignoring.");
+                return;
+            }
+            dragOnPlane.normalize();
+
+            // Determine the axis of rotation: perpendicular to both face normal and drag direction on the plane
+            const potentialRotationAxis = new THREE.Vector3().crossVectors(faceNormalWorld, dragOnPlane).round(); // Round to align with world axes (X, Y, Z)
+            // console.log("determineMouseRotation - Potential Rotation Axis:", potentialRotationAxis);
+
+            // Check if potentialRotationAxis is valid (non-zero)
+            if (potentialRotationAxis.lengthSq() < 0.5) {
+                console.warn("determineMouseRotation - Could not determine valid rotation axis (cross product near zero). Normal:", faceNormalWorld, "DragOnPlane:", dragOnPlane);
+                // Fallback? Or maybe the drag was too short/ambiguous. Let's ignore for now.
+                controls.enabled = true; // Re-enable controls if rotation fails here
+                return;
+            }
+            const rotationAxis = potentialRotationAxis.normalize();
+
+
+            // Determine direction of rotation (Sign of the angle)
+            // This depends on how you want the drag to map. Let's try: drag direction defines the movement.
+            // We need to know which direction on the screen corresponds to positive rotation around the axis.
+            // A simpler approach: pick one axis direction (e.g., +X, +Y, +Z). The cross product result gives direction.
+            // If we want drag right = clockwise for Front face:
+            // Face = +Z (0,0,1). Drag = +X (1,0,0). Axis should be -Y (0,-1,0). Cross( (0,0,1), (1,0,0) ) = (0,1,0). Needs adjustment.
+            // Let's use a simpler heuristic: Assume the cross product gives the correct AXIS, and we just need the sign.
+            // Compare drag direction projected onto a vector perpendicular to both normal and rotation axis.
+            let direction = 1; // Default direction, might need adjustment based on testing
+
+            // Heuristic Adjustment based on coordinate system and desired feel:
+            // Test which direction feels natural. Often, the cross product's sign needs flipping depending on view/face.
+            // Let's test the default cross product direction first. It might need case-by-case adjustment if it feels reversed.
+            // A common convention: positive angle = counter-clockwise when looking from positive axis towards origin.
+
+            // Select Cubies for Rotation (using the robust method)
+            const clickedCoord = clickedObject.position.dot(rotationAxis);
+            const step = TOTAL_CUBIE_SIZE;
+            const numLayers = CUBE_SIZE;
+            const offsetLayer = (numLayers - 1) / 2;
+            let nearestLayerCoord = 0;
+            let minDist = Infinity;
+            for (let i = 0; i < numLayers; i++) {
+                const layerCenterCoord = (i - offsetLayer) * step;
+                const dist = Math.abs(clickedCoord - layerCenterCoord);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestLayerCoord = layerCenterCoord;
+                }
+            }
+            const tolerance = step / 2.1;
+            const affectedCubies = cubies.filter(cubie =>
+                Math.abs(cubie.position.dot(rotationAxis) - nearestLayerCoord) < tolerance
+            );
+
+            if (affectedCubies.length === 0) {
+                console.error("determineMouseRotation - No cubies selected for rotation layer. Coord:", nearestLayerCoord, "Axis:", rotationAxis);
+                controls.enabled = true; // Re-enable controls if it fails
+                return;
+            }
+            // console.log(`determineMouseRotation - Rotating ${affectedCubies.length} cubies on axis ${JSON.stringify(rotationAxis)} around ${nearestLayerCoord.toFixed(2)} with direction ${direction}`);
+
+            rotateLayer(affectedCubies, rotationAxis, direction * Math.PI / 2);
+        }
+
+
+        // General layer rotation function (used by mouse and keyboard)
+        function rotateLayer(cubiesToRotate, axis, angle) {
+            if (isRotating) {
+                console.log("Ignoring request: Rotation already in progress.");
+                return;
+            }
+            isRotating = true;
+            controls.enabled = false; // Disable camera controls during animation
+
+            const pivot = new THREE.Group();
+            scene.add(pivot);
+
+            cubiesToRotate.forEach(cubie => {
+                pivot.attach(cubie);
+            });
+
+            new TWEEN.Tween(pivot.rotation)
+                .to({
+                    x: pivot.rotation.x + axis.x * angle,
+                    y: pivot.rotation.y + axis.y * angle,
+                    z: pivot.rotation.z + axis.z * angle
+                }, 400)
+                .easing(TWEEN.Easing.Cubic.Out) // Adjusted easing slightly
+                .onComplete(() => {
+                    cubiesToRotate.forEach(cubie => {
+                        cubie.updateMatrixWorld(); // Ensure world matrix is up-to-date
+                        cubeGroup.attach(cubie);
+                        snapCubieToGrid(cubie);
+                    });
+                    scene.remove(pivot);
+                    isRotating = false;
+                    controls.enabled = true;
+                    // console.log("Rotation complete. Controls enabled.");
+                    processMoveQueue();
+                })
+                .start();
+        }
+
+        // --- Keyboard Control ---
+        function onKeyDown(event) {
+            if (isRotating) return; // Ignore keypress if animating
+
+            let face = '';
+            let direction = event.shiftKey ? -1 : 1; // Shift reverses direction
+
+            switch (event.key.toUpperCase()) {
+                case 'U': face = 'U'; break;
+                case 'D': face = 'D'; break;
+                case 'L': face = 'L'; break;
+                case 'R': face = 'R'; break;
+                case 'F': face = 'F'; break;
+                case 'B': face = 'B'; break;
+                default: return; // Exit if key is not a recognized cube face key
+            }
+
+            event.preventDefault(); // Prevent default browser action (like scrolling) for these keys
+            // console.log(`Key press: ${face}, Direction: ${direction}`);
+            performKeyboardRotation(face, direction);
+        }
+
+        function performKeyboardRotation(face, direction) {
+            let axis = new THREE.Vector3();
+            let layerIndex = -1; // 0, 1, or 2 for 3x3 cube size
+
+            // Define axis and layer based on standard Rubik's notation
+            switch (face) {
+                case 'U': axis.set(0, 1, 0); layerIndex = CUBE_SIZE - 1; direction *= -1; break; // Standard notation U is clockwise VIEWED FROM TOP (+Y axis -> -ve angle)
+                case 'D': axis.set(0, 1, 0); layerIndex = 0; break; // Standard D is clockwise VIEWED FROM BOTTOM (-Y axis -> +ve angle)
+                case 'L': axis.set(1, 0, 0); layerIndex = 0; break; // Standard L is clockwise VIEWED FROM LEFT (-X axis -> +ve angle)
+                case 'R': axis.set(1, 0, 0); layerIndex = CUBE_SIZE - 1; direction *= -1; break; // Standard R is clockwise VIEWED FROM RIGHT (+X axis -> -ve angle)
+                case 'F': axis.set(0, 0, 1); layerIndex = CUBE_SIZE - 1; direction *= -1; break; // Standard F is clockwise VIEWED FROM FRONT (+Z axis -> -ve angle)
+                case 'B': axis.set(0, 0, 1); layerIndex = 0; break; // Standard B is clockwise VIEWED FROM BACK (-Z axis -> +ve angle)
+            }
+
+            const step = TOTAL_CUBIE_SIZE;
+            const offsetLayer = (CUBE_SIZE - 1) / 2;
+            const targetLayerCoord = (layerIndex - offsetLayer) * step;
+            const tolerance = step / 2.1;
+
+            const affectedCubies = cubies.filter(cubie =>
+                Math.abs(cubie.position.dot(axis) - targetLayerCoord) < tolerance
+            );
+
+            if (affectedCubies.length === 0) {
+                console.error(`Keyboard Rotation Error: No cubies found for face ${face} (Layer ${layerIndex} on axis ${JSON.stringify(axis)})`);
+                return;
+            }
+
+            const angle = direction * Math.PI / 2;
+            // console.log(`Keyboard rotating face ${face}: ${affectedCubies.length} cubies on axis ${JSON.stringify(axis)} by angle ${angle}`);
+            rotateLayer(affectedCubies, axis, angle);
+        }
+
+
+        // --- Utility: Snap to Grid ---
+        function snapCubieToGrid(cubie) {
+            const step = TOTAL_CUBIE_SIZE;
+            cubie.position.x = Math.round(cubie.position.x / step) * step;
+            cubie.position.y = Math.round(cubie.position.y / step) * step;
+            cubie.position.z = Math.round(cubie.position.z / step) * step;
+            // No need for NaN checks if input is always reasonable, but they don't hurt:
+            cubie.position.x = isFinite(cubie.position.x) ? cubie.position.x : 0;
+            cubie.position.y = isFinite(cubie.position.y) ? cubie.position.y : 0;
+            cubie.position.z = isFinite(cubie.position.z) ? cubie.position.z : 0;
+        }
+
+        // --- Scramble & Reset ---
+        function scrambleCube() {
+            if (isRotating) return;
+            const axes = [new THREE.Vector3(1,0,0), new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,1)];
+            const directions = [-1, 1];
+            const numScrambleMoves = 25; // Increased scramble moves
+            moveQueue = [];
+            const step = TOTAL_CUBIE_SIZE;
+            const offsetLayer = (CUBE_SIZE - 1) / 2;
+
+            // console.log(`Queueing ${numScrambleMoves} scramble moves...`);
+            for (let i = 0; i < numScrambleMoves; i++) {
+                const axis = axes[Math.floor(Math.random() * axes.length)].clone();
+                const layerIndex = Math.floor(Math.random() * CUBE_SIZE);
+                const direction = directions[Math.floor(Math.random() * directions.length)];
+                const layerCoord = (layerIndex - offsetLayer) * step;
+                const tolerance = step / 2.1;
+
+                // It's better to store the *parameters* for the move, not the cubies themselves,
+                // as their positions will change between queued moves.
+                moveQueue.push({
+                    axis: axis,
+                    layerIndex: layerIndex, // Store layer index instead of cubies
+                    angle: direction * Math.PI / 2
+                });
+            }
+            processMoveQueue();
+        }
+
+        function resetCubeState() {
+            if (isRotating) return;
+            moveQueue = [];
+            // console.log("Resetting cube...");
+            createCube(); // Recreate for guaranteed clean state
+            // console.log("Cube reset.");
+            controls.reset(); // Also reset camera controls orientation
+            camera.position.set(5, 5, 7); // Reset camera position
+        }
+
+        function processMoveQueue() {
+            if (isRotating || moveQueue.length === 0) {
+                // if (!isRotating && moveQueue.length === 0) console.log("Move queue processed.");
+                return;
+            }
+
+            const move = moveQueue.shift();
+            const axis = move.axis;
+            const layerIndex = move.layerIndex;
+            const angle = move.angle;
+
+            // Find affected cubies based on stored parameters *now*
+            const step = TOTAL_CUBIE_SIZE;
+            const offsetLayer = (CUBE_SIZE - 1) / 2;
+            const targetLayerCoord = (layerIndex - offsetLayer) * step;
+            const tolerance = step / 2.1;
+            const affectedCubies = cubies.filter(cubie =>
+                Math.abs(cubie.position.dot(axis) - targetLayerCoord) < tolerance
+            );
+
+            if (affectedCubies.length === 0) {
+                console.error("Error processing queue: No cubies found for intended layer. Aborting queue.", move);
+                moveQueue = []; // Clear queue
+                isRotating = false;
+                controls.enabled = true;
+                return;
+            }
+            // console.log(`Processing queued move: Axis=${JSON.stringify(axis)}, LayerIdx=${layerIndex}, Angle=${angle > 0 ? 90 : -90}, Cubies=${affectedCubies.length}`);
+            rotateLayer(affectedCubies, axis, angle);
+        }
+
+        // --- Animation Loop ---
+        function animate(time) {
+            requestAnimationFrame(animate);
+            TWEEN.update(time);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Window Resize ---
+        function onWindowResize() {
+            const container = document.getElementById('container');
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // --- Start ---
+        init();
+
+    </script>
+</body>
+</html>
