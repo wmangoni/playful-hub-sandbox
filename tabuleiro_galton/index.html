@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabuleiro de Galton (Dark Neon)</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #1a1a1a; /* Fundo escuro */
+            color: #eee; /* Texto claro */
+            flex-direction: column;
+            font-family: sans-serif;
+        }
+        canvas {
+            /* Borda sutil */
+            border: 1px solid #444;
+            /* Fundo escuro para o canvas (revelado pelo clearRect) */
+            background-color: #1a1a1a;
+            display: block;
+        }
+        #controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 8px 15px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #333; /* Fundo botão escuro */
+            color: #eee; /* Texto botão claro */
+            border: 1px solid #555; /* Borda botão */
+            border-radius: 4px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        button:hover {
+            background-color: #444;
+            border-color: #00ccff; /* Borda neon no hover */
+        }
+        button:active {
+            background-color: #555;
+        }
+        label {
+            margin-left: 10px;
+        }
+        input[type="range"] {
+            cursor: pointer;
+            accent-color: #00ccff; /* Cor do slider (varia entre browsers) */
+        }
+        #totalBalls {
+            min-width: 80px; /* Espaço para a contagem */
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="galtonCanvas"></canvas>
+    <div id="controls">
+        <button id="addBallBtn">Adicionar 1 Bolinha</button>
+        <button id="add10BallsBtn">Adicionar 10 Bolinhas</button>
+        <button id="resetBtn">Resetar</button>
+        <label for="speedSlider">Velocidade:</label>
+        <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+        <span id="totalBalls">Total: 0</span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('galtonCanvas');
+        const ctx = canvas.getContext('2d');
+        const controls = document.getElementById('controls');
+        const addBallBtn = document.getElementById('addBallBtn');
+        const add10BallsBtn = document.getElementById('add10BallsBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const speedSlider = document.getElementById('speedSlider');
+        const totalBallsSpan = document.getElementById('totalBalls');
+
+        // --- Configurações ---
+        let canvasWidth = 600;
+        let canvasHeight = 600;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        const ballRadius = 5;
+        const pegRadius = 4;
+        const numRows = 15;
+        const gravity = 0.15;
+        const restitution = 0.6;
+        const horizontalRandomness = 0.4;
+        const binHeight = 80;
+
+        // --- Cores Tema Dark Neon ---
+        const pegColor = '#aaa'; // Pinos um pouco mais claros
+        const ballColor = '#00ccff'; // Azul Neon
+        const ballShadowColor = 'rgba(0, 204, 255, 0.7)'; // Sombra/Glow da bola
+        const binColor = '#666'; // Cor das divisórias dos coletores
+        const histogramColor = '#ff3366'; // Vermelho/Rosa Neon
+        const histogramShadowColor = 'rgba(255, 51, 102, 0.6)'; // Sombra/Glow do histograma
+
+        let balls = [];
+        let pegs = [];
+        let bins = [];
+        let simulationSpeed = 1;
+        let totalBallCount = 0;
+
+        // --- Funções (setup, createBall, update - sem mudanças lógicas) ---
+
+        function setup() {
+            balls = [];
+            pegs = [];
+            bins = [];
+            totalBallCount = 0;
+            updateTotalBallsDisplay();
+
+            const rowSpacing = (canvasHeight - binHeight - 100) / (numRows + 1);
+            const initialHorizontalSpacing = 30;
+            const topOffset = 60;
+
+            for (let i = 0; i < numRows; i++) {
+                const numPegsInRow = i + 1;
+                const y = topOffset + (i + 1) * rowSpacing;
+                const currentHorizontalSpacing = initialHorizontalSpacing * (numRows / (numPegsInRow + 1)) * 1.1;
+                 const totalWidthForRow = (numPegsInRow - 1) * currentHorizontalSpacing;
+                 const startX = (canvasWidth - totalWidthForRow) / 2;
+
+                 for (let j = 0; j < numPegsInRow; j++) {
+                     const x = startX + j * currentHorizontalSpacing;
+                     pegs.push({ x, y, radius: pegRadius });
+                 }
+             }
+
+             const numBins = numRows + 1;
+             const binWidth = canvasWidth / numBins;
+             for (let i = 0; i < numBins; i++) {
+                 bins.push({
+                     x: i * binWidth,
+                     y: canvasHeight - binHeight,
+                     width: binWidth,
+                     height: binHeight,
+                     count: 0
+                 });
+             }
+         }
+
+        function createBall() {
+            totalBallCount++;
+            updateTotalBallsDisplay();
+            const startX = canvasWidth / 2 + (Math.random() - 0.5) * 5;
+            balls.push({
+                x: startX,
+                y: ballRadius + 10,
+                vx: (Math.random() - 0.5) * 1,
+                vy: 0,
+                radius: ballRadius,
+                // Cor da bola definida na constante
+                active: true
+            });
+        }
+
+         function update(dt) {
+            const effectiveDt = dt * simulationSpeed;
+            if (effectiveDt <= 0) return;
+
+            const ballsToRemoveIndexes = []; // Para remover de forma segura
+
+            balls.forEach((ball, index) => {
+                if (!ball.active) return;
+
+                ball.vy += gravity * effectiveDt;
+                ball.x += ball.vx * effectiveDt;
+                ball.y += ball.vy * effectiveDt;
+
+                // Colisão com paredes
+                if (ball.x - ball.radius < 0) {
+                    ball.x = ball.radius;
+                    ball.vx *= -restitution;
+                } else if (ball.x + ball.radius > canvasWidth) {
+                    ball.x = canvasWidth - ball.radius;
+                    ball.vx *= -restitution;
+                }
+
+                // Colisão com pinos
+                pegs.forEach(peg => {
+                    const dx = ball.x - peg.x;
+                    const dy = ball.y - peg.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const minDistance = ball.radius + peg.radius;
+
+                    if (distance < minDistance) {
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+                        const relativeVelocity = ball.vx * nx + ball.vy * ny;
+
+                        if (relativeVelocity < 0) {
+                            const impulse = -(1 + restitution) * relativeVelocity;
+                            ball.vx += impulse * nx;
+                            ball.vy += impulse * ny;
+                            ball.vx += (Math.random() - 0.5) * horizontalRandomness;
+
+                            const overlap = minDistance - distance;
+                            ball.x += nx * overlap * 0.51; // Pequeno ajuste > 0.5 para garantir separação
+                            ball.y += ny * overlap * 0.51;
+                        }
+                    }
+                });
+
+                // Verificar coletores
+                if (ball.y + ball.radius > canvasHeight - binHeight && ball.y < canvasHeight + ball.radius) { // Verifica se está na zona dos coletores
+                    let collected = false;
+                    for (let i = 0; i < bins.length; i++) {
+                        if (ball.x >= bins[i].x && ball.x < bins[i].x + bins[i].width) {
+                            // Verifica se está realmente "descansando" no fundo
+                            // Uma verificação simples: se a velocidade vertical for pequena
+                            // e estiver perto do fundo. Ou simplesmente coletar ao entrar na área.
+                             if (ball.y + ball.radius >= canvasHeight - 1 ) { // Tocou o fundo virtual
+                                bins[i].count++;
+                                ball.active = false;
+                                collected = true;
+                                // Marcar para remoção posterior se desejar performance
+                                // ballsToRemoveIndexes.push(index);
+                                break;
+                             } else if (ball.y > canvasHeight - binHeight) {
+                                 // Está na área do coletor, mas não necessariamente parado
+                                 // Pode adicionar colisões com as paredes do coletor aqui se desejar
+                             }
+                        }
+                    }
+                    // Caso caia exatamente na divisa ou algo estranho aconteça
+                    if (!collected && ball.y + ball.radius > canvasHeight - 1) {
+                         let closestBin = 0;
+                         let minDist = Infinity;
+                         for(let i=0; i < bins.length; i++) {
+                             const binCenterX = bins[i].x + bins[i].width / 2;
+                             const dist = Math.abs(ball.x - binCenterX);
+                             if (dist < minDist) {
+                                 minDist = dist;
+                                 closestBin = i;
+                             }
+                         }
+                         bins[closestBin].count++;
+                         ball.active = false;
+                         // ballsToRemoveIndexes.push(index);
+                    }
+                } else if (ball.y - ball.radius > canvasHeight) {
+                    // Se a bola cair completamente para fora por algum motivo
+                     ball.active = false;
+                     // ballsToRemoveIndexes.push(index);
+                }
+            });
+
+            // Remover bolas inativas (opcional, melhora performance a longo prazo)
+            // Executar a remoção em ordem reversa para não afetar os índices
+            // for (let i = ballsToRemoveIndexes.length - 1; i >= 0; i--) {
+            //     balls.splice(ballsToRemoveIndexes[i], 1);
+            // }
+         }
+
+        function draw() {
+            // Limpar canvas (revela a cor de fundo definida no CSS)
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+             // Resetar efeitos de sombra antes de desenhar elementos sem brilho
+             ctx.shadowBlur = 0;
+             ctx.shadowColor = 'transparent';
+
+            // Desenhar pinos
+            ctx.fillStyle = pegColor;
+            pegs.forEach(peg => {
+                ctx.beginPath();
+                ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Desenhar coletores (divisórias e fundo)
+            ctx.strokeStyle = binColor; // Usar stroke para linhas finas
+            ctx.lineWidth = 1; // Linhas finas
+            // Linha de fundo não é mais necessária se as barras preenchem
+            // ctx.beginPath();
+            // ctx.moveTo(0, canvasHeight - binHeight);
+            // ctx.lineTo(canvasWidth, canvasHeight - binHeight);
+            // ctx.stroke();
+
+            // Divisórias verticais
+            for (let i = 1; i < bins.length; i++) { // Começa de 1 para não desenhar a borda esquerda
+                const x = i * bins[0].width; // Assumindo larguras iguais
+                ctx.beginPath();
+                ctx.moveTo(x, canvasHeight - binHeight);
+                ctx.lineTo(x, canvasHeight); // Desenha até o fundo
+                ctx.stroke();
+            }
+            // Adicionar bordas laterais dos coletores se necessário
+            ctx.beginPath();
+            ctx.moveTo(1, canvasHeight - binHeight); // Linha esquerda
+            ctx.lineTo(1, canvasHeight);
+            ctx.moveTo(canvasWidth - 1, canvasHeight - binHeight); // Linha direita
+            ctx.lineTo(canvasWidth - 1, canvasHeight);
+            ctx.stroke();
+
+
+             // Desenhar histograma nos coletores (com brilho)
+             const maxCount = Math.max(1, ...bins.map(b => b.count));
+             ctx.fillStyle = histogramColor;
+             // Aplicar brilho para o histograma
+             ctx.shadowBlur = 10; // Intensidade do brilho
+             ctx.shadowColor = histogramShadowColor; // Cor do brilho
+
+             bins.forEach(bin => {
+                 const barHeight = (bin.count / maxCount) * (binHeight - 5); // -5 para margem
+                 if (bin.count > 0) {
+                     ctx.fillRect(
+                         bin.x + 2, // Pequena margem interna
+                         canvasHeight - barHeight - 2, // Começa de baixo para cima
+                         bin.width - 4, // Largura com margens
+                         barHeight
+                     );
+                 }
+             });
+
+             // Resetar sombra antes de desenhar as bolas (ou outros elementos sem brilho)
+            // ctx.shadowBlur = 0;
+            // ctx.shadowColor = 'transparent'; // Já resetado antes dos pinos
+
+             // Desenhar bolinhas (com brilho)
+             ctx.fillStyle = ballColor;
+             // Aplicar brilho para as bolas
+             ctx.shadowBlur = 8;
+             ctx.shadowColor = ballShadowColor;
+
+             balls.forEach(ball => {
+                 if (!ball.active) return;
+                 ctx.beginPath();
+                 ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                 ctx.fill();
+             });
+
+            // É uma boa prática resetar a sombra no final do desenho
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+         }
+
+
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            const dt = (timestamp - lastTime) / 16.67; // Delta time normalizado
+            lastTime = timestamp;
+
+            const maxDt = 3;
+            const effectiveDt = Math.min(dt, maxDt);
+
+            update(effectiveDt);
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateTotalBallsDisplay() {
+            totalBallsSpan.textContent = `Total: ${totalBallCount}`;
+        }
+
+        // --- Event Listeners (sem mudanças) ---
+        addBallBtn.addEventListener('click', createBall);
+        add10BallsBtn.addEventListener('click', () => {
+            // Adiciona bolas com um pequeno intervalo para não sobrecarregar de uma vez
+            let count = 0;
+            const intervalId = setInterval(() => {
+                if (count < 10) {
+                    createBall();
+                    count++;
+                } else {
+                    clearInterval(intervalId);
+                }
+            }, 50); // Adiciona uma bola a cada 50ms
+        });
+        resetBtn.addEventListener('click', () => {
+            setup();
+        });
+        speedSlider.addEventListener('input', (e) => {
+            simulationSpeed = parseFloat(e.target.value);
+        });
+
+        // --- Inicialização ---
+        setup();
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
