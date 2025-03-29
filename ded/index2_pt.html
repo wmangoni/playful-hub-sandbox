@@ -288,6 +288,13 @@
             #close-shop:hover {
                 background-color: #7a5c3d;
             }
+
+            #info {
+                position: absolute;
+                top: 96px;
+                left: 26px;
+                font-size: 12px;
+            }
         </style>
     </head>
     <body>
@@ -301,11 +308,17 @@
           Seu navegador não suporta o elemento de áudio.
         </audio>
 
+        <!-- Adicionar botão de TTS -->
+        <button id="tts-toggle-button" style="position: absolute; top: 74px; left: 24px; z-index: 10; font-size: 16px; padding: 3px 6px;">
+            🔊 Narrador
+        </button>
+        <!-- Fim botão TTS -->
+
         <div class="game-container">
             <h1>A Masmorra de Drakmor</h1>
             <p class="subtitle">Uma Aventura Simples de D&D</p>
             <div id="character-select">
-                <h2>Escolha o Seu Personagem</h2>
+                <h2 style="text-align: center;">Escolha o Seu Personagem</h2>
                 <div class="character-select">
                     <div class="character-card" data-class="warrior" onclick="selectCharacter('warrior')">
                         <h3>Guerreiro</h3>
@@ -447,6 +460,21 @@
                     armor: 4
                 }
             };
+
+            let currentTypewriterInterval = null;
+            let skipTyping = false;
+
+            var choicesElement = document.getElementById('choices');
+
+            // --- Fase 2: TTS Variables ---
+            let ttsEnabled = true; // Controle global para ativar/desativar TTS
+            let synth = window.speechSynthesis; // Acesso à API de fala
+            let voices = []; // Array para guardar as vozes disponíveis
+            let selectedVoice = null; // Para guardar a voz pt-BR preferida
+            let utterance = null; // Para guardar a instância da fala atual
+            // Flag para indicar se a API de fala foi "desbloqueada" pela interação do usuário
+            let speechApiUnlocked = false;
+
             // Cenas do jogo
             const scenes = {
                 start: {
@@ -1671,7 +1699,114 @@
                     }
                 }
             }
+
+
             let selectedCharacter = null;
+
+
+
+            /**
+             * Tenta popular a lista de vozes disponíveis e selecionar uma voz pt-BR.
+             * Precisa ser chamada APÓS a interação do usuário e/ou no evento 'voiceschanged'.
+             */
+            function populateVoiceList() {
+                if (!synth) return; // Sai se a API não for suportada
+
+                voices = synth.getVoices().sort(function (a, b) {
+                    const aname = a.name.toUpperCase();
+                    const bname = b.name.toUpperCase();
+                    if (aname < bname) return -1;
+                    else if (aname == bname) return 0;
+                    else return +1;
+                });
+                console.log("Vozes disponíveis:", voices);
+
+                // Tenta encontrar uma voz em Português do Brasil
+                selectedVoice = voices.find(voice => voice.name.includes('Daniel - Portuguese') || voice.name.includes('Maria - Portuguese'));
+
+                 // Fallback para outras pt-BR ou qualquer pt
+                if (!selectedVoice) {
+                     selectedVoice = voices.find(voice => voice.lang === 'pt-BR');
+                }
+                 if (!selectedVoice) {
+                    selectedVoice = voices.find(voice => voice.lang.startsWith('pt-'));
+                }
+                 // Fallback final para a primeira voz disponível
+                 if (!selectedVoice && voices.length > 0) {
+                     selectedVoice = voices[0];
+                 }
+
+                 if (selectedVoice) {
+                     console.log("Voz selecionada:", selectedVoice.name, selectedVoice.lang);
+                 } else {
+                     console.warn("Nenhuma voz pt-BR encontrada ou API não retornou vozes ainda.");
+                 }
+            }
+
+            /**
+             * Lê o texto fornecido usando a Web Speech API.
+             * @param {string} text - O texto a ser lido.
+             */
+            function speakText(text) {
+                if (!ttsEnabled || !synth || !speechApiUnlocked || !text) {
+                     console.log("TTS desabilitado, API não pronta/desbloqueada ou texto vazio.");
+                     return; // Sai se TTS desabilitado, API não disponível/desbloqueada ou texto vazio
+                }
+
+                // Cancela qualquer fala anterior para evitar sobreposição
+                stopSpeech();
+
+                // Cria a "declaração" (utterance)
+                utterance = new SpeechSynthesisUtterance(text);
+
+                utterance.onend = function() {
+                    console.log("Narração concluída.");
+                    utterance = null; // Limpa a referência
+                };
+
+                utterance.onerror = function(event) {
+                    console.error("Erro na síntese de fala:", event.error);
+                    utterance = null; // Limpa a referência
+                };
+
+                // Tenta usar a voz pt-BR selecionada
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                     utterance.lang = selectedVoice.lang; // Garante a língua correta
+                 } else {
+                     // Se nenhuma voz específica foi encontrada, define o idioma
+                     // para dar uma dica ao navegador, mesmo que use a voz padrão.
+                     utterance.lang = 'pt-BR';
+                     console.warn("Usando voz padrão para pt-BR.");
+                 }
+
+                // (Opcional) Ajustar taxa e tom
+                utterance.rate = 1.0; // 0.1 a 10 (1 = normal)
+                utterance.pitch = 1.0; // 0 a 2 (1 = normal)
+
+                // Tenta falar (pode precisar de resume se o contexto estava suspenso)
+                if (synth.paused) {
+                     synth.resume(); // Se estava pausado, retoma
+                 }
+                synth.speak(utterance);
+                console.log("Tentando narrar:", text.substring(0, 30) + "...");
+            }
+
+            /**
+             * Interrompe a narração atual.
+             */
+            function stopSpeech() {
+                if (synth && synth.speaking) {
+                    console.log("Cancelando narração anterior.");
+                    synth.cancel();
+                }
+                // Também remove qualquer utterance pendente na fila, embora cancel() geralmente faça isso.
+                 if (utterance) {
+                    // utterance = null; // Não necessariamente nulo aqui, cancel deve tratar
+                 }
+            }
+
+            // --- Fim Funções de Fala ---
 
             function selectCharacter(characterClass) {
                 //Remove previous selection
@@ -1680,6 +1815,93 @@
                 }
                 selectedCharacter = characterClass;
                 document.querySelector(`.character-card[data-class='${characterClass}']`).classList.add('selected');
+            }
+
+            /**
+             * Exibe texto em um elemento com efeito de máquina de escrever.
+             * @param {HTMLElement} element - O elemento HTML onde o texto será exibido.
+             * @param {string} text - O texto completo a ser digitado.
+             * @param {number} [speed=40] - O intervalo em milissegundos entre cada caractere.
+             * @param {function} [callback] - Função a ser chamada quando a digitação terminar.
+             * @returns {number} - O ID do intervalo (para poder limpar externamente).
+             */
+            function typewriterEffect(element, text, speed = 40, callback) {
+                if (!element) {
+                    console.error("Elemento para typewriter não encontrado!");
+                    return null;
+                }
+                 if (currentTypewriterInterval) { // Limpa qualquer intervalo anterior
+                    clearInterval(currentTypewriterInterval);
+                }
+
+                element.textContent = ''; // Limpa o texto inicial
+                let i = 0;
+                skipTyping = false; // Reseta a flag de pular
+
+                currentTypewriterInterval = setInterval(() => {
+                    if (skipTyping) { // Verifica se o jogador quer pular
+                         clearInterval(currentTypewriterInterval);
+                         currentTypewriterInterval = null;
+                         element.textContent = text; // Exibe todo o texto
+                         if (callback) callback(); // Executa o callback
+                         return;
+                     }
+
+                    if (i < text.length) {
+                        element.textContent += text.charAt(i);
+                        i++;
+                    } else {
+                        clearInterval(currentTypewriterInterval); // Para o intervalo
+                        currentTypewriterInterval = null;
+                        skipTyping = false; // Reseta a flag ao concluir
+                        if (callback) {
+                            callback(); // Chama a função de callback ao terminar
+                        }
+                    }
+                }, speed);
+
+                return currentTypewriterInterval; // Retorna o ID para referência
+            }
+
+            /**
+             * Função para habilitar os botões de escolha.
+             */
+            function enableChoices() {
+                const choiceButtons = document.querySelectorAll('#choices button');
+                choiceButtons.forEach(button => button.disabled = false);
+                // Habilita novamente o clique para pular, se necessário (opcional)
+                // setupSkipListener(); // Chamaria uma função que adiciona o listener se ele foi removido
+            }
+
+            /**
+             * Função para desabilitar os botões de escolha.
+             */
+            function disableChoices() {
+                 const choiceButtons = document.querySelectorAll('#choices button');
+                 choiceButtons.forEach(button => button.disabled = true);
+            }
+
+            /**
+             * Configura o listener para pular a digitação
+             */
+            function setupSkipListener() {
+                const sceneTextElement = document.getElementById('scene-text');
+                if (!sceneTextElement) return;
+
+                // Remove listener antigo para evitar múltiplos gatilhos
+                sceneTextElement.removeEventListener('click', handleSkipTyping);
+                // Adiciona novo listener
+                sceneTextElement.addEventListener('click', handleSkipTyping, { once: true }); // 'once: true' remove o listener após o primeiro clique
+             }
+
+            /**
+             * Handler para o clique que pula a digitação
+             */
+            function handleSkipTyping() {
+                if (currentTypewriterInterval) {
+                    console.log("Pulando digitação...");
+                    skipTyping = true; // Sinaliza para o intervalo terminar e exibir tudo
+                }
             }
 
             function startGame() {
@@ -1749,6 +1971,15 @@
             }
 
             function loadScene(sceneName) {
+
+                stopSpeech();
+
+                // Limpa qualquer digitação anterior em andamento
+                if (currentTypewriterInterval) {
+                    clearInterval(currentTypewriterInterval);
+                    currentTypewriterInterval = null;
+                    skipTyping = false; // Reseta a flag
+                }
                 
                 changeImage(sceneName);
 
@@ -1775,13 +2006,39 @@
                     gameScreenDiv.appendChild(sceneTextDiv);
                     sceneTextElement = sceneTextDiv;
                 }
+
+                speakText(scene.text); // Tenta ler o texto da cena
+
                 const diceContainer = document.getElementById('dice-container');
                 const resultMessageElement = document.getElementById('result-message');
                 console.log("sceneTextElement", sceneTextElement);
-                sceneTextElement.textContent = scene.text;
+
+                sceneTextElement.textContent = '...'; // Placeholder enquanto digita
+
+                // --- Modificação Principal ---
+                disableChoices(); // Desabilita escolhas enquanto o texto é digitado
+
+                choicesElement.innerHTML = ''; // Limpa escolhas antigas IMEDIATAMENTE
+
+                diceContainer.classList.add('hidden'); // Esconde dados por padrão
+                resultMessageElement.classList.add('hidden'); // Esconde mensagem por padrão
+
+                //sceneTextElement.textContent = scene.text;
+
+                // Inicia o efeito de digitação, passando a função para habilitar escolhas como callback
+                typewriterEffect(sceneTextElement, scene.text, 40, () => {
+                     // --- Este código executa DEPOIS que a digitação termina ---
+                     console.log("Digitação concluída para:", sceneName);
+                     // Adiciona as escolhas SOMENTE APÓS a digitação (ou skip)
+                     addChoiceInCurrentScene(scene, diceContainer, choicesElement); // Passa choicesElement
+                     enableChoices(); // Reabilita as escolhas
+                 });
+
+                 // Configura o listener para permitir pular a digitação atual
+                 setupSkipListener();
 
                 //Add choices for the current scene
-                const choicesElement = addChoiceInCurrentScene(scene, diceContainer);
+                addChoiceInCurrentScene(scene, diceContainer);
 
                 diceContainer.classList.add('hidden'); // Hide dice by default
                 resultMessageElement.classList.add('hidden'); // Hide result message by default
@@ -1794,9 +2051,10 @@
                 gameState.checkDifficulty = 10;
             }
 
-            function addChoiceInCurrentScene(scene, diceContainer) {
-
-                const choicesElement = document.getElementById('choices');
+            function addChoiceInCurrentScene(scene, diceContainer, choicesElement) {
+                if (!choicesElement) {
+                    choicesElement = document.getElementById('choices'); // Fallback se não for passado
+                }
 
                 //Clear existing choices
                 choicesElement.innerHTML = '';
@@ -1805,6 +2063,11 @@
                     const button = document.createElement('button');
                     button.textContent = choice.text;
                     button.onclick = () => {
+                        
+                        // Ao clicar na escolha, remove o listener de skip da cena atual
+                        const sceneTextElement = document.getElementById('scene-text');
+                        if (sceneTextElement) sceneTextElement.removeEventListener('click', handleSkipTyping);
+
                         if (choice.requiresCheck) {
                             gameState.mem = {
                                 nextSceneSuccess: scenes[`${choice.nextScene}_success`] ? `${choice.nextScene}_success` : choice.nextScene,
@@ -1849,7 +2112,7 @@
                 const resultMessageElement = document.getElementById('result-message');
                 setTimeout(() => {
                     const diceContainer = document.getElementById('dice-container');
-                    const choicesElement = document.getElementById('choices');
+                    choicesElement = document.getElementById('choices');
                     let checkSuccess = false;
 
                     if (gameState.mem.checkType === "combat") {
@@ -2102,6 +2365,102 @@
                     }
                 });
             });
+
+            function init() {
+                // ... (configuração inicial: scene, camera, etc. se aplicável, ou elementos DOM)
+
+                // Event Listeners para Teclado/Mouse/Toque (se houver, para o jogo em si)
+                // document.addEventListener('keydown', handleKeyDown); // Exemplo se você tiver
+                // gameContainer.addEventListener('click', handleGameClick); // Exemplo
+
+                // --- Modificar listener de inicialização ---
+                function initializeAudioAndSpeech() {
+                     // Tenta inicializar/resumir AudioContext (se você usar áudio para outras coisas)
+                     /*
+                     if (!audioContext) {
+                         try {
+                             audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                             console.log("Audio Context Created on user gesture.");
+                         } catch (e) { console.error("Error creating Audio Context:", e); }
+                     }
+                     if (audioContext && audioContext.state === 'suspended') {
+                         audioContext.resume().catch(e => console.error("Error resuming AudioContext:", e));
+                     }
+                     */
+
+                    // --- Inicialização da API de Fala ---
+                    if (synth) { // Verifica se a API existe no navegador
+                        if (!speechApiUnlocked) {
+                             // Tenta "desbloquear" a API com uma chamada silenciosa ou resume
+                             // synth.speak(new SpeechSynthesisUtterance('')); // Método comum, mas pode dar 'cancelled'
+                            // Ou tenta retomar, pode ser suficiente em alguns navegadores
+                             if (synth.paused) { synth.resume(); } // Se estiver pausado, retoma
+                             if (synth.speaking) { synth.cancel(); } // Cancela algo que possa ter ficado preso
+
+                            console.log("Tentativa de desbloquear Speech Synthesis API.");
+                            speechApiUnlocked = true; // Assume que foi desbloqueado pela interação
+
+                             // Popula a lista de vozes. A lista pode não estar pronta imediatamente.
+                             // Opção 1: Tenta popular direto (pode não ter vozes ainda)
+                             populateVoiceList();
+                             // Opção 2: Tenta popular após um pequeno atraso
+                              // setTimeout(populateVoiceList, 250);
+                             // Opção 3 (Melhor): Usa o evento 'onvoiceschanged'
+                             if (synth.onvoiceschanged !== undefined) {
+                                 synth.onvoiceschanged = populateVoiceList;
+                            }
+                        }
+                    } else {
+                        console.warn("Web Speech API (speechSynthesis) não suportada neste navegador.");
+                        ttsEnabled = false; // Desabilita TTS se não for suportado
+                    }
+                    // --- Fim Inicialização da Fala ---
+
+
+                    // Atualiza UI e remove listeners
+                    window.removeEventListener('click', initializeAudioAndSpeech);
+                    window.removeEventListener('keydown', initializeAudioAndSpeech);
+                    window.removeEventListener('touchstart', initializeAudioAndSpeech); // Adicionar touch
+                 }
+
+                // Adiciona listeners para a primeira interação
+                window.addEventListener('click', initializeAudioAndSpeech, { once: true });
+                window.addEventListener('keydown', initializeAudioAndSpeech, { once: true });
+                window.addEventListener('touchstart', initializeAudioAndSpeech, { once: true }); // Adicionar touch
+
+                // --- Início do Jogo ---
+                // Não chame loadScene aqui, espere a seleção de personagem
+                // initGame(); // Ou qualquer função que prepare a tela inicial
+                updateStatsDisplay(); // Atualiza a UI inicial
+                updateInventoryDisplay(); // Atualiza UI inicial
+
+                // --- Controle Opcional de Mudo TTS ---
+                const ttsToggleButton = document.getElementById('tts-toggle-button');
+
+                function updateTtsButtonVisual() {
+                     if (ttsToggleButton) {
+                         ttsToggleButton.textContent = ttsEnabled ? '🔊 Narrador' : '🔇 Narrador';
+                         ttsToggleButton.style.opacity = ttsEnabled ? '1' : '0.6';
+                     }
+                 }
+
+                if (ttsToggleButton) {
+                    ttsToggleButton.addEventListener('click', () => {
+                        ttsEnabled = !ttsEnabled;
+                        updateTtsButtonVisual();
+                        if (!ttsEnabled) {
+                            stopSpeech(); // Para a fala imediatamente se for desabilitado
+                        }
+                        console.log("TTS Habilitado:", ttsEnabled);
+                    });
+                    updateTtsButtonVisual(); // Define o estado inicial do botão
+                }
+                // --- Fim Controle Opcional ---
+            }
+
+            // Chame init() no final do script para configurar tudo
+            init();
+
         </script>
     </body>
 </html>
