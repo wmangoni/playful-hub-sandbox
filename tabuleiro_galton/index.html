@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tabuleiro de Galton (Dark Neon)</title>
+    <title>Tabuleiro de Galton (Layouts)</title>
     <style>
         body {
             display: flex;
@@ -11,63 +11,92 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #1a1a1a; /* Fundo escuro */
-            color: #eee; /* Texto claro */
+            background-color: #1a1a1a;
+            color: #eee;
             flex-direction: column;
             font-family: sans-serif;
         }
         canvas {
-            /* Borda sutil */
             border: 1px solid #444;
-            /* Fundo escuro para o canvas (revelado pelo clearRect) */
             background-color: #1a1a1a;
             display: block;
+            margin-bottom: 15px; /* Espaço entre canvas e controles */
         }
         #controls {
-            margin-top: 15px;
             display: flex;
-            gap: 10px;
+            flex-wrap: wrap; /* Permite que os controles quebrem linha se necessário */
+            gap: 10px 15px; /* Espaçamento vertical e horizontal */
             align-items: center;
+            justify-content: center; /* Centraliza os controles */
+            max-width: 600px; /* Limita largura dos controles */
+            width: 95%; /* Usa quase toda a largura disponível */
         }
-        button {
-            padding: 8px 15px;
-            font-size: 1em;
+        button, select {
+            padding: 8px 12px; /* Ajuste padding */
+            font-size: 0.9em; /* Ajuste fonte */
             cursor: pointer;
-            background-color: #333; /* Fundo botão escuro */
-            color: #eee; /* Texto botão claro */
-            border: 1px solid #555; /* Borda botão */
+            background-color: #333;
+            color: #eee;
+            border: 1px solid #555;
             border-radius: 4px;
             transition: background-color 0.2s, border-color 0.2s;
         }
-        button:hover {
+        button:hover, select:hover {
             background-color: #444;
-            border-color: #00ccff; /* Borda neon no hover */
+            border-color: #00ccff;
         }
         button:active {
             background-color: #555;
         }
+        /* Estilo específico para o select */
+        select {
+           appearance: none; /* Remove aparência padrão */
+           background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23CCCCCC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.6-3.6%205.4-7.9%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+           background-repeat: no-repeat;
+           background-position: right 10px top 50%;
+           background-size: .65em auto;
+           padding-right: 30px; /* Espaço para a seta */
+        }
         label {
-            margin-left: 10px;
+            margin-left: 5px; /* Reduzido */
         }
         input[type="range"] {
             cursor: pointer;
-            accent-color: #00ccff; /* Cor do slider (varia entre browsers) */
+            accent-color: #00ccff;
+            vertical-align: middle; /* Alinha melhor com o texto */
         }
         #totalBalls {
-            min-width: 80px; /* Espaço para a contagem */
+            min-width: 70px; /* Ajustado */
             text-align: right;
+            font-size: 0.9em;
         }
+        .control-group { /* Agrupa label e input/select */
+           display: inline-flex;
+           align-items: center;
+           gap: 5px;
+        }
+
     </style>
 </head>
 <body>
     <canvas id="galtonCanvas"></canvas>
     <div id="controls">
-        <button id="addBallBtn">Adicionar 1 Bolinha</button>
-        <button id="add10BallsBtn">Adicionar 10 Bolinhas</button>
+        <button id="addBallBtn">Adicionar 1</button>
+        <button id="add10BallsBtn">Adicionar 10</button>
         <button id="resetBtn">Resetar</button>
-        <label for="speedSlider">Velocidade:</label>
-        <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
-        <span id="totalBalls">Total: 0</span>
+         <div class="control-group">
+             <label for="layoutSelector">Layout:</label>
+             <select id="layoutSelector">
+                 <option value="triangle" selected>Triangular</option>
+                 <option value="grid">Grade</option>
+                 <!-- Adicionar mais opções aqui -->
+             </select>
+         </div>
+         <div class="control-group">
+            <label for="speedSlider">Velocidade:</label>
+            <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+         </div>
+         <span id="totalBalls">Total: 0</span>
     </div>
 
     <script>
@@ -78,6 +107,7 @@
         const add10BallsBtn = document.getElementById('add10BallsBtn');
         const resetBtn = document.getElementById('resetBtn');
         const speedSlider = document.getElementById('speedSlider');
+        const layoutSelector = document.getElementById('layoutSelector'); // Pega o select
         const totalBallsSpan = document.getElementById('totalBalls');
 
         // --- Configurações ---
@@ -88,19 +118,20 @@
 
         const ballRadius = 5;
         const pegRadius = 4;
-        const numRows = 15;
+        const numRowsTriangle = 15; // Específico para o layout triangular
         const gravity = 0.15;
         const restitution = 0.6;
         const horizontalRandomness = 0.4;
         const binHeight = 80;
+        const topOffset = 60; // Espaço no topo antes dos pinos
 
-        // --- Cores Tema Dark Neon ---
-        const pegColor = '#aaa'; // Pinos um pouco mais claros
-        const ballColor = '#00ccff'; // Azul Neon
-        const ballShadowColor = 'rgba(0, 204, 255, 0.7)'; // Sombra/Glow da bola
-        const binColor = '#666'; // Cor das divisórias dos coletores
-        const histogramColor = '#ff3366'; // Vermelho/Rosa Neon
-        const histogramShadowColor = 'rgba(255, 51, 102, 0.6)'; // Sombra/Glow do histograma
+        // Cores Tema Dark Neon (sem mudanças)
+        const pegColor = '#aaa';
+        const ballColor = '#00ccff';
+        const ballShadowColor = 'rgba(0, 204, 255, 0.7)';
+        const binColor = '#666';
+        const histogramColor = '#ff3366';
+        const histogramShadowColor = 'rgba(255, 51, 102, 0.6)';
 
         let balls = [];
         let pegs = [];
@@ -108,45 +139,85 @@
         let simulationSpeed = 1;
         let totalBallCount = 0;
 
-        // --- Funções (setup, createBall, update - sem mudanças lógicas) ---
+        // --- Funções ---
 
         function setup() {
             balls = [];
-            pegs = [];
+            pegs = []; // Limpa os pinos existentes
             bins = [];
             totalBallCount = 0;
             updateTotalBallsDisplay();
 
-            const rowSpacing = (canvasHeight - binHeight - 100) / (numRows + 1);
-            const initialHorizontalSpacing = 30;
-            const topOffset = 60;
+            const selectedLayout = layoutSelector.value; // Obtém o layout selecionado
 
-            for (let i = 0; i < numRows; i++) {
-                const numPegsInRow = i + 1;
-                const y = topOffset + (i + 1) * rowSpacing;
-                const currentHorizontalSpacing = initialHorizontalSpacing * (numRows / (numPegsInRow + 1)) * 1.1;
-                 const totalWidthForRow = (numPegsInRow - 1) * currentHorizontalSpacing;
-                 const startX = (canvasWidth - totalWidthForRow) / 2;
+            // --- Geração dos Pinos (depende do layout) ---
+            const availableHeight = canvasHeight - binHeight - topOffset - 30; // Altura disponível para pinos
 
-                 for (let j = 0; j < numPegsInRow; j++) {
-                     const x = startX + j * currentHorizontalSpacing;
-                     pegs.push({ x, y, radius: pegRadius });
-                 }
-             }
+            if (selectedLayout === 'triangle') {
+                // Layout Triangular (código original adaptado)
+                const numRows = numRowsTriangle;
+                const rowSpacing = availableHeight / (numRows + 1);
+                const initialHorizontalSpacing = 30; // Pode precisar ajustar
 
-             const numBins = numRows + 1;
-             const binWidth = canvasWidth / numBins;
-             for (let i = 0; i < numBins; i++) {
-                 bins.push({
-                     x: i * binWidth,
-                     y: canvasHeight - binHeight,
-                     width: binWidth,
-                     height: binHeight,
-                     count: 0
-                 });
-             }
-         }
+                for (let i = 0; i < numRows; i++) {
+                    const numPegsInRow = i + 1;
+                    const y = topOffset + (i + 1) * rowSpacing;
+                    // Ajusta o espaçamento horizontal para tentar preencher mais a largura
+                    const requiredWidth = (numPegsInRow + 1) * (pegRadius * 3); // Largura mínima necessária
+                    let currentHorizontalSpacing = Math.max(pegRadius * 3, (canvasWidth * 0.8) / Math.max(1, numPegsInRow)); // Espaçamento dinâmico
+                    // Garante que o espaçamento não seja menor que o diâmetro + folga
+                    currentHorizontalSpacing = Math.max(currentHorizontalSpacing, pegRadius * 2.5);
 
+
+                    const totalWidthForRow = (numPegsInRow - 1) * currentHorizontalSpacing;
+                    let startX = (canvasWidth - totalWidthForRow) / 2;
+                    // Garante que o startX não seja muito pequeno (colidindo com a borda)
+                    startX = Math.max(startX, pegRadius * 2 + 10);
+
+                    for (let j = 0; j < numPegsInRow; j++) {
+                        const x = startX + j * currentHorizontalSpacing;
+                         // Garante que o pino não saia pela direita
+                         if (x < canvasWidth - (pegRadius * 2 + 10)) {
+                             pegs.push({ x, y, radius: pegRadius });
+                         }
+                    }
+                }
+            } else if (selectedLayout === 'grid') {
+                // Layout em Grade
+                const gridRows = 10; // Número de linhas na grade (ajustável)
+                const gridCols = 11; // Número de colunas na grade (ajustável)
+                const rowSpacing = availableHeight / (gridRows + 1);
+                const colSpacing = (canvasWidth * 0.9) / (gridCols -1); // Usa 90% da largura
+
+                const startX = canvasWidth * 0.05; // Margem lateral
+
+                for (let i = 0; i < gridRows; i++) {
+                    const y = topOffset + (i + 1) * rowSpacing;
+                    for (let j = 0; j < gridCols; j++) {
+                        const x = startX + j * colSpacing;
+                        pegs.push({ x, y, radius: pegRadius });
+                    }
+                }
+            }
+            // --- Fim da Geração dos Pinos ---
+
+            // Calcular coletores (bins) - A quantidade depende do layout triangular original ou pode ser fixa
+            // Vamos manter baseado no numRowsTriangle para consistência inicial, mas pode ser ajustado.
+            const numBins = numRowsTriangle + 1;
+            const binWidth = canvasWidth / numBins;
+            for (let i = 0; i < numBins; i++) {
+                bins.push({
+                    x: i * binWidth,
+                    y: canvasHeight - binHeight,
+                    width: binWidth,
+                    height: binHeight,
+                    count: 0
+                });
+            }
+        }
+
+        // --- createBall, update, draw, gameLoop, updateTotalBallsDisplay (sem mudanças lógicas) ---
+        // (O código dessas funções permanece o mesmo da versão anterior "dark neon")
         function createBall() {
             totalBallCount++;
             updateTotalBallsDisplay();
@@ -157,16 +228,13 @@
                 vx: (Math.random() - 0.5) * 1,
                 vy: 0,
                 radius: ballRadius,
-                // Cor da bola definida na constante
                 active: true
             });
         }
 
-         function update(dt) {
+        function update(dt) {
             const effectiveDt = dt * simulationSpeed;
             if (effectiveDt <= 0) return;
-
-            const ballsToRemoveIndexes = []; // Para remover de forma segura
 
             balls.forEach((ball, index) => {
                 if (!ball.active) return;
@@ -203,34 +271,25 @@
                             ball.vx += (Math.random() - 0.5) * horizontalRandomness;
 
                             const overlap = minDistance - distance;
-                            ball.x += nx * overlap * 0.51; // Pequeno ajuste > 0.5 para garantir separação
+                            ball.x += nx * overlap * 0.51;
                             ball.y += ny * overlap * 0.51;
                         }
                     }
                 });
 
                 // Verificar coletores
-                if (ball.y + ball.radius > canvasHeight - binHeight && ball.y < canvasHeight + ball.radius) { // Verifica se está na zona dos coletores
+                 if (ball.y + ball.radius > canvasHeight - binHeight && ball.y < canvasHeight + ball.radius) {
                     let collected = false;
                     for (let i = 0; i < bins.length; i++) {
                         if (ball.x >= bins[i].x && ball.x < bins[i].x + bins[i].width) {
-                            // Verifica se está realmente "descansando" no fundo
-                            // Uma verificação simples: se a velocidade vertical for pequena
-                            // e estiver perto do fundo. Ou simplesmente coletar ao entrar na área.
-                             if (ball.y + ball.radius >= canvasHeight - 1 ) { // Tocou o fundo virtual
+                             if (ball.y + ball.radius >= canvasHeight - 1 ) {
                                 bins[i].count++;
                                 ball.active = false;
                                 collected = true;
-                                // Marcar para remoção posterior se desejar performance
-                                // ballsToRemoveIndexes.push(index);
                                 break;
-                             } else if (ball.y > canvasHeight - binHeight) {
-                                 // Está na área do coletor, mas não necessariamente parado
-                                 // Pode adicionar colisões com as paredes do coletor aqui se desejar
                              }
                         }
                     }
-                    // Caso caia exatamente na divisa ou algo estranho aconteça
                     if (!collected && ball.y + ball.radius > canvasHeight - 1) {
                          let closestBin = 0;
                          let minDist = Infinity;
@@ -242,31 +301,21 @@
                                  closestBin = i;
                              }
                          }
-                         bins[closestBin].count++;
+                         if (bins[closestBin]) { // Verifica se o bin existe
+                            bins[closestBin].count++;
+                         }
                          ball.active = false;
-                         // ballsToRemoveIndexes.push(index);
                     }
                 } else if (ball.y - ball.radius > canvasHeight) {
-                    // Se a bola cair completamente para fora por algum motivo
                      ball.active = false;
-                     // ballsToRemoveIndexes.push(index);
                 }
             });
-
-            // Remover bolas inativas (opcional, melhora performance a longo prazo)
-            // Executar a remoção em ordem reversa para não afetar os índices
-            // for (let i = ballsToRemoveIndexes.length - 1; i >= 0; i--) {
-            //     balls.splice(ballsToRemoveIndexes[i], 1);
-            // }
          }
 
         function draw() {
-            // Limpar canvas (revela a cor de fundo definida no CSS)
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-             // Resetar efeitos de sombra antes de desenhar elementos sem brilho
-             ctx.shadowBlur = 0;
-             ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
 
             // Desenhar pinos
             ctx.fillStyle = pegColor;
@@ -277,57 +326,44 @@
             });
 
             // Desenhar coletores (divisórias e fundo)
-            ctx.strokeStyle = binColor; // Usar stroke para linhas finas
-            ctx.lineWidth = 1; // Linhas finas
-            // Linha de fundo não é mais necessária se as barras preenchem
-            // ctx.beginPath();
-            // ctx.moveTo(0, canvasHeight - binHeight);
-            // ctx.lineTo(canvasWidth, canvasHeight - binHeight);
-            // ctx.stroke();
-
-            // Divisórias verticais
-            for (let i = 1; i < bins.length; i++) { // Começa de 1 para não desenhar a borda esquerda
-                const x = i * bins[0].width; // Assumindo larguras iguais
+            ctx.strokeStyle = binColor;
+            ctx.lineWidth = 1;
+            for (let i = 1; i < bins.length; i++) {
+                const x = bins[i].x; // Usa a posição x do bin
                 ctx.beginPath();
                 ctx.moveTo(x, canvasHeight - binHeight);
-                ctx.lineTo(x, canvasHeight); // Desenha até o fundo
+                ctx.lineTo(x, canvasHeight);
                 ctx.stroke();
             }
-            // Adicionar bordas laterais dos coletores se necessário
-            ctx.beginPath();
-            ctx.moveTo(1, canvasHeight - binHeight); // Linha esquerda
-            ctx.lineTo(1, canvasHeight);
-            ctx.moveTo(canvasWidth - 1, canvasHeight - binHeight); // Linha direita
-            ctx.lineTo(canvasWidth - 1, canvasHeight);
-            ctx.stroke();
+             // Adicionar bordas laterais dos coletores
+             ctx.beginPath();
+             ctx.moveTo(1, canvasHeight - binHeight);
+             ctx.lineTo(1, canvasHeight);
+             ctx.moveTo(canvasWidth - 1, canvasHeight - binHeight);
+             ctx.lineTo(canvasWidth - 1, canvasHeight);
+             ctx.stroke();
 
 
-             // Desenhar histograma nos coletores (com brilho)
+             // Desenhar histograma (com brilho)
              const maxCount = Math.max(1, ...bins.map(b => b.count));
              ctx.fillStyle = histogramColor;
-             // Aplicar brilho para o histograma
-             ctx.shadowBlur = 10; // Intensidade do brilho
-             ctx.shadowColor = histogramShadowColor; // Cor do brilho
+             ctx.shadowBlur = 10;
+             ctx.shadowColor = histogramShadowColor;
 
              bins.forEach(bin => {
-                 const barHeight = (bin.count / maxCount) * (binHeight - 5); // -5 para margem
+                 const barHeight = (bin.count / maxCount) * (binHeight - 5);
                  if (bin.count > 0) {
                      ctx.fillRect(
-                         bin.x + 2, // Pequena margem interna
-                         canvasHeight - barHeight - 2, // Começa de baixo para cima
-                         bin.width - 4, // Largura com margens
+                         bin.x + 2,
+                         canvasHeight - barHeight - 2,
+                         bin.width - 4,
                          barHeight
                      );
                  }
              });
 
-             // Resetar sombra antes de desenhar as bolas (ou outros elementos sem brilho)
-            // ctx.shadowBlur = 0;
-            // ctx.shadowColor = 'transparent'; // Já resetado antes dos pinos
-
              // Desenhar bolinhas (com brilho)
              ctx.fillStyle = ballColor;
-             // Aplicar brilho para as bolas
              ctx.shadowBlur = 8;
              ctx.shadowColor = ballShadowColor;
 
@@ -338,23 +374,18 @@
                  ctx.fill();
              });
 
-            // É uma boa prática resetar a sombra no final do desenho
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
          }
 
-
         let lastTime = 0;
         function gameLoop(timestamp) {
-            const dt = (timestamp - lastTime) / 16.67; // Delta time normalizado
+            const dt = (timestamp - lastTime) / 16.67;
             lastTime = timestamp;
-
             const maxDt = 3;
             const effectiveDt = Math.min(dt, maxDt);
-
             update(effectiveDt);
             draw();
-
             requestAnimationFrame(gameLoop);
         }
 
@@ -362,10 +393,9 @@
             totalBallsSpan.textContent = `Total: ${totalBallCount}`;
         }
 
-        // --- Event Listeners (sem mudanças) ---
+        // --- Event Listeners ---
         addBallBtn.addEventListener('click', createBall);
         add10BallsBtn.addEventListener('click', () => {
-            // Adiciona bolas com um pequeno intervalo para não sobrecarregar de uma vez
             let count = 0;
             const intervalId = setInterval(() => {
                 if (count < 10) {
@@ -374,17 +404,21 @@
                 } else {
                     clearInterval(intervalId);
                 }
-            }, 50); // Adiciona uma bola a cada 50ms
+            }, 50);
         });
-        resetBtn.addEventListener('click', () => {
-            setup();
-        });
+
+        // Resetar agora também chama setup para redesenhar pinos se layout mudou
+        resetBtn.addEventListener('click', setup);
+
+        // Quando o layout mudar, chamar setup() para reconfigurar o tabuleiro
+        layoutSelector.addEventListener('change', setup);
+
         speedSlider.addEventListener('input', (e) => {
             simulationSpeed = parseFloat(e.target.value);
         });
 
         // --- Inicialização ---
-        setup();
+        setup(); // Configura o tabuleiro com o layout selecionado inicialmente
         lastTime = performance.now();
         requestAnimationFrame(gameLoop);
     </script>
