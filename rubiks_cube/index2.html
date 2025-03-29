@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2x2x2 Rubik's Cube Simulator</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #282c34;
+            color: #eee;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        #container {
+            display: flex;
+            align-items: flex-start; /* Align items to the top */
+            gap: 20px;
+            padding: 20px;
+            max-width: 95vw; /* Limit width */
+            max-height: 95vh; /* Limit height */
+        }
+        #canvas-container {
+            width: 60vmin; /* Responsive size based on viewport */
+            height: 60vmin;
+            min-width: 300px;
+            min-height: 300px;
+            max-width: 700px; /* Max size */
+            max-height: 700px;
+            border: 3px solid #555;
+            position: relative; /* For potential overlays later */
+        }
+        canvas {
+            display: block; /* Remove extra space below canvas */
+        }
+        #controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 columns */
+            gap: 10px;
+            padding: 15px;
+            background-color: #3a3f4a;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        #controls button {
+            padding: 10px 15px;
+            font-size: 1.1em;
+            cursor: pointer;
+            background-color: #4f5461;
+            color: #eee;
+            border: 1px solid #666;
+            border-radius: 4px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        #controls button:hover {
+            background-color: #5a606d;
+        }
+        #controls button:active {
+            background-color: #6a707d;
+            transform: scale(0.95);
+        }
+         /* Spanning scramble button across columns */
+        #controls .span-3 {
+            grid-column: span 3;
+            background-color: #e06c75; /* Different color for scramble */
+        }
+         #controls .span-3:hover {
+            background-color: #d15c65;
+         }
+         h3 {
+             grid-column: span 3; /* Title spans all columns */
+             text-align: center;
+             margin: 0 0 10px 0;
+             color: #abb2bf;
+         }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container"></div>
+        <div id="controls">
+            <h3>Moves</h3>
+            <button id="btn-U">U</button>
+            <button id="btn-D">D</button>
+            <button id="btn-Ui">U'</button>
+            <button id="btn-L">L</button>
+            <button id="btn-R">R</button>
+            <button id="btn-Di">D'</button>
+            <button id="btn-F">F</button>
+            <button id="btn-B">B</button>
+            <button id="btn-Li">L'</button>
+            <button id="btn-Fi">F'</button>
+            <button id="btn-Bi">B'</button>
+            <button id="btn-Ri">R'</button>
+            <button id="btn-scramble" class="span-3">Scramble</button>
+             <!-- <button id="btn-reset" class="span-3">Reset (TODO)</button> -->
+        </div>
+    </div>
+
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <!-- Main Application Logic -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Global Variables ---
+        let scene, camera, renderer, controls;
+        let cubeGroup; // A group to hold all cubelets
+        let cubelets = []; // Array to hold individual cubelet meshes
+        const cubeletSize = 1;
+        const spacing = 0.08; // Small gap between cubelets
+        const cubeSize = 2 * cubeletSize + spacing; // Total size of one dimension
+        const halfCubeSize = cubeSize / 2;
+        const epsilon = 0.01; // Tolerância para comparações e snapping
+
+        // Standard Rubik's Colors
+        const colors = {
+            white:  0xffffff, // U face (Top, +Y)
+            yellow: 0xffff00, // D face (Bottom, -Y)
+            blue:   0x0000ff, // F face (Front, +Z)
+            green:  0x00ff00, // B face (Back, -Z)
+            red:    0xff0000, // L face (Left, -X)
+            orange: 0xffa500, // R face (Right, +X)
+            black:  0x1a1a1a  // Inner faces
+        };
+
+        // Rotation state
+        let isRotating = false; // Prevent multiple rotations at once
+        const rotationSpeed = Math.PI / 16; // Radians per frame (adjust for speed)
+        let rotationQueue = []; // Queue for scramble moves
+
+        // --- Initialization ---
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x282c34);
+
+            // Camera
+            const container = document.getElementById('canvas-container');
+            const aspect = container.offsetWidth / container.offsetHeight;
+            camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 100);
+            camera.position.set(3, 4, 5); // Position camera to view the cube
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.offsetWidth, container.offsetHeight);
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Soft white light
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            // Cube Group
+            cubeGroup = new THREE.Group();
+            scene.add(cubeGroup);
+
+            // Create Cubelets
+            createCube();
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; // Optional smooth camera movement
+            controls.dampingFactor = 0.1;
+            controls.minDistance = 4;
+            controls.maxDistance = 15;
+
+            // Event Listeners for Buttons
+            setupButtonListeners();
+
+             // Handle Resize
+             window.addEventListener('resize', onWindowResize);
+
+            // Start Animation Loop
+            animate();
+        }
+
+        // --- Create Cubelets ---
+        function createCube() {
+            cubelets = []; // Clear existing cubelets if any
+            cubeGroup.clear(); // Clear the group
+
+            const geometry = new THREE.BoxGeometry(cubeletSize, cubeletSize, cubeletSize);
+            const edgeGeometry = new THREE.EdgesGeometry(geometry); // For outlines
+            const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 4 }); // Black outlines
+
+            const offset = (cubeletSize + spacing) / 2;
+
+            for (let x = -offset; x <= offset; x += cubeletSize + spacing) {
+                for (let y = -offset; y <= offset; y += cubeletSize + spacing) {
+                    for (let z = -offset; z <= offset; z += cubeletSize + spacing) {
+
+                        // Determine face colors based on position
+                        const materials = [
+                            (x > 0) ? new THREE.MeshStandardMaterial({ color: colors.orange }) : new THREE.MeshStandardMaterial({ color: colors.black }), // Right (+X)
+                            (x < 0) ? new THREE.MeshStandardMaterial({ color: colors.red })    : new THREE.MeshStandardMaterial({ color: colors.black }), // Left (-X)
+                            (y > 0) ? new THREE.MeshStandardMaterial({ color: colors.white })  : new THREE.MeshStandardMaterial({ color: colors.black }), // Top (+Y)
+                            (y < 0) ? new THREE.MeshStandardMaterial({ color: colors.yellow }) : new THREE.MeshStandardMaterial({ color: colors.black }), // Bottom (-Y)
+                            (z > 0) ? new THREE.MeshStandardMaterial({ color: colors.blue })   : new THREE.MeshStandardMaterial({ color: colors.black }), // Front (+Z)
+                            (z < 0) ? new THREE.MeshStandardMaterial({ color: colors.green })  : new THREE.MeshStandardMaterial({ color: colors.black })  // Back (-Z)
+                        ];
+
+                        const cubelet = new THREE.Mesh(geometry, materials);
+                        cubelet.position.set(x, y, z);
+
+                        // Store initial position/axis info if needed for solving later
+                        cubelet.userData.initialPosition = cubelet.position.clone();
+
+                        // Add outline
+                        const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+                        cubelet.add(edges); // Add edges as child of cubelet
+
+                        cubeGroup.add(cubelet);
+                        cubelets.push(cubelet);
+                    }
+                }
+            }
+        }
+
+        // --- Button Listeners ---
+        function setupButtonListeners() {
+            const moves = ['U', 'D', 'L', 'R', 'F', 'B'];
+            moves.forEach(move => {
+                // Clockwise
+                document.getElementById(`btn-${move}`).addEventListener('click', () => {
+                    if (!isRotating) {
+                         // rotateFace(move, false); // Instant rotation
+                         requestRotation(move, false); // Animated rotation
+                    }
+                });
+                // Counter-clockwise (prime)
+                 document.getElementById(`btn-${move}i`).addEventListener('click', () => {
+                     if (!isRotating) {
+                         // rotateFace(move, true); // Instant rotation
+                         requestRotation(move, true); // Animated rotation
+                     }
+                 });
+            });
+
+            document.getElementById('btn-scramble').addEventListener('click', () => {
+                if (!isRotating && rotationQueue.length === 0) { // Only scramble if idle
+                    scrambleCube();
+                }
+            });
+        }
+
+        // --- Rotation Logic ---
+        let activeRotation = null; // Stores info about the current rotation animation
+
+        function requestRotation(face, isPrime) {
+            if (isRotating) return; // Don't start if already rotating
+
+            isRotating = true;
+            var direction = isPrime ? 1 : -1; // THREE rotations are CCW positive
+            const angle = Math.PI / 2; // 90 degrees
+            let axis;
+            let layerSelector; // Function to select cubelets for the layer
+
+            switch (face) {
+                case 'U': axis = new THREE.Vector3(0, 1, 0); layerSelector = pos => pos.y > epsilon; break; // Use epsilon for float comparison
+                case 'D': axis = new THREE.Vector3(0, 1, 0); layerSelector = pos => pos.y < -epsilon; direction *= -1; break;
+                case 'L': axis = new THREE.Vector3(1, 0, 0); layerSelector = pos => pos.x < -epsilon; break;
+                case 'R': axis = new THREE.Vector3(1, 0, 0); layerSelector = pos => pos.x > epsilon; direction *= -1; break;
+                case 'F': axis = new THREE.Vector3(0, 0, 1); layerSelector = pos => pos.z > epsilon; break;
+                case 'B': axis = new THREE.Vector3(0, 0, 1); layerSelector = pos => pos.z < -epsilon; direction *= -1; break;
+                default:
+                    console.error("Invalid face:", face);
+                    isRotating = false;
+                    return;
+            }
+
+            const pivot = new THREE.Group();
+            cubeGroup.add(pivot); // Add pivot to the main group initially
+
+            const layerCubelets = [];
+
+            // Find cubelets in the layer
+            cubelets.forEach(c => {
+                const worldPos = new THREE.Vector3();
+                // Certifique-se que a matriz do objeto esteja atualizada antes de pegar a posição mundial
+                c.updateMatrixWorld(true);
+                c.getWorldPosition(worldPos); // Get world position
+
+                // Converte a posição mundial para o espaço local do cubeGroup
+                const localPos = cubeGroup.worldToLocal(worldPos);
+
+                // Agora passamos localPos para layerSelector, que espera um vetor de posição
+                if (layerSelector(localPos)) {
+                    layerCubelets.push(c);
+                }
+            });
+
+            if (layerCubelets.length !== 4) {
+                console.warn(`Incorrect number of cubelets found for face ${face}: ${layerCubelets.length}`);
+                 // Attempt to find based on stored initial position (less reliable after moves)
+                 // isRotating = false; return; // Safer to stop if selection fails
+            }
+
+
+             // Attach selected cubelets to the pivot
+            layerCubelets.forEach(c => {
+                // cubeGroup.remove(c); // Remove from main group first (incorrect)
+                pivot.attach(c); // Attach preserves world transforms
+            });
+
+
+            activeRotation = {
+                pivot: pivot,
+                axis: axis,
+                targetAngle: direction * angle,
+                currentAngle: 0,
+                layerCubelets: layerCubelets // Keep track of cubelets being rotated
+            };
+        }
+
+         function updateRotation() {
+             if (!activeRotation) return;
+
+             const { pivot, axis, targetAngle } = activeRotation;
+             const deltaAngle = Math.sign(targetAngle) * rotationSpeed;
+
+             // Increment rotation
+             activeRotation.currentAngle += deltaAngle;
+
+             // Apply rotation to pivot
+             // Use Quaternion for smoother rotation
+             const q = new THREE.Quaternion();
+             q.setFromAxisAngle(axis, deltaAngle);
+             pivot.applyQuaternion(q);
+
+
+             // Check if rotation is complete
+            if ((targetAngle > 0 && activeRotation.currentAngle >= targetAngle - epsilon) || // Use epsilon aqui também
+                (targetAngle < 0 && activeRotation.currentAngle <= targetAngle + epsilon))
+            {
+                // Snap to final angle precisely on the PIVOT first
+                const finalQ = new THREE.Quaternion();
+                // Calculate remaining angle needed to reach target *exactly* from the angle *before* the last deltaAngle step
+                const angleBeforeLastStep = activeRotation.currentAngle - deltaAngle;
+                const remainingAngle = targetAngle - angleBeforeLastStep;
+                finalQ.setFromAxisAngle(axis, remainingAngle);
+                pivot.applyQuaternion(finalQ); // Apply final precise rotation to pivot
+
+                // --- CORREÇÃO/MELHORIA ---
+
+                // 1. Update world matrices before re-attaching
+                pivot.updateMatrixWorld(true); // Ensure pivot's world matrix is absolutely final
+
+                activeRotation.layerCubelets.forEach(c => {
+                    // Ensure the cubelet's matrix reflects its final state relative to the pivot
+                    c.updateMatrixWorld(true);
+
+                    // 2. Reattach to the main group
+                    cubeGroup.attach(c); // Preserves world transform
+
+                    // 3. Snap cubelet's local position and rotation within cubeGroup
+                    snapObjectToGrid(c);
+                });
+
+                // --- FIM DA CORREÇÃO ---
+
+                // Cleanup
+                cubeGroup.remove(activeRotation.pivot); // Remove the pivot from the group
+                activeRotation.pivot = null; // Help garbage collection
+                activeRotation = null;
+                isRotating = false;
+                //console.log("Rotation finished");
+
+                // Process next rotation in queue if any
+                processRotationQueue();
+            }
+        }
+
+        // --- NOVA FUNÇÃO AUXILIAR ---
+
+        function snapObjectToGrid(obj) {
+            const offset = (cubeletSize + spacing) / 2;
+
+            // Snap position: Round to nearest expected grid coordinate (-offset, 0, offset)
+            obj.position.x = Math.round(obj.position.x / offset) * offset;
+            obj.position.y = Math.round(obj.position.y / offset) * offset;
+            obj.position.z = Math.round(obj.position.z / offset) * offset;
+
+            // Snap rotation: Round Euler angles to nearest 90 degrees (PI/2)
+            // It's often easier to work with Euler for snapping, then convert back to Quaternion
+            const euler = new THREE.Euler().setFromQuaternion(obj.quaternion, 'XYZ'); // Or 'YXZ' etc. Choose one order.
+            const snapAngle = angle => Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
+
+            euler.x = snapAngle(euler.x);
+            euler.y = snapAngle(euler.y);
+            euler.z = snapAngle(euler.z);
+
+            // Apply the snapped rotation back to the quaternion
+            obj.quaternion.setFromEuler(euler);
+
+            // Important: Update the object's matrix after changing position/rotation directly
+            obj.updateMatrix();
+            // Optionally update world matrix too, though it should be updated in next frame's render pass
+            // obj.updateMatrixWorld(true);
+        }
+
+
+        // --- Scramble ---
+        function scrambleCube() {
+            const moves = ['U', 'D', 'L', 'R', 'F', 'B'];
+            const modifiers = ['', "'"]; // '' for clockwise, "'" for counter-clockwise
+            const numScrambleMoves = 20; // Typical scramble length
+
+            rotationQueue = []; // Clear previous queue
+
+            console.log("Scrambling...");
+            let lastMoveAxis = '';
+
+            for (let i = 0; i < numScrambleMoves; i++) {
+                let randomMove, randomModifier, moveAxis;
+                do {
+                     randomMove = moves[Math.floor(Math.random() * moves.length)];
+                     randomModifier = modifiers[Math.floor(Math.random() * modifiers.length)];
+                     // Determine axis to prevent consecutive moves on same axis (optional but good)
+                     moveAxis = ['U', 'D'].includes(randomMove) ? 'Y' : ['L', 'R'].includes(randomMove) ? 'X' : 'Z';
+                 } while (moveAxis === lastMoveAxis); // Avoid same axis twice in a row
+
+                 lastMoveAxis = moveAxis;
+                 rotationQueue.push({ face: randomMove, isPrime: randomModifier === "'" });
+            }
+            console.log("Queue:", rotationQueue.map(m => m.face + (m.isPrime ? "'" : "")).join(" "));
+
+            processRotationQueue(); // Start processing the queue
+        }
+
+        function processRotationQueue() {
+             if (isRotating || rotationQueue.length === 0) {
+                 if (rotationQueue.length === 0 && !isRotating) console.log("Scramble complete or queue empty.");
+                 return;
+             }
+
+             const nextMove = rotationQueue.shift(); // Get the next move from the front
+             requestRotation(nextMove.face, nextMove.isPrime);
+         }
+
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isRotating && activeRotation) {
+                updateRotation();
+            }
+
+            controls.update(); // Only required if controls.enableDamping = true
+            renderer.render(scene, camera);
+        }
+
+         // --- Resize Handler ---
+         function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+             if (!container) return;
+
+             const width = container.offsetWidth;
+             const height = container.offsetHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+
+        // --- Start ---
+        init();
+
+    </script>
+</body>
+</html>
