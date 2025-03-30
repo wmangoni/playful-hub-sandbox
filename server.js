@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const app = express();
-const port = 80;
+const port = process.env.PORT || 3000;
 
 // Habilitar CORS para todas as rotas
 app.use(cors());
