@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo de Pular Obstáculos com IA (ES)</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Alinha no topo */
+            font-family: sans-serif;
+            margin-top: 20px;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid black;
+            background-color: #e0e0ff; /* Céu azul claro */
+            margin: 5px;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #visContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-left: 20px;
+        }
+        #info {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        #graphContainer canvas {
+             background-color: #ffffff;
+        }
+        h3 {
+            margin-top: 15px;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="info">Geração: <span id="generation">1</span> | Melhor Pontuação da Geração: <span id="bestScore">0</span></div>
+        <canvas id="gameCanvas" width="600" height="300"></canvas>
+        <div id="graphContainer">
+             <h3>Melhores Pontuações por Geração</h3>
+             <canvas id="graphCanvas" width="600" height="150"></canvas>
+        </div>
+    </div>
+    <div id="visContainer">
+         <h3>Rede Neural (Jogador 0)</h3>
+         <canvas id="nnCanvas" width="250" height="300"></canvas>
+    </div>
+
+    <script>
+        // --- Configurações Globais ---
+        const gameCanvas = document.getElementById('gameCanvas');
+        const gameCtx = gameCanvas.getContext('2d');
+        const nnCanvas = document.getElementById('nnCanvas');
+        const nnCtx = nnCanvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        const GAME_WIDTH = gameCanvas.width;
+        const GAME_HEIGHT = gameCanvas.height;
+        const GROUND_Y = GAME_HEIGHT - 50;
+        const GRAVITY = 0.6;
+        const JUMP_STRENGTH = -12;
+        const OBSTACLE_SPEED = 5;
+        const OBSTACLE_COLOR = 'darkred';
+        const PLAYER_COLORS = ['blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink', 'teal'];
+
+        const NUM_PLAYERS = 10; // Número de indivíduos na população da ES
+        const MUTATION_RATE = 0.1; // Taxa de mutação
+        const MUTATION_AMOUNT = 0.2; // Magnitude da mutação
+
+        let players = [];
+        let obstacles = [];
+        let frameCount = 0;
+        let generation = 1;
+        let activePlayers = NUM_PLAYERS;
+        let nextObstacleFrame = 100; // Quando o próximo obstáculo aparece
+        let evolutionaryStrategy;
+        let bestScoresHistory = []; // Armazena as melhores pontuações de cada geração
+
+        // --- Classe Perceptron (Rede Neural) ---
+        class Perceptron {
+            constructor(numInputs) {
+                this.numInputs = numInputs;
+                // Inicializa pesos e bias aleatoriamente entre -1 e 1
+                this.weights = Array(numInputs).fill(0).map(() => Math.random() * 2 - 1);
+                this.bias = Math.random() * 2 - 1;
+                this.lastInputs = Array(numInputs).fill(0); // Para visualização
+                this.lastActivation = 0; // Para visualização
+            }
+
+            // Função de ativação degrau (Step function)
+            activate(sum) {
+                return sum > 0 ? 1 : 0; // 1 para pular, 0 para não pular
+            }
+
+            // Calcula a saída da rede
+            feedForward(inputs) {
+                if (inputs.length !== this.numInputs) {
+                    console.error("Número incorreto de inputs!");
+                    return 0;
+                }
+                this.lastInputs = inputs; // Guarda os inputs para visualização
+
+                let sum = this.bias;
+                for (let i = 0; i < this.numInputs; i++) {
+                    sum += inputs[i] * this.weights[i];
+                }
+                this.lastActivation = sum; // Guarda a ativação bruta para visualização
+                return this.activate(sum);
+            }
+
+            // Define os pesos e bias a partir de um array de genes
+            setGenes(genes) {
+                if (genes.length !== this.numInputs + 1) {
+                    console.error("Número incorreto de genes para setar!");
+                    return;
+                }
+                this.weights = genes.slice(0, this.numInputs);
+                this.bias = genes[this.numInputs];
+            }
+
+            // Retorna os pesos e bias como um array de genes
+            getGenes() {
+                return [...this.weights, this.bias];
+            }
+
+            // Número total de genes (pesos + bias)
+            getNumGenes() {
+                return this.numInputs + 1;
+            }
+        }
+
+        // --- Classe Jogador ---
+        class Player {
+            constructor(color, brain) {
+                this.width = 30;
+                this.height = 50;
+                this.x = 50;
+                this.y = GROUND_Y - this.height;
+                this.velocityY = 0;
+                this.isJumping = false;
+                this.color = color;
+                this.isAlive = true;
+                this.score = 0;
+                this.brain = brain; // Instância do Perceptron
+            }
+
+            jump() {
+                if (!this.isJumping) {
+                    this.velocityY = JUMP_STRENGTH;
+                    this.isJumping = true;
+                }
+            }
+
+            update() {
+                if (!this.isAlive) return;
+
+                this.score++; // Incrementa pontuação a cada frame vivo
+
+                // Aplica gravidade
+                this.velocityY += GRAVITY;
+                this.y += this.velocityY;
+
+                // Verifica colisão com o chão
+                if (this.y + this.height > GROUND_Y) {
+                    this.y = GROUND_Y - this.height;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+
+                 // Lógica da IA para decidir pular
+                 this.think();
+            }
+
+            getInputs(obstacles) {
+                let closestObstacle = null;
+                let minDistance = Infinity;
+
+                // Encontra o obstáculo mais próximo que está à frente do jogador
+                for (const obstacle of obstacles) {
+                    const distance = obstacle.x - (this.x + this.width);
+                    if (distance >= 0 && distance < minDistance) {
+                        minDistance = distance;
+                        closestObstacle = obstacle;
+                    }
+                }
+
+                // Normalização simples (pode precisar de ajuste)
+                const inputDistance = closestObstacle ? minDistance / GAME_WIDTH : 1.0; // Normaliza distância (0 a 1)
+                const inputPlayerY = (GROUND_Y - (this.y + this.height)) / (GROUND_Y); // Altura relativa ao chão (0 no chão, >0 pulando)
+
+
+                 // Se não houver obstáculo à frente, talvez usar um valor padrão grande ou 1.0
+                 if (!closestObstacle) {
+                     return [1.0, inputPlayerY]; // Distância máxima, altura atual
+                 }
+
+                return [inputDistance, inputPlayerY];
+            }
+
+            think() {
+                 const inputs = this.getInputs(obstacles);
+                 const output = this.brain.feedForward(inputs);
+                 if (output === 1) {
+                     this.jump();
+                 }
+            }
+
+
+            draw(ctx) {
+                if (!this.isAlive) return;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            checkCollision(obstacle) {
+                // Verificação simples de colisão AABB (Axis-Aligned Bounding Box)
+                return (
+                    this.x < obstacle.x + obstacle.width &&
+                    this.x + this.width > obstacle.x &&
+                    this.y < obstacle.y + obstacle.height &&
+                    this.y + this.height > obstacle.y
+                );
+            }
+        }
+
+        // --- Classe Obstáculo ---
+        class Obstacle {
+            constructor() {
+                this.width = 20 + Math.random() * 30; // Largura variável
+                this.height = 30 + Math.random() * 40; // Altura variável
+                this.x = GAME_WIDTH;
+                this.y = GROUND_Y - this.height; // Sempre no chão
+                this.speed = OBSTACLE_SPEED;
+                this.color = OBSTACLE_COLOR;
+            }
+
+            update() {
+                this.x -= this.speed;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            isOffscreen() {
+                return this.x + this.width < 0;
+            }
+        }
+
+        // --- Classe Estratégia Evolutiva (ES) ---
+        class EvolutionaryStrategy {
+            constructor(populationSize, mutationRate, mutationAmount, numGenes) {
+                this.populationSize = populationSize;
+                this.mutationRate = mutationRate;
+                this.mutationAmount = mutationAmount;
+                this.numGenes = numGenes;
+                this.population = this.initializePopulation();
+            }
+
+            // Inicializa a população com genes aleatórios [-1, 1]
+            initializePopulation() {
+                const pop = [];
+                for (let i = 0; i < this.populationSize; i++) {
+                    pop.push({
+                        genes: Array(this.numGenes).fill(0).map(() => Math.random() * 2 - 1),
+                        fitness: 0
+                    });
+                }
+                return pop;
+            }
+
+            // Cria um novo indivíduo (usado na geração)
+            createIndividual(genes) {
+                return { genes: genes, fitness: 0 };
+            }
+
+            // Avalia a população com base nas pontuações (fitness)
+            evaluate(fitnessScores) {
+                 if (fitnessScores.length !== this.populationSize) {
+                     console.error("Tamanho do array de fitness não corresponde ao tamanho da população!");
+                     // Se der erro, tenta usar os scores dos players que ainda existem
+                     fitnessScores = players.map(p => p.score);
+                     if(fitnessScores.length !== this.populationSize) {
+                         console.error("Erro grave ao tentar recuperar scores.");
+                         // Como último recurso, atribui fitness 0 a todos e espera a próxima geração
+                         this.population.forEach(ind => ind.fitness = 0);
+                         return;
+                     }
+                 }
+                 for (let i = 0; i < this.populationSize; i++) {
+                     // Garante que o indivíduo existe antes de atribuir fitness
+                     if (this.population[i]) {
+                         this.population[i].fitness = fitnessScores[i] || 0; // Usa 0 se score for undefined/null
+                     } else {
+                         console.warn(`Indivíduo ${i} não encontrado na população durante avaliação.`);
+                     }
+                 }
+                 // Ordena a população por fitness (do maior para o menor)
+                 this.population.sort((a, b) => b.fitness - a.fitness);
+            }
+
+            // Seleciona os melhores indivíduos (elitismo simples)
+            selection() {
+                // Mantém os top 50% (pode ajustar)
+                const numToKeep = Math.ceil(this.populationSize * 0.5);
+                return this.population.slice(0, numToKeep);
+            }
+
+            // Aplica mutação a um conjunto de genes
+            mutate(genes) {
+                const mutatedGenes = [...genes]; // Cria cópia
+                for (let i = 0; i < this.numGenes; i++) {
+                    if (Math.random() < this.mutationRate) {
+                        // Adiciona um valor aleatório pequeno
+                        mutatedGenes[i] += (Math.random() * 2 - 1) * this.mutationAmount;
+                        // Mantém os genes dentro de um limite (opcional, mas pode ajudar)
+                        // mutatedGenes[i] = Math.max(-1, Math.min(1, mutatedGenes[i]));
+                    }
+                }
+                return mutatedGenes;
+            }
+
+             // Gera a próxima população
+            generateNewPopulation() {
+                const bestIndividuals = this.selection();
+                const newPopulation = [];
+
+                // Elitismo: Adiciona os melhores diretamente
+                bestIndividuals.forEach(ind => newPopulation.push(this.createIndividual([...ind.genes]))); // Copia os genes
+
+                // Preenche o resto da população com mutações dos melhores
+                while (newPopulation.length < this.populationSize) {
+                    // Escolhe um dos melhores aleatoriamente para mutar
+                    const parentIndex = Math.floor(Math.random() * bestIndividuals.length);
+                    const parentGenes = bestIndividuals[parentIndex].genes;
+                    const mutatedGenes = this.mutate(parentGenes);
+                    newPopulation.push(this.createIndividual(mutatedGenes));
+                }
+
+                this.population = newPopulation;
+            }
+
+            // Retorna os genes de um indivíduo específico
+            getIndividualGenes(index) {
+                 if (index >= 0 && index < this.population.length) {
+                     return this.population[index].genes;
+                 } else {
+                     console.error(`Índice de indivíduo inválido: ${index}`);
+                     // Retorna genes aleatórios como fallback para evitar crash total
+                     return Array(this.numGenes).fill(0).map(() => Math.random() * 2 - 1);
+                 }
+            }
+
+            getBestFitness() {
+                return this.population[0] ? this.population[0].fitness : 0;
+            }
+        }
+
+        // --- Funções de Visualização ---
+
+        function drawNeuralNetwork(ctx, nn) {
+            const canvasWidth = ctx.canvas.width;
+            const canvasHeight = ctx.canvas.height;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            ctx.fillStyle = 'white'; // Fundo branco para o NN
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+
+            const inputLabels = ["Dist Obst.", "Alt Jogador"];
+            const outputLabel = "Pular?";
+            const neuronRadius = 15;
+            const inputLayerX = 50;
+            const outputLayerX = canvasWidth - 70;
+            const layerMarginY = 50;
+            const neuronSpacingY = 60;
+
+            ctx.font = "10px Arial";
+            ctx.fillStyle = "black";
+            ctx.textAlign = "center";
+
+            // Desenha Neurônios de Entrada
+            for (let i = 0; i < nn.numInputs; i++) {
+                const y = layerMarginY + i * neuronSpacingY;
+                ctx.beginPath();
+                ctx.arc(inputLayerX, y, neuronRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#aaddff'; // Azul claro para inputs
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+
+                // Valor do Input
+                ctx.fillStyle = "black";
+                ctx.fillText(nn.lastInputs[i]?.toFixed(2) || 'N/A', inputLayerX, y + 5);
+                // Label do Input
+                ctx.fillText(inputLabels[i] || `Input ${i+1}`, inputLayerX, y - neuronRadius - 5);
+
+                // Desenha Conexões e Pesos
+                 const outputY = layerMarginY + (canvasHeight - 2 * layerMarginY) / 2; // Centro da camada de saída
+                ctx.beginPath();
+                ctx.moveTo(inputLayerX + neuronRadius, y);
+                ctx.lineTo(outputLayerX - neuronRadius, outputY);
+                ctx.strokeStyle = nn.weights[i] > 0 ? 'green' : 'red'; // Verde para positivo, Vermelho para negativo
+                ctx.lineWidth = Math.abs(nn.weights[i]) * 2 + 0.5; // Espessura baseada no peso
+                ctx.stroke();
+
+                // Escreve o Peso na conexão
+                const midX = (inputLayerX + outputLayerX) / 2;
+                const midY = (y + outputY) / 2;
+                ctx.fillStyle = "black";
+                 ctx.lineWidth = 1; // Reset linewidth for text
+                 ctx.textAlign = "center";
+                ctx.font = "10px Arial";
+                // Pequeno background para o texto do peso
+                const text = nn.weights[i]?.toFixed(2) || 'N/A';
+                const textWidth = ctx.measureText(text).width;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillRect(midX - textWidth / 2 - 1, midY - 7, textWidth + 2, 12);
+                ctx.fillStyle = "black";
+                ctx.fillText(text, midX, midY);
+
+            }
+
+            // Desenha Neurônio de Saída
+            const outputY = layerMarginY + (canvasHeight - 2 * layerMarginY) / 2; // Centralizado
+            ctx.beginPath();
+            ctx.arc(outputLayerX, outputY, neuronRadius, 0, Math.PI * 2);
+            const outputValue = nn.activate(nn.lastActivation);
+            ctx.fillStyle = outputValue > 0 ? '#ffddaa' : '#cccccc'; // Laranja se ativa, cinza se inativa
+            ctx.fill();
+            ctx.strokeStyle = 'black';
+            ctx.stroke();
+
+             // Valor da Ativação (antes da função degrau) e Bias dentro do neurônio
+             ctx.fillStyle = "black";
+             ctx.font = "9px Arial";
+             ctx.textAlign = "center";
+             ctx.fillText(`Act: ${nn.lastActivation?.toFixed(2) || 'N/A'}`, outputLayerX, outputY );
+             ctx.fillText(`Bias: ${nn.bias?.toFixed(2) || 'N/A'}`, outputLayerX, outputY + 10);
+
+            // Label do Output
+            ctx.font = "10px Arial";
+            ctx.fillText(outputLabel, outputLayerX, outputY - neuronRadius - 5);
+             ctx.fillText(`Out: ${outputValue}`, outputLayerX, outputY + neuronRadius + 12); // Mostra 0 ou 1
+
+             // Reset defaults
+             ctx.lineWidth = 1;
+             ctx.textAlign = "start";
+        }
+
+
+        function drawFitnessGraph(ctx, history) {
+             const canvasWidth = ctx.canvas.width;
+             const canvasHeight = ctx.canvas.height;
+             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+             if (history.length === 0) return;
+
+             const padding = 30;
+             const chartWidth = canvasWidth - 2 * padding;
+             const chartHeight = canvasHeight - 2 * padding;
+             const barWidth = Math.max(1, chartWidth / history.length - 5); // Largura da barra com espaçamento
+             const maxScore = Math.max(...history, 1); // Evita divisão por zero
+
+             // Desenha Eixos
+             ctx.strokeStyle = '#aaa';
+             ctx.lineWidth = 1;
+             // Eixo Y
+             ctx.beginPath();
+             ctx.moveTo(padding, padding);
+             ctx.lineTo(padding, canvasHeight - padding);
+             ctx.stroke();
+             // Eixo X
+             ctx.beginPath();
+             ctx.moveTo(padding, canvasHeight - padding);
+             ctx.lineTo(canvasWidth - padding, canvasHeight - padding);
+             ctx.stroke();
+
+             // Desenha Barras
+             ctx.fillStyle = '#3498db'; // Azul
+             for (let i = 0; i < history.length; i++) {
+                 const barHeight = (history[i] / maxScore) * chartHeight;
+                 const x = padding + i * (barWidth + 5); // Adiciona 5 de espaçamento
+                 const y = canvasHeight - padding - barHeight;
+
+                 // Limita a largura se houver muitas gerações
+                 const currentBarWidth = Math.min(barWidth, chartWidth / history.length * 0.8);
+
+                 ctx.fillRect(x, y, currentBarWidth, barHeight);
+
+                  // Adiciona rótulo da geração a cada 5 barras (ou se for a última)
+                 if (history.length < 30 || i % 5 === 0 || i === history.length - 1) {
+                     ctx.fillStyle = '#555';
+                     ctx.font = '10px Arial';
+                     ctx.textAlign = 'center';
+                     ctx.fillText(i + 1, x + currentBarWidth / 2, canvasHeight - padding + 15);
+                 }
+             }
+
+              // Label Eixo Y (Max Score)
+             ctx.fillStyle = '#555';
+             ctx.font = '10px Arial';
+             ctx.textAlign = 'right';
+             ctx.fillText(maxScore.toFixed(0), padding - 5, padding + 5);
+             ctx.fillText('0', padding - 5, canvasHeight - padding + 5);
+             ctx.textAlign = 'start'; // Reset alignment
+        }
+
+        // --- Lógica Principal do Jogo ---
+
+        function spawnObstacle() {
+            obstacles.push(new Obstacle());
+             // Próximo obstáculo aparecerá entre 50 e 150 frames a partir de agora
+            nextObstacleFrame = frameCount + 60 + Math.floor(Math.random() * 90);
+        }
+
+        function resetGame() {
+            console.log(`Fim da Geração ${generation}. Avaliando...`);
+
+            // 1. Coleta Fitness (Scores)
+            const fitnessScores = players.map(p => p.score);
+
+             // Armazena a melhor pontuação desta geração para o gráfico
+            const bestFitnessThisGen = Math.max(...fitnessScores);
+            bestScoresHistory.push(bestFitnessThisGen);
+            document.getElementById('bestScore').textContent = bestFitnessThisGen.toFixed(0);
+
+             // Atualiza o gráfico
+            drawFitnessGraph(graphCtx, bestScoresHistory);
+
+            // 2. Avalia e Gera Nova População na ES
+            evolutionaryStrategy.evaluate(fitnessScores);
+            evolutionaryStrategy.generateNewPopulation();
+
+
+            // 3. Reseta o estado do jogo
+            obstacles = [];
+            frameCount = 0;
+            activePlayers = NUM_PLAYERS;
+            generation++;
+            document.getElementById('generation').textContent = generation;
+            nextObstacleFrame = 100; // Reseta timer do obstáculo
+
+
+            // 4. Cria novos jogadores com os genes da nova população
+            players = [];
+            for (let i = 0; i < NUM_PLAYERS; i++) {
+                 const brain = new Perceptron(2); // Cria novo cérebro (2 inputs)
+                 const genes = evolutionaryStrategy.getIndividualGenes(i);
+                 brain.setGenes(genes);
+                players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
+            }
+             console.log(`Iniciando Geração ${generation} com nova população.`);
+        }
+
+        function update() {
+            frameCount++;
+            activePlayers = 0; // Recalcula a cada frame
+
+            // Atualiza Jogadores
+            players.forEach(player => {
+                if (player.isAlive) {
+                    player.update();
+                    activePlayers++;
+                }
+            });
+
+            // Atualiza Obstáculos
+            if (frameCount >= nextObstacleFrame && activePlayers > 0) {
+                spawnObstacle();
+            }
+
+            // Move e remove obstáculos fora da tela
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].update();
+                if (obstacles[i].isOffscreen()) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Verifica Colisões
+            players.forEach(player => {
+                if (!player.isAlive) return; // Não verifica colisão se já estiver morto
+
+                for (const obstacle of obstacles) {
+                    if (player.checkCollision(obstacle)) {
+                        player.isAlive = false;
+                        // Não decrementa activePlayers aqui, será contado no próximo frame
+                        break; // Um obstáculo é suficiente para matar
+                    }
+                }
+            });
+
+            // Verifica se todos os jogadores morreram
+            if (activePlayers === 0) {
+                resetGame();
+            }
+        }
+
+        function draw() {
+            // Limpa o Canvas do Jogo
+            gameCtx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+             // Desenha Céu (opcional, pode usar o background do canvas)
+             gameCtx.fillStyle = '#e0e0ff';
+             gameCtx.fillRect(0, 0, GAME_WIDTH, GROUND_Y);
+
+            // Desenha o Chão
+            gameCtx.fillStyle = '#654321'; // Marrom
+            gameCtx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+
+            // Desenha Obstáculos
+            obstacles.forEach(obstacle => obstacle.draw(gameCtx));
+
+            // Desenha Jogadores
+            players.forEach(player => player.draw(gameCtx));
+
+             // Desenha a Rede Neural do Jogador 0 (se ele existir e tiver cérebro)
+             if (players.length > 0 && players[0].brain) {
+                  // Passa o contexto, a instância do Perceptron do jogador 0
+                  drawNeuralNetwork(nnCtx, players[0].brain);
+             } else {
+                 // Limpa o canvas da NN se não houver jogador 0
+                 nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
+             }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop); // Chama o próximo frame
+        }
+
+        // --- Inicialização ---
+        function init() {
+            // Cria a Estratégia Evolutiva
+            const numGenes = new Perceptron(2).getNumGenes(); // 2 inputs + 1 bias = 3 genes
+            evolutionaryStrategy = new EvolutionaryStrategy(NUM_PLAYERS, MUTATION_RATE, MUTATION_AMOUNT, numGenes);
+
+             // Cria os jogadores iniciais com genes da primeira população aleatória
+             players = [];
+             for (let i = 0; i < NUM_PLAYERS; i++) {
+                 const brain = new Perceptron(2);
+                 const genes = evolutionaryStrategy.getIndividualGenes(i);
+                 brain.setGenes(genes);
+                 players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
+             }
+
+            activePlayers = NUM_PLAYERS;
+            frameCount = 0;
+            generation = 1;
+            bestScoresHistory = []; // Limpa histórico no início
+
+            document.getElementById('generation').textContent = generation;
+            document.getElementById('bestScore').textContent = '0';
+
+
+            // Limpa o gráfico inicial
+            graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+            drawFitnessGraph(graphCtx, []); // Desenha gráfico vazio
+
+             console.log("Jogo inicializado. Iniciando Geração 1.");
+            // Inicia o loop do jogo
+            gameLoop();
+        }
+
+        // Inicia o jogo quando a página carregar
+        window.onload = init;
+
+    </script>
+</body>
+</html>
