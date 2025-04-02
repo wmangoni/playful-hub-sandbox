@@ -1,11 +1,24 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Habilitar CORS para todas as rotas
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000', 'https://seudominio.com']; // Adicione seus domínios
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permite requisições sem origin (como Postman, apps mobile, ou same-origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'A política de CORS para este site não permite acesso da Origem especificada.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
 
 // Middleware para processar JSON
 app.use(express.json());
@@ -53,8 +66,35 @@ app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/as
 app.use('/ded/assets', express.static(path.join(__dirname, 'ded/assets')));
 app.use('/driving_simulator/assets', express.static(path.join(__dirname, 'driving_simulator/assets')));
 
+app.use(helmet());
+
+// Você pode precisar configurar o helmet, especialmente o CSP,
+// para permitir que seus scripts e assets funcionem corretamente.
+// Exemplo básico (PODE PRECISAR DE AJUSTES):
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"], // Permite carregar recursos do mesmo domínio
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Permite scripts do mesmo domínio e inline (AJUSTE CONFORME NECESSÁRIO)
+      // Adicione outras diretivas conforme necessário (styleSrc, imgSrc, etc.)
+    },
+  })
+);
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Limita cada IP a 100 requisições por janela (windowMs)
+  standardHeaders: true, // Retorna info do limite nos headers `RateLimit-*`
+  legacyHeaders: false, // Desabilita headers `X-RateLimit-*`
+  message: 'Muitas requisições criadas a partir deste IP, por favor tente novamente após 15 minutos'
+});
+
+// Aplica o rate limiting a todas as requisições
+app.use(limiter);
+// Ou aplique apenas a rotas específicas: app.use('/api/', limiter); 
+
 // Iniciar o servidor
 app.listen(port, () => {
     console.log(`Servidor rodando em http://localhost:${port}`);
     console.log(`Jogo acessível em http://localhost:${port}/jogo`);
-}); 
+});
