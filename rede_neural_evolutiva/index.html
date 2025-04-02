@@ -54,7 +54,7 @@
     </div>
     <div id="visContainer">
          <h3>Rede Neural (Jogador 0)</h3>
-         <canvas id="nnCanvas" width="400" height="600"></canvas>
+         <canvas id="nnCanvas" width="400" height="800"></canvas>
     </div>
 
     <script>
@@ -66,6 +66,30 @@
         const graphCanvas = document.getElementById('graphCanvas');
         const graphCtx = graphCanvas.getContext('2d');
 
+        const genesP1 = [
+            "-0.915",
+            "0.799",
+            "-0.754",
+            "-0.092",
+            "-0.086",
+            "-0.680",
+            "-0.593",
+            "-0.585",
+            "0.311",
+            "0.608",
+            "-0.143",
+            "0.360",
+            "0.087",
+            "0.472",
+            "0.217",
+            "-0.262",
+            "0.630",
+            "-0.325",
+            "-0.371",
+            "0.248",
+            "0.170"
+        ];
+
         const GAME_WIDTH = gameCanvas.width;
         const GAME_HEIGHT = gameCanvas.height;
         const GROUND_Y = GAME_HEIGHT - 50;
@@ -73,11 +97,17 @@
         const JUMP_STRENGTH = -13;
         const OBSTACLE_SPEED = 5;
         const OBSTACLE_COLOR = 'darkred';
-        const PLAYER_COLORS = ['blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink', 'teal'];
+        const PLAYER_COLORS = [
+            'blue', 'green', 'orange', 'purple', 'red', 'magenta', 
+            'yellow', 'black-green', 'pink', 'teal', 'crimson', 'indigo', 
+            'coral', 'maroon', 'olive', 'navy', 'turquoise', 'gold', 
+            'plum', 'sienna'
+        ];
 
-        const NUM_PLAYERS = 10; // Número de indivíduos na população da ES
-        const MUTATION_RATE = 0.1; // Taxa de mutação
-        const MUTATION_AMOUNT = 0.2; // Magnitude da mutação
+        const NUM_PLAYERS = 20; // Número de indivíduos na população da ES
+        const MUTATION_RATE = 0.2; // Taxa de mutação
+        const MUTATION_AMOUNT = 0.99; // Magnitude da mutação
+        const HIDDEN_UNITS = 4;
 
         let players = [];
         let obstacles = [];
@@ -109,8 +139,16 @@
                     Array.from({length: numOutputs}, () => (Math.random() * 2 - 1) * xavier(hiddenUnits, numOutputs)));
 
                 // Biases inicializados próximos de zero
-                this.bias1 = Array.from({length: hiddenUnits}, () => (Math.random() * 0.2 - 0.1));
-                this.bias2 = Array.from({length: numOutputs}, () => (Math.random() * 0.2 - 0.1));
+                //this.bias1 = Array.from({length: hiddenUnits}, () => (Math.random() * 0.2 - 0.1));
+                //this.bias2 = Array.from({length: numOutputs}, () => (Math.random() * 0.2 - 0.1));
+                this.bias1 = Array.from(
+                    {length: hiddenUnits},
+                    () => (Math.random() * 2 - 1) * xavier(numInputs, hiddenUnits) * 0.01
+                ); // Menor inicialização
+                this.bias2 = Array.from(
+                    {length: numOutputs},
+                    () => (Math.random() * 2 - 1) * xavier(hiddenUnits, numOutputs) * 0.01
+                );
 
                 this.lastInputs = [];
                 this.hiddenActivations = [];
@@ -186,8 +224,8 @@
                     this.bias2[i] = genes[idx++];
                 }
 
-                this.weights = genes.slice(0, this.numInputs);
-                this.bias = genes[this.numInputs];
+                //this.weights = genes.slice(0, this.numInputs);
+                //this.bias = genes[this.numInputs];
 
             }
 
@@ -199,9 +237,9 @@
 
         // --- Classe Jogador ---
         class Player {
-            constructor(color, brain) {
+            constructor(color, brain, height) {
                 this.width = Math.random() * 5 + 25;
-                this.height = Math.random() * 10 + 40;
+                this.height = height ? height : Math.random() * 10 + 40;
                 this.x = Math.random() * 2 + 48;
                 this.y = GROUND_Y - this.height;
                 this.velocityY = 0;
@@ -225,15 +263,15 @@
                 }
 
                 if (!closestObstacle) {
-                    return [1.0, 0, 0, 0]; // Distância máxima, altura jogador e obstáculo 0
+                    return [1.0, 0, 0]; // Distância máxima, altura jogador e obstáculo 0
                 }
 
                 const inputDistance = minDistance / GAME_WIDTH;
-                const inputPlayerY = (GROUND_Y - (this.y + this.height)) / GROUND_Y;
+                //const inputPlayerY = (GROUND_Y - (this.y + this.height)) / GROUND_Y;
                 const inputObstacleHeight = closestObstacle.height / GROUND_Y;
-                const inputObstacleSpeed = closestObstacle.speed / 10; // Normaliza velocidade (0.5-0.9)
+                const inputObstacleSpeed = (closestObstacle.speed - 5) / 5; // Normaliza velocidade (0.5-0.9)
 
-                return [inputDistance, inputPlayerY, inputObstacleHeight, inputObstacleSpeed];
+                return [inputDistance, inputObstacleHeight, inputObstacleSpeed];
             }
 
             think() {
@@ -260,12 +298,16 @@
 
 
                 // Bonus por se manter próximo ao chão
-                const groundBonus = (GROUND_Y - (this.y + this.height)) < 10 ? 0.1 : 0;
+                const groundBonus = (GROUND_Y - (this.y + this.height)) < 10 ? 0.5 : 0;
 
                 // Penalidade por pular desnecessariamente
-                const jumpPenalty = this.isJumping ? -0.05 : 0;
+                const jumpPenalty = this.isJumping ? -0.5 : 0;
 
-                this.score += 1 + groundBonus + jumpPenalty;
+                const weightPenalty = this.brain.getGenes().reduce((sum, gene) => sum + Math.abs(gene), 0) * -0.01;
+                this.score += 1 + groundBonus + jumpPenalty + weightPenalty;
+
+                //console.log("Ativações ocultas:", this.brain.hiddenActivations);
+                //console.log("Saída:", this.brain.lastOutput);
 
 
                 // Verifica colisão com o chão
@@ -274,7 +316,6 @@
                     this.velocityY = 0;
                     this.isJumping = false;
                 }
-
 
                 // Lógica da IA para decidir pular
                 this.think();
@@ -303,7 +344,7 @@
             constructor() {
                 this.height = 30 + Math.random() * 60; // Altura entre 30-100
                 this.width = 20 + Math.random() * 40; // Largura entre 20-70
-                this.speed = OBSTACLE_SPEED + Math.random() * 2; // Velocidade 5-7
+                this.speed = OBSTACLE_SPEED + Math.random() * 5; // Velocidade 5-7
                 this.x = GAME_WIDTH;
                 this.y = GROUND_Y - this.height; // Sempre no chão
                 this.color = OBSTACLE_COLOR;
@@ -329,25 +370,74 @@
                 this.populationSize = populationSize;
                 this.numGenes = numGenes;
                 this.population = this.initializePopulation();
-
-                // Aumentar a taxa de mutação para redes maiores
-                this.mutationRate = mutationRate * 2.5; // 0.2 → 0.2*2 = 0.4
-                this.mutationAmount = mutationAmount * 2; // 0.2 → 0.3
-                
-                // Manter mais diversidade genética
-                this.selection = () => {
-                    const numToKeep = Math.ceil(this.populationSize * 0.3); // Reduzir elitismo
-                    return this.population.slice(0, numToKeep);
+                this.mutationRate = mutationRate;
+                this.mutationAmount = mutationAmount;
+            }
+            
+            selection() {
+                // Manter os 20% melhores (elitismo)
+                const eliteCount = Math.ceil(this.populationSize * 0.2);
+                return this.population.slice(0, eliteCount);
+            }
+            
+            // Adicionar método de crossover (recombinação)
+            crossover(parent1, parent2) {
+                const childGenes = [];
+                for (let i = 0; i < this.numGenes; i++) {
+                    childGenes.push(Math.random() < 0.5 ? parent1.genes[i] : parent2.genes[i]);
                 }
+                return childGenes;
+            }
+            
+            // Modificar o método de geração de nova população para incluir crossover
+            generateNewPopulation() {
+                // Reduzir mutação mais lentamente
+                this.mutationAmount *= 0.995; // Decaimento de 0.5% por geração
+                this.mutationRate *= 0.998; // Decaimento de 0.2% por geração
+                
+                // Limites mínimos mais altos
+                this.mutationAmount = Math.max(0.15, this.mutationAmount);
+                this.mutationRate = Math.max(0.08, this.mutationRate);
+                
+                // Selecionar pais
+                const parents = this.selection();
+                const newPopulation = [];
+                
+                // Adicionar elites diretamente (10% melhores sem mutação)
+                const eliteCount = Math.ceil(this.populationSize * 0.1);
+                for (let i = 0; i < eliteCount; i++) {
+                    newPopulation.push(this.createIndividual([...this.population[i].genes]));
+                }
+                
+                // Gerar o resto da população com crossover e mutação
+                while (newPopulation.length < this.populationSize) {
+                    // Selecionar dois pais aleatórios do grupo de selecionados
+                    const parent1 = parents[Math.floor(Math.random() * parents.length)];
+                    const parent2 = parents[Math.floor(Math.random() * parents.length)];
+                    
+                    // Aplicar crossover
+                    let childGenes = this.crossover(parent1, parent2);
+                    
+                    // Aplicar mutação
+                    childGenes = this.mutate(childGenes);
+                    
+                    // Adicionar à nova população
+                    newPopulation.push(this.createIndividual(childGenes));
+                }
+                
+                this.population = newPopulation;
             }
 
             // Inicializa a população com genes aleatórios [-1, 1]
             initializePopulation() {
+                // O fitness é a pontuação que cada indivíduo (jogador) consegue no jogo
+                // Quanto maior o fitness, melhor o jogador se saiu e mais chances ele tem
+                // de passar seus genes para a próxima geração
                 const pop = [];
                 for (let i = 0; i < this.populationSize; i++) {
                     pop.push({
                         genes: Array(this.numGenes).fill(0).map(() => Math.random() * 2 - 1),
-                        fitness: 0
+                        fitness: 0 // Começa com 0 pois ainda não jogou
                     });
                 }
                 return pop;
@@ -360,34 +450,41 @@
 
             // Avalia a população com base nas pontuações (fitness)
             evaluate(fitnessScores) {
-                 if (fitnessScores.length !== this.populationSize) {
-                     console.error("Tamanho do array de fitness não corresponde ao tamanho da população!");
-                     // Se der erro, tenta usar os scores dos players que ainda existem
-                     fitnessScores = players.map(p => p.score);
-                     if(fitnessScores.length !== this.populationSize) {
-                         console.error("Erro grave ao tentar recuperar scores.");
-                         // Como último recurso, atribui fitness 0 a todos e espera a próxima geração
-                         this.population.forEach(ind => ind.fitness = 0);
-                         return;
-                     }
-                 }
-                 for (let i = 0; i < this.populationSize; i++) {
-                     // Garante que o indivíduo existe antes de atribuir fitness
-                     if (this.population[i]) {
-                         this.population[i].fitness = fitnessScores[i] || 0; // Usa 0 se score for undefined/null
-                     } else {
-                         console.warn(`Indivíduo ${i} não encontrado na população durante avaliação.`);
-                     }
-                 }
-                 // Ordena a população por fitness (do maior para o menor)
-                 this.population.sort((a, b) => b.fitness - a.fitness);
-            }
-
-            // Seleciona os melhores indivíduos (elitismo simples)
-            selection() {
-                // Mantém os top 50% (pode ajustar)
-                const numToKeep = Math.ceil(this.populationSize * 0.5);
-                return this.population.slice(0, numToKeep);
+                if (fitnessScores.length !== this.populationSize) {
+                    console.error("Tamanho do array de fitness não corresponde ao tamanho da população!");
+                    // Se der erro, tenta usar os scores dos players que ainda existem
+                    fitnessScores = players.map(p => p.score);
+                    if(fitnessScores.length !== this.populationSize) {
+                        console.error("Erro grave ao tentar recuperar scores.");
+                        // Como último recurso, atribui fitness 0 a todos e espera a próxima geração
+                        this.population.forEach(ind => ind.fitness = 0);
+                        return;
+                    }
+                }
+                for (let i = 0; i < this.populationSize; i++) {
+                    // Garante que o indivíduo existe antes de atribuir fitness
+                    if (this.population[i]) {
+                        this.population[i].fitness = fitnessScores[i] || 0; // Usa 0 se score for undefined/null
+                    } else {
+                        console.warn(`Indivíduo ${i} não encontrado na população durante avaliação.`);
+                    }
+                }
+                // Ordena a população por fitness (do maior para o menor)
+                // Ordena a população em ordem decrescente de fitness (pontuação)
+                // Para cada par de indivíduos a,b:
+                // - Se b.fitness > a.fitness, retorna número positivo (b vem antes)
+                // - Se b.fitness < a.fitness, retorna número negativo (a vem antes) 
+                // - Se b.fitness = a.fitness, retorna 0 (mantém ordem)
+                this.population.sort((a, b) => b.fitness - a.fitness);
+                // Imprime o primeiro (melhor) e último (pior) indivíduo da população ordenada
+                console.log("Melhor indivíduo:", {
+                    fitness: this.population[0].fitness.toFixed(2),
+                    genes: this.population[0].genes.map(g => g.toFixed(3))
+                });
+                console.log("Pior indivíduo:", {
+                    fitness: this.population[this.population.length-1].fitness.toFixed(2), 
+                    genes: this.population[this.population.length-1].genes.map(g => g.toFixed(3))
+                });
             }
 
             // Aplica mutação a um conjunto de genes
@@ -396,42 +493,18 @@
                 for (let i = 0; i < this.numGenes; i++) {
                     if (Math.random() < this.mutationRate) {
                         // Mutação adaptativa (maior impacto em genes extremos)
-                        const scale = 1.4 - Math.abs(mutatedGenes[i]);
-                        mutatedGenes[i] += (Math.random() * 1.6 - 1) * this.mutationAmount * scale;
+                        const scale = 1.2 - Math.abs(mutatedGenes[i]);
+                        const mutation = (Math.random() * 1.4 - 1) * this.mutationAmount * scale;
+                        const oldValue = mutatedGenes[i];
+                        mutatedGenes[i] += mutation;
                         
-                        // Limitar valores entre -5 e 5
-                        mutatedGenes[i] = Math.max(-5, Math.min(5, mutatedGenes[i]));
+                        // Limitar valores entre -2 e 2
+                        mutatedGenes[i] = Math.max(-2, Math.min(2, mutatedGenes[i]));
+
+                        //console.log(`Gene ${i}: ${oldValue.toFixed(4)} -> ${mutatedGenes[i].toFixed(4)} (mutation: ${mutation.toFixed(4)}, scale: ${scale.toFixed(4)})`);
                     }
                 }
                 return mutatedGenes;
-            }
-
-             // Gera a próxima população
-            generateNewPopulation() {
-                // Reduzir mutação ao longo do tempo
-                this.mutationAmount *= 0.98; // Decaimento de 2% por geração
-                this.mutationRate *= 0.99; // Decaimento de 1% por geração
-
-                // Limites mínimos
-                //this.mutationAmount = Math.max(0.1, this.mutationAmount);
-                //this.mutationRate = Math.max(0.05, this.mutationRate);
-
-                const bestIndividuals = this.selection();
-                const newPopulation = [];
-
-                // Elitismo: Adiciona os melhores diretamente
-                bestIndividuals.forEach(ind => newPopulation.push(this.createIndividual([...ind.genes]))); // Copia os genes
-
-                // Preenche o resto da população com mutações dos melhores
-                while (newPopulation.length < this.populationSize) {
-                    // Escolhe um dos melhores aleatoriamente para mutar
-                    const parentIndex = Math.floor(Math.random() * bestIndividuals.length);
-                    const parentGenes = bestIndividuals[parentIndex].genes;
-                    const mutatedGenes = this.mutate(parentGenes);
-                    newPopulation.push(this.createIndividual(mutatedGenes));
-                }
-
-                this.population = newPopulation;
             }
 
             // Retorna os genes de um indivíduo específico
@@ -453,10 +526,8 @@
         // --- Funções de Visualização ---
 
         function drawNeuralNetwork(ctx, nn) {
-            // ... (código atualizado para mostrar múltiplas camadas) ...
-            // Configurações atualizadas para 3 inputs, 4 neurônios ocultos e 1 output
             const layers = [
-                { neurons: nn.lastInputs, labels: ["Distância", "Altura", "Alt Obst", "Veloc Obst"] },
+                { neurons: nn.lastInputs, labels: ["Distância", "Alt Obst", "Veloc Obst"] },
                 { neurons: nn.hiddenActivations, labels: [] },
                 { neurons: [nn.lastOutput], labels: ["Pular?"] }
             ];
@@ -609,10 +680,8 @@
             document.getElementById('generation').textContent = generation;
             nextObstacleFrame = 100; // Reseta timer do obstáculo
 
-
-            const hiddenUnits = 6;
             const numOutputs = 1;
-            const brainTemplate = new MLP(4, hiddenUnits, numOutputs);
+            const brainTemplate = new MLP(3, HIDDEN_UNITS, numOutputs);
             const numGenes = brainTemplate.getNumGenes();
             
             evolutionaryStrategy = new EvolutionaryStrategy(
@@ -622,11 +691,22 @@
             // 4. Cria novos jogadores com os genes da nova população
             players = [];
             for (let i = 0; i < NUM_PLAYERS; i++) {
-                const brain = new MLP(4, hiddenUnits, numOutputs);
-                const genes = evolutionaryStrategy.getIndividualGenes(i);
+                const brain = new MLP(3, HIDDEN_UNITS, numOutputs);
+                var genes = evolutionaryStrategy.getIndividualGenes(i);
+
+                // Se for o primeiro jogador, use os genes pré-treinados
+                if (i === 0) {
+                    genes = genesP1; // Ou outra variável que contenha seus genes pré-treinados
+                }
+                
                 brain.setGenes(genes);
                 players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
             }
+
+            const brainP1 = new MLP(3, HIDDEN_UNITS, numOutputs);
+            brainP1.setGenes(genesP1);
+            players[NUM_PLAYERS -1]=new Player("black", brainP1, 45);
+
             console.log(`Iniciando Geração ${generation} com nova população.`);
         }
 
@@ -678,9 +758,9 @@
             // Limpa o Canvas do Jogo
             gameCtx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-             // Desenha Céu (opcional, pode usar o background do canvas)
-             gameCtx.fillStyle = '#e0e0ff';
-             gameCtx.fillRect(0, 0, GAME_WIDTH, GROUND_Y);
+            // Desenha Céu (opcional, pode usar o background do canvas)
+            gameCtx.fillStyle = '#e0e0ff';
+            gameCtx.fillRect(0, 0, GAME_WIDTH, GROUND_Y);
 
             // Desenha o Chão
             gameCtx.fillStyle = '#654321'; // Marrom
@@ -692,14 +772,21 @@
             // Desenha Jogadores
             players.forEach(player => player.draw(gameCtx));
 
-             // Desenha a Rede Neural do Jogador 0 (se ele existir e tiver cérebro)
-             if (players.length > 0 && players[0].brain) {
-                  // Passa o contexto, a instância do Perceptron do jogador 0
-                  drawNeuralNetwork(nnCtx, players[0].brain);
-             } else {
-                 // Limpa o canvas da NN se não houver jogador 0
-                 nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
-             }
+            // Desenha a Rede Neural do Jogador 0 (se ele existir e tiver cérebro)
+            if (players.length > 0 && players[0].brain) {
+                // Passa o contexto, a instância do Perceptron do jogador 0
+                    // Encontra o jogador com maior pontuação
+                    let bestPlayer = players[0];
+                    for (let i = 1; i < players.length; i++) {
+                        if (players[i].score > bestPlayer.score) {
+                            bestPlayer = players[i];
+                        }
+                    }
+                    drawNeuralNetwork(nnCtx, bestPlayer.brain);
+            } else {
+                // Limpa o canvas da NN se não houver jogador 0
+                nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
+            }
         }
 
         function gameLoop() {
@@ -710,32 +797,36 @@
 
         // --- Inicialização ---
         function init() {
-            const hiddenUnits = 6;
+
             const numOutputs = 1;
-            const brainTemplate = new MLP(4, hiddenUnits, numOutputs);
+            const brainTemplate = new MLP(3, HIDDEN_UNITS, numOutputs);
             const numGenes = brainTemplate.getNumGenes();
             
             evolutionaryStrategy = new EvolutionaryStrategy(
                 NUM_PLAYERS, MUTATION_RATE, MUTATION_AMOUNT, numGenes
             );
 
-            // Cria jogadores com MLP
+             // Cria os jogadores iniciais com genes da primeira população aleatória
             players = [];
             for (let i = 0; i < NUM_PLAYERS; i++) {
-                const brain = new MLP(4, hiddenUnits, numOutputs);
-                const genes = evolutionaryStrategy.getIndividualGenes(i);
+                const brain = new MLP(3, HIDDEN_UNITS, numOutputs);
+                var genes = evolutionaryStrategy.getIndividualGenes(i);
+        
+                // Se for o primeiro jogador, use os genes pré-treinados (P1 = Player 1)
+                if (i === 0) {
+                    genes = genesP1; // Ou outra variável que contenha seus genes pre-treinados
+                }
+
                 brain.setGenes(genes);
                 players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
             }
 
-             // Cria os jogadores iniciais com genes da primeira população aleatória
-             players = [];
-            for (let i = 0; i < NUM_PLAYERS; i++) {
-                const brain = new MLP(4, hiddenUnits, numOutputs);
-                const genes = evolutionaryStrategy.getIndividualGenes(i);
-                brain.setGenes(genes);
-                players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
-            }
+            const brainP1 = new MLP(3, HIDDEN_UNITS, numOutputs);
+            brainP1.x -= 12;
+            brainP1.color = 'black';
+            brainP1.setGenes(genesP1);
+            players[NUM_PLAYERS -1]=new Player("black", brainP1, 55);
+
 
             activePlayers = NUM_PLAYERS;
             frameCount = 0;
