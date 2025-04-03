@@ -620,17 +620,330 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            const deltaTime = clock.getDelta(); // Get time elapsed since last frame
+            const deltaTime = clock.getDelta();
 
             updateCar(deltaTime);
             updateCamera();
             updateClouds(deltaTime);
+            
+            // Adicionar verificação de colisão
+            checkForCollisions();
 
             renderer.render(scene, camera);
         }
 
         // --- Start ---
         init();
+
+        // Obter posição atual do carro
+        function getCarPosition() {
+            // Substitua isso com seu código real para obter a posição do carro
+            return {
+                x: car.position.x,
+                y: car.position.y,
+                width: car.geometry.parameters.width,
+                height: car.geometry.parameters.height
+            };
+        }
+
+        // Obter obstáculos na tela/mundo
+        function getObstacles() {
+            // Substitua isso com seu código real para obter obstáculos
+            const obstacles = [];
+            
+            // Adicionar montanhas
+            mountains.forEach(mountain => {
+                obstacles.push({
+                    type: 'mountain',
+                    x: mountain.position.x,
+                    y: mountain.position.y,
+                    width: mountain.geometry.parameters.radius * 2,
+                    height: mountain.geometry.parameters.height
+                });
+            });
+            
+            // Adicionar árvores
+            trees.forEach(tree => {
+                obstacles.push({
+                    type: 'tree',
+                    x: tree.position.x,
+                    y: tree.position.y,
+                    width: tree.geometry.parameters.radius * 2,
+                    height: tree.geometry.parameters.height
+                });
+            });
+            
+            return obstacles;
+        }
+
+        // Obter estado atual do carro
+        function getCarState() {
+            // Substitua isso com seu código real
+            return {
+                speed: car.position.z,
+                acceleration: 0,
+                damage: 0
+            };
+        }
+
+        // Atualizar estado do carro
+        function updateCarState(newState) {
+            // Substitua isso com seu código real
+            car.position.z = newState.speed;
+            car.acceleration = newState.acceleration;
+            car.damage = newState.damage;
+            
+            // Verificar se o carro está destruído
+            if (newState.damage >= 100) {
+                gameOver();
+            }
+        }
+
+        // Mostrar feedback visual para colisão
+        function showCollisionFeedback(collision) {
+            // Opcional: Adicione efeitos visuais como sacudir a tela
+            // ou mostrar partículas na posição da colisão
+            if (collision.obstacleType === 'mountain') {
+                shakeScreen(1.0); // Forte
+            } else {
+                shakeScreen(0.5); // Moderado
+            }
+            
+            // Mostrar dano no HUD
+            updateDamageDisplay();
+        }
+
+        /**
+         * Detecta colisões entre o carro e obstáculos (montanhas e árvores)
+         * @param {Object} carPosition - Posição e dimensões do carro
+         * @param {Array} obstacles - Array de obstáculos com suas posições e dimensões
+         * @returns {Object|null} Objeto com informações sobre a colisão ou null se não houver colisão
+         */
+        function detectCollision(carPosition, obstacles) {
+            // Verificar parâmetros
+            if (!carPosition || !obstacles || !Array.isArray(obstacles)) {
+                console.error("Parâmetros inválidos para detectCollision");
+                return null;
+            }
+
+            // Criar uma caixa de colisão para o carro
+            const carBox = new THREE.Box3().setFromObject(car);
+            
+            // Verificar colisão com cada obstáculo
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                let obstacleObj;
+                
+                // Obter o objeto 3D do obstáculo
+                if (obstacle.type === 'tree') {
+                    obstacleObj = trees[i];
+                } else if (obstacle.type === 'mountain') {
+                    obstacleObj = mountains[i];
+                }
+                
+                if (!obstacleObj) continue;
+                
+                // Criar uma caixa de colisão para o obstáculo
+                const obstacleBox = new THREE.Box3().setFromObject(obstacleObj);
+                
+                // Verificar interseção entre as caixas
+                if (carBox.intersectsBox(obstacleBox)) {
+                    return {
+                        obstacleIndex: i,
+                        obstacleType: obstacle.type,
+                        collisionPoint: {
+                            x: (carBox.min.x + carBox.max.x) / 2,
+                            y: (carBox.min.y + carBox.max.y) / 2,
+                            z: (carBox.min.z + carBox.max.z) / 2
+                        }
+                    };
+                }
+            }
+            
+            // Nenhuma colisão detectada
+            return null;
+        }
+
+        /**
+         * Gerencia o comportamento do carro após uma colisão
+         * @param {Object} collision - Informações sobre a colisão
+         * @param {Object} carState - Estado atual do carro
+         * @returns {Object} Estado atualizado do carro após a colisão
+         */
+        function handleCollision(collision, carState) {
+            if (!collision) return carState;
+            
+            // Clonar o estado atual do carro
+            const newState = { ...carState };
+            
+            // Definir valores padrão se não existirem
+            newState.damage = newState.damage || 0;
+            
+            // Aplicar efeitos baseados no tipo de obstáculo
+            if (collision.obstacleType === 'mountain') {
+                // Colisão com montanha - impacto forte
+                newState.speed = 0;
+                newState.damage += 25;
+                
+                // Recuar o carro um pouco
+                const pushBackDistance = 2.0;
+                car.translateZ(pushBackDistance);
+                
+                // Efeito sonoro para colisão forte (se implementado)
+                playCollisionSound('mountain');
+                
+            } else if (collision.obstacleType === 'tree') {
+                // Colisão com árvore - impacto moderado
+                newState.speed = newState.speed * 0.5;
+                newState.damage += 10;
+                
+                // Recuar o carro ligeiramente
+                const pushBackDistance = 1.0;
+                car.translateZ(pushBackDistance);
+                
+                // Efeito sonoro para colisão com árvore
+                playCollisionSound('tree');
+            }
+            
+            // Atualizar o display de informações
+            document.getElementById('info').textContent = `Colisão com ${collision.obstacleType === 'mountain' ? 'montanha' : 'árvore'}! Dano: ${newState.damage}%`;
+            
+            // Verificar game over
+            if (newState.damage >= 100) {
+                gameOver();
+            }
+            
+            return newState;
+        }
+
+        /**
+         * Função principal para verificar e responder a colisões
+         * Deve ser chamada no loop principal do jogo
+         */
+        function checkForCollisions() {
+            // Coletar informações sobre os obstáculos
+            const obstacles = [];
+            
+            // Adicionar montanhas
+            mountains.forEach((mountain, index) => {
+                obstacles.push({
+                    type: 'mountain',
+                    index: index
+                });
+            });
+            
+            // Adicionar árvores
+            trees.forEach((tree, index) => {
+                obstacles.push({
+                    type: 'tree',
+                    index: index
+                });
+            });
+            
+            // Detectar colisão
+            const collision = detectCollision({ position: car.position }, obstacles);
+            
+            // Responder à colisão, se houver
+            if (collision) {
+                // Obter estado atual do carro (aproximado)
+                const carState = {
+                    speed: carSpeed,
+                    damage: car.userData.damage || 0
+                };
+                
+                // Processar a colisão
+                const updatedState = handleCollision(collision, carState);
+                
+                // Atualizar o estado do carro
+                car.userData.damage = updatedState.damage;
+                
+                // Efeito de tela tremendo
+                shakeScreen(collision.obstacleType === 'mountain' ? 1.0 : 0.5);
+            }
+        }
+
+        /**
+         * Reproduz um som de colisão
+         * @param {string} type - Tipo de colisão ('mountain' ou 'tree')
+         */
+        function playCollisionSound(type) {
+            if (!isAudioContextInitialized || !audioContext) return;
+            
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                // Configurar o som com base no tipo de colisão
+                oscillator.type = 'triangle'; //'sine';
+                oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(30, audioContext.currentTime + 0.5);
+                gainNode.gain.setValueAtTime(1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + (type === 'mountain' ? 0.5 : 0.3));
+            } catch (e) {
+                console.error("Erro ao reproduzir som de colisão:", e);
+            }
+        }
+
+        /**
+         * Aplica um efeito de tremor à câmera
+         * @param {number} intensity - Intensidade do tremor (0.0 a 1.0)
+         */
+        function shakeScreen(intensity) {
+            // Implementar tremor de tela
+            const originalPosition = camera.position.clone();
+            const shakeDuration = 500; // ms
+            const startTime = Date.now();
+            
+            function applyShake() {
+                const elapsed = Date.now() - startTime;
+                const remainingTime = shakeDuration - elapsed;
+                
+                if (remainingTime <= 0) {
+                    camera.position.copy(originalPosition);
+                    return;
+                }
+                
+                // Calcular intensidade diminuindo com o tempo
+                const currentIntensity = intensity * (remainingTime / shakeDuration);
+                
+                // Aplicar tremor aleatório
+                camera.position.set(
+                    originalPosition.x + (Math.random() - 0.5) * currentIntensity,
+                    originalPosition.y + (Math.random() - 0.5) * currentIntensity,
+                    originalPosition.z + (Math.random() - 0.5) * currentIntensity
+                );
+                
+                requestAnimationFrame(applyShake);
+            }
+            
+            applyShake();
+        }
+
+        /**
+         * Função de game over
+         */
+        function gameOver() {
+            // Parar o jogo e mostrar mensagem de game over
+            document.getElementById('info').textContent = "Game Over! Seu carro está destruído.";
+            document.getElementById('info').style.color = "red";
+            document.getElementById('info').style.fontSize = "24px";
+            
+            // Desativar controles
+            for (let key in keys) {
+                keys[key] = false;
+            }
+            
+            // Opcional: recarregar o jogo após alguns segundos
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        }
 
     </script>
 </body>
