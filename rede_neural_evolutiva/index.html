@@ -49,7 +49,7 @@
         <canvas id="gameCanvas" width="600" height="300"></canvas>
         <div id="graphContainer">
              <h3>Melhores Pontuações por Geração</h3>
-             <canvas id="graphCanvas" width="600" height="150"></canvas>
+             <canvas id="graphCanvas" width="600" height="350"></canvas>
         </div>
     </div>
     <div id="visContainer">
@@ -66,6 +66,8 @@
         const graphCanvas = document.getElementById('graphCanvas');
         const graphCtx = graphCanvas.getContext('2d');
 
+        // Comment out or remove the old genesP1, as it's the wrong size now
+        /*
         const genesP1 = [
             "-0.915",
             "0.799",
@@ -89,6 +91,8 @@
             "0.248",
             "0.170"
         ];
+        */
+        let genesP1 = null; // Set to null or an empty array initially
 
         const GAME_WIDTH = gameCanvas.width;
         const GAME_HEIGHT = gameCanvas.height;
@@ -107,7 +111,10 @@
         const NUM_PLAYERS = 20; // Número de indivíduos na população da ES
         const MUTATION_RATE = 0.2; // Taxa de mutação
         const MUTATION_AMOUNT = 0.99; // Magnitude da mutação
-        const HIDDEN_UNITS = 4;
+        const HIDDEN_UNITS_1 = 8; // Renamed from HIDDEN_UNITS
+        const HIDDEN_UNITS_2 = 4; // Size of the new second hidden layer
+        const NUM_INPUTS = 3;
+        const NUM_OUTPUTS = 1;
 
         let players = [];
         let obstacles = [];
@@ -117,42 +124,51 @@
         let nextObstacleFrame = 100; // Quando o próximo obstáculo aparece
         let evolutionaryStrategy;
         let bestScoresHistory = []; // Armazena as melhores pontuações de cada geração
+        let worstScoresHistory = []; // Armazena as piores pontuações de cada geração
 
         // --- Classe Perceptron (Rede Neural) ---
         class MLP {
-            constructor(numInputs, hiddenUnits, numOutputs) {
-                this.weights = Array(numInputs).fill(0).map(() => Math.random() * 2 - 1);
-                this.bias = Math.random() * 2 - 1;
-                this.lastActivation = 0; // Para visualização
+            constructor(numInputs, hiddenUnits1, hiddenUnits2, numOutputs) {
+                // Use constants directly for consistency, ignore constructor args for now
+                numInputs = NUM_INPUTS;
+                hiddenUnits1 = HIDDEN_UNITS_1;
+                hiddenUnits2 = HIDDEN_UNITS_2; // Use the new constant
+                numOutputs = NUM_OUTPUTS;
+
+                // Remove old single-layer properties if they exist
+                // delete this.weights;
+                // delete this.bias;
+                // delete this.lastActivation;
 
                 this.numInputs = numInputs;
-                this.hiddenUnits = hiddenUnits;
+                this.hiddenUnits1 = hiddenUnits1;
+                this.hiddenUnits2 = hiddenUnits2; // Store the size
                 this.numOutputs = numOutputs;
 
-                // Inicialização Xavier para melhor convergência
+                // --- Initialization with Xavier ---
                 const xavier = (fanIn, fanOut) => Math.sqrt(6 / (fanIn + fanOut));
-                
-                this.weights1 = Array.from({length: numInputs}, () => 
-                    Array.from({length: hiddenUnits}, () => (Math.random() * 2 - 1) * xavier(numInputs, hiddenUnits)));
-                
-                this.weights2 = Array.from({length: hiddenUnits}, () => 
-                    Array.from({length: numOutputs}, () => (Math.random() * 2 - 1) * xavier(hiddenUnits, numOutputs)));
 
-                // Biases inicializados próximos de zero
-                //this.bias1 = Array.from({length: hiddenUnits}, () => (Math.random() * 0.2 - 0.1));
-                //this.bias2 = Array.from({length: numOutputs}, () => (Math.random() * 0.2 - 0.1));
-                this.bias1 = Array.from(
-                    {length: hiddenUnits},
-                    () => (Math.random() * 2 - 1) * xavier(numInputs, hiddenUnits) * 0.01
-                ); // Menor inicialização
-                this.bias2 = Array.from(
-                    {length: numOutputs},
-                    () => (Math.random() * 2 - 1) * xavier(hiddenUnits, numOutputs) * 0.01
-                );
+                // Layer 1 (Input -> Hidden1)
+                this.weights_in_h1 = Array.from({length: numInputs}, () =>
+                    Array.from({length: hiddenUnits1}, () => (Math.random() * 2 - 1) * xavier(numInputs, hiddenUnits1)));
+                this.bias_h1 = Array.from({length: hiddenUnits1}, () => (Math.random() * 2 - 1) * xavier(numInputs, hiddenUnits1) * 0.01);
 
-                this.lastInputs = [];
-                this.hiddenActivations = [];
-                this.lastOutput = 0;
+                // Layer 2 (Hidden1 -> Hidden2)
+                this.weights_h1_h2 = Array.from({length: hiddenUnits1}, () =>
+                    Array.from({length: hiddenUnits2}, () => (Math.random() * 2 - 1) * xavier(hiddenUnits1, hiddenUnits2)));
+                this.bias_h2 = Array.from({length: hiddenUnits2}, () => (Math.random() * 2 - 1) * xavier(hiddenUnits1, hiddenUnits2) * 0.01);
+
+                // Layer 3 (Hidden2 -> Output)
+                this.weights_h2_out = Array.from({length: hiddenUnits2}, () =>
+                    Array.from({length: numOutputs}, () => (Math.random() * 2 - 1) * xavier(hiddenUnits2, numOutputs)));
+                this.bias_out = Array.from({length: numOutputs}, () => (Math.random() * 2 - 1) * xavier(hiddenUnits2, numOutputs) * 0.01);
+
+
+                // --- Store activations for visualization ---
+                this.lastInputs = Array(numInputs).fill(0);
+                this.hiddenActivations1 = Array(hiddenUnits1).fill(0);
+                this.hiddenActivations2 = Array(hiddenUnits2).fill(0); // For the second hidden layer
+                this.lastOutput = Array(numOutputs).fill(0);
             }
 
             // Usar ReLU para evitar vanishing gradient
@@ -165,73 +181,104 @@
             }
 
             feedForward(inputs) {
+                if (inputs.length !== this.numInputs) {
+                    console.error(`Input length mismatch: expected ${this.numInputs}, got ${inputs.length}`);
+                    // Pad or truncate inputs as a fallback, or return an error/default value
+                    inputs = inputs.slice(0, this.numInputs);
+                    while (inputs.length < this.numInputs) inputs.push(0);
+                }
                 this.lastInputs = inputs;
 
-                // Camada oculta com ReLU
-                this.hiddenActivations = this.bias1.map((b, i) => {
-                    const sum = inputs.reduce((acc, val, j) => acc + val * this.weights1[j][i], b);
+                // Camada oculta 1 com ReLU
+                this.hiddenActivations1 = this.bias_h1.map((bias, i) => {
+                    const sum = inputs.reduce((acc, val, j) => acc + val * this.weights_in_h1[j][i], bias);
+                    return this.relu(sum);
+                });
+
+                // Camada oculta 2 com ReLU
+                this.hiddenActivations2 = this.bias_h2.map((bias, i) => {
+                    const sum = this.hiddenActivations1.reduce((acc, val, j) => acc + val * this.weights_h1_h2[j][i], bias);
                     return this.relu(sum);
                 });
 
                 // Camada de saída com sigmoid
-                const outputs = this.bias2.map((b, i) => {
-                    const sum = this.hiddenActivations.reduce((acc, val, j) => acc + val * this.weights2[j][i], b);
+                const outputs = this.bias_out.map((bias, i) => {
+                    // Use hiddenActivations2 as input for the output layer
+                    const sum = this.hiddenActivations2.reduce((acc, val, j) => acc + val * this.weights_h2_out[j][i], bias);
                     return this.sigmoid(sum);
                 });
 
-                let sum = this.bias;
-                for (let i = 0; i < this.numInputs; i++) {
-                    sum += inputs[i] * this.weights[i];
-                }
-                this.lastActivation = sum; // Guarda a ativação bruta para visualização
-
-
-                this.lastOutput = outputs[0];
-                return outputs[0] > 0.5 ? 1 : 0;
+                this.lastOutput = outputs; // Store the array
+                // Return 1 if the first output neuron is > 0.5, else 0
+                return (outputs.length > 0 && outputs[0] > 0.5) ? 1 : 0;
             }
 
             getGenes() {
                 const genes = [];
-
-                this.weights1.forEach(row => genes.push(...row));
-                genes.push(...this.bias1);
-
-                this.weights2.forEach(row => genes.push(...row));
-                genes.push(...this.bias2);
+                // Layer 1
+                this.weights_in_h1.forEach(row => genes.push(...row));
+                genes.push(...this.bias_h1);
+                // Layer 2
+                this.weights_h1_h2.forEach(row => genes.push(...row));
+                genes.push(...this.bias_h2);
+                // Layer 3
+                this.weights_h2_out.forEach(row => genes.push(...row));
+                genes.push(...this.bias_out);
                 return genes;
             }
 
             setGenes(genes) {
                 let idx = 0;
-                // Pesos da primeira camada
-                for(let i = 0; i < this.numInputs; i++) {
-                    for(let j = 0; j < this.hiddenUnits; j++) {
-                        this.weights1[i][j] = genes[idx++];
+                try {
+                    // Layer 1 (Input -> Hidden1)
+                    for(let i = 0; i < this.numInputs; i++) {
+                        for(let j = 0; j < this.hiddenUnits1; j++) {
+                            if (idx >= genes.length) throw new Error("Gene array too short");
+                            this.weights_in_h1[i][j] = parseFloat(genes[idx++]);
+                        }
                     }
-                }
-                // Bias da primeira camada
-                for(let i = 0; i < this.hiddenUnits; i++) {
-                    this.bias1[i] = genes[idx++];
-                }
-                // Pesos da segunda camada
-                for(let i = 0; i < this.hiddenUnits; i++) {
-                    for(let j = 0; j < this.numOutputs; j++) {
-                        this.weights2[i][j] = genes[idx++];
+                    for(let i = 0; i < this.hiddenUnits1; i++) {
+                         if (idx >= genes.length) throw new Error("Gene array too short");
+                        this.bias_h1[i] = parseFloat(genes[idx++]);
                     }
-                }
-                // Bias da segunda camada
-                for(let i = 0; i < this.numOutputs; i++) {
-                    this.bias2[i] = genes[idx++];
-                }
+                    // Layer 2 (Hidden1 -> Hidden2)
+                    for(let i = 0; i < this.hiddenUnits1; i++) {
+                        for(let j = 0; j < this.hiddenUnits2; j++) {
+                             if (idx >= genes.length) throw new Error("Gene array too short");
+                            this.weights_h1_h2[i][j] = parseFloat(genes[idx++]);
+                        }
+                    }
+                    for(let i = 0; i < this.hiddenUnits2; i++) {
+                         if (idx >= genes.length) throw new Error("Gene array too short");
+                        this.bias_h2[i] = parseFloat(genes[idx++]);
+                    }
+                    // Layer 3 (Hidden2 -> Output)
+                    for(let i = 0; i < this.hiddenUnits2; i++) {
+                        for(let j = 0; j < this.numOutputs; j++) {
+                             if (idx >= genes.length) throw new Error("Gene array too short");
+                            this.weights_h2_out[i][j] = parseFloat(genes[idx++]);
+                        }
+                    }
+                    for(let i = 0; i < this.numOutputs; i++) {
+                         if (idx >= genes.length) throw new Error("Gene array too short");
+                        this.bias_out[i] = parseFloat(genes[idx++]);
+                    }
 
-                //this.weights = genes.slice(0, this.numInputs);
-                //this.bias = genes[this.numInputs];
+                     if (idx !== this.getNumGenes()) {
+                         console.warn(`Gene count mismatch after setting: expected ${this.getNumGenes()}, processed ${idx}`);
+                     }
 
+                } catch (e) {
+                    console.error("Error setting genes:", e, "Index:", idx, "Gene Array Length:", genes.length);
+                     // Optionally reset weights to default random if loading fails critically
+                }
             }
 
             getNumGenes() {
-                return (this.numInputs * this.hiddenUnits) + this.hiddenUnits +
-                       (this.hiddenUnits * this.numOutputs) + this.numOutputs;
+                const genesLayer1 = (this.numInputs * this.hiddenUnits1) + this.hiddenUnits1;
+                const genesLayer2 = (this.hiddenUnits1 * this.hiddenUnits2) + this.hiddenUnits2;
+                const genesLayer3 = (this.hiddenUnits2 * this.numOutputs) + this.numOutputs;
+                return genesLayer1 + genesLayer2 + genesLayer3;
             }
         }
 
@@ -263,7 +310,7 @@
                 }
 
                 if (!closestObstacle) {
-                    return [1.0, 0, 0]; // Distância máxima, altura jogador e obstáculo 0
+                    return [1.0, 0.5, 0]; // Distância máxima, altura obstáculo e velocidade obstáculo 0
                 }
 
                 const inputDistance = minDistance / GAME_WIDTH;
@@ -301,9 +348,9 @@
                 const groundBonus = (GROUND_Y - (this.y + this.height)) < 10 ? 0.5 : 0;
 
                 // Penalidade por pular desnecessariamente
-                const jumpPenalty = this.isJumping ? -0.5 : 0;
+                const jumpPenalty = this.isJumping ? -0.6 : 0;
 
-                const weightPenalty = this.brain.getGenes().reduce((sum, gene) => sum + Math.abs(gene), 0) * -0.01;
+                const weightPenalty = this.brain.getGenes().reduce((sum, gene) => sum + Math.abs(gene), 0) * -0.02;
                 this.score += 1 + groundBonus + jumpPenalty + weightPenalty;
 
                 //console.log("Ativações ocultas:", this.brain.hiddenActivations);
@@ -526,15 +573,23 @@
         // --- Funções de Visualização ---
 
         function drawNeuralNetwork(ctx, nn) {
+            // Check if the new activation property exists
+            const hiddenActivations2 = nn.hiddenActivations2 || [];
+
             const layers = [
-                { neurons: nn.lastInputs, labels: ["Distância", "Alt Obst", "Veloc Obst"] },
-                { neurons: nn.hiddenActivations, labels: [] },
-                { neurons: [nn.lastOutput], labels: ["Pular?"] }
+                { neurons: nn.lastInputs || [], labels: ["Distância", "Alt Obst", "Veloc Obst"] },
+                { neurons: nn.hiddenActivations1 || [], labels: [] }, // Hidden Layer 1
+                { neurons: hiddenActivations2, labels: [] },           // Hidden Layer 2 <-- NEW
+                { neurons: nn.lastOutput || [0], labels: ["Pular?"] }   // Output Layer
             ];
 
-            const neuronRadius = 15;
-            const layerSpacing = 150;
-            const verticalPadding = 50;
+            const neuronRadius = 12; // Slightly smaller radius
+            const layerSpacing = 100; // Adjust spacing if needed
+            const verticalPadding = 30;
+            const maxNeuronsHeight = Math.max(...layers.map(l => l.neurons.length)) * 70; // Estimate height needed
+            // Adjust canvas height dynamically or ensure it's large enough
+            // ctx.canvas.height = Math.max(ctx.canvas.height, maxNeuronsHeight + 2 * verticalPadding);
+
 
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             ctx.fillStyle = 'white';
@@ -542,43 +597,69 @@
 
             // Desenha neurônios e conexões
             layers.forEach((layer, layerIdx) => {
-                const x = 50 + layerIdx * layerSpacing;
-                const neurons = layer.neurons;
-                
+                const x = 30 + layerIdx * layerSpacing;
+                // Filter out potential undefined/null values if activation arrays weren't initialized properly
+                const neurons = layer.neurons.filter(n => typeof n === 'number');
+                const numNeuronsInLayer = neurons.length;
+                // Calculate vertical spacing to center the layer
+                const totalLayerHeight = (numNeuronsInLayer - 1) * 70; // 70px vertical spacing between neurons
+                const startY = (ctx.canvas.height - totalLayerHeight) / 2;
+
+
                 neurons.forEach((neuron, neuronIdx) => {
-                    const y = verticalPadding + (neuronIdx * 80);
-                    
-                    // Desenha neurônio
+                    const y = startY + (neuronIdx * 70);
+
+                    // Draw neuron
                     ctx.beginPath();
                     ctx.arc(x, y, neuronRadius, 0, Math.PI * 2);
                     ctx.fillStyle = '#aaddff';
                     ctx.fill();
                     ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 1; // Reset line width
                     ctx.stroke();
 
-                    // Texto do valor
+                    // Text value
                     ctx.fillStyle = 'black';
-                    ctx.font = '10px Arial';
+                    ctx.font = '9px Arial'; // Smaller font
                     ctx.textAlign = 'center';
-                    ctx.fillText(neuron.toFixed(2), x, y + 5);
+                    ctx.fillText(neuron.toFixed(2), x, y + 4);
 
-                    // Labels apenas na primeira camada
-                    if (layerIdx === 0) {
-                        ctx.fillText(layer.labels[neuronIdx], x, y - 20);
+                    // Labels
+                    if (layer.labels && layer.labels[neuronIdx]) {
+                         ctx.font = '10px Arial';
+                         ctx.fillText(layer.labels[neuronIdx], x, y - (neuronRadius + 5));
                     }
 
-                    // Conexões com próxima camada
+                    // Connections to the *next* layer
                     if (layerIdx < layers.length - 1) {
                         const nextLayer = layers[layerIdx + 1];
+                        const numNeuronsInNextLayer = nextLayer.neurons.length;
+                        const nextLayerTotalHeight = (numNeuronsInNextLayer - 1) * 70;
+                        const nextLayerStartY = (ctx.canvas.height - nextLayerTotalHeight) / 2;
+
+
                         nextLayer.neurons.forEach((_, nextNeuronIdx) => {
                             const nextX = x + layerSpacing;
-                            const nextY = verticalPadding + (nextNeuronIdx * 80);
-                            
+                            const nextY = nextLayerStartY + (nextNeuronIdx * 70);
+
                             ctx.beginPath();
                             ctx.moveTo(x + neuronRadius, y);
                             ctx.lineTo(nextX - neuronRadius, nextY);
-                            ctx.strokeStyle = '#888';
-                            ctx.lineWidth = 0.5;
+
+                            // --- Determine weight value for color/thickness (Example) ---
+                            let weight = 0;
+                            try {
+                                if (layerIdx === 0) weight = nn.weights_in_h1[neuronIdx][nextNeuronIdx];
+                                else if (layerIdx === 1) weight = nn.weights_h1_h2[neuronIdx][nextNeuronIdx];
+                                else if (layerIdx === 2) weight = nn.weights_h2_out[neuronIdx][nextNeuronIdx];
+                            } catch (e) { /* Ignore potential errors if weights aren't structured as expected */ }
+
+                            // --- Style based on weight ---
+                            const absWeight = Math.abs(weight);
+                            ctx.lineWidth = Math.max(0.2, Math.min(absWeight * 1.5, 2.0)); // Thickness based on weight magnitude
+                            ctx.strokeStyle = weight > 0 ? `rgba(0, 150, 0, ${0.2 + absWeight * 0.6})` // Green for positive
+                                            : `rgba(150, 0, 0, ${0.2 + absWeight * 0.6})`; // Red for negative
+
                             ctx.stroke();
                         });
                     }
@@ -587,55 +668,76 @@
         }
 
 
-        function drawFitnessGraph(ctx, history) {
+        function drawFitnessGraph(ctx, bestHistory, worstHistory) {
              const canvasWidth = ctx.canvas.width;
              const canvasHeight = ctx.canvas.height;
              ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-             if (history.length === 0) return;
+             // --- Slice both histories to get the last 50 points ---
+             const pointsToShow = 50;
+             const startBestIndex = Math.max(1, bestHistory.length - pointsToShow);
+             const startWorstIndex = Math.max(1, worstHistory.length - pointsToShow); // Should be same as best
+
+             const slicedBestHistory = bestHistory.slice(startBestIndex);
+             const slicedWorstHistory = worstHistory.slice(startWorstIndex); // Slice worst scores too
+
+             const historyLength = slicedBestHistory.length; // Use length of sliced data
+
+             if (historyLength === 0) return;
 
              const padding = 30;
              const chartWidth = canvasWidth - 2 * padding;
              const chartHeight = canvasHeight - 2 * padding;
-             const barWidth = Math.max(1, chartWidth / history.length - 5); // Largura da barra com espaçamento
-             const maxScore = Math.max(...history, 1); // Evita divisão por zero
 
-             // Desenha Eixos
+             // Calculate overall max score from the visible best scores for scaling
+             const maxScore = Math.max(...slicedBestHistory, 1);
+
+             // --- Adjust bar width and spacing for two bars ---
+             const totalBarSpace = Math.max(1, chartWidth / historyLength); // Total space per generation pair
+             const barGap = 3; // Gap between generations
+             const barWidth = Math.max(1, (totalBarSpace - barGap) / 2); // Width for each bar (best/worst)
+
+             // Desenha Eixos (same as before)
              ctx.strokeStyle = '#aaa';
              ctx.lineWidth = 1;
-             // Eixo Y
-             ctx.beginPath();
-             ctx.moveTo(padding, padding);
-             ctx.lineTo(padding, canvasHeight - padding);
-             ctx.stroke();
-             // Eixo X
-             ctx.beginPath();
-             ctx.moveTo(padding, canvasHeight - padding);
-             ctx.lineTo(canvasWidth - padding, canvasHeight - padding);
-             ctx.stroke();
+             ctx.beginPath(); ctx.moveTo(padding, padding); ctx.lineTo(padding, canvasHeight - padding); ctx.stroke(); // Y Axis
+             ctx.beginPath(); ctx.moveTo(padding, canvasHeight - padding); ctx.lineTo(canvasWidth - padding, canvasHeight - padding); ctx.stroke(); // X Axis
 
-             // Desenha Barras
-             ctx.fillStyle = '#3498db'; // Azul
-             for (let i = 0; i < history.length; i++) {
-                 const barHeight = (history[i] / maxScore) * chartHeight;
-                 const x = padding + i * (barWidth + 5); // Adiciona 5 de espaçamento
-                 const y = canvasHeight - padding - barHeight;
+             // Desenha Barras (Best and Worst)
+             for (let i = 0; i < historyLength; i++) {
+                 const currentBestScore = slicedBestHistory[i];
+                 const currentWorstScore = slicedWorstHistory[i];
 
-                 // Limita a largura se houver muitas gerações
-                 const currentBarWidth = Math.min(barWidth, chartWidth / history.length * 0.8);
+                 const bestBarHeight = currentBestScore;
+                 const worstBarHeight = currentWorstScore;
 
-                 ctx.fillRect(x, y, currentBarWidth, barHeight);
+                 // X position for the start of this generation's bars
+                 const xStart = padding + i * totalBarSpace;
+                 const yBest = canvasHeight - padding - bestBarHeight;
+                 const yWorst = canvasHeight - padding - worstBarHeight;
 
-                  // Adiciona rótulo da geração a cada 5 barras (ou se for a última)
-                 if (history.length < 30 || i % 5 === 0 || i === history.length - 1) {
+                 // Draw Best Score Bar
+                 ctx.fillStyle = '#3498db'; // Blue
+                 ctx.fillRect(xStart, yBest, barWidth, bestBarHeight);
+
+                 // Draw Worst Score Bar (next to best bar)
+                 ctx.fillStyle = '#e74c3c'; // Red
+                 ctx.fillRect(xStart + barWidth, yWorst, barWidth, worstBarHeight); // Position it right after the blue bar
+
+                 // Adiciona rótulo da geração (adjust index based on startIndex)
+                 const generationNumber = startBestIndex + i + 1;
+                 // Label less frequently if many bars are shown
+                 const labelFrequency = (historyLength > 30) ? 10 : 5;
+                 if (i % labelFrequency === 0 || i === historyLength - 1) {
                      ctx.fillStyle = '#555';
                      ctx.font = '10px Arial';
                      ctx.textAlign = 'center';
-                     ctx.fillText(i + 1, x + currentBarWidth / 2, canvasHeight - padding + 15);
+                     // Center label under the pair of bars
+                     ctx.fillText(generationNumber, xStart + barWidth, canvasHeight - padding + 15);
                  }
              }
 
-              // Label Eixo Y (Max Score)
+              // Label Eixo Y (Max Score of visible data)
              ctx.fillStyle = '#555';
              ctx.font = '10px Arial';
              ctx.textAlign = 'right';
@@ -659,13 +761,15 @@
             // 1. Coleta Fitness (Scores)
             const fitnessScores = players.map(p => p.score);
 
-             // Armazena a melhor pontuação desta geração para o gráfico
-            const bestFitnessThisGen = Math.max(...fitnessScores);
+            // Armazena a melhor e pior pontuação desta geração para os gráficos
+            const bestFitnessThisGen = Math.max(...fitnessScores, 1); // Use 0 if empty
+            const worstFitnessThisGen = Math.min(...fitnessScores, 1); // Use 0 if empty
             bestScoresHistory.push(bestFitnessThisGen);
+            worstScoresHistory.push(worstFitnessThisGen);
             document.getElementById('bestScore').textContent = bestFitnessThisGen.toFixed(0);
 
-             // Atualiza o gráfico
-            drawFitnessGraph(graphCtx, bestScoresHistory);
+            // Atualiza o gráfico (passando ambos os históricos)
+            drawFitnessGraph(graphCtx, bestScoresHistory, worstScoresHistory);
 
             // 2. Avalia e Gera Nova População na ES
             evolutionaryStrategy.evaluate(fitnessScores);
@@ -680,10 +784,12 @@
             document.getElementById('generation').textContent = generation;
             nextObstacleFrame = 100; // Reseta timer do obstáculo
 
-            const numOutputs = 1;
-            const brainTemplate = new MLP(3, HIDDEN_UNITS, numOutputs);
+            // const numOutputs = NUM_OUTPUTS; // Already defined globally
+            // Create a template brain to get the correct number of genes
+            const brainTemplate = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
             const numGenes = brainTemplate.getNumGenes();
-            
+
+            // Initialize ES with the correct number of genes
             evolutionaryStrategy = new EvolutionaryStrategy(
                 NUM_PLAYERS, MUTATION_RATE, MUTATION_AMOUNT, numGenes
             );
@@ -691,21 +797,36 @@
             // 4. Cria novos jogadores com os genes da nova população
             players = [];
             for (let i = 0; i < NUM_PLAYERS; i++) {
-                const brain = new MLP(3, HIDDEN_UNITS, numOutputs);
+                // Pass all required hidden layer sizes to the constructor
+                const brain = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
                 var genes = evolutionaryStrategy.getIndividualGenes(i);
 
-                // Se for o primeiro jogador, use os genes pré-treinados
-                if (i === 0) {
-                    genes = genesP1; // Ou outra variável que contenha seus genes pré-treinados
+                // Comment out the pre-trained gene loading for now
+                /*
+                if (i === 0 && genesP1) { // Check if genesP1 exists
+                    // Ensure genesP1 has the correct length before trying to set
+                    if(genesP1.length === numGenes) {
+                        genes = genesP1;
+                    } else {
+                        console.warn("genesP1 has incorrect length for the new network structure. Using random genes.");
+                    }
                 }
-                
+                */
+
                 brain.setGenes(genes);
                 players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
             }
 
-            const brainP1 = new MLP(3, HIDDEN_UNITS, numOutputs);
-            brainP1.setGenes(genesP1);
-            players[NUM_PLAYERS -1]=new Player("black", brainP1, 45);
+            // Comment out the specific P1 brain creation for now
+            /*
+            const brainP1 = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
+            if(genesP1 && genesP1.length === numGenes) {
+                brainP1.setGenes(genesP1);
+                //players[NUM_PLAYERS -1]=new Player("black", brainP1, 45);
+            } else {
+                 console.warn("Cannot create specific P1 player, genesP1 invalid.");
+            }
+            */
 
             console.log(`Iniciando Geração ${generation} com nova população.`);
         }
@@ -797,9 +918,8 @@
 
         // --- Inicialização ---
         function init() {
-
-            const numOutputs = 1;
-            const brainTemplate = new MLP(3, HIDDEN_UNITS, numOutputs);
+            // const numOutputs = NUM_OUTPUTS; // Already defined globally
+            const brainTemplate = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
             const numGenes = brainTemplate.getNumGenes();
             
             evolutionaryStrategy = new EvolutionaryStrategy(
@@ -809,29 +929,43 @@
              // Cria os jogadores iniciais com genes da primeira população aleatória
             players = [];
             for (let i = 0; i < NUM_PLAYERS; i++) {
-                const brain = new MLP(3, HIDDEN_UNITS, numOutputs);
+                 // Pass all required hidden layer sizes to the constructor
+                const brain = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
                 var genes = evolutionaryStrategy.getIndividualGenes(i);
-        
-                // Se for o primeiro jogador, use os genes pré-treinados (P1 = Player 1)
-                if (i === 0) {
-                    genes = genesP1; // Ou outra variável que contenha seus genes pre-treinados
+
+                // Comment out pre-trained gene loading
+                /*
+                if (i === 0 && genesP1) {
+                    if(genesP1.length === numGenes) {
+                        genes = genesP1;
+                    } else {
+                         console.warn("genesP1 has incorrect length for the new network structure. Using random genes.");
+                    }
                 }
+                */
 
                 brain.setGenes(genes);
                 players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
             }
 
-            const brainP1 = new MLP(3, HIDDEN_UNITS, numOutputs);
-            brainP1.x -= 12;
-            brainP1.color = 'black';
-            brainP1.setGenes(genesP1);
-            players[NUM_PLAYERS -1]=new Player("black", brainP1, 55);
-
+            // Comment out specific P1 creation
+            /*
+            const brainP1 = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
+            // brainP1.x -= 12; // Cannot set x on brain
+            // brainP1.color = 'black'; // Cannot set color on brain
+            if(genesP1 && genesP1.length === numGenes) {
+                brainP1.setGenes(genesP1);
+                // players[NUM_PLAYERS -1]=new Player("black", brainP1, 55);
+            } else {
+                 console.warn("Cannot create specific P1 player, genesP1 invalid.");
+            }
+            */
 
             activePlayers = NUM_PLAYERS;
             frameCount = 0;
             generation = 1;
             bestScoresHistory = []; // Limpa histórico no início
+            worstScoresHistory = []; // <-- ADD THIS LINE: Clear worst history too
 
             document.getElementById('generation').textContent = generation;
             document.getElementById('bestScore').textContent = '0';
@@ -839,7 +973,7 @@
 
             // Limpa o gráfico inicial
             graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
-            drawFitnessGraph(graphCtx, []); // Desenha gráfico vazio
+            drawFitnessGraph(graphCtx, [], []); // <-- MODIFY THIS CALL: Pass empty worst history
 
              console.log("Jogo inicializado. Iniciando Geração 1.");
             // Inicia o loop do jogo
