@@ -93,7 +93,7 @@
         const growthTimes = { // Em segundos (reduzido para demonstração)
             flower: { seed: 0, sprout: 5, bud: 15, bloom: 30 },
             tree: { seed: 0, sapling: 10, growing: 30, mature: 60 },
-            pinetree: { seed: 0, sapling: 20, growing: 60, mature: 120 }, // Tempos mais longos para o pinheiro
+            pinetree: { seed: 0, sapling: 20, growing: 60, mature: 120, ancient: 180 }, // Adicionado o estágio "ancient" com 180s
             mushroom: { spore: 0, small: 5, grown: 20 }
         };
 
@@ -234,22 +234,25 @@
             if (intersects.length > 0 && currentSeedType) {
                 const intersectPoint = intersects[0].point;
                 plantSeed(intersectPoint, currentSeedType);
-                currentSeedType = null; // Desselecionar após plantar
+                //currentSeedType = null; // Desselecionar após plantar
                 console.log(`Planted ${currentSeedType} at`, intersectPoint);
             } else if (intersects.length === 0) {
-                 // Tentar tocar nas plantas (opcional - colher melodia)
-                 const plantIntersects = raycaster.intersectObjects(plants.map(p => p.mesh).filter(m => m)); // Pega os meshes das plantas
-                 if (plantIntersects.length > 0) {
-                     const plant = plantIntersects[0].object.userData.plantData;
-                     console.log(`Tocou na planta: ${plant.type}`);
-                     // Aqui poderia tocar um som aleatório (Web Audio API seria melhor)
-                     try { notificationSound.play(); } catch (e) { console.warn("Audio play failed", e); }
-                     showNotification(`🎶 Melodia suave da ${plant.type} 🎶`, 1500);
-                 }
+                // Tentar tocar nas plantas (opcional - colher melodia)
+                const plantIntersects = raycaster.intersectObjects(plants.map(p => p.mesh).filter(m => m)); // Pega os meshes das plantas
+                if (plantIntersects.length > 0) {
+                    const plant = plantIntersects[0].object.userData.plantData;
+                    console.log(`Tocou na planta: ${plant.type}`);
+                    // Aqui poderia tocar um som aleatório (Web Audio API seria melhor)
+                    try { notificationSound.play(); } catch (e) { console.warn("Audio play failed", e); }
+                    showNotification(`🎶 Melodia suave da ${plant.type} 🎶`, 1500);
+                }
             }
         }
 
         function plantSeed(position, type) {
+            // Adicionar variabilidade de tamanho para cada planta individual
+            const sizeVariation = 0.85 + Math.random() * 0.3; // Variação de 85% a 115% do tamanho normal
+            
             const plantData = {
                 id: THREE.MathUtils.generateUUID(),
                 type: type,
@@ -258,6 +261,7 @@
                 growthStage: 0,
                 mesh: null,
                 notifiedStages: {},
+                sizeVariation: sizeVariation, // Armazenar o fator de escala para esta planta
                 bloomColor: type === 'flower' ? flowerBloomColors[Math.floor(Math.random() * flowerBloomColors.length)] : null
             };
 
@@ -274,7 +278,7 @@
             switch(type) {
                 case 'flower': return ['seed', 'sprout', 'bud', 'bloom'];
                 case 'tree': return ['seed', 'sapling', 'growing', 'mature'];
-                case 'pinetree': return ['seed', 'sapling', 'growing', 'mature']; // Mesmos estágios da árvore normal
+                case 'pinetree': return ['seed', 'sapling', 'growing', 'mature', 'ancient']; // Adicionado "ancient"
                 case 'mushroom': return ['spore', 'small', 'grown'];
                 default: return [];
             }
@@ -378,34 +382,37 @@
             const stageName = stages[plantData.growthStage];
             let geometry, material, mesh;
             const scaleFactor = 0.5 + plantData.growthStage * 0.5; // Aumenta tamanho com estágio
+            
+            // Obter a variação de tamanho desta planta específica (padrão: 1.0 se não definido)
+            const sizeVariation = plantData.sizeVariation || 1.0;
 
             switch (plantData.type) {
                 case 'flower':
                     material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
                     if (stageName === 'seed') {
-                        geometry = new THREE.SphereGeometry(0.08, 8, 6);
+                        geometry = new THREE.SphereGeometry(0.08 * sizeVariation, 8, 6);
                         material.color.set(0x8B4513); // Brown
                     } else if (stageName === 'sprout') {
-                        geometry = new THREE.ConeGeometry(0.12, 0.3, 8);
+                        geometry = new THREE.ConeGeometry(0.12 * sizeVariation, 0.3 * sizeVariation, 8);
                         material.color.set(0x90EE90); // LightGreen
                         mesh = new THREE.Mesh(geometry, material);
-                        mesh.position.y = 0.15;
+                        mesh.position.y = 0.15 * sizeVariation;
                         return mesh;
                     } else if (stageName === 'bud') {
-                        geometry = new THREE.SphereGeometry(0.2, 8, 6);
+                        geometry = new THREE.SphereGeometry(0.2 * sizeVariation, 8, 6);
                         material.color.set(0xFFC0CB); // Pink
                     } else { // bloom
-                        geometry = new THREE.SphereGeometry(0.3, 16, 12);
+                        geometry = new THREE.SphereGeometry(0.3 * sizeVariation, 16, 12);
                         material.color.set(plantData.bloomColor || 0xFF69B4); // Use stored color, fallback to pink
                     }
                     break;
 
                 case 'tree':
-                     material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                     const trunkHeight = [0.1, 0.8, 1.5, 3.0][plantData.growthStage];
-                     const trunkRadius = [0.05, 0.1, 0.2, 0.4][plantData.growthStage];
-                     const leavesRadius = [0.1, 0.5, 1.0, 1.8][plantData.growthStage];
-                     const leavesColor = stageName === 'seed' ? 0x8B4513 : 0x006400; // DarkGreen except seed
+                    material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
+                    const trunkHeight = [0.1, 0.8, 1.5, 3.0][plantData.growthStage] * sizeVariation;
+                    const trunkRadius = [0.05, 0.1, 0.2, 0.4][plantData.growthStage] * sizeVariation;
+                    const leavesRadius = [0.1, 0.5, 1.0, 1.8][plantData.growthStage] * sizeVariation;
+                    const leavesColor = stageName === 'seed' ? 0x8B4513 : 0x006400; // DarkGreen except seed
 
                     const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.8, trunkRadius, trunkHeight, 8);
                     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
@@ -418,7 +425,15 @@
 
                     if (stageName !== 'seed') {
                         const leavesGeo = new THREE.SphereGeometry(leavesRadius, 16, 12);
-                        const leavesMat = new THREE.MeshStandardMaterial({ color: leavesColor });
+                        // Também adicionar variação sutil na cor das folhas
+                        const colorVariation = -0.1 + Math.random() * 0.2; // -10% a +10% variação
+                        const baseColor = new THREE.Color(leavesColor);
+                        // Ajustar levemente a cor para cada árvore
+                        baseColor.r = Math.max(0, Math.min(1, baseColor.r * (1 + colorVariation * 0.3)));
+                        baseColor.g = Math.max(0, Math.min(1, baseColor.g * (1 + colorVariation)));
+                        baseColor.b = Math.max(0, Math.min(1, baseColor.b * (1 + colorVariation * 0.3)));
+                        
+                        const leavesMat = new THREE.MeshStandardMaterial({ color: baseColor });
                         const leavesMesh = new THREE.Mesh(leavesGeo, leavesMat);
                         leavesMesh.castShadow = true;
                         leavesMesh.position.y = trunkHeight + leavesRadius * 0.7; // Topo do tronco
@@ -428,13 +443,13 @@
 
                 case 'pinetree':
                     material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                    // Parâmetros do pinheiro - tronco mais fino e alto (aumentados)
-                    const pineHeight = [0.1, 1.5, 3.0, 5.5][plantData.growthStage]; // Aumentado significativamente
-                    const pineTrunkRadius = [0.05, 0.1, 0.2, 0.3][plantData.growthStage]; // Ligeiramente mais grosso
+                    // Parâmetros do pinheiro aumentados drasticamente com fator de variação
+                    const pineHeight = [0.1, 1.5, 3.0, 6.0, 11.0][plantData.growthStage] * sizeVariation;
+                    const pineTrunkRadius = [0.05, 0.1, 0.2, 0.35, 0.5][plantData.growthStage] * sizeVariation;
                     const pineTrunkColor = 0x5C4033; // Marrom mais escuro
                     
                     // Criar o tronco
-                    const pineTrunkGeo = new THREE.CylinderGeometry(pineTrunkRadius * 0.8, pineTrunkRadius, pineHeight, 8);
+                    const pineTrunkGeo = new THREE.CylinderGeometry(pineTrunkRadius * 0.8, pineTrunkRadius, pineHeight, 10); // Aumentado polígonos
                     const pineTrunkMat = new THREE.MeshStandardMaterial({ color: pineTrunkColor });
                     const pineTrunkMesh = new THREE.Mesh(pineTrunkGeo, pineTrunkMat);
                     pineTrunkMesh.castShadow = true;
@@ -446,18 +461,30 @@
                     if (stageName !== 'seed') {
                         // Adicionar os níveis de "folhas" em formato de cones
                         const numLayers = plantData.growthStage === 1 ? 1 : 
-                                          plantData.growthStage === 2 ? 3 : 4; // Mais camadas
-                        const pineGreen = 0x2E8B57; // Verde escuro para o pinheiro
+                                          plantData.growthStage === 2 ? 3 : 
+                                          plantData.growthStage === 3 ? 4 : 5; // 5 camadas para o estágio "ancient"
+                        
+                        // Variação sutil na cor do pinheiro 
+                        let pineGreen = plantData.growthStage === 4 ? 0x1A4D2E : 0x2E8B57;
+                        // Pequena variação de cor para cada pinheiro
+                        const colorVariation = -0.1 + Math.random() * 0.2; // -10% a +10% variação
+                        const baseColor = new THREE.Color(pineGreen);
+                        baseColor.g = Math.max(0, Math.min(1, baseColor.g * (1 + colorVariation)));
+                        baseColor.b = Math.max(0, Math.min(1, baseColor.b * (1 + colorVariation * 0.5)));
+                        pineGreen = baseColor;
                         
                         for (let i = 0; i < numLayers; i++) {
-                            // Para cada camada, criar um cone
-                            const layerHeight = pineHeight * (0.45 - i * 0.05); // Cones ligeiramente mais altos
-                            const layerRadius = pineHeight * (0.35 - i * 0.03); // Cones ligeiramente mais largos
+                            // Para cada camada, criar um cone com leve variação de tamanho
+                            const layerVariation = 0.95 + Math.random() * 0.1; // Sutil variação entre camadas (95%-105%)
+                            const layerHeight = pineHeight * (0.45 - i * 0.05) * layerVariation;
+                            const layerRadius = pineHeight * (0.35 - i * 0.03) * layerVariation;
                             
                             // Posição Y vai subindo pelo tronco
-                            const layerY = pineHeight * (0.55 + i * 0.15); // Distribuição ao longo do tronco
+                            const layerY = pineHeight * (stageName === 'ancient' ? 
+                                                   (0.5 + i * 0.12) : // Distribuição para árvore antiga
+                                                   (0.55 + i * 0.15)); // Distribuição para outros estágios
                             
-                            const coneGeo = new THREE.ConeGeometry(layerRadius, layerHeight, 8);
+                            const coneGeo = new THREE.ConeGeometry(layerRadius, layerHeight, 10); // Aumentado polígonos
                             const coneMat = new THREE.MeshStandardMaterial({ 
                                 color: pineGreen,
                                 roughness: 0.9,
@@ -469,15 +496,62 @@
                             
                             mesh.add(coneMesh);
                         }
+                        
+                        // Para o estágio "ancient", adicione alguns detalhes extras (textura de casca)
+                        if (stageName === 'ancient') {
+                            // Número de detalhes de casca varia por árvore
+                            const barkDetails = 15 + Math.floor(Math.random() * 10);
+                            
+                            for (let i = 0; i < barkDetails; i++) {
+                                const barkSize = (0.1 + Math.random() * 0.2) * sizeVariation;
+                                const barkGeo = new THREE.BoxGeometry(barkSize, barkSize * 0.5, barkSize);
+                                const barkMat = new THREE.MeshStandardMaterial({
+                                    color: 0x4B3621, // Tom marrom mais escuro para a casca
+                                    roughness: 1.0
+                                });
+                                const barkMesh = new THREE.Mesh(barkGeo, barkMat);
+                                
+                                // Posicionar aleatoriamente ao redor do tronco
+                                const angle = Math.random() * Math.PI * 2;
+                                const trunkOffset = pineTrunkRadius * 0.9;
+                                const height = Math.random() * pineHeight * 0.8;
+                                
+                                barkMesh.position.set(
+                                    Math.cos(angle) * trunkOffset,
+                                    height, 
+                                    Math.sin(angle) * trunkOffset
+                                );
+                                
+                                // Rotação aleatória para parecer natural
+                                barkMesh.rotation.set(
+                                    Math.random() * 0.5,
+                                    Math.random() * Math.PI * 2,
+                                    Math.random() * 0.5
+                                );
+                                
+                                mesh.add(barkMesh);
+                            }
+                        }
                     }
                     return mesh;
 
                 case 'mushroom':
-                     material = new THREE.MeshStandardMaterial({ roughness: 0.7 });
-                     const mushStemHeight = [0.05, 0.2, 0.4][plantData.growthStage];
-                     const mushCapRadius = [0.05, 0.25, 0.5][plantData.growthStage];
-                     const stemColor = 0xFFFACD; // LemonChiffon
-                     const capColor = stageName === 'spore' ? 0xD2B48C : 0xDC143C; // Crimson (or Tan for spore)
+                    material = new THREE.MeshStandardMaterial({ roughness: 0.7 });
+                    const mushStemHeight = [0.05, 0.2, 0.4][plantData.growthStage] * sizeVariation;
+                    const mushCapRadius = [0.05, 0.25, 0.5][plantData.growthStage] * sizeVariation;
+                    
+                    // Variação sutil nas cores do cogumelo
+                    const stemHue = Math.random() * 0.1; // Variação da cor do caule
+                    const stemColor = new THREE.Color(0xFFFACD).lerp(new THREE.Color(0xFFF0C0), stemHue);
+                    
+                    const capHue = Math.random() * 0.2; // Variação da cor da tampa
+                    const baseCapColor = stageName === 'spore' ? 0xD2B48C : 0xDC143C;
+                    const capColor = new THREE.Color(baseCapColor).lerp(
+                        stageName === 'spore' 
+                            ? new THREE.Color(0xC2A478) 
+                            : new THREE.Color(0xFF0000), 
+                        capHue
+                    );
 
                     const stemGeo = new THREE.CylinderGeometry(mushStemHeight * 0.3, mushStemHeight * 0.4, mushStemHeight, 8);
                     const stemMat = new THREE.MeshStandardMaterial({ color: stemColor });
@@ -554,17 +628,24 @@
                             // Notificação de marco importante (ex: florescer, amadurecer)
                             if ((plant.type === 'flower' && newStageName === 'bloom') ||
                                 (plant.type === 'tree' && newStageName === 'mature') ||
-                                (plant.type === 'pinetree' && newStageName === 'mature') ||
+                                (plant.type === 'pinetree' && (newStageName === 'mature' || newStageName === 'ancient')) ||
                                 (plant.type === 'mushroom' && newStageName === 'grown'))
                             {
                                 if (!plant.notifiedStages[newStageName]) {
                                      const messages = {
                                          'flower': `Sua ${plant.type} desabrochou! 🌸`,
                                          'tree': `Sua ${plant.type} está madura! 🌳`,
-                                         'pinetree': `Seu pinheiro atingiu o tamanho máximo! 🌲`,
+                                         'pinetree': newStageName === 'ancient' ? 
+                                                    `Seu pinheiro se tornou uma árvore ancestral! 🌲` : 
+                                                    `Seu pinheiro atingiu o tamanho máximo! 🌲`,
                                          'mushroom': `Seu ${plant.type} cresceu! 🍄`
                                      };
-                                     showNotification(messages[plant.type], 5000);
+                                     // Usar a mensagem específica para pinheiro baseada no estágio
+                                     const message = plant.type === 'pinetree' ? 
+                                                    messages['pinetree'] : 
+                                                    messages[plant.type];
+                                     
+                                     showNotification(message, 5000);
                                      try { notificationSound.play(); } catch(e) { console.warn("Audio play failed", e); }
                                      plant.notifiedStages[newStageName] = true;
                                 }
