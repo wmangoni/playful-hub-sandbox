@@ -41,11 +41,37 @@
             margin-bottom: 5px;
             text-align: center;
         }
+        /* Estilos para syntax highlighting do JSON */
+        #savedJsonContent .string { color: green; }
+        #savedJsonContent .number { color: darkorange; }
+        #savedJsonContent .boolean { color: blue; }
+        #savedJsonContent .null { color: magenta; }
+        #savedJsonContent .key { color: red; }
+        
+        /* Estilo para o contêiner da visualização do JSON */
+        #jsonViewer {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            padding: 10px;
+        }
+        
+        #savedJsonInfo {
+            background-color: #f9f9f9;
+            padding: 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <div id="info">Geração: <span id="generation">1</span> | Melhor Pontuação da Geração: <span id="bestScore">0</span></div>
+        <div id="info">Geração: <span id="generation">1</span> | Melhor Pontuação da Geração: <span id="bestScore">0</span>
+            <button id="saveBestBtn" style="margin-left: 10px; background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Copiar Melhor</button>
+            <button id="loadBestBtn" style="margin-left: 5px; background-color: #2980b9; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Adicionar Salvo</button>
+        </div>
+        <div id="eliteInfo" style="font-size: 14px; margin-bottom: 5px;">Jogadores Elite: 0 ouro, 0 prata</div>
         <canvas id="gameCanvas" width="600" height="300"></canvas>
         <div id="graphContainer">
              <h3>Melhores Pontuações por Geração</h3>
@@ -55,6 +81,12 @@
     <div id="visContainer">
          <h3>Rede Neural (Jogador 0)</h3>
          <canvas id="nnCanvas" width="400" height="800"></canvas>
+         
+         <div id="jsonViewer" style="margin-top: 20px; width: 400px;">
+             <h3>Melhor Indivíduo Salvo</h3>
+             <div id="savedJsonInfo" style="margin-bottom: 10px; font-size: 12px; color: #666;">Carregando...</div>
+             <pre id="savedJsonContent" style="background: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px; height: 300px; overflow: auto; font-size: 11px; line-height: 1.3;"></pre>
+         </div>
     </div>
 
     <script>
@@ -125,6 +157,11 @@
         let evolutionaryStrategy;
         let bestScoresHistory = []; // Armazena as melhores pontuações de cada geração
         let worstScoresHistory = []; // Armazena as piores pontuações de cada geração
+
+        // Variáveis para armazenar o melhor indivíduo
+        let bestEverFitness = 0;
+        let bestEverNeuralNetwork = null;
+        let bestEverGeneration = 0;
 
         // --- Classe Perceptron (Rede Neural) ---
         class MLP {
@@ -497,17 +534,23 @@
 
             // Avalia a população com base nas pontuações (fitness)
             evaluate(fitnessScores) {
+                // Verificar se os dados de fitness são válidos
+                if (!fitnessScores || fitnessScores.length === 0) {
+                    console.error("Array de fitness inválido ou vazio");
+                    return;
+                }
+                
+                // Verificar compatibilidade de tamanho
                 if (fitnessScores.length !== this.populationSize) {
-                    console.error("Tamanho do array de fitness não corresponde ao tamanho da população!");
-                    // Se der erro, tenta usar os scores dos players que ainda existem
-                    fitnessScores = players.map(p => p.score);
-                    if(fitnessScores.length !== this.populationSize) {
-                        console.error("Erro grave ao tentar recuperar scores.");
-                        // Como último recurso, atribui fitness 0 a todos e espera a próxima geração
-                        this.population.forEach(ind => ind.fitness = 0);
-                        return;
+                    console.warn(`Tamanho do array de fitness (${fitnessScores.length}) não corresponde ao tamanho da população (${this.populationSize})!`);
+                    // Ajustar o tamanho do array de fitness se necessário
+                    fitnessScores = fitnessScores.slice(0, this.populationSize);
+                    while (fitnessScores.length < this.populationSize) {
+                        fitnessScores.push(0); // Preencher com zeros se faltar
                     }
                 }
+                
+                // Atribuir fitness aos indivíduos
                 for (let i = 0; i < this.populationSize; i++) {
                     // Garante que o indivíduo existe antes de atribuir fitness
                     if (this.population[i]) {
@@ -516,22 +559,24 @@
                         console.warn(`Indivíduo ${i} não encontrado na população durante avaliação.`);
                     }
                 }
+                
                 // Ordena a população por fitness (do maior para o menor)
-                // Ordena a população em ordem decrescente de fitness (pontuação)
-                // Para cada par de indivíduos a,b:
-                // - Se b.fitness > a.fitness, retorna número positivo (b vem antes)
-                // - Se b.fitness < a.fitness, retorna número negativo (a vem antes) 
-                // - Se b.fitness = a.fitness, retorna 0 (mantém ordem)
                 this.population.sort((a, b) => b.fitness - a.fitness);
+                
                 // Imprime o primeiro (melhor) e último (pior) indivíduo da população ordenada
-                console.log("Melhor indivíduo:", {
-                    fitness: this.population[0].fitness.toFixed(2),
-                    genes: this.population[0].genes.map(g => g.toFixed(3))
-                });
-                console.log("Pior indivíduo:", {
-                    fitness: this.population[this.population.length-1].fitness.toFixed(2), 
-                    genes: this.population[this.population.length-1].genes.map(g => g.toFixed(3))
-                });
+                if (this.population.length > 0) {
+                    console.log("Melhor indivíduo:", {
+                        fitness: this.population[0].fitness.toFixed(2),
+                        genes: this.population[0].genes.map(g => g.toFixed(3))
+                    });
+                    
+                    if (this.population.length > 1) {
+                        console.log("Pior indivíduo:", {
+                            fitness: this.population[this.population.length-1].fitness.toFixed(2), 
+                            genes: this.population[this.population.length-1].genes.map(g => g.toFixed(3))
+                        });
+                    }
+                }
             }
 
             // Aplica mutação a um conjunto de genes
@@ -673,15 +718,29 @@
              const canvasHeight = ctx.canvas.height;
              ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
+             // Verificar se há dados de histórico
+             if (!bestHistory || bestHistory.length === 0) {
+                 ctx.fillStyle = '#555';
+                 ctx.font = '12px Arial';
+                 ctx.textAlign = 'center';
+                 ctx.fillText('Sem dados de histórico disponíveis', canvasWidth / 2, canvasHeight / 2);
+                 return;
+             }
+
+             // Garantir que worstHistory tem o mesmo tamanho que bestHistory
+             if (!worstHistory || worstHistory.length !== bestHistory.length) {
+                 console.warn('worstHistory inválido ou com tamanho diferente de bestHistory');
+                 worstHistory = bestHistory.map(() => 0); // Preencher com zeros
+             }
+
              // --- Slice both histories to get the last 50 points ---
              const pointsToShow = 50;
-             const startBestIndex = Math.max(1, bestHistory.length - pointsToShow);
-             const startWorstIndex = Math.max(1, worstHistory.length - pointsToShow); // Should be same as best
-
+             const startBestIndex = Math.max(0, bestHistory.length - pointsToShow);
+             
              const slicedBestHistory = bestHistory.slice(startBestIndex);
-             const slicedWorstHistory = worstHistory.slice(startWorstIndex); // Slice worst scores too
+             const slicedWorstHistory = worstHistory.slice(startBestIndex);
 
-             const historyLength = slicedBestHistory.length; // Use length of sliced data
+             const historyLength = slicedBestHistory.length;
 
              if (historyLength === 0) return;
 
@@ -693,11 +752,11 @@
              const maxScore = Math.max(...slicedBestHistory, 1);
 
              // --- Adjust bar width and spacing for two bars ---
-             const totalBarSpace = Math.max(1, chartWidth / historyLength); // Total space per generation pair
-             const barGap = 3; // Gap between generations
-             const barWidth = Math.max(1, (totalBarSpace - barGap) / 2); // Width for each bar (best/worst)
+             const totalBarSpace = Math.max(1, chartWidth / historyLength);
+             const barGap = 3;
+             const barWidth = Math.max(1, (totalBarSpace - barGap) / 2);
 
-             // Desenha Eixos (same as before)
+             // Desenha Eixos
              ctx.strokeStyle = '#aaa';
              ctx.lineWidth = 1;
              ctx.beginPath(); ctx.moveTo(padding, padding); ctx.lineTo(padding, canvasHeight - padding); ctx.stroke(); // Y Axis
@@ -705,11 +764,12 @@
 
              // Desenha Barras (Best and Worst)
              for (let i = 0; i < historyLength; i++) {
-                 const currentBestScore = slicedBestHistory[i];
-                 const currentWorstScore = slicedWorstHistory[i];
+                 const currentBestScore = slicedBestHistory[i] || 0;
+                 const currentWorstScore = slicedWorstHistory[i] || 0;
 
-                 const bestBarHeight = currentBestScore;
-                 const worstBarHeight = currentWorstScore;
+                 // Normaliza os valores para escala do gráfico
+                 const bestBarHeight = (currentBestScore / maxScore) * chartHeight;
+                 const worstBarHeight = (currentWorstScore / maxScore) * chartHeight;
 
                  // X position for the start of this generation's bars
                  const xStart = padding + i * totalBarSpace;
@@ -722,28 +782,26 @@
 
                  // Draw Worst Score Bar (next to best bar)
                  ctx.fillStyle = '#e74c3c'; // Red
-                 ctx.fillRect(xStart + barWidth, yWorst, barWidth, worstBarHeight); // Position it right after the blue bar
+                 ctx.fillRect(xStart + barWidth, yWorst, barWidth, worstBarHeight);
 
-                 // Adiciona rótulo da geração (adjust index based on startIndex)
+                 // Adiciona rótulo da geração
                  const generationNumber = startBestIndex + i + 1;
-                 // Label less frequently if many bars are shown
                  const labelFrequency = (historyLength > 30) ? 10 : 5;
                  if (i % labelFrequency === 0 || i === historyLength - 1) {
                      ctx.fillStyle = '#555';
                      ctx.font = '10px Arial';
                      ctx.textAlign = 'center';
-                     // Center label under the pair of bars
                      ctx.fillText(generationNumber, xStart + barWidth, canvasHeight - padding + 15);
                  }
              }
 
-              // Label Eixo Y (Max Score of visible data)
+             // Label Eixo Y
              ctx.fillStyle = '#555';
              ctx.font = '10px Arial';
              ctx.textAlign = 'right';
              ctx.fillText(maxScore.toFixed(0), padding - 5, padding + 5);
              ctx.fillText('0', padding - 5, canvasHeight - padding + 5);
-             ctx.textAlign = 'start'; // Reset alignment
+             ctx.textAlign = 'start';
         }
 
         // --- Lógica Principal do Jogo ---
@@ -758,12 +816,24 @@
         function resetGame() {
             console.log(`Fim da Geração ${generation}. Avaliando...`);
 
-            // 1. Coleta Fitness (Scores)
-            const fitnessScores = players.map(p => p.score);
+            // 1. Identificar os 2 melhores jogadores da geração atual
+            const bestPlayers = [...players]
+                .sort((a, b) => b.score - a.score) // Ordenar por pontuação (maior primeiro)
+                .slice(0, 2); // Pegar os 2 primeiros (melhores)
+            
+            // Salvar os dados dos cérebros dos melhores jogadores
+            const bestPlayersBrains = bestPlayers.map(player => ({
+                brain: brainToStructuredFormat(player.brain),
+                score: player.score
+            }));
+            
+            // 2. Coleta Fitness (Scores) - Usar apenas os primeiros NUM_PLAYERS jogadores
+            // para evitar "tamanho do array de fitness não corresponde ao tamanho da população"
+            const fitnessScores = players.slice(0, NUM_PLAYERS).map(p => p.score);
 
             // Armazena a melhor e pior pontuação desta geração para os gráficos
-            const bestFitnessThisGen = Math.max(...fitnessScores, 1); // Use 0 if empty
-            const worstFitnessThisGen = Math.min(...fitnessScores, 1); // Use 0 if empty
+            const bestFitnessThisGen = Math.max(...fitnessScores, 1); // Use 1 if empty
+            const worstFitnessThisGen = Math.min(...fitnessScores, 1); // Use 1 if empty
             bestScoresHistory.push(bestFitnessThisGen);
             worstScoresHistory.push(worstFitnessThisGen);
             document.getElementById('bestScore').textContent = bestFitnessThisGen.toFixed(0);
@@ -771,20 +841,17 @@
             // Atualiza o gráfico (passando ambos os históricos)
             drawFitnessGraph(graphCtx, bestScoresHistory, worstScoresHistory);
 
-            // 2. Avalia e Gera Nova População na ES
+            // 3. Avalia e Gera Nova População na ES
             evolutionaryStrategy.evaluate(fitnessScores);
             evolutionaryStrategy.generateNewPopulation();
 
-
-            // 3. Reseta o estado do jogo
+            // 4. Reseta o estado do jogo
             obstacles = [];
             frameCount = 0;
-            activePlayers = NUM_PLAYERS;
             generation++;
             document.getElementById('generation').textContent = generation;
             nextObstacleFrame = 100; // Reseta timer do obstáculo
 
-            // const numOutputs = NUM_OUTPUTS; // Already defined globally
             // Create a template brain to get the correct number of genes
             const brainTemplate = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
             const numGenes = brainTemplate.getNumGenes();
@@ -794,41 +861,76 @@
                 NUM_PLAYERS, MUTATION_RATE, MUTATION_AMOUNT, numGenes
             );
 
-            // 4. Cria novos jogadores com os genes da nova população
+            // 5. Cria novos jogadores com os genes da nova população
             players = [];
             for (let i = 0; i < NUM_PLAYERS; i++) {
                 // Pass all required hidden layer sizes to the constructor
                 const brain = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
                 var genes = evolutionaryStrategy.getIndividualGenes(i);
-
-                // Comment out the pre-trained gene loading for now
-                /*
-                if (i === 0 && genesP1) { // Check if genesP1 exists
-                    // Ensure genesP1 has the correct length before trying to set
-                    if(genesP1.length === numGenes) {
-                        genes = genesP1;
-                    } else {
-                        console.warn("genesP1 has incorrect length for the new network structure. Using random genes.");
-                    }
-                }
-                */
-
                 brain.setGenes(genes);
                 players.push(new Player(PLAYER_COLORS[i % PLAYER_COLORS.length], brain));
             }
-
-            // Comment out the specific P1 brain creation for now
-            /*
-            const brainP1 = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
-            if(genesP1 && genesP1.length === numGenes) {
-                brainP1.setGenes(genesP1);
-                //players[NUM_PLAYERS -1]=new Player("black", brainP1, 45);
-            } else {
-                 console.warn("Cannot create specific P1 player, genesP1 invalid.");
+            
+            // Inicializa activePlayers com a população base
+            activePlayers = NUM_PLAYERS;
+            
+            // 6. NOVO: Adiciona os 2 melhores jogadores da geração anterior
+            if (bestPlayersBrains.length > 0) {
+                // Para cada um dos melhores jogadores
+                bestPlayersBrains.forEach((playerData, index) => {
+                    // Criar um novo cérebro e aplicar os pesos do melhor indivíduo
+                    const eliteBrain = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
+                    applyStructuredFormatToBrain(eliteBrain, playerData.brain);
+                    
+                    // Criar cor personalizada para distinguir os indivíduos elite
+                    // Primeiro dourado, segundo prata
+                    const eliteColor = index === 0 ? 'gold' : 'silver';
+                    
+                    // Criar o novo jogador elite
+                    const elitePlayer = new Player(eliteColor, eliteBrain);
+                    
+                    // Adicionar ao array de jogadores
+                    players.push(elitePlayer);
+                    activePlayers++; // Incrementar o contador de jogadores ativos
+                    
+                    console.log(`Adicionado jogador elite #${index+1} da geração anterior (pontuação: ${playerData.score.toFixed(2)})`);
+                });
             }
-            */
 
             console.log(`Iniciando Geração ${generation} com nova população.`);
+
+            // Atualiza a visualização dos jogadores de elite
+            updateEliteStatusDisplay();
+            
+            // Atualiza a visualização do JSON do melhor jogador
+            updateJsonViewer();
+        }
+
+        function updateEliteStatusDisplay() {
+            // Contar quantos jogadores dourados e prateados existem
+            const goldCount = players.filter(p => p.color === 'gold').length;
+            const silverCount = players.filter(p => p.color === 'silver').length;
+            
+            // Verificar se o elemento existe
+            const infoElement = document.getElementById('eliteInfo');
+            
+            if (infoElement) {
+                // Atualizar o texto do elemento existente
+                infoElement.textContent = `Jogadores Elite: ${goldCount} ouro, ${silverCount} prata`;
+            } else {
+                // Criar um novo elemento para mostrar a informação
+                const infoDiv = document.createElement('div');
+                infoDiv.id = 'eliteInfo';
+                infoDiv.style.fontSize = '14px';
+                infoDiv.style.marginBottom = '5px';
+                infoDiv.textContent = `Jogadores Elite: ${goldCount} ouro, ${silverCount} prata`;
+                
+                // Inserir após a div 'info'
+                const infoElement = document.getElementById('info');
+                if (infoElement && infoElement.parentNode) {
+                    infoElement.parentNode.insertBefore(infoDiv, infoElement.nextSibling);
+                }
+            }
         }
 
         function update() {
@@ -908,12 +1010,32 @@
                 // Limpa o canvas da NN se não houver jogador 0
                 nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
             }
+
+            // NOVO: Atualiza informações de jogadores elite a cada frame
+            updateEliteStatusDisplay();
         }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop); // Chama o próximo frame
+        // Controle de FPS
+        let lastFrameTime = 0;
+        const targetFPS = 120; // FPS alvo (pode ser ajustado)
+        const frameInterval = 1000 / targetFPS; // Intervalo entre frames em ms
+
+        function gameLoop(timestamp) {
+            // Calcula o tempo desde o último frame
+            const deltaTime = timestamp - lastFrameTime;
+            
+            // Verifica se é hora de renderizar um novo frame
+            if (deltaTime >= frameInterval) {
+                // Atualiza o tempo do último frame
+                lastFrameTime = timestamp - (deltaTime % frameInterval);
+                
+                // Atualiza e desenha o jogo
+                update();
+                draw();
+            }
+            
+            // Agenda o próximo frame
+            requestAnimationFrame(gameLoop);
         }
 
         // --- Inicialização ---
@@ -978,6 +1100,278 @@
              console.log("Jogo inicializado. Iniciando Geração 1.");
             // Inicia o loop do jogo
             gameLoop();
+            
+            // Configurar os botões
+            setupButtons();
+            
+            // Atualizar visualização do JSON
+            updateJsonViewer();
+        }
+
+        // Função para converter o cérebro da rede neural para o formato estruturado
+        function brainToStructuredFormat(brain) {
+            return {
+                // Pesos e biases da primeira camada oculta
+                hiddenLayer1: {
+                    weights: Array.from({ length: NUM_INPUTS }, (_, i) => 
+                        Array.from({ length: HIDDEN_UNITS_1 }, (_, j) => brain.weights_in_h1[i][j])
+                    ),
+                    biases: [...brain.bias_h1]
+                },
+                // Pesos e biases da segunda camada oculta
+                hiddenLayer2: {
+                    weights: Array.from({ length: HIDDEN_UNITS_1 }, (_, i) => 
+                        Array.from({ length: HIDDEN_UNITS_2 }, (_, j) => brain.weights_h1_h2[i][j])
+                    ),
+                    biases: [...brain.bias_h2]
+                },
+                // Pesos e biases da camada de saída
+                outputLayer: {
+                    weights: Array.from({ length: HIDDEN_UNITS_2 }, (_, i) => 
+                        Array.from({ length: NUM_OUTPUTS }, (_, j) => brain.weights_h2_out[i][j])
+                    ),
+                    biases: [...brain.bias_out]
+                }
+            };
+        }
+
+        // Função para aplicar os pesos estruturados a um cérebro
+        function applyStructuredFormatToBrain(brain, data) {
+            // Camada oculta 1
+            for (let i = 0; i < NUM_INPUTS; i++) {
+                for (let j = 0; j < HIDDEN_UNITS_1; j++) {
+                    brain.weights_in_h1[i][j] = data.hiddenLayer1.weights[i][j];
+                }
+            }
+            for (let i = 0; i < HIDDEN_UNITS_1; i++) {
+                brain.bias_h1[i] = data.hiddenLayer1.biases[i];
+            }
+            
+            // Camada oculta 2
+            for (let i = 0; i < HIDDEN_UNITS_1; i++) {
+                for (let j = 0; j < HIDDEN_UNITS_2; j++) {
+                    brain.weights_h1_h2[i][j] = data.hiddenLayer2.weights[i][j];
+                }
+            }
+            for (let i = 0; i < HIDDEN_UNITS_2; i++) {
+                brain.bias_h2[i] = data.hiddenLayer2.biases[i];
+            }
+            
+            // Camada de saída
+            for (let i = 0; i < HIDDEN_UNITS_2; i++) {
+                for (let j = 0; j < NUM_OUTPUTS; j++) {
+                    brain.weights_h2_out[i][j] = data.outputLayer.weights[i][j];
+                }
+            }
+            for (let i = 0; i < NUM_OUTPUTS; i++) {
+                brain.bias_out[i] = data.outputLayer.biases[i];
+            }
+        }
+
+        // Função para salvar e copiar o melhor indivíduo (sem adicionar no jogo)
+        function saveBestIndividual() {
+            // Encontrar o melhor jogador vivo
+            let bestPlayer = null;
+            let bestScore = -Infinity;
+            
+            // Primeiro, procura entre jogadores vivos
+            for (const player of players) {
+                if (player.isAlive && player.score > bestScore) {
+                    bestScore = player.score;
+                    bestPlayer = player;
+                }
+            }
+            
+            // Se não tiver jogadores vivos, procurar entre todos
+            if (!bestPlayer) {
+                for (const player of players) {
+                    if (player.score > bestScore) {
+                        bestScore = player.score;
+                        bestPlayer = player;
+                    }
+                }
+            }
+            
+            if (!bestPlayer) {
+                alert('Nenhum jogador encontrado para salvar!');
+                return;
+            }
+            
+            // Converter o cérebro para o formato estruturado
+            const neuralNetworkData = brainToStructuredFormat(bestPlayer.brain);
+            
+            // Salvar no localStorage com metadados
+            const saveData = {
+                neuralNetworkData: neuralNetworkData,
+                fitness: bestPlayer.score,
+                generation: generation,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('bestIndividual', JSON.stringify(saveData));
+            
+            // Atualizar variáveis globais
+            bestEverFitness = bestPlayer.score;
+            bestEverNeuralNetwork = neuralNetworkData;
+            bestEverGeneration = generation;
+            
+            // Exibir mensagem de confirmação e copiar para a área de transferência
+            const dataString = JSON.stringify(neuralNetworkData, null, 2);
+            navigator.clipboard.writeText(dataString)
+                .then(() => {
+                    alert(`Melhor indivíduo salvo e copiado para a área de transferência!\nPontuação: ${bestPlayer.score.toFixed(2)}`);
+                })
+                .catch(() => {
+                    alert(`Melhor indivíduo salvo com sucesso!\nPontuação: ${bestPlayer.score.toFixed(2)}\nVeja o console para detalhes.`);
+                    console.log('Dados do melhor indivíduo:', dataString);
+                });
+            
+            // Atualizar visualização do JSON
+            updateJsonViewer();
+        }
+
+        // Nova função para carregar e adicionar um jogador a partir do localStorage
+        function loadAndAddSavedIndividual() {
+            const savedData = localStorage.getItem('bestIndividual');
+            if (!savedData) {
+                alert('Nenhum indivíduo salvo encontrado no localStorage!');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(savedData);
+                
+                // Criar um novo cérebro e aplicar os pesos do indivíduo salvo
+                const newBrain = new MLP(NUM_INPUTS, HIDDEN_UNITS_1, HIDDEN_UNITS_2, NUM_OUTPUTS);
+                applyStructuredFormatToBrain(newBrain, data.neuralNetworkData);
+                
+                // Criar o novo jogador com cor dourada para destacar
+                const newPlayer = new Player('darkgoldenrod', newBrain);
+                newPlayer.x -= 12;
+                
+                // Adicionar ao array de jogadores
+                players.push(newPlayer);
+                activePlayers++; // Incrementar o contador de jogadores ativos
+                
+                alert(`Indivíduo adicionado com sucesso!\nGeração original: ${data.generation}\nPontuação original: ${data.fitness.toFixed(2)}`);
+                
+                // Atualizar visualização do JSON
+                updateJsonViewer();
+                
+            } catch (e) {
+                console.error("Erro ao adicionar indivíduo do localStorage:", e);
+                alert('Erro ao adicionar indivíduo. Verifique o console para detalhes.');
+            }
+        }
+
+        // Função para carregar o melhor indivíduo do localStorage (apenas para referência, não adiciona ao jogo)
+        function loadBestIndividual() {
+            const savedData = localStorage.getItem('bestIndividual');
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    bestEverFitness = data.fitness;
+                    bestEverNeuralNetwork = data.neuralNetworkData;
+                    bestEverGeneration = data.generation;
+                    
+                    console.log(`Melhor indivíduo carregado na memória! Fitness: ${bestEverFitness.toFixed(2)}, Geração: ${bestEverGeneration}`);
+                    
+                    // Atualizar visualização do JSON
+                    updateJsonViewer();
+                    
+                    return data.neuralNetworkData;
+                } catch (e) {
+                    console.error("Erro ao carregar o melhor indivíduo:", e);
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        // Atualize a função setupSaveButton para configurar ambos os botões
+        function setupButtons() {
+            // Configurar botão de salvar/copiar
+            const saveButton = document.getElementById('saveBestBtn');
+            if (saveButton) {
+                saveButton.addEventListener('click', saveBestIndividual);
+            } else {
+                console.error('Botão de salvar não encontrado!');
+            }
+            
+            // Configurar botão de carregar/adicionar
+            const loadButton = document.getElementById('loadBestBtn');
+            if (loadButton) {
+                loadButton.addEventListener('click', loadAndAddSavedIndividual);
+            } else {
+                console.error('Botão de carregar não encontrado!');
+            }
+            
+            // Carregar o melhor indivíduo para referência (não adiciona ao jogo)
+            loadBestIndividual();
+            
+            // Atualizar visualização do JSON
+            updateJsonViewer();
+        }
+
+        // Função para atualizar a visualização do JSON salvo
+        function updateJsonViewer() {
+            const savedJsonInfo = document.getElementById('savedJsonInfo');
+            const savedJsonContent = document.getElementById('savedJsonContent');
+            
+            if (!savedJsonInfo || !savedJsonContent) return;
+            
+            const savedData = localStorage.getItem('bestIndividual');
+            
+            if (!savedData) {
+                savedJsonInfo.textContent = "Nenhum indivíduo salvo encontrado.";
+                savedJsonContent.textContent = "";
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(savedData);
+                
+                // Mostrar informações resumidas
+                savedJsonInfo.innerHTML = `
+                    <strong>Geração:</strong> ${data.generation} | 
+                    <strong>Fitness:</strong> ${data.fitness.toFixed(2)} | 
+                    <strong>Data:</strong> ${new Date(data.timestamp).toLocaleString()}
+                `;
+                
+                // Exibir em formato JSON com indentação e cores
+                const jsonString = JSON.stringify(data, null, 2);
+                savedJsonContent.innerHTML = formatJsonWithColors(jsonString);
+                
+            } catch (e) {
+                savedJsonInfo.textContent = "Erro ao carregar os dados salvos.";
+                savedJsonContent.textContent = "Erro: " + e.message;
+                console.error("Erro ao atualizar visualização do JSON:", e);
+            }
+        }
+
+        // Função para formatar JSON com cores (opcional)
+        function formatJsonWithColors(json) {
+            if (!json) return '';
+            
+            // Substitui valores por cores
+            return json
+                .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                    let cls = 'number';
+                    if (/^"/.test(match)) {
+                        if (/:$/.test(match)) {
+                            cls = 'key';
+                        } else {
+                            cls = 'string';
+                        }
+                    } else if (/true|false/.test(match)) {
+                        cls = 'boolean';
+                    } else if (/null/.test(match)) {
+                        cls = 'null';
+                    }
+                    
+                    // Retorna valores com span colorido
+                    return '<span class="' + cls + '">' + match + '</span>';
+                });
         }
 
         // Inicia o jogo quando a página carregar
