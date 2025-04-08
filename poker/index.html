@@ -262,15 +262,15 @@
 
         .game-message {
             background-color: rgba(0, 0, 0, 0.7);
-            padding: 15px;
             border-radius: 10px;
-            margin: 15px 0;
             text-align: center;
             font-size: 18px;
+            padding: 15px;
         }
 
         .game-message-container {
             min-height: 60px;
+            margin: 15px 0;
         }
 
         .mode-select {
@@ -347,6 +347,65 @@
             font-size: 14px;
             white-space: nowrap;
             z-index: 100;
+        }
+
+        @keyframes winnerGlow {
+            0% { box-shadow: 0 0 5px 2px rgba(212, 175, 55, 0.5); }
+            50% { box-shadow: 0 0 20px 10px rgba(212, 175, 55, 0.8); }
+            100% { box-shadow: 0 0 5px 2px rgba(212, 175, 55, 0.5); }
+        }
+        
+        @keyframes chipsFly {
+            0% { 
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            80% {
+                opacity: 0.8;
+            }
+            100% { 
+                transform: translate(var(--target-x), var(--target-y)) scale(0.5);
+                opacity: 0;
+            }
+        }
+        
+        .winner-highlight {
+            animation: winnerGlow 1.5s ease-in-out infinite;
+            border: 2px solid #d4af37 !important;
+        }
+        
+        .pot-chip {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: #d4af37;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+            font-weight: bold;
+            font-size: 12px;
+            z-index: 100;
+            animation: chipsFly 1.5s forwards;
+        }
+        
+        .win-amount {
+            position: absolute;
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 24px;
+            text-shadow: 0 0 5px black;
+            z-index: 101;
+            opacity: 0;
+            animation: fadeInOut 2s forwards;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(0); }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-30px); }
         }
     </style>
 </head>
@@ -950,8 +1009,13 @@
             // Se apenas um jogador restou (todos os outros desistiram), ele é o vencedor
             if (activePlayers.length === 1) {
                 const winner = activePlayers[0];
-                winner.chips += gameState.pot;
-                showGameMessage(`${winner.name} wins $${gameState.pot}!`);
+                const winAmount = gameState.pot;
+                winner.chips += winAmount;
+                
+                // Animar a vitória
+                animateWinner(winner, winAmount);
+                
+                showGameMessage(`${winner.name} wins $${winAmount}!`);
                 gameState.pot = 0;
                 return winner;
             }
@@ -977,20 +1041,95 @@
                 // Lógica de desempate (simplificada)
                 // Em caso de empate, dividir o pot igualmente
                 const splitAmount = Math.floor(gameState.pot / tiedPlayers.length);
+                
+                // Animar múltiplos vencedores
                 tiedPlayers.forEach(player => {
                     player.chips += splitAmount;
+                    animateWinner(player, splitAmount);
                 });
+                
                 showGameMessage(`Tie! Pot split between ${tiedPlayers.map(p => p.name).join(', ')}!`);
             } else {
                 // Sem empate, o vencedor leva tudo
-                winner.chips += gameState.pot;
-                showGameMessage(`${winner.name} wins $${gameState.pot} with ${winner.handRanking}!`);
+                const winAmount = gameState.pot;
+                winner.chips += winAmount;
+                
+                // Animar o vencedor
+                animateWinner(winner, winAmount);
+                
+                showGameMessage(`${winner.name} wins $${winAmount} with ${winner.handRanking}!`);
             }
             
             // Importante: zerar o pot após distribuir os ganhos
             gameState.pot = 0;
             
             return winner;
+        }
+
+        // Função para animar o vencedor e o movimento de fichas
+        function animateWinner(player, amount) {
+            // Encontrar o elemento do jogador
+            const playerIndex = gameState.players.indexOf(player);
+            const playerElement = document.querySelector(`.player:nth-child(${playerIndex + 1})`);
+            
+            if (!playerElement) return;
+            
+            // Destacar o jogador vencedor
+            playerElement.classList.add('winner-highlight');
+            
+            // Encontrar a posição do pot e do jogador para animar as fichas
+            const tableElement = document.querySelector('.table');
+            const potPosition = {
+                x: tableElement.offsetWidth / 2,
+                y: tableElement.offsetHeight / 2
+            };
+            
+            const playerPosition = {
+                x: playerElement.offsetLeft + playerElement.offsetWidth / 2,
+                y: playerElement.offsetTop + playerElement.offsetHeight / 2
+            };
+            
+            // Criar animação de fichas voando do pot para o jogador
+            const chipCount = Math.min(10, Math.max(3, Math.floor(amount / 100)));
+            
+            for (let i = 0; i < chipCount; i++) {
+                setTimeout(() => {
+                    const chip = document.createElement('div');
+                    chip.className = 'pot-chip';
+                    chip.textContent = '$';
+                    chip.style.left = `${potPosition.x}px`;
+                    chip.style.top = `${potPosition.y}px`;
+                    
+                    // Calcular a direção para o jogador
+                    const targetX = playerPosition.x - potPosition.x;
+                    const targetY = playerPosition.y - potPosition.y;
+                    
+                    chip.style.setProperty('--target-x', `${targetX}px`);
+                    chip.style.setProperty('--target-y', `${targetY}px`);
+                    
+                    tableElement.appendChild(chip);
+                    
+                    // Remover o chip após a animação
+                    setTimeout(() => {
+                        chip.remove();
+                    }, 1500);
+                }, i * 100);
+            }
+            
+            // Mostrar o valor ganho
+            const winAmount = document.createElement('div');
+            winAmount.className = 'win-amount';
+            winAmount.textContent = `+$${amount}`;
+            winAmount.style.left = `${playerPosition.x - 40}px`;
+            winAmount.style.top = `${playerPosition.y - 30}px`;
+            
+            tableElement.appendChild(winAmount);
+            
+            // Remover o destaque e o valor após um tempo
+            setTimeout(() => {
+                playerElement.classList.remove('winner-highlight');
+                winAmount.remove();
+            }, 3000);
         }
 
         // Ações do jogador
