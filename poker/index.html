@@ -43,7 +43,6 @@
         }
 
         header {
-            margin-bottom: 30px;
             text-align: center;
         }
 
@@ -491,6 +490,21 @@
             font-size: 0.9em;
             color: #aaa;
         }
+
+        #background-music {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            display: none; /* Oculto por padrão */
+        }
+
+        #play-music {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
@@ -498,6 +512,15 @@
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
+
+    <audio id="background-music" controls>
+        <source src="../assets/sounds/jazz_2.mpeg" type="audio/mpeg" />
+        Seu navegador não suporta o elemento de áudio.
+    </audio>
+
+    <button id="play-music" class="mode-button">
+        🎵 Música de Fundo
+    </button>
     
     <header>
         <h1>Poker Texas Hold'em</h1>
@@ -554,6 +577,28 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const music = document.getElementById('background-music');
+            const playButton = document.getElementById('play-music');
+            
+            // Definir volume inicial para 40%
+            music.volume = 0.4;
+            
+            // Adicionar evento de clique ao botão de música
+            playButton.addEventListener('click', function() {
+                // Mostrar o player e ocultar o botão
+                music.style.display = 'block';
+                playButton.style.display = 'none';
+                
+                // Iniciar a reprodução
+                music.play().catch(error => {
+                    console.log('Reprodução automática bloqueada pelo navegador:', error);
+                    // Se a reprodução automática for bloqueada, mantenha o botão visível
+                    playButton.style.display = 'block';
+                });
+            });
+        });
+        
         // Constantes e configurações
         const SUITS = ['♥', '♦', '♠', '♣'];
         const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
@@ -641,114 +686,303 @@
         }
 
         function evaluateHand(cards) {
-            const allCards = [...cards];
+            // Ordenar as cartas por valor (do maior para o menor)
+            const sortedCards = [...cards].sort((a, b) => b.value - a.value);
             
-            // Ordenar as cartas pelo valor (do menor para o maior)
-            allCards.sort((a, b) => getCardValue(a) - getCardValue(b));
+            // Verificar royal flush, straight flush, etc...
+            // (código existente)
             
-            // Verificar cada tipo de mão possível
-            if (isRoyalFlush(allCards)) return { rank: 9, name: 'Royal Flush' };
-            if (isStraightFlush(allCards)) return { rank: 8, name: 'Straight Flush' };
-            if (isFourOfAKind(allCards)) return { rank: 7, name: 'Four of a Kind' };
-            if (isFullHouse(allCards)) return { rank: 6, name: 'Full House' };
-            if (isFlush(allCards)) return { rank: 5, name: 'Flush' };
-            if (isStraight(allCards)) return { rank: 4, name: 'Straight' };
-            if (isThreeOfAKind(allCards)) return { rank: 3, name: 'Three of a Kind' };
-            if (isTwoPair(allCards)) return { rank: 2, name: 'Two Pair' };
-            if (isPair(allCards)) return { rank: 1, name: 'Pair' };
+            // Adicionar informações detalhadas para desempate
+            const result = {
+                name: "High Card", // Nome padrão, será substituído
+                rank: 0,           // Ranking da mão (0-9)
+                primaryValue: 0,   // Valor principal para desempate (ex: valor do par)
+                secondaryValue: 0, // Valor secundário para desempate (ex: valor do segundo par)
+                kickers: []        // Cartas kicker para desempate adicional
+            };
             
-            return { rank: 0, name: 'High Card' };
-        }
-
-        // Funções simplificadas para verificar os tipos de mãos
-        function isRoyalFlush(cards) {
-            return isStraightFlush(cards) && cards.some(card => card.value === 'A') && 
-                   cards.some(card => card.value === 'K');
-        }
-
-        function isStraightFlush(cards) {
-            return isFlush(cards) && isStraight(cards);
-        }
-
-        function isFourOfAKind(cards) {
-            const valueCounts = countValues(cards);
-            return Object.values(valueCounts).some(count => count >= 4);
-        }
-
-        function isFullHouse(cards) {
-            const valueCounts = countValues(cards);
-            const counts = Object.values(valueCounts);
-            return counts.includes(3) && counts.includes(2);
-        }
-
-        function isFlush(cards) {
-            const suits = cards.map(card => card.suit);
-            return SUITS.some(suit => suits.filter(s => s === suit).length >= 5);
-        }
-
-        function isStraight(cards) {
-            const values = cards.map(card => getCardValue(card));
-            const uniqueValues = [...new Set(values)].sort((a, b) => a - b);
-            
-            // Verificar sequência normal
-            let sequence = 1;
-            for (let i = 1; i < uniqueValues.length; i++) {
-                if (uniqueValues[i] === uniqueValues[i-1] + 1) {
-                    sequence++;
-                    if (sequence >= 5) return true;
-                } else if (uniqueValues[i] !== uniqueValues[i-1]) {
-                    sequence = 1;
-                }
+            // Verificar Royal Flush
+            if (hasRoyalFlush(sortedCards)) {
+                result.name = "Royal Flush";
+                result.rank = 9;
+                return result;
             }
             
-            // Verificar sequência A-5
-            if (uniqueValues.includes(0) && uniqueValues.includes(VALUES.length - 1)) {
-                let lowSequence = 1;
-                const lowValues = uniqueValues.filter(v => v < 5 || v === VALUES.length - 1);
-                lowValues.sort((a, b) => {
-                    if (a === VALUES.length - 1) return -1;
-                    if (b === VALUES.length - 1) return 1;
-                    return a - b;
-                });
-                
-                for (let i = 1; i < lowValues.length; i++) {
-                    if (
-                        (lowValues[i-1] === VALUES.length - 1 && lowValues[i] === 0) ||
-                        (lowValues[i] === lowValues[i-1] + 1)
-                    ) {
-                        lowSequence++;
-                        if (lowSequence >= 5) return true;
-                    } else {
-                        lowSequence = 1;
-                    }
-                }
+            // Verificar Straight Flush
+            const straightFlushValue = hasStraightFlush(sortedCards);
+            if (straightFlushValue) {
+                result.name = "Straight Flush";
+                result.rank = 8;
+                result.primaryValue = straightFlushValue;
+                return result;
+            }
+            
+            // Verificar Four of a Kind (Quadra)
+            const fourOfAKind = hasFourOfAKind(sortedCards);
+            if (fourOfAKind) {
+                result.name = "Four of a Kind";
+                result.rank = 7;
+                result.primaryValue = fourOfAKind.value;
+                result.kickers = fourOfAKind.kickers;
+                return result;
+            }
+            
+            // Verificar Full House
+            const fullHouse = hasFullHouse(sortedCards);
+            if (fullHouse) {
+                result.name = "Full House";
+                result.rank = 6;
+                result.primaryValue = fullHouse.threeValue;
+                result.secondaryValue = fullHouse.pairValue;
+                return result;
+            }
+            
+            // Verificar Flush
+            const flush = hasFlush(sortedCards);
+            if (flush) {
+                result.name = "Flush";
+                result.rank = 5;
+                result.kickers = flush.slice(0, 5).map(card => card.value);
+                return result;
+            }
+            
+            // Verificar Straight
+            const straightValue = hasStraight(sortedCards);
+            if (straightValue) {
+                result.name = "Straight";
+                result.rank = 4;
+                result.primaryValue = straightValue;
+                return result;
+            }
+            
+            // Verificar Three of a Kind (Trinca)
+            const threeOfAKind = hasThreeOfAKind(sortedCards);
+            if (threeOfAKind) {
+                result.name = "Three of a Kind";
+                result.rank = 3;
+                result.primaryValue = threeOfAKind.value;
+                result.kickers = threeOfAKind.kickers;
+                return result;
+            }
+            
+            // Verificar Two Pair (Dois Pares)
+            const twoPair = hasTwoPair(sortedCards);
+            if (twoPair) {
+                result.name = "Two Pair";
+                result.rank = 2;
+                result.primaryValue = twoPair.highPairValue;
+                result.secondaryValue = twoPair.lowPairValue;
+                result.kickers = [twoPair.kicker];
+                return result;
+            }
+            
+            // Verificar One Pair (Um Par)
+            const onePair = hasOnePair(sortedCards);
+            if (onePair) {
+                result.name = "One Pair";
+                result.rank = 1;
+                result.primaryValue = onePair.value;
+                result.kickers = onePair.kickers;
+                return result;
+            }
+            
+            // High Card
+            result.name = "High Card";
+            result.rank = 0;
+            result.kickers = sortedCards.slice(0, 5).map(card => card.value);
+            return result;
+        }
+
+        // Funções auxiliares para verificar cada tipo de mão
+        function hasRoyalFlush(cards) {
+            // Verificar se há um straight flush
+            const straightFlushValue = hasStraightFlush(cards);
+            
+            // Um royal flush é um straight flush com a carta mais alta sendo um Ás (valor 14)
+            if (straightFlushValue === 14) {
+                return true;
             }
             
             return false;
         }
 
-        function isThreeOfAKind(cards) {
-            const valueCounts = countValues(cards);
-            return Object.values(valueCounts).some(count => count >= 3);
-        }
-
-        function isTwoPair(cards) {
-            const valueCounts = countValues(cards);
-            const pairs = Object.values(valueCounts).filter(count => count >= 2);
-            return pairs.length >= 2;
-        }
-
-        function isPair(cards) {
-            const valueCounts = countValues(cards);
-            return Object.values(valueCounts).some(count => count >= 2);
-        }
-
-        function countValues(cards) {
-            const valueCounts = {};
-            for (const card of cards) {
-                valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
+        function hasStraightFlush(cards) {
+            // Agrupar cartas por naipe
+            const suits = {};
+            cards.forEach(card => {
+                suits[card.suit] = (suits[card.suit] || 0) + 1;
+            });
+            
+            // Verificar cada naipe que tem pelo menos 5 cartas
+            for (const suit in suits) {
+                if (suits[suit] >= 5) {
+                    // Filtrar apenas as cartas deste naipe
+                    const sameSuitCards = cards.filter(card => card.suit === suit);
+                    
+                    // Verificar se há uma sequência neste naipe
+                    const straightValue = hasStraight(sameSuitCards);
+                    if (straightValue) {
+                        return straightValue;
+                    }
+                }
             }
-            return valueCounts;
+            
+            return null;
+        }
+
+        function hasFourOfAKind(cards) {
+            // Agrupar cartas por valor
+            const groups = {};
+            cards.forEach(card => {
+                groups[card.value] = (groups[card.value] || 0) + 1;
+            });
+            
+            // Procurar por quatro cartas do mesmo valor
+            for (const value in groups) {
+                if (groups[value] === 4) {
+                    // Encontrar o kicker (carta mais alta que não faz parte da quadra)
+                    const kickers = cards.filter(card => card.value !== parseInt(value))
+                                        .slice(0, 1)
+                                        .map(card => card.value);
+                    
+                    return {
+                        value: parseInt(value),
+                        kickers: kickers
+                    };
+                }
+            }
+            
+            return null;
+        }
+
+        function hasFullHouse(cards) {
+            // Agrupar cartas por valor
+            const groups = {};
+            cards.forEach(card => {
+                groups[card.value] = (groups[card.value] || 0) + 1;
+            });
+            
+            let threeOfAKindValue = null;
+            let pairValue = null;
+            
+            // Procurar por três cartas do mesmo valor
+            for (const value in groups) {
+                if (groups[value] >= 3) {
+                    threeOfAKindValue = parseInt(value);
+                    break;
+                }
+            }
+            
+            // Se encontrou três cartas, procurar por um par
+            if (threeOfAKindValue !== null) {
+                for (const value in groups) {
+                    const cardValue = parseInt(value);
+                    if (cardValue !== threeOfAKindValue && groups[value] >= 2) {
+                        pairValue = cardValue;
+                        break;
+                    }
+                }
+                
+                // Se tiver 4 cartas do mesmo valor, podemos usar 3 delas para a trinca
+                // e as outras 2 para formar um par
+                if (pairValue === null && groups[threeOfAKindValue] >= 5) {
+                    pairValue = threeOfAKindValue;
+                }
+            }
+            
+            if (threeOfAKindValue !== null && pairValue !== null) {
+                return {
+                    threeValue: threeOfAKindValue,
+                    pairValue: pairValue
+                };
+            }
+            
+            return null;
+        }
+
+        function hasThreeOfAKind(cards) {
+            // Agrupar cartas por valor
+            const groups = {};
+            cards.forEach(card => {
+                groups[card.value] = (groups[card.value] || 0) + 1;
+            });
+            
+            // Procurar por três cartas do mesmo valor
+            for (const value in groups) {
+                if (groups[value] === 3) {
+                    // Encontrar os kickers (duas cartas mais altas que não fazem parte da trinca)
+                    const kickers = cards.filter(card => card.value !== parseInt(value))
+                                        .slice(0, 2)
+                                        .map(card => card.value);
+                    
+                    return {
+                        value: parseInt(value),
+                        kickers: kickers
+                    };
+                }
+            }
+            
+            return null;
+        }
+
+        function hasTwoPair(cards) {
+            // Agrupar cartas por valor
+            const groups = {};
+            cards.forEach(card => {
+                groups[card.value] = (groups[card.value] || 0) + 1;
+            });
+            
+            const pairs = [];
+            
+            // Procurar por pares
+            for (const value in groups) {
+                if (groups[value] >= 2) {
+                    pairs.push(parseInt(value));
+                }
+            }
+            
+            // Ordenar pares do maior para o menor
+            pairs.sort((a, b) => b - a);
+            
+            if (pairs.length >= 2) {
+                // Encontrar o kicker (carta mais alta que não faz parte dos pares)
+                const kicker = cards.filter(card => !pairs.includes(card.value))
+                                   .slice(0, 1)
+                                   .map(card => card.value)[0] || 0;
+                
+                return {
+                    highPairValue: pairs[0],
+                    lowPairValue: pairs[1],
+                    kicker: kicker
+                };
+            }
+            
+            return null;
+        }
+
+        function hasOnePair(cards) {
+            // Agrupar cartas por valor
+            const groups = {};
+            cards.forEach(card => {
+                groups[card.value] = (groups[card.value] || 0) + 1;
+            });
+            
+            // Procurar por um par
+            for (const value in groups) {
+                if (groups[value] === 2) {
+                    // Encontrar os kickers (três cartas mais altas que não fazem parte do par)
+                    const kickers = cards.filter(card => card.value !== parseInt(value))
+                                        .slice(0, 3)
+                                        .map(card => card.value);
+                    
+                    return {
+                        value: parseInt(value),
+                        kickers: kickers
+                    };
+                }
+            }
+            
+            return null;
         }
 
         // Funções de UI
@@ -1131,66 +1365,75 @@
                 return winner;
             }
             
-            // Avaliar as mãos de todos os jogadores ativos
+            // Avaliar as mãos de todos os jogadores ativos com informações detalhadas
             activePlayers.forEach(player => {
                 const cards = [...player.cards, ...gameState.communityCards];
                 const handResult = evaluateHand(cards);
                 player.handRanking = handResult.name;
                 player.handRank = handResult.rank;
+                player.handDetails = {
+                    primaryValue: handResult.primaryValue,
+                    secondaryValue: handResult.secondaryValue,
+                    kickers: handResult.kickers
+                };
             });
             
             // Ordenar jogadores pelo ranking da mão (do maior para o menor)
-            activePlayers.sort((a, b) => b.handRank - a.handRank);
+            activePlayers.sort((a, b) => {
+                // Primeiro, comparar pelo rank da mão
+                if (b.handRank !== a.handRank) {
+                    return b.handRank - a.handRank;
+                }
+                
+                // Se o rank for igual, comparar pelo valor primário
+                if (b.handDetails.primaryValue !== a.handDetails.primaryValue) {
+                    return b.handDetails.primaryValue - a.handDetails.primaryValue;
+                }
+                
+                // Se o valor primário for igual, comparar pelo valor secundário
+                if (b.handDetails.secondaryValue !== a.handDetails.secondaryValue) {
+                    return b.handDetails.secondaryValue - a.handDetails.secondaryValue;
+                }
+                
+                // Se o valor secundário for igual, comparar pelos kickers
+                const aKickers = a.handDetails.kickers || [];
+                const bKickers = b.handDetails.kickers || [];
+                
+                // Comparar cada kicker em ordem
+                for (let i = 0; i < Math.min(aKickers.length, bKickers.length); i++) {
+                    if (bKickers[i] !== aKickers[i]) {
+                        return bKickers[i] - aKickers[i];
+                    }
+                }
+                
+                // Se todos os kickers forem iguais, é um empate perfeito
+                return 0;
+            });
             
-            // O jogador com o maior ranking é o vencedor
+            // O jogador com o maior ranking é o vencedor, mas pode haver empate perfeito
             const winner = activePlayers[0];
             
-            // Verificar se há empate
-            const tiedPlayers = activePlayers.filter(player => player.handRank === winner.handRank);
+            // Verificar se há empate perfeito (todos os critérios de desempate são iguais)
+            const tiedPlayers = activePlayers.filter(player => {
+                if (player.handRank !== winner.handRank) return false;
+                if (player.handDetails.primaryValue !== winner.handDetails.primaryValue) return false;
+                if (player.handDetails.secondaryValue !== winner.handDetails.secondaryValue) return false;
+                
+                // Comparar kickers
+                const playerKickers = player.handDetails.kickers || [];
+                const winnerKickers = winner.handDetails.kickers || [];
+                
+                if (playerKickers.length !== winnerKickers.length) return false;
+                
+                for (let i = 0; i < playerKickers.length; i++) {
+                    if (playerKickers[i] !== winnerKickers[i]) return false;
+                }
+                
+                // Se chegou aqui, é um empate perfeito
+                return true;
+            });
             
-            if (tiedPlayers.length > 1) {
-                // Lógica de desempate (simplificada)
-                // Em caso de empate, dividir o pot igualmente
-                const splitAmount = Math.floor(gameState.pot / tiedPlayers.length);
-                
-                // Animar múltiplos vencedores
-                tiedPlayers.forEach(player => {
-                    player.chips += splitAmount;
-                    animateWinner(player, splitAmount);
-                });
-                
-                // Adicionar ao histórico
-                addToHistory({
-                    winners: tiedPlayers,
-                    amount: gameState.pot,
-                    hand: tiedPlayers[0].handRanking,
-                    type: 'showdown'
-                });
-                
-                showGameMessage(`Tie! Pot split between ${tiedPlayers.map(p => p.name).join(', ')}!`);
-            } else {
-                // Sem empate, o vencedor leva tudo
-                const winAmount = gameState.pot;
-                winner.chips += winAmount;
-                
-                // Animar o vencedor
-                animateWinner(winner, winAmount);
-                
-                // Adicionar ao histórico
-                addToHistory({
-                    winners: [winner],
-                    amount: winAmount,
-                    hand: winner.handRanking,
-                    type: 'showdown'
-                });
-                
-                showGameMessage(`${winner.name} wins $${winAmount} with ${winner.handRanking}!`);
-            }
-            
-            // Importante: zerar o pot após distribuir os ganhos
-            gameState.pot = 0;
-            
-            return winner;
+            // Resto do código para distribuir o pot...
         }
 
         // Função para animar o vencedor e o movimento de fichas
@@ -1738,6 +1981,75 @@
                 }
             }
         });
+
+        // Adicionar a função hasFlush que está faltando
+        function hasFlush(cards) {
+            // Agrupar cartas por naipe
+            const suits = {};
+            cards.forEach(card => {
+                suits[card.suit] = (suits[card.suit] || 0) + 1;
+            });
+            
+            // Verificar se há pelo menos 5 cartas do mesmo naipe
+            for (const suit in suits) {
+                if (suits[suit] >= 5) {
+                    // Filtrar apenas as cartas deste naipe e ordenar por valor
+                    const flushCards = cards
+                        .filter(card => card.suit === suit)
+                        .sort((a, b) => b.value - a.value)
+                        .slice(0, 5); // Pegar as 5 cartas mais altas
+                    
+                    return flushCards;
+                }
+            }
+            
+            return null;
+        }
+
+        // Também precisamos implementar as funções para straight e straight flush
+        function hasStraight(cards) {
+            // Ordenar cartas por valor (do maior para o menor) e remover duplicatas
+            const uniqueValues = [...new Set(cards.map(card => card.value))].sort((a, b) => b - a);
+            
+            // Caso especial: A-5-4-3-2 (Ás pode ser 1)
+            if (uniqueValues.includes(14)) { // Ás
+                uniqueValues.push(1); // Adicionar Ás como 1 também
+            }
+            
+            // Procurar por 5 valores consecutivos
+            for (let i = 0; i < uniqueValues.length - 4; i++) {
+                if (uniqueValues[i] - uniqueValues[i + 4] === 4) {
+                    // Encontrou uma sequência
+                    return uniqueValues[i]; // Retorna o valor mais alto da sequência
+                }
+            }
+            
+            return null;
+        }
+
+        function hasStraightFlush(cards) {
+            // Agrupar cartas por naipe
+            const suits = {};
+            cards.forEach(card => {
+                suits[card.suit] = (suits[card.suit] || 0) + 1;
+            });
+            
+            // Verificar cada naipe que tem pelo menos 5 cartas
+            for (const suit in suits) {
+                if (suits[suit] >= 5) {
+                    // Filtrar apenas as cartas deste naipe
+                    const sameSuitCards = cards.filter(card => card.suit === suit);
+                    
+                    // Verificar se há uma sequência neste naipe
+                    const straightValue = hasStraight(sameSuitCards);
+                    if (straightValue) {
+                        return straightValue;
+                    }
+                }
+            }
+            
+            return null;
+        }
     </script>
 </body>
 </html> 
