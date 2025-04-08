@@ -407,6 +407,90 @@
             80% { opacity: 1; }
             100% { opacity: 0; transform: translateY(-30px); }
         }
+
+        .history-panel {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            width: 250px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid var(--accent-color);
+            border-radius: 10px;
+            padding: 15px;
+            color: var(--text-color);
+            max-height: 80vh;
+            overflow-y: auto;
+            transition: height 0.3s ease, padding 0.3s ease;
+        }
+
+        .history-title {
+            color: var(--accent-color);
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-align: center;
+            border-bottom: 1px solid var(--accent-color);
+            padding-bottom: 5px;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .history-toggle {
+            position: absolute;
+            right: 5px;
+            top: 0;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .history-panel.minimized {
+            height: 40px;
+            padding-bottom: 5px;
+            overflow: hidden;
+        }
+
+        .history-panel.minimized .history-toggle {
+            transform: rotate(180deg);
+        }
+
+        .history-entry {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .history-entry:last-child {
+            border-bottom: none;
+        }
+
+        .history-round {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 5px;
+        }
+
+        .history-winner {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .history-winner-name {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .history-amount {
+            color: #d4af37;
+            font-weight: bold;
+        }
+
+        .history-hand {
+            font-style: italic;
+            font-size: 0.9em;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
@@ -459,6 +543,14 @@
                 <button class="control-button max-bet">Max</button>
             </div>
         </div>
+
+    </div>
+    <div class="history-panel" id="history-panel">
+        <div class="history-title" id="history-title">
+            Histórico de Rodadas
+            <span class="history-toggle" id="history-toggle">▼</span>
+        </div>
+        <div id="history-container"></div>
     </div>
 
     <script>
@@ -484,7 +576,9 @@
             isPlayerTurn: false,
             gameMode: null, // singleplayer or multiplayer
             socket: null,
-            roomId: null
+            roomId: null,
+            history: [],
+            round: 0
         };
 
         // Elementos do DOM
@@ -897,6 +991,9 @@
         }
 
         function startNewHand() {
+            // Incrementar o contador de rodadas
+            gameState.round = (gameState.round || 0) + 1;
+            
             gameState.phase = 'preflop';
             gameState.pot = 0;
             gameState.currentBet = gameState.minBet * 2; // Big blind
@@ -1015,8 +1112,22 @@
                 // Animar a vitória
                 animateWinner(winner, winAmount);
                 
-                showGameMessage(`${winner.name} wins $${winAmount}!`);
+                // Adicionar ao histórico - sem informação da mão
+                addToHistory({
+                    winners: [winner],
+                    amount: winAmount,
+                    hand: "todos desistiram", // Indicação clara de que venceu por desistência
+                    type: 'fold'
+                });
+                
+                showGameMessage(`${winner.name} vence $${winAmount} (todos os outros jogadores desistiram)!`);
                 gameState.pot = 0;
+                
+                // Iniciar nova mão após um atraso
+                setTimeout(() => {
+                    startNewHand();
+                }, 3000);
+                
                 return winner;
             }
             
@@ -1048,6 +1159,14 @@
                     animateWinner(player, splitAmount);
                 });
                 
+                // Adicionar ao histórico
+                addToHistory({
+                    winners: tiedPlayers,
+                    amount: gameState.pot,
+                    hand: tiedPlayers[0].handRanking,
+                    type: 'showdown'
+                });
+                
                 showGameMessage(`Tie! Pot split between ${tiedPlayers.map(p => p.name).join(', ')}!`);
             } else {
                 // Sem empate, o vencedor leva tudo
@@ -1056,6 +1175,14 @@
                 
                 // Animar o vencedor
                 animateWinner(winner, winAmount);
+                
+                // Adicionar ao histórico
+                addToHistory({
+                    winners: [winner],
+                    amount: winAmount,
+                    hand: winner.handRanking,
+                    type: 'showdown'
+                });
                 
                 showGameMessage(`${winner.name} wins $${winAmount} with ${winner.handRanking}!`);
             }
@@ -1481,10 +1608,136 @@
             foldBtn.disabled = true;
             
             showGameMessage('Bem-vindo ao Poker Texas Hold\'em! Escolha um modo de jogo.', 0);
+            
+            gameState.history = [];
+            gameState.round = 0;
         }
 
         // Iniciar o jogo
         init();
+
+        // Função para adicionar uma entrada ao histórico
+        function addToHistory(entry) {
+            // Limitar o histórico a 7 entradas
+            if (gameState.history.length >= 7) {
+                gameState.history.pop(); // Remove a entrada mais antiga
+            }
+            
+            // Adicionar nova entrada no início
+            gameState.history.unshift({
+                ...entry,
+                round: gameState.round
+            });
+            
+            // Atualizar a exibição do histórico
+            updateHistoryDisplay();
+        }
+
+        // Função para atualizar a exibição do histórico
+        function updateHistoryDisplay() {
+            const historyContainer = document.getElementById('history-container');
+            historyContainer.innerHTML = '';
+            
+            gameState.history.forEach(entry => {
+                const historyEntry = document.createElement('div');
+                historyEntry.className = 'history-entry';
+                
+                const roundElement = document.createElement('div');
+                roundElement.className = 'history-round';
+                roundElement.textContent = `Rodada ${entry.round}`;
+                
+                const winnerElement = document.createElement('div');
+                winnerElement.className = 'history-winner';
+                
+                if (entry.winners.length === 1) {
+                    // Um vencedor
+                    const winnerNameElement = document.createElement('span');
+                    winnerNameElement.className = 'history-winner-name';
+                    winnerNameElement.textContent = entry.winners[0].name;
+                    
+                    const amountElement = document.createElement('span');
+                    amountElement.className = 'history-amount';
+                    amountElement.textContent = ` ganhou $${entry.amount}`;
+                    
+                    winnerElement.appendChild(winnerNameElement);
+                    winnerElement.appendChild(amountElement);
+                    
+                    if (entry.hand) {
+                        const handElement = document.createElement('div');
+                        handElement.className = 'history-hand';
+                        
+                        // Verificar se a vitória foi por fold
+                        if (entry.type === 'fold' || entry.hand === "todos desistiram") {
+                            handElement.textContent = `(todos desistiram)`;
+                        } else {
+                            handElement.textContent = `com ${entry.hand}`;
+                        }
+                        
+                        historyEntry.appendChild(handElement);
+                    }
+                } else {
+                    // Múltiplos vencedores (empate)
+                    winnerElement.textContent = 'Empate entre ';
+                    
+                    entry.winners.forEach((winner, index) => {
+                        const winnerNameElement = document.createElement('span');
+                        winnerNameElement.className = 'history-winner-name';
+                        winnerNameElement.textContent = winner.name;
+                        
+                        winnerElement.appendChild(winnerNameElement);
+                        
+                        if (index < entry.winners.length - 1) {
+                            winnerElement.appendChild(document.createTextNode(', '));
+                        }
+                    });
+                    
+                    const amountElement = document.createElement('div');
+                    amountElement.className = 'history-amount';
+                    amountElement.textContent = `Cada um ganhou $${Math.floor(entry.amount / entry.winners.length)}`;
+                    historyEntry.appendChild(amountElement);
+                    
+                    if (entry.hand) {
+                        const handElement = document.createElement('div');
+                        handElement.className = 'history-hand';
+                        handElement.textContent = `com ${entry.hand}`;
+                        historyEntry.appendChild(handElement);
+                    }
+                }
+                
+                historyEntry.appendChild(roundElement);
+                historyEntry.appendChild(winnerElement);
+                historyContainer.appendChild(historyEntry);
+            });
+        }
+
+        // Função para alternar entre minimizado e maximizado
+        function toggleHistoryPanel() {
+            const historyPanel = document.getElementById('history-panel');
+            const historyToggle = document.getElementById('history-toggle');
+            
+            historyPanel.classList.toggle('minimized');
+            
+            // Salvar preferência do usuário
+            const isMinimized = historyPanel.classList.contains('minimized');
+            localStorage.setItem('pokerHistoryMinimized', isMinimized);
+        }
+
+        // Adicionar evento de clique ao título do histórico
+        document.addEventListener('DOMContentLoaded', function() {
+            const historyTitle = document.getElementById('history-title');
+            if (historyTitle) {
+                historyTitle.addEventListener('click', toggleHistoryPanel);
+            }
+            
+            // Verificar preferência salva
+            const historyPanel = document.getElementById('history-panel');
+            if (historyPanel) {
+                const savedPreference = localStorage.getItem('pokerHistoryMinimized');
+                if (savedPreference === 'true') {
+                    historyPanel.classList.add('minimized');
+                }
+            }
+        });
     </script>
 </body>
 </html> 
