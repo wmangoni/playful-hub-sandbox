@@ -269,6 +269,10 @@
             font-size: 18px;
         }
 
+        .game-message-container {
+            min-height: 60px;
+        }
+
         .mode-select {
             position: absolute;
             top: 0;
@@ -382,7 +386,9 @@
             <!-- Jogadores serão adicionados aqui -->
         </div>
 
-        <div class="game-message"></div>
+        <div class="game-message-container">
+            <div class="game-message"></div>
+        </div>
 
         <div class="controls">
             <button class="control-button check-call">Check/Call</button>
@@ -918,43 +924,73 @@
         }
 
         function handleShowdown() {
-            // Evaluate all hands
-            const activePlayers = gameState.players.filter(player => !player.folded);
-            
-            activePlayers.forEach(player => {
-                // Combine player cards with community cards to find best hand
-                const allCards = [...player.cards, ...gameState.communityCards];
-                const handResult = evaluateHand(allCards);
-                player.handRank = handResult.rank;
-                player.handRanking = handResult.name;
+            // Revelar todas as cartas
+            gameState.players.forEach(player => {
+                if (!player.isAI) {
+                    player.showCards = true;
+                }
             });
             
-            // Sort players by hand rank
-            activePlayers.sort((a, b) => b.handRank - a.handRank);
+            // Determinar o vencedor e distribuir o pot
+            const winner = determineWinner();
             
-            // Determine winner(s)
-            const winners = activePlayers.filter(player => player.handRank === activePlayers[0].handRank);
-            
-            // Award pot
-            const winAmount = Math.floor(gameState.pot / winners.length);
-            winners.forEach(winner => {
-                winner.chips += winAmount;
-            });
-            
-            // Show winner message
-            if (winners.length === 1) {
-                showGameMessage(`${winners[0].name} vence com ${winners[0].handRanking}!`);
-            } else {
-                const winnerNames = winners.map(w => w.name).join(', ');
-                showGameMessage(`Empate entre ${winnerNames} com ${winners[0].handRanking}!`);
-            }
-            
+            // Atualizar a UI
             updateUI();
             
-            // Start new hand after delay
+            // Iniciar nova mão após um atraso
             setTimeout(() => {
                 startNewHand();
-            }, 5000);
+            }, 3000);
+        }
+
+        function determineWinner() {
+            // Filtrar apenas jogadores que não desistiram
+            const activePlayers = gameState.players.filter(player => !player.folded);
+            
+            // Se apenas um jogador restou (todos os outros desistiram), ele é o vencedor
+            if (activePlayers.length === 1) {
+                const winner = activePlayers[0];
+                winner.chips += gameState.pot;
+                showGameMessage(`${winner.name} wins $${gameState.pot}!`);
+                gameState.pot = 0;
+                return winner;
+            }
+            
+            // Avaliar as mãos de todos os jogadores ativos
+            activePlayers.forEach(player => {
+                const cards = [...player.cards, ...gameState.communityCards];
+                const handResult = evaluateHand(cards);
+                player.handRanking = handResult.name;
+                player.handRank = handResult.rank;
+            });
+            
+            // Ordenar jogadores pelo ranking da mão (do maior para o menor)
+            activePlayers.sort((a, b) => b.handRank - a.handRank);
+            
+            // O jogador com o maior ranking é o vencedor
+            const winner = activePlayers[0];
+            
+            // Verificar se há empate
+            const tiedPlayers = activePlayers.filter(player => player.handRank === winner.handRank);
+            
+            if (tiedPlayers.length > 1) {
+                // Lógica de desempate (simplificada)
+                // Em caso de empate, dividir o pot igualmente
+                const splitAmount = Math.floor(gameState.pot / tiedPlayers.length);
+                tiedPlayers.forEach(player => {
+                    player.chips += splitAmount;
+                });
+                showGameMessage(`Tie! Pot split between ${tiedPlayers.map(p => p.name).join(', ')}!`);
+            } else {
+                // Sem empate, o vencedor leva tudo
+                winner.chips += gameState.pot;
+                showGameMessage(`${winner.name} wins $${gameState.pot} with ${winner.handRanking}!`);
+            }
+            
+            // Importante: zerar o pot após distribuir os ganhos
+            gameState.pot = 0;
+            
+            return winner;
         }
 
         // Ações do jogador
