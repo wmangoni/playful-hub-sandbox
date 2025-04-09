@@ -132,7 +132,7 @@
             font-weight: bold;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
-        #level {
+        #phase-display {
             position: absolute;
             top: 40px;
             left: 10px;
@@ -211,6 +211,62 @@
             50% { transform: translateX(3px) rotate(0.5deg); }
             75% { transform: translateX(-2px) rotate(-0.2deg); }
         }
+        #boss {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            top: 30px;
+            left: calc(50% - 50px);
+            z-index: 3;
+        }
+        #boss svg {
+            width: 100%;
+            height: 100%;
+        }
+        #boss-hp-bar-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background-color: #444;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            z-index: 10;
+            text-align: center;
+        }
+        #boss-hp-bar-fill {
+            height: 100%;
+            width: 100%;
+            background-color: #e74c3c;
+            border-radius: 4px;
+            transition: width 0.3s ease-out;
+        }
+        #boss-name {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px black;
+        }
+        #high-score {
+            margin-top: 10px;
+            font-size: 18px;
+            color: #f1c40f;
+        }
+        .enemy-bullet {
+            position: absolute;
+            width: 8px;
+            height: 15px;
+            background-color: #e74c3c;
+            border-radius: 4px;
+            box-shadow: 0 0 3px #e74c3c;
+        }
     </style>
 </head>
 <body>
@@ -224,17 +280,30 @@
         <div id="player-hp-bar-container">
             <div id="player-hp-bar-fill"></div>
         </div>
+        <div id="phase-display">Fase: 1</div>
         <div id="special-charges">Tiro Especial: 3</div>
-        <div id="level">Nível: 1</div>
         <div id="special-active">TIRO TRIPLO ATIVO!</div>
         <div id="special-bar"><div id="special-bar-fill"></div></div>
+        <div id="boss-hp-bar-container" style="display: none;">
+            <div id="boss-hp-bar-fill"></div>
+            <div id="boss-name">CHEFE</div>
+        </div>
         <svg id="player" viewBox="0 0 100 100">
             <polygon points="50,0 100,100 50,70 0,100" fill="#3498db" />
             <rect x="45" y="70" width="10" height="20" fill="#e74c3c" />
         </svg>
+        <div id="boss" style="display: none;">
+            <svg viewBox="0 0 150 150">
+                <rect x="10" y="10" width="130" height="100" fill="#8e44ad" rx="15" />
+                <circle cx="75" cy="60" r="25" fill="#c0392b" />
+                <rect x="30" y="110" width="20" height="30" fill="#bdc3c7" />
+                <rect x="100" y="110" width="20" height="30" fill="#bdc3c7" />
+            </svg>
+        </div>
         <div id="game-over">
             <div>Game Over</div>
             <div id="final-score">Score: 0</div>
+            <div id="high-score">High Score: 0</div>
             <button id="restart-button">Play Again</button>
         </div>
     </div>
@@ -255,13 +324,17 @@
         const player = document.getElementById('player');
         const scoreElement = document.getElementById('score');
         const playerHPBarFill = document.getElementById('player-hp-bar-fill');
+        const phaseDisplay = document.getElementById('phase-display');
         const specialChargesElement = document.getElementById('special-charges');
-        const levelElement = document.getElementById('level');
         const specialActiveElement = document.getElementById('special-active');
         const specialBarFill = document.getElementById('special-bar-fill');
         const gameOverScreen = document.getElementById('game-over');
         const finalScoreElement = document.getElementById('final-score');
+        const highScoreElement = document.getElementById('high-score');
         const restartButton = document.getElementById('restart-button');
+        const bossElement = document.getElementById('boss');
+        const bossHPContainer = document.getElementById('boss-hp-bar-container');
+        const bossHPFill = document.getElementById('boss-hp-bar-fill');
         
         const containerWidth = gameContainer.offsetWidth;
         const containerHeight = gameContainer.offsetHeight;
@@ -272,8 +345,10 @@
         let playerY = containerHeight - playerHeight - 20;
         let bullets = [];
         let enemies = [];
+        let enemyBullets = [];
         let stars = [];
         let score = 0;
+        let highScore = 0;
         let playerMaxHP = 100;
         let playerCurrentHP = playerMaxHP;
         let isPlayerInvulnerable = false;
@@ -281,109 +356,97 @@
         const playerInvulnerableDuration = 1500;
         let isGameOver = false;
         let gameLoopId;
-        let difficultyLevel = 1;
+        let currentPhase = 1;
+        let phaseProgress = 0;
+        const phaseGoals = [15, 1];
+        let isBossActive = false;
+        let bossData = {};
         let specialCharges = 3;
         let isSpecialActive = false;
         let specialTimer = null;
         let specialTimeLeft = 0;
         
-        // Controls state
         let isLeftPressed = false;
         let isRightPressed = false;
         let isFirePressed = false;
         let isSpecialPressed = false;
         let lastFireTime = 0;
+        let lastEnemySpawnTime = 0;
         
-        // Elementos de Áudio
         const sfxShoot = document.getElementById('sfx-shoot');
         const sfxSpecialShoot = document.getElementById('sfx-special-shoot');
         const sfxEnemyHit = document.getElementById('sfx-enemy-hit');
         const sfxExplosion = document.getElementById('sfx-explosion');
         const sfxPlayerDamage = document.getElementById('sfx-player-damage');
         const sfxGameOver = document.getElementById('sfx-game-over');
-        // const sfxPowerup = document.getElementById('sfx-powerup');
         const bgmGame = document.getElementById('bgm-game');
         const bgmGameOver = document.getElementById('bgm-game-over');
         
-        const MAX_DIFFICULTY_LEVEL = 20; // Limite máximo de dificuldade
-        
-        // Função auxiliar para tocar sons com segurança
         function playSound(audioElement) {
             if (audioElement) {
-                audioElement.currentTime = 0; // Reinicia o som se já estiver tocando
+                audioElement.currentTime = 0;
                 audioElement.play().catch(error => {
-                    // Autoplay pode ser bloqueado, logar o erro mas não quebrar o jogo
-                    // console.warn("Audio play failed:", error);
                 });
             }
         }
         
-        // Parar todas as músicas
         function stopMusic() {
             if (bgmGame) bgmGame.pause();
             if (bgmGameOver) bgmGameOver.pause();
         }
         
-        // Initialize stars com parallax
         function createStars() {
-            stars.forEach(star => { // Limpa estrelas antigas se resetar
+            stars.forEach(star => {
                 if(star.parentNode === gameContainer) gameContainer.removeChild(star);
             });
-            stars = []; // Limpa o array
+            stars = [];
 
-            const starCounts = { layer1: 30, layer2: 40, layer3: 50 }; // Densidade por camada
-            const starSpeeds = { layer1: 0.8, layer2: 0.4, layer3: 0.2 }; // Velocidade por camada
+            const starCounts = { layer1: 30, layer2: 40, layer3: 50 };
+            const starSpeeds = { layer1: 0.8, layer2: 0.4, layer3: 0.2 };
 
             for (const layer in starCounts) {
                 for (let i = 0; i < starCounts[layer]; i++) {
                     const star = document.createElement('div');
-                    star.className = `star star-${layer}`; // Adiciona classe da camada
+                    star.className = `star star-${layer}`;
                     star.style.left = Math.random() * containerWidth + 'px';
                     star.style.top = Math.random() * containerHeight + 'px';
-                    star.speed = starSpeeds[layer] * (Math.random() * 0.5 + 0.75); // Pequena variação na velocidade da camada
-                    gameContainer.insertBefore(star, player); // Insere antes do jogador
+                    star.speed = starSpeeds[layer] * (Math.random() * 0.5 + 0.75);
+                    gameContainer.insertBefore(star, player);
                     stars.push(star);
                 }
             }
         }
         
-        // Update player position based on controls
         function updatePlayer() {
             if (isLeftPressed && playerX > 0) {
-                playerX -= 7; // Increased player speed
+                playerX -= 7;
             }
             if (isRightPressed && playerX < containerWidth - playerWidth) {
-                playerX += 7; // Increased player speed
+                playerX += 7;
             }
             player.style.left = playerX + 'px';
         }
         
-        // Função para criar explosão visual
         function createExplosion(x, y) {
             const explosion = document.createElement('div');
             explosion.className = 'explosion';
-            // Ajusta posição para centralizar a explosão
             explosion.style.left = (x - 25) + 'px';
             explosion.style.top = (y - 25) + 'px';
             gameContainer.appendChild(explosion);
-            playSound(sfxExplosion); // Toca som de explosão
+            playSound(sfxExplosion);
 
-            // Remove a explosão do DOM após a animação
             setTimeout(() => {
                 if (explosion.parentNode === gameContainer) {
                     gameContainer.removeChild(explosion);
                 }
-            }, 300); // Duração da animação CSS
+            }, 300);
         }
         
-        // Fire a bullet - Adiciona som
         function fireBullet() {
             const currentTime = Date.now();
-            if (currentTime - lastFireTime < 150) return; // Faster fire rate
+            if (currentTime - lastFireTime < 150) return;
 
             if (isSpecialActive) {
-                // Triple special shot (middle, left diagonal, right diagonal)
-                // Middle bullet
                 const bullet1 = document.createElement('div');
                 bullet1.className = 'special-bullet';
                 bullet1.style.left = (playerX + playerWidth / 2 - 5) + 'px';
@@ -392,9 +455,8 @@
                 bullet1.speedY = -10;
                 gameContainer.appendChild(bullet1);
                 bullets.push(bullet1);
-                playSound(sfxSpecialShoot); // Som diferente para tiro especial
+                playSound(sfxSpecialShoot);
                 
-                // Left diagonal bullet
                 const bullet2 = document.createElement('div');
                 bullet2.className = 'special-bullet';
                 bullet2.style.left = (playerX + playerWidth / 2 - 15) + 'px';
@@ -404,7 +466,6 @@
                 gameContainer.appendChild(bullet2);
                 bullets.push(bullet2);
                 
-                // Right diagonal bullet
                 const bullet3 = document.createElement('div');
                 bullet3.className = 'special-bullet';
                 bullet3.style.left = (playerX + playerWidth / 2 + 5) + 'px';
@@ -414,7 +475,6 @@
                 gameContainer.appendChild(bullet3);
                 bullets.push(bullet3);
             } else {
-                // Regular single bullet
                 const bullet = document.createElement('div');
                 bullet.className = 'bullet';
                 bullet.style.left = (playerX + playerWidth / 2 - 5) + 'px';
@@ -423,27 +483,24 @@
                 bullet.speedY = -10;
                 gameContainer.appendChild(bullet);
                 bullets.push(bullet);
-                playSound(sfxShoot); // Som de tiro normal
+                playSound(sfxShoot);
             }
             
             lastFireTime = currentTime;
         }
         
-        // Activate special shot
         function activateSpecial() {
             if (specialCharges > 0 && !isSpecialActive) {
                 isSpecialActive = true;
                 specialCharges--;
                 specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
                 specialActiveElement.style.display = 'block';
-                specialTimeLeft = 2000; // 2 seconds
+                specialTimeLeft = 2000;
                 
-                // Cancel any existing timer
                 if (specialTimer) {
                     clearInterval(specialTimer);
                 }
                 
-                // Start countdown
                 specialTimer = setInterval(() => {
                     specialTimeLeft -= 100;
                     const percentage = (specialTimeLeft / 2000) * 100;
@@ -456,7 +513,6 @@
             }
         }
         
-        // Deactivate special shot
         function deactivateSpecial() {
             isSpecialActive = false;
             specialActiveElement.style.display = 'none';
@@ -468,7 +524,6 @@
             }
         }
         
-        // Update bullets position
         function updateBullets() {
             for (let i = 0; i < bullets.length; i++) {
                 const bullet = bullets[i];
@@ -486,90 +541,76 @@
             }
         }
         
-        // Create an enemy - usar sprite (comentado)
         function createEnemy() {
-            // Increase spawn rate and enemy speed based on difficulty level
-            const spawnRate = 0.02 + (difficultyLevel - 1) * 0.005;
-            const maxEnemies = 8 + Math.floor((difficultyLevel - 1) / 2);
-            
-            if (Math.random() < spawnRate && enemies.length < maxEnemies) {
+            if (isBossActive) return;
+
+            const now = Date.now();
+            const timeSinceLastSpawn = now - lastEnemySpawnTime;
+
+            const baseSpawnInterval = 1500 - (currentPhase * 100);
+            const spawnInterval = Math.max(300, baseSpawnInterval);
+            const maxEnemies = 6 + currentPhase * 2;
+
+            if (timeSinceLastSpawn > spawnInterval && enemies.length < maxEnemies) {
+                lastEnemySpawnTime = now;
+
                 const enemy = document.createElement('div');
                 enemy.className = 'enemy';
 
-                // *** Se usar sprites, defina o background aqui ***
-                // const enemyType = Math.floor(Math.random() * 3);
-                // enemy.style.backgroundImage = `url('images/enemy_type${enemyType}.png')`;
-                // enemy.dataset.type = enemyType; // Guarda o tipo se precisar
+                let enemyType = 0;
+                if (currentPhase >= 2) {
+                    enemyType = Math.floor(Math.random() * 2);
+                }
 
-                // *** Manter SVG por enquanto ***
-                const enemyType = Math.floor(Math.random() * 3);
                 enemy.innerHTML = `<svg viewBox="0 0 100 100">
-                    ${enemyType === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c" /><circle cx="30" cy="40" r="10" fill="#000" /><circle cx="70" cy="40" r="10" fill="#000" />' :
-                      enemyType === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6" /><circle cx="35" cy="45" r="8" fill="#000" /><circle cx="65" cy="45" r="8" fill="#000" />' :
-                      '<rect x="10" y="10" width="80" height="80" fill="#f39c12" /><rect x="25" y="30" width="15" height="15" fill="#000" /><rect x="60" y="30" width="15" height="15" fill="#000" />'}
+                    ${enemyType === 0 ? '<circle cx="50" cy="50" r="40" fill="#e74c3c"/><circle cx="30" cy="40" r="10" fill="#000"/><circle cx="70" cy="40" r="10" fill="#000"/>' :
+                      enemyType === 1 ? '<polygon points="10,50 50,10 90,50 50,90" fill="#9b59b6"/><circle cx="35" cy="45" r="8" fill="#000"/><circle cx="65" cy="45" r="8" fill="#000"/>' :
+                      '<rect x="10" y="10" width="80" height="80" fill="#f39c12"/><rect x="25" y="30" width="15" height="15" fill="#000"/><rect x="60" y="30" width="15" height="15" fill="#000"/>'}
                 </svg>`;
-                // *** Fim SVG ***
 
                 const x = Math.random() * (containerWidth - 30);
                 enemy.style.left = x + 'px';
-                enemy.style.top = '0px';
-                
-                // Base speed is increased with difficulty
-                const baseSpeed = 0.5 + (difficultyLevel - 1) * 0.2;
+                enemy.style.top = '-30px';
+
+                const baseSpeed = 0.5 + (currentPhase * 0.15);
                 enemy.speed = Math.random() * 1 + baseSpeed;
-                
-                // Add special movement pattern for higher levels
-                if (difficultyLevel >= 3) {
-                    enemy.movementType = Math.floor(Math.random() * 3);
-                    enemy.movementOffset = 0;
-                    
-                    if (enemy.movementType === 1) {
-                        // Zigzag movement
-                        enemy.amplitude = Math.random() * 30 + 20;
-                        enemy.frequency = Math.random() * 0.1 + 0.05;
-                    }
+
+                if (currentPhase >= 2) {
+                    enemy.movementType = Math.floor(Math.random() * 2);
+                     if (enemy.movementType === 1) {
+                         enemy.amplitude = Math.random() * 30 + 20;
+                         enemy.frequency = Math.random() * 0.1 + 0.05;
+                         enemy.movementOffset = Math.random() * Math.PI * 2;
+                     }
+                } else {
+                    enemy.movementType = 0;
                 }
-                
+
                 gameContainer.appendChild(enemy);
                 enemies.push(enemy);
             }
         }
         
-        // Update enemies position
         function updateEnemies() {
-            for (let i = 0; i < enemies.length; i++) {
+            if (isBossActive) return;
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
                 let x = parseFloat(enemy.style.left);
                 let y = parseFloat(enemy.style.top) + enemy.speed;
                 
-                // Apply special movement patterns based on difficulty level
                 if (enemy.movementType === 1) {
-                    // Zigzag movement
                     enemy.movementOffset += enemy.frequency;
                     x += Math.sin(enemy.movementOffset) * 2;
-                } else if (enemy.movementType === 2 && difficultyLevel >= 4) {
-                    // Homing movement (slight tracking of player)
-                    const playerCenterX = playerX + playerWidth / 2;
-                    const enemyCenterX = x + 15;
-                    
-                    if (playerCenterX < enemyCenterX) {
-                        x -= 0.5;
-                    } else if (playerCenterX > enemyCenterX) {
-                        x += 0.5;
-                    }
                 }
                 
-                // Keep enemy within screen bounds
                 if (x < 0) x = 0;
                 if (x > containerWidth - 30) x = containerWidth - 30;
-                
+
                 if (y > containerHeight) {
-                    gameContainer.removeChild(enemy);
+                    if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
                     enemies.splice(i, 1);
-                    i--;
-                    
-                    // After level 2, lose lives when enemies reach bottom
-                    if (difficultyLevel >= 3) {
+                    if (currentPhase > 1) {
                         playerTakeDamage(10);
                     }
                 } else {
@@ -579,187 +620,171 @@
             }
         }
         
-        // Update stars position (parallax effect)
         function updateStars() {
             for (let i = 0; i < stars.length; i++) {
                 const star = stars[i];
                 let y = parseFloat(star.style.top) + star.speed;
                 
                 if (y > containerHeight) {
-                    y = -5; // Reinicia um pouco acima do topo
-                    star.style.left = Math.random() * containerWidth + 'px'; // Nova posição X
+                    y = -5;
+                    star.style.left = Math.random() * containerWidth + 'px';
                 }
                 
                 star.style.top = y + 'px';
             }
         }
         
-        // Check for collisions - Adiciona feedback visual e sonoro no hit do inimigo, limita nível
         function checkCollisions() {
-            // Check bullet-enemy collisions
-            for (let i = bullets.length - 1; i >= 0; i--) { // Iterar de trás para frente ao remover
+            for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 if (!bullet) continue;
                 const bulletRect = bullet.getBoundingClientRect();
 
-                for (let j = enemies.length - 1; j >= 0; j--) { // Iterar de trás para frente
-                    const enemy = enemies[j];
-                    if (!enemy) continue;
-                    const enemyRect = enemy.getBoundingClientRect();
+                let hit = false;
 
+                if (isBossActive) {
+                    const bossRect = bossElement.getBoundingClientRect();
                     if (
-                        bulletRect.left < enemyRect.right &&
-                        bulletRect.right > enemyRect.left &&
-                        bulletRect.top < enemyRect.bottom &&
-                        bulletRect.bottom > enemyRect.top
+                        bulletRect.left < bossRect.right &&
+                        bulletRect.right > bossRect.left &&
+                        bulletRect.top < bossRect.bottom &&
+                        bulletRect.bottom > bossRect.top * 0.8
                     ) {
-                        // Feedback visual de hit no inimigo (piscar/aumentar)
-                        enemy.classList.add('hit');
-                        setTimeout(() => enemy.classList.remove('hit'), 100);
+                        bossTakeDamage(bullet.classList.contains('special-bullet') ? 3 : 1);
+                        hit = true;
+                    }
+                } else {
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const enemy = enemies[j];
+                        if (!enemy) continue;
+                        const enemyRect = enemy.getBoundingClientRect();
 
-                        playSound(sfxEnemyHit); // Som de acerto no inimigo
+                        if (
+                            bulletRect.left < enemyRect.right &&
+                            bulletRect.right > enemyRect.left &&
+                            bulletRect.top < enemyRect.bottom &&
+                            bulletRect.bottom > enemyRect.top
+                        ) {
+                            enemy.classList.add('hit');
+                            setTimeout(() => enemy.classList.remove('hit'), 100);
+                            playSound(sfxEnemyHit);
 
-                        // --- Implementar HP inimigo aqui (Etapa 1) ---
-                        // Por agora, inimigo morre com 1 hit
-                        createExplosion(enemyRect.left + enemyRect.width / 2, enemyRect.top + enemyRect.height / 2); // Cria explosão
-                        try {
-                             if (bullet.parentNode === gameContainer) gameContainer.removeChild(bullet);
-                             if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
-                        } catch (e) { console.warn("Error removing elements:", e); }
+                            createExplosion(enemyRect.left + enemyRect.width / 2, enemyRect.top + enemyRect.height / 2);
+                            if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
+                            enemies.splice(j, 1);
 
-                        bullets.splice(i, 1);
-                        enemies.splice(j, 1);
+                            score += 10 * currentPhase;
+                            scoreElement.textContent = `Score: ${score}`;
 
-                        // Score points
-                        const points = 10 * difficultyLevel;
-                        score += points;
-                        scoreElement.textContent = `Score: ${score}`;
-
-                        // Check if we reached new level - com limite
-                        const calculatedLevel = 1 + Math.floor(score / 150);
-                        const newLevel = Math.min(calculatedLevel, MAX_DIFFICULTY_LEVEL); // Limita o nível
-
-                        if (newLevel > difficultyLevel) {
-                            difficultyLevel = newLevel;
-                            levelElement.textContent = `Nível: ${difficultyLevel}`;
-
-                            // Award extra special charge every 2 levels
-                            if (difficultyLevel % 2 === 0 && specialCharges < 3) {
-                                specialCharges++;
-                                specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
+                            phaseProgress++;
+                            const goalIndex = currentPhase - 1;
+                            if (goalIndex < phaseGoals.length && typeof phaseGoals[goalIndex] === 'number' && phaseGoals[goalIndex] > 1) {
+                                if (phaseProgress >= phaseGoals[goalIndex]) {
+                                    advancePhase();
+                                }
                             }
+
+                            hit = true;
+                            break;
                         }
-                        // Bullet hit an enemy, break inner loop and continue checking other bullets
-                        break; // Sai do loop de inimigos (j)
                     }
                 }
-                 // Se a bala foi removida (splice), não precisa checar mais colisões para ela
-                 // A iteração i-- já cuida disso ao iterar de trás para frente
+
+                if (hit) {
+                    if (bullet.parentNode === gameContainer) gameContainer.removeChild(bullet);
+                    bullets.splice(i, 1);
+                }
             }
-            
-            // Check player-enemy collisions
-            if (!isPlayerInvulnerable) { // Só checa colisão com inimigo se não estiver invulnerável
+
+            if (!isPlayerInvulnerable && !isBossActive) {
                 const playerRect = player.getBoundingClientRect();
-                for (let i = 0; i < enemies.length; i++) {
+                for (let i = enemies.length - 1; i >= 0; i--) {
                     const enemy = enemies[i];
                     if (!enemy) continue;
                     const enemyRect = enemy.getBoundingClientRect();
 
                     if (
-                        playerRect.left < enemyRect.right -5 && // Ajuste para colisão mais justa
+                        playerRect.left < enemyRect.right - 5 &&
                         playerRect.right > enemyRect.left + 5 &&
                         playerRect.top < enemyRect.bottom - 5 &&
                         playerRect.bottom > enemyRect.top + 5
                     ) {
-                        // Collision detected
-                        try {
-                            if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
-                        } catch (e) {
-                             console.warn("Error removing enemy during player-enemy collision:", e);
-                        }
+                        createExplosion(enemyRect.left + enemyRect.width / 2, enemyRect.top + enemyRect.height / 2);
+                        if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
                         enemies.splice(i, 1);
-                        playerTakeDamage(25); // Inimigo causa 25 de dano (ajuste conforme necessário)
-                        i--; // Decrementa o índice pois removemos um inimigo
-                        // Não precisa mais decrementar vidas ou checar game over aqui, playerTakeDamage cuida disso
-                        break; // Sai do loop de inimigos após uma colisão
+                        playerTakeDamage(25);
+                        if (isGameOver) return;
+                        break;
                     }
                 }
             }
         }
         
-        // Game over function - Toca som e BGM diferente
         function gameOver() {
-            if (isGameOver) return; // Evita chamar múltiplas vezes
+            if (isGameOver) return;
             isGameOver = true;
             finalScoreElement.textContent = `Score: ${score}`;
+            saveHighScore();
             gameOverScreen.style.display = 'flex';
             if(gameLoopId) cancelAnimationFrame(gameLoopId);
             deactivateSpecial();
-            player.style.display = 'none'; // Garante que o jogador suma
+            player.style.display = 'none';
 
             playSound(sfxGameOver);
-            stopMusic(); // Para a música do jogo
-            playSound(bgmGameOver); // Toca música de game over
+            stopMusic();
+            playSound(bgmGameOver);
 
             isPlayerInvulnerable = false;
             player.classList.remove('invulnerable');
-            if (playerInvulnerableTimer) {
-                clearTimeout(playerInvulnerableTimer);
-                playerInvulnerableTimer = null;
-            }
+            if (playerInvulnerableTimer) clearTimeout(playerInvulnerableTimer);
+            bossElement.style.display = 'none';
+            bossHPContainer.style.display = 'none';
         }
         
-        // Reset game state - Reseta música
         function resetGame() {
-            stopMusic(); // Para qualquer música que esteja tocando
-            // Clear all game elements
-            while (bullets.length > 0) {
-                gameContainer.removeChild(bullets[0]);
-                bullets.shift();
-            }
-            while (enemies.length > 0) {
-                gameContainer.removeChild(enemies[0]);
-                enemies.shift();
-            }
-            while (stars.length > 0) {
-                gameContainer.removeChild(stars[0]);
-                stars.shift();
-            }
-            
-            // Reset game variables
+            stopMusic();
+            loadHighScore();
+
+            bullets.forEach(b => { if(b.parentNode === gameContainer) gameContainer.removeChild(b); });
+            bullets = [];
+            enemies.forEach(e => { if(e.parentNode === gameContainer) gameContainer.removeChild(e); });
+            enemies = [];
+            enemyBullets.forEach(eb => { if(eb.parentNode === gameContainer) gameContainer.removeChild(eb); });
+            enemyBullets = [];
+
             playerX = containerWidth / 2 - playerWidth / 2;
             playerY = containerHeight - playerHeight - 20;
-            score = 0;
             playerCurrentHP = playerMaxHP;
             isPlayerInvulnerable = false;
-            if (playerInvulnerableTimer) {
-                clearTimeout(playerInvulnerableTimer);
-                playerInvulnerableTimer = null;
-            }
-            difficultyLevel = 1;
+            if (playerInvulnerableTimer) clearTimeout(playerInvulnerableTimer);
+            score = 0;
+            currentPhase = 1;
+            phaseProgress = 0;
+            isBossActive = false;
+            bossData = {};
             specialCharges = 3;
             isGameOver = false;
             isSpecialActive = false;
-            
-            // Update UI
+            lastEnemySpawnTime = 0;
+
             scoreElement.textContent = `Score: ${score}`;
             updatePlayerHPBar();
-            levelElement.textContent = `Nível: ${difficultyLevel}`;
+            phaseDisplay.textContent = `Fase: ${currentPhase}`;
             specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
             gameOverScreen.style.display = 'none';
             specialActiveElement.style.display = 'none';
             specialBarFill.style.width = '0%';
-            player.style.display = 'block'; // Garante que o jogador reapareça
+            player.style.display = 'block';
             player.classList.remove('invulnerable');
-            
-            // Setup game elements
+            bossElement.style.display = 'none';
+            bossHPContainer.style.display = 'none';
+
             createStars();
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             gameLoopId = null;
             startGame();
         }
         
-        // Auto-fire (to make game easier)
         function enableAutoFire() {
             setInterval(() => {
                 if (!isGameOver) {
@@ -768,7 +793,6 @@
             }, 300);
         }
         
-        // Main game loop
         function gameLoop() {
             if (!isGameOver) {
                 updatePlayer();
@@ -777,9 +801,10 @@
                 }
                 if (isSpecialPressed && !isSpecialActive && specialCharges > 0) {
                     activateSpecial();
-                    isSpecialPressed = false; // Reset to prevent continuous activation
+                    isSpecialPressed = false;
                 }
                 updateBullets();
+                updateEnemyBullets();
                 createEnemy();
                 updateEnemies();
                 updateStars();
@@ -788,7 +813,6 @@
             }
         }
         
-        // Handle keyboard events
         function setupControls() {
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft' || e.key === 'a') {
@@ -820,7 +844,6 @@
                 }
             });
             
-            // Touch controls for mobile
             let touchStartX = 0;
             gameContainer.addEventListener('touchstart', (e) => {
                 e.preventDefault();
@@ -828,12 +851,10 @@
                 const containerRect = gameContainer.getBoundingClientRect();
                 touchStartX = touch.clientX - containerRect.left;
                 
-                // Double tap detection for special
                 const now = new Date().getTime();
                 const timeSince = now - (touch.target.lastTouch || 0);
                 
                 if (timeSince < 300 && timeSince > 0) {
-                    // Double tap - activate special
                     isSpecialPressed = true;
                 }
                 
@@ -847,7 +868,6 @@
                 const containerRect = gameContainer.getBoundingClientRect();
                 const touchX = touch.clientX - containerRect.left;
                 
-                // Determine movement based on relative position from touch start
                 if (touchX < touchStartX - 20) {
                     isLeftPressed = true;
                     isRightPressed = false;
@@ -870,47 +890,40 @@
                 isRightPressed = false;
             });
             
-            // Restart button
             restartButton.addEventListener('click', resetGame);
         }
         
-        // Start the game - Inicia BGM
         function startGame() {
-            // Certifique-se de que os controles estão configurados apenas uma vez
             if (!window.controlsInitialized) {
                 setupControls();
-                enableAutoFire(); // Habilita se desejar
-                window.controlsInitialized = true; // Flag para evitar re-setup
+                enableAutoFire();
+                window.controlsInitialized = true;
             }
-            stopMusic(); // Para garantir que música de game over pare
-            playSound(bgmGame); // Toca música principal
-            if (!gameLoopId) { // Evita múltiplos loops
+            stopMusic();
+            playSound(bgmGame);
+            if (!gameLoopId) {
                gameLoopId = requestAnimationFrame(gameLoop);
             }
         }
         
-        // Atualiza a barra de vida do jogador na UI
         function updatePlayerHPBar() {
             const percentage = (playerCurrentHP / playerMaxHP) * 100;
-            playerHPBarFill.style.width = `${Math.max(0, percentage)}%`; // Garante que não seja negativo
+            playerHPBarFill.style.width = `${Math.max(0, percentage)}%`;
         }
         
-        // Função para fazer o jogador levar dano - Adiciona som e screen shake
         function playerTakeDamage(damage) {
             if (isPlayerInvulnerable) return;
 
             playerCurrentHP -= damage;
             updatePlayerHPBar();
-            playSound(sfxPlayerDamage); // Toca som de dano
-            triggerScreenShake(); // Ativa o screen shake
+            playSound(sfxPlayerDamage);
+            triggerScreenShake();
 
             if (playerCurrentHP <= 0) {
-                // Cria explosão na posição do jogador antes de morrer
                 createExplosion(playerX + playerWidth / 2, playerY + playerHeight / 2);
-                player.style.display = 'none'; // Esconde o jogador
+                player.style.display = 'none';
                 gameOver();
             } else {
-                // Ativar invulnerabilidade
                 isPlayerInvulnerable = true;
                 player.classList.add('invulnerable');
                 if (playerInvulnerableTimer) clearTimeout(playerInvulnerableTimer);
@@ -922,15 +935,185 @@
             }
         }
         
-        // Função para aplicar screen shake
         function triggerScreenShake() {
             gameContainer.classList.add('shake');
             setTimeout(() => {
                 gameContainer.classList.remove('shake');
-            }, 150); // Duração do shake (igual à animação CSS)
+            }, 150);
         }
         
-        // Initialize the game
+        function spawnBoss() {
+            console.log("Spawning Boss for Phase", currentPhase);
+            isBossActive = true;
+            bossElement.style.display = 'block';
+            bossHPContainer.style.display = 'block';
+
+            bossData = {
+                maxHP: 300 + (currentPhase * 100),
+                currentHP: 0,
+                x: containerWidth / 2 - 50,
+                y: 30,
+                speedX: 1.5 + (currentPhase * 0.2),
+                directionX: 1,
+                attackTimer: 0,
+                attackInterval: 1500 - (currentPhase * 100),
+                lastAttackTime: 0
+            };
+            bossData.currentHP = bossData.maxHP;
+            bossElement.style.left = bossData.x + 'px';
+            bossElement.style.top = bossData.y + 'px';
+            updateBossHPBar();
+
+            enemies.forEach(enemy => {
+                if(enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
+            });
+            enemies = [];
+        }
+        
+        function updateBossHPBar() {
+            const percentage = (bossData.currentHP / bossData.maxHP) * 100;
+            bossHPFill.style.width = `${Math.max(0, percentage)}%`;
+        }
+        
+        function updateBoss() {
+            if (!isBossActive) return;
+
+            bossData.x += bossData.speedX * bossData.directionX;
+            if (bossData.x <= 10 || bossData.x >= containerWidth - 110) {
+                bossData.directionX *= -1;
+                bossData.x = Math.max(10, Math.min(bossData.x, containerWidth - 110));
+            }
+            bossElement.style.left = bossData.x + 'px';
+
+            const now = Date.now();
+            if (now - bossData.lastAttackTime > bossData.attackInterval) {
+                bossData.lastAttackTime = now;
+                const cannonLeftX = bossData.x + 25;
+                const cannonRightX = bossData.x + 75;
+                const cannonY = bossData.y + 90;
+
+                bossFireBullet(cannonLeftX, cannonY, 0, 3 + currentPhase * 0.5);
+                bossFireBullet(cannonRightX, cannonY, 0, 3 + currentPhase * 0.5);
+            }
+        }
+        
+        function bossTakeDamage(damage) {
+            if (!isBossActive) return;
+            bossData.currentHP -= damage;
+            updateBossHPBar();
+            playSound(sfxEnemyHit);
+
+            bossElement.style.filter = 'brightness(1.8)';
+            setTimeout(() => { bossElement.style.filter = 'brightness(1)'; }, 100);
+
+            if (bossData.currentHP <= 0) {
+                defeatBoss();
+            }
+        }
+        
+        function defeatBoss() {
+            console.log("Boss Defeated!");
+            isBossActive = false;
+            createExplosion(bossData.x + 50, bossData.y + 50);
+            bossElement.style.display = 'none';
+            bossHPContainer.style.display = 'none';
+
+            score += 500 * currentPhase;
+            scoreElement.textContent = `Score: ${score}`;
+            if (specialCharges < 3) {
+                 specialCharges++;
+                 specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
+            }
+             playerCurrentHP = Math.min(playerMaxHP, playerCurrentHP + 25);
+             updatePlayerHPBar();
+
+            advancePhase();
+        }
+        
+        function advancePhase() {
+            currentPhase++;
+            phaseProgress = 0;
+            phaseDisplay.textContent = `Fase: ${currentPhase}`;
+            console.log(`Advanced to Phase ${currentPhase}`);
+
+            const goalIndex = currentPhase - 1;
+            if (goalIndex < phaseGoals.length && typeof phaseGoals[goalIndex] === 'number' && phaseGoals[goalIndex] === 1) {
+                spawnBoss();
+            } else if (goalIndex >= phaseGoals.length) {
+                console.log("Todas as fases definidas completas!");
+            }
+            showPhaseNotification(`Fase ${currentPhase} Iniciada!`);
+        }
+        
+        function showPhaseNotification(message) {
+            let notification = document.getElementById('phase-notification');
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'phase-notification';
+                notification.style.position = 'absolute';
+                notification.style.top = '40%';
+                notification.style.left = '50%';
+                notification.style.transform = 'translate(-50%, -50%)';
+                notification.style.padding = '15px 30px';
+                notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                notification.style.color = '#0f0';
+                notification.style.fontSize = '24px';
+                notification.style.fontWeight = 'bold';
+                notification.style.borderRadius = '10px';
+                notification.style.zIndex = '20';
+                notification.style.display = 'none';
+                gameContainer.appendChild(notification);
+            }
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+        
+        function loadHighScore() {
+            const storedScore = localStorage.getItem('spaceShooterHighScore');
+            highScore = storedScore ? parseInt(storedScore, 10) : 0;
+            highScoreElement.textContent = `High Score: ${highScore}`;
+        }
+        
+        function saveHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('spaceShooterHighScore', highScore);
+                highScoreElement.textContent = `High Score: ${highScore}`;
+            }
+        }
+        
+        function updateEnemyBullets() {
+            for (let i = enemyBullets.length - 1; i >= 0; i--) {
+                const bullet = enemyBullets[i];
+                const x = parseFloat(bullet.style.left);
+                const y = parseFloat(bullet.style.top) + bullet.speedY;
+
+                if (y > containerHeight || y < -20 || x < -10 || x > containerWidth + 10) {
+                    if (bullet.parentNode === gameContainer) gameContainer.removeChild(bullet);
+                    enemyBullets.splice(i, 1);
+                } else {
+                    bullet.style.top = y + 'px';
+                    bullet.style.left = x + (bullet.speedX || 0) + 'px';
+                }
+            }
+        }
+        
+        function bossFireBullet(startX, startY, speedX, speedY) {
+            const bullet = document.createElement('div');
+            bullet.className = 'enemy-bullet';
+            bullet.style.left = startX + 'px';
+            bullet.style.top = startY + 'px';
+            bullet.speedX = speedX;
+            bullet.speedY = speedY;
+            gameContainer.appendChild(bullet);
+            enemyBullets.push(bullet);
+        }
+        
+        window.controlsInitialized = false;
+        loadHighScore();
         resetGame();
     </script>
 </body>
