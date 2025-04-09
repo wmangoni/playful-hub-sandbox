@@ -282,7 +282,7 @@
             from { transform: scale(1); filter: brightness(1); }
             to { transform: scale(1.2); filter: brightness(1.3); }
         }
-        #player.shielded::after {
+        #player .shielded::after {
             content: '';
             position: absolute;
             top: -5px;
@@ -296,6 +296,10 @@
         @keyframes shield-pulse {
             from { transform: scale(1); opacity: 0.5; }
             to { transform: scale(1.1); opacity: 0.8; }
+        }
+        .bullet.homing {
+            background-color: #e67e22;
+            box-shadow: 0 0 4px #e67e22;
         }
     </style>
 </head>
@@ -417,6 +421,9 @@
         let lastBossSummonTime = 0;
         let powerups = [];
         let hasShield = 0;
+
+        let isHomingActive = false;
+        let homingTimer = null;
         
         function playSound(audioElement) {
             if (audioElement) {
@@ -572,13 +579,43 @@
         function updateBullets() {
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
-                const x = parseFloat(bullet.style.left) + (bullet.speedX || 0);
-                const y = parseFloat(bullet.style.top) + (bullet.speedY || -10);
+                let x = parseFloat(bullet.style.left);
+                let y = parseFloat(bullet.style.top);
                 
-                if (y < 0 || x < 0 || x > containerWidth) {
+                if (isHomingActive && !bullet.classList.contains('special-bullet')) {
+                    // Encontra o inimigo mais próximo
+                    let closestEnemy = null;
+                    let closestDist = Infinity;
+                    const allEnemies = enemies.concat(summonedEnemies);
+                    
+                    for (const enemy of allEnemies) {
+                        const enemyX = parseFloat(enemy.style.left) + 15;
+                        const enemyY = parseFloat(enemy.style.top) + 15;
+                        const dist = Math.hypot(enemyX - x, enemyY - y);
+                        
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestEnemy = enemy;
+                        }
+                    }
+                    
+                    if (closestEnemy) {
+                        const targetX = parseFloat(closestEnemy.style.left) + 15;
+                        const targetY = parseFloat(closestEnemy.style.top) + 15;
+                        const angle = Math.atan2(targetY - y, targetX - x);
+                        
+                        bullet.speedX = Math.cos(angle) * 8;
+                        bullet.speedY = Math.sin(angle) * 8;
+                    }
+                }
+                
+                x += (bullet.speedX || 0);
+                y += (bullet.speedY || -10);
+                
+                if (y < 0 || x < 0 || x > containerWidth || y > containerHeight) {
                     gameContainer.removeChild(bullet);
                     bullets.splice(i, 1);
-                    i--;
+                    //i--;
                 } else {
                     bullet.style.left = x + 'px';
                     bullet.style.top = y + 'px';
@@ -666,7 +703,7 @@
                         if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
                         enemies.splice(i, 1);
                         if (currentPhase > 1) {
-                            playerTakeDamage(10);
+                            playerTakeDamage(Math.random() * 10 + 5);
                         }
                     } else {
                         enemy.style.left = x + 'px';
@@ -723,7 +760,7 @@
             const rand = Math.random();
             let svgContent = '';
             
-            if (rand < 0.1) { // 10% chance de vida
+            if (rand < 0.1) {
                 powerup.type = 'health';
                 svgContent = `
                     <svg viewBox="0 0 50 50">
@@ -733,7 +770,7 @@
                         <circle cx="25" cy="25" r="12" fill="none" stroke="white" stroke-width="2"/>
                     </svg>
                 `;
-            } else if (rand < 0.7) { // 60% chance de escudo
+            } else if (rand < 0.5) {
                 powerup.type = 'shield';
                 svgContent = `
                     <svg viewBox="0 0 50 50">
@@ -743,12 +780,21 @@
                               fill="#2980b9"/>
                     </svg>
                 `;
-            } else { // 30% chance de recarga especial
+            } else if (rand < 0.7) {
                 powerup.type = 'special';
                 svgContent = `
                     <svg viewBox="0 0 50 50">
                         <circle cx="25" cy="25" r="20" fill="#9b59b6"/>
                         <path d="M25 10 L30 20 L40 20 L32 28 L35 38 L25 32 L15 38 L18 28 L10 20 L20 20 Z" 
+                              fill="white"/>
+                    </svg>
+                `;
+            } else { 
+                powerup.type = 'homing';
+                svgContent = `
+                    <svg viewBox="0 0 50 50">
+                        <circle cx="25" cy="25" r="20" fill="#e67e22"/>
+                        <path d="M25 5 L30 20 L45 25 L30 30 L25 45 L20 30 L5 25 L20 20 Z" 
                               fill="white"/>
                     </svg>
                 `;
@@ -969,6 +1015,9 @@
                             specialCharges += 1;
                             specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
                             break;
+                        case 'homing':
+                            activateHoming();
+                            break;
                     }
 
                     // Remove o powerup
@@ -978,6 +1027,23 @@
                     powerups.splice(i, 1);
                     playSound(sfxPowerup);
                 }
+            }
+        }
+
+        function activateHoming() {
+            isHomingActive = true;
+            if (homingTimer) clearTimeout(homingTimer);
+            
+            homingTimer = setTimeout(() => {
+                deactivateHoming();
+            }, 6000);
+        }
+        
+        function deactivateHoming() {
+            isHomingActive = false;
+            if (homingTimer) {
+                clearTimeout(homingTimer);
+                homingTimer = null;
             }
         }
         
@@ -1186,11 +1252,14 @@
 
             if (isPlayerInvulnerable || isGameOver) return;
 
-            if (hasShield <= 0) {
-                hasShield = 0;
-                player.classList.remove('shielded');
-                triggerScreenShake();
-                return;
+            if (hasShield > 0) {
+                hasShield--;
+                if (hasShield <= 0) {
+                    hasShield = 0;
+                    player.classList.remove('shielded');
+                } else {
+                    return;
+                }
             }
 
             playerCurrentHP -= damage;
