@@ -267,6 +267,36 @@
             border-radius: 4px;
             box-shadow: 0 0 3px #e74c3c;
         }
+        .powerup {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            animation: pulse 1s infinite alternate;
+            z-index: 2;
+        }
+        .powerup svg {
+            width: 100%;
+            height: 100%;
+        }
+        @keyframes pulse {
+            from { transform: scale(1); filter: brightness(1); }
+            to { transform: scale(1.2); filter: brightness(1.3); }
+        }
+        #player.shielded::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 2px solid #3498db;
+            animation: shield-pulse 1s infinite alternate;
+        }
+        @keyframes shield-pulse {
+            from { transform: scale(1); opacity: 0.5; }
+            to { transform: scale(1.1); opacity: 0.8; }
+        }
     </style>
 </head>
 <body>
@@ -358,7 +388,7 @@
         let gameLoopId;
         let currentPhase = 1;
         let phaseProgress = 0;
-        const phaseGoals = [15, 1];
+        const phaseGoals = [25, 1, 35, 1];
         let isBossActive = false;
         let bossData = {};
         let specialCharges = 3;
@@ -373,6 +403,7 @@
         let lastFireTime = 0;
         let lastEnemySpawnTime = 0;
         
+        const sfxPowerup = document.getElementById('sfx-powerup');
         const sfxShoot = document.getElementById('sfx-shoot');
         const sfxSpecialShoot = document.getElementById('sfx-special-shoot');
         const sfxEnemyHit = document.getElementById('sfx-enemy-hit');
@@ -382,10 +413,16 @@
         const bgmGame = document.getElementById('bgm-game');
         const bgmGameOver = document.getElementById('bgm-game-over');
         
+        let summonedEnemies = [];
+        let lastBossSummonTime = 0;
+        let powerups = [];
+        let hasShield = 0;
+        
         function playSound(audioElement) {
             if (audioElement) {
                 audioElement.currentTime = 0;
                 audioElement.play().catch(error => {
+                    console.error("Error playing sound:", error);
                 });
             }
         }
@@ -430,8 +467,16 @@
         function createExplosion(x, y) {
             const explosion = document.createElement('div');
             explosion.className = 'explosion';
-            explosion.style.left = (x - 25) + 'px';
-            explosion.style.top = (y - 25) + 'px';
+            
+            // Obtém a posição do container do jogo
+            const containerRect = gameContainer.getBoundingClientRect();
+            
+            // Ajusta as coordenadas para serem relativas ao container
+            const relativeX = x - containerRect.left;
+            const relativeY = y - containerRect.top;
+            
+            explosion.style.left = (relativeX - 25) + 'px';
+            explosion.style.top = (relativeY - 25) + 'px';
             gameContainer.appendChild(explosion);
             playSound(sfxExplosion);
 
@@ -525,7 +570,7 @@
         }
         
         function updateBullets() {
-            for (let i = 0; i < bullets.length; i++) {
+            for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 const x = parseFloat(bullet.style.left) + (bullet.speedX || 0);
                 const y = parseFloat(bullet.style.top) + (bullet.speedY || -10);
@@ -541,25 +586,34 @@
             }
         }
         
-        function createEnemy() {
-            if (isBossActive) return;
+        function createEnemy(forceSpawn = false, optionalX, optionalY) {
+            if (isBossActive && !forceSpawn) return;
 
             const now = Date.now();
             const timeSinceLastSpawn = now - lastEnemySpawnTime;
 
             const baseSpawnInterval = 1500 - (currentPhase * 100);
             const spawnInterval = Math.max(300, baseSpawnInterval);
-            const maxEnemies = 6 + currentPhase * 2;
+            const maxEnemiesAllowed = 6 + currentPhase * 2;
 
-            if (timeSinceLastSpawn > spawnInterval && enemies.length < maxEnemies) {
-                lastEnemySpawnTime = now;
+            let shouldSpawn = forceSpawn;
+            if (!forceSpawn) {
+                shouldSpawn = timeSinceLastSpawn > spawnInterval && enemies.length < maxEnemiesAllowed;
+            }
+
+            if (shouldSpawn) {
+                if (!forceSpawn) {
+                    lastEnemySpawnTime = now;
+                }
 
                 const enemy = document.createElement('div');
                 enemy.className = 'enemy';
 
                 let enemyType = 0;
-                if (currentPhase >= 2) {
+                if (currentPhase >= 2 && !forceSpawn) {
                     enemyType = Math.floor(Math.random() * 2);
+                } else if (forceSpawn) {
+                    enemyType = Math.random() < 0.7 ? 0 : 1;
                 }
 
                 enemy.innerHTML = `<svg viewBox="0 0 100 100">
@@ -568,40 +622,67 @@
                       '<rect x="10" y="10" width="80" height="80" fill="#f39c12"/><rect x="25" y="30" width="15" height="15" fill="#000"/><rect x="60" y="30" width="15" height="15" fill="#000"/>'}
                 </svg>`;
 
-                const x = Math.random() * (containerWidth - 30);
+                const x = optionalX !== undefined ? optionalX : Math.random() * (containerWidth - 30);
+                const y = optionalY !== undefined ? optionalY : -30;
                 enemy.style.left = x + 'px';
-                enemy.style.top = '-30px';
+                enemy.style.top = y + 'px';
 
                 const baseSpeed = 0.5 + (currentPhase * 0.15);
-                enemy.speed = Math.random() * 1 + baseSpeed;
+                enemy.speed = forceSpawn ? baseSpeed * 0.8 : Math.random() * 1 + baseSpeed;
 
-                if (currentPhase >= 2) {
-                    enemy.movementType = Math.floor(Math.random() * 2);
-                     if (enemy.movementType === 1) {
-                         enemy.amplitude = Math.random() * 30 + 20;
-                         enemy.frequency = Math.random() * 0.1 + 0.05;
-                         enemy.movementOffset = Math.random() * Math.PI * 2;
-                     }
-                } else {
-                    enemy.movementType = 0;
+                enemy.movementType = 0;
+                if (currentPhase >= 2 && Math.random() < 0.4) {
+                    enemy.movementType = 1;
+                    enemy.amplitude = Math.random() * 20 + 10;
+                    enemy.frequency = Math.random() * 0.1 + 0.05;
+                    enemy.movementOffset = Math.random() * Math.PI * 2;
                 }
 
                 gameContainer.appendChild(enemy);
-                enemies.push(enemy);
+                if (forceSpawn) {
+                    summonedEnemies.push(enemy);
+                } else {
+                    enemies.push(enemy);
+                }
             }
         }
         
         function updateEnemies() {
-            if (isBossActive) return;
+            if (!isBossActive) {
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const enemy = enemies[i];
+                    let x = parseFloat(enemy.style.left);
+                    let y = parseFloat(enemy.style.top) + enemy.speed;
+                    
+                    if (enemy.movementType === 1) {
+                        enemy.movementOffset += enemy.frequency;
+                        x += Math.sin(enemy.movementOffset) * 2;
+                    }
+                    
+                    if (x < 0) x = 0;
+                    if (x > containerWidth - 30) x = containerWidth - 30;
 
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const enemy = enemies[i];
+                    if (y > containerHeight) {
+                        if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
+                        enemies.splice(i, 1);
+                        if (currentPhase > 1) {
+                            playerTakeDamage(10);
+                        }
+                    } else {
+                        enemy.style.left = x + 'px';
+                        enemy.style.top = y + 'px';
+                    }
+                }
+            }
+
+            for (let i = summonedEnemies.length - 1; i >= 0; i--) {
+                const enemy = summonedEnemies[i];
                 let x = parseFloat(enemy.style.left);
                 let y = parseFloat(enemy.style.top) + enemy.speed;
                 
                 if (enemy.movementType === 1) {
                     enemy.movementOffset += enemy.frequency;
-                    x += Math.sin(enemy.movementOffset) * 2;
+                    x += Math.sin(enemy.movementOffset) * 1.5;
                 }
                 
                 if (x < 0) x = 0;
@@ -609,10 +690,7 @@
 
                 if (y > containerHeight) {
                     if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
-                    enemies.splice(i, 1);
-                    if (currentPhase > 1) {
-                        playerTakeDamage(10);
-                    }
+                    summonedEnemies.splice(i, 1);
                 } else {
                     enemy.style.left = x + 'px';
                     enemy.style.top = y + 'px';
@@ -634,48 +712,147 @@
             }
         }
         
+        function createPowerup(x, y) {
+            const powerupChance = (7 - currentPhase) / 10;
+            if (Math.random() > powerupChance) return; // 10% de chance de criar powerup
+
+            const powerup = document.createElement('div');
+            powerup.className = 'powerup';
+            
+            // Determina o tipo do powerup baseado nas probabilidades
+            const rand = Math.random();
+            let svgContent = '';
+            
+            if (rand < 0.1) { // 10% chance de vida
+                powerup.type = 'health';
+                svgContent = `
+                    <svg viewBox="0 0 50 50">
+                        <circle cx="25" cy="25" r="20" fill="#2ecc71"/>
+                        <rect x="15" y="22" width="20" height="6" fill="white"/>
+                        <rect x="22" y="15" width="6" height="20" fill="white"/>
+                        <circle cx="25" cy="25" r="12" fill="none" stroke="white" stroke-width="2"/>
+                    </svg>
+                `;
+            } else if (rand < 0.7) { // 60% chance de escudo
+                powerup.type = 'shield';
+                svgContent = `
+                    <svg viewBox="0 0 50 50">
+                        <path d="M25 5 L45 15 L45 30 C45 40 35 45 25 45 C15 45 5 40 5 30 L5 15 Z" 
+                              fill="#3498db"/>
+                        <path d="M25 10 L40 18 L40 30 C40 38 32 42 25 42 C18 42 10 38 10 30 L10 18 Z" 
+                              fill="#2980b9"/>
+                    </svg>
+                `;
+            } else { // 30% chance de recarga especial
+                powerup.type = 'special';
+                svgContent = `
+                    <svg viewBox="0 0 50 50">
+                        <circle cx="25" cy="25" r="20" fill="#9b59b6"/>
+                        <path d="M25 10 L30 20 L40 20 L32 28 L35 38 L25 32 L15 38 L18 28 L10 20 L20 20 Z" 
+                              fill="white"/>
+                    </svg>
+                `;
+            }
+
+            powerup.innerHTML = svgContent;
+            powerup.style.left = (x - 350) + 'px';
+            powerup.style.top = (y - 290) + 'px';
+            powerup.speedY = 2;
+            gameContainer.appendChild(powerup);
+            powerups.push(powerup);
+        }
+        
+        function updatePowerups() {
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const powerup = powerups[i];
+                const y = parseFloat(powerup.style.top) + powerup.speedY;
+
+                if (y > containerHeight) {
+                    if (powerup.parentNode === gameContainer) {
+                        gameContainer.removeChild(powerup);
+                    }
+                    powerups.splice(i, 1);
+                } else {
+                    powerup.style.top = y + 'px';
+                }
+            }
+        }
+        
         function checkCollisions() {
-            for (let i = bullets.length - 1; i >= 0; i--) {
+            // 1. Colisões Bala do Jogador -> Inimigo/Chefe/Invocados
+            for (let i = bullets.length - 1; i >= 0; i--) { // Iterar de trás para frente
                 const bullet = bullets[i];
-                if (!bullet) continue;
+                if (!bullet || !bullet.parentNode) continue; // Verifica se a bala ainda existe no DOM
                 const bulletRect = bullet.getBoundingClientRect();
+                let hit = false; // Flag para esta bala específica
 
-                let hit = false;
-
+                // --- Checa Chefe ---
                 if (isBossActive) {
+                    updateBoss();
                     const bossRect = bossElement.getBoundingClientRect();
                     if (
                         bulletRect.left < bossRect.right &&
                         bulletRect.right > bossRect.left &&
                         bulletRect.top < bossRect.bottom &&
-                        bulletRect.bottom > bossRect.top * 0.8
+                        bulletRect.bottom > bossRect.top // Simplificado, colide com toda a área do chefe
                     ) {
                         bossTakeDamage(bullet.classList.contains('special-bullet') ? 3 : 1);
-                        hit = true;
+                        hit = true; // Marca que a bala atingiu algo
+                        // Não use 'break' aqui, a bala será removida no final se 'hit' for true
                     }
-                } else {
-                    for (let j = enemies.length - 1; j >= 0; j--) {
-                        const enemy = enemies[j];
-                        if (!enemy) continue;
-                        const enemyRect = enemy.getBoundingClientRect();
+                }
 
+                // --- Checa Inimigos Invocados (SEMPRE, mas só se não atingiu o chefe) ---
+                if (!hit) { // Só verifica se não atingiu o chefe
+                    for (let j = summonedEnemies.length - 1; j >= 0; j--) {
+                        const enemy = summonedEnemies[j];
+                        if (!enemy || !enemy.parentNode) continue; // Verifica se o inimigo ainda existe
+                        const enemyRect = enemy.getBoundingClientRect();
                         if (
                             bulletRect.left < enemyRect.right &&
                             bulletRect.right > enemyRect.left &&
                             bulletRect.top < enemyRect.bottom &&
                             bulletRect.bottom > enemyRect.top
                         ) {
+                            // Destruir inimigo invocado
+                            const enemyCenterX = enemyRect.left + (enemyRect.width / 2);
+                            const enemyCenterY = enemyRect.top + (enemyRect.height / 2);
+                            createExplosion(enemyCenterX, enemyCenterY);
+                            createPowerup(enemyCenterX, enemyCenterY);
+                            if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
+                            summonedEnemies.splice(j, 1);
+                            playSound(sfxEnemyHit);
+                            hit = true; // Marca que a bala atingiu algo
+                            break; // Sai do loop INTERNO (j) - bala atinge só UM inimigo invocado
+                        }
+                    }
+                }
+
+                // --- Checa Inimigos Normais (SÓ se chefe NÃO ativo E não atingiu nada ainda) ---
+                if (!isBossActive && !hit) { // Só verifica se chefe não está ativo E não atingiu invocado/chefe
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const enemy = enemies[j];
+                         if (!enemy || !enemy.parentNode) continue; // Verifica se o inimigo ainda existe
+                        const enemyRect = enemy.getBoundingClientRect();
+                        if (
+                            bulletRect.left < enemyRect.right &&
+                            bulletRect.right > enemyRect.left &&
+                            bulletRect.top < enemyRect.bottom &&
+                            bulletRect.bottom > enemyRect.top
+                        ) {
+                            // Destruir inimigo normal, pontuar, etc.
                             enemy.classList.add('hit');
                             setTimeout(() => enemy.classList.remove('hit'), 100);
                             playSound(sfxEnemyHit);
-
-                            createExplosion(enemyRect.left + enemyRect.width / 2, enemyRect.top + enemyRect.height / 2);
+                            const enemyCenterX = enemyRect.left + (enemyRect.width / 2);
+                            const enemyCenterY = enemyRect.top + (enemyRect.height / 2);
+                            createExplosion(enemyCenterX, enemyCenterY);
+                            createPowerup(enemyCenterX, enemyCenterY);
                             if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
                             enemies.splice(j, 1);
 
                             score += 10 * currentPhase;
                             scoreElement.textContent = `Score: ${score}`;
-
                             phaseProgress++;
                             const goalIndex = currentPhase - 1;
                             if (goalIndex < phaseGoals.length && typeof phaseGoals[goalIndex] === 'number' && phaseGoals[goalIndex] > 1) {
@@ -683,39 +860,123 @@
                                     advancePhase();
                                 }
                             }
-
-                            hit = true;
-                            break;
+                            hit = true; // Marca que a bala atingiu algo
+                            break; // Sai do loop INTERNO (j) - bala atinge só UM inimigo normal
                         }
                     }
                 }
 
+                // --- Remove a bala SE atingiu QUALQUER alvo ---
                 if (hit) {
-                    if (bullet.parentNode === gameContainer) gameContainer.removeChild(bullet);
-                    bullets.splice(i, 1);
+                    if (bullet.parentNode === gameContainer) {
+                        try { // Adiciona try-catch para segurança
+                             gameContainer.removeChild(bullet);
+                        } catch(e) {
+                            console.warn("Error removing bullet after hit:", e, bullet);
+                        }
+                    }
+                    bullets.splice(i, 1); // Remove do array
+                    // Não precisa decrementar 'i' porque estamos iterando de trás para frente
+                }
+            } // Fim do loop das balas (i)
+
+            // 2. Colisões Tiro Inimigo/Chefe -> Jogador
+            if (!isPlayerInvulnerable && !isGameOver) {
+                const playerRect = player.getBoundingClientRect();
+                for (let i = enemyBullets.length - 1; i >= 0; i--) {
+                     const bullet = enemyBullets[i];
+                     if (!bullet || !bullet.parentNode) continue;
+                     const bulletRect = bullet.getBoundingClientRect();
+
+                     if (
+                         playerRect.left < bulletRect.right &&
+                         playerRect.right > bulletRect.left &&
+                         playerRect.top < bulletRect.bottom &&
+                         playerRect.bottom > bulletRect.top
+                     ) {
+                         playerTakeDamage(15);
+                         if (bullet.parentNode === gameContainer) {
+                            try { gameContainer.removeChild(bullet); } catch(e) {}
+                         }
+                         enemyBullets.splice(i, 1);
+                         break;
+                     }
                 }
             }
 
-            if (!isPlayerInvulnerable && !isBossActive) {
+            // 3. Colisões Jogador -> Inimigo/Invocado
+            if (!isPlayerInvulnerable && !isGameOver) {
                 const playerRect = player.getBoundingClientRect();
-                for (let i = enemies.length - 1; i >= 0; i--) {
-                    const enemy = enemies[i];
-                    if (!enemy) continue;
+                const allKillableEnemies = enemies.concat(summonedEnemies);
+
+                for (let i = allKillableEnemies.length - 1; i >= 0; i--) {
+                    const enemy = allKillableEnemies[i];
+                    if (!enemy || !enemy.parentNode) continue;
                     const enemyRect = enemy.getBoundingClientRect();
 
                     if (
-                        playerRect.left < enemyRect.right - 5 &&
-                        playerRect.right > enemyRect.left + 5 &&
-                        playerRect.top < enemyRect.bottom - 5 &&
-                        playerRect.bottom > enemyRect.top + 5
+                        playerRect.left < enemyRect.right &&
+                        playerRect.right > enemyRect.left &&
+                        playerRect.top < enemyRect.bottom &&
+                        playerRect.bottom > enemyRect.top
                     ) {
-                        createExplosion(enemyRect.left + enemyRect.width / 2, enemyRect.top + enemyRect.height / 2);
-                        if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
-                        enemies.splice(i, 1);
+                        const enemyCenterX = enemyRect.left + (enemyRect.width / 2);
+                        const enemyCenterY = enemyRect.top + (enemyRect.height / 2);
+                        createExplosion(enemyCenterX, enemyCenterY);
+                        if (enemy.parentNode === gameContainer) {
+                            try { gameContainer.removeChild(enemy); } catch(e) {}
+                        }
+
+                        const indexInEnemies = enemies.indexOf(enemy);
+                        if (indexInEnemies > -1) {
+                            enemies.splice(indexInEnemies, 1);
+                        } else {
+                            const indexInSummoned = summonedEnemies.indexOf(enemy);
+                            if (indexInSummoned > -1) {
+                                summonedEnemies.splice(indexInSummoned, 1);
+                            }
+                        }
+
                         playerTakeDamage(25);
-                        if (isGameOver) return;
                         break;
                     }
+                }
+            }
+
+            // 4. Colisões Jogador -> Powerups
+            const playerRect = player.getBoundingClientRect();
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const powerup = powerups[i];
+                const powerupRect = powerup.getBoundingClientRect();
+
+                if (
+                    playerRect.left < powerupRect.right &&
+                    playerRect.right > powerupRect.left &&
+                    playerRect.top < powerupRect.bottom &&
+                    playerRect.bottom > powerupRect.top
+                ) {
+                    // Aplica o efeito do powerup
+                    switch (powerup.type) {
+                        case 'health':
+                            playerCurrentHP = Math.min(playerMaxHP, playerCurrentHP + 25);
+                            updatePlayerHPBar();
+                            break;
+                        case 'shield':
+                            hasShield += 1;
+                            player.classList.add('shielded');
+                            break;
+                        case 'special':
+                            specialCharges += 1;
+                            specialChargesElement.textContent = `Tiro Especial: ${specialCharges}`;
+                            break;
+                    }
+
+                    // Remove o powerup
+                    if (powerup.parentNode === gameContainer) {
+                        gameContainer.removeChild(powerup);
+                    }
+                    powerups.splice(i, 1);
+                    playSound(sfxPowerup);
                 }
             }
         }
@@ -752,6 +1013,9 @@
             enemyBullets.forEach(eb => { if(eb.parentNode === gameContainer) gameContainer.removeChild(eb); });
             enemyBullets = [];
 
+            summonedEnemies.forEach(e => { if(e.parentNode === gameContainer) gameContainer.removeChild(e); });
+            summonedEnemies = [];
+
             playerX = containerWidth / 2 - playerWidth / 2;
             playerY = containerHeight - playerHeight - 20;
             playerCurrentHP = playerMaxHP;
@@ -783,6 +1047,11 @@
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             gameLoopId = null;
             startGame();
+
+            powerups.forEach(p => { if(p.parentNode === gameContainer) gameContainer.removeChild(p); });
+            powerups = [];
+            hasShield = 0;
+            player.classList.remove('shielded');
         }
         
         function enableAutoFire() {
@@ -809,6 +1078,7 @@
                 updateEnemies();
                 updateStars();
                 checkCollisions();
+                updatePowerups();
                 gameLoopId = requestAnimationFrame(gameLoop);
             }
         }
@@ -912,7 +1182,16 @@
         }
         
         function playerTakeDamage(damage) {
-            if (isPlayerInvulnerable) return;
+            console.log(`playerTakeDamage called. Damage: ${damage}, isPlayerInvulnerable: ${isPlayerInvulnerable}`);
+
+            if (isPlayerInvulnerable || isGameOver) return;
+
+            if (hasShield <= 0) {
+                hasShield = 0;
+                player.classList.remove('shielded');
+                triggerScreenShake();
+                return;
+            }
 
             playerCurrentHP -= damage;
             updatePlayerHPBar();
@@ -920,17 +1199,26 @@
             triggerScreenShake();
 
             if (playerCurrentHP <= 0) {
-                createExplosion(playerX + playerWidth / 2, playerY + playerHeight / 2);
+                playerCurrentHP = 0;
+                updatePlayerHPBar();
+                const playerRect = player.getBoundingClientRect();
+                createExplosion(playerRect.left + playerWidth / 2, playerRect.top + playerHeight / 2);
                 player.style.display = 'none';
                 gameOver();
             } else {
                 isPlayerInvulnerable = true;
                 player.classList.add('invulnerable');
-                if (playerInvulnerableTimer) clearTimeout(playerInvulnerableTimer);
+                console.log("Player is now INVULNERABLE");
+
+                if (playerInvulnerableTimer) {
+                    clearTimeout(playerInvulnerableTimer);
+                }
+
                 playerInvulnerableTimer = setTimeout(() => {
                     isPlayerInvulnerable = false;
                     player.classList.remove('invulnerable');
                     playerInvulnerableTimer = null;
+                    console.log("Player is VULNERABLE again");
                 }, playerInvulnerableDuration);
             }
         }
@@ -953,11 +1241,18 @@
                 currentHP: 0,
                 x: containerWidth / 2 - 50,
                 y: 30,
+                targetY: 30,
                 speedX: 1.5 + (currentPhase * 0.2),
+                speedY: 0.5 + (currentPhase * 0.1),
                 directionX: 1,
+                directionY: 1,
                 attackTimer: 0,
-                attackInterval: 1500 - (currentPhase * 100),
-                lastAttackTime: 0
+                attackInterval: 1400 - (currentPhase * 90),
+                lastAttackTime: 0,
+                summonInterval: 8000 - (currentPhase * 500),
+                lastSummonTime: Date.now(),
+                attackPattern: 0,
+                lastPatternSwitchTime: Date.now()
             };
             bossData.currentHP = bossData.maxHP;
             bossElement.style.left = bossData.x + 'px';
@@ -968,6 +1263,8 @@
                 if(enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
             });
             enemies = [];
+            summonedEnemies.forEach(enemy => { if(enemy.parentNode === gameContainer) gameContainer.removeChild(enemy); });
+            summonedEnemies = [];
         }
         
         function updateBossHPBar() {
@@ -977,23 +1274,54 @@
         
         function updateBoss() {
             if (!isBossActive) return;
+            const now = Date.now();
 
             bossData.x += bossData.speedX * bossData.directionX;
             if (bossData.x <= 10 || bossData.x >= containerWidth - 110) {
                 bossData.directionX *= -1;
                 bossData.x = Math.max(10, Math.min(bossData.x, containerWidth - 110));
             }
+            bossData.y += bossData.speedY * bossData.directionY;
+            if (bossData.y <= 20 || bossData.y >= 60) {
+                bossData.directionY *= -1;
+                bossData.y = Math.max(20, Math.min(bossData.y, 60));
+            }
             bossElement.style.left = bossData.x + 'px';
+            bossElement.style.top = bossData.y + 'px';
 
-            const now = Date.now();
             if (now - bossData.lastAttackTime > bossData.attackInterval) {
                 bossData.lastAttackTime = now;
                 const cannonLeftX = bossData.x + 25;
                 const cannonRightX = bossData.x + 75;
                 const cannonY = bossData.y + 90;
 
-                bossFireBullet(cannonLeftX, cannonY, 0, 3 + currentPhase * 0.5);
-                bossFireBullet(cannonRightX, cannonY, 0, 3 + currentPhase * 0.5);
+                bossData.attackPattern = (bossData.attackPattern + 1) % 3;
+
+                if (bossData.attackPattern === 0) {
+                    bossFireBullet(cannonLeftX, cannonY, 0, 4 + currentPhase * 0.5);
+                    bossFireBullet(cannonRightX, cannonY, 0, 4 + currentPhase * 0.5);
+                } else if (bossData.attackPattern === 1) {
+                    bossFireBullet(cannonLeftX, cannonY, -1, 3.5 + currentPhase * 0.5);
+                    bossFireBullet(bossData.x + 50, cannonY, 0, 4 + currentPhase * 0.5);
+                    bossFireBullet(cannonRightX, cannonY, 1, 3.5 + currentPhase * 0.5);
+                } else {
+                    const targetCannonX = Math.random() < 0.5 ? cannonLeftX : cannonRightX;
+                    for(let i=0; i<3; i++){
+                        setTimeout(() => {
+                            if(isBossActive) bossFireBullet(targetCannonX, cannonY, 0, 5 + currentPhase * 0.5);
+                        }, i * 100);
+                    }
+                }
+            }
+
+            if (now - bossData.lastSummonTime > bossData.summonInterval 
+                && summonedEnemies.length < 4
+            ) {
+                bossData.lastSummonTime = now;
+                console.log("Boss summoning enemies...");
+                const summonY = bossData.y + 80;
+                createEnemy(true, bossData.x, summonY);
+                createEnemy(true, bossData.x + 70, summonY);
             }
         }
         
@@ -1001,12 +1329,12 @@
             if (!isBossActive) return;
             bossData.currentHP -= damage;
             updateBossHPBar();
-            playSound(sfxEnemyHit);
 
             bossElement.style.filter = 'brightness(1.8)';
             setTimeout(() => { bossElement.style.filter = 'brightness(1)'; }, 100);
 
             if (bossData.currentHP <= 0) {
+                playSound(sfxEnemyHit);
                 defeatBoss();
             }
         }
@@ -1017,6 +1345,9 @@
             createExplosion(bossData.x + 50, bossData.y + 50);
             bossElement.style.display = 'none';
             bossHPContainer.style.display = 'none';
+
+            summonedEnemies.forEach(enemy => { if(enemy.parentNode === gameContainer) gameContainer.removeChild(enemy); });
+            summonedEnemies = [];
 
             score += 500 * currentPhase;
             scoreElement.textContent = `Score: ${score}`;
@@ -1037,7 +1368,10 @@
             console.log(`Advanced to Phase ${currentPhase}`);
 
             const goalIndex = currentPhase - 1;
-            if (goalIndex < phaseGoals.length && typeof phaseGoals[goalIndex] === 'number' && phaseGoals[goalIndex] === 1) {
+            if (goalIndex < phaseGoals.length 
+                && typeof phaseGoals[goalIndex] === 'number' 
+                && phaseGoals[goalIndex] === 1
+            ) {
                 spawnBoss();
             } else if (goalIndex >= phaseGoals.length) {
                 console.log("Todas as fases definidas completas!");
