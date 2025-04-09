@@ -282,24 +282,29 @@
             from { transform: scale(1); filter: brightness(1); }
             to { transform: scale(1.2); filter: brightness(1.3); }
         }
-        #player .shielded::after {
+        #player.shielded::after {
             content: '';
             position: absolute;
-            top: -5px;
-            left: -5px;
-            right: -5px;
-            bottom: -5px;
+            top: -10px;
+            left: -10px;
+            width: calc(100% + 20px);
+            height: calc(100% + 20px);
             border-radius: 50%;
             border: 2px solid #3498db;
+            box-shadow: 0 0 10px #3498db;
             animation: shield-pulse 1s infinite alternate;
+            pointer-events: none;
         }
         @keyframes shield-pulse {
             from { transform: scale(1); opacity: 0.5; }
             to { transform: scale(1.1); opacity: 0.8; }
         }
         .bullet.homing {
+            width: 12px;
+            height: 12px;
             background-color: #e67e22;
-            box-shadow: 0 0 4px #e67e22;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #e67e22;
         }
     </style>
 </head>
@@ -320,7 +325,7 @@
         <div id="special-bar"><div id="special-bar-fill"></div></div>
         <div id="boss-hp-bar-container" style="display: none;">
             <div id="boss-hp-bar-fill"></div>
-            <div id="boss-name">CHEFE</div>
+            <div id="boss-name">Bossnick</div>
         </div>
         <svg id="player" viewBox="0 0 100 100">
             <polygon points="50,0 100,100 50,70 0,100" fill="#3498db" />
@@ -346,7 +351,8 @@
     <audio id="sfx-shoot" src="../assets/sounds/laser-shoot.mp3" preload="auto"></audio>
     <audio id="sfx-special-shoot" src="../assets/sounds/special-shoot.mp3" preload="auto"></audio>
     <audio id="sfx-enemy-hit" src="../assets/sounds/enemy_hit.mp3" preload="auto"></audio>
-    <audio id="sfx-explosion" src="../assets/sounds/sfx-pop.mp3" preload="auto"></audio>
+    <audio id="sfx-pop" src="../assets/sounds/sfx-pop.mp3" preload="auto"></audio>
+    <audio id="sfx-explosion" src="../assets/sounds/explosion.mp3" preload="auto"></audio>
     <audio id="sfx-player-damage" src="../assets/sounds/player_damage.mp3" preload="auto"></audio>
     <audio id="sfx-game-over" src="../assets/sounds/game_over.mp3" preload="auto"></audio>
     <audio id="sfx-powerup" src="../assets/sounds/powerup.mp3" preload="auto"></audio>
@@ -392,7 +398,7 @@
         let gameLoopId;
         let currentPhase = 1;
         let phaseProgress = 0;
-        const phaseGoals = [25, 1, 35, 1];
+        const phaseGoals = [25, 1, 35, 1, 45, 1, 55, 1, 65, 1, 75, 1, 85, 1, 95, 1];
         let isBossActive = false;
         let bossData = {};
         let specialCharges = 3;
@@ -410,8 +416,8 @@
         const sfxPowerup = document.getElementById('sfx-powerup');
         const sfxShoot = document.getElementById('sfx-shoot');
         const sfxSpecialShoot = document.getElementById('sfx-special-shoot');
-        const sfxEnemyHit = document.getElementById('sfx-enemy-hit');
         const sfxExplosion = document.getElementById('sfx-explosion');
+        const sfxPop = document.getElementById('sfx-pop');
         const sfxPlayerDamage = document.getElementById('sfx-player-damage');
         const sfxGameOver = document.getElementById('sfx-game-over');
         const bgmGame = document.getElementById('bgm-game');
@@ -485,7 +491,7 @@
             explosion.style.left = (relativeX - 25) + 'px';
             explosion.style.top = (relativeY - 25) + 'px';
             gameContainer.appendChild(explosion);
-            playSound(sfxExplosion);
+            playSound(sfxPop);
 
             setTimeout(() => {
                 if (explosion.parentNode === gameContainer) {
@@ -528,7 +534,7 @@
                 bullets.push(bullet3);
             } else {
                 const bullet = document.createElement('div');
-                bullet.className = 'bullet';
+                bullet.className = isHomingActive ? 'bullet homing' : 'bullet';
                 bullet.style.left = (playerX + playerWidth / 2 - 5) + 'px';
                 bullet.style.top = (playerY - 15) + 'px';
                 bullet.speedX = 0;
@@ -583,11 +589,25 @@
                 let y = parseFloat(bullet.style.top);
                 
                 if (isHomingActive && !bullet.classList.contains('special-bullet')) {
-                    // Encontra o inimigo mais próximo
-                    let closestEnemy = null;
+                    let targetX = null;
+                    let targetY = null;
                     let closestDist = Infinity;
-                    const allEnemies = enemies.concat(summonedEnemies);
                     
+                    // Checa o boss primeiro se estiver ativo
+                    if (isBossActive) {
+                        const bossCenterX = parseFloat(bossElement.style.left) + 15;
+                        const bossCenterY = parseFloat(bossElement.style.top) + 15;
+                        const distToBoss = Math.hypot(bossCenterX - x, bossCenterY - y);
+                        
+                        if (distToBoss < closestDist) {
+                            closestDist = distToBoss;
+                            targetX = bossCenterX;
+                            targetY = bossCenterY;
+                        }
+                    }
+                    
+                    // Checa inimigos normais e invocados
+                    const allEnemies = enemies.concat(summonedEnemies);
                     for (const enemy of allEnemies) {
                         const enemyX = parseFloat(enemy.style.left) + 15;
                         const enemyY = parseFloat(enemy.style.top) + 15;
@@ -595,15 +615,14 @@
                         
                         if (dist < closestDist) {
                             closestDist = dist;
-                            closestEnemy = enemy;
+                            targetX = enemyX;
+                            targetY = enemyY;
                         }
                     }
                     
-                    if (closestEnemy) {
-                        const targetX = parseFloat(closestEnemy.style.left) + 15;
-                        const targetY = parseFloat(closestEnemy.style.top) + 15;
+                    // Se encontrou um alvo, ajusta a trajetória
+                    if (targetX !== null && targetY !== null) {
                         const angle = Math.atan2(targetY - y, targetX - x);
-                        
                         bullet.speedX = Math.cos(angle) * 8;
                         bullet.speedY = Math.sin(angle) * 8;
                     }
@@ -615,7 +634,6 @@
                 if (y < 0 || x < 0 || x > containerWidth || y > containerHeight) {
                     gameContainer.removeChild(bullet);
                     bullets.splice(i, 1);
-                    //i--;
                 } else {
                     bullet.style.left = x + 'px';
                     bullet.style.top = y + 'px';
@@ -801,7 +819,7 @@
             }
 
             powerup.innerHTML = svgContent;
-            powerup.style.left = (x - 350) + 'px';
+            powerup.style.left = (x - 400) + 'px';
             powerup.style.top = (y - 290) + 'px';
             powerup.speedY = 2;
             gameContainer.appendChild(powerup);
@@ -867,7 +885,7 @@
                             createPowerup(enemyCenterX, enemyCenterY);
                             if (enemy.parentNode === gameContainer) gameContainer.removeChild(enemy);
                             summonedEnemies.splice(j, 1);
-                            playSound(sfxEnemyHit);
+                            playSound(sfxPop);
                             hit = true; // Marca que a bala atingiu algo
                             break; // Sai do loop INTERNO (j) - bala atinge só UM inimigo invocado
                         }
@@ -889,7 +907,7 @@
                             // Destruir inimigo normal, pontuar, etc.
                             enemy.classList.add('hit');
                             setTimeout(() => enemy.classList.remove('hit'), 100);
-                            playSound(sfxEnemyHit);
+                            playSound(sfxPop);
                             const enemyCenterX = enemyRect.left + (enemyRect.width / 2);
                             const enemyCenterY = enemyRect.top + (enemyRect.height / 2);
                             createExplosion(enemyCenterX, enemyCenterY);
@@ -1277,7 +1295,6 @@
             } else {
                 isPlayerInvulnerable = true;
                 player.classList.add('invulnerable');
-                console.log("Player is now INVULNERABLE");
 
                 if (playerInvulnerableTimer) {
                     clearTimeout(playerInvulnerableTimer);
@@ -1287,7 +1304,6 @@
                     isPlayerInvulnerable = false;
                     player.classList.remove('invulnerable');
                     playerInvulnerableTimer = null;
-                    console.log("Player is VULNERABLE again");
                 }, playerInvulnerableDuration);
             }
         }
@@ -1403,7 +1419,7 @@
             setTimeout(() => { bossElement.style.filter = 'brightness(1)'; }, 100);
 
             if (bossData.currentHP <= 0) {
-                playSound(sfxEnemyHit);
+                playSound(sfxExplosion);
                 defeatBoss();
             }
         }
@@ -1431,20 +1447,38 @@
         }
         
         function advancePhase() {
+            // Incrementa a fase atual e reinicia o progresso da fase
             currentPhase++;
             phaseProgress = 0;
+            
+            // Atualiza o texto que mostra a fase atual na interface
             phaseDisplay.textContent = `Fase: ${currentPhase}`;
             console.log(`Advanced to Phase ${currentPhase}`);
 
+            // Calcula o índice correspondente no array phaseGoals
+            // (phaseGoals contém os objetivos para cada fase)
             const goalIndex = currentPhase - 1;
+            
+            // Verifica se:
+            // 1. O índice está dentro dos limites do array phaseGoals
+            // 2. O valor no array é um número
+            // 3. O valor é par (o que indica que é uma fase de chefe)
             if (goalIndex < phaseGoals.length 
                 && typeof phaseGoals[goalIndex] === 'number' 
                 && phaseGoals[goalIndex] === 1
             ) {
+                // Se o valor for par, significa que esta fase tem um chefe
                 spawnBoss();
+                if (phaseProgress > 4) {
+                    spawnBoss();
+                }
             } else if (goalIndex >= phaseGoals.length) {
+                // Se o índice estiver fora dos limites do array,
+                // significa que o jogador completou todas as fases definidas
                 console.log("Todas as fases definidas completas!");
             }
+            
+            // Mostra uma notificação na tela informando o início da nova fase
             showPhaseNotification(`Fase ${currentPhase} Iniciada!`);
         }
         
