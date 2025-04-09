@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo de Xadrez com IA</title>
+    <!-- Incluir CSS do chessboardjs -->
+    <link rel="stylesheet"
+          href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            background-color: #b3aa88;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* Container para o tabuleiro e o overlay */
+        .board-container {
+            position: relative; /* Necessário para posicionar o overlay absoluto */
+            width: 400px; /* Mesma largura do tabuleiro */
+            margin-bottom: 15px;
+        }
+        #myBoard {
+            width: 400px; /* Ou ajuste conforme necessário */
+            margin-bottom: 15px;
+        }
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #status, #turn {
+            margin: 5px 0;
+            font-weight: bold;
+            min-height: 1.2em; /* Evita saltos de layout */
+        }
+        select, button {
+            padding: 8px 12px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        .highlight-check {
+            box-shadow: inset 0 0 15px 5px rgba(255, 0, 0, 0.5); /* Destaque visual para rei em xeque */
+        }
+        /* --- Estilo do Overlay de Loading --- */
+        #loadingOverlay {
+            position: absolute; /* Posiciona sobre o tabuleiro */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7); /* Fundo branco semi-transparente */
+            color: #333;
+            font-size: 1.8em;
+            font-weight: bold;
+            display: flex; /* Para centralizar o texto */
+            justify-content: center;
+            align-items: center;
+            z-index: 100; /* Garante que fique por cima das peças */
+            cursor: wait; /* Muda o cursor */
+            border-radius: 3px; /* Opcional: arredondar bordas */
+            /* Escondido por padrão */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out; /* Transição suave */
+        }
+        /* Classe para mostrar o overlay */
+        #loadingOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h2>Xadrez com IA (Minimax Alpha-Beta)</h2>
+        <div class="board-container">
+            <div id="myBoard"></div>
+            <!-- Elemento do Overlay -->
+            <div id="loadingOverlay">Pensando...</div>
+        </div>
+        <div id="status">Status: Novo Jogo</div>
+        <div id="turn">Turno: Brancas</div>
+
+        <div class="controls">
+            <label for="difficulty">Dificuldade:</label>
+            <select id="difficulty">
+                <option value="1">Fácil (Profundidade 1)</option>
+                <option value="2" selected>Médio (Profundidade 2)</option>
+                <option value="3">Difícil (Profundidade 3)</option>
+            </select>
+            <button id="newGameButton">Novo Jogo</button>
+        </div>
+    </div>
+
+    <!-- Incluir Bibliotecas JavaScript -->
+    <!-- jQuery (dependência do chessboardjs) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- chessboardjs -->
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <!-- chess.js (lógica do xadrez) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+    <script>
+        // --- Variáveis Globais ---
+        var board = null; // Objeto chessboardjs
+        var game = new Chess(); // Objeto chess.js
+        var playerColor = 'w'; // Jogador humano é sempre as brancas por simplicidade
+        var aiColor = 'b';
+        var currentDifficultyDepth = 2; // Profundidade inicial (Médio)
+        var loadingOverlay = document.getElementById('loadingOverlay'); // Referência ao overlay
+
+        // --- Tabelas Posição-Peça (Piece-Square Tables) ---
+        // Valores adaptados/simplificados. Positivo é bom para a peça naquela casa.
+        // Definidos da perspectiva das Brancas (linha 0 é a 8ª fileira, linha 7 é a 1ª)
+
+        var pawnTable = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,  5,  5,  5,  5,  5,  5,  5], // Peões avançados valem mais
+            [ 1,  1,  2,  3,  3,  2,  1,  1],
+            [ 0,  0,  0,  2,  2,  0,  0,  0],
+            [ 0,  0,  0,  2,  2,  0,  0,  0], // Centro inicial
+            [ 0, -1, -1,  0,  0, -1, -1,  0], // Penalidade pequena para peões bloqueados iniciais
+            [ 0,  0,  0, -2, -2,  0,  0,  0], // Penalidade maior para peões muito recuados
+            [ 0,  0,  0,  0,  0,  0,  0,  0]
+        ];
+
+        var knightTable = [
+            [-5, -4, -3, -3, -3, -3, -4, -5],
+            [-4, -2,  0,  0,  0,  0, -2, -4],
+            [-3,  0,  1,  1,  1,  1,  0, -3],
+            [-3,  0,  1,  2,  2,  1,  0, -3], // Cavalos centralizados são bons
+            [-3,  0,  1,  2,  2,  1,  0, -3],
+            [-3,  0,  1,  1,  1,  1,  0, -3],
+            [-4, -2,  0,  0,  0,  0, -2, -4],
+            [-5, -4, -3, -3, -3, -3, -4, -5] // Cavalos nos cantos são ruins
+        ];
+
+        var bishopTable = [
+            [-2, -1, -1, -1, -1, -1, -1, -2],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-1,  0,  0,  1,  1,  0,  0, -1],
+            [-1,  0,  1,  1,  1,  1,  0, -1], // Bispos em diagonais longas e centro
+            [-1,  0,  1,  1,  1,  1,  0, -1],
+            [-1,  0,  0,  1,  1,  0,  0, -1],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-2, -1, -1, -1, -1, -1, -1, -2]
+        ];
+
+        var rookTable = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [ 0,  1,  1,  1,  1,  1,  1,  0], // Torres na 7ª (ou 2ª para pretas)
+            [-1,  0,  0,  0,  0,  0,  0, -1], // Ligeiramente pior nas casas iniciais
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [ 0,  0,  0,  1,  1,  0,  0,  0] // Bom em colunas abertas/semi-abertas (simplificado)
+        ];
+
+        // Rainha: Combinação de Torre e Bispo (simplificado aqui como bônus central)
+         var queenTable = [
+            [-2, -1, -1, -0, -0, -1, -1, -2],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-1,  0,  0,  0,  0,  0,  0, -1],
+            [-2, -1, -1, -0, -0, -1, -1, -2]
+        ];
+
+        // Rei: Segurança é chave (simplificado para evitar bordas/centro no início)
+        var kingTable = [
+            [ 2,  3,  1,  0,  0,  1,  3,  2], // Bom estar perto do canto após roque
+            [ 2,  2,  0,  0,  0,  0,  2,  2],
+            [-1, -2, -2, -2, -2, -2, -2, -1],
+            [-2, -3, -3, -4, -4, -3, -3, -2], // Ruim no centro exposto
+            [-3, -4, -4, -5, -5, -4, -4, -3],
+            [-3, -4, -4, -5, -5, -4, -4, -3],
+            [-3, -4, -4, -5, -5, -4, -4, -3],
+            [-3, -4, -4, -5, -5, -4, -4, -3]
+        ];
+        // TODO: Adicionar tabelas de final de jogo para o Rei (onde ele deve ir para o centro)
+
+        // --- Funções da IA (Minimax com Poda Alpha-Beta) ---
+
+        // Heurística: Material + Posição
+        function evaluateBoard(boardState, colorToMove) {
+            var totalEvaluation = 0;
+            for (var i = 0; i < 8; i++) { // Linhas (0-7) -> Fileiras (8-1)
+                for (var j = 0; j < 8; j++) { // Colunas (0-7) -> Colunas (a-h)
+                    var piece = boardState[i][j];
+                    if (piece) {
+                        var pieceValue = getPieceValue(piece);
+                        var positionalValue = 0;
+                        var table = null;
+
+                        switch (piece.type) {
+                            case 'p': table = pawnTable; break;
+                            case 'n': table = knightTable; break;
+                            case 'b': table = bishopTable; break;
+                            case 'r': table = rookTable; break;
+                            case 'q': table = queenTable; break;
+                            case 'k': table = kingTable; break; // Usar tabela de meio jogo por padrão
+                        }
+
+                        if (table) {
+                            // A tabela é definida da perspectiva das Brancas.
+                            // Se a peça for Preta, precisamos inverter a linha (i).
+                            var row = piece.color === 'w' ? i : 7 - i;
+                            var col = j;
+                            positionalValue = table[row][col];
+                        }
+
+                        // Adiciona valor material e posicional.
+                        // Se a peça for preta, subtrai o valor (pois positivo é bom para brancas).
+                        totalEvaluation += (piece.color === 'w' ? (pieceValue + positionalValue) : -(pieceValue + positionalValue));
+                    }
+                }
+            }
+            // A avaliação é sempre do ponto de vista das Brancas
+            return totalEvaluation;
+        }
+
+        function getPieceValue(piece) {
+            if (piece === null) {
+                return 0;
+            }
+            var getAbsoluteValue = function (piece) {
+                switch (piece.type) {
+                    case 'p': return 10;
+                    case 'n': return 30;
+                    case 'b': return 30;
+                    case 'r': return 50;
+                    case 'q': return 90;
+                    case 'k': return 900; // Valor alto para o rei
+                    default: return 0;
+                }
+            };
+
+            var absoluteValue = getAbsoluteValue(piece);
+            return piece.color === 'w' ? absoluteValue : -absoluteValue;
+        }
+
+        // Algoritmo Minimax com Poda Alfa-Beta
+        // Retorna [melhor avaliação, melhor movimento]
+        function minimaxRoot(depth, isMaximizingPlayer) {
+            var newGameMoves = game.moves({ verbose: true });
+            var bestMove = isMaximizingPlayer ? -Infinity : Infinity;;
+            var bestMoveFound = null;
+
+            //console.log(`--- AI (${aiColor}) evaluating at depth ${depth} ---`); // Log de início
+
+            for (var i = 0; i < newGameMoves.length; i++) {
+                var newGameMove = newGameMoves[i];
+                game.move(newGameMove.san); // Faz o movimento
+                var value = minimax(depth - 1, -Infinity, Infinity, !isMaximizingPlayer);
+                game.undo(); // Desfaz o movimento
+
+                //console.log(`Move: ${newGameMove.san}, Score: ${value}`);
+
+                // O jogador AI (preto) quer MINIMIZAR a pontuação (negativo é bom para ele)
+                // Como estamos no root e queremos o melhor para o AI (preto), procuramos o menor valor retornado pelo minimax
+                if (value <= bestMove) {
+                    bestMove = value;
+                    bestMoveFound = newGameMove;
+                }
+            }
+            // //console.log("Best move found:", bestMoveFound, "with value:", bestMove);
+             // Se nenhum movimento for encontrado (o que não deveria acontecer a menos que seja fim de jogo)
+            if (bestMoveFound === null && newGameMoves.length > 0) {
+                 console.warn("Nenhum bestMoveFound, retornando o primeiro movimento legal.");
+                 return newGameMoves[0];
+            } else if (newGameMoves.length === 0) {
+                 console.warn("Nenhum movimento legal encontrado no minimaxRoot.");
+                return null; // Fim de jogo ou situação inesperada
+            }
+            return bestMoveFound;
+        }
+
+        function minimax(depth, alpha, beta, isMaximizingPlayer) {
+            if (depth === 0 || game.game_over()) {
+                // Passa o tabuleiro atual do 'game' e o próximo a mover
+                return evaluateBoard(game.board(), game.turn());
+            }
+
+            var newGameMoves = game.moves();
+
+            if (isMaximizingPlayer) { // Vez das Brancas (tentando maximizar a pontuação)
+                var bestMove = -Infinity;
+                for (var i = 0; i < newGameMoves.length; i++) {
+                    game.move(newGameMoves[i]);
+                    bestMove = Math.max(bestMove, minimax(depth - 1, alpha, beta, !isMaximizingPlayer));
+                    game.undo();
+                    alpha = Math.max(alpha, bestMove);
+                    if (beta <= alpha) { // Poda Beta
+                        return bestMove;
+                    }
+                }
+                return bestMove;
+            } else { // Vez das Pretas (tentando minimizar a pontuação)
+                var bestMove = Infinity;
+                for (var i = 0; i < newGameMoves.length; i++) {
+                    game.move(newGameMoves[i]);
+                    bestMove = Math.min(bestMove, minimax(depth - 1, alpha, beta, !isMaximizingPlayer));
+                    game.undo();
+                    beta = Math.min(beta, bestMove);
+                    if (beta <= alpha) { // Poda Alfa
+                        //console.log(`beta <= alpha -> Best move: ${bestMove}`);
+                        return bestMove;
+                    }
+                }
+                //console.log(`-> Best move: ${bestMove}`);
+                return bestMove;
+            }
+        }
+
+        // --- Funções de Controle do Jogo ---
+
+        function makeAIMove() {
+            if (game.game_over()) return;
+
+            const ply = game.history().length; // Número de meios-movimentos jogados
+            const isOpeningPhase = ply < 4; // Aplicar livro nos 2 primeiros lances das pretas (ply 1 e 3)
+            let openingMoveSAN = null;
+            let captureAvailable = false;
+            let bookMoveMade = false;
+
+            // 1. Verificar se estamos na fase de abertura e é a vez da IA
+            if (game.turn() === aiColor && isOpeningPhase) {
+                // 2. Verificar se há alguma captura disponível
+                const possibleMoves = game.moves({ verbose: true });
+                for (const move of possibleMoves) {
+                    if (move.flags.includes('c')) {
+                        captureAvailable = true;
+                        //console.log("AI: Captura disponível, ignorando livro de abertura.");
+                        break;
+                    }
+                }
+
+                // 3. Se não houver captura, determinar o movimento do livro
+                if (!captureAvailable) {
+                    if (ply === 1) { // Primeiro movimento das Pretas
+                        openingMoveSAN = 'e6';
+                    } else if (ply === 3) { // Segundo movimento das Pretas
+                        // Verificar se e6 foi jogado (histórico deve ter 3 lances, o segundo sendo e6)
+                         if (game.history().length === 3 && game.history({verbose:true})[1].san === 'e6') {
+                              openingMoveSAN = 'd5';
+                         } else {
+                              //console.log("AI: Condição para d5 (após e6) não atendida, usando Minimax.");
+                         }
+                    }
+                }
+            }
+
+            // 4. Tentar executar o movimento do livro, se aplicável
+            if (openingMoveSAN) {
+                 const moveResult = game.move(openingMoveSAN);
+                 if (moveResult) {
+                     //console.log("AI: Jogando movimento da abertura (Defesa Francesa):", openingMoveSAN);
+                     board.position(game.fen());
+                     updateStatus();
+                     bookMoveMade = true;
+                     // Não precisa de setTimeout aqui, é instantâneo
+                 } else {
+                     // Isso não deveria acontecer para e6/d5 no início, mas por segurança:
+                     console.warn("AI: Movimento da abertura", openingMoveSAN, "foi ilegal? Usando Minimax.");
+                 }
+            }
+
+            // 5. Se nenhum movimento do livro foi feito, usar Minimax
+            if (!bookMoveMade) {
+                // //console.log("AI: Usando Minimax para encontrar o movimento.");
+                var depth = parseInt(document.getElementById('difficulty').value);
+                // ---> MOSTRAR LOADING <---
+                loadingOverlay.classList.add('active');
+                // Opcional: remover a atualização do #status para "Pensando..." se o overlay for suficiente
+                // setThinkingStatus(true);
+                // Usar setTimeout para não bloquear a UI e dar sensação de "pensamento"
+                window.setTimeout(function() {
+                    var move = minimaxRoot(depth, false); // Preto é minimizador
+
+                    // ---> ESCONDER LOADING (SEMPRE, mesmo se move for null) <---
+                    loadingOverlay.classList.remove('active');
+                    // setThinkingStatus(false);
+
+                    if (move) {
+                        game.move(move.san);
+                        board.position(game.fen());
+                        updateStatus();
+                    } else {
+                        console.error("AI Minimax falhou em encontrar um movimento! Estado:", game.fen(), game.game_over());
+                    }
+                    setThinkingStatus(false);
+                }, 100); // Delay pequeno
+            }
+        }
+
+        // Função setThinkingStatus (sem alterações)
+        function setThinkingStatus(isThinking) {
+            const statusElement = document.getElementById('status');
+            if (isThinking) {
+                statusElement.textContent = "IA está pensando...";
+            } else {
+                 updateStatus(); // Restaura o status normal
+             }
+         }
+
+        // Função onDrop (sem alterações)
+        function onDrop(source, target) {
+            var move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback';
+            updateStatus();
+            if (!game.game_over() && game.turn() === aiColor) {
+                // A IA joga imediatamente após o movimento do jogador
+                makeAIMove(); // Não precisa mais de timeout aqui, makeAIMove decide se usa timeout (para minimax)
+            }
+        }
+
+        // Função onDragStart (sem alterações)
+        function onDragStart(source, piece, position, orientation) {
+            if (game.game_over() || game.turn() !== playerColor || piece.search(/^b/) !== -1) {
+                return false;
+            }
+        }
+
+        // Atualiza o status do jogo (turno, xeque, etc.)
+        function updateStatus() {
+            var status = '';
+            var currentTurn = game.turn() === 'w' ? 'Brancas' : 'Pretas';
+            var turnElement = document.getElementById('turn');
+            var statusElement = document.getElementById('status');
+            var boardElement = $('#myBoard .square-55d63'); // Seleciona os quadrados do tabuleiro
+            boardElement.removeClass('highlight-check'); // Remove destaque de xeque anterior
+
+            if (game.in_checkmate()) {
+                status = 'Fim de Jogo: Xeque-mate! Vencedor: ' + (game.turn() === 'b' ? 'Brancas' : 'Pretas');
+            } else if (game.in_draw()) {
+                status = 'Fim de Jogo: Empate!';
+                if (game.in_stalemate()) {
+                    status += ' (Afogamento)';
+                } else if (game.in_threefold_repetition()) {
+                    status += ' (Repetição Tripla)';
+                } else if (game.insufficient_material()) {
+                    status += ' (Material Insuficiente)';
+                } else {
+                    status += ' (Regra dos 50 movimentos)';
+                }
+            } else {
+                status = 'Status: Em andamento';
+                if (game.in_check()) {
+                    status += ' - ' + currentTurn + ' em Xeque!';
+                    // Encontra a posição do rei em xeque e adiciona a classe de destaque
+                     var kingPos = findKing(game.turn());
+                     if (kingPos) {
+                         $('#myBoard .square-' + kingPos).addClass('highlight-check');
+                     }
+                }
+            }
+
+            turnElement.textContent = 'Turno: ' + currentTurn;
+            statusElement.textContent = status;
+        }
+
+         // Função auxiliar para encontrar a posição do rei
+         function findKing(color) {
+             var boardState = game.board();
+             for (var i = 0; i < 8; i++) {
+                 for (var j = 0; j < 8; j++) {
+                     var piece = boardState[i][j];
+                     //console.log("piece: " + piece);
+                     if (piece && piece.type === 'k' && piece.color === color) {
+                         // Converte coordenadas (linha, coluna) para notação de casa (ex: e4)
+                         return String.fromCharCode('a'.charCodeAt(0) + j) + (8 - i);
+                     }
+                 }
+             }
+             return null; // Não deveria acontecer em um jogo normal
+         }
+
+
+        // Configuração inicial do chessboardjs
+        var config = {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            // onSnapEnd é chamado após uma peça voltar para a posição original (movimento inválido)
+            onSnapEnd: function() {
+                board.position(game.fen()); // Garante que o tabuleiro visual corresponde ao estado lógico
+            },
+            pieceTheme: '../assets/images/{piece}.png' // Peças padrão
+        };
+        board = Chessboard('myBoard', config); // Inicializa o tabuleiro
+
+        // --- Event Listeners ---
+        document.getElementById('newGameButton').addEventListener('click', function() {
+            game = new Chess(); // Reinicia a lógica do jogo
+            board.position('start'); // Reinicia o tabuleiro visual
+            loadingOverlay.classList.remove('active');
+            updateStatus();
+            document.getElementById('turn').textContent = 'Turno: Brancas';
+            $('#myBoard .square-55d63').removeClass('highlight-check');
+        });
+
+        document.getElementById('difficulty').addEventListener('change', function(e) {
+            currentDifficultyDepth = parseInt(e.target.value);
+            //console.log("Dificuldade alterada para Profundidade: " + currentDifficultyDepth);
+            // Opcional: Reiniciar o jogo ao mudar a dificuldade?
+            // game = new Chess();
+            // board.position('start');
+            // updateStatus();
+        });
+
+        // --- Inicialização ---
+        $(window).resize(board.resize); // Torna o tabuleiro responsivo se a janela mudar de tamanho
+        updateStatus(); // Define o status inicial
+
+    </script>
+
+</body>
+</html>
