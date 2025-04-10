@@ -100,6 +100,10 @@
         .highlight-black {
             box-shadow: inset 0 0 3px 3px yellow;
         }
+        /* Estilo para os movimentos possíveis */
+        .highlight-legal-move {
+            background-color: rgba(0, 255, 0, 0.3) !important;
+        }
     </style>
 </head>
 <body>
@@ -777,8 +781,44 @@
             $('#myBoard .square-' + target).addClass('highlight-black');
         }
 
-        // Modificar a função onDrop
+        // Função para remover highlights de movimentos possíveis
+        function removeLegalMoveHighlights() {
+            $('#myBoard .square-55d63').removeClass('highlight-legal-move');
+        }
+
+        // Função para mostrar movimentos possíveis
+        function showLegalMoves(square) {
+            // Obter movimentos possíveis para a peça
+            const moves = game.moves({
+                square: square,
+                verbose: true
+            });
+
+            // Destacar cada movimento possível
+            moves.forEach(move => {
+                $(`#myBoard .square-${move.to}`).addClass('highlight-legal-move');
+            });
+        }
+
+        // Modificar a função onDragStart para mostrar movimentos possíveis
+        function onDragStart(source, piece, position, orientation) {
+            // Remover highlights anteriores
+            removeLegalMoveHighlights();
+            
+            // Não permitir mover se o jogo acabou ou não é a vez do jogador
+            if (game.game_over() || game.turn() !== playerColor || piece.search(/^b/) !== -1) {
+                return false;
+            }
+
+            // Mostrar movimentos possíveis
+            showLegalMoves(source);
+        }
+
+        // Modificar a função onDrop para limpar os highlights
         function onDrop(source, target) {
+            // Remover highlights de movimentos possíveis
+            removeLegalMoveHighlights();
+
             const capturedPiece = game.get(target);
             
             var move = game.move({ 
@@ -825,13 +865,6 @@
                 } else {
                     makeAIMove();
                 }
-            }
-        }
-
-        // Função onDragStart (sem alterações)
-        function onDragStart(source, piece, position, orientation) {
-            if (game.game_over() || game.turn() !== playerColor || piece.search(/^b/) !== -1) {
-                return false;
             }
         }
 
@@ -895,11 +928,17 @@
             position: 'start',
             onDragStart: onDragStart,
             onDrop: onDrop,
-            // onSnapEnd é chamado após uma peça voltar para a posição original (movimento inválido)
             onSnapEnd: function() {
-                board.position(game.fen()); // Garante que o tabuleiro visual corresponde ao estado lógico
+                board.position(game.fen());
             },
-            pieceTheme: '../assets/images/{piece}.png' // Peças padrão
+            onMouseoutSquare: removeLegalMoveHighlights,
+            onMouseoverSquare: function(square, piece) {
+                // Mostrar movimentos possíveis apenas se for uma peça do jogador
+                if (piece && piece.charAt(0) === playerColor) {
+                    showLegalMoves(square);
+                }
+            },
+            pieceTheme: '../assets/images/{piece}.png'
         };
         board = Chessboard('myBoard', config); // Inicializa o tabuleiro
 
@@ -907,13 +946,14 @@
         document.getElementById('newGameButton').addEventListener('click', function() {
             game = new Chess();
             board.position('start');
-            board.draggable = true; // Reabilita o tabuleiro
+            board.draggable = true;
             loadingOverlay.classList.remove('active');
             capturedPieces.w = [];
             capturedPieces.b = [];
             updateCapturedPieces();
             updateStatus();
             removeHighlights();
+            removeLegalMoveHighlights();
             document.getElementById('turn').textContent = 'Turno: Brancas';
             $('#myBoard .square-55d63').removeClass('highlight-check');
         });
