@@ -78,16 +78,37 @@
             opacity: 1;
             visibility: visible;
         }
+        .captured-pieces {
+            display: flex;
+            flex-wrap: wrap;
+            min-height: 50px;
+            padding: 10px;
+            margin: 10px 0;
+            background: #e8e0d3;
+            border-radius: 4px;
+            width: 400px; /* Mesma largura do tabuleiro */
+        }
+        .captured-piece {
+            width: 30px;
+            height: 30px;
+            margin: 2px;
+        }
     </style>
 </head>
 <body>
 
     <div class="game-container">
         <h2>Xadrez com IA (Minimax Alpha-Beta)</h2>
+        <div class="captured-pieces" id="blackCaptured">
+            <!-- Peças pretas capturadas -->
+        </div>
         <div class="board-container">
             <div id="myBoard"></div>
             <!-- Elemento do Overlay -->
             <div id="loadingOverlay">Pensando...</div>
+        </div>
+        <div class="captured-pieces" id="whiteCaptured">
+            <!-- Peças brancas capturadas -->
         </div>
         <div id="status">Status: Novo Jogo</div>
         <div id="turn">Turno: Brancas</div>
@@ -121,6 +142,11 @@
         var aiColor = 'b';
         var currentDifficultyDepth = 2; // Profundidade inicial (Fácil)
         var loadingOverlay = document.getElementById('loadingOverlay'); // Referência ao overlay
+        const capturedPieces = {
+            w: [], // Peças brancas capturadas
+            b: []  // Peças pretas capturadas
+        };
+        const DEBUG_MODE = false; // Controle global para debug
 
         // --- Tabelas Posição-Peça (Piece-Square Tables) ---
         // Valores adaptados/simplificados. Positivo é bom para a peça naquela casa.
@@ -196,6 +222,13 @@
         // TODO: Adicionar tabelas de final de jogo para o Rei (onde ele deve ir para o centro)
 
         // --- Funções da IA (Minimax com Poda Alpha-Beta) ---
+
+        // Função de debug centralizada
+        function debug(...args) {
+            if (DEBUG_MODE) {
+                console.log(...args);
+            }
+        }
 
         // Heurística: Material + Posição
         function evaluateBoard(board, turn) {
@@ -598,7 +631,18 @@
                     setThinkingStatus(false);
 
                     if (move) {
+                        const capturedPiece = game.get(move.to);
+                        
                         game.move(move.san);
+                        
+                        if (capturedPiece) {
+                            const color = capturedPiece.color;
+                            const type = capturedPiece.type;
+                            debug("IA capturou:", color, type);
+                            capturedPieces[color].push(type);
+                            updateCapturedPieces();
+                        }
+
                         board.position(game.fen());
                         updateStatus();
                     } else {
@@ -616,17 +660,63 @@
                 statusElement.textContent = "IA está pensando...";
             } else {
                  updateStatus(); // Restaura o status normal
-             }
-         }
+            }
+        }
+
+        // Função auxiliar para obter o nome correto da peça para a URL da imagem
+        function getPieceName(pieceName) {
+            return pieceName.toUpperCase().slice(-1);
+        }
+
+        // Função atualizada para exibir as peças capturadas
+        function updateCapturedPieces() {
+            const blackCaptured = document.getElementById('blackCaptured');
+            const whiteCaptured = document.getElementById('whiteCaptured');
+
+            debug("Estado atual das peças capturadas:", JSON.stringify(capturedPieces, undefined, 4));
+            
+            blackCaptured.innerHTML = '';
+            whiteCaptured.innerHTML = '';
+            
+            capturedPieces.b.forEach(piece => {
+                const img = document.createElement('img');
+                img.src = `../assets/images/b${getPieceName(piece)}.png`;
+                img.classList.add('captured-piece');
+                blackCaptured.appendChild(img);
+            });
+            
+            capturedPieces.w.forEach(piece => {
+                const img = document.createElement('img');
+                img.src = `../assets/images/w${getPieceName(piece)}.png`;
+                img.classList.add('captured-piece');
+                whiteCaptured.appendChild(img);
+            });
+        }
 
         // Função onDrop (sem alterações)
         function onDrop(source, target) {
-            var move = game.move({ from: source, to: target, promotion: 'q' });
+            const capturedPiece = game.get(target);
+            
+            var move = game.move({ 
+                from: source, 
+                to: target, 
+                promotion: 'q'
+            });
+
             if (move === null) return 'snapback';
+
+            if (capturedPiece) {
+                const color = capturedPiece.color;
+                const type = capturedPiece.type;
+                debug("Peça capturada:", color, type);
+                capturedPieces[color].push(type);
+                updateCapturedPieces();
+            }
+
             updateStatus();
+            
             if (!game.game_over() && game.turn() === aiColor) {
-                // A IA joga imediatamente após o movimento do jogador
-                makeAIMove(); // Não precisa mais de timeout aqui, makeAIMove decide se usa timeout (para minimax)
+                makeAIMove();
             }
         }
 
@@ -711,6 +801,10 @@
             game = new Chess(); // Reinicia a lógica do jogo
             board.position('start'); // Reinicia o tabuleiro visual
             loadingOverlay.classList.remove('active');
+            // Resetar peças capturadas
+            capturedPieces.w = [];
+            capturedPieces.b = [];
+            updateCapturedPieces();
             updateStatus();
             document.getElementById('turn').textContent = 'Turno: Brancas';
             $('#myBoard .square-55d63').removeClass('highlight-check');
