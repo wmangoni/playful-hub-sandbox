@@ -93,6 +93,13 @@
             height: 30px;
             margin: 2px;
         }
+        /* Estilos para destacar a última jogada */
+        .highlight-white {
+            box-shadow: inset 0 0 3px 3px yellow;
+        }
+        .highlight-black {
+            box-shadow: inset 0 0 3px 3px yellow;
+        }
     </style>
 </head>
 <body>
@@ -635,6 +642,9 @@
                         
                         game.move(move.san);
                         
+                        // Destacar o movimento da IA
+                        highlightMove(move.from, move.to);
+                        
                         if (capturedPiece) {
                             const color = capturedPiece.color;
                             const type = capturedPiece.type;
@@ -693,7 +703,20 @@
             });
         }
 
-        // Função onDrop (sem alterações)
+        // Função para remover highlights anteriores
+        function removeHighlights() {
+            $('#myBoard .square-55d63').removeClass('highlight-white');
+            $('#myBoard .square-55d63').removeClass('highlight-black');
+        }
+
+        // Função para destacar um movimento
+        function highlightMove(source, target) {
+            removeHighlights();
+            $('#myBoard .square-' + source).addClass('highlight-white');
+            $('#myBoard .square-' + target).addClass('highlight-black');
+        }
+
+        // Modificar a função onDrop
         function onDrop(source, target) {
             const capturedPiece = game.get(target);
             
@@ -704,6 +727,9 @@
             });
 
             if (move === null) return 'snapback';
+
+            // Destacar o movimento do jogador
+            highlightMove(source, target);
 
             if (capturedPiece) {
                 const color = capturedPiece.color;
@@ -798,14 +824,14 @@
 
         // --- Event Listeners ---
         document.getElementById('newGameButton').addEventListener('click', function() {
-            game = new Chess(); // Reinicia a lógica do jogo
-            board.position('start'); // Reinicia o tabuleiro visual
+            game = new Chess();
+            board.position('start');
             loadingOverlay.classList.remove('active');
-            // Resetar peças capturadas
             capturedPieces.w = [];
             capturedPieces.b = [];
             updateCapturedPieces();
             updateStatus();
+            removeHighlights(); // Remove qualquer highlight existente
             document.getElementById('turn').textContent = 'Turno: Brancas';
             $('#myBoard .square-55d63').removeClass('highlight-check');
         });
