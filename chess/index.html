@@ -154,6 +154,9 @@
             b: []  // Peças pretas capturadas
         };
         const DEBUG_MODE = false; // Controle global para debug
+        const moveSound = new Audio('../assets/sounds/sfx-pop.mp3');
+        const victorySound = new Audio('../assets/sounds/powerup3.mp3');
+        const defeatSound = new Audio('../assets/sounds/game_over_bgm.mp3');
 
         // --- Tabelas Posição-Peça (Piece-Square Tables) ---
         // Valores adaptados/simplificados. Positivo é bom para a peça naquela casa.
@@ -237,7 +240,15 @@
             }
         }
 
-        // Heurística: Material + Posição
+        // Função para tocar o som do movimento
+        function playMoveSound() {
+            moveSound.currentTime = 0; // Reseta o áudio para o início
+            moveSound.play().catch(error => {
+                debug("Erro ao tocar som:", error);
+            });
+        }
+
+        // Modificar a função evaluateBoard para incluir avaliação de ataques
         function evaluateBoard(board, turn) {
             let totalEvaluation = 0;
             
@@ -308,6 +319,38 @@
                 }
             }
             
+            // Bônus para xeque
+            if (game.in_check()) {
+                const checkBonus = 50; // Valor significativo para incentivar xeques
+                totalEvaluation += (turn === 'w' ? -checkBonus : checkBonus);
+            }
+
+            // Bônus para xeque-mate
+            if (game.in_checkmate()) {
+                const mateBonus = 10000; // Valor muito alto para priorizar mate
+                totalEvaluation += (turn === 'w' ? -mateBonus : mateBonus);
+            }
+
+            // Bônus para ataques ao rei
+            const enemyKingSquare = findKing(turn === 'w' ? 'b' : 'w');
+            if (enemyKingSquare) {
+                const [kingFile, kingRank] = [enemyKingSquare.charCodeAt(0) - 'a'.charCodeAt(0), 8 - parseInt(enemyKingSquare[1])];
+                
+                // Avaliar proximidade das peças ao rei inimigo
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        const piece = board[i][j];
+                        if (piece && piece.color === turn) {
+                            // Calcular distância Manhattan ao rei
+                            const distance = Math.abs(i - kingRank) + Math.abs(j - kingFile);
+                            // Quanto menor a distância, maior o bônus
+                            const proximityBonus = (7 - distance) * 3;
+                            totalEvaluation += (turn === 'w' ? proximityBonus : -proximityBonus);
+                        }
+                    }
+                }
+            }
+            
             return totalEvaluation;
         }
 
@@ -341,6 +384,21 @@
                 case 'q': return 90;  // Dama
                 default: return 0;
             }
+        }
+
+        // Função auxiliar para encontrar a posição do rei
+        function findKing(color) {
+            var boardState = game.board();
+            for (var i = 0; i < 8; i++) {
+                for (var j = 0; j < 8; j++) {
+                    var piece = boardState[i][j];
+                    if (piece && piece.type === 'k' && piece.color === color) {
+                        // Converte coordenadas (linha, coluna) para notação de casa (ex: e4)
+                        return String.fromCharCode('a'.charCodeAt(0) + j) + (8 - i);
+                    }
+                }
+            }
+            return null; // Não deveria acontecer em um jogo normal
         }
 
         // Implementar uma função de busca seletiva que avalia apenas os movimentos mais promissores
@@ -642,6 +700,9 @@
                         
                         game.move(move.san);
                         
+                        // Tocar som do movimento
+                        playMoveSound();
+                        
                         // Destacar o movimento da IA
                         highlightMove(move.from, move.to);
                         
@@ -728,6 +789,9 @@
 
             if (move === null) return 'snapback';
 
+            // Tocar som do movimento
+            playMoveSound();
+
             // Destacar o movimento do jogador
             highlightMove(source, target);
 
@@ -742,7 +806,25 @@
             updateStatus();
             
             if (!game.game_over() && game.turn() === aiColor) {
-                makeAIMove();
+                // Adiciona delay consistente para os primeiros movimentos
+                if (game.history().length <= 4) { // Primeiros 2 lances de cada lado
+                    setTimeout(() => {
+                        const possibleMoves = game.moves();
+                        const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        
+                        game.move(randomMove);
+                        playMoveSound();
+                        
+                        // Destacar o movimento aleatório da IA
+                        const lastMove = game.history({verbose: true})[game.history().length - 1];
+                        highlightMove(lastMove.from, lastMove.to);
+                        
+                        board.position(game.fen());
+                        updateStatus();
+                    }, 400);
+                } else {
+                    makeAIMove();
+                }
             }
         }
 
@@ -755,58 +837,57 @@
 
         // Atualiza o status do jogo (turno, xeque, etc.)
         function updateStatus() {
-            var status = '';
-            var currentTurn = game.turn() === 'w' ? 'Brancas' : 'Pretas';
-            var turnElement = document.getElementById('turn');
-            var statusElement = document.getElementById('status');
-            var boardElement = $('#myBoard .square-55d63'); // Seleciona os quadrados do tabuleiro
-            boardElement.removeClass('highlight-check'); // Remove destaque de xeque anterior
+            let status = '';
+            let gameEnded = false;
 
             if (game.in_checkmate()) {
-                status = 'Fim de Jogo: Xeque-mate! Vencedor: ' + (game.turn() === 'b' ? 'Brancas' : 'Pretas');
-            } else if (game.in_draw()) {
-                status = 'Fim de Jogo: Empate!';
-                if (game.in_stalemate()) {
-                    status += ' (Afogamento)';
-                } else if (game.in_threefold_repetition()) {
-                    status += ' (Repetição Tripla)';
-                } else if (game.insufficient_material()) {
-                    status += ' (Material Insuficiente)';
+                // Verifica quem ganhou
+                const winner = game.turn() === 'w' ? 'Pretas' : 'Brancas';
+                status = `Fim de jogo, ${winner} venceram por xeque-mate`;
+                gameEnded = true;
+                
+                // Toca o som apropriado
+                if (winner === 'Brancas') {
+                    victorySound.play().catch(error => debug("Erro ao tocar som de vitória:", error));
                 } else {
-                    status += ' (Regra dos 50 movimentos)';
-                }
-            } else {
-                status = 'Status: Em andamento';
-                if (game.in_check()) {
-                    status += ' - ' + currentTurn + ' em Xeque!';
-                    // Encontra a posição do rei em xeque e adiciona a classe de destaque
-                     var kingPos = findKing(game.turn());
-                     if (kingPos) {
-                         $('#myBoard .square-' + kingPos).addClass('highlight-check');
-                     }
+                    defeatSound.play().catch(error => debug("Erro ao tocar som de derrota:", error));
                 }
             }
+            else if (game.in_draw()) {
+                status = 'Fim de jogo, empate';
+                gameEnded = true;
+                defeatSound.play().catch(error => debug("Erro ao tocar som de empate:", error));
+            }
+            else if (game.in_stalemate()) {
+                status = 'Fim de jogo, empate por afogamento';
+                gameEnded = true;
+                defeatSound.play().catch(error => debug("Erro ao tocar som de empate:", error));
+            }
+            else if (game.in_threefold_repetition()) {
+                status = 'Fim de jogo, empate por tripla repetição';
+                gameEnded = true;
+                defeatSound.play().catch(error => debug("Erro ao tocar som de empate:", error));
+            }
+            else if (game.insufficient_material()) {
+                status = 'Fim de jogo, empate por material insuficiente';
+                gameEnded = true;
+                defeatSound.play().catch(error => debug("Erro ao tocar som de empate:", error));
+            }
+            else {
+                status = game.turn() === 'b' ? 'Turno: Pretas' : 'Turno: Brancas';
+            }
 
-            turnElement.textContent = 'Turno: ' + currentTurn;
-            statusElement.textContent = status;
+            if (game.in_check()) {
+                status += ' (XEQUE)';
+            }
+
+            document.getElementById('turn').textContent = status;
+            
+            // Se o jogo acabou, desabilita o tabuleiro
+            if (gameEnded) {
+                board.draggable = false;
+            }
         }
-
-         // Função auxiliar para encontrar a posição do rei
-         function findKing(color) {
-             var boardState = game.board();
-             for (var i = 0; i < 8; i++) {
-                 for (var j = 0; j < 8; j++) {
-                     var piece = boardState[i][j];
-                     //console.log("piece: " + piece);
-                     if (piece && piece.type === 'k' && piece.color === color) {
-                         // Converte coordenadas (linha, coluna) para notação de casa (ex: e4)
-                         return String.fromCharCode('a'.charCodeAt(0) + j) + (8 - i);
-                     }
-                 }
-             }
-             return null; // Não deveria acontecer em um jogo normal
-         }
-
 
         // Configuração inicial do chessboardjs
         var config = {
@@ -826,12 +907,13 @@
         document.getElementById('newGameButton').addEventListener('click', function() {
             game = new Chess();
             board.position('start');
+            board.draggable = true; // Reabilita o tabuleiro
             loadingOverlay.classList.remove('active');
             capturedPieces.w = [];
             capturedPieces.b = [];
             updateCapturedPieces();
             updateStatus();
-            removeHighlights(); // Remove qualquer highlight existente
+            removeHighlights();
             document.getElementById('turn').textContent = 'Turno: Brancas';
             $('#myBoard .square-55d63').removeClass('highlight-check');
         });
