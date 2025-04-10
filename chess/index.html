@@ -95,9 +95,11 @@
         <div class="controls">
             <label for="difficulty">Dificuldade:</label>
             <select id="difficulty">
-                <option value="1">Fácil (Profundidade 1)</option>
-                <option value="2" selected>Médio (Profundidade 2)</option>
-                <option value="3">Difícil (Profundidade 3)</option>
+                <option value="2">Muito Fácil</option>
+                <option value="3" selected>Fácil</option>
+                <option value="4">Médio</option>
+                <option value="5">Difícil</option>
+                <option value="6">Muito Difícil</option>
             </select>
             <button id="newGameButton">Novo Jogo</button>
         </div>
@@ -117,7 +119,7 @@
         var game = new Chess(); // Objeto chess.js
         var playerColor = 'w'; // Jogador humano é sempre as brancas por simplicidade
         var aiColor = 'b';
-        var currentDifficultyDepth = 2; // Profundidade inicial (Médio)
+        var currentDifficultyDepth = 2; // Profundidade inicial (Fácil)
         var loadingOverlay = document.getElementById('loadingOverlay'); // Referência ao overlay
 
         // --- Tabelas Posição-Peça (Piece-Square Tables) ---
@@ -196,40 +198,76 @@
         // --- Funções da IA (Minimax com Poda Alpha-Beta) ---
 
         // Heurística: Material + Posição
-        function evaluateBoard(boardState, colorToMove) {
-            var totalEvaluation = 0;
-            for (var i = 0; i < 8; i++) { // Linhas (0-7) -> Fileiras (8-1)
-                for (var j = 0; j < 8; j++) { // Colunas (0-7) -> Colunas (a-h)
-                    var piece = boardState[i][j];
+        function evaluateBoard(board, turn) {
+            let totalEvaluation = 0;
+            
+            // Primeiro, avaliamos o valor material e posicional das peças
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const piece = board[i][j];
                     if (piece) {
-                        var pieceValue = getPieceValue(piece);
-                        var positionalValue = 0;
-                        var table = null;
-
+                        // Valor material da peça
+                        const pieceValue = getPieceValue(piece);
+                        
+                        // Valor posicional da peça
+                        let positionalValue = 0;
+                        let table = null;
+                        
+                        // Selecionar a tabela apropriada para a peça
                         switch (piece.type) {
                             case 'p': table = pawnTable; break;
                             case 'n': table = knightTable; break;
                             case 'b': table = bishopTable; break;
                             case 'r': table = rookTable; break;
                             case 'q': table = queenTable; break;
-                            case 'k': table = kingTable; break; // Usar tabela de meio jogo por padrão
+                            case 'k': table = kingTable; break;
                         }
-
+                        
                         if (table) {
                             // A tabela é definida da perspectiva das Brancas.
                             // Se a peça for Preta, precisamos inverter a linha (i).
-                            var row = piece.color === 'w' ? i : 7 - i;
-                            var col = j;
+                            const row = piece.color === 'w' ? i : 7 - i;
+                            const col = j;
                             positionalValue = table[row][col];
                         }
-
+                        
                         // Adiciona valor material e posicional.
-                        // Se a peça for preta, subtrai o valor (pois positivo é bom para brancas).
                         totalEvaluation += (piece.color === 'w' ? (pieceValue + positionalValue) : -(pieceValue + positionalValue));
                     }
                 }
             }
-            // A avaliação é sempre do ponto de vista das Brancas
+            
+            // Adicionar avaliação de segurança das peças
+            // Verificar se alguma peça está sob ataque e não defendida
+            const currentPosition = game.fen();
+            
+            // Verificar ameaças às peças brancas
+            if (turn === 'b') {
+                // Simular cada movimento possível das pretas
+                const possibleMoves = game.moves({ verbose: true });
+                for (const move of possibleMoves) {
+                    if (move.flags.includes('c')) { // Se é uma captura
+                        const capturedPieceValue = getPieceValueByType(move.captured);
+                        // Adicionar um bônus para capturas vantajosas
+                        // Quanto maior o valor da peça capturada, maior o bônus
+                        totalEvaluation -= capturedPieceValue * 1.5; // Bônus para pretas (negativo para brancas)
+                    }
+                }
+            }
+            
+            // Verificar ameaças às peças pretas
+            if (turn === 'w') {
+                // Simular cada movimento possível das brancas
+                const possibleMoves = game.moves({ verbose: true });
+                for (const move of possibleMoves) {
+                    if (move.flags.includes('c')) { // Se é uma captura
+                        const capturedPieceValue = getPieceValueByType(move.captured);
+                        // Adicionar um bônus para capturas vantajosas
+                        totalEvaluation += capturedPieceValue * 1.5; // Bônus para brancas
+                    }
+                }
+            }
+            
             return totalEvaluation;
         }
 
@@ -253,76 +291,240 @@
             return piece.color === 'w' ? absoluteValue : -absoluteValue;
         }
 
-        // Algoritmo Minimax com Poda Alfa-Beta
-        // Retorna [melhor avaliação, melhor movimento]
+        // Função auxiliar para obter o valor de uma peça pelo seu tipo
+        function getPieceValueByType(pieceType) {
+            switch (pieceType) {
+                case 'p': return 10;  // Peão
+                case 'n': return 30;  // Cavalo
+                case 'b': return 30;  // Bispo
+                case 'r': return 50;  // Torre
+                case 'q': return 90;  // Dama
+                default: return 0;
+            }
+        }
+
+        // Implementar uma função de busca seletiva que avalia apenas os movimentos mais promissores
         function minimaxRoot(depth, isMaximizingPlayer) {
-            var newGameMoves = game.moves({ verbose: true });
-            var bestMove = isMaximizingPlayer ? -Infinity : Infinity;;
-            var bestMoveFound = null;
-
-            //console.log(`--- AI (${aiColor}) evaluating at depth ${depth} ---`); // Log de início
-
-            for (var i = 0; i < newGameMoves.length; i++) {
-                var newGameMove = newGameMoves[i];
-                game.move(newGameMove.san); // Faz o movimento
-                var value = minimax(depth - 1, -Infinity, Infinity, !isMaximizingPlayer);
-                game.undo(); // Desfaz o movimento
-
-                //console.log(`Move: ${newGameMove.san}, Score: ${value}`);
-
-                // O jogador AI (preto) quer MINIMIZAR a pontuação (negativo é bom para ele)
-                // Como estamos no root e queremos o melhor para o AI (preto), procuramos o menor valor retornado pelo minimax
-                if (value <= bestMove) {
-                    bestMove = value;
-                    bestMoveFound = newGameMove;
+            const moves = game.moves({ verbose: true });
+            
+            // Número de melhores movimentos para explorar em cada nível
+            const BEAM_WIDTH = 4;
+            
+            // Fase 1: Avaliar todos os movimentos possíveis na primeira camada
+            const evaluatedMoves = [];
+            
+            for (const move of moves) {
+                game.move(move.san);
+                // Avaliação superficial (profundidade 1)
+                const score = evaluateBoard(game.board(), game.turn());
+                game.undo();
+                
+                evaluatedMoves.push({
+                    move: move,
+                    score: score
+                });
+            }
+            
+            // Ordenar os movimentos
+            // Para o jogador maximizador (brancas), ordenamos do maior para o menor
+            // Para o jogador minimizador (pretas), ordenamos do menor para o maior
+            evaluatedMoves.sort((a, b) => {
+                return isMaximizingPlayer ? b.score - a.score : a.score - b.score;
+            });
+            
+            // Selecionar apenas os N melhores movimentos
+            const bestMoves = evaluatedMoves.slice(0, Math.min(BEAM_WIDTH, evaluatedMoves.length));
+            
+            // Fase 2: Explorar com profundidade total apenas os melhores movimentos
+            let bestMoveFound = null;
+            let bestScore = isMaximizingPlayer ? -Infinity : Infinity;
+            
+            for (const moveObj of bestMoves) {
+                game.move(moveObj.move.san);
+                // Agora explorar com profundidade total usando seletividade em cada nível
+                const value = selectiveSearch(depth - 1, -Infinity, Infinity, !isMaximizingPlayer, BEAM_WIDTH);
+                game.undo();
+                
+                // Atualizar o melhor movimento
+                if (isMaximizingPlayer) {
+                    if (value > bestScore) {
+                        bestScore = value;
+                        bestMoveFound = moveObj.move;
+                    }
+                } else {
+                    if (value < bestScore) {
+                        bestScore = value;
+                        bestMoveFound = moveObj.move;
+                    }
                 }
             }
-            // //console.log("Best move found:", bestMoveFound, "with value:", bestMove);
-             // Se nenhum movimento for encontrado (o que não deveria acontecer a menos que seja fim de jogo)
-            if (bestMoveFound === null && newGameMoves.length > 0) {
-                 console.warn("Nenhum bestMoveFound, retornando o primeiro movimento legal.");
-                 return newGameMoves[0];
-            } else if (newGameMoves.length === 0) {
-                 console.warn("Nenhum movimento legal encontrado no minimaxRoot.");
-                return null; // Fim de jogo ou situação inesperada
+            
+            // Se por algum motivo não encontrarmos o melhor movimento
+            if (bestMoveFound === null && moves.length > 0) {
+                return moves[0];
             }
+            
             return bestMoveFound;
         }
 
-        function minimax(depth, alpha, beta, isMaximizingPlayer) {
+        // Modificar a função selectiveSearch para considerar capturas como movimentos prioritários
+        function selectiveSearch(depth, alpha, beta, isMaximizingPlayer, beamWidth) {
+            // Caso base: fim da recursão
             if (depth === 0 || game.game_over()) {
-                // Passa o tabuleiro atual do 'game' e o próximo a mover
                 return evaluateBoard(game.board(), game.turn());
             }
-
-            var newGameMoves = game.moves();
-
-            if (isMaximizingPlayer) { // Vez das Brancas (tentando maximizar a pontuação)
-                var bestMove = -Infinity;
-                for (var i = 0; i < newGameMoves.length; i++) {
-                    game.move(newGameMoves[i]);
-                    bestMove = Math.max(bestMove, minimax(depth - 1, alpha, beta, !isMaximizingPlayer));
+            
+            const moves = game.moves({ verbose: true });
+            
+            // Se estivermos no último nível ou houver poucos movimentos, avaliar todos
+            if (depth === 1 || moves.length <= beamWidth) {
+                return minimax(depth, alpha, beta, isMaximizingPlayer);
+            }
+            
+            // Separar movimentos de captura e não-captura
+            const captureMoves = [];
+            const nonCaptureMoves = [];
+            
+            for (const move of moves) {
+                if (move.flags.includes('c')) {
+                    captureMoves.push(move);
+                } else {
+                    nonCaptureMoves.push(move);
+                }
+            }
+            
+            // Avaliar superficialmente todos os movimentos neste nível
+            const evaluatedCaptures = [];
+            const evaluatedNonCaptures = [];
+            
+            // Avaliar capturas
+            for (const move of captureMoves) {
+                game.move(move);
+                // Avaliação superficial
+                const score = evaluateBoard(game.board(), game.turn());
+                game.undo();
+                
+                evaluatedCaptures.push({
+                    move: move,
+                    score: score
+                });
+            }
+            
+            // Avaliar não-capturas
+            for (const move of nonCaptureMoves) {
+                game.move(move);
+                // Avaliação superficial
+                const score = evaluateBoard(game.board(), game.turn());
+                game.undo();
+                
+                evaluatedNonCaptures.push({
+                    move: move,
+                    score: score
+                });
+            }
+            
+            // Ordenar os movimentos
+            evaluatedCaptures.sort((a, b) => {
+                return isMaximizingPlayer ? b.score - a.score : a.score - b.score;
+            });
+            
+            evaluatedNonCaptures.sort((a, b) => {
+                return isMaximizingPlayer ? b.score - a.score : a.score - b.score;
+            });
+            
+            // Selecionar os melhores movimentos, priorizando capturas
+            let bestMoves = [];
+            
+            // Adicionar todas as capturas (ou até o limite de beam width)
+            bestMoves = bestMoves.concat(evaluatedCaptures.slice(0, beamWidth));
+            
+            // Adicionar os melhores movimentos não-captura até completar o beam width
+            if (bestMoves.length < beamWidth) {
+                bestMoves = bestMoves.concat(
+                    evaluatedNonCaptures.slice(0, beamWidth - bestMoves.length)
+                );
+            }
+            
+            // Agora que temos os melhores movimentos, aplicamos o minimax tradicional
+            if (isMaximizingPlayer) {
+                let bestScore = -Infinity;
+                
+                for (const moveObj of bestMoves) {
+                    game.move(moveObj.move);
+                    const score = selectiveSearch(depth - 1, alpha, beta, false, beamWidth);
                     game.undo();
-                    alpha = Math.max(alpha, bestMove);
-                    if (beta <= alpha) { // Poda Beta
-                        return bestMove;
+                    
+                    bestScore = Math.max(bestScore, score);
+                    alpha = Math.max(alpha, bestScore);
+                    
+                    if (beta <= alpha) {
+                        break; // Poda alpha-beta
                     }
                 }
-                return bestMove;
-            } else { // Vez das Pretas (tentando minimizar a pontuação)
-                var bestMove = Infinity;
-                for (var i = 0; i < newGameMoves.length; i++) {
-                    game.move(newGameMoves[i]);
-                    bestMove = Math.min(bestMove, minimax(depth - 1, alpha, beta, !isMaximizingPlayer));
+                
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                
+                for (const moveObj of bestMoves) {
+                    game.move(moveObj.move);
+                    const score = selectiveSearch(depth - 1, alpha, beta, true, beamWidth);
                     game.undo();
-                    beta = Math.min(beta, bestMove);
-                    if (beta <= alpha) { // Poda Alfa
-                        //console.log(`beta <= alpha -> Best move: ${bestMove}`);
-                        return bestMove;
+                    
+                    bestScore = Math.min(bestScore, score);
+                    beta = Math.min(beta, bestScore);
+                    
+                    if (beta <= alpha) {
+                        break; // Poda alpha-beta
                     }
                 }
-                //console.log(`-> Best move: ${bestMove}`);
-                return bestMove;
+                
+                return bestScore;
+            }
+        }
+
+        // Manter a função minimax original para os níveis mais profundos
+        function minimax(depth, alpha, beta, isMaximizingPlayer) {
+            if (depth === 0 || game.game_over()) {
+                return evaluateBoard(game.board(), game.turn());
+            }
+            
+            const moves = game.moves();
+            
+            if (isMaximizingPlayer) {
+                let bestScore = -Infinity;
+                
+                for (const move of moves) {
+                    game.move(move);
+                    const score = minimax(depth - 1, alpha, beta, false);
+                    game.undo();
+                    
+                    bestScore = Math.max(bestScore, score);
+                    alpha = Math.max(alpha, bestScore);
+                    
+                    if (beta <= alpha) {
+                        break; // Poda alpha-beta
+                    }
+                }
+                
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                
+                for (const move of moves) {
+                    game.move(move);
+                    const score = minimax(depth - 1, alpha, beta, true);
+                    game.undo();
+                    
+                    bestScore = Math.min(bestScore, score);
+                    beta = Math.min(beta, bestScore);
+                    
+                    if (beta <= alpha) {
+                        break; // Poda alpha-beta
+                    }
+                }
+                
+                return bestScore;
             }
         }
 
@@ -332,7 +534,7 @@
             if (game.game_over()) return;
 
             const ply = game.history().length; // Número de meios-movimentos jogados
-            const isOpeningPhase = ply < 4; // Aplicar livro nos 2 primeiros lances das pretas (ply 1 e 3)
+            const isOpeningPhase = ply < 6; // Aplicar livro nos 3 primeiros lances das pretas (ply 1 e 3 e 5)
             let openingMoveSAN = null;
             let captureAvailable = false;
             let bookMoveMade = false;
@@ -384,16 +586,16 @@
                 // //console.log("AI: Usando Minimax para encontrar o movimento.");
                 var depth = parseInt(document.getElementById('difficulty').value);
                 // ---> MOSTRAR LOADING <---
-                loadingOverlay.classList.add('active');
+                //loadingOverlay.classList.add('active');
                 // Opcional: remover a atualização do #status para "Pensando..." se o overlay for suficiente
-                // setThinkingStatus(true);
+                setThinkingStatus(true);
                 // Usar setTimeout para não bloquear a UI e dar sensação de "pensamento"
                 window.setTimeout(function() {
                     var move = minimaxRoot(depth, false); // Preto é minimizador
 
                     // ---> ESCONDER LOADING (SEMPRE, mesmo se move for null) <---
-                    loadingOverlay.classList.remove('active');
-                    // setThinkingStatus(false);
+                    //loadingOverlay.classList.remove('active');
+                    setThinkingStatus(false);
 
                     if (move) {
                         game.move(move.san);
@@ -403,7 +605,7 @@
                         console.error("AI Minimax falhou em encontrar um movimento! Estado:", game.fen(), game.game_over());
                     }
                     setThinkingStatus(false);
-                }, 100); // Delay pequeno
+                }, 400); // Delay pequeno
             }
         }
 
