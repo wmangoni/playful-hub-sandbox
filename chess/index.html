@@ -150,7 +150,7 @@
         var game = new Chess(); // Objeto chess.js
         var playerColor = 'w'; // Jogador humano é sempre as brancas por simplicidade
         var aiColor = 'b';
-        var currentDifficultyDepth = 2; // Profundidade inicial (Fácil)
+        var currentDifficultyDepth = 3; // Profundidade inicial (Fácil)
         var loadingOverlay = document.getElementById('loadingOverlay'); // Referência ao overlay
         const capturedPieces = {
             w: [], // Peças brancas capturadas
@@ -183,6 +183,7 @@
         // Valores adaptados/simplificados. Positivo é bom para a peça naquela casa.
         // Definidos da perspectiva das Brancas (linha 0 é a 8ª fileira, linha 7 é a 1ª)
 
+        /*
         var pawnTable = [
             [ 0,   0,   0,   0,   0,   0,   0,   0],
             [50,  50,  50,  50,  50,  50,  50,  50], // Peões avançados valem mais
@@ -191,6 +192,18 @@
             [ 0,   0,   0,  20,  20,   0,   0,   0], // Centro inicial
             [ 0, -10, -10,   0,   0, -10, -10,   0], // Penalidade pequena para peões bloqueados iniciais
             [ 0,   0,   0, -20, -20,   0,   0,   0], // Penalidade maior para peões muito recuados
+            [ 0,   0,   0,   0,   0,   0,   0,   0]
+        ];
+        */
+
+        var pawnTable = [
+            [ 0,   0,   0,   0,   0,   0,   0,   0],
+            [ 5,  10,  10, -20, -20,  10,  10,   5],
+            [ 5,  -5, -10,   0,   0, -10,  -5,   5],
+            [ 0,   0,   0,  20,  20,   0,   0,   0],
+            [ 5,   5,  10,  25,  25,  10,   5,   5],
+            [ 10,  10, 20,  30,  30,  20,  10,  10],
+            [ 50,  50, 50,  50,  50,  50,  50,  50],
             [ 0,   0,   0,   0,   0,   0,   0,   0]
         ];
 
@@ -231,10 +244,10 @@
          var queenTable = [
             [-20, -10, -10,   0,   0, -10, -10, -20],
             [-10,   0,   0,   0,   0,   0,   0, -10],
-            [-10,   0,   0,   0,   0,   0,   0, -10],
-            [  0,   0,   0,   0,   0,   0,   0,   0],
-            [  0,   0,   0,   0,   0,   0,   0,   0],
-            [-10,   0,   0,   0,   0,   0,   0, -10],
+            [-10,   0,  10,  10,  10,  10,   0, -10],
+            [  0,   0,  10,  10,  10,  10,   0,   0],
+            [  0,   0,  10,  10,  10,  10,   0,   0],
+            [-10,   0,  10,  10,  10,  10,   0, -10],
             [-10,   0,   0,   0,   0,   0,   0, -10],
             [-20, -10, -10,   0,   0, -10, -10, -20]
         ];
@@ -278,66 +291,79 @@
             });
         }
 
-        // --- NOVA FUNÇÃO evaluateBoard ---
-        function evaluateBoard(currentBoard, turn) { // Renomeado para clareza
-            let totalEvaluation = 0;
+        // Função auxiliar para determinar a fase do jogo (simplificado)
+        function determineIsEndGame(currentBoard) {
+            let whiteMaterial = 0;
+            let blackMaterial = 0;
+            let queens = 0;
+
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const piece = currentBoard[i][j];
+                    if (piece && piece.type !== 'k' && piece.type !== 'p') {
+                        const value = getPieceValue(piece); // Usa a função existente
+                        if (piece.color === 'w') {
+                            whiteMaterial += value;
+                        } else {
+                            blackMaterial += value;
+                        }
+                        if (piece.type === 'q') {
+                            queens++;
+                        }
+                    }
+                }
+            }
+            // Critério: Sem damas OU material total (sem peões/reis) abaixo de um limiar
+            const lowMaterialThreshold = KNIGHT_VALUE + BISHOP_VALUE + ROOK_VALUE; // Exemplo de limiar
+            return queens === 0 || (whiteMaterial < lowMaterialThreshold && blackMaterial < lowMaterialThreshold);
+        }
+
+        // --- FUNÇÃO evaluateBoard REATORADA ---
+        function evaluateBoard(currentBoard, turn) {
+            let materialScore = 0;
+            let positionalScore = 0;
+            let structureAndSafetyScore = 0;
+            let tacticalBonus = 0; // Bônus para xeque, mate, ataques
+
             let whiteKingSquare = null;
             let blackKingSquare = null;
             let whiteMinorPiecesDeveloped = 0;
             let blackMinorPiecesDeveloped = 0;
-            let whitePawns = []; // Armazena { square: 'e2', col: 4 }
+            let whitePawns = []; // Armazena { square: 'e2', col: 4, row: 6 }
             let blackPawns = [];
 
-            // --- FASE 1: Iterar pelo tabuleiro, coletar dados e calcular material/posição ---
+            const isEndGame = determineIsEndGame(currentBoard);
+
+            // --- FASE 1: Calcular Material e Posição Base (Tabelas) ---
             for (let i = 0; i < 8; i++) { // Linhas (0-7) -> Fileiras (8-1)
                 for (let j = 0; j < 8; j++) { // Colunas (0-7) -> Colunas (a-h)
                     const piece = currentBoard[i][j];
                     const square = String.fromCharCode('a'.charCodeAt(0) + j) + (8 - i);
 
                     if (piece) {
+                        // 1.1 Calcular Score Material
                         const pieceValue = getPieceValue(piece);
-                        let positionalValue = 0;
+                        materialScore += (piece.color === 'w' ? pieceValue : -pieceValue);
+
+                        // 1.2 Calcular Score Posicional (usando tabelas)
                         let table = null;
-
-                        // Detectar Fase do Jogo - verifica se há apenas 1 peça maior por lado além dos peões
-                        let whiteMajorPieces = 0;
-                        let blackMajorPieces = 0;
-                        
-                        // Conta peças maiores (torre, cavalo, bispo, dama) para cada lado
-                        for (let row = 0; row < 8; row++) {
-                            for (let col = 0; col < 8; col++) {
-                                const piece = currentBoard[row][col];
-                                if (piece && piece.type !== 'p' && piece.type !== 'k' && piece.type !== 'q') {
-                                    if (piece.color === 'w') whiteMajorPieces++;
-                                    else blackMajorPieces++;
-                                }
-                            }
-                        }
-                        
-                        // Final de jogo se cada lado tiver apenas 1 peça maior
-                        const isEndGame = whiteMajorPieces <= 1 && blackMajorPieces <= 1;
-
-                        console.log(isEndGame);
-                        console.log(piece.type);
-
                         switch (piece.type) {
                             case 'p':
                                 table = pawnTable;
-                                if (piece.color === 'w') whitePawns.push({ square: square, col: j });
-                                else blackPawns.push({ square: square, col: j });
-                                // Bônus centro peão
-                                if ((square === 'd4' || square === 'e4') && piece.color === 'w') positionalValue += CENTER_PAWN_BONUS;
-                                if ((square === 'd5' || square === 'e5') && piece.color === 'b') positionalValue -= CENTER_PAWN_BONUS; // Note o sinal
+                                if (piece.color === 'w') whitePawns.push({ square: square, col: j, row: i });
+                                else blackPawns.push({ square: square, col: j, row: i });
                                 break;
                             case 'n':
                                 table = knightTable;
-                                if (piece.color === 'w' && square !== 'b1' && square !== 'g1') whiteMinorPiecesDeveloped++;
-                                if (piece.color === 'b' && square !== 'b8' && square !== 'g8') blackMinorPiecesDeveloped++;
+                                // Conta desenvolvimento se não estiver na casa inicial
+                                if (piece.color === 'w' && !(i === 7 && (j === 1 || j === 6))) whiteMinorPiecesDeveloped += 10;
+                                if (piece.color === 'b' && !(i === 0 && (j === 1 || j === 6))) blackMinorPiecesDeveloped += 10;
                                 break;
                             case 'b':
                                 table = bishopTable;
-                                if (piece.color === 'w' && square !== 'c1' && square !== 'f1') whiteMinorPiecesDeveloped++;
-                                if (piece.color === 'b' && square !== 'c8' && square !== 'f8') blackMinorPiecesDeveloped++;
+                                // Conta desenvolvimento se não estiver na casa inicial
+                                if (piece.color === 'w' && !(i === 7 && (j === 2 || j === 5))) whiteMinorPiecesDeveloped += 10;
+                                if (piece.color === 'b' && !(i === 0 && (j === 2 || j === 5))) blackMinorPiecesDeveloped += 10;
                                 break;
                             case 'r': table = rookTable; break;
                             case 'q': table = queenTable; break;
@@ -349,13 +375,11 @@
                         }
 
                         if (table) {
-                            const row = piece.color === 'w' ? i : 7 - i; // Ajusta linha para tabela
-                            const col = j;
-                            positionalValue += table[row][col];
+                            const tableRow = piece.color === 'w' ? i : 7 - i; // Ajusta linha para tabela (espelha para pretas)
+                            const tableCol = j;
+                            const tableValue = table[tableRow][tableCol];
+                            positionalScore += (piece.color === 'w' ? tableValue : -tableValue);
                         }
-
-                        // Adiciona valor material e posicional
-                        totalEvaluation += (piece.color === 'w' ? (pieceValue + positionalValue) : -(pieceValue + positionalValue));
                     }
                 }
             }
@@ -368,10 +392,10 @@
             const whitePawnCols = whitePawns.map(p => p.col);
             const blackPawnCols = blackPawns.map(p => p.col);
 
-            // Penalidades (Dobrados, Isolados) e Bônus (Passados) para Brancas
+            // Penalidades/Bônus para Brancas
             whitePawns.forEach(pawn => {
                 const col = pawn.col;
-                const rank = parseInt(pawn.square[1]);
+                const rank = 8 - pawn.row; // Rank (1-8)
                 if (whitePawnCols.filter(c => c === col).length > 1) whitePawnStructureScore += DOUBLED_PAWN_PENALTY;
                 if (!whitePawnCols.includes(col - 1) && !whitePawnCols.includes(col + 1)) whitePawnStructureScore += ISOLATED_PAWN_PENALTY;
                 // Passados: Checar se não há peões pretos na frente ou adjacentes
@@ -379,112 +403,143 @@
                 for (let bpCol = col - 1; bpCol <= col + 1; bpCol++) {
                     if (bpCol >= 0 && bpCol <= 7) {
                         blackPawns.forEach(blackPawn => {
-                            if (blackPawn.col === bpCol && parseInt(blackPawn.square[1]) > rank) {
+                            if (blackPawn.col === bpCol && blackPawn.row < pawn.row) { // Peão preto está à frente
                                 isPassed = false;
                             }
                         });
                     }
+                    if (!isPassed) break;
                 }
-                if (isPassed) whitePawnStructureScore += PASSED_PAWN_BONUS_BASE + (rank - 2) * 5; // Bonus aumenta com avanço
+                if (isPassed) whitePawnStructureScore += PASSED_PAWN_BONUS_BASE + (rank - 2) * 5;
+                // Bônus centro peão (pode ser redundante se já estiver na tabela, mas explícito aqui)
+                if (pawn.square === 'd4' || pawn.square === 'e4') whitePawnStructureScore += CENTER_PAWN_BONUS;
             });
 
-            // Penalidades (Dobrados, Isolados) e Bônus (Passados) para Pretas
+            // Penalidades/Bônus para Pretas
             blackPawns.forEach(pawn => {
                 const col = pawn.col;
-                const rank = parseInt(pawn.square[1]);
-                if (blackPawnCols.filter(c => c === col).length > 1) blackPawnStructureScore += DOUBLED_PAWN_PENALTY; // Penalidade é negativa
+                const rank = 8 - pawn.row; // Rank (1-8)
+                if (blackPawnCols.filter(c => c === col).length > 1) blackPawnStructureScore += DOUBLED_PAWN_PENALTY;
                 if (!blackPawnCols.includes(col - 1) && !blackPawnCols.includes(col + 1)) blackPawnStructureScore += ISOLATED_PAWN_PENALTY;
                 // Passados: Checar se não há peões brancos na frente ou adjacentes
                 let isPassed = true;
                 for (let wpCol = col - 1; wpCol <= col + 1; wpCol++) {
                     if (wpCol >= 0 && wpCol <= 7) {
                         whitePawns.forEach(whitePawn => {
-                            if (whitePawn.col === wpCol && parseInt(whitePawn.square[1]) < rank) {
+                            if (whitePawn.col === wpCol && whitePawn.row > pawn.row) { // Peão branco está à frente
                                 isPassed = false;
                             }
                         });
                     }
+                     if (!isPassed) break;
                 }
                 if (isPassed) blackPawnStructureScore += PASSED_PAWN_BONUS_BASE + (7 - rank) * 5; // Bonus aumenta com avanço (para pretas)
+                // Bônus centro peão
+                if (pawn.square === 'd5' || pawn.square === 'e5') blackPawnStructureScore += CENTER_PAWN_BONUS;
             });
 
-            totalEvaluation += whitePawnStructureScore; // Adiciona score branco
-            totalEvaluation -= blackPawnStructureScore; // Subtrai score preto (pois penalidade já é negativa)
+            structureAndSafetyScore += whitePawnStructureScore; // Adiciona score branco
+            structureAndSafetyScore -= blackPawnStructureScore; // Subtrai score preto
 
-
-            // 2.2 Segurança do Rei e Roque (Simplificado)
-            // Verifica se o rei branco rocou (simplificado: rei em g1/c1 e torre em f1/d1)
-            let whiteCastled = false;
+            // 2.2 Segurança do Rei e Roque
             let whiteKingSafetyScore = 0;
+            let blackKingSafetyScore = 0;
+            // Verifica roque branco (simplificado)
+            let whiteCastled = false;
             if (whiteKingSquare) {
-                if (whiteKingSquare.square === 'g1' && currentBoard[7][5]?.type === 'r' && currentBoard[7][5]?.color === 'w') { // Roque curto
+                if (whiteKingSquare.square === 'g1' && currentBoard[7][5]?.type === 'r' && currentBoard[7][5]?.color === 'w') { // Roque curto O-O
                     whiteCastled = true;
-                    // Escudo de peões
-                    if (currentBoard[6][5]) whiteKingSafetyScore += PAWN_SHIELD_BONUS; // f2
-                    if (currentBoard[6][6]) whiteKingSafetyScore += PAWN_SHIELD_BONUS; // g2
-                    if (currentBoard[6][7]) whiteKingSafetyScore += PAWN_SHIELD_BONUS; // h2
-                } else if (whiteKingSquare.square === 'c1' && currentBoard[7][3]?.type === 'r' && currentBoard[7][3]?.color === 'w') { // Roque longo
+                    if (currentBoard[6][5]?.type === 'p' && currentBoard[6][5]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // f2
+                    if (currentBoard[6][6]?.type === 'p' && currentBoard[6][6]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // g2
+                    if (currentBoard[6][7]?.type === 'p' && currentBoard[6][7]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // h2
+                } else if (whiteKingSquare.square === 'c1' && currentBoard[7][3]?.type === 'r' && currentBoard[7][3]?.color === 'w') { // Roque longo O-O-O
                     whiteCastled = true;
-                    // Escudo de peões
-                    if (currentBoard[6][0]) whiteKingSafetyScore += PAWN_SHIELD_BONUS; // a2
-                    if (currentBoard[6][1]) whiteKingSafetyScore += PAWN_SHIELD_BONUS; // b2
-                    if (currentBoard[6][2]) whiteKingSafetyScore += PAWN_SHIELD_BONUS; // c2
+                    if (currentBoard[6][0]?.type === 'p' && currentBoard[6][0]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // a2
+                    if (currentBoard[6][1]?.type === 'p' && currentBoard[6][1]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // b2
+                    if (currentBoard[6][2]?.type === 'p' && currentBoard[6][2]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // c2
                 }
                 if (whiteCastled) whiteKingSafetyScore += CASTLING_BONUS;
-                else if (whiteKingSquare.square === 'e1') { // Se não rocou e está na casa inicial (potencialmente exposto)
-                    // TODO: Adicionar verificação de coluna aberta/semi-aberta para penalidade
-                    // whiteKingSafetyScore += KING_EXPOSED_PENALTY; (Aplicar com cuidado)
-                }
+                // else if (!isEndGame && (whiteKingSquare.col > 2 && whiteKingSquare.col < 5)) { // Penalidade se rei estiver no centro no meio-jogo sem rocar?
+                //     whiteKingSafetyScore += KING_EXPOSED_PENALTY;
+                // }
             }
-
-            // Verifica se o rei preto rocou
+             // Verifica roque preto (simplificado)
             let blackCastled = false;
-            let blackKingSafetyScore = 0;
-            if (blackKingSquare) {
-                if (blackKingSquare.square === 'g8' && currentBoard[0][5]?.type === 'r' && currentBoard[0][5]?.color === 'b') { // Roque curto
+             if (blackKingSquare) {
+                if (blackKingSquare.square === 'g8' && currentBoard[0][5]?.type === 'r' && currentBoard[0][5]?.color === 'b') { // Roque curto O-O
                     blackCastled = true;
-                    // Escudo de peões
-                    if (currentBoard[1][5]) blackKingSafetyScore += PAWN_SHIELD_BONUS; // f7
-                    if (currentBoard[1][6]) blackKingSafetyScore += PAWN_SHIELD_BONUS; // g7
-                    if (currentBoard[1][7]) blackKingSafetyScore += PAWN_SHIELD_BONUS; // h7
-                } else if (blackKingSquare.square === 'c8' && currentBoard[0][3]?.type === 'r' && currentBoard[0][3]?.color === 'b') { // Roque longo
+                    if (currentBoard[1][5]?.type === 'p' && currentBoard[1][5]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // f7
+                    if (currentBoard[1][6]?.type === 'p' && currentBoard[1][6]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // g7
+                    if (currentBoard[1][7]?.type === 'p' && currentBoard[1][7]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // h7
+                } else if (blackKingSquare.square === 'c8' && currentBoard[0][3]?.type === 'r' && currentBoard[0][3]?.color === 'b') { // Roque longo O-O-O
                     blackCastled = true;
-                    // Escudo de peões
-                    if (currentBoard[1][0]) blackKingSafetyScore += PAWN_SHIELD_BONUS; // a7
-                    if (currentBoard[1][1]) blackKingSafetyScore += PAWN_SHIELD_BONUS; // b7
-                    if (currentBoard[1][2]) blackKingSafetyScore += PAWN_SHIELD_BONUS; // c7
+                    if (currentBoard[1][0]?.type === 'p' && currentBoard[1][0]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // a7
+                    if (currentBoard[1][1]?.type === 'p' && currentBoard[1][1]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // b7
+                    if (currentBoard[1][2]?.type === 'p' && currentBoard[1][2]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // c7
                 }
                 if (blackCastled) blackKingSafetyScore += CASTLING_BONUS;
-                else if (blackKingSquare.square === 'e8') {
-                    // blackKingSafetyScore += KING_EXPOSED_PENALTY; (Aplicar com cuidado)
-                }
+                // else if (!isEndGame && (blackKingSquare.col > 2 && blackKingSquare.col < 5)) {
+                //     blackKingSafetyScore += KING_EXPOSED_PENALTY;
+                // }
             }
-
-            totalEvaluation += whiteKingSafetyScore;
-            totalEvaluation -= blackKingSafetyScore;
-
+            structureAndSafetyScore += whiteKingSafetyScore;
+            structureAndSafetyScore -= blackKingSafetyScore;
 
             // 2.3 Desenvolvimento de Peças Menores
-            totalEvaluation += whiteMinorPiecesDeveloped * DEVELOPMENT_BONUS;
-            totalEvaluation -= blackMinorPiecesDeveloped * DEVELOPMENT_BONUS;
+            structureAndSafetyScore += whiteMinorPiecesDeveloped * DEVELOPMENT_BONUS;
+            structureAndSafetyScore -= blackMinorPiecesDeveloped * DEVELOPMENT_BONUS;
 
-            // 2.4 Bônus de Xeque (usando a API do chess.js)
-            // É importante chamar isso DEPOIS de ter avaliado a posição estática
-            // porque a avaliação é sobre a POSIÇÃO ATUAL, não o próximo movimento.
-            // Mas `game.in_check()` reflete o estado atual corretamente.
-            if (game.in_check()) {
-                // Se é a vez das Pretas e elas estão em xeque, isso é bom para as Brancas.
-                // Se é a vez das Brancas e elas estão em xeque, isso é ruim para as Brancas.
-                totalEvaluation += (turn === 'b' ? 50 : -50); // Bônus/Penalidade por xeque
-            }
-            // A avaliação de mate já é implícita pelo valor altíssimo do rei, mas pode ser explícita
+            // --- FASE 3: Bônus Táticos (Xeque, Mate, Ataque) ---
+            // Usamos a instância global 'game' para verificar estados como xeque/mate
+            // A avaliação é da *posição atual*. game.turn() indica quem jogaria *depois*.
+            const turnAfterPosition = game.turn();
+
             if (game.in_checkmate()) {
-                totalEvaluation += (turn === 'b' ? KING_VALUE * 2 : -KING_VALUE * 2); // Garante vitória/derrota
+                // Se é a vez das Brancas jogarem e estão em mate, Pretas venceram (ruim para Brancas -> grande negativo)
+                // Se é a vez das Pretas jogarem e estão em mate, Brancas venceram (bom para Brancas -> grande positivo)
+                tacticalBonus += (turnAfterPosition === 'w' ? -KING_VALUE * 2 : KING_VALUE * 2);
+            } else if (game.in_stalemate() || game.in_draw() || game.insufficient_material() || game.in_threefold_repetition()) {
+                // Empates devem ter score próximo de 0, ajustando a partir do material/posição
+                // Se um lado tem vantagem material mas força empate, isso é ruim para ele.
+                // Vamos retornar 0 diretamente para simplificar, assumindo que empate é neutro.
+                // return 0; // Ou ajustar baseado na avaliação atual? Por ora, deixamos somar.
+            } else if (game.in_check()) {
+                // Se é a vez das Brancas jogarem e estão em xeque, é ruim para Brancas (negativo).
+                // Se é a vez das Pretas jogarem e estão em xeque, é bom para Brancas (positivo).
+                tacticalBonus += (turnAfterPosition === 'w' ? -50 : 50);
             }
 
+            // 3.2 Bônus de Ataque ao Rei (Proximidade - lógica anterior mantida)
+            const enemyColor = turn === 'w' ? 'b' : 'w';
+            const enemyKingSquare = enemyColor === 'w' ? whiteKingSquare : blackKingSquare;
+            let attackBonus = 0;
+            if (enemyKingSquare && !isEndGame) { // Bônus de ataque mais relevante no meio-jogo
+                const kingRow = enemyKingSquare.row;
+                const kingCol = enemyKingSquare.col;
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        const piece = currentBoard[i][j];
+                        // Se a peça é da cor que está avaliando (cor de 'turn')
+                        if (piece && piece.color === turn) {
+                            const distance = Math.abs(i - kingRow) + Math.abs(j - kingCol);
+                            // Bônus maior para peças mais próximas (inversamente proporcional à distância)
+                            // Ajuste o multiplicador conforme necessário
+                            attackBonus += Math.max(0, (14 - distance)) * 2; // Ex: 14 - dist, max 0, mult 2
+                        }
+                    }
+                }
+            }
+            // O bônus de ataque é bom para quem está atacando (turn)
+            tacticalBonus += (turn === 'w' ? attackBonus : -attackBonus);
 
-            // --- FASE 3: Retornar Avaliação Final ---
-            // A avaliação é sempre do ponto de vista das Brancas (positivo = vantagem branca)
+
+            // --- FASE 4: Retornar Avaliação Final ---
+            // Soma todas as componentes. A avaliação é sempre do ponto de vista das Brancas.
+            let totalEvaluation = materialScore + positionalScore + structureAndSafetyScore + tacticalBonus;
+
+            debug(`Eval (White's Pov): Material=${materialScore}, Positional=${positionalScore}, Struct/Safe=${structureAndSafetyScore}, Tactical=${tacticalBonus} => Total=${totalEvaluation}`);
+
+            // A função minimax lida com maximizar/minimizar, então retornamos sempre a perspectiva das Brancas.
             return totalEvaluation;
         }
 
@@ -521,7 +576,7 @@
             const moves = game.moves({ verbose: true });
             
             // Número de melhores movimentos para explorar em cada nível
-            const BEAM_WIDTH = 4;
+            const BEAM_WIDTH = 10;
             
             // Fase 1: Avaliar todos os movimentos possíveis na primeira camada
             const evaluatedMoves = [];
@@ -773,7 +828,7 @@
                          if (game.history().length === 3 && game.history({verbose:true})[1].san === 'e6') {
                               openingMoveSAN = 'd5';
                          } else {
-                              //console.log("AI: Condição para d5 (após e6) não atendida, usando Minimax.");
+                              console.log("AI: Condição para d5 (após e6) não atendida, usando Minimax.");
                          }
                     }
                 }

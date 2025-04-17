@@ -98,6 +98,7 @@
             padding: 20px;
             text-align: center;
             cursor: pointer;
+            position: relative;
         }
 
         .game-card:hover {
@@ -374,10 +375,6 @@
         }
 
         /* Efeito de borda neon para os cards */
-        .game-card {
-            position: relative;
-        }
-        
         .game-card::before {
             content: '';
             position: absolute;
@@ -476,6 +473,43 @@
             position: absolute;
             top: 0;
             left: 0;
+        }
+
+        /* Estilos para o estado de carregamento do card */
+        .game-card.loading::after { /* Overlay escuro */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* Overlay semi-transparente */
+            border-radius: 12px; /* Combina com o border-radius do card */
+            z-index: 10; /* Garante que fique sobre o conteúdo do card */
+            display: block;
+        }
+
+        .game-card .spinner { /* Spinner de carregamento */
+            display: none; /* Escondido por padrão */
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #ffffff; /* Cor do spinner */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            position: absolute; /* Posicionado em relação ao card */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Centraliza o spinner */
+            z-index: 11; /* Garante que fique sobre o overlay */
+        }
+
+        .game-card.loading .spinner {
+            display: block; /* Mostra o spinner quando a classe .loading está presente */
+        }
+
+        @keyframes spin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
         }
     </style>
 </head>
@@ -639,7 +673,7 @@
                     <a href="./chess/index.html" class="play-button">
                         <div class="game-card">
                             <div class="game-icon puzzle-icon">
-                                <span class="icon-centered">🧔</span>
+                                <span class="icon-centered">♟️</span>
                             </div>
                             <h3 class="game-title">Chess</h3>
                             <p class="game-description">Challenge your mind in a chess game against an AI with different difficulty levels.</p>
@@ -751,6 +785,49 @@
                 // Iniciar animação
                 moveToNewPosition();
             }
+
+            // --- Início do código para o efeito de carregamento ---
+            const gameLinks = document.querySelectorAll('.play-button'); // Seleciona todos os links dos jogos
+            const fakeLoadDuration = 7000; // Duração do carregamento falso em milissegundos (7 segundos)
+
+            gameLinks.forEach(link => {
+                link.addEventListener('click', function(event) {
+                    event.preventDefault(); // Impede a navegação imediata
+
+                    const targetUrl = this.href; // Guarda a URL de destino
+                    const gameCard = this.querySelector('.game-card'); // Encontra o card dentro do link
+
+                    if (gameCard) {
+                        // 1. Adiciona a classe 'loading' para aplicar o overlay e mostrar o spinner
+                        gameCard.classList.add('loading');
+
+                        // 2. Cria e adiciona o elemento spinner (se ainda não existir)
+                        let spinner = gameCard.querySelector('.spinner');
+                        if (!spinner) {
+                            spinner = document.createElement('div');
+                            spinner.className = 'spinner';
+                            gameCard.appendChild(spinner);
+                        }
+                        spinner.style.display = 'block'; // Garante que está visível
+
+                        // 3. Define um timeout para simular o carregamento
+                        setTimeout(() => {
+                            // 4. Navega para a URL do jogo após o tempo definido
+                            window.location.href = targetUrl;
+
+                            // Opcional: Remover a classe e o spinner antes de navegar
+                            // (pode não ser visível devido à navegação rápida)
+                            // gameCard.classList.remove('loading');
+                            // if (spinner) spinner.style.display = 'none';
+
+                        }, fakeLoadDuration);
+                    } else {
+                        // Fallback: Se não encontrar o card, navega imediatamente
+                        window.location.href = targetUrl;
+                    }
+                });
+            });
+            // --- Fim do código para o efeito de carregamento ---
         });
     </script>
 </body>
