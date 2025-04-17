@@ -317,14 +317,28 @@
             const lowMaterialThreshold = KNIGHT_VALUE + BISHOP_VALUE + ROOK_VALUE; // Exemplo de limiar
             return queens === 0 || (whiteMaterial < lowMaterialThreshold && blackMaterial < lowMaterialThreshold);
         }
-
-        // --- FUNÇÃO evaluateBoard REATORADA ---
+            
+        // --- NOVA FUNÇÃO evaluateBoard ---
         function evaluateBoard(currentBoard, turn) {
+            let totalEvaluation = 0;
+            
+            // Verificação de empate por repetição (adicionar no início da função)
+            if (game.in_threefold_repetition()) {
+                // Se for a vez das pretas (IA), penalizar fortemente o empate
+                // pois queremos que a IA evite repetições
+                return turn === 'b' ? -5000 : 5000;
+            }
+            
+            // Verificação de outros tipos de empate
+            if (game.in_draw() || game.in_stalemate() || game.insufficient_material()) {
+                // Penalizar empates em geral, mas menos que o mate
+                return turn === 'b' ? -3000 : 3000;
+            }
+
             let materialScore = 0;
             let positionalScore = 0;
             let structureAndSafetyScore = 0;
             let tacticalBonus = 0; // Bônus para xeque, mate, ataques
-
             let whiteKingSquare = null;
             let blackKingSquare = null;
             let whiteMinorPiecesDeveloped = 0;
@@ -535,7 +549,7 @@
 
             // --- FASE 4: Retornar Avaliação Final ---
             // Soma todas as componentes. A avaliação é sempre do ponto de vista das Brancas.
-            let totalEvaluation = materialScore + positionalScore + structureAndSafetyScore + tacticalBonus;
+            totalEvaluation = materialScore + positionalScore + structureAndSafetyScore + tacticalBonus;
 
             debug(`Eval (White's Pov): Material=${materialScore}, Positional=${positionalScore}, Struct/Safe=${structureAndSafetyScore}, Tactical=${tacticalBonus} => Total=${totalEvaluation}`);
 
