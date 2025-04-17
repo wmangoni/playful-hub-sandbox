@@ -359,7 +359,18 @@
             }
         }
         
-        // Variáveis do jogo
+        // --- Elementos de Áudio ---
+        const backgroundMusic = new Audio('./assets/sounds/happy-relaxing-loop.mp3');
+        backgroundMusic.loop = true; // Para tocar em loop
+        backgroundMusic.volume = 0.4; // Ajuste o volume conforme necessário
+
+        const noteCaptureSound = new Audio('./assets/sounds/sfx-pop.mp3');
+        noteCaptureSound.volume = 0.5; // Volume 50%
+
+        const obstacleHitSound = new Audio('./assets/sounds/enemy_hit.mp3');
+        obstacleHitSound.volume = 0.7; // Ajuste o volume conforme necessário
+
+        // Variáveis globais do jogo
         let gameActive = false;
         let score = 0;
         let combo = 0;
@@ -627,71 +638,105 @@
                 active: true
             });
         }
-        
+
+        // Função para quando um obstáculo é atingido (seja por clique ou por passar)
+        function hitObstacle(obstacle, clicked = false) {
+            // Tocar som de acerto de obstáculo
+            obstacleHitSound.currentTime = 0;
+            obstacleHitSound.play().catch(error => console.error("Erro ao tocar som de obstáculo:", error));
+
+            // Reduzir vida
+            lives--;
+
+            // Resetar combo
+            combo = 0;
+
+            // Mostrar feedback visual
+            const stringY = strings[obstacle.stringIndex].points[0].y;
+            showFeedback("HIT!", obstacle.x, stringY, "red");
+
+            // Desativar obstáculo
+            obstacle.active = false;
+
+            // Atualizar UI
+            updateScoreDisplay();
+
+            // Verificar game over
+            if (lives <= 0) {
+                gameOver();
+            }
+        }
+
         // Substituir a função checkNoteCapture por uma versão mais simples
         function checkNoteCapture(x, y) {
             // Verificar cliques em notas
             for (let i = 0; i < notes.length; i++) {
                 const note = notes[i];
                 if (!note.active) continue;
-                
+
                 // Obter a posição Y da corda
                 const stringY = strings[note.stringIndex].points[0].y;
-                
+
                 // Calcular a distância entre o clique e a nota
                 const distance = Math.sqrt(Math.pow(x - note.x, 2) + Math.pow(y - stringY, 2));
-                
+
                 // Verificar se o clique foi próximo o suficiente da nota
-                if (distance <= note.radius * 2) {
+                if (distance <= note.radius * 2) { // Aumentar um pouco a área de clique
                     // Verificar se a nota está na zona de captura
                     const zone = captureZones[note.stringIndex];
-                    if (Math.abs(note.x - zone.x) <= zone.width / 2) {
+                    if (Math.abs(note.x - zone.x) <= zone.width / 2 + note.radius) { // Ajustar verificação da zona
                         // Capturar nota
-                        captureNote(note, Math.abs(note.x - zone.x) / (zone.width / 2));
-                        return;
+                        // Calcular precisão baseada na distância do centro da zona
+                        const precisionFactor = 1 - (Math.abs(note.x - zone.x) / (zone.width / 2));
+                        captureNote(note, Math.max(0, precisionFactor)); // Garante que precisão não seja negativa
+                        return; // Sai após capturar uma nota
                     } else {
-                        // Nota clicada fora da zona de captura
-                        showFeedback("TOO EARLY!", note.x, stringY, "yellow");
-                        return;
+                        // Nota clicada fora da zona de captura (considerar como erro ou ignorar?)
+                        // showFeedback("TOO EARLY/LATE!", note.x, stringY, "yellow");
+                        // Por enquanto, vamos ignorar cliques fora da zona para simplificar
+                        // return;
                     }
                 }
             }
-            
+
             // Verificar cliques em obstáculos
             for (let i = 0; i < obstacles.length; i++) {
                 const obstacle = obstacles[i];
                 if (!obstacle.active) continue;
-                
+
                 // Obter a posição Y da corda
                 const stringY = strings[obstacle.stringIndex].points[0].y;
-                
+
                 // Calcular a distância entre o clique e o obstáculo
                 const distance = Math.sqrt(Math.pow(x - obstacle.x, 2) + Math.pow(y - stringY, 2));
-                
+
                 // Verificar se o clique foi próximo o suficiente do obstáculo
-                if (distance <= obstacle.radius * 2) {
-                    // Atingiu obstáculo
-                    hitObstacle(obstacle);
-                    return;
+                if (distance <= obstacle.radius * 1.5) { // Área de clique um pouco maior que o raio visual
+                    // Atingiu obstáculo com clique
+                    hitObstacle(obstacle, true); // Passa true para indicar que foi clicado
+                    return; // Sai após atingir um obstáculo
                 }
             }
-            
-            // Verificar se o clique foi dentro de alguma zona de captura
+
+            // Verificar se o clique foi dentro de alguma zona de captura (sem acertar nota)
             let clickedInZone = false;
+            let clickY = y; // Usar o Y do clique
             for (let i = 0; i < captureZones.length; i++) {
                 const zone = captureZones[i];
                 const stringY = strings[i].points[0].y;
-                
-                // Verificar se o clique está dentro da zona de captura
-                if (Math.abs(x - zone.x) <= zone.width / 2 && Math.abs(y - stringY) <= 40) {
+
+                // Verificar se o clique está horizontalmente na zona e verticalmente próximo à corda
+                if (Math.abs(x - zone.x) <= zone.width / 2 && Math.abs(clickY - stringY) <= 40) { // 40px de tolerância vertical
                     clickedInZone = true;
                     break;
                 }
             }
-            
-            // Se clicou em uma zona de captura mas não acertou nada
+
+            // Se clicou em uma zona de captura mas não acertou nada (nem nota, nem obstáculo)
             if (clickedInZone) {
-                showFeedback("MISS!", x, y, "yellow");
+                // Não penalizar por clicar na zona vazia por enquanto
+                // showFeedback("MISS!", x, y, "yellow");
+                // missedNote(); // Chama a função de erro se desejar penalizar
             }
         }
 
@@ -793,6 +838,11 @@
             
             startButton.addEventListener('click', () => {
                 document.body.removeChild(startScreen);
+                // Tenta iniciar a música de fundo
+                backgroundMusic.play().catch(error => {
+                    console.error("Erro ao tocar música de fundo:", error);
+                    // Opcional: Mostrar uma mensagem ao usuário que o áudio pode precisar de interação
+                });
                 initGame();
             });
             
@@ -969,6 +1019,10 @@
 
         // Capturar uma nota
         function captureNote(note, precision) {
+            // Tocar som de captura
+            noteCaptureSound.currentTime = 0; // Reinicia o som para permitir toques rápidos
+            noteCaptureSound.play().catch(error => console.error("Erro ao tocar som de captura:", error));
+
             // Pontos base + bônus de precisão
             let earnedPoints = note.points;
             
@@ -1110,6 +1164,8 @@
         // Game over
         function gameOver() {
             gameActive = false;
+            backgroundMusic.pause(); // Pausa a música de fundo
+            backgroundMusic.currentTime = 0; // Opcional: reseta a música para o início
             
             // Verificar se a pontuação atual é um high score
             const isHighScore = checkHighScore(score);
@@ -1401,49 +1457,6 @@
                 <div>Lives: ${'❤️'.repeat(lives)}</div>
                 <div>Level: ${level}</div>
             `;
-        }
-
-        // Função para quando o jogador atinge um obstáculo
-        function hitObstacle(obstacle) {
-            // Reduzir vida
-            lives--;
-            
-            // Resetar combo
-            combo = 0;
-            
-            // Desativar o obstáculo
-            obstacle.active = false;
-            
-            // Efeito visual
-            const string = strings[obstacle.stringIndex];
-            
-            // Flash vermelho na tela
-            const flash = document.createElement('div');
-            flash.style.position = 'absolute';
-            flash.style.left = '0';
-            flash.style.top = '0';
-            flash.style.width = '100%';
-            flash.style.height = '100%';
-            flash.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-            flash.style.pointerEvents = 'none';
-            flash.style.zIndex = '999';
-            document.body.appendChild(flash);
-            
-            // Remover o flash após um curto período
-            setTimeout(() => {
-                document.body.removeChild(flash);
-            }, 200);
-            
-            // Mostrar feedback
-            showFeedback("OUCH!", obstacle.x, strings[obstacle.stringIndex].points[0].y, "red");
-            
-            // Atualizar UI
-            updateScoreDisplay();
-            
-            // Verificar game over
-            if (lives <= 0) {
-                gameOver();
-            }
         }
 
         // Inicializar o jogo
