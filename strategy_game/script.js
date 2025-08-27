@@ -279,6 +279,10 @@ document.addEventListener('DOMContentLoaded', () => {
             tile.addEventListener('click', () => placeBuilding(tile));
             map.appendChild(tile);
         }
+        
+        console.log('--- Jogo Inicializado ---');
+        console.log(`Dificuldade: Nível ${difficultyLevel}`);
+        console.log(`Recursos Iniciais: Gold: ${gold}, Food: ${food}`);
 
         updateResources();
         addEvent(`Game started! Welcome to Level ${difficultyLevel}!`);
@@ -310,36 +314,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         timerDisplay.textContent = `Time: ${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        console.log(`Tempo: ${minutes}:${remainingSeconds.toString().padStart(2, '0')}`);
     }
 
     function updateResources() {
-        const farms = document.querySelectorAll('[data-type="farm"]').length;
-        const temples = document.querySelectorAll('[data-type="temple"]').length;
-        const castles = document.querySelectorAll('[data-type="castle"]').length;
-        const barracks = document.querySelectorAll('[data-type="barracks"]').length;
-        const mines = document.querySelectorAll('[data-type="mine"]').length;
-        const lumbercamps = document.querySelectorAll('[data-type="lumbercamp"]').length;
+    const farms = document.querySelectorAll('[data-type="farm"]').length;
+    const temples = document.querySelectorAll('[data-type="temple"]').length;
+    const castles = document.querySelectorAll('[data-type="castle"]').length;
+    const barracks = document.querySelectorAll('[data-type="barracks"]').length;
+    const mines = document.querySelectorAll('[data-type="mine"]').length;
+    const lumbercamps = document.querySelectorAll('[data-type="lumbercamp"]').length;
 
-        food += (farms * 3) + (lumbercamps * 10) - (barracks * 1);
-        gold += (castles * 4) + (temples * 1) + (mines * 10) - (barracks * 1);
+    // A Fazenda e o Acampamento Madeireiro agora geram 1 de ouro cada
+    gold += (castles * 4) + (temples * 1) + (mines * 10) + (farms * 4) + (lumbercamps * 1) - (barracks * 1);
+    food += (farms * 3) + (lumbercamps * 10) - (barracks * 1);
 
-        goldDisplay.textContent = `Gold: ${gold}`;
-        foodDisplay.textContent = `Food: ${food}`;
-    }
+    goldDisplay.textContent = `Gold: ${gold}`;
+    foodDisplay.textContent = `Food: ${food}`;
+
+    console.log('--- Atualização de Recursos ---');
+    console.log(`Produção: Ouro por Castelos: ${castles * 4}, Templos: ${temples * 1}, Minas: ${mines * 10}, Fazendas: ${farms * 1}, Acampamentos: ${lumbercamps * 1}. Custo por Quartéis: ${barracks * 1}`);
+    console.log(`Produção: Comida por Fazendas: ${farms * 3}, Acampamentos: ${lumbercamps * 10}. Custo por Quartéis: ${barracks * 1}`);
+    console.log(`Recursos totais: Gold: ${gold}, Food: ${food}`);
+}
 
     function placeBuilding(tile) {
         if (!selectedBuilding) {
+            console.log('Erro: Botão não selecionado.');
             showStatusMessage('Please select a building first!');
             return;
         }
 
         if (tile.dataset.type !== 'grass') {
+            console.log(`Erro: Tentativa de construir em um terreno inválido: ${tile.dataset.type}.`);
             showStatusMessage('You can only build on grass!');
             return;
         }
 
         const buildingCost = costs[selectedBuilding];
         if (gold >= buildingCost.gold && food >= buildingCost.food) {
+            console.log(`Construindo: ${selectedBuilding}. Custos: Gold -${buildingCost.gold}, Food -${buildingCost.food}.`);
             gold -= buildingCost.gold;
             food -= buildingCost.food;
             tile.dataset.type = selectedBuilding;
@@ -350,12 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 templeButton.classList.remove('hidden');
                 templeActive = true;
                 showStatusMessage('🏛️ The Temple is now available!');
+                console.log('Templo desbloqueado!');
             }
 
             if (selectedBuilding === 'castle') {
                 checkWinCondition();
             }
         } else {
+            console.log(`Não foi possível construir ${selectedBuilding}. Recursos insuficientes. Gold necessário: ${buildingCost.gold}, atual: ${gold}. Food necessário: ${buildingCost.food}, atual: ${food}.`);
             showStatusMessage('Not enough resources!');
         }
     }
@@ -368,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (eventLog.children.length > 50) {
             eventLog.removeChild(eventLog.lastChild);
         }
+        console.log(`Log de Evento: ${text}`);
     }
     
     function showStatusMessage(text) {
@@ -389,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             eventIcon.classList.remove(`event-${type}`);
             eventOverlay.style.display = 'none';
         }, 1500); 
+        console.log(`Animação de evento acionada: ${type} com ícone ${icon}`);
     }
 
     function handleRandomEvent() {
@@ -396,11 +414,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
             event.execute();
             showEventAnimation(event.type, event.icon);
+            console.log(`Evento aleatório: ${event.name}`);
         }
     }
 
     function checkWinCondition() {
         const castlesBuilt = document.querySelectorAll('[data-type="castle"]').length;
+        console.log(`Verificando condição de vitória. Castelos construídos: ${castlesBuilt}. Necessários: ${difficultyLevel}`);
         if (castlesBuilt >= difficultyLevel) {
             if (difficultyLevel >= 10) {
                 endGame();
@@ -417,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nextLevelMessage.textContent = `Level ${difficultyLevel} completed in ${minutes}m${remainingSeconds}s!`;
         nextLevelScreen.classList.remove('hidden');
         nextLevelScreen.style.display = 'flex';
+        console.log(`Nível ${difficultyLevel} concluído em ${minutes}m e ${remainingSeconds}s. Avançando para o próximo nível.`);
         difficultyLevel++;
     }
 
@@ -427,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         winMessage.textContent = `You won the game in ${minutes}m${remainingSeconds}s!`;
         winScreen.classList.remove('hidden');
         winScreen.style.display = 'flex';
+        console.log(`Jogo finalizado! Vitória em ${minutes}m e ${remainingSeconds}s.`);
     }
 
     buildButtons.forEach(button => {
@@ -434,14 +456,23 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedBuilding = button.dataset.building;
             buildButtons.forEach(b => b.classList.remove('selected'));
             button.classList.add('selected');
+            console.log(`Botão selecionado: ${selectedBuilding}`);
         });
     });
 
-    restartButton.addEventListener('click', () => initGame(true));
-    nextLevelButton.addEventListener('click', () => initGame(false));
+    restartButton.addEventListener('click', () => {
+        console.log('Reiniciando o jogo.');
+        initGame(true);
+    });
+
+    nextLevelButton.addEventListener('click', () => {
+        console.log('Iniciando o próximo nível.');
+        initGame(false);
+    });
 
     startGameButton.addEventListener('click', () => {
         tutorialScreen.style.display = 'none';
+        console.log('Iniciando o jogo pelo botão de tutorial.');
         initGame();
     });
 });
