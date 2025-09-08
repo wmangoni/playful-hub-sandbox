@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jogo de Xadrez com IA</title>
+    <!-- Incluir CSS do chessboardjs -->
     <link rel="stylesheet"
           href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
 
@@ -103,12 +104,6 @@
         .highlight-legal-move {
             background-color: rgba(0, 255, 0, 0.3) !important;
         }
-        /* --- Animação de Captura --- */
-        .animate-capture {
-            transform: scale(0.1);
-            opacity: 0;
-            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-        }
     </style>
 </head>
 <body>
@@ -116,13 +111,16 @@
     <div class="game-container">
         <h2>Xadrez com IA (Minimax Alpha-Beta)</h2>
         <div class="captured-pieces" id="blackCaptured">
-            </div>
+            <!-- Peças pretas capturadas -->
+        </div>
         <div class="board-container">
             <div id="myBoard"></div>
+            <!-- Elemento do Overlay -->
             <div id="loadingOverlay">Pensando...</div>
         </div>
         <div class="captured-pieces" id="whiteCaptured">
-            </div>
+            <!-- Peças brancas capturadas -->
+        </div>
         <div id="status">Status: Novo Jogo</div>
         <div id="turn">Turno: Brancas</div>
 
@@ -138,8 +136,12 @@
         </div>
     </div>
 
+    <!-- Incluir Bibliotecas JavaScript -->
+    <!-- jQuery (dependência do chessboardjs) -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- chessboardjs -->
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <!-- chess.js (lógica do xadrez) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
     <script>
@@ -156,7 +158,6 @@
         };
         const DEBUG_MODE = false; // Controle global para debug
         const moveSound = new Audio('../assets/sounds/sfx-pop.mp3');
-        const captureSound = new Audio('../assets/sounds/sfx-swoosh.mp3'); // Novo som de captura
         const victorySound = new Audio('../assets/sounds/powerup3.mp3');
         const defeatSound = new Audio('../assets/sounds/game_over_bgm.mp3');
 
@@ -287,14 +288,6 @@
             moveSound.currentTime = 0; // Reseta o áudio para o início
             moveSound.play().catch(error => {
                 debug("Erro ao tocar som:", error);
-            });
-        }
-        
-        // Nova função para tocar o som de captura
-        function playCaptureSound() {
-            captureSound.currentTime = 0;
-            captureSound.play().catch(error => {
-                debug("Erro ao tocar som de captura:", error);
             });
         }
 
@@ -519,7 +512,7 @@
                 // Se é a vez das Brancas jogarem e estão em mate, Pretas venceram (ruim para Brancas -> grande negativo)
                 // Se é a vez das Pretas jogarem e estão em mate, Brancas venceram (bom para Brancas -> grande positivo)
                 tacticalBonus += (turnAfterPosition === 'w' ? -KING_VALUE * 2 : KING_VALUE * 2);
-            } else if (game.in_draw() || game.in_stalemate() || game.insufficient_material() || game.in_threefold_repetition()) {
+            } else if (game.in_stalemate() || game.in_draw() || game.insufficient_material() || game.in_threefold_repetition()) {
                 // Empates devem ter score próximo de 0, ajustando a partir do material/posição
                 // Se um lado tem vantagem material mas força empate, isso é ruim para ele.
                 // Vamos retornar 0 diretamente para simplificar, assumindo que empate é neutro.
@@ -875,51 +868,38 @@
                 // //console.log("AI: Usando Minimax para encontrar o movimento.");
                 var depth = parseInt(document.getElementById('difficulty').value);
                 // ---> MOSTRAR LOADING <---
+                //loadingOverlay.classList.add('active');
+                // Opcional: remover a atualização do #status para "Pensando..." se o overlay for suficiente
                 setThinkingStatus(true);
                 // Usar setTimeout para não bloquear a UI e dar sensação de "pensamento"
                 window.setTimeout(function() {
                     var move = minimaxRoot(depth, false); // Preto é minimizador
 
+                    // ---> ESCONDER LOADING (SEMPRE, mesmo se move for null) <---
+                    //loadingOverlay.classList.remove('active');
+                    setThinkingStatus(false);
+
                     if (move) {
                         const capturedPiece = game.get(move.to);
                         
-                        // --- LÓGICA DE ANIMAÇÃO DA IA ---
-                        if (capturedPiece) {
-                            // Encontra o elemento da peça capturada
-                            const capturedEl = document.querySelector(`#myBoard .square-${move.to} .piece`);
-                            if (capturedEl) {
-                                // Aplica a classe de animação
-                                capturedEl.classList.add('animate-capture');
-                                // Toca o som de captura
-                                playCaptureSound();
-                            }
-                        }
+                        game.move(move.san);
                         
-                        // Adiciona um pequeno delay para a animação ocorrer
-                        setTimeout(() => {
-                            // Move a peça no jogo
-                            game.move(move.san);
-                            // Toca o som do movimento (ou só o de captura se houve captura)
-                            if (!capturedPiece) {
-                                playMoveSound();
-                            }
-                            // Destaca o movimento da IA
-                            highlightMove(move.from, move.to);
-                            
-                            // Atualiza a lista de peças capturadas
-                            if (capturedPiece) {
-                                const color = capturedPiece.color;
-                                const type = capturedPiece.type;
-                                debug("IA capturou:", color, type);
-                                capturedPieces[color].push(type);
-                                updateCapturedPieces();
-                            }
-                            
-                            // Atualiza a posição do tabuleiro e o status
-                            board.position(game.fen());
-                            updateStatus();
-                        }, capturedPiece ? 300 : 0); // Delay de 300ms se houve captura
+                        // Tocar som do movimento
+                        playMoveSound();
+                        
+                        // Destacar o movimento da IA
+                        highlightMove(move.from, move.to);
+                        
+                        if (capturedPiece) {
+                            const color = capturedPiece.color;
+                            const type = capturedPiece.type;
+                            debug("IA capturou:", color, type);
+                            capturedPieces[color].push(type);
+                            updateCapturedPieces();
+                        }
 
+                        board.position(game.fen());
+                        updateStatus();
                     } else {
                         console.error("AI Minimax falhou em encontrar um movimento! Estado:", game.fen(), game.game_over());
                     }
@@ -1018,76 +998,54 @@
         function onDrop(source, target) {
             // Remover highlights de movimentos possíveis
             removeLegalMoveHighlights();
-            
-            // Encontra a peça que será capturada, se houver
-            const capturedPiece = game.get(target);
 
-            // Tenta mover a peça no jogo (sempre com promoção para 'q' por simplicidade)
+            const capturedPiece = game.get(target);
+            
             var move = game.move({ 
                 from: source, 
                 to: target, 
                 promotion: 'q'
             });
 
-            // Se o movimento for ilegal, retorna
             if (move === null) return 'snapback';
-            
-            // --- LÓGICA DE ANIMAÇÃO DO JOGADOR ---
+
+            // Tocar som do movimento
+            playMoveSound();
+
+            // Destacar o movimento do jogador
+            highlightMove(source, target);
+
             if (capturedPiece) {
-                // Encontra o elemento da peça capturada
-                const capturedEl = document.querySelector(`#myBoard .square-${target} .piece`);
-                if (capturedEl) {
-                    // Aplica a classe de animação
-                    capturedEl.classList.add('animate-capture');
-                    // Toca o som de captura
-                    playCaptureSound();
-                }
+                const color = capturedPiece.color;
+                const type = capturedPiece.type;
+                debug("Peça capturada:", color, type);
+                capturedPieces[color].push(type);
+                updateCapturedPieces();
             }
+
+            updateStatus();
             
-            // Toca o som de movimento se não houve captura
-            if (!capturedPiece) {
-                playMoveSound();
+            if (!game.game_over() && game.turn() === aiColor) {
+                // Adiciona delay consistente para os primeiros movimentos
+                if (game.history().length <= 4) { // Primeiros 2 lances de cada lado
+                    setTimeout(() => {
+                        const possibleMoves = game.moves();
+                        const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        
+                        game.move(randomMove);
+                        playMoveSound();
+                        
+                        // Destacar o movimento aleatório da IA
+                        const lastMove = game.history({verbose: true})[game.history().length - 1];
+                        highlightMove(lastMove.from, lastMove.to);
+                        
+                        board.position(game.fen());
+                        updateStatus();
+                    }, 400);
+                } else {
+                    makeAIMove();
+                }
             }
-
-            // Adiciona um pequeno delay para a animação ocorrer
-            setTimeout(() => {
-                // Destacar o movimento do jogador
-                highlightMove(source, target);
-                
-                // Atualiza a lista de peças capturadas
-                if (capturedPiece) {
-                    const color = capturedPiece.color;
-                    const type = capturedPiece.type;
-                    debug("Peça capturada:", color, type);
-                    capturedPieces[color].push(type);
-                    updateCapturedPieces();
-                }
-
-                updateStatus();
-                
-                // Pede para a IA fazer o movimento se o jogo não acabou
-                if (!game.game_over() && game.turn() === aiColor) {
-                    // Adiciona delay consistente para os primeiros movimentos
-                    if (game.history().length <= 4) { // Primeiros 2 lances de cada lado
-                        setTimeout(() => {
-                            const possibleMoves = game.moves();
-                            const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-                            
-                            game.move(randomMove);
-                            playMoveSound();
-                            
-                            // Destacar o movimento aleatório da IA
-                            const lastMove = game.history({verbose: true})[game.history().length - 1];
-                            highlightMove(lastMove.from, lastMove.to);
-                            
-                            board.position(game.fen());
-                            updateStatus();
-                        }, 400);
-                    } else {
-                        makeAIMove();
-                    }
-                }
-            }, capturedPiece ? 300 : 0); // Delay de 300ms se houve captura
         }
 
         // Atualiza o status do jogo (turno, xeque, etc.)
