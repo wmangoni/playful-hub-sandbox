@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <!-- Google Tag Manager -->
+    <script>
+    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-KM6SHZXP');
+    </script>
+    <!-- End Google Tag Manager -->
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Simulação de autômatos celulares onde células vivem ou morrem baseadas em regras simples. Observe padrões complexos emergirem de regras simples.">
+    <meta name="keywords" content="conway, game of life, autômatos, celulares, simulação, matemática, PlayfulHub">
+    <meta property="og:title" content="Conway's Game of Life - Jogue Grátis no PlayfulHub">
+    <meta property="og:description" content="Simulação de autômatos celulares onde células vivem ou morrem baseadas em regras simples. Observe padrões complexos emergirem de regras simples.">
+    <meta property="og:image" content="/assets/images/gameoflife_preview.png">
+    <meta property="og:url" content="https://playfulhub.com.br/jogos/gameoflife">
+    <meta property="og:type" content="website">
+    
+    <title>Conway's Game of Life - Jogue Grátis Online no PlayfulHub</title>
+    
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6741914590073026"
+     crossorigin="anonymous"></script>
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-J0T2LXD7XH"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-J0T2LXD7XH');
+    </script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #1a1a2e;
+            --secondary-color: #16213e;
+            --accent-color: #0f3460;
+            --highlight-color: #e94560;
+            --text-light: #ffffff;
+            --text-muted: #cccccc;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: var(--text-light);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header */
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--highlight-color);
+            text-decoration: none;
+        }
+        
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .breadcrumb a {
+            color: var(--text-light);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .breadcrumb a:hover {
+            color: var(--highlight-color);
+        }
+        
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .game-content {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        /* Game Title Section */
+        .game-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .game-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, var(--highlight-color), #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .game-description {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* Game Container */
+        .game-container {
+            background: #000;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 2rem 0;
+            text-align: center;
+            border: 2px solid var(--border-color);
+        }
+        #gameFrame img { max-width: 644px; }
+        
+        .play-button {
+            display: inline-block;
+            background: linear-gradient(45deg, var(--highlight-color), #ff6b6b);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin: 1rem 0;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+        }
+        
+        .play-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
+        }
+        
+        /* Instructions Section */
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-left: 4px solid var(--highlight-color);
+        }
+        
+        .instructions h3 {
+            color: var(--highlight-color);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+        
+        .control-key {
+            background: var(--highlight-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+        }
+        
+        /* Tips Section */
+        .tips {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .tips h3 {
+            color: var(--highlight-color);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .tip-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 3px solid var(--highlight-color);
+        }
+        
+        .tip-number {
+            background: var(--highlight-color);
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        /* Game Info */
+        .game-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: var(--highlight-color);
+            font-size: 0.9rem;
+        }
+        
+        .info-value {
+            color: var(--text-muted);
+        }
+        
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .tag {
+            background: rgba(233, 69, 96, 0.2);
+            color: var(--highlight-color);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(233, 69, 96, 0.3);
+        }
+        
+        /* Sidebar Ads */
+        .ad-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-color);
+        }
+        
+        .ad-container ins {
+            width: 100%;
+            height: 100%;
+            min-height: 250px;
+        }
+        
+        /* Related Games */
+        .related-games {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        
+        .related-games h3 {
+            color: var(--highlight-color);
+            margin-bottom: 1rem;
+        }
+        
+        .related-game {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin: 0.5rem 0;
+            text-decoration: none;
+            color: var(--text-light);
+            transition: background 0.3s ease;
+        }
+        
+        .related-game:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .related-game-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        /* Footer */
+        .footer {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2rem 0;
+            margin-top: 3rem;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                order: -1;
+            }
+            
+            .game-title {
+                font-size: 2rem;
+            }
+            
+            .game-iframe {
+                height: 400px;
+            }
+            
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--highlight-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">🎮 PlayfulHub</a>
+                <nav class="breadcrumb">
+                    <a href="/">Início</a>
+                    <i class="fas fa-chevron-right"></i>
+                    <a href="/jogos">Jogos</a>
+                    <i class="fas fa-chevron-right"></i>
+                    <span>Conway's Game of Life</span>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="main-content">
+            <!-- Main Game Content -->
+            <main class="game-content">
+                <!-- Game Header -->
+                <div class="game-header">
+                    <h1 class="game-title">Conway's Game of Life</h1>
+                    <p class="game-description">Simulação de autômatos celulares onde células vivem ou morrem baseadas em regras simples. Observe padrões complexos emergirem de regras simples.</p>
+                </div>
+                
+                <!-- Game Container -->
+                <div class="game-container">
+                    <a id="gameFrame" class="game-iframe" href="/gameoflife/">
+                        <img src="../assets/images/gameoflife_preview.png" alt="Conway's Game of Life">
+                    </a>
+                </div>
+                
+                <!-- Instructions -->
+                <section class="instructions">
+                    <h3><i class="fas fa-gamepad"></i> Como Jogar</h3>
+                    <div class="controls-grid">
+                        
+        <div class="control-item">
+            <span class="control-key">Mouse</span>
+            <span>Adicionar/remover células</span>
+        </div>
+    
+        <div class="control-item">
+            <span class="control-key">Espaço</span>
+            <span>Pausar/continuar</span>
+        </div>
+    
+        <div class="control-item">
+            <span class="control-key">R</span>
+            <span>Reiniciar</span>
+        </div>
+    
+        <div class="control-item">
+            <span class="control-key">+/-</span>
+            <span>Ajustar velocidade</span>
+        </div>
+    
+                    </div>
+                    <p><strong>Objetivo:</strong> Observe como padrões complexos emergem de regras simples.</p>
+                </section>
+                
+                <!-- Tips and Strategies -->
+                <section class="tips">
+                    <h3><i class="fas fa-lightbulb"></i> Dicas e Estratégias</h3>
+                    
+        <div class="tip-item">
+            <span class="tip-number">1</span>
+            <span>Comece com padrões simples e observe o que acontece</span>
+        </div>
+    
+        <div class="tip-item">
+            <span class="tip-number">2</span>
+            <span>Experimente diferentes configurações iniciais</span>
+        </div>
+    
+        <div class="tip-item">
+            <span class="tip-number">3</span>
+            <span>Alguns padrões são "voadores" - eles se movem pelo grid</span>
+        </div>
+    
+        <div class="tip-item">
+            <span class="tip-number">4</span>
+            <span>A beleza está na simplicidade das regras</span>
+        </div>
+    
+                </section>
+                
+                <!-- Game Information -->
+                <section class="game-info">
+                    <h3><i class="fas fa-info-circle"></i> Sobre o Jogo</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Gênero</span>
+                            <span class="info-value">Simulação / Matemática</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Desenvolvedor</span>
+                            <span class="info-value">PlayfulHub</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Características</span>
+                            <span class="info-value">Regras clássicas de Conway, padrões emergentes, controles de velocidade</span>
+                        </div>
+                    </div>
+                    <div class="tags">
+                        <span class="tag">Conway</span><span class="tag">Autômatos</span><span class="tag">Simulação</span><span class="tag">Matemática</span><span class="tag">Padrões</span>
+                    </div>
+                </section>
+            </main>
+            
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Ad Space 1 -->
+                <div class="ad-container">
+                    <ins class="adsbygoogle"
+                         style="display:block"
+                         data-ad-client="ca-pub-6741914590073026"
+                         data-ad-slot="1892478235"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                </div>
+                
+                <!-- Related Games -->
+                <div class="related-games">
+                    <h3>Jogos Relacionados</h3>
+                    
+            <a href="/jogos/lazy_gardner" class="related-game">
+                <div class="related-game-icon" style="background: linear-gradient(45deg, #e94560, #ff6b6b);">
+                    🎮
+                </div>
+                <div>
+                    <div style="font-weight: bold;">Lazy Gardener</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Simulação / Relaxante</div>
+                </div>
+            </a>
+        
+            <a href="/jogos/puzzle" class="related-game">
+                <div class="related-game-icon" style="background: linear-gradient(45deg, #e94560, #ff6b6b);">
+                    🎮
+                </div>
+                <div>
+                    <div style="font-weight: bold;">Puzzle Master</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Quebra-cabeça</div>
+                </div>
+            </a>
+        
+            <a href="/jogos/strategy_game" class="related-game">
+                <div class="related-game-icon" style="background: linear-gradient(45deg, #e94560, #ff6b6b);">
+                    🏰
+                </div>
+                <div>
+                    <div style="font-weight: bold;">Strategy Empire</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Estratégia</div>
+                </div>
+            </a>
+        
+                </div>
+                
+                <!-- Ad Space 2 -->
+                <div class="ad-container">
+                    <ins class="adsbygoogle"
+                         style="display:block"
+                         data-ad-client="ca-pub-6741914590073026"
+                         data-ad-slot="1892478236"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                </div>
+            </aside>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 PlayfulHub - Desenvolvido com ☕ por William Mangoni</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Initialize AdSense
+        (adsbygoogle = window.adsbygoogle || []).push({});
+        
+        // Track game interactions for analytics
+        const gameFrame = document.getElementById('gameFrame');
+        if (gameFrame) {
+            gameFrame.addEventListener('click', function() {
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'game_interaction', {
+                        'game_name': 'Conway's Game of Life',
+                        'interaction_type': 'click_preview'
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>

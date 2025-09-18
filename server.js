@@ -43,12 +43,34 @@ app.get('/api/hello', (req, res) => {
 
 // Criar rotas para as páginas HTML
 createHtmlRoute('/', 'index.html');
+
+// Rotas para páginas de jogos otimizadas (SEO-friendly)
+createHtmlRoute('/jogos/puzzle', 'jogos/puzzle.html');
+createHtmlRoute('/jogos/space_shooter', 'jogos/space_shooter.html');
+createHtmlRoute('/jogos/ded', 'jogos/ded.html');
+createHtmlRoute('/jogos/3d_shooter', 'jogos/3d_shooter.html');
+createHtmlRoute('/jogos/chess', 'jogos/chess.html');
+createHtmlRoute('/jogos/tetris', 'jogos/tetris.html');
+createHtmlRoute('/jogos/snake', 'jogos/snake.html');
+createHtmlRoute('/jogos/strategy_game', 'jogos/strategy_game.html');
+createHtmlRoute('/jogos/rubiks_cube', 'jogos/rubiks_cube.html');
+createHtmlRoute('/jogos/archer', 'jogos/archer.html');
+createHtmlRoute('/jogos/lazy_gardner', 'jogos/lazy_gardner.html');
+createHtmlRoute('/jogos/gameoflife', 'jogos/gameoflife.html');
+createHtmlRoute('/jogos/driving_simulator', 'jogos/driving_simulator.html');
+createHtmlRoute('/jogos/visual_effects', 'jogos/visual_effects.html');
+createHtmlRoute('/jogos/poker', 'jogos/poker.html');
+createHtmlRoute('/jogos/it_simulator', 'jogos/it_simulator.html');
+createHtmlRoute('/jogos/tabuleiro_galton', 'jogos/tabuleiro_galton.html');
+createHtmlRoute('/jogos/pinball', 'jogos/pinball.html');
+
+// Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
 createHtmlRoute('/ded/index_new', 'ded/index_new.html');
 createHtmlRoute('/3d_shooter', '3d_shooter/index.html');
 createHtmlRoute('/driving_simulator', 'driving_simulator/index.html');
 createHtmlRoute('/poker', 'poker/index.html');
-createHtmlRoute('/game_of_life', 'game_of_life/index.html');
+createHtmlRoute('/game_of_life', 'gameoflife/index.html');
 createHtmlRoute('/it_simulator', 'it_simulator/index.html');
 createHtmlRoute('/archer', 'archer/index.html');
 createHtmlRoute('/pinball', 'pinball/index.html');
@@ -60,6 +82,8 @@ createHtmlRoute('/strategy_game', 'strategy_game/index.html');
 createHtmlRoute('/tetris', 'tetris/index.html');
 createHtmlRoute('/tabuleiro_galton', 'tabuleiro_galton/index.html');
 createHtmlRoute('/visual_effects', 'visual_effects/index.html');
+createHtmlRoute('/chess', 'chess/index.html');
+createHtmlRoute('/lazy_gardner', 'lazy_gardner/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
