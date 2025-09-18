@@ -182,7 +182,7 @@ const gamesData = {
         relatedGames: ['chess', 'ded', 'puzzle']
     },
     'rubiks_cube': {
-        title: 'Rubik\'s Cube',
+        title: 'Rubiks Cube',
         description: 'Resolva o clássico cubo mágico em 3D! Gire as faces, organize as cores e teste suas habilidades de resolução de problemas.',
         keywords: 'rubik, cubo mágico, 3D, puzzle, cores, desafio, PlayfulHub',
         genre: 'Puzzle 3D',
@@ -249,7 +249,7 @@ const gamesData = {
         relatedGames: ['gameoflife', 'visual_effects', 'puzzle']
     },
     'gameoflife': {
-        title: 'Conway\'s Game of Life',
+        title: 'Conways Game of Life',
         description: 'Simulação de autômatos celulares onde células vivem ou morrem baseadas em regras simples. Observe padrões complexos emergirem de regras simples.',
         keywords: 'conway, game of life, autômatos, celulares, simulação, matemática, PlayfulHub',
         genre: 'Simulação / Matemática',
@@ -316,8 +316,8 @@ const gamesData = {
         relatedGames: ['space_shooter', 'archer', 'snake']
     },
     'poker': {
-        title: 'Poker Texas Hold\'em',
-        description: 'Jogue Poker Texas Hold\'em contra a IA ou online com amigos. Teste suas habilidades de blefe e estratégia neste clássico jogo de cartas.',
+        title: 'Poker Texas Holdem',
+        description: 'Jogue Poker Texas Holdem contra a IA ou online com amigos. Teste suas habilidades de blefe e estratégia neste clássico jogo de cartas.',
         keywords: 'poker, texas holdem, cartas, blefe, estratégia, IA, PlayfulHub',
         genre: 'Cartas / Estratégia',
         developer: 'PlayfulHub',
