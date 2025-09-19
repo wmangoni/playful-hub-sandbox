@@ -26,6 +26,12 @@ app.use(express.json());
 // Servir arquivos estáticos da pasta raiz
 app.use(express.static('./'));
 
+// Rota específica para ads.txt (importante para AdSense)
+app.get('/ads.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.sendFile(path.join(__dirname, 'ads.txt'));
+});
+
 // Função auxiliar para criar rotas de páginas HTML
 const createHtmlRoute = (route, filename) => {
     app.get(route, (req, res) => {
