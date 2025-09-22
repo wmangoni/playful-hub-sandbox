@@ -5,9 +5,16 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const app = express();
 const port = process.env.PORT || 3000;
+const fs = require('fs'); // Adicionado para verificar a existência do arquivo ads.txt
 
 // Habilitar CORS para todas as rotas
-const allowedOrigins = ['http://localhost:3000', 'https://seudominio.com']; // Adicione seus domínios
+const allowedOrigins = [
+  'http://localhost:3000', 
+  'https://playfulhub.com.br',
+  'https://www.playfulhub.com.br',
+  'https://playfulhub.herokuapp.com',
+  'https://playfulhub.netlify.app'
+];
 app.use(cors({
   origin: function (origin, callback) {
     // Permite requisições sem origin (como Postman, apps mobile, ou same-origin)
@@ -28,8 +35,23 @@ app.use(express.static('./'));
 
 // Rota específica para ads.txt (importante para AdSense)
 app.get('/ads.txt', (req, res) => {
-    res.setHeader('Content-Type', 'text/plain');
-    res.sendFile(path.join(__dirname, 'ads.txt'));
+    // Headers específicos para ads.txt
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Permitir acesso de qualquer origem
+    
+    // Log para debug
+    console.log(`[ADS.TXT] Requisição de: ${req.ip} - ${req.get('User-Agent')}`);
+    
+    // Verificar se o arquivo existe
+    const adsPath = path.join(__dirname, 'ads.txt');
+    if (fs.existsSync(adsPath)) {
+        res.sendFile(adsPath);
+    } else {
+        // Fallback: enviar conteúdo direto
+        const adsContent = 'google.com, pub-6741914590073026, DIRECT, f08c47fec0942fa0';
+        res.send(adsContent);
+    }
 });
 
 // Função auxiliar para criar rotas de páginas HTML
@@ -122,6 +144,16 @@ const limiter = rateLimit({
 // Aplica o rate limiting a todas as requisições
 app.use(limiter);
 // Ou aplique apenas a rotas específicas: app.use('/api/', limiter); 
+
+// Adicionar health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        ads_txt_available: fs.existsSync(path.join(__dirname, 'ads.txt')),
+        domain: req.get('host')
+    });
+});
 
 // Iniciar o servidor
 app.listen(port, () => {
