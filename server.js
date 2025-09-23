@@ -5,9 +5,16 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const app = express();
 const port = process.env.PORT || 3000;
+const fs = require('fs'); // Adicionado para verificar a existência do arquivo ads.txt
 
 // Habilitar CORS para todas as rotas
-const allowedOrigins = ['http://localhost:3000', 'https://seudominio.com']; // Adicione seus domínios
+const allowedOrigins = [
+  'http://localhost:3000', 
+  'https://playfulhub.com.br',
+  'https://www.playfulhub.com.br',
+  'https://playfulhub.herokuapp.com',
+  'https://playfulhub.netlify.app'
+];
 app.use(cors({
   origin: function (origin, callback) {
     // Permite requisições sem origin (como Postman, apps mobile, ou same-origin)
@@ -26,6 +33,41 @@ app.use(express.json());
 // Servir arquivos estáticos da pasta raiz
 app.use(express.static('./'));
 
+// Rota específica para ads.txt (importante para AdSense)
+app.get('/ads.txt', (req, res) => {
+    // Headers específicos para ads.txt
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Permitir acesso de qualquer origem
+    
+    // Log para debug
+    console.log(`[ADS.TXT] Requisição de: ${req.ip} - ${req.get('User-Agent')}`);
+    
+    // Verificar se o arquivo existe
+    const adsPath = path.join(__dirname, 'ads.txt');
+    if (fs.existsSync(adsPath)) {
+        res.sendFile(adsPath);
+    } else {
+        // Fallback: enviar conteúdo direto
+        const adsContent = 'google.com, pub-6741914590073026, DIRECT, f08c47fec0942fa0';
+        res.send(adsContent);
+    }
+});
+
+// Rota específica para robots.txt (importante para crawlers)
+app.get('/robots.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const robotsPath = path.join(__dirname, 'robots.txt');
+    if (fs.existsSync(robotsPath)) {
+        res.sendFile(robotsPath);
+    } else {
+        // Fallback mínimo permissivo
+        res.send('User-agent: *\nAllow: /');
+    }
+});
+
 // Função auxiliar para criar rotas de páginas HTML
 const createHtmlRoute = (route, filename) => {
     app.get(route, (req, res) => {
@@ -43,12 +85,34 @@ app.get('/api/hello', (req, res) => {
 
 // Criar rotas para as páginas HTML
 createHtmlRoute('/', 'index.html');
+
+// Rotas para páginas de jogos otimizadas (SEO-friendly)
+createHtmlRoute('/jogos/puzzle', 'jogos/puzzle.html');
+createHtmlRoute('/jogos/space_shooter', 'jogos/space_shooter.html');
+createHtmlRoute('/jogos/ded', 'jogos/ded.html');
+createHtmlRoute('/jogos/3d_shooter', 'jogos/3d_shooter.html');
+createHtmlRoute('/jogos/chess', 'jogos/chess.html');
+createHtmlRoute('/jogos/tetris', 'jogos/tetris.html');
+createHtmlRoute('/jogos/snake', 'jogos/snake.html');
+createHtmlRoute('/jogos/strategy_game', 'jogos/strategy_game.html');
+createHtmlRoute('/jogos/rubiks_cube', 'jogos/rubiks_cube.html');
+createHtmlRoute('/jogos/archer', 'jogos/archer.html');
+createHtmlRoute('/jogos/lazy_gardner', 'jogos/lazy_gardner.html');
+createHtmlRoute('/jogos/gameoflife', 'jogos/gameoflife.html');
+createHtmlRoute('/jogos/driving_simulator', 'jogos/driving_simulator.html');
+createHtmlRoute('/jogos/visual_effects', 'jogos/visual_effects.html');
+createHtmlRoute('/jogos/poker', 'jogos/poker.html');
+createHtmlRoute('/jogos/it_simulator', 'jogos/it_simulator.html');
+createHtmlRoute('/jogos/tabuleiro_galton', 'jogos/tabuleiro_galton.html');
+createHtmlRoute('/jogos/pinball', 'jogos/pinball.html');
+
+// Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
 createHtmlRoute('/ded/index_new', 'ded/index_new.html');
 createHtmlRoute('/3d_shooter', '3d_shooter/index.html');
 createHtmlRoute('/driving_simulator', 'driving_simulator/index.html');
 createHtmlRoute('/poker', 'poker/index.html');
-createHtmlRoute('/game_of_life', 'game_of_life/index.html');
+createHtmlRoute('/game_of_life', 'gameoflife/index.html');
 createHtmlRoute('/it_simulator', 'it_simulator/index.html');
 createHtmlRoute('/archer', 'archer/index.html');
 createHtmlRoute('/pinball', 'pinball/index.html');
@@ -60,6 +124,8 @@ createHtmlRoute('/strategy_game', 'strategy_game/index.html');
 createHtmlRoute('/tetris', 'tetris/index.html');
 createHtmlRoute('/tabuleiro_galton', 'tabuleiro_galton/index.html');
 createHtmlRoute('/visual_effects', 'visual_effects/index.html');
+createHtmlRoute('/chess', 'chess/index.html');
+createHtmlRoute('/lazy_gardner', 'lazy_gardner/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
@@ -93,8 +159,22 @@ const limiter = rateLimit({
 app.use(limiter);
 // Ou aplique apenas a rotas específicas: app.use('/api/', limiter); 
 
-// Iniciar o servidor
-app.listen(port, () => {
-    console.log(`Servidor rodando em http://localhost:${port}`);
-    console.log(`Jogo acessível em http://localhost:${port}/jogo`);
+// Adicionar health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        ads_txt_available: fs.existsSync(path.join(__dirname, 'ads.txt')),
+        domain: req.get('host')
+    });
 });
+
+// Iniciar o servidor (não iniciar durante testes)
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => {
+        console.log(`Servidor rodando em http://localhost:${port}`);
+        console.log(`Jogo acessível em http://localhost:${port}/jogo`);
+    });
+}
+
+module.exports = app;
