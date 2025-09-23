@@ -54,6 +54,20 @@ app.get('/ads.txt', (req, res) => {
     }
 });
 
+// Rota específica para robots.txt (importante para crawlers)
+app.get('/robots.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const robotsPath = path.join(__dirname, 'robots.txt');
+    if (fs.existsSync(robotsPath)) {
+        res.sendFile(robotsPath);
+    } else {
+        // Fallback mínimo permissivo
+        res.send('User-agent: *\nAllow: /');
+    }
+});
+
 // Função auxiliar para criar rotas de páginas HTML
 const createHtmlRoute = (route, filename) => {
     app.get(route, (req, res) => {
