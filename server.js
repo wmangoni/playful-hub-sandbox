@@ -155,8 +155,12 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Iniciar o servidor
-app.listen(port, () => {
-    console.log(`Servidor rodando em http://localhost:${port}`);
-    console.log(`Jogo acessível em http://localhost:${port}/jogo`);
-});
+// Iniciar o servidor (não iniciar durante testes)
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => {
+        console.log(`Servidor rodando em http://localhost:${port}`);
+        console.log(`Jogo acessível em http://localhost:${port}/jogo`);
+    });
+}
+
+module.exports = app;
