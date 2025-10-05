@@ -35,10 +35,13 @@
         import * as THREE from 'three';
 
         let scene, camera, renderer;
-        let car, aiCar, ground, road;
+        let car, ground, road;
+        const aiCars = [];
         let trees = [];
         let clouds = [];
         let mountains = [];
+        let roadPath;
+        let roadWaypoints = [];
 
         let audioContext;
         let engineSoundBuffer; // To store the decoded audio data
@@ -313,45 +316,30 @@
             ground.receiveShadow = true; // Allow ground to receive shadows
             scene.add(ground);
 
-            // --- Road ---
-            const roadWidth = 12;
-            const roadLength = 1000;
-            const roadGeometry = new THREE.PlaneGeometry(roadWidth, roadLength);
-            const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 }); // Dark grey
-            road = new THREE.Mesh(roadGeometry, roadMaterial);
-            road.rotation.x = -Math.PI / 2;
-            road.position.y = 0.01; // Slightly above ground to prevent z-fighting
-            road.receiveShadow = true;
-            scene.add(road);
-
-            // --- Road Lines ---
-            const lineMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-            const lineLength = 6;
-            const lineGap = 8;
-            const lineWidth = 0.3;
-            const numLines = Math.floor(roadLength / (lineLength + lineGap));
-
-            for (let i = 0; i < numLines; i++) {
-                const lineGeometry = new THREE.PlaneGeometry(lineWidth, lineLength);
-                const line = new THREE.Mesh(lineGeometry, lineMaterial);
-                line.rotation.x = -Math.PI / 2;
-                line.position.y = 0.02; // Slightly above road
-                line.position.z = -roadLength / 2 + (lineLength + lineGap) / 2 + i * (lineLength + lineGap);
-                line.receiveShadow = true; // Lines can also receive shadows
-                scene.add(line);
-            }
+            // --- Curved Road ---
+            createCurvedRoad();
 
             // --- Car ---
             car = createCarModel(); // Player's car (default red)
             car.position.y = 0;
             scene.add(car);
 
-            // --- AI Car ---
-            aiCar = createCarModel(0x00ff00); // Green car
-            aiCar.position.y = 0;
-            aiCar.position.z = -450; // Start at the far end of the road
-            aiCar.rotation.y = Math.PI; // Face towards the player
-            scene.add(aiCar);
+            // --- AI Cars ---
+            const aiCarColors = [0x00ff00, 0xffff00, 0x0000ff];
+            for (let i = 0; i < aiCarColors.length; i++) {
+                const aiCar = createCarModel(aiCarColors[i]);
+                const waypointIndex = Math.floor(roadWaypoints.length / (aiCarColors.length + 1)) * (i + 1);
+                const waypoint = roadWaypoints[waypointIndex];
+                aiCar.position.copy(waypoint);
+                aiCar.position.y = 0;
+
+                const nextWaypoint = roadWaypoints[waypointIndex + 1];
+                aiCar.lookAt(nextWaypoint);
+
+                aiCar.userData.targetWaypointIndex = waypointIndex + 1;
+                aiCars.push(aiCar);
+                scene.add(aiCar);
+            }
 
             // --- Trees ---
             createTrees();
@@ -531,6 +519,72 @@
             }
         }
 
+        function createCurvedRoad() {
+            // Define a more interesting path for the road
+            roadPath = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, 0, 400),
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(150, 0, -200),
+                new THREE.Vector3(0, 0, -400),
+                new THREE.Vector3(-250, 0, -600),
+                new THREE.Vector3(-150, 0, -800),
+                new THREE.Vector3(0, 0, -1000),
+                new THREE.Vector3(200, 0, -1200)
+            ]);
+
+            const points = roadPath.getPoints(200); // Increase points for smoother curve
+            roadWaypoints = points; // Save waypoints for AI
+
+            // Create the road geometry
+            const roadWidth = 12;
+            const roadGeometry = new THREE.BufferGeometry().setFromPoints(points);
+
+            const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, side: THREE.DoubleSide });
+
+            const roadMesh = new THREE.Mesh(roadGeometry, roadMaterial);
+
+            const extrudeSettings = {
+                steps: 200,
+                bevelEnabled: false,
+                extrudePath: roadPath
+            };
+
+            const shape = new THREE.Shape();
+            shape.moveTo(-roadWidth / 2, 0);
+            shape.lineTo(roadWidth / 2, 0);
+            shape.lineTo(roadWidth / 2, 1);
+            shape.lineTo(-roadWidth / 2, 1);
+
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            road = new THREE.Mesh(geometry, roadMaterial);
+            road.position.y = 0.01;
+            road.receiveShadow = true;
+            scene.add(road);
+
+            // Create road lines
+            const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const numLines = 100;
+            const lineLength = 6;
+            const lineGap = 8;
+            const totalLength = lineLength + lineGap;
+
+            for (let i = 0; i < numLines; i++) {
+                const t = (i * totalLength) / roadPath.getLength();
+                const pos = roadPath.getPointAt(t);
+                const tangent = roadPath.getTangentAt(t);
+
+                const lineGeometry = new THREE.PlaneGeometry(0.3, lineLength);
+                const line = new THREE.Mesh(lineGeometry, lineMaterial);
+
+                line.position.copy(pos);
+                line.position.y += 0.02;
+                line.lookAt(pos.clone().add(tangent));
+                line.rotation.x = -Math.PI / 2;
+
+                scene.add(line);
+            }
+        }
+
 
         // --- Event Handlers ---
         function handleKeyDown(event) {
@@ -588,23 +642,53 @@
         }
 
         function updateAiCar(deltaTime) {
-            const aiCarSpeed = 12.0; // Slightly slower than player
-            const roadWidth = 12;
+            const aiCarSpeed = 10.0;
+            const waypointDistanceThreshold = 5;
 
-            // Move the AI car forward
-            aiCar.translateZ(-aiCarSpeed * deltaTime);
+            aiCars.forEach(aiCar => {
+                let targetWaypointIndex = aiCar.userData.targetWaypointIndex;
+                if (targetWaypointIndex >= roadWaypoints.length) {
+                    targetWaypointIndex = 0; // Loop back to the start
+                }
 
-            // Simple AI: steer back towards the center of the road
-            if (aiCar.position.x > roadWidth / 2 - 2) {
-                aiCar.rotation.y += 0.5 * deltaTime; // Turn left
-            } else if (aiCar.position.x < -roadWidth / 2 + 2) {
-                aiCar.rotation.y -= 0.5 * deltaTime; // Turn right
-            }
+                const targetWaypoint = roadWaypoints[targetWaypointIndex];
+                const direction = targetWaypoint.clone().sub(aiCar.position).normalize();
+                const distance = aiCar.position.distanceTo(targetWaypoint);
 
-            // Reset car if it goes off the map
-            if (aiCar.position.z > 500) {
-                aiCar.position.z = -500;
-            }
+                // Basic obstacle avoidance
+                let avoidance = new THREE.Vector3(0, 0, 0);
+                let slowedDown = false;
+
+                const raycaster = new THREE.Raycaster(aiCar.position, aiCar.getWorldDirection(new THREE.Vector3()));
+                const obstacles = [...aiCars.filter(c => c !== aiCar), car];
+                const intersects = raycaster.intersectObjects(obstacles, true);
+
+                if (intersects.length > 0 && intersects[0].distance < 15) {
+                    const obstacle = intersects[0].object;
+                    const avoidanceDirection = new THREE.Vector3(direction.z, 0, -direction.x); // Perpendicular to current direction
+                    avoidance.add(avoidanceDirection.multiplyScalar(0.1));
+                    slowedDown = true;
+                }
+
+                const effectiveSpeed = slowedDown ? aiCarSpeed * 0.5 : aiCarSpeed;
+                aiCar.position.add(direction.multiplyScalar(effectiveSpeed * deltaTime));
+                aiCar.position.add(avoidance);
+
+                // Smoothly look at the target
+                const lookAtTarget = targetWaypoint.clone().add(avoidance);
+                const targetQuaternion = new THREE.Quaternion().setFromRotationMatrix(
+                    new THREE.Matrix4().lookAt(aiCar.position, lookAtTarget, aiCar.up)
+                );
+                aiCar.quaternion.slerp(targetQuaternion, 0.1);
+
+
+                if (distance < waypointDistanceThreshold) {
+                    aiCar.userData.targetWaypointIndex++;
+                    if (aiCar.userData.targetWaypointIndex >= roadWaypoints.length) {
+                        aiCar.userData.targetWaypointIndex = 0; // Loop
+                    }
+                }
+            });
         }
 
         function updateCamera() {
@@ -753,22 +837,16 @@
             const carBox = new THREE.Box3().setFromObject(carObject);
 
             // Check for collision with other cars
-            if (aiCar && carObject !== aiCar) {
-                const aiCarBox = new THREE.Box3().setFromObject(aiCar);
-                if (carBox.intersectsBox(aiCarBox)) {
-                    return {
-                        obstacleType: 'car',
-                        object: aiCar
-                    };
-                }
-            }
-            if (car && carObject !== car) {
-                const playerCarBox = new THREE.Box3().setFromObject(car);
-                if (carBox.intersectsBox(playerCarBox)) {
-                    return {
-                        obstacleType: 'car',
-                        object: car
-                    };
+            const allCars = [car, ...aiCars];
+            for (const otherCar of allCars) {
+                if (carObject !== otherCar) {
+                    const otherCarBox = new THREE.Box3().setFromObject(otherCar);
+                    if (carBox.intersectsBox(otherCarBox)) {
+                        return {
+                            obstacleType: 'car',
+                            object: otherCar
+                        };
+                    }
                 }
             }
 
@@ -896,15 +974,16 @@
             
             // Detectar colisão
             const playerCollision = detectCollision(car, obstacles);
-            const aiCollision = detectCollision(aiCar, obstacles);
-
-            // Responder à colisão, se houver
             if (playerCollision) {
                 handlePlayerCollision(playerCollision);
             }
-            if (aiCollision) {
-                handleAiCollision(aiCollision);
-            }
+
+            aiCars.forEach(aiCar => {
+                const aiCollision = detectCollision(aiCar, obstacles);
+                if (aiCollision) {
+                    handleAiCollision(aiCar, aiCollision);
+                }
+            });
         }
 
         function handlePlayerCollision(collision) {
@@ -917,11 +996,17 @@
             shakeScreen(collision.obstacleType === 'mountain' ? 1.0 : 0.5);
         }
 
-        function handleAiCollision(collision) {
+        function handleAiCollision(aiCar, collision) {
             // Reverse AI car on collision
             if (collision.obstacleType === 'tree' || collision.obstacleType === 'mountain' || collision.obstacleType === 'car') {
-                aiCar.position.z += 5; // Move back
-                aiCar.rotation.y += Math.PI / 2; // Turn
+                // A simple push back and turn might not be enough for a curved track.
+                // For now, let's just move it back along its forward vector.
+                const pushBackDistance = 5;
+                const backward = aiCar.getWorldDirection(new THREE.Vector3()).negate();
+                aiCar.position.add(backward.multiplyScalar(pushBackDistance));
+
+                // And give it a slight turn to try and get out of the situation
+                aiCar.rotation.y += Math.PI / 4;
             }
         }
 
