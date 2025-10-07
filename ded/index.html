@@ -1,1348 +1,1183 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-  <head>
-    <!-- Google Tag Manager -->
-    <script>
-      (function (w, d, s, l, i) {
-        w[l] = w[l] || [];
-        w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-        var f = d.getElementsByTagName(s)[0],
-          j = d.createElement(s),
-          dl = l != "dataLayer" ? "&l=" + l : "";
-        j.async = true;
-        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-        f.parentNode.insertBefore(j, f);
-      })(window, document, "script", "dataLayer", "GTM-KM6SHZXP");
-    </script>
-    <!-- End Google Tag Manager -->
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RPG Adventure Quest</title>
-    <style>
-      body {
-        font-family: "Palatino", serif;
-        background-color: #f5f1e6;
-        color: #333;
-        max-width: 100%;
-        margin: 0 auto;
-        padding: 20px;
-      }
-
-      audio {
-        position: absolute;
-        top: 0px;
-        left: 0px;
-        box-shadow: 4px 1px 12px;
-        border-radius: 30px;
-      }
-
-      .game-container {
-        background-color: #fff;
-        border: 2px solid #7a5c3d;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        height: 90vh;
-      }
-
-      .game-container2 {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        grid-template-rows: repeat(5, 1fr);
-        gap: 8px;
-      }
-
-      .col1 {
-        grid-column: span 2 / span 2;
-        grid-row: span 5 / span 5;
-      }
-
-      .col2 {
-        grid-column: span 2 / span 2;
-        grid-row: span 5 / span 5;
-        grid-column-start: 3;
-      }
-      .col3 {
-        grid-row: span 5 / span 5;
-        grid-column-start: 5;
-      }
-
-      h1 {
-        color: #8b0000;
-        text-align: center;
-        font-size: 28px;
-        margin-bottom: 10px;
-      }
-
-      .subtitle {
-        text-align: center;
-        font-style: italic;
-        margin-bottom: 30px;
-        color: #555;
-      }
-
-      .scene-description {
-        border-left: 4px solid #8b0000;
-        padding: 10px 15px;
-        margin: 15px 0;
-        background-color: #f9f5eb;
-        overflow: auto;
-        max-height: 20vh;
-      }
-
-      .stats {
-        display: flex;
-        justify-content: space-between;
-        background-color: #eee8d9;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 15px 0;
-      }
-
-      .stat {
-        text-align: center;
-      }
-
-      .stat-value {
-        font-weight: bold;
-        font-size: 18px;
-      }
-
-      .choices {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 20px;
-      }
-
-      button {
-        background-color: #7a5c3d;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-family: "Palatino", serif;
-        font-size: 16px;
-        transition: background-color 0.3s;
-      }
-
-      button:hover {
-        background-color: #8b0000;
-      }
-
-      #image-container {
-        padding-top: 16px;
-      }
-
-      #image-container img {
-        max-width: 100%;
-        max-height: 76vh;
-      }
-
-      .inventory {
-        margin-top: 20px;
-        padding: 10px;
-        background-color: #eee8d9;
-        border-radius: 5px;
-      }
-
-      .inventory h3 {
-        margin-top: 0;
-        color: #7a5c3d;
-      }
-
-      .dice-roll {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 20px 0;
-      }
-
-      .dice {
-        width: 60px;
-        height: 60px;
-        background-color: white;
-        border: 2px solid #333;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        font-weight: bold;
-        margin: 0 10px;
-      }
-
-      .roll-button {
-        margin-left: 20px;
-      }
-
-      .log {
-        overflow-y: auto;
-        margin-top: 15px;
-        border: 1px solid #ccc;
-        padding: 10px;
-        font-style: italic;
-        font-size: 14px;
-        color: #555;
-        border-radius: 5px;
-        max-height: 75vh;
-      }
-
-      .hidden {
-        display: none !important;
-      }
-
-      .character-select {
-        display: flex;
-        gap: 15px;
-        justify-content: center;
-        margin-bottom: 30px;
-      }
-
-      .character-card {
-        border: 2px solid #7a5c3d;
-        border-radius: 5px;
-        padding: 15px;
-        text-align: center;
-        cursor: pointer;
-        width: 150px;
-        transition: all 0.3s;
-      }
-
-      .character-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-      }
-
-      .character-card.selected {
-        border-color: #8b0000;
-        background-color: #f9e9e9;
-      }
-
-      .result-message {
-        padding: 15px;
-        margin: 15px 0;
-        border-radius: 5px;
-        font-weight: bold;
-      }
-
-      .success {
-        background-color: #d4edda;
-        color: #155724;
-      }
-
-      .failure {
-        background-color: #f8d7da;
-        color: #721c24;
-      }
-      .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-
-      .modal-content {
-        background-color: #fff;
-        border: 2px solid #7a5c3d;
-        padding: 20px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        font-family: "Palatino", serif;
-        text-align: center;
-      }
-
-      .shop-items {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-
-      .shop-item {
-        background-color: #7a5c3d;
-        color: white;
-        border: none;
-        padding: 10px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-family: "Palatino", serif;
-        font-size: 16px;
-        transition: background-color 0.3s;
-      }
-
-      .shop-item:hover {
-        background-color: #8b0000;
-      }
-
-      #close-shop {
-        background-color: #8b0000;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-family: "Palatino", serif;
-        font-size: 16px;
-        transition: background-color 0.3s;
-      }
-
-      #close-shop:hover {
-        background-color: #7a5c3d;
-      }
-
-      #info {
-        position: absolute;
-        top: 96px;
-        left: 26px;
-        font-size: 12px;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Google Tag Manager (noscript) -->
-    <noscript
-      ><iframe
-        src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
-        height="0"
-        width="0"
-        style="display: none; visibility: hidden"
-      ></iframe
-    ></noscript>
-    <!-- End Google Tag Manager (noscript) -->
-
-    <audio controls autoplay loop>
-      <source src="audio/medieval-music.mp3" type="audio/mpeg" />
-      Seu navegador não suporta o elemento de áudio.
-    </audio>
-
-    <!-- Adicionar botão de TTS -->
-    <button
-      id="tts-toggle-button"
-      style="
-        position: absolute;
-        top: 74px;
-        left: 24px;
-        z-index: 10;
-        font-size: 16px;
-        padding: 3px 6px;
-      "
-    >
-      🔊 Narrador
-    </button>
-    <!-- Fim botão TTS -->
-
-    <a
-      href="index_new.html"
-      style="
-        color: #666;
-        text-decoration: none;
-        font-style: italic;
-        position: absolute;
-        top: 28px;
-        right: 28px;
-        color: blue;
-        z-index: 10;
-      "
-      >Testar nova versão beta</a
-    >
-
-    <div class="game-container">
-      <h1>A Masmorra de Drakmor</h1>
-      <p class="subtitle">Uma Aventura Simples de D&D</p>
-      <div id="character-select">
-        <h2 style="text-align: center">Escolha o Seu Personagem</h2>
-        <div class="character-select">
-          <div
-            class="character-card"
-            data-class="warrior"
-            onclick="selectCharacter('warrior')"
-          >
-            <h3>Guerreiro</h3>
-            <p>Força e saúde elevadas, habilidoso com armas</p>
-            <p>
-              <strong>FOR:</strong> 16 <strong>DES:</strong> 12 <br />
-              <strong>CON:</strong> 15 <strong>INT:</strong> 8
-            </p>
-          </div>
-          <div
-            class="character-card"
-            data-class="wizard"
-            onclick="selectCharacter('wizard')"
-          >
-            <h3>Mago</h3>
-            <p>Mestre em magia arcana com feitiços poderosos</p>
-            <p>
-              <strong>FOR:</strong> 8 <strong>DES:</strong> 14 <br />
-              <strong>CON:</strong> 10 <strong>INT:</strong> 17
-            </p>
-          </div>
-          <div
-            class="character-card"
-            data-class="rogue"
-            onclick="selectCharacter('rogue')"
-          >
-            <h3>Ladino</h3>
-            <p>Ágil e astuto, habilidoso em furtividade</p>
-            <p>
-              <strong>FOR:</strong> 10 <strong>DES:</strong> 17 <br />
-              <strong>CON:</strong> 12 <strong>INT:</strong> 14
-            </p>
-          </div>
-          <div
-            class="character-card"
-            data-class="paladin"
-            onclick="selectCharacter('paladin')"
-          >
-            <h3>Paladino</h3>
-            <p>
-              Um paladino é um guerreiro sagrado, que mistura habilidades de
-              combate de um guerreiro com poderes divinos de um clérigo
-            </p>
-            <p>
-              <strong>FOR:</strong> 13 <strong>DES:</strong> 11 <br />
-              <strong>CON:</strong> 17 <strong>INT:</strong> 10
-            </p>
-          </div>
-          <div
-            class="character-card"
-            data-class="archer"
-            onclick="selectCharacter('archer')"
-          >
-            <h3>Arqueiro</h3>
-            <p>
-              Um arqueiro é uma pessoa que usa um arco e flechas para atingir um
-              alvo
-            </p>
-            <p>
-              <strong>FOR:</strong> 10 <strong>DES:</strong> 17 <br />
-              <strong>CON:</strong> 12 <strong>INT:</strong> 13
-            </p>
-          </div>
-        </div>
-        <div style="text-align: center; margin-top: 20px">
-          <button onclick="startGame()">Começar Aventura</button>
-        </div>
-      </div>
-      <div class="game-container2">
-        <div id="game-screen" class="hidden col1">
-          <div class="stats">
-            <div class="stat">
-              <div>❤️ Vida</div>
-              <div class="stat-value" id="health">20</div>
-            </div>
-            <div class="stat">
-              <div>🪙 Ouro</div>
-              <div class="stat-value" id="gold">5</div>
-            </div>
-            <div class="stat">
-              <div>📈 Experiência</div>
-              <div class="stat-value" id="xp">0</div>
-            </div>
-          </div>
-          <div class="scene-description" id="scene-text"></div>
-          <div id="dice-container" class="hidden dice-roll">
-            <div class="dice" id="dice">?</div>
-            <button id="dice-button" class="roll-button" onclick="rollDice()">
-              🎲 Rolar d20
-            </button>
-          </div>
-          <div id="result-message" class="hidden result-message"></div>
-          <div class="choices" id="choices">
-            <button id="open-shop" class="hidden">Abrir Lojinha</button>
-          </div>
-          <div class="inventory">
-            <h3>🎒 Inventário</h3>
-            <div id="inventory-items">Nada ainda</div>
-          </div>
-        </div>
-        <div id="image-container" class="col2 hidden">
-          <img id="image" src="./images/check_supplies.png" />
-        </div>
-        <div class="col3 log hidden" id="game-log">📝 Logs do jogo</div>
-      </div>
-    </div>
-    <div id="shop-modal" class="modal hidden">
-      <div class="modal-content">
-        <h2>🏦 Lojinha</h2>
-        <p id="player-gold">🪙 Ouro: 5</p>
-        <div class="shop-items">
-          <button class="shop-item" data-item="Poção de Vida" data-price="10">
-            🫙 Poção de Vida - 10g
-          </button>
-          <button class="shop-item" data-item="Espada" data-price="32">
-            ⚔️ Espada - 32g
-          </button>
-          <button class="shop-item" data-item="Machado" data-price="36">
-            🪓 Machado - 36g
-          </button>
-          <button class="shop-item" data-item="Adaga" data-price="45">
-            💀 Adaga de osso estranha - 45g
-          </button>
-          <button class="shop-item" data-item="Escudo" data-price="31">
-            🛡️ Escudo - 31g
-          </button>
-          <button class="shop-item" data-item="Corda" data-price="5">
-            🪢 Corda - 5g
-          </button>
-          <button class="shop-item" data-item="Tocha" data-price="2">
-            🔦 Tocha - 2g
-          </button>
-        </div>
-        <button id="close-shop">Fechar</button>
-      </div>
-    </div>
-    <script>
-      // Estado do jogo
-      const gameState = {
-        player: {
-          class: "",
-          health: 20,
-          maxHealth: 20,
-          gold: 5,
-          xp: 0,
-          inventory: [],
-          stats: {},
-        },
-        mem: {},
-        currentScene: "start",
-        lastScene: "start",
-        currentEnemy: {
-          name: "Wolf",
-          ac: 12,
-          hp: 12,
-          max_hp: 12,
-          str: 10,
-          dex: 10,
-          con: 10,
-          bba: 1,
-        },
-        log: [],
-        pendingCheck: null,
-        checkDifficulty: 10,
-      };
-      // Atributos do personagem
-      const characterStats = {
-        warrior: {
-          str: 16,
-          dex: 12,
-          con: 15,
-          int: 8,
-          luck: 8,
-          bba: 2,
-          armor: 6,
-        },
-        wizard: {
-          str: 8,
-          dex: 14,
-          con: 10,
-          int: 17,
-          luck: 12,
-          bba: 1,
-          armor: 2,
-        },
-        rogue: {
-          str: 10,
-          dex: 17,
-          con: 12,
-          int: 14,
-          luck: 10,
-          bba: 1,
-          armor: 4,
-        },
-        paladin: {
-          str: 13,
-          dex: 11,
-          con: 17,
-          int: 10,
-          luck: 9,
-          bba: 2,
-          armor: 8,
-        },
-        archer: {
-          str: 10,
-          dex: 17,
-          con: 12,
-          int: 13,
-          luck: 11,
-          bba: 1,
-          armor: 5,
-        },
-      };
-
-      let currentTypewriterInterval = null;
-      let skipTyping = false;
-
-      var choicesElement = document.getElementById("choices");
-
-      // --- Fase 2: TTS Variables ---
-      let ttsEnabled = true; // Controle global para ativar/desativar TTS
-      let synth = window.speechSynthesis; // Acesso à API de fala
-      let voices = []; // Array para guardar as vozes disponíveis
-      let selectedVoice = null; // Para guardar a voz pt-BR preferida
-      let utterance = null; // Para guardar a instância da fala atual
-      // Flag para indicar se a API de fala foi "desbloqueada" pela interação do usuário
-      let speechApiUnlocked = false;
-
-      // Carregar cenas do arquivo JSON
-      let scenes = {};
-      fetch("assets/scenes.json")
-        .then((response) => response.json())
-        .then((data) => {
-          // Converter strings de função em funções reais
-          for (let sceneName in data) {
-            if (data[sceneName].onEnter) {
-              // Usando Function para criar uma nova função a partir da string
-              data[sceneName].onEnter = new Function(
-                "return " + data[sceneName].onEnter
-              )();
+    <head>
+        <!-- Google Tag Manager -->
+        <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-KM6SHZXP');</script>
+        <!-- End Google Tag Manager -->
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RPG Adventure Quest</title>
+        <style>
+            body {
+                font-family: 'Palatino', serif;
+                background-color: #f5f1e6;
+                color: #333;
+                max-width: 100%;
+                margin: 0 auto;
+                padding: 20px;
             }
-          }
-          scenes = data;
-          // Iniciar o jogo após carregar as cenas
-          startGame();
-        })
-        .catch((error) => {
-          console.error("Erro ao carregar as cenas:", error);
-          alert("Erro ao carregar o jogo. Por favor, recarregue a página.");
-        });
 
-      let selectedCharacter = null;
-
-      /**
-       * Tenta popular a lista de vozes disponíveis e selecionar uma voz pt-BR.
-       * Precisa ser chamada APÓS a interação do usuário e/ou no evento 'voiceschanged'.
-       */
-      function populateVoiceList() {
-        if (!synth) return; // Sai se a API não for suportada
-
-        voices = synth.getVoices().sort(function (a, b) {
-          const aname = a.name.toUpperCase();
-          const bname = b.name.toUpperCase();
-          if (aname < bname) return -1;
-          else if (aname == bname) return 0;
-          else return +1;
-        });
-        console.log("Vozes disponíveis:", voices);
-
-        // Tenta encontrar uma voz em Português do Brasil
-        selectedVoice = voices.find(
-          (voice) =>
-            voice.name.includes("Daniel - Portuguese") ||
-            voice.name.includes("Maria - Portuguese")
-        );
-
-        // Fallback para outras pt-BR ou qualquer pt
-        if (!selectedVoice) {
-          selectedVoice = voices.find((voice) => voice.lang === "pt-BR");
-        }
-        if (!selectedVoice) {
-          selectedVoice = voices.find((voice) => voice.lang.startsWith("pt-"));
-        }
-        // Fallback final para a primeira voz disponível
-        if (!selectedVoice && voices.length > 0) {
-          selectedVoice = voices[0];
-        }
-
-        if (selectedVoice) {
-          console.log(
-            "Voz selecionada:",
-            selectedVoice.name,
-            selectedVoice.lang
-          );
-        } else {
-          console.warn(
-            "Nenhuma voz pt-BR encontrada ou API não retornou vozes ainda."
-          );
-        }
-      }
-
-      /**
-       * Lê o texto fornecido usando a Web Speech API.
-       * @param {string} text - O texto a ser lido.
-       */
-      function speakText(text) {
-        if (!ttsEnabled || !synth || !speechApiUnlocked || !text) {
-          console.log(
-            "TTS desabilitado, API não pronta/desbloqueada ou texto vazio."
-          );
-          return; // Sai se TTS desabilitado, API não disponível/desbloqueada ou texto vazio
-        }
-
-        // Cancela qualquer fala anterior para evitar sobreposição
-        stopSpeech();
-
-        // Cria a "declaração" (utterance)
-        utterance = new SpeechSynthesisUtterance(text);
-
-        utterance.onend = function () {
-          console.log("Narração concluída.");
-          utterance = null; // Limpa a referência
-        };
-
-        utterance.onerror = function (event) {
-          console.error("Erro na síntese de fala:", event.error);
-          utterance = null; // Limpa a referência
-        };
-
-        // Tenta usar a voz pt-BR selecionada
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-          utterance.lang = selectedVoice.lang; // Garante a língua correta
-        } else {
-          // Se nenhuma voz específica foi encontrada, define o idioma
-          // para dar uma dica ao navegador, mesmo que use a voz padrão.
-          utterance.lang = "pt-BR";
-          console.warn("Usando voz padrão para pt-BR.");
-        }
-
-        // (Opcional) Ajustar taxa e tom
-        utterance.rate = 1.0; // 0.1 a 10 (1 = normal)
-        utterance.pitch = 1.0; // 0 a 2 (1 = normal)
-
-        // Tenta falar (pode precisar de resume se o contexto estava suspenso)
-        if (synth.paused) {
-          synth.resume(); // Se estava pausado, retoma
-        }
-        synth.speak(utterance);
-        console.log("Tentando narrar:", text.substring(0, 30) + "...");
-      }
-
-      /**
-       * Interrompe a narração atual.
-       */
-      function stopSpeech() {
-        if (synth && synth.speaking) {
-          console.log("Cancelando narração anterior.");
-          synth.cancel();
-        }
-        // Também remove qualquer utterance pendente na fila, embora cancel() geralmente faça isso.
-        if (utterance) {
-          // utterance = null; // Não necessariamente nulo aqui, cancel deve tratar
-        }
-      }
-
-      // --- Fim Funções de Fala ---
-
-      function selectCharacter(characterClass) {
-        //Remove previous selection
-        if (selectedCharacter) {
-          document
-            .querySelector(`.character-card.selected`)
-            .classList.remove("selected");
-        }
-        selectedCharacter = characterClass;
-        document
-          .querySelector(`.character-card[data-class='${characterClass}']`)
-          .classList.add("selected");
-      }
-
-      /**
-       * Exibe texto em um elemento com efeito de máquina de escrever.
-       * @param {HTMLElement} element - O elemento HTML onde o texto será exibido.
-       * @param {string} text - O texto completo a ser digitado.
-       * @param {number} [speed=40] - O intervalo em milissegundos entre cada caractere.
-       * @param {function} [callback] - Função a ser chamada quando a digitação terminar.
-       * @returns {number} - O ID do intervalo (para poder limpar externamente).
-       */
-      function typewriterEffect(element, text, speed = 40, callback) {
-        if (!element) {
-          console.error("Elemento para typewriter não encontrado!");
-          return null;
-        }
-        if (currentTypewriterInterval) {
-          // Limpa qualquer intervalo anterior
-          clearInterval(currentTypewriterInterval);
-        }
-
-        element.textContent = ""; // Limpa o texto inicial
-        let i = 0;
-        skipTyping = false; // Reseta a flag de pular
-
-        currentTypewriterInterval = setInterval(() => {
-          if (skipTyping) {
-            // Verifica se o jogador quer pular
-            clearInterval(currentTypewriterInterval);
-            currentTypewriterInterval = null;
-            element.textContent = text; // Exibe todo o texto
-            if (callback) callback(); // Executa o callback
-            return;
-          }
-
-          if (i < text.length) {
-            element.textContent += text.charAt(i);
-            i++;
-          } else {
-            clearInterval(currentTypewriterInterval); // Para o intervalo
-            currentTypewriterInterval = null;
-            skipTyping = false; // Reseta a flag ao concluir
-            if (callback) {
-              callback(); // Chama a função de callback ao terminar
+            audio {
+                position: absolute;
+                top: 0px;
+                left: 0px;
+                box-shadow: 4px 1px 12px;
+                border-radius: 30px;
             }
-          }
-        }, speed);
 
-        return currentTypewriterInterval; // Retorna o ID para referência
-      }
+            .game-container {
+                background-color: #fff;
+                border: 2px solid #7a5c3d;
+                border-radius: 8px;
+                padding: 20px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                height: 90vh;
+            }
 
-      /**
-       * Função para habilitar os botões de escolha.
-       */
-      function enableChoices() {
-        const choiceButtons = document.querySelectorAll("#choices button");
-        choiceButtons.forEach((button) => (button.disabled = false));
-        // Habilita novamente o clique para pular, se necessário (opcional)
-        // setupSkipListener(); // Chamaria uma função que adiciona o listener se ele foi removido
-      }
+            .game-container2 {
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                grid-template-rows: repeat(5, 1fr);
+                gap: 8px;
+            }
 
-      /**
-       * Função para desabilitar os botões de escolha.
-       */
-      function disableChoices() {
-        const choiceButtons = document.querySelectorAll("#choices button");
-        choiceButtons.forEach((button) => (button.disabled = true));
-      }
+            .col1 {
+                grid-column: span 2 / span 2;
+                grid-row: span 5 / span 5;
+            }
 
-      /**
-       * Configura o listener para pular a digitação
-       */
-      function setupSkipListener() {
-        const sceneTextElement = document.getElementById("scene-text");
-        if (!sceneTextElement) return;
+            .col2 {
+                grid-column: span 2 / span 2;
+                grid-row: span 5 / span 5;
+                grid-column-start: 3;
+            }
+            .col3 {
+                grid-row: span 5 / span 5;
+                grid-column-start: 5;
+            }
 
-        // Remove listener antigo para evitar múltiplos gatilhos
-        sceneTextElement.removeEventListener("click", handleSkipTyping);
-        // Adiciona novo listener
-        sceneTextElement.addEventListener("click", handleSkipTyping, {
-          once: true,
-        }); // 'once: true' remove o listener após o primeiro clique
-      }
+            h1 {
+                color: #8b0000;
+                text-align: center;
+                font-size: 28px;
+                margin-bottom: 10px;
+            }
 
-      /**
-       * Handler para o clique que pula a digitação
-       */
-      function handleSkipTyping() {
-        if (currentTypewriterInterval) {
-          console.log("Pulando digitação...");
-          skipTyping = true; // Sinaliza para o intervalo terminar e exibir tudo
-        }
-      }
+            .subtitle {
+                text-align: center;
+                font-style: italic;
+                margin-bottom: 30px;
+                color: #555;
+            }
 
-      function startGame() {
-        if (!selectedCharacter) {
-          alert("⁉️ Escolha um personagem antes de iniciar a aventura.");
-          return;
-        }
-        //Initialize game state based on selected character
-        gameState.player.class = selectedCharacter;
-        gameState.player.stats = characterStats[selectedCharacter];
-        gameState.player.health = gameState.player.maxHealth = 20; // Reset health for new game
-        // Hide character selection and show game screen
-        document.getElementById("character-select").classList.add("hidden");
-        document.getElementById("game-screen").classList.remove("hidden");
-        document.getElementById("game-log").classList.remove("hidden");
-        document.getElementById("image-container").classList.remove("hidden");
-        //Start the game with the 'start' scene
-        loadScene("start");
-        updateStatsDisplay();
-      }
+            .scene-description {
+                border-left: 4px solid #8b0000;
+                padding: 10px 15px;
+                margin: 15px 0;
+                background-color: #f9f5eb;
+                overflow: auto;
+                max-height: 20vh;
+            }
 
-      function verificarImagem(idImagem, srcAlternativo) {
-        const imagem = document.getElementById(idImagem);
-        const src = imagem.src;
+            .stats {
+                display: flex;
+                justify-content: space-between;
+                background-color: #eee8d9;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 15px 0;
+            }
 
-        const testeImagem = new Image();
-        testeImagem.src = src;
+            .stat {
+                text-align: center;
+            }
 
-        testeImagem.onload = function () {
-          console.log("Imagem carregada com sucesso!");
-          gameState.lastImage = src;
-        };
+            .stat-value {
+                font-weight: bold;
+                font-size: 18px;
+            }
 
-        testeImagem.onerror = function () {
-          console.log("Erro ao carregar a imagem.");
-          if (srcAlternativo) {
-            imagem.src = srcAlternativo;
-            console.log("Imagem substituída por: " + srcAlternativo);
+            .choices {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                margin-top: 20px;
+            }
 
-            const testeImagem2 = new Image();
-            testeImagem2.src = srcAlternativo;
+            button {
+                background-color: #7a5c3d;
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: 'Palatino', serif;
+                font-size: 16px;
+                transition: background-color 0.3s;
+            }
 
-            testeImagem2.onload = function () {
-              console.log("Imagem carregada com sucesso!");
-              gameState.lastImage = srcAlternativo;
+            button:hover {
+                background-color: #8b0000;
+            }
+
+            #image-container {
+                padding-top: 16px;
+            }
+
+            #image-container img {
+                max-width: 100%;
+                max-height: 76vh;
+            }
+
+            .inventory {
+                margin-top: 20px;
+                padding: 10px;
+                background-color: #eee8d9;
+                border-radius: 5px;
+            }
+
+            .inventory h3 {
+                margin-top: 0;
+                color: #7a5c3d;
+            }
+
+            .dice-roll {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 20px 0;
+            }
+
+            .dice {
+                width: 60px;
+                height: 60px;
+                background-color: white;
+                border: 2px solid #333;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 24px;
+                font-weight: bold;
+                margin: 0 10px;
+            }
+
+            .roll-button {
+                margin-left: 20px;
+            }
+
+            .log {
+                overflow-y: auto;
+                margin-top: 15px;
+                border: 1px solid #ccc;
+                padding: 10px;
+                font-style: italic;
+                font-size: 14px;
+                color: #555;
+                border-radius: 5px;
+                max-height: 75vh;
+            }
+
+            .hidden {
+                display: none !important;
+            }
+
+            .character-select {
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                margin-bottom: 30px;
+            }
+
+            .character-card {
+                border: 2px solid #7a5c3d;
+                border-radius: 5px;
+                padding: 15px;
+                text-align: center;
+                cursor: pointer;
+                width: 150px;
+                transition: all 0.3s;
+            }
+
+            .character-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            }
+
+            .character-card.selected {
+                border-color: #8b0000;
+                background-color: #f9e9e9;
+            }
+
+            .result-message {
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+
+            .success {
+                background-color: #d4edda;
+                color: #155724;
+            }
+
+            .failure {
+                background-color: #f8d7da;
+                color: #721c24;
+            }
+            .modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .modal-content {
+                background-color: #fff;
+                border: 2px solid #7a5c3d;
+                padding: 20px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                font-family: 'Palatino', serif;
+                text-align: center;
+            }
+
+            .shop-items {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+
+            .shop-item {
+                background-color: #7a5c3d;
+                color: white;
+                border: none;
+                padding: 10px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: 'Palatino', serif;
+                font-size: 16px;
+                transition: background-color 0.3s;
+            }
+
+            .shop-item:hover {
+                background-color: #8b0000;
+            }
+
+            #close-shop {
+                background-color: #8b0000;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: 'Palatino', serif;
+                font-size: 16px;
+                transition: background-color 0.3s;
+            }
+
+            #close-shop:hover {
+                background-color: #7a5c3d;
+            }
+
+            #info {
+                position: absolute;
+                top: 96px;
+                left: 26px;
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Google Tag Manager (noscript) -->
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+        height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+        <!-- End Google Tag Manager (noscript) -->
+
+        <audio controls autoplay loop>
+          <source src="audio/medieval-music.mp3" type="audio/mpeg" />
+          Seu navegador não suporta o elemento de áudio.
+        </audio>
+
+        <!-- Adicionar botão de TTS -->
+        <button id="tts-toggle-button" style="position: absolute; top: 74px; left: 24px; z-index: 10; font-size: 16px; padding: 3px 6px;">
+            🔊 Narrador
+        </button>
+        <!-- Fim botão TTS -->
+
+
+        <a href="index_new.html" style="color: #666; text-decoration: none; font-style: italic; position: absolute; top: 28px; right: 28px; color: blue; z-index: 10;">Testar nova versão beta</a>
+
+        <div class="game-container">
+            <h1>A Masmorra de Drakmor</h1>
+            <p class="subtitle">Uma Aventura Simples de D&D</p>
+            <div id="character-select">
+                <h2 style="text-align: center;">Escolha o Seu Personagem</h2>
+                <div class="character-select">
+                    <div class="character-card" data-class="warrior" onclick="selectCharacter('warrior')">
+                        <h3>Guerreiro</h3>
+                        <p>Força e saúde elevadas, habilidoso com armas</p>
+                        <p>
+                            <strong>FOR:</strong> 16 <strong>DES:</strong> 12 <br>
+                            <strong>CON:</strong> 15 <strong>INT:</strong> 8
+                        </p>
+                    </div>
+                    <div class="character-card" data-class="wizard" onclick="selectCharacter('wizard')">
+                        <h3>Mago</h3>
+                        <p>Mestre em magia arcana com feitiços poderosos</p>
+                        <p>
+                            <strong>FOR:</strong> 8 <strong>DES:</strong> 14 <br>
+                            <strong>CON:</strong> 10 <strong>INT:</strong> 17
+                        </p>
+                    </div>
+                    <div class="character-card" data-class="rogue" onclick="selectCharacter('rogue')">
+                        <h3>Ladino</h3>
+                        <p>Ágil e astuto, habilidoso em furtividade</p>
+                        <p>
+                            <strong>FOR:</strong> 10 <strong>DES:</strong> 17 <br>
+                            <strong>CON:</strong> 12 <strong>INT:</strong> 14
+                        </p>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="startGame()">Começar Aventura</button>
+                </div>
+            </div>
+            <div class="game-container2">
+                <div id="game-screen" class="hidden col1">
+                    <div class="stats">
+                        <div class="stat">
+                            <div>❤️ Vida</div>
+                            <div class="stat-value" id="health">20</div>
+                        </div>
+                        <div class="stat">
+                            <div>🪙 Ouro</div>
+                            <div class="stat-value" id="gold">5</div>
+                        </div>
+                        <div class="stat">
+                            <div>📈 Experiência</div>
+                            <div class="stat-value" id="xp">0</div>
+                        </div>
+                    </div>
+                    <div class="scene-description" id="scene-text"></div>
+                    <div id="dice-container" class="hidden dice-roll">
+                        <div class="dice" id="dice">?</div>
+                        <button id="dice-button" class="roll-button" onclick="rollDice()">🎲 Rolar d20</button>
+                    </div>
+                    <div id="result-message" class="hidden result-message"></div>
+                    <div class=choices id=choices>
+                        <button id="open-shop" class="hidden">Abrir Lojinha</button>
+                    </div>
+                    <div class="inventory">
+                        <h3>🎒 Inventário</h3>
+                        <div id="inventory-items"> Nada ainda </div>
+                    </div>
+                </div>
+                <div id="image-container" class ="col2 hidden">
+                    <img id="image" src="./images/check_supplies.png">
+                </div>
+                <div class="col3 log hidden" id="game-log">📝 Logs do jogo</div>
+            </div>
+        </div>
+        <div id="shop-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>🏦 Lojinha</h2>
+                <p id="player-gold">🪙 Ouro: 5</p>
+                <div class="shop-items">
+                    <button class="shop-item" data-item="Poção de Vida" data-price="10">🫙 Poção de Vida - 10g</button>
+                    <button class="shop-item" data-item="Espada" data-price="32">⚔️ Espada - 32g</button>
+                    <button class="shop-item" data-item="Machado" data-price="36">🪓 Machado - 36g</button>
+                    <button class="shop-item" data-item="Adaga" data-price="45">💀 Adaga de osso estranha - 45g</button>
+                    <button class="shop-item" data-item="Escudo" data-price="31">🛡️ Escudo - 31g</button>
+                    <button class="shop-item" data-item="Corda" data-price="5">🪢 Corda - 5g</button>
+                    <button class="shop-item" data-item="Tocha" data-price="2">🔦 Tocha - 2g</button>
+                </div>
+                <button id="close-shop">Fechar</button>
+            </div>
+        </div>
+        <script>
+            // Estado do jogo
+            const gameState = {
+                player: {
+                    class: "",
+                    health: 20,
+                    maxHealth: 20,
+                    gold: 5,
+                    xp: 0,
+                    inventory: [],
+                    stats: {}
+                },
+                mem: {},
+                currentScene: "start",
+                lastScene: "start",
+                currentEnemy: {
+                    name: "Wolf",
+                    ac: 12,
+                    hp: 12,
+                    max_hp: 12,
+                    str: 10,
+                    dex: 10,
+                    con: 10,
+                    bba: 1
+                },
+                log: [],
+                pendingCheck: null,
+                checkDifficulty: 10
+            };
+            // Atributos do personagem
+            const characterStats = {
+                warrior: {
+                    str: 16,
+                    dex: 12,
+                    con: 15,
+                    int: 8,
+                    luck: 8,
+                    bba: 2,
+                    armor: 6
+                },
+                wizard: {
+                    str: 8,
+                    dex: 14,
+                    con: 10,
+                    int: 17,
+                    luck: 12,
+                    bba: 1,
+                    armor: 2
+                },
+                rogue: {
+                    str: 10,
+                    dex: 17,
+                    con: 12,
+                    int: 14,
+                    luck: 10,
+                    bba: 1,
+                    armor: 4
+                }
             };
 
-            testeImagem2.onerror = function () {
-              console.log("Erro ao carregar a imagem.");
-              if (srcAlternativo) {
-                imagem.src = gameState.lastImage;
-                console.log("Imagem substituída por: " + gameState.lastImage);
+            let currentTypewriterInterval = null;
+            let skipTyping = false;
+
+            var choicesElement = document.getElementById('choices');
+
+            // --- Fase 2: TTS Variables ---
+            let ttsEnabled = true; // Controle global para ativar/desativar TTS
+            let synth = window.speechSynthesis; // Acesso à API de fala
+            let voices = []; // Array para guardar as vozes disponíveis
+            let selectedVoice = null; // Para guardar a voz pt-BR preferida
+            let utterance = null; // Para guardar a instância da fala atual
+            // Flag para indicar se a API de fala foi "desbloqueada" pela interação do usuário
+            let speechApiUnlocked = false;
+
+            // Carregar cenas do arquivo JSON
+            let scenes = {};
+            fetch('assets/scenes.json')
+                .then(response => response.json())
+                .then(data => {
+                    // Converter strings de função em funções reais
+                    for (let sceneName in data) {
+                        if (data[sceneName].onEnter) {
+                            // Usando Function para criar uma nova função a partir da string
+                            data[sceneName].onEnter = new Function('return ' + data[sceneName].onEnter)();
+                        }
+                    }
+                    scenes = data;
+                    // Iniciar o jogo após carregar as cenas
+                    startGame();
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar as cenas:', error);
+                    alert('Erro ao carregar o jogo. Por favor, recarregue a página.');
+                });
+
+            let selectedCharacter = null;
+
+            /**
+             * Tenta popular a lista de vozes disponíveis e selecionar uma voz pt-BR.
+             * Precisa ser chamada APÓS a interação do usuário e/ou no evento 'voiceschanged'.
+             */
+            function populateVoiceList() {
+                if (!synth) return; // Sai se a API não for suportada
+
+                voices = synth.getVoices().sort(function (a, b) {
+                    const aname = a.name.toUpperCase();
+                    const bname = b.name.toUpperCase();
+                    if (aname < bname) return -1;
+                    else if (aname == bname) return 0;
+                    else return +1;
+                });
+                console.log("Vozes disponíveis:", voices);
+
+                // Tenta encontrar uma voz em Português do Brasil
+                selectedVoice = voices.find(voice => voice.name.includes('Daniel - Portuguese') || voice.name.includes('Maria - Portuguese'));
+
+                 // Fallback para outras pt-BR ou qualquer pt
+                if (!selectedVoice) {
+                     selectedVoice = voices.find(voice => voice.lang === 'pt-BR');
+                }
+                 if (!selectedVoice) {
+                    selectedVoice = voices.find(voice => voice.lang.startsWith('pt-'));
+                }
+                 // Fallback final para a primeira voz disponível
+                 if (!selectedVoice && voices.length > 0) {
+                     selectedVoice = voices[0];
+                 }
+
+                 if (selectedVoice) {
+                     console.log("Voz selecionada:", selectedVoice.name, selectedVoice.lang);
+                 } else {
+                     console.warn("Nenhuma voz pt-BR encontrada ou API não retornou vozes ainda.");
+                 }
+            }
+
+            /**
+             * Lê o texto fornecido usando a Web Speech API.
+             * @param {string} text - O texto a ser lido.
+             */
+            function speakText(text) {
+                if (!ttsEnabled || !synth || !speechApiUnlocked || !text) {
+                     console.log("TTS desabilitado, API não pronta/desbloqueada ou texto vazio.");
+                     return; // Sai se TTS desabilitado, API não disponível/desbloqueada ou texto vazio
+                }
+
+                // Cancela qualquer fala anterior para evitar sobreposição
+                stopSpeech();
+
+                // Cria a "declaração" (utterance)
+                utterance = new SpeechSynthesisUtterance(text);
+
+                utterance.onend = function() {
+                    console.log("Narração concluída.");
+                    utterance = null; // Limpa a referência
+                };
+
+                utterance.onerror = function(event) {
+                    console.error("Erro na síntese de fala:", event.error);
+                    utterance = null; // Limpa a referência
+                };
+
+                // Tenta usar a voz pt-BR selecionada
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                     utterance.lang = selectedVoice.lang; // Garante a língua correta
+                 } else {
+                     // Se nenhuma voz específica foi encontrada, define o idioma
+                     // para dar uma dica ao navegador, mesmo que use a voz padrão.
+                     utterance.lang = 'pt-BR';
+                     console.warn("Usando voz padrão para pt-BR.");
+                 }
+
+                // (Opcional) Ajustar taxa e tom
+                utterance.rate = 1.0; // 0.1 a 10 (1 = normal)
+                utterance.pitch = 1.0; // 0 a 2 (1 = normal)
+
+                // Tenta falar (pode precisar de resume se o contexto estava suspenso)
+                if (synth.paused) {
+                     synth.resume(); // Se estava pausado, retoma
+                 }
+                synth.speak(utterance);
+                console.log("Tentando narrar:", text.substring(0, 30) + "...");
+            }
+
+            /**
+             * Interrompe a narração atual.
+             */
+            function stopSpeech() {
+                if (synth && synth.speaking) {
+                    console.log("Cancelando narração anterior.");
+                    synth.cancel();
+                }
+                // Também remove qualquer utterance pendente na fila, embora cancel() geralmente faça isso.
+                 if (utterance) {
+                    // utterance = null; // Não necessariamente nulo aqui, cancel deve tratar
+                 }
+            }
+
+            // --- Fim Funções de Fala ---
+
+            function selectCharacter(characterClass) {
+                //Remove previous selection
+                if (selectedCharacter) {
+                    document.querySelector(`.character-card.selected`).classList.remove('selected');
+                }
+                selectedCharacter = characterClass;
+                document.querySelector(`.character-card[data-class='${characterClass}']`).classList.add('selected');
+            }
+
+            /**
+             * Exibe texto em um elemento com efeito de máquina de escrever.
+             * @param {HTMLElement} element - O elemento HTML onde o texto será exibido.
+             * @param {string} text - O texto completo a ser digitado.
+             * @param {number} [speed=40] - O intervalo em milissegundos entre cada caractere.
+             * @param {function} [callback] - Função a ser chamada quando a digitação terminar.
+             * @returns {number} - O ID do intervalo (para poder limpar externamente).
+             */
+            function typewriterEffect(element, text, speed = 40, callback) {
+                if (!element) {
+                    console.error("Elemento para typewriter não encontrado!");
+                    return null;
+                }
+                 if (currentTypewriterInterval) { // Limpa qualquer intervalo anterior
+                    clearInterval(currentTypewriterInterval);
+                }
+
+                element.textContent = ''; // Limpa o texto inicial
+                let i = 0;
+                skipTyping = false; // Reseta a flag de pular
+
+                currentTypewriterInterval = setInterval(() => {
+                    if (skipTyping) { // Verifica se o jogador quer pular
+                         clearInterval(currentTypewriterInterval);
+                         currentTypewriterInterval = null;
+                         element.textContent = text; // Exibe todo o texto
+                         if (callback) callback(); // Executa o callback
+                         return;
+                     }
+
+                    if (i < text.length) {
+                        element.textContent += text.charAt(i);
+                        i++;
+                    } else {
+                        clearInterval(currentTypewriterInterval); // Para o intervalo
+                        currentTypewriterInterval = null;
+                        skipTyping = false; // Reseta a flag ao concluir
+                        if (callback) {
+                            callback(); // Chama a função de callback ao terminar
+                        }
+                    }
+                }, speed);
+
+                return currentTypewriterInterval; // Retorna o ID para referência
+            }
+
+            /**
+             * Função para habilitar os botões de escolha.
+             */
+            function enableChoices() {
+                const choiceButtons = document.querySelectorAll('#choices button');
+                choiceButtons.forEach(button => button.disabled = false);
+                // Habilita novamente o clique para pular, se necessário (opcional)
+                // setupSkipListener(); // Chamaria uma função que adiciona o listener se ele foi removido
+            }
+
+            /**
+             * Função para desabilitar os botões de escolha.
+             */
+            function disableChoices() {
+                 const choiceButtons = document.querySelectorAll('#choices button');
+                 choiceButtons.forEach(button => button.disabled = true);
+            }
+
+            /**
+             * Configura o listener para pular a digitação
+             */
+            function setupSkipListener() {
+                const sceneTextElement = document.getElementById('scene-text');
+                if (!sceneTextElement) return;
+
+                // Remove listener antigo para evitar múltiplos gatilhos
+                sceneTextElement.removeEventListener('click', handleSkipTyping);
+                // Adiciona novo listener
+                sceneTextElement.addEventListener('click', handleSkipTyping, { once: true }); // 'once: true' remove o listener após o primeiro clique
+             }
+
+            /**
+             * Handler para o clique que pula a digitação
+             */
+            function handleSkipTyping() {
+                if (currentTypewriterInterval) {
+                    console.log("Pulando digitação...");
+                    skipTyping = true; // Sinaliza para o intervalo terminar e exibir tudo
+                }
+            }
+
+            function startGame() {
+                if (!selectedCharacter) {
+                    alert("⁉️ Escolha um personagem antes de iniciar a aventura.");
+                    return;
+                }
+                //Initialize game state based on selected character
+                gameState.player.class = selectedCharacter;
+                gameState.player.stats = characterStats[selectedCharacter];
+                gameState.player.health = gameState.player.maxHealth = 20; // Reset health for new game
+                // Hide character selection and show game screen
+                document.getElementById('character-select').classList.add('hidden');
+                document.getElementById('game-screen').classList.remove('hidden');
+                document.getElementById('game-log').classList.remove('hidden');
+                document.getElementById('image-container').classList.remove('hidden');
+                //Start the game with the 'start' scene
+                loadScene('start');
+                updateStatsDisplay();
+            }
+
+            function verificarImagem(idImagem, srcAlternativo) {
+                const imagem = document.getElementById(idImagem);
+                const src = imagem.src;
+
+                const testeImagem = new Image();
+                testeImagem.src = src;
+
+                testeImagem.onload = function() {
+                    console.log("Imagem carregada com sucesso!");
+                    gameState.lastImage = src;
+                };
+
+                testeImagem.onerror = function() {
+                    console.log("Erro ao carregar a imagem.");
+                    if (srcAlternativo) {
+                        imagem.src = srcAlternativo;
+                        console.log("Imagem substituída por: " + srcAlternativo);
+
+                        const testeImagem2 = new Image();
+                        testeImagem2.src = srcAlternativo;
+
+                        testeImagem2.onload = function() {
+                            console.log("Imagem carregada com sucesso!");
+                            gameState.lastImage = srcAlternativo;
+                        };
+
+                        testeImagem2.onerror = function() {
+                            console.log("Erro ao carregar a imagem.");
+                            if (srcAlternativo) {
+                                imagem.src = gameState.lastImage;
+                                console.log("Imagem substituída por: " + gameState.lastImage);
+                            }
+                        };
+                    }
+                };
+            }
+
+            function changeImage(sceneName) {
+                const imgElement = document.getElementById("image");
+                const src = "./images/"+sceneName;
+                const extPng = ".png";
+                const extJpg = ".jpeg";
+
+                imgElement.src = src + extPng;
+                verificarImagem("image", src + extJpg);
+            }
+
+            function loadScene(sceneName) {
+
+                stopSpeech();
+
+                // Limpa qualquer digitação anterior em andamento
+                if (currentTypewriterInterval) {
+                    clearInterval(currentTypewriterInterval);
+                    currentTypewriterInterval = null;
+                    skipTyping = false; // Reseta a flag
+                }
+
+                changeImage(sceneName);
+
+                console.log("gameState", JSON.stringify(gameState, undefined, 4));
+                console.log("sceneName", sceneName);
+
+                gameState.currentScene = sceneName;
+                const scene = scenes[sceneName];
+
+                console.log("scene", scene);
+
+                const sceneTextElement = document.getElementById('scene-text');
+                if (!sceneTextElement) {
+                    console.log("o elemento sumiu!");
+                    const sceneTextDiv = document.createElement('div');
+                    sceneTextDiv.id = 'scene-text';
+                    sceneTextDiv.textContent = 'Esta é a cena do jogo!'; // Adiciona um texto de exemplo
+                    // Encontra a div com o id "game-screen"
+                    const gameScreenDiv = document.getElementById('game-screen');
+                    if (gameScreenDiv == null || gameScreenDiv == undefined) {
+                        console.log("cade essa bagaça de div?");
+                    }
+                    // Adiciona a div "scene-text" como filha da div "game-screen"
+                    gameScreenDiv.appendChild(sceneTextDiv);
+                    sceneTextElement = sceneTextDiv;
+                }
+
+                speakText(scene.text); // Tenta ler o texto da cena
+
+                const diceContainer = document.getElementById('dice-container');
+                const resultMessageElement = document.getElementById('result-message');
+                console.log("sceneTextElement", sceneTextElement);
+
+                sceneTextElement.textContent = '...'; // Placeholder enquanto digita
+
+                // --- Modificação Principal ---
+                disableChoices(); // Desabilita escolhas enquanto o texto é digitado
+
+                choicesElement.innerHTML = ''; // Limpa escolhas antigas IMEDIATAMENTE
+
+                diceContainer.classList.add('hidden'); // Esconde dados por padrão
+                resultMessageElement.classList.add('hidden'); // Esconde mensagem por padrão
+
+                //sceneTextElement.textContent = scene.text;
+
+                // Inicia o efeito de digitação, passando a função para habilitar escolhas como callback
+                typewriterEffect(sceneTextElement, scene.text, 40, () => {
+                     // --- Este código executa DEPOIS que a digitação termina ---
+                     console.log("Digitação concluída para:", sceneName);
+                     // Adiciona as escolhas SOMENTE APÓS a digitação (ou skip)
+                     addChoiceInCurrentScene(scene, diceContainer, choicesElement); // Passa choicesElement
+                     enableChoices(); // Reabilita as escolhas
+                 });
+
+                 // Configura o listener para permitir pular a digitação atual
+                 setupSkipListener();
+
+                //Add choices for the current scene
+                addChoiceInCurrentScene(scene, diceContainer);
+
+                diceContainer.classList.add('hidden'); // Hide dice by default
+                resultMessageElement.classList.add('hidden'); // Hide result message by default
+
+                // Run onEnter function if it exists for the scene
+                if (scene.onEnter) {
+                    scene.onEnter();
+                }
+                // Reset check difficulty after scene load
+                gameState.checkDifficulty = 10;
+            }
+
+            function addChoiceInCurrentScene(scene, diceContainer, choicesElement) {
+                if (!choicesElement) {
+                    choicesElement = document.getElementById('choices'); // Fallback se não for passado
+                }
+
+                //Clear existing choices
+                choicesElement.innerHTML = '';
+
+                scene.choices.forEach(choice => {
+                    const button = document.createElement('button');
+                    button.textContent = choice.text;
+                    button.onclick = () => {
+
+                        // Ao clicar na escolha, remove o listener de skip da cena atual
+                        const sceneTextElement = document.getElementById('scene-text');
+                        if (sceneTextElement) sceneTextElement.removeEventListener('click', handleSkipTyping);
+
+                        if (choice.requiresCheck) {
+                            gameState.mem = {
+                                nextSceneSuccess: scenes[`${choice.nextScene}_success`] ? `${choice.nextScene}_success` : choice.nextScene,
+                                nextSceneFailure: scenes[`${choice.nextScene}_failure`] ? `${choice.nextScene}_failure` : choice.nextScene,
+                                checkType: choice.checkType
+                            };
+                            if (!diceContainer) {
+                                diceContainer = document.getElementById('dice-container');
+                            }
+                            diceContainer.classList.remove('hidden');
+                            choicesElement.classList.add('hidden'); // Hide choices during dice roll
+                        } else {
+                            loadScene(choice.nextScene);
+                        }
+                    };
+                    choicesElement.appendChild(button);
+                });
+
+                choicesElement.classList.remove('hidden'); // Ensure choices are visible when scene loads
+            }
+
+            function rollingDice(sides = 6, num = 1) {
+                return Array.from({length: num}, () => Math.floor(Math.random() * sides) + 1);
+            }
+
+            function activeDiceButton() {
+                const diceButton = document.getElementById('dice-button');
+                diceButton.disabled = false;
+            }
+
+            function disactiveDiceButton() {
+                const diceButton = document.getElementById('dice-button');
+                diceButton.disabled = true;
+            }
+
+            function rollDice() {
+                //disabilitar o botão
+                disactiveDiceButton();
+
+                const diceResult = Math.floor(Math.random() * 20) + 1;
+                document.getElementById('dice').textContent = diceResult;
+                const resultMessageElement = document.getElementById('result-message');
+                setTimeout(() => {
+                    const diceContainer = document.getElementById('dice-container');
+                    choicesElement = document.getElementById('choices');
+                    let checkSuccess = false;
+
+                    if (gameState.mem.checkType === "combat") {
+                        initFight(gameState.currentEnemy);
+                        checkSuccess = true;
+                    } else {
+                        let modifiedRoll = 0;
+
+                        let logMessage = `Resultado da rolagem de dado: ${diceResult} para a categoria de teste: ${gameState.mem.checkType}. `;
+
+                        if (gameState.mem.checkType === 'luck') { // No stat modifier for luck checks - raw d20 roll.
+                            modifiedRoll = diceResult; // Luck checks are raw d20 rolls
+                        }
+
+                        const statValue = Math.floor((gameState.player.stats[gameState.mem.checkType] - 10)/2); // Get relevant stat
+                        modifiedRoll = diceResult;
+
+                        if (statValue !== undefined) {
+                            modifiedRoll += statValue;
+                            logMessage += `\nModificador status +${statValue}. resultado da rolagem: ${modifiedRoll}. `;
+                        }
+
+                        if (modifiedRoll >= gameState.checkDifficulty) {
+                            checkSuccess = true;
+                            resultMessageElement.textContent = "Success!";
+                            resultMessageElement.classList.remove('failure');
+                            resultMessageElement.classList.add('success');
+                            logMessage += `\n👍 Sucesso no teste de dificuldade: ${gameState.checkDifficulty}.`;
+                        } else {
+                            resultMessageElement.textContent = "Failure!";
+                            resultMessageElement.classList.remove('success');
+                            resultMessageElement.classList.add('failure');
+                            logMessage += `\n👎 Falha no teste de dificuldade: ${gameState.checkDifficulty}.`;
+                        }
+                        resultMessageElement.classList.remove('hidden');
+                        addToLog(logMessage);
+                    }
+
+                    diceContainer.classList.add('hidden');
+                    choicesElement.classList.remove('hidden'); // Re-enable choices after roll
+                    // Set timeout to load next scene after showing result message (e.g., 1.5 seconds)
+                    setTimeout(() => {
+                        console.log("gameState.mem", gameState.mem);
+                        console.log("gameState.currentScene", gameState.currentScene);
+                        if (checkSuccess) {
+                            if (!gameState.mem.nextSceneSuccess) {
+                                loadScene(gameState.currentScene + "_success");
+                            } else {
+                                loadScene(gameState.mem.nextSceneSuccess);
+                            }
+                        } else {
+                            if (!gameState.mem.nextSceneFailure) {
+                                loadScene(gameState.currentScene + "_failure");
+                            } else {
+                                loadScene(gameState.mem.nextSceneFailure);
+                            }
+                        }
+                    }, 1000); // Wait 1.5 seconds before loading next scene
+                    gameState.pendingCheck = null; //Clear pending check
+                    document.getElementById('dice').textContent = "🎲"
+                    activeDiceButton();
+                }, 1500);
+
+            }
+
+            function initFight(enemy) {
+                do {
+                    fight(enemy)
+                } while(enemy.hp > 0 && gameState.player.health > 0)
+            }
+
+            function fight(enemy) {
+
+                let atkBonus = 0;
+
+                if (gameState.player.inventory.includes("Adaga")) {
+                    atkBonus = 2;
+                    addToLog(`💀 A adaga de ossos lhe dá +${atkBonus} de ataque.`);
+                }
+                if (gameState.player.inventory.includes("Espada")) {
+                    atkBonus = 3;
+                    addToLog(`⚔️ A espada lhe dá +${atkBonus} de ataque.`);
+                }
+                if (gameState.player.inventory.includes("Machado")) {
+                    atkBonus = 4;
+                    addToLog(`🪓 O machado lhe dá +${atkBonus} de ataque.`);
+                }
+
+                let attackRoll = atkBonus + rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10)/2) + gameState.player.stats.bba;
+
+                addToLog(`Você ataca o ${enemy.name} (AC ${enemy.ac})... Roll: ${attackRoll}`);
+
+                if (attackRoll >= enemy.ac) {
+                    const damage = rollingDice(8)[0] + Math.floor((gameState.player.stats.str - 10)/2);
+                    addToLog(`🥊 Você acerta ${damage} de dano no inimigo!`);
+
+                    enemy.hp -= damage;
+
+                    if (enemy.hp <= 0) {
+                        const xpGain = 50;
+                        const goldGain = rollingDice(6, 3).reduce((a, b) => a + b);
+                        addToLog(`🎊 Você derrotou o ${enemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`);
+                        gameState.player.xp += xpGain;
+                        gameState.player.gold += goldGain;
+                    } else {
+                        addToLog(`🥊 O ${enemy.name} sobreviveu e te ataca!`);
+                        enemyAttack(enemy)
+                    }
+                } else {
+                    addToLog("Você errou!");
+                    addToLog(`🥊 O ${enemy.name} te ataca!`);
+                    enemyAttack(enemy)
+                }
+            }
+
+            function enemyAttack(enemy) {
+                let attackEnemy = rollingDice(20)[0] + Math.floor((gameState.player.stats.str - 10)/2) + gameState.player.stats.bba;
+                let armorBonus = 0;
+                if (gameState.player.inventory.includes("Escudo")) {
+                    armorBonus = 4;
+                    addToLog(`🛡️ O escudo lhe dá +${armorBonus} de armadura.`);
+                }
+                if (attackEnemy >= 10 + Math.floor((gameState.player.stats.dex - 10)/2) + gameState.player.stats.armor + armorBonus) {
+                    addToLog(`🥊 O ${enemy.name} acerta você.`);
+                    const enemyDamage = rollingDice(6)[0];
+                    addToLog(`Você levou ${enemyDamage} de dano!`);
+                    changeHealth(enemyDamage);
+                } else {
+                    addToLog(enemy.name + " miss!");
+                }
+            }
+
+            function changeHealth(amount) {
+                gameState.player.health += amount;
+                if (gameState.player.health > gameState.player.maxHealth) gameState.player.health = gameState.player.maxHealth; // cap health
+                if (gameState.player.health <= 0) {
+                    gameState.player.health = 0;
+                    addToLog("☠️☠️☠️ Você morreu pq perdeu todos os pontos de vida! ☠️☠️☠️");
+                    loadScene('death'); // Load death scene
+                }
+                updateStatsDisplay();
+            }
+
+            function changeGold(amount) {
+                gameState.player.gold += amount;
+                if (gameState.player.gold < 0) gameState.player.gold = 0; // No negative gold
+                if (amount > 0) {
+                    addToLog("Você ganhou " + amount + " 🪙.");
+                } else {
+                    addToLog(amount + " 🪙 foi removido da sua mochila");
+                }
+                updateStatsDisplay();
+            }
+
+            function changeXP(amount) {
+                gameState.player.xp += amount;
+                updateStatsDisplay();
+                addToLog("Você ganhou " + amount + " de XP." );
+            }
+
+            function addToInventory(item) {
+                gameState.player.inventory.push(item);
+                updateInventoryDisplay();
+                addToLog(`Adicionado ${item} ao inventário.`);
+            }
+
+            function removeHealthPotionsFromInventory() {
+                gameState.player.inventory = gameState.player.inventory.filter(item => item !== 'Poção de cura');
+                updateInventoryDisplay();
+            }
+
+            function removeFromInventory(item) {
+                const index = gameState.player.inventory.indexOf(item);
+                if (index > -1) {
+                    gameState.player.inventory.splice(index, 1);
+                    updateInventoryDisplay();
+                    addToLog(`Removido ${item} ao inventário.`);
+                }
+            }
+
+            function haveMoney(amount) {
+              if (amount < gameState.player.gold) {
+                gameState.player.gold -= amount;
+                addToLog(amount + " 🪙 foram removidas da sua mochila");
+                updateStatsDisplay();
+                return true;
               }
-            };
-          }
-        };
-      }
 
-      function changeImage(sceneName) {
-        const imgElement = document.getElementById("image");
-        const src = "./images/" + sceneName;
-        const extPng = ".png";
-        const extJpg = ".jpeg";
-
-        imgElement.src = src + extPng;
-        verificarImagem("image", src + extJpg);
-      }
-
-      function loadScene(sceneName) {
-        stopSpeech();
-
-        // Limpa qualquer digitação anterior em andamento
-        if (currentTypewriterInterval) {
-          clearInterval(currentTypewriterInterval);
-          currentTypewriterInterval = null;
-          skipTyping = false; // Reseta a flag
-        }
-
-        changeImage(sceneName);
-
-        console.log("gameState", JSON.stringify(gameState, undefined, 4));
-        console.log("sceneName", sceneName);
-
-        gameState.currentScene = sceneName;
-        const scene = scenes[sceneName];
-
-        console.log("scene", scene);
-
-        const sceneTextElement = document.getElementById("scene-text");
-        if (!sceneTextElement) {
-          console.log("o elemento sumiu!");
-          const sceneTextDiv = document.createElement("div");
-          sceneTextDiv.id = "scene-text";
-          sceneTextDiv.textContent = "Esta é a cena do jogo!"; // Adiciona um texto de exemplo
-          // Encontra a div com o id "game-screen"
-          const gameScreenDiv = document.getElementById("game-screen");
-          if (gameScreenDiv == null || gameScreenDiv == undefined) {
-            console.log("cade essa bagaça de div?");
-          }
-          // Adiciona a div "scene-text" como filha da div "game-screen"
-          gameScreenDiv.appendChild(sceneTextDiv);
-          sceneTextElement = sceneTextDiv;
-        }
-
-        speakText(scene.text); // Tenta ler o texto da cena
-
-        const diceContainer = document.getElementById("dice-container");
-        const resultMessageElement = document.getElementById("result-message");
-        console.log("sceneTextElement", sceneTextElement);
-
-        sceneTextElement.textContent = "..."; // Placeholder enquanto digita
-
-        // --- Modificação Principal ---
-        disableChoices(); // Desabilita escolhas enquanto o texto é digitado
-
-        choicesElement.innerHTML = ""; // Limpa escolhas antigas IMEDIATAMENTE
-
-        diceContainer.classList.add("hidden"); // Esconde dados por padrão
-        resultMessageElement.classList.add("hidden"); // Esconde mensagem por padrão
-
-        //sceneTextElement.textContent = scene.text;
-
-        // Inicia o efeito de digitação, passando a função para habilitar escolhas como callback
-        typewriterEffect(sceneTextElement, scene.text, 40, () => {
-          // --- Este código executa DEPOIS que a digitação termina ---
-          console.log("Digitação concluída para:", sceneName);
-          // Adiciona as escolhas SOMENTE APÓS a digitação (ou skip)
-          addChoiceInCurrentScene(scene, diceContainer, choicesElement); // Passa choicesElement
-          enableChoices(); // Reabilita as escolhas
-        });
-
-        // Configura o listener para permitir pular a digitação atual
-        setupSkipListener();
-
-        //Add choices for the current scene
-        addChoiceInCurrentScene(scene, diceContainer);
-
-        diceContainer.classList.add("hidden"); // Hide dice by default
-        resultMessageElement.classList.add("hidden"); // Hide result message by default
-
-        // Run onEnter function if it exists for the scene
-        if (scene.onEnter) {
-          scene.onEnter();
-        }
-        // Reset check difficulty after scene load
-        gameState.checkDifficulty = 10;
-      }
-
-      function addChoiceInCurrentScene(scene, diceContainer, choicesElement) {
-        if (!choicesElement) {
-          choicesElement = document.getElementById("choices"); // Fallback se não for passado
-        }
-
-        //Clear existing choices
-        choicesElement.innerHTML = "";
-
-        scene.choices.forEach((choice) => {
-          const button = document.createElement("button");
-          button.textContent = choice.text;
-          button.onclick = () => {
-            // Ao clicar na escolha, remove o listener de skip da cena atual
-            const sceneTextElement = document.getElementById("scene-text");
-            if (sceneTextElement)
-              sceneTextElement.removeEventListener("click", handleSkipTyping);
-
-            if (choice.requiresCheck) {
-              gameState.mem = {
-                nextSceneSuccess: scenes[`${choice.nextScene}_success`]
-                  ? `${choice.nextScene}_success`
-                  : choice.nextScene,
-                nextSceneFailure: scenes[`${choice.nextScene}_failure`]
-                  ? `${choice.nextScene}_failure`
-                  : choice.nextScene,
-                checkType: choice.checkType,
-              };
-              if (!diceContainer) {
-                diceContainer = document.getElementById("dice-container");
-              }
-              diceContainer.classList.remove("hidden");
-              choicesElement.classList.add("hidden"); // Hide choices during dice roll
-            } else {
-              loadScene(choice.nextScene);
-            }
-          };
-          choicesElement.appendChild(button);
-        });
-
-        choicesElement.classList.remove("hidden"); // Ensure choices are visible when scene loads
-      }
-
-      function rollingDice(sides = 6, num = 1) {
-        return Array.from(
-          { length: num },
-          () => Math.floor(Math.random() * sides) + 1
-        );
-      }
-
-      function activeDiceButton() {
-        const diceButton = document.getElementById("dice-button");
-        diceButton.disabled = false;
-      }
-
-      function disactiveDiceButton() {
-        const diceButton = document.getElementById("dice-button");
-        diceButton.disabled = true;
-      }
-
-      function rollDice() {
-        //disabilitar o botão
-        disactiveDiceButton();
-
-        const diceResult = Math.floor(Math.random() * 20) + 1;
-        document.getElementById("dice").textContent = diceResult;
-        const resultMessageElement = document.getElementById("result-message");
-        setTimeout(() => {
-          const diceContainer = document.getElementById("dice-container");
-          choicesElement = document.getElementById("choices");
-          let checkSuccess = false;
-
-          if (gameState.mem.checkType === "combat") {
-            initFight(gameState.currentEnemy);
-            checkSuccess = true;
-          } else {
-            let modifiedRoll = 0;
-
-            let logMessage = `Resultado da rolagem de dado: ${diceResult} para a categoria de teste: ${gameState.mem.checkType}. `;
-
-            if (gameState.mem.checkType === "luck") {
-              // No stat modifier for luck checks - raw d20 roll.
-              modifiedRoll = diceResult; // Luck checks are raw d20 rolls
+              return false;
             }
 
-            const statValue = Math.floor(
-              (gameState.player.stats[gameState.mem.checkType] - 10) / 2
-            ); // Get relevant stat
-            modifiedRoll = diceResult;
-
-            if (statValue !== undefined) {
-              modifiedRoll += statValue;
-              logMessage += `\nModificador status +${statValue}. resultado da rolagem: ${modifiedRoll}. `;
+            function updateStatsDisplay() {
+                document.getElementById('health').textContent = gameState.player.health;
+                document.getElementById('gold').textContent = gameState.player.gold;
+                document.getElementById('xp').textContent = gameState.player.xp;
             }
 
-            if (modifiedRoll >= gameState.checkDifficulty) {
-              checkSuccess = true;
-              resultMessageElement.textContent = "Success!";
-              resultMessageElement.classList.remove("failure");
-              resultMessageElement.classList.add("success");
-              logMessage += `\n👍 Sucesso no teste de dificuldade: ${gameState.checkDifficulty}.`;
-            } else {
-              resultMessageElement.textContent = "Failure!";
-              resultMessageElement.classList.remove("success");
-              resultMessageElement.classList.add("failure");
-              logMessage += `\n👎 Falha no teste de dificuldade: ${gameState.checkDifficulty}.`;
+            function updateInventoryDisplay() {
+                const inventoryItemsElement = document.getElementById('inventory-items');
+                if (gameState.player.inventory.length === 0) {
+                    inventoryItemsElement.textContent = "Mochila vazia!";
+                } else {
+                    inventoryItemsElement.innerHTML = ''; // Clear existing items
+                    const ul = document.createElement('ul');
+                    gameState.player.inventory.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = item;
+                        ul.appendChild(li);
+                    });
+                    inventoryItemsElement.appendChild(ul);
+                }
             }
-            resultMessageElement.classList.remove("hidden");
-            addToLog(logMessage);
-          }
 
-          diceContainer.classList.add("hidden");
-          choicesElement.classList.remove("hidden"); // Re-enable choices after roll
-          // Set timeout to load next scene after showing result message (e.g., 1.5 seconds)
-          setTimeout(() => {
-            console.log("gameState.mem", gameState.mem);
-            console.log("gameState.currentScene", gameState.currentScene);
-            if (checkSuccess) {
-              if (!gameState.mem.nextSceneSuccess) {
-                loadScene(gameState.currentScene + "_success");
-              } else {
-                loadScene(gameState.mem.nextSceneSuccess);
-              }
-            } else {
-              if (!gameState.mem.nextSceneFailure) {
-                loadScene(gameState.currentScene + "_failure");
-              } else {
-                loadScene(gameState.mem.nextSceneFailure);
-              }
+            function addToLog(message) {
+                gameState.log.push(message);
+                const logElement = document.getElementById('game-log');
+                const logMessageElement = document.createElement('p');
+                logMessageElement.textContent = message;
+                logElement.appendChild(logMessageElement);
+                logElement.scrollTop = logElement.scrollHeight; //Auto-scroll to bottom
             }
-          }, 1000); // Wait 1.5 seconds before loading next scene
-          gameState.pendingCheck = null; //Clear pending check
-          document.getElementById("dice").textContent = "🎲";
-          activeDiceButton();
-        }, 1500);
-      }
 
-      function initFight(enemy) {
-        do {
-          fight(enemy);
-        } while (enemy.hp > 0 && gameState.player.health > 0);
-      }
+            // Selecionar elementos da lojinha
+            const openShopButton = document.getElementById('open-shop');
+            const closeShopButton = document.getElementById('close-shop');
+            const shopModal = document.getElementById('shop-modal');
+            const playerGoldElement = document.getElementById('player-gold');
+            const shopItems = document.querySelectorAll('.shop-item');
 
-      function fight(enemy) {
-        let atkBonus = 0;
+            // Abrir a lojinha
+            openShopButton.addEventListener('click', () => {
+                playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
+                shopModal.classList.remove('hidden');
+            });
 
-        if (gameState.player.inventory.includes("Adaga")) {
-          atkBonus = 2;
-          addToLog(`💀 A adaga de ossos lhe dá +${atkBonus} de ataque.`);
-        }
-        if (gameState.player.inventory.includes("Espada")) {
-          atkBonus = 3;
-          addToLog(`⚔️ A espada lhe dá +${atkBonus} de ataque.`);
-        }
-        if (gameState.player.inventory.includes("Machado")) {
-          atkBonus = 4;
-          addToLog(`🪓 O machado lhe dá +${atkBonus} de ataque.`);
-        }
+            // Fechar a lojinha
+            closeShopButton.addEventListener('click', () => {
+                shopModal.classList.add('hidden');
+            });
 
-        let attackRoll =
-          atkBonus +
-          rollingDice(20)[0] +
-          Math.floor((gameState.player.stats.str - 10) / 2) +
-          gameState.player.stats.bba;
+            // Comprar itens
+            shopItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const itemName = item.getAttribute('data-item');
+                    const itemPrice = parseInt(item.getAttribute('data-price'), 10);
 
-        addToLog(
-          `Você ataca o ${enemy.name} (AC ${enemy.ac})... Roll: ${attackRoll}`
-        );
+                    if (gameState.player.gold >= itemPrice) {
+                        gameState.player.gold -= itemPrice;
+                        addToInventory(itemName);
+                        playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
+                        addToLog(`Você comprou ${itemName} por ${itemPrice}g.`);
+                        updateStatsDisplay(); // Atualiza o ouro na interface
+                    } else {
+                        addToLog("Ouro insuficiente para comprar este item.");
+                    }
+                });
+            });
 
-        if (attackRoll >= enemy.ac) {
-          const damage =
-            rollingDice(8)[0] +
-            Math.floor((gameState.player.stats.str - 10) / 2);
-          addToLog(`🥊 Você acerta ${damage} de dano no inimigo!`);
+            function init() {
+                // ... (configuração inicial: scene, camera, etc. se aplicável, ou elementos DOM)
 
-          enemy.hp -= damage;
+                // Event Listeners para Teclado/Mouse/Toque (se houver, para o jogo em si)
+                // document.addEventListener('keydown', handleKeyDown); // Exemplo se você tiver
+                // gameContainer.addEventListener('click', handleGameClick); // Exemplo
 
-          if (enemy.hp <= 0) {
-            const xpGain = 50;
-            const goldGain = rollingDice(6, 3).reduce((a, b) => a + b);
-            addToLog(
-              `🎊 Você derrotou o ${enemy.name}! Ganhou ${xpGain} de XP e ${goldGain}g`
-            );
-            gameState.player.xp += xpGain;
-            gameState.player.gold += goldGain;
-          } else {
-            addToLog(`🥊 O ${enemy.name} sobreviveu e te ataca!`);
-            enemyAttack(enemy);
-          }
-        } else {
-          addToLog("Você errou!");
-          addToLog(`🥊 O ${enemy.name} te ataca!`);
-          enemyAttack(enemy);
-        }
-      }
-
-      function enemyAttack(enemy) {
-        let attackEnemy =
-          rollingDice(20)[0] +
-          Math.floor((gameState.player.stats.str - 10) / 2) +
-          gameState.player.stats.bba;
-        let armorBonus = 0;
-        if (gameState.player.inventory.includes("Escudo")) {
-          armorBonus = 4;
-          addToLog(`🛡️ O escudo lhe dá +${armorBonus} de armadura.`);
-        }
-        if (
-          attackEnemy >=
-          10 +
-            Math.floor((gameState.player.stats.dex - 10) / 2) +
-            gameState.player.stats.armor +
-            armorBonus
-        ) {
-          addToLog(`🥊 O ${enemy.name} acerta você.`);
-          const enemyDamage = rollingDice(6)[0];
-          addToLog(`Você levou ${enemyDamage} de dano!`);
-          changeHealth(enemyDamage);
-        } else {
-          addToLog(enemy.name + " miss!");
-        }
-      }
-
-      function changeHealth(amount) {
-        gameState.player.health += amount;
-        if (gameState.player.health > gameState.player.maxHealth)
-          gameState.player.health = gameState.player.maxHealth; // cap health
-        if (gameState.player.health <= 0) {
-          gameState.player.health = 0;
-          addToLog(
-            "☠️☠️☠️ Você morreu pq perdeu todos os pontos de vida! ☠️☠️☠️"
-          );
-          loadScene("death"); // Load death scene
-        }
-        updateStatsDisplay();
-      }
-
-      function changeGold(amount) {
-        gameState.player.gold += amount;
-        if (gameState.player.gold < 0) gameState.player.gold = 0; // No negative gold
-        if (amount > 0) {
-          addToLog("Você ganhou " + amount + " 🪙.");
-        } else {
-          addToLog(amount + " 🪙 foi removido da sua mochila");
-        }
-        updateStatsDisplay();
-      }
-
-      function changeXP(amount) {
-        gameState.player.xp += amount;
-        updateStatsDisplay();
-        addToLog("Você ganhou " + amount + " de XP.");
-      }
-
-      function addToInventory(item) {
-        gameState.player.inventory.push(item);
-        updateInventoryDisplay();
-        addToLog(`Adicionado ${item} ao inventário.`);
-      }
-
-      function removeHealthPotionsFromInventory() {
-        gameState.player.inventory = gameState.player.inventory.filter(
-          (item) => item !== "Poção de cura"
-        );
-        updateInventoryDisplay();
-      }
-
-      function removeFromInventory(item) {
-        const index = gameState.player.inventory.indexOf(item);
-        if (index > -1) {
-          gameState.player.inventory.splice(index, 1);
-          updateInventoryDisplay();
-          addToLog(`Removido ${item} ao inventário.`);
-        }
-      }
-
-      function haveMoney(amount) {
-        if (amount < gameState.player.gold) {
-          gameState.player.gold -= amount;
-          addToLog(amount + " 🪙 foram removidas da sua mochila");
-          updateStatsDisplay();
-          return true;
-        }
-
-        return false;
-      }
-
-      function updateStatsDisplay() {
-        document.getElementById("health").textContent = gameState.player.health;
-        document.getElementById("gold").textContent = gameState.player.gold;
-        document.getElementById("xp").textContent = gameState.player.xp;
-      }
-
-      function updateInventoryDisplay() {
-        const inventoryItemsElement =
-          document.getElementById("inventory-items");
-        if (gameState.player.inventory.length === 0) {
-          inventoryItemsElement.textContent = "Mochila vazia!";
-        } else {
-          inventoryItemsElement.innerHTML = ""; // Clear existing items
-          const ul = document.createElement("ul");
-          gameState.player.inventory.forEach((item) => {
-            const li = document.createElement("li");
-            li.textContent = item;
-            ul.appendChild(li);
-          });
-          inventoryItemsElement.appendChild(ul);
-        }
-      }
-
-      function addToLog(message) {
-        gameState.log.push(message);
-        const logElement = document.getElementById("game-log");
-        const logMessageElement = document.createElement("p");
-        logMessageElement.textContent = message;
-        logElement.appendChild(logMessageElement);
-        logElement.scrollTop = logElement.scrollHeight; //Auto-scroll to bottom
-      }
-
-      // Selecionar elementos da lojinha
-      const openShopButton = document.getElementById("open-shop");
-      const closeShopButton = document.getElementById("close-shop");
-      const shopModal = document.getElementById("shop-modal");
-      const playerGoldElement = document.getElementById("player-gold");
-      const shopItems = document.querySelectorAll(".shop-item");
-
-      // Abrir a lojinha
-      openShopButton.addEventListener("click", () => {
-        playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
-        shopModal.classList.remove("hidden");
-      });
-
-      // Fechar a lojinha
-      closeShopButton.addEventListener("click", () => {
-        shopModal.classList.add("hidden");
-      });
-
-      // Comprar itens
-      shopItems.forEach((item) => {
-        item.addEventListener("click", () => {
-          const itemName = item.getAttribute("data-item");
-          const itemPrice = parseInt(item.getAttribute("data-price"), 10);
-
-          if (gameState.player.gold >= itemPrice) {
-            gameState.player.gold -= itemPrice;
-            addToInventory(itemName);
-            playerGoldElement.textContent = `Ouro: ${gameState.player.gold}`;
-            addToLog(`Você comprou ${itemName} por ${itemPrice}g.`);
-            updateStatsDisplay(); // Atualiza o ouro na interface
-          } else {
-            addToLog("Ouro insuficiente para comprar este item.");
-          }
-        });
-      });
-
-      function init() {
-        // ... (configuração inicial: scene, camera, etc. se aplicável, ou elementos DOM)
-
-        // Event Listeners para Teclado/Mouse/Toque (se houver, para o jogo em si)
-        // document.addEventListener('keydown', handleKeyDown); // Exemplo se você tiver
-        // gameContainer.addEventListener('click', handleGameClick); // Exemplo
-
-        // --- Modificar listener de inicialização ---
-        function initializeAudioAndSpeech() {
-          // Tenta inicializar/resumir AudioContext (se você usar áudio para outras coisas)
-          /*
+                // --- Modificar listener de inicialização ---
+                function initializeAudioAndSpeech() {
+                     // Tenta inicializar/resumir AudioContext (se você usar áudio para outras coisas)
+                     /*
                      if (!audioContext) {
                          try {
                              audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1354,102 +1189,89 @@
                      }
                      */
 
-          // --- Inicialização da API de Fala ---
-          if (synth) {
-            // Verifica se a API existe no navegador
-            if (!speechApiUnlocked) {
-              // Tenta "desbloquear" a API com uma chamada silenciosa ou resume
-              // synth.speak(new SpeechSynthesisUtterance('')); // Método comum, mas pode dar 'cancelled'
-              // Ou tenta retomar, pode ser suficiente em alguns navegadores
-              if (synth.paused) {
-                synth.resume();
-              } // Se estiver pausado, retoma
-              if (synth.speaking) {
-                synth.cancel();
-              } // Cancela algo que possa ter ficado preso
+                    // --- Inicialização da API de Fala ---
+                    if (synth) { // Verifica se a API existe no navegador
+                        if (!speechApiUnlocked) {
+                             // Tenta "desbloquear" a API com uma chamada silenciosa ou resume
+                             // synth.speak(new SpeechSynthesisUtterance('')); // Método comum, mas pode dar 'cancelled'
+                            // Ou tenta retomar, pode ser suficiente em alguns navegadores
+                             if (synth.paused) { synth.resume(); } // Se estiver pausado, retoma
+                             if (synth.speaking) { synth.cancel(); } // Cancela algo que possa ter ficado preso
 
-              console.log("Tentativa de desbloquear Speech Synthesis API.");
-              speechApiUnlocked = true; // Assume que foi desbloqueado pela interação
+                            console.log("Tentativa de desbloquear Speech Synthesis API.");
+                            speechApiUnlocked = true; // Assume que foi desbloqueado pela interação
 
-              // Popula a lista de vozes. A lista pode não estar pronta imediatamente.
-              // Opção 1: Tenta popular direto (pode não ter vozes ainda)
-              populateVoiceList();
-              // Opção 2: Tenta popular após um pequeno atraso
-              // setTimeout(populateVoiceList, 250);
-              // Opção 3 (Melhor): Usa o evento 'onvoiceschanged'
-              if (synth.onvoiceschanged !== undefined) {
-                synth.onvoiceschanged = populateVoiceList;
-              }
+                             // Popula a lista de vozes. A lista pode não estar pronta imediatamente.
+                             // Opção 1: Tenta popular direto (pode não ter vozes ainda)
+                             populateVoiceList();
+                             // Opção 2: Tenta popular após um pequeno atraso
+                              // setTimeout(populateVoiceList, 250);
+                             // Opção 3 (Melhor): Usa o evento 'onvoiceschanged'
+                             if (synth.onvoiceschanged !== undefined) {
+                                 synth.onvoiceschanged = populateVoiceList;
+                            }
+                        }
+                    } else {
+                        console.warn("Web Speech API (speechSynthesis) não suportada neste navegador.");
+                        ttsEnabled = false; // Desabilita TTS se não for suportado
+                    }
+                    // --- Fim Inicialização da Fala ---
+
+
+                    // Atualiza UI e remove listeners
+                    window.removeEventListener('click', initializeAudioAndSpeech);
+                    window.removeEventListener('keydown', initializeAudioAndSpeech);
+                    window.removeEventListener('touchstart', initializeAudioAndSpeech); // Adicionar touch
+                 }
+
+                // Adiciona listeners para a primeira interação
+                window.addEventListener('click', initializeAudioAndSpeech, { once: true });
+                window.addEventListener('keydown', initializeAudioAndSpeech, { once: true });
+                window.addEventListener('touchstart', initializeAudioAndSpeech, { once: true }); // Adicionar touch
+
+                // --- Início do Jogo ---
+                // Não chame loadScene aqui, espere a seleção de personagem
+                // initGame(); // Ou qualquer função que prepare a tela inicial
+                updateStatsDisplay(); // Atualiza a UI inicial
+                updateInventoryDisplay(); // Atualiza UI inicial
+
+                // --- Controle Opcional de Mudo TTS ---
+                const ttsToggleButton = document.getElementById('tts-toggle-button');
+
+                function updateTtsButtonVisual() {
+                     if (ttsToggleButton) {
+                         ttsToggleButton.textContent = ttsEnabled ? '🔊 Narrador' : '🔇 Narrador';
+                         ttsToggleButton.style.opacity = ttsEnabled ? '1' : '0.6';
+                     }
+                 }
+
+                if (ttsToggleButton) {
+                    ttsToggleButton.addEventListener('click', () => {
+                        ttsEnabled = !ttsEnabled;
+                        updateTtsButtonVisual();
+                        if (!ttsEnabled) {
+                            stopSpeech(); // Para a fala imediatamente se for desabilitado
+                        }
+                        console.log("TTS Habilitado:", ttsEnabled);
+                    });
+                    updateTtsButtonVisual(); // Define o estado inicial do botão
+                }
+                // --- Fim Controle Opcional ---
             }
-          } else {
-            console.warn(
-              "Web Speech API (speechSynthesis) não suportada neste navegador."
-            );
-            ttsEnabled = false; // Desabilita TTS se não for suportado
-          }
-          // --- Fim Inicialização da Fala ---
 
-          // Atualiza UI e remove listeners
-          window.removeEventListener("click", initializeAudioAndSpeech);
-          window.removeEventListener("keydown", initializeAudioAndSpeech);
-          window.removeEventListener("touchstart", initializeAudioAndSpeech); // Adicionar touch
-        }
+            // Chame init() no final do script para configurar tudo
+            init();
 
-        // Adiciona listeners para a primeira interação
-        window.addEventListener("click", initializeAudioAndSpeech, {
-          once: true,
-        });
-        window.addEventListener("keydown", initializeAudioAndSpeech, {
-          once: true,
-        });
-        window.addEventListener("touchstart", initializeAudioAndSpeech, {
-          once: true,
-        }); // Adicionar touch
-
-        // --- Início do Jogo ---
-        // Não chame loadScene aqui, espere a seleção de personagem
-        // initGame(); // Ou qualquer função que prepare a tela inicial
-        updateStatsDisplay(); // Atualiza a UI inicial
-        updateInventoryDisplay(); // Atualiza UI inicial
-
-        // --- Controle Opcional de Mudo TTS ---
-        const ttsToggleButton = document.getElementById("tts-toggle-button");
-
-        function updateTtsButtonVisual() {
-          if (ttsToggleButton) {
-            ttsToggleButton.textContent = ttsEnabled
-              ? "🔊 Narrador"
-              : "🔇 Narrador";
-            ttsToggleButton.style.opacity = ttsEnabled ? "1" : "0.6";
-          }
-        }
-
-        if (ttsToggleButton) {
-          ttsToggleButton.addEventListener("click", () => {
-            ttsEnabled = !ttsEnabled;
-            updateTtsButtonVisual();
-            if (!ttsEnabled) {
-              stopSpeech(); // Para a fala imediatamente se for desabilitado
+            function changeMusic(musicPath) {
+                const audioElement = document.querySelector('audio');
+                if (audioElement) {
+                    audioElement.src = musicPath;
+                    audioElement.play().catch(error => {
+                        console.error('Erro ao tocar música:', error);
+                    });
+                }
             }
-            console.log("TTS Habilitado:", ttsEnabled);
-          });
-          updateTtsButtonVisual(); // Define o estado inicial do botão
-        }
-        // --- Fim Controle Opcional ---
-      }
 
-      // Chame init() no final do script para configurar tudo
-      init();
-
-      function changeMusic(musicPath) {
-        const audioElement = document.querySelector("audio");
-        if (audioElement) {
-          audioElement.src = musicPath;
-          audioElement.play().catch((error) => {
-            console.error("Erro ao tocar música:", error);
-          });
-        }
-      }
-    </script>
-  </body>
+        </script>
+    </body>
 </html>

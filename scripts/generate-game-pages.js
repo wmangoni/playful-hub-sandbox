@@ -273,8 +273,8 @@ const gamesData = {
     },
     'driving_simulator': {
         title: 'Driving Simulator',
-        description: 'Dirija por estradas em um lugar belo neste simulador de direção relaxante. Aproveite a paisagem e a experiência de dirigir.',
-        keywords: 'direção, simulador, carro, estrada, paisagem, relaxante, PlayfulHub',
+        description: 'Dirija pela cidade enquanto compete contra o computador para ver quem coleta mais moedas.',
+        keywords: 'direção, simulador, carro, estrada, paisagem, PlayfulHub',
         genre: 'Simulação / Corrida',
         developer: 'PlayfulHub',
         features: 'Física de direção realista, paisagens bonitas, controles suaves',
@@ -285,12 +285,11 @@ const gamesData = {
             { key: 'Shift', action: 'Marcha alta' }
         ],
         tips: [
-            'Mantenha uma velocidade segura',
-            'Observe a paisagem - é parte da experiência',
-            'Use os freios suavemente para uma direção mais realista',
-            'Aproveite o momento - não há pressa'
+            'Priorize as moedas mais próximas',
+            'Observe onde as moedas reaparecem depois de um tempo',
+            'Não se afaste muito da area central do mapa'
         ],
-        tags: ['Direção', 'Simulador', 'Carro', 'Paisagem', 'Relaxante'],
+        tags: ['Direção', 'Simulador', 'Carro', 'Paisagem', 'Competitivo'],
         relatedGames: ['3d_shooter', 'visual_effects', 'lazy_gardner']
     },
     'visual_effects': {
