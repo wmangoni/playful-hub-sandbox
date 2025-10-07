@@ -1,1103 +1,629 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Three.js Driving Sim</title>
+    <title>Simulador de Carro 3D</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #87CEEB; }
-        canvas { display: block; }
-        #info {
-            position: absolute;
-            top: 10px;
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        #canvas {
+            display: block;
             width: 100%;
-            text-align: center;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-            font-family: Arial, sans-serif;
-            font-size: 16px;
-            text-shadow: 1px 1px 2px black;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px 50px;
+            border-radius: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+        #speedometer {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 150px;
+            height: 150px;
+        }
+        #healthBars {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+        }
+        .healthBar {
+            margin: 10px 0;
+        }
+        .healthBar label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .healthBarContainer {
+            width: 200px;
+            height: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .healthBarFill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        #aiMessage {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 152, 0, 0.9);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="info">Use WASD or Arrow Keys to drive</div>
+    <canvas id="canvas"></canvas>
+    <div id="ui">
+        <div id="scoreboard">
+            <div>JOGADOR: <span id="playerScore">0</span> | IA: <span id="aiScore">0</span></div>
+        </div>
+        <div id="message">Pressione ESPAÇO para iniciar</div>
+        <div id="aiMessage"></div>
+        <canvas id="speedometer"></canvas>
+        <div id="healthBars">
+            <div class="healthBar">
+                <label>JOGADOR</label>
+                <div class="healthBarContainer">
+                    <div class="healthBarFill" id="playerHealth" style="width: 0%;">0/10</div>
+                </div>
+            </div>
+            <div class="healthBar">
+                <label>IA</label>
+                <div class="healthBarContainer">
+                    <div class="healthBarFill" id="aiHealth" style="width: 0%;">0/10</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.164.1/build/three.module.js"
-            }
-        }
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Configuração inicial
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 0, 500);
 
-    <script type="module">
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
 
-        import * as THREE from 'three';
+        // Iluminação
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.left = -100;
+        dirLight.shadow.camera.right = 100;
+        dirLight.shadow.camera.top = 100;
+        dirLight.shadow.camera.bottom = -100;
+        scene.add(dirLight);
 
-        let scene, camera, renderer;
-        let car, ground, road;
-        const aiCars = [];
-        let trees = [];
-        let clouds = [];
-        let mountains = [];
-        let roadPath;
-        let roadWaypoints = [];
+        // Chão
+        const groundGeometry = new THREE.PlaneGeometry(300, 300);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
 
-        let audioContext;
-        let engineSoundBuffer; // To store the decoded audio data
-        let engineSoundSource; // To control the playing sound source node
-        let engineGainNode;    // To control the engine sound volume/pitch
-        let isAudioContextInitialized = false;
-        const BASE_ENGINE_PITCH = 0.5; // Base playback rate for idle
-        const MAX_ENGINE_PITCH = 1.8;  // Max playback rate at full speed
-        const PITCH_ACCELERATION = 2.5; // How quickly pitch changes with speed
+        // Estrada
+        const roadGeometry = new THREE.PlaneGeometry(20, 300);
+        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.position.y = 0.01;
+        road.receiveShadow = true;
+        scene.add(road);
 
-        // Movement state
-        const keys = {
-            w: false, a: false, s: false, d: false,
-            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false
-        };
-        const carSpeed = 15.0;
-        const turnSpeed = 1.5; // Radians per second
-        const cloudSpeed = 2.0;
-
-        let clock = new THREE.Clock();
-
-        // --- New Function: Load Sounds ---
-        async function loadSounds() {
-            // Remove context creation from here. Assume it exists when called.
-            // if (!isAudioContextInitialized || engineSoundBuffer) return; // Check modified below
-
-            // Ensure context is valid before proceeding
-            if (!audioContext || audioContext.state !== 'running' || engineSoundBuffer) {
-                 // If context isn't running yet, wait for it (or handle error)
-                 // If buffer already loaded, skip.
-                 if (!audioContext) console.warn("loadSounds called before AudioContext created.");
-                 // We might try to resume again here just in case, though it should be running
-                 if (audioContext && audioContext.state === 'suspended') {
-                     await audioContext.resume();
-                 }
-                 // Re-check state after potential resume
-                 if (!audioContext || audioContext.state !== 'running') return;
-                 if (engineSoundBuffer) return;
-            }
-             isAudioContextInitialized = true; // Mark as initialized *if* context is running
-
-            try {
-                const soundUrl = '/driving_simulator/assets/motor.mp3';
-                console.log(`Attempting to load engine sound from: ${soundUrl}`);
-
-                const response = await fetch(soundUrl);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status} for ${soundUrl}`);
-                }
-                const arrayBuffer = await response.arrayBuffer();
-                engineSoundBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                console.log("Engine sound decoded successfully.");
-
-                startEngineSound(); // Start playing immediately after loading
-
-            } catch (error) {
-                console.error("Error loading or decoding engine sound:", error);
-                 isAudioContextInitialized = false; // Reset flag on error
-            }
+        // Linhas da estrada
+        for (let i = -140; i < 140; i += 20) {
+            const lineGeometry = new THREE.PlaneGeometry(2, 10);
+            const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+            const line = new THREE.Mesh(lineGeometry, lineMaterial);
+            line.rotation.x = -Math.PI / 2;
+            line.position.set(0, 0.02, i);
+            scene.add(line);
         }
 
-        // --- New Function: Start Engine Sound ---
-        function startEngineSound() {
-            if (!isAudioContextInitialized || !engineSoundBuffer || engineSoundSource) {
-                if (!isAudioContextInitialized) console.warn("Attempted to start engine sound before audio context was ready.");
-                if (!engineSoundBuffer) console.warn("Attempted to start engine sound before buffer loaded.");
-                if (engineSoundSource) console.warn("Attempted to start engine sound when source already exists.");
-                return;
+        // Nuvens
+        function createCloud(x, y, z) {
+            const cloud = new THREE.Group();
+            for (let i = 0; i < 5; i++) {
+                const cloudGeometry = new THREE.SphereGeometry(3 + Math.random() * 2, 8, 8);
+                const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+                const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                cloudPart.position.set(Math.random() * 8 - 4, Math.random() * 2, Math.random() * 8 - 4);
+                cloud.add(cloudPart);
             }
-            
-            console.log("Preparing to start engine sound source..."); // Added log
-
-            engineSoundSource = audioContext.createBufferSource();
-            engineSoundSource.buffer = engineSoundBuffer;
-            engineSoundSource.loop = true;
-
-            engineGainNode = audioContext.createGain();
-            engineGainNode.gain.value = 0.4;
-
-            engineSoundSource.connect(engineGainNode);
-            engineGainNode.connect(audioContext.destination);
-
-            engineSoundSource.playbackRate.value = BASE_ENGINE_PITCH;
-
-            try {
-                engineSoundSource.start();
-                console.log("Engine sound source started.");
-            } catch(e) {
-                console.error("Error starting engine sound source:", e);
-                // Handle error, maybe try resuming context again?
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume().then(() => engineSoundSource.start()); // Try starting after resume
-                }
-            }
+            cloud.position.set(x, y, z);
+            return cloud;
         }
 
-        // --- New Function: Update Engine Sound Pitch ---
-        function updateEngineSound(currentSpeed) {
-            if (!isAudioContextInitialized || !engineSoundSource || !engineGainNode) {
-                return; // Sound not ready or playing
-            }
-
-            // Map car speed to engine pitch (playbackRate)
-            // Normalize speed (assuming carSpeed is max forward speed)
-            const normalizedSpeed = Math.abs(currentSpeed) / carSpeed; // Use absolute speed
-            const targetPitch = BASE_ENGINE_PITCH + normalizedSpeed * (MAX_ENGINE_PITCH - BASE_ENGINE_PITCH);
-
-            // Smoothly change the pitch using setTargetAtTime
-            engineSoundSource.playbackRate.setTargetAtTime(
-                targetPitch,
-                audioContext.currentTime,
-                0.1 // Time constant for smoothing (lower = faster change)
+        for (let i = 0; i < 10; i++) {
+            const cloud = createCloud(
+                Math.random() * 200 - 100,
+                30 + Math.random() * 20,
+                Math.random() * 200 - 100
             );
-
-            // Optional: Adjust volume slightly based on speed/pitch
-            const targetVolume = 0.3 + normalizedSpeed * 0.3; // Volume increases slightly with speed
-             engineGainNode.gain.setTargetAtTime(targetVolume, audioContext.currentTime, 0.2);
+            scene.add(cloud);
         }
 
-        function createCarModel(color = 0xff3333) {
-            const carGroup = new THREE.Group();
+        // Montanhas
+        for (let i = 0; i < 8; i++) {
+            const mountainGeometry = new THREE.ConeGeometry(15 + Math.random() * 10, 30 + Math.random() * 20, 4);
+            const mountainMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+            const angle = (i / 8) * Math.PI * 2;
+            mountain.position.set(Math.cos(angle) * 120, 15, Math.sin(angle) * 120);
+            mountain.rotation.y = Math.random() * Math.PI;
+            scene.add(mountain);
+        }
 
-            // Main Body
-            const bodyWidth = 2.2;
-            const bodyHeight = 1.0;
-            const bodyLength = 4.5;
-            const bodyGeometry = new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyLength);
-            const bodyMaterial = new THREE.MeshStandardMaterial({ color: color, flatShading: false }); // Slightly less bright red
+        // Árvores
+        function createTree(x, z) {
+            const tree = new THREE.Group();
+            const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 5, 8);
+            const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.y = 2.5;
+            trunk.castShadow = true;
+            tree.add(trunk);
+
+            const leavesGeometry = new THREE.SphereGeometry(3, 8, 8);
+            const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves.position.y = 6;
+            leaves.castShadow = true;
+            tree.add(leaves);
+
+            tree.position.set(x, 0, z);
+            return tree;
+        }
+
+        for (let i = 0; i < 30; i++) {
+            const x = Math.random() * 260 - 130;
+            const z = Math.random() * 260 - 130;
+            if (Math.abs(x) > 15 && Math.sqrt(x * x + z * z) > 30) {
+                scene.add(createTree(x, z));
+            }
+        }
+
+        // Trilho do trem (circular)
+        const trackRadius = 40;
+        const trackGeometry = new THREE.TorusGeometry(trackRadius, 0.3, 8, 50);
+        const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+        const track = new THREE.Mesh(trackGeometry, trackMaterial);
+        track.rotation.x = Math.PI / 2;
+        track.position.y = 0.3;
+        scene.add(track);
+
+        // Trem
+        const trainGroup = new THREE.Group();
+        const trainGeometry = new THREE.BoxGeometry(3, 2, 5);
+        const trainMaterial = new THREE.MeshLambertMaterial({ color: 0xFF0000 });
+        const trainBody = new THREE.Mesh(trainGeometry, trainMaterial);
+        trainBody.castShadow = true;
+        trainGroup.add(trainBody);
+
+        const chimneyGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 8);
+        const chimneyMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const chimney = new THREE.Mesh(chimneyGeometry, chimneyMaterial);
+        chimney.position.set(0, 1.75, 1.5);
+        trainGroup.add(chimney);
+
+        trainGroup.position.set(trackRadius, 1, 0);
+        scene.add(trainGroup);
+
+        let trainAngle = 0;
+
+        // Carros
+        function createCar(color) {
+            const car = new THREE.Group();
+            const bodyGeometry = new THREE.BoxGeometry(2, 1, 3);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: color });
             const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.y = bodyHeight / 2 + 0.4; // Position base of body slightly above origin
+            body.position.y = 0.5;
             body.castShadow = true;
-            carGroup.add(body);
+            car.add(body);
 
-            // Cabin (slightly smaller box on top)
-            const cabinWidth = bodyWidth * 0.85;
-            const cabinHeight = 0.8;
-            const cabinLength = bodyLength * 0.55;
-            const cabinGeometry = new THREE.BoxGeometry(cabinWidth, cabinHeight, cabinLength);
-            const cabinMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.8) }); // Darker version of the main color
-            const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
-            // Position cabin on top of the body, slightly forward
-            cabin.position.y = bodyHeight + cabinHeight / 2 + 0.4;
-            cabin.position.z = -bodyLength * 0.1; // Move slightly forward from center
-            cabin.castShadow = true;
-            carGroup.add(cabin);
+            const topGeometry = new THREE.BoxGeometry(1.5, 0.8, 1.5);
+            const top = new THREE.Mesh(topGeometry, bodyMaterial);
+            top.position.set(0, 1.4, -0.2);
+            top.castShadow = true;
+            car.add(top);
 
-            // Wheels
-            const wheelRadius = 0.4;
-            const wheelWidth = 0.3;
-            const wheelGeometry = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 16);
-            const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 }); // Dark grey/black
-
+            const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+            const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
             const wheelPositions = [
-                { x: bodyWidth / 2 + wheelWidth / 2 - 0.1, y: wheelRadius, z: bodyLength / 2 * 0.7 }, // Front Right
-                { x: -bodyWidth / 2 - wheelWidth / 2 + 0.1, y: wheelRadius, z: bodyLength / 2 * 0.7 }, // Front Left
-                { x: bodyWidth / 2 + wheelWidth / 2 - 0.1, y: wheelRadius, z: -bodyLength / 2 * 0.7 }, // Rear Right
-                { x: -bodyWidth / 2 - wheelWidth / 2 + 0.1, y: wheelRadius, z: -bodyLength / 2 * 0.7 } // Rear Left
+                [-1, 0.4, 1],
+                [1, 0.4, 1],
+                [-1, 0.4, -1],
+                [1, 0.4, -1]
             ];
 
             wheelPositions.forEach(pos => {
                 const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-                wheel.rotation.z = Math.PI / 2; // Rotate cylinder to be a wheel
-                wheel.position.set(pos.x, pos.y, pos.z);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(pos[0], pos[1], pos[2]);
                 wheel.castShadow = true;
-                carGroup.add(wheel);
+                car.add(wheel);
             });
 
-            // Windows (using planes for simplicity)
-            const windowMaterial = new THREE.MeshStandardMaterial({
-                color: 0x6699cc, // Light blueish
-                transparent: true,
-                opacity: 0.6,
-                // side: THREE.DoubleSide // Needed if using planes
-            });
-
-            // Front Windshield
-            const frontWindowGeom = new THREE.BoxGeometry(cabinWidth * 0.95, cabinHeight * 0.7, 0.05);
-            const frontWindow = new THREE.Mesh(frontWindowGeom, windowMaterial);
-            frontWindow.position.set(0, cabin.position.y, cabin.position.z + cabinLength / 2 + 0.03);
-            frontWindow.rotation.x = Math.PI / 10; // Slight angle
-            carGroup.add(frontWindow);
-
-            // Rear Window
-            const rearWindowGeom = new THREE.BoxGeometry(cabinWidth * 0.95, cabinHeight * 0.6, 0.05);
-            const rearWindow = new THREE.Mesh(rearWindowGeom, windowMaterial);
-            rearWindow.position.set(0, cabin.position.y, cabin.position.z - cabinLength / 2 - 0.03);
-            rearWindow.rotation.x = -Math.PI / 12; // Slight angle
-            carGroup.add(rearWindow);
-
-            // Side Windows (Left & Right)
-            const sideWindowGeom = new THREE.BoxGeometry(0.05, cabinHeight * 0.6, cabinLength * 0.8);
-            const sideWindowLeft = new THREE.Mesh(sideWindowGeom, windowMaterial);
-            sideWindowLeft.position.set(-cabinWidth / 2 - 0.03, cabin.position.y, cabin.position.z);
-            carGroup.add(sideWindowLeft);
-
-            const sideWindowRight = new THREE.Mesh(sideWindowGeom, windowMaterial);
-            sideWindowRight.position.set(cabinWidth / 2 + 0.03, cabin.position.y, cabin.position.z);
-            carGroup.add(sideWindowRight);
-
-            // Antenna
-            const antennaHeight = 1.0;
-            const antennaGeom = new THREE.CylinderGeometry(0.02, 0.02, antennaHeight, 6);
-            const antennaMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
-            const antenna = new THREE.Mesh(antennaGeom, antennaMat);
-            antenna.position.set(bodyWidth / 2 * 0.7, body.position.y + bodyHeight / 2 + antennaHeight / 2, -bodyLength / 2 * 0.8);
-            antenna.castShadow = true;
-            carGroup.add(antenna);
-
-            // License Plate
-            const plateWidth = 0.6;
-            const plateHeight = 0.3;
-            const plateGeom = new THREE.PlaneGeometry(plateWidth, plateHeight);
-            const plateMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
-            const plate = new THREE.Mesh(plateGeom, plateMat);
-            plate.position.set(0, body.position.y - bodyHeight*0.1, bodyLength / 2 + 0.01); // Position at the back center
-            carGroup.add(plate);
-
-            // Exhaust Pipe
-            const pipeRadius = 0.08;
-            const pipeLength = 0.5;
-            const pipeGeom = new THREE.CylinderGeometry(pipeRadius, pipeRadius, pipeLength, 8);
-            const pipeMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-            const exhaustPipe = new THREE.Mesh(pipeGeom, pipeMat);
-            exhaustPipe.rotation.x = Math.PI / 2; // Point it backwards
-            exhaustPipe.position.set(-bodyWidth / 2 * 0.4, body.position.y - bodyHeight*0.2, bodyLength / 2 + pipeLength / 2); // Position under the rear left
-            exhaustPipe.castShadow = true;
-            carGroup.add(exhaustPipe);
-
-            return carGroup;
+            return car;
         }
 
-        function init() {
-            // --- Basic Setup ---
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // Sky blue
-            scene.fog = new THREE.Fog(0x87CEEB, 150, 450); // Add fog for depth
+        const playerCar = createCar(0x0000FF);
+        playerCar.position.set(-5, 0, -50);
+        scene.add(playerCar);
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 10); // Initial position behind the car
+        const aiCar = createCar(0xFF0000);
+        aiCar.position.set(5, 0, -50);
+        scene.add(aiCar);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true; // Enable shadows
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
-            document.body.appendChild(renderer.domElement);
+        // Moedas
+        const coins = [];
+        function createCoin() {
+            const coinGeometry = new THREE.CylinderGeometry(1, 1, 0.3, 16);
+            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
+            const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+            
+            let x, z;
+            do {
+                x = Math.random() * 200 - 100;
+                z = Math.random() * 200 - 100;
+            } while (Math.sqrt(x * x + z * z) < 25 || Math.abs(x) < 12);
+            
+            coin.position.set(x, 1, z);
+            coin.castShadow = true;
+            scene.add(coin);
+            coins.push(coin);
+        }
 
-            // --- Lighting ---
-            const ambientLight = new THREE.AmbientLight(0xAAAAAA); // Soft ambient light
-            scene.add(ambientLight);
+        for (let i = 0; i < 5; i++) {
+            createCoin();
+        }
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            directionalLight.position.set(100, 100, 50);
-            directionalLight.castShadow = true;
-            // Configure shadow properties for better quality/performance trade-off
-            directionalLight.shadow.mapSize.width = 1024;
-            directionalLight.shadow.mapSize.height = 1024;
-            directionalLight.shadow.camera.near = 0.5;
-            directionalLight.shadow.camera.far = 500;
-            directionalLight.shadow.camera.left = -150;
-            directionalLight.shadow.camera.right = 150;
-            directionalLight.shadow.camera.top = 150;
-            directionalLight.shadow.camera.bottom = -150;
-            scene.add(directionalLight);
-            // const helper = new THREE.CameraHelper( directionalLight.shadow.camera ); scene.add( helper ); // Debug shadows
+        // Estado do jogo
+        let gameState = {
+            started: false,
+            playerScore: 0,
+            aiScore: 0,
+            playerSpeed: 0,
+            aiTarget: null
+        };
 
-
-            // --- Ground ---
-            const groundGeometry = new THREE.PlaneGeometry(500, 1000); // Wider than long
-            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x55aa55, side: THREE.DoubleSide }); // Green grass
-            ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2; // Rotate flat
-            ground.receiveShadow = true; // Allow ground to receive shadows
-            scene.add(ground);
-
-            // --- Curved Road ---
-            createCurvedRoad();
-
-            // --- Car ---
-            car = createCarModel(); // Player's car (default red)
-            car.position.y = 0;
-            scene.add(car);
-
-            // --- AI Cars ---
-            const aiCarColors = [0x00ff00, 0xffff00, 0x0000ff];
-            for (let i = 0; i < aiCarColors.length; i++) {
-                const aiCar = createCarModel(aiCarColors[i]);
-                const waypointIndex = Math.floor(roadWaypoints.length / (aiCarColors.length + 1)) * (i + 1);
-                const waypoint = roadWaypoints[waypointIndex];
-                aiCar.position.copy(waypoint);
-                aiCar.position.y = 0;
-
-                const nextWaypoint = roadWaypoints[waypointIndex + 1];
-                aiCar.lookAt(nextWaypoint);
-
-                aiCar.userData.targetWaypointIndex = waypointIndex + 1;
-                aiCars.push(aiCar);
-                scene.add(aiCar);
-            }
-
-            // --- Trees ---
-            createTrees();
-
-            // --- Mountains ---
-            createMountains();
-
-            // --- Clouds ---
-            createClouds();
-
-            // --- Event Listeners ---
-            window.addEventListener('keydown', handleKeyDown);
-            window.addEventListener('keyup', handleKeyUp);
-            window.addEventListener('resize', onWindowResize);
-
-            function startAudioOnClick() {
-                // 1. Create/Resume AudioContext HERE, triggered by user gesture
-                if (!audioContext) {
-                    try {
-                         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                         console.log("Audio Context Created on user gesture.");
-                     } catch (e) {
-                         console.error("Error creating Audio Context:", e);
-                         // Update UI to indicate audio failure
-                         document.getElementById('info').textContent = "Audio Error! Refresh and click/press key.";
-                         return; // Stop if context creation fails
-                     }
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === ' ') {
+                if (!gameState.started || gameState.playerScore >= 10 || gameState.aiScore >= 10) {
+                    resetGame();
                 }
-
-                // 2. Resume context if it's suspended (essential)
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume().then(() => {
-                        console.log("AudioContext resumed successfully.");
-                        isAudioContextInitialized = true; // Set flag AFTER successful resume
-                        loadSounds(); // NOW load sounds
-                    }).catch(e => {
-                        console.error("Error resuming AudioContext:", e);
-                        document.getElementById('info').textContent = "Could not start audio. Interaction failed?";
-                    });
-                } else if (audioContext.state === 'running') {
-                    console.log("AudioContext already running.");
-                    isAudioContextInitialized = true; // Set flag if already running
-                    loadSounds(); // Load sounds if context is already running
-                } else {
-                    console.warn("AudioContext in unexpected state:", audioContext.state);
-                    // Maybe try creating again? Or show error.
-                    document.getElementById('info').textContent = "Audio issue. Try again?";
-                }
-
-                // Update UI
-                document.getElementById('info').textContent = "Use WASD or Arrow Keys to drive";
-
-                // Listener cleanup (already handled by 'once: true')
-                // window.removeEventListener('click', startAudioOnClick);
-                // window.removeEventListener('keydown', startAudioOnClick);
-             }
-
-            // Attach the listeners (using 'once' is good practice)
-            window.addEventListener('click', startAudioOnClick, { once: true });
-            window.addEventListener('keydown', startAudioOnClick, { once: true });
-            document.getElementById('info').textContent = "Click or Press Key to Start Sound";
-
-            // --- Start Animation ---
-            animate();
-        }
-
-
-        function createTree() {
-            // Increase base heights and radii slightly
-            const trunkHeight = Math.random() * 2.5 + 3; // 3.0 to 5.5
-            const trunkRadius = 0.25 + Math.random() * 0.15; // 0.25 to 0.4
-            const trunkGeometry = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, trunkHeight, 8);
-            const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
-            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-            trunk.position.y = trunkHeight / 2; // Set base at y=0
-            trunk.castShadow = true;
-            trunk.receiveShadow = true;
-
-            const leavesHeight = Math.random() * 3.5 + 3.5; // 3.5 to 7.0
-            const leavesRadius = 1.5 + Math.random() * 1.5; // 1.5 to 3.0
-            const leavesGeometry = new THREE.ConeGeometry(leavesRadius, leavesHeight, 8);
-            const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Forest green
-            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-            // Position leaves slightly higher due to taller trunks
-            leaves.position.y = trunkHeight + leavesHeight / 2 * 0.75;
-            leaves.castShadow = true;
-            leaves.receiveShadow = true;
-
-            const tree = new THREE.Group();
-            tree.add(trunk);
-            tree.add(leaves);
-
-            return tree;
-        }
-
-        function createTrees() {
-            const numberOfTrees = 200;
-            const spawnAreaX = 450;
-            const spawnAreaZ = 950;
-            const roadBuffer = 15; // Keep trees away from road center
-
-            for (let i = 0; i < numberOfTrees; i++) {
-                const tree = createTree();
-                let x, z;
-                // Ensure trees don't spawn on the road
-                do {
-                    x = (Math.random() - 0.5) * spawnAreaX;
-                    z = (Math.random() - 0.5) * spawnAreaZ;
-                } while (Math.abs(x) < roadBuffer);
-
-                tree.position.set(x, 0, z);
-                 tree.scale.setScalar(0.8 + Math.random() * 0.4); // Vary size slightly
-                scene.add(tree);
-                trees.push(tree);
             }
-        }
+        });
+        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
-        function createMountain() {
-             const height = 50 + Math.random() * 100; // 50 to 150 tall
-             const radius = 20 + Math.random() * 30; // 20 to 50 wide base
-             const mountainGeometry = new THREE.ConeGeometry(radius, height, 16); // More segments for smoother look
-             const mountainMaterial = new THREE.MeshStandardMaterial({
-                 color: 0x6c757d, // Greyish-brown
-                 flatShading: true // Low-poly look
-             });
-             const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-             mountain.position.y = height / 2 - 1; // Place base slightly below ground level
-             mountain.receiveShadow = true;
-             return mountain;
-         }
-
-         function createMountains() {
-             const numberOfMountains = 25;
-             const distance = 300; // How far away
-             const spread = 500; // How spread out horizontally
-
-             for (let i = 0; i < numberOfMountains; i++) {
-                 const mountain = createMountain();
-                 const angle = (i / numberOfMountains) * Math.PI * 2; // Spread in a rough circle
-                 const d = distance + Math.random() * 150; // Vary distance
-                 mountain.position.x = Math.cos(angle) * (spread/2 + Math.random() * spread/2);
-                 mountain.position.z = Math.sin(angle) * (spread/2 + Math.random() * spread/2) - d/2; // Push mostly back
-
-                 // Ensure mountains are sufficiently far
-                 if (Math.abs(mountain.position.x) < 100 && mountain.position.z > -150) {
-                     mountain.position.z -= 150;
-                 }
-
-                 scene.add(mountain);
-                 mountains.push(mountain);
-             }
-         }
-
-
-        function createCloud() {
-             const cloudGeometry = new THREE.SphereGeometry(8 + Math.random() * 8, 8, 6); // Random size, low poly
-             const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }); // Basic white, slightly transparent
-             const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
-             return cloud;
-         }
-
-        function createClouds() {
-            const numberOfClouds = 30;
-            const cloudLevelY = 100;
-            const spreadX = 450;
-            const spreadZ = 450;
-
-            for (let i = 0; i < numberOfClouds; i++) {
-                const cloud = createCloud();
-                cloud.position.set(
-                    (Math.random() - 0.5) * spreadX,
-                    cloudLevelY + Math.random() * 30, // Vary height slightly
-                    (Math.random() - 0.5) * spreadZ - 50 // Mostly in front/sides initially
-                );
-                scene.add(cloud);
-                clouds.push(cloud);
-            }
-        }
-
-        function createCurvedRoad() {
-            // Define a more interesting path for the road
-            roadPath = new THREE.CatmullRomCurve3([
-                new THREE.Vector3(0, 0, 400),
-                new THREE.Vector3(0, 0, 0),
-                new THREE.Vector3(150, 0, -200),
-                new THREE.Vector3(0, 0, -400),
-                new THREE.Vector3(-250, 0, -600),
-                new THREE.Vector3(-150, 0, -800),
-                new THREE.Vector3(0, 0, -1000),
-                new THREE.Vector3(200, 0, -1200)
-            ]);
-
-            const points = roadPath.getPoints(200); // Increase points for smoother curve
-            roadWaypoints = points; // Save waypoints for AI
-
-            // Create the road geometry
-            const roadWidth = 12;
-            const roadGeometry = new THREE.BufferGeometry().setFromPoints(points);
-
-            const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, side: THREE.DoubleSide });
-
-            const roadMesh = new THREE.Mesh(roadGeometry, roadMaterial);
-
-            const extrudeSettings = {
-                steps: 200,
-                bevelEnabled: false,
-                extrudePath: roadPath
+        function resetGame() {
+            gameState = {
+                started: true,
+                playerScore: 0,
+                aiScore: 0,
+                playerSpeed: 0,
+                aiTarget: null
             };
-
-            const shape = new THREE.Shape();
-            shape.moveTo(-roadWidth / 2, 0);
-            shape.lineTo(roadWidth / 2, 0);
-            shape.lineTo(roadWidth / 2, 1);
-            shape.lineTo(-roadWidth / 2, 1);
-
-            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            road = new THREE.Mesh(geometry, roadMaterial);
-            road.position.y = 0.01;
-            road.receiveShadow = true;
-            scene.add(road);
-
-            // Create road lines
-            const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const numLines = 100;
-            const lineLength = 6;
-            const lineGap = 8;
-            const totalLength = lineLength + lineGap;
-
-            for (let i = 0; i < numLines; i++) {
-                const t = (i * totalLength) / roadPath.getLength();
-                const pos = roadPath.getPointAt(t);
-                const tangent = roadPath.getTangentAt(t);
-
-                const lineGeometry = new THREE.PlaneGeometry(0.3, lineLength);
-                const line = new THREE.Mesh(lineGeometry, lineMaterial);
-
-                line.position.copy(pos);
-                line.position.y += 0.02;
-                line.lookAt(pos.clone().add(tangent));
-                line.rotation.x = -Math.PI / 2;
-
-                scene.add(line);
+            playerCar.position.set(-5, 0, -50);
+            playerCar.rotation.y = 0;
+            aiCar.position.set(5, 0, -50);
+            aiCar.rotation.y = 0;
+            
+            coins.forEach(coin => scene.remove(coin));
+            coins.length = 0;
+            for (let i = 0; i < 5; i++) {
+                createCoin();
             }
+            
+            updateUI();
+            document.getElementById('message').style.display = 'none';
         }
 
-
-        // --- Event Handlers ---
-        function handleKeyDown(event) {
-            if (event.key in keys) {
-                keys[event.key] = true;
-            }
+        function updateUI() {
+            document.getElementById('playerScore').textContent = gameState.playerScore;
+            document.getElementById('aiScore').textContent = gameState.aiScore;
+            
+            const playerPercent = (gameState.playerScore / 10) * 100;
+            const aiPercent = (gameState.aiScore / 10) * 100;
+            
+            document.getElementById('playerHealth').style.width = playerPercent + '%';
+            document.getElementById('playerHealth').textContent = gameState.playerScore + '/10';
+            document.getElementById('aiHealth').style.width = aiPercent + '%';
+            document.getElementById('aiHealth').textContent = gameState.aiScore + '/10';
         }
 
-        function handleKeyUp(event) {
-            if (event.key in keys) {
-                keys[event.key] = false;
-            }
+        function showAIMessage() {
+            const msg = document.getElementById('aiMessage');
+            msg.textContent = 'IA COLETOU UMA MOEDA!';
+            msg.style.display = 'block';
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 1500);
         }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // --- Game Logic ---
-        function updateCar(deltaTime) {
-            let moveForward = keys.w || keys.ArrowUp;
-            let moveBackward = keys.s || keys.ArrowDown;
-            let turnLeft = keys.a || keys.ArrowLeft;
-            let turnRight = keys.d || keys.ArrowRight;
-
-            let currentSpeed = 0;
-            if (moveForward) {
-                currentSpeed = carSpeed;
-            } else if (moveBackward) {
-                currentSpeed = -carSpeed * 0.5; // Slower reverse
-            }
-
-            // Apply movement
-            car.translateZ(-currentSpeed * deltaTime); // Move along car's local Z axis
-
-            // Apply turning only when moving
-            if (currentSpeed !== 0) {
-                let currentTurnSpeed = 0;
-                if (turnLeft) {
-                    currentTurnSpeed = turnSpeed;
-                } else if (turnRight) {
-                    currentTurnSpeed = -turnSpeed;
-                }
-                car.rotateY(currentTurnSpeed * deltaTime);
-            }
-
-            // --- Add this line ---
-            updateEngineSound(currentSpeed); // Update pitch based on speed
-
-            // Keep car within reasonable bounds (optional)
-            // car.position.x = THREE.MathUtils.clamp(car.position.x, -240, 240);
-            // car.position.z = THREE.MathUtils.clamp(car.position.z, -490, 490);
-        }
-
-        function updateAiCar(deltaTime) {
-            const aiCarSpeed = 10.0;
-            const waypointDistanceThreshold = 5;
-
-            aiCars.forEach(aiCar => {
-                let targetWaypointIndex = aiCar.userData.targetWaypointIndex;
-                if (targetWaypointIndex >= roadWaypoints.length) {
-                    targetWaypointIndex = 0; // Loop back to the start
-                }
-
-                const targetWaypoint = roadWaypoints[targetWaypointIndex];
-                const direction = targetWaypoint.clone().sub(aiCar.position).normalize();
-                const distance = aiCar.position.distanceTo(targetWaypoint);
-
-                // Basic obstacle avoidance
-                let avoidance = new THREE.Vector3(0, 0, 0);
-                let slowedDown = false;
-
-                const raycaster = new THREE.Raycaster(aiCar.position, aiCar.getWorldDirection(new THREE.Vector3()));
-                const obstacles = [...aiCars.filter(c => c !== aiCar), car];
-                const intersects = raycaster.intersectObjects(obstacles, true);
-
-                if (intersects.length > 0 && intersects[0].distance < 15) {
-                    const obstacle = intersects[0].object;
-                    const avoidanceDirection = new THREE.Vector3(direction.z, 0, -direction.x); // Perpendicular to current direction
-                    avoidance.add(avoidanceDirection.multiplyScalar(0.1));
-                    slowedDown = true;
-                }
-
-                const effectiveSpeed = slowedDown ? aiCarSpeed * 0.5 : aiCarSpeed;
-                aiCar.position.add(direction.multiplyScalar(effectiveSpeed * deltaTime));
-                aiCar.position.add(avoidance);
-
-                // Smoothly look at the target
-                const lookAtTarget = targetWaypoint.clone().add(avoidance);
-                const targetQuaternion = new THREE.Quaternion().setFromRotationMatrix(
-                    new THREE.Matrix4().lookAt(aiCar.position, lookAtTarget, aiCar.up)
+        function explode(car) {
+            const originalPos = car === playerCar ? 
+                new THREE.Vector3(-5, 0, -50) : 
+                new THREE.Vector3(5, 0, -50);
+            
+            // Efeito de explosão simples
+            const particles = [];
+            for (let i = 0; i < 10; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.2, 4, 4);
+                const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xFF6600 });
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.position.copy(car.position);
+                particle.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 2,
+                    Math.random() * 2,
+                    (Math.random() - 0.5) * 2
                 );
-                aiCar.quaternion.slerp(targetQuaternion, 0.1);
-
-
-                if (distance < waypointDistanceThreshold) {
-                    aiCar.userData.targetWaypointIndex++;
-                    if (aiCar.userData.targetWaypointIndex >= roadWaypoints.length) {
-                        aiCar.userData.targetWaypointIndex = 0; // Loop
-                    }
-                }
-            });
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            setTimeout(() => {
+                particles.forEach(p => scene.remove(p));
+            }, 500);
+            
+            car.position.copy(originalPos);
+            car.rotation.y = 0;
+            if (car === playerCar) gameState.playerSpeed = 0;
         }
 
-        function updateCamera() {
-            // Calculate desired camera position relative to car
-            const relativeCameraOffset = new THREE.Vector3(0, 5, 12); // Offset: Up and Behind
-            const cameraOffset = relativeCameraOffset.applyMatrix4(car.matrixWorld); // Apply car's rotation and position
-
-            // Smoothly interpolate camera position towards the target offset
-            camera.position.lerp(cameraOffset, 0.1); // Adjust lerp factor (0.1) for smoothness
-
-            // Calculate look-at point slightly in front of the car
-            const lookAtTarget = new THREE.Vector3(0, 1.5, -10); // Look slightly down and ahead
-            const lookAtPoint = lookAtTarget.applyMatrix4(car.matrixWorld);
-
-            // Smoothly interpolate look-at point
-            // Using a temporary vector to avoid modifying camera directly during calculation
-             const currentLookAt = new THREE.Vector3(); // Get where camera is currently looking is complex, lerping position is usually enough.
-             camera.lookAt(lookAtPoint);
-
-
-             // Basic fixed lookAt for simplicity if lerping position is sufficient:
-             // camera.lookAt(car.position.x, car.position.y + 1, car.position.z); // Look towards the car center mass
+        function checkCollision(obj1, obj2, distance = 3) {
+            return obj1.position.distanceTo(obj2.position) < distance;
         }
 
-         function updateClouds(deltaTime) {
-             clouds.forEach(cloud => {
-                 cloud.position.x += cloudSpeed * deltaTime;
-                 // Wrap clouds around if they go too far
-                 if (cloud.position.x > 250) {
-                     cloud.position.x = -250 - Math.random() * 50; // Respawn on the other side with variation
-                     cloud.position.z = (Math.random() - 0.5) * 450 - 50; // Randomize Z position too
-                 }
-             });
-         }
+        // Velocímetro
+        const speedCanvas = document.getElementById('speedometer');
+        const speedCtx = speedCanvas.getContext('2d');
+        speedCanvas.width = 150;
+        speedCanvas.height = 150;
 
-        // --- Animation Loop ---
+        function drawSpeedometer(speed) {
+            const centerX = 75;
+            const centerY = 75;
+            const radius = 60;
+            
+            speedCtx.clearRect(0, 0, 150, 150);
+            
+            // Fundo
+            speedCtx.beginPath();
+            speedCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            speedCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            speedCtx.fill();
+            
+            // Marcações
+            speedCtx.strokeStyle = '#fff';
+            speedCtx.lineWidth = 2;
+            for (let i = 0; i <= 10; i++) {
+                const angle = (Math.PI * 0.75) + (i / 10) * (Math.PI * 1.5);
+                const x1 = centerX + Math.cos(angle) * (radius - 10);
+                const y1 = centerY + Math.sin(angle) * (radius - 10);
+                const x2 = centerX + Math.cos(angle) * (radius - 5);
+                const y2 = centerY + Math.sin(angle) * (radius - 5);
+                speedCtx.beginPath();
+                speedCtx.moveTo(x1, y1);
+                speedCtx.lineTo(x2, y2);
+                speedCtx.stroke();
+            }
+            
+            // Ponteiro
+            const speedPercent = Math.min(speed / 0.5, 1);
+            const angle = (Math.PI * 0.75) + speedPercent * (Math.PI * 1.5);
+            speedCtx.strokeStyle = '#ff0000';
+            speedCtx.lineWidth = 3;
+            speedCtx.beginPath();
+            speedCtx.moveTo(centerX, centerY);
+            speedCtx.lineTo(
+                centerX + Math.cos(angle) * (radius - 15),
+                centerY + Math.sin(angle) * (radius - 15)
+            );
+            speedCtx.stroke();
+            
+            // Texto
+            speedCtx.fillStyle = '#fff';
+            speedCtx.font = 'bold 16px Arial';
+            speedCtx.textAlign = 'center';
+            speedCtx.fillText(Math.round(speed * 100) + ' km/h', centerX, centerY + 30);
+        }
+
+        // Loop de animação
         function animate() {
             requestAnimationFrame(animate);
 
-            const deltaTime = clock.getDelta();
+            if (gameState.started && gameState.playerScore < 10 && gameState.aiScore < 10) {
+                // Controle do jogador
+                const acceleration = 0.01;
+                const maxSpeed = 0.5;
+                const turnSpeed = 0.05;
 
-            updateCar(deltaTime);
-            updateAiCar(deltaTime);
-            updateCamera();
-            updateClouds(deltaTime);
-            
-            // Adicionar verificação de colisão
-            checkForCollisions();
+                if (keys['arrowup'] || keys['w']) {
+                    gameState.playerSpeed = Math.min(gameState.playerSpeed + acceleration, maxSpeed);
+                } else if (keys['arrowdown'] || keys['s']) {
+                    gameState.playerSpeed = Math.max(gameState.playerSpeed - acceleration, -maxSpeed / 2);
+                } else {
+                    gameState.playerSpeed *= 0.95;
+                }
+
+                if (keys['arrowleft'] || keys['a']) {
+                    playerCar.rotation.y += turnSpeed;
+                }
+                if (keys['arrowright'] || keys['d']) {
+                    playerCar.rotation.y -= turnSpeed;
+                }
+
+                playerCar.position.x += Math.sin(playerCar.rotation.y) * gameState.playerSpeed;
+                playerCar.position.z += Math.cos(playerCar.rotation.y) * gameState.playerSpeed;
+
+                // IA
+                if (!gameState.aiTarget || !coins.includes(gameState.aiTarget)) {
+                    let minDist = Infinity;
+                    coins.forEach(coin => {
+                        const dist = aiCar.position.distanceTo(coin.position);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            gameState.aiTarget = coin;
+                        }
+                    });
+                }
+
+                if (gameState.aiTarget) {
+                    const dx = gameState.aiTarget.position.x - aiCar.position.x;
+                    const dz = gameState.aiTarget.position.z - aiCar.position.z;
+                    const targetAngle = Math.atan2(dx, dz);
+                    
+                    let angleDiff = targetAngle - aiCar.rotation.y;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    
+                    aiCar.rotation.y += angleDiff * 0.05;
+                    
+                    const aiSpeed = 0.35;
+                    aiCar.position.x += Math.sin(aiCar.rotation.y) * aiSpeed;
+                    aiCar.position.z += Math.cos(aiCar.rotation.y) * aiSpeed;
+                }
+
+                // Limites do mapa
+                [playerCar, aiCar].forEach(car => {
+                    if (Math.abs(car.position.x) > 145) car.position.x = Math.sign(car.position.x) * 145;
+                    if (Math.abs(car.position.z) > 145) car.position.z = Math.sign(car.position.z) * 145;
+                });
+
+                // Colisão com trem
+                if (checkCollision(playerCar, trainGroup, 4)) {
+                    explode(playerCar);
+                }
+                if (checkCollision(aiCar, trainGroup, 4)) {
+                    explode(aiCar);
+                }
+
+                // Coleta de moedas
+                coins.forEach((coin, index) => {
+                    coin.rotation.y += 0.05;
+                    
+                    if (checkCollision(playerCar, coin, 2.5)) {
+                        gameState.playerScore++;
+                        scene.remove(coin);
+                        coins.splice(index, 1);
+                        createCoin();
+                        updateUI();
+                    }
+                    
+                    if (checkCollision(aiCar, coin, 2.5)) {
+                        gameState.aiScore++;
+                        scene.remove(coin);
+                        coins.splice(index, 1);
+                        createCoin();
+                        showAIMessage();
+                        updateUI();
+                        gameState.aiTarget = null;
+                    }
+                });
+
+                // Verificar vitória
+                if (gameState.playerScore >= 10) {
+                    document.getElementById('message').textContent = 'VOCÊ VENCEU! Pressione ESPAÇO para jogar novamente';
+                    document.getElementById('message').style.display = 'block';
+                }
+                if (gameState.aiScore >= 10) {
+                    document.getElementById('message').textContent = 'IA VENCEU! Pressione ESPAÇO para jogar novamente';
+                    document.getElementById('message').style.display = 'block';
+                }
+            }
+
+            // Animação do trem
+            trainAngle += 0.01;
+            trainGroup.position.x = Math.cos(trainAngle) * trackRadius;
+            trainGroup.position.z = Math.sin(trainAngle) * trackRadius;
+            trainGroup.rotation.y = -trainAngle + Math.PI / 2;
+
+            // Câmera seguindo o jogador
+            const cameraDistance = 15;
+            const cameraHeight = 8;
+            camera.position.x = playerCar.position.x - Math.sin(playerCar.rotation.y) * cameraDistance;
+            camera.position.z = playerCar.position.z - Math.cos(playerCar.rotation.y) * cameraDistance;
+            camera.position.y = playerCar.position.y + cameraHeight;
+            camera.lookAt(playerCar.position);
+
+            drawSpeedometer(Math.abs(gameState.playerSpeed));
 
             renderer.render(scene, camera);
         }
 
-        // --- Start ---
-        init();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-        // Obter posição atual do carro
-        function getCarPosition() {
-            // Substitua isso com seu código real para obter a posição do carro
-            return {
-                x: car.position.x,
-                y: car.position.y,
-                width: car.geometry.parameters.width,
-                height: car.geometry.parameters.height
-            };
-        }
-
-        // Obter obstáculos na tela/mundo
-        function getObstacles() {
-            // Substitua isso com seu código real para obter obstáculos
-            const obstacles = [];
-            
-            // Adicionar montanhas
-            mountains.forEach(mountain => {
-                obstacles.push({
-                    type: 'mountain',
-                    x: mountain.position.x,
-                    y: mountain.position.y,
-                    width: mountain.geometry.parameters.radius * 2,
-                    height: mountain.geometry.parameters.height
-                });
-            });
-            
-            // Adicionar árvores
-            trees.forEach(tree => {
-                obstacles.push({
-                    type: 'tree',
-                    x: tree.position.x,
-                    y: tree.position.y,
-                    width: tree.geometry.parameters.radius * 2,
-                    height: tree.geometry.parameters.height
-                });
-            });
-            
-            return obstacles;
-        }
-
-        // Obter estado atual do carro
-        function getCarState() {
-            // Substitua isso com seu código real
-            return {
-                speed: car.position.z,
-                acceleration: 0,
-                damage: 0
-            };
-        }
-
-        // Atualizar estado do carro
-        function updateCarState(newState) {
-            // Substitua isso com seu código real
-            car.position.z = newState.speed;
-            car.acceleration = newState.acceleration;
-            car.damage = newState.damage;
-            
-            // Verificar se o carro está destruído
-            if (newState.damage >= 100) {
-                gameOver();
-            }
-        }
-
-        // Mostrar feedback visual para colisão
-        function showCollisionFeedback(collision) {
-            // Opcional: Adicione efeitos visuais como sacudir a tela
-            // ou mostrar partículas na posição da colisão
-            if (collision.obstacleType === 'mountain') {
-                shakeScreen(1.0); // Forte
-            } else {
-                shakeScreen(0.5); // Moderado
-            }
-            
-            // Mostrar dano no HUD
-            updateDamageDisplay();
-        }
-
-        /**
-         * Detecta colisões entre o carro e obstáculos (montanhas e árvores)
-         * @param {Object} carPosition - Posição e dimensões do carro
-         * @param {Array} obstacles - Array de obstáculos com suas posições e dimensões
-         * @returns {Object|null} Objeto com informações sobre a colisão ou null se não houver colisão
-         */
-        function detectCollision(carObject, obstacles) {
-            if (!carObject || !obstacles || !Array.isArray(obstacles)) {
-                console.error("Invalid parameters for detectCollision");
-                return null;
-            }
-
-            const carBox = new THREE.Box3().setFromObject(carObject);
-
-            // Check for collision with other cars
-            const allCars = [car, ...aiCars];
-            for (const otherCar of allCars) {
-                if (carObject !== otherCar) {
-                    const otherCarBox = new THREE.Box3().setFromObject(otherCar);
-                    if (carBox.intersectsBox(otherCarBox)) {
-                        return {
-                            obstacleType: 'car',
-                            object: otherCar
-                        };
-                    }
-                }
-            }
-
-
-            for (let i = 0; i < obstacles.length; i++) {
-                const obstacle = obstacles[i];
-                let obstacleObj;
-                
-                // Obter o objeto 3D do obstáculo
-                if (obstacle.type === 'tree') {
-                    obstacleObj = trees[i];
-                } else if (obstacle.type === 'mountain') {
-                    obstacleObj = mountains[i];
-                }
-                
-                if (!obstacleObj) continue;
-                
-                // Criar uma caixa de colisão para o obstáculo
-                const obstacleBox = new THREE.Box3().setFromObject(obstacleObj);
-                
-                // Verificar interseção entre as caixas
-                if (carBox.intersectsBox(obstacleBox)) {
-                    return {
-                        obstacleIndex: i,
-                        obstacleType: obstacle.type,
-                        collisionPoint: {
-                            x: (carBox.min.x + carBox.max.x) / 2,
-                            y: (carBox.min.y + carBox.max.y) / 2,
-                            z: (carBox.min.z + carBox.max.z) / 2
-                        }
-                    };
-                }
-            }
-            
-            // Nenhuma colisão detectada
-            return null;
-        }
-
-        /**
-         * Gerencia o comportamento do carro após uma colisão
-         * @param {Object} collision - Informações sobre a colisão
-         * @param {Object} carState - Estado atual do carro
-         * @returns {Object} Estado atualizado do carro após a colisão
-         */
-        function handleCollision(collision, carState) {
-            if (!collision) return carState;
-            
-            // Clonar o estado atual do carro
-            const newState = { ...carState };
-            
-            // Definir valores padrão se não existirem
-            newState.damage = newState.damage || 0;
-            
-            // Aplicar efeitos baseados no tipo de obstáculo
-            if (collision.obstacleType === 'mountain') {
-                // Colisão com montanha - impacto forte
-                newState.speed = 0;
-                newState.damage += 25;
-                
-                // Recuar o carro um pouco
-                const pushBackDistance = 2.0;
-                car.translateZ(pushBackDistance);
-                
-                // Efeito sonoro para colisão forte (se implementado)
-                playCollisionSound('mountain');
-                
-            } else if (collision.obstacleType === 'tree') {
-                // Colisão com árvore - impacto moderado
-                newState.speed = newState.speed * 0.5;
-                newState.damage += 10;
-                
-                // Recuar o carro ligeiramente
-                const pushBackDistance = 1.0;
-                car.translateZ(pushBackDistance);
-                
-                // Efeito sonoro para colisão com árvore
-                playCollisionSound('tree');
-            } else if (collision.obstacleType === 'car') {
-                // Colisão com carro - impacto moderado
-                newState.speed = 0;
-                newState.damage += 15;
-
-                // Recuar o carro ligeiramente
-                const pushBackDistance = 1.5;
-                car.translateZ(pushBackDistance);
-
-                // Efeito sonoro para colisão com carro
-                playCollisionSound('car');
-            }
-            
-            // Atualizar o display de informações
-            document.getElementById('info').textContent = `Colisão com ${collision.obstacleType === 'mountain' ? 'montanha' : 'árvore'}! Dano: ${newState.damage}%`;
-            
-            // Verificar game over
-            if (newState.damage >= 100) {
-                gameOver();
-            }
-            
-            return newState;
-        }
-
-        /**
-         * Função principal para verificar e responder a colisões
-         * Deve ser chamada no loop principal do jogo
-         */
-        function checkForCollisions() {
-            // Coletar informações sobre os obstáculos
-            const obstacles = [];
-            
-            // Adicionar montanhas
-            mountains.forEach((mountain, index) => {
-                obstacles.push({
-                    type: 'mountain',
-                    index: index
-                });
-            });
-            
-            // Adicionar árvores
-            trees.forEach((tree, index) => {
-                obstacles.push({
-                    type: 'tree',
-                    index: index
-                });
-            });
-            
-            // Detectar colisão
-            const playerCollision = detectCollision(car, obstacles);
-            if (playerCollision) {
-                handlePlayerCollision(playerCollision);
-            }
-
-            aiCars.forEach(aiCar => {
-                const aiCollision = detectCollision(aiCar, obstacles);
-                if (aiCollision) {
-                    handleAiCollision(aiCar, aiCollision);
-                }
-            });
-        }
-
-        function handlePlayerCollision(collision) {
-            const carState = {
-                speed: carSpeed,
-                damage: car.userData.damage || 0
-            };
-            const updatedState = handleCollision(collision, carState);
-            car.userData.damage = updatedState.damage;
-            shakeScreen(collision.obstacleType === 'mountain' ? 1.0 : 0.5);
-        }
-
-        function handleAiCollision(aiCar, collision) {
-            // Reverse AI car on collision
-            if (collision.obstacleType === 'tree' || collision.obstacleType === 'mountain' || collision.obstacleType === 'car') {
-                // A simple push back and turn might not be enough for a curved track.
-                // For now, let's just move it back along its forward vector.
-                const pushBackDistance = 5;
-                const backward = aiCar.getWorldDirection(new THREE.Vector3()).negate();
-                aiCar.position.add(backward.multiplyScalar(pushBackDistance));
-
-                // And give it a slight turn to try and get out of the situation
-                aiCar.rotation.y += Math.PI / 4;
-            }
-        }
-
-        /**
-         * Reproduz um som de colisão
-         * @param {string} type - Tipo de colisão ('mountain' ou 'tree')
-         */
-        function playCollisionSound(type) {
-            if (!isAudioContextInitialized || !audioContext) return;
-
-            try {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-
-                if (type === 'car') {
-                    oscillator.type = 'noise';
-                    gainNode.gain.setValueAtTime(0.8, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-                } else {
-                    oscillator.type = 'triangle';
-                    oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
-                    oscillator.frequency.exponentialRampToValueAtTime(30, audioContext.currentTime + 0.5);
-                    gainNode.gain.setValueAtTime(1, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                }
-
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + (type === 'mountain' ? 0.5 : 0.3));
-            } catch (e) {
-                console.error("Error playing collision sound:", e);
-            }
-        }
-
-        /**
-         * Aplica um efeito de tremor à câmera
-         * @param {number} intensity - Intensidade do tremor (0.0 a 1.0)
-         */
-        function shakeScreen(intensity) {
-            // Implementar tremor de tela
-            const originalPosition = camera.position.clone();
-            const shakeDuration = 500; // ms
-            const startTime = Date.now();
-            
-            function applyShake() {
-                const elapsed = Date.now() - startTime;
-                const remainingTime = shakeDuration - elapsed;
-                
-                if (remainingTime <= 0) {
-                    camera.position.copy(originalPosition);
-                    return;
-                }
-                
-                // Calcular intensidade diminuindo com o tempo
-                const currentIntensity = intensity * (remainingTime / shakeDuration);
-                
-                // Aplicar tremor aleatório
-                camera.position.set(
-                    originalPosition.x + (Math.random() - 0.5) * currentIntensity,
-                    originalPosition.y + (Math.random() - 0.5) * currentIntensity,
-                    originalPosition.z + (Math.random() - 0.5) * currentIntensity
-                );
-                
-                requestAnimationFrame(applyShake);
-            }
-            
-            applyShake();
-        }
-
-        /**
-         * Função de game over
-         */
-        function gameOver() {
-            // Parar o jogo e mostrar mensagem de game over
-            document.getElementById('info').textContent = "Game Over! Seu carro está destruído.";
-            document.getElementById('info').style.color = "red";
-            document.getElementById('info').style.fontSize = "24px";
-            
-            // Desativar controles
-            for (let key in keys) {
-                keys[key] = false;
-            }
-            
-            // Opcional: recarregar o jogo após alguns segundos
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
-        }
-
+        document.getElementById('message').style.display = 'block';
+        animate();
     </script>
 </body>
 </html>
