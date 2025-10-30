@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Luta DBZ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial Black', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e22ce 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffd700;
+            font-size: 48px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 20px #ff6600;
+            margin-bottom: 30px;
+            animation: glow 2s infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 20px #ff6600; }
+            to { text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 30px #ff9900, 0 0 40px #ffcc00; }
+        }
+
+        .selection-screen {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .fighter-selection {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 25px;
+            border-radius: 15px;
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+        }
+
+        .fighter-selection h2 {
+            color: #ffd700;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+            text-transform: uppercase;
+        }
+
+        .characters-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .character-card {
+            background: linear-gradient(145deg, #2d3748, #1a202c);
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            text-align: center;
+        }
+
+        .character-card:hover {
+            transform: scale(1.05);
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .character-card.selected {
+            border-color: #ff0000;
+            background: linear-gradient(145deg, #4a1a1a, #2d0a0a);
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.8);
+        }
+
+        .character-card h3 {
+            color: #ffd700;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .character-stats {
+            color: #fff;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+
+        .stat-bar {
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 3px 0;
+        }
+
+        .stat-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6600, #ffd700);
+            transition: width 0.3s;
+        }
+
+        .start-button {
+            display: block;
+            margin: 30px auto;
+            padding: 20px 60px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(145deg, #ff6600, #ff0000);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            box-shadow: 0 5px 20px rgba(255, 102, 0, 0.5);
+        }
+
+        .start-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 30px rgba(255, 102, 0, 0.8);
+        }
+
+        .start-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .battle-screen {
+            display: none;
+        }
+
+        .battle-arena {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 30px;
+            border: 3px solid #ffd700;
+            margin-bottom: 30px;
+        }
+
+        .fighters-display {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 30px;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .fighter-panel {
+            background: linear-gradient(145deg, #2d3748, #1a202c);
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #ffd700;
+        }
+
+        .fighter-name {
+            color: #ffd700;
+            font-size: 32px;
+            text-align: center;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .hp-bar-container {
+            background: rgba(0, 0, 0, 0.5);
+            height: 40px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            border: 2px solid #ffd700;
+            position: relative;
+        }
+
+        .hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #7fff00);
+            transition: width 0.5s, background 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #000;
+            font-size: 18px;
+        }
+
+        .hp-bar.low {
+            background: linear-gradient(90deg, #ff0000, #ff6600);
+        }
+
+        .ki-bar-container {
+            background: rgba(0, 0, 0, 0.5);
+            height: 25px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #00bfff;
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .ki-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00bfff, #1e90ff);
+            transition: width 0.3s;
+        }
+
+        .stats-display {
+            color: #fff;
+            font-size: 14px;
+            line-height: 2;
+        }
+
+        .vs-text {
+            color: #ff0000;
+            font-size: 64px;
+            text-align: center;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff6600;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .battle-log {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            border: 2px solid #ffd700;
+        }
+
+        .battle-log h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .log-entry {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            animation: slideIn 0.3s;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-attack {
+            background: rgba(255, 102, 0, 0.3);
+            color: #ffcc00;
+            border-left: 4px solid #ff6600;
+        }
+
+        .log-special {
+            background: rgba(0, 191, 255, 0.3);
+            color: #00ffff;
+            border-left: 4px solid #00bfff;
+        }
+
+        .log-damage {
+            background: rgba(255, 0, 0, 0.3);
+            color: #ff6666;
+            border-left: 4px solid #ff0000;
+        }
+
+        .log-heal {
+            background: rgba(0, 255, 0, 0.3);
+            color: #66ff66;
+            border-left: 4px solid #00ff00;
+        }
+
+        .log-info {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-left: 4px solid #ffd700;
+        }
+
+        .battle-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+        }
+
+        .stat-card h4 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        .stat-item {
+            color: #fff;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+        }
+
+        .winner-announcement {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 50px 80px;
+            border-radius: 20px;
+            border: 5px solid #ffd700;
+            z-index: 1000;
+            display: none;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.8);
+        }
+
+        .winner-announcement h2 {
+            color: #ffd700;
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: glow 1s infinite alternate;
+        }
+
+        .winner-announcement p {
+            color: #fff;
+            font-size: 32px;
+            margin-bottom: 30px;
+        }
+
+        .restart-button {
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(145deg, #ff6600, #ff0000);
+            border: 3px solid #ffd700;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .restart-button:hover {
+            transform: scale(1.1);
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ffd700;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ DRAGON BALL Z - SIMULADOR DE LUTA ⚡</h1>
+
+        <div class="selection-screen" id="selectionScreen">
+            <div class="fighter-selection">
+                <h2>👊 Lutador 1</h2>
+                <div class="characters-grid" id="fighter1Grid"></div>
+            </div>
+
+            <div class="fighter-selection">
+                <h2>👊 Lutador 2</h2>
+                <div class="characters-grid" id="fighter2Grid"></div>
+            </div>
+
+            <button class="start-button" id="startButton" disabled>⚡ INICIAR BATALHA ⚡</button>
+        </div>
+
+        <div class="battle-screen" id="battleScreen">
+            <div class="battle-arena">
+                <div class="fighters-display">
+                    <div class="fighter-panel">
+                        <div class="fighter-name" id="fighter1Name"></div>
+                        <div class="hp-bar-container">
+                            <div class="hp-bar" id="fighter1HP" style="width: 100%;">HP: 100%</div>
+                        </div>
+                        <div class="ki-bar-container">
+                            <div class="ki-bar" id="fighter1KI" style="width: 100%"></div>
+                        </div>
+                        <div class="stats-display" id="fighter1Stats"></div>
+                    </div>
+
+                    <div class="vs-text">VS</div>
+
+                    <div class="fighter-panel">
+                        <div class="fighter-name" id="fighter2Name"></div>
+                        <div class="hp-bar-container">
+                            <div class="hp-bar" id="fighter2HP" style="width: 100%;">HP: 100%</div>
+                        </div>
+                        <div class="ki-bar-container">
+                            <div class="ki-bar" id="fighter2KI" style="width: 100%"></div>
+                        </div>
+                        <div class="stats-display" id="fighter2Stats"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="battle-log">
+                <h3>📜 LOG DE BATALHA</h3>
+                <div id="logContent"></div>
+            </div>
+
+            <div class="battle-stats">
+                <div class="stat-card">
+                    <h4>📊 ESTATÍSTICAS - LUTADOR 1</h4>
+                    <div id="stats1Content"></div>
+                </div>
+                <div class="stat-card">
+                    <h4>📊 ESTATÍSTICAS - LUTADOR 2</h4>
+                    <div id="stats2Content"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="winner-announcement" id="winnerAnnouncement">
+            <h2>🏆 VITÓRIA! 🏆</h2>
+            <p id="winnerText"></p>
+            <button class="restart-button" onclick="resetGame()">NOVA BATALHA</button>
+        </div>
+    </div>
+
+    <script>
+        const characters = {
+            goku: {
+                name: "GOKU",
+                hp: 1000,
+                attack: 85,
+                defense: 70,
+                speed: 90,
+                ki: 100,
+                special: "Kamehameha",
+                specialDamage: 150
+            },
+            vegeta: {
+                name: "VEGETA",
+                hp: 950,
+                attack: 90,
+                defense: 75,
+                speed: 85,
+                ki: 100,
+                special: "Final Flash",
+                specialDamage: 160
+            },
+            gohan: {
+                name: "GOHAN",
+                hp: 900,
+                attack: 88,
+                defense: 65,
+                speed: 88,
+                ki: 100,
+                special: "Masenko",
+                specialDamage: 145
+            },
+            piccolo: {
+                name: "PICCOLO",
+                hp: 850,
+                attack: 75,
+                defense: 85,
+                speed: 75,
+                ki: 100,
+                special: "Makankosappo",
+                specialDamage: 140
+            },
+            trunks: {
+                name: "TRUNKS",
+                hp: 880,
+                attack: 82,
+                defense: 70,
+                speed: 92,
+                ki: 100,
+                special: "Burning Attack",
+                specialDamage: 135
+            },
+            frieza: {
+                name: "FREEZA",
+                hp: 920,
+                attack: 87,
+                defense: 68,
+                speed: 80,
+                ki: 100,
+                special: "Death Ball",
+                specialDamage: 155
+            },
+            cell: {
+                name: "CELL",
+                hp: 980,
+                attack: 89,
+                defense: 80,
+                speed: 83,
+                ki: 100,
+                special: "Perfect Kamehameha",
+                specialDamage: 165
+            },
+            majinbuu: {
+                name: "MAJIN BOO",
+                hp: 1100,
+                attack: 80,
+                defense: 90,
+                speed: 70,
+                ki: 100,
+                special: "Chocolate Beam",
+                specialDamage: 130
+            },
+            krillin: {
+                name: "KURIRIN",
+                hp: 700,
+                attack: 65,
+                defense: 60,
+                speed: 85,
+                ki: 100,
+                special: "Kienzan",
+                specialDamage: 120
+            }
+        };
+
+        let selectedFighter1 = null;
+        let selectedFighter2 = null;
+        let battleStats = {
+            fighter1: { attacks: 0, specialsUsed: 0, damageDealt: 0, damageTaken: 0 },
+            fighter2: { attacks: 0, specialsUsed: 0, damageDealt: 0, damageTaken: 0 }
+        };
+
+        function initCharacterSelection() {
+            const fighter1Grid = document.getElementById('fighter1Grid');
+            const fighter2Grid = document.getElementById('fighter2Grid');
+
+            Object.keys(characters).forEach(key => {
+                const char = characters[key];
+                
+                const card1 = createCharacterCard(char, key, 1);
+                const card2 = createCharacterCard(char, key, 2);
+                
+                fighter1Grid.appendChild(card1);
+                fighter2Grid.appendChild(card2);
+            });
+        }
+
+        function createCharacterCard(char, key, fighter) {
+            const card = document.createElement('div');
+            card.className = 'character-card';
+            card.onclick = () => selectCharacter(key, fighter, card);
+            
+            card.innerHTML = `
+                <h3>${char.name}</h3>
+                <div class="character-stats">
+                    <div>HP: ${char.hp}</div>
+                    <div class="stat-bar"><div class="stat-fill" style="width: ${char.hp / 11}%"></div></div>
+                    <div>ATK: ${char.attack}</div>
+                    <div class="stat-bar"><div class="stat-fill" style="width: ${char.attack}%"></div></div>
+                    <div>DEF: ${char.defense}</div>
+                    <div class="stat-bar"><div class="stat-fill" style="width: ${char.defense}%"></div></div>
+                    <div>SPD: ${char.speed}</div>
+                    <div class="stat-bar"><div class="stat-fill" style="width: ${char.speed}%"></div></div>
+                    <div style="color: #00bfff; margin-top: 5px;">⚡ ${char.special}</div>
+                </div>
+            `;
+            
+            return card;
+        }
+
+        function selectCharacter(key, fighter, card) {
+            if (fighter === 1) {
+                document.querySelectorAll('#fighter1Grid .character-card').forEach(c => c.classList.remove('selected'));
+                selectedFighter1 = JSON.parse(JSON.stringify(characters[key]));
+                selectedFighter1.maxHP = selectedFighter1.hp;
+                selectedFighter1.currentKI = selectedFighter1.ki;
+            } else {
+                document.querySelectorAll('#fighter2Grid .character-card').forEach(c => c.classList.remove('selected'));
+                selectedFighter2 = JSON.parse(JSON.stringify(characters[key]));
+                selectedFighter2.maxHP = selectedFighter2.hp;
+                selectedFighter2.currentKI = selectedFighter2.ki;
+            }
+            
+            card.classList.add('selected');
+            
+            if (selectedFighter1 && selectedFighter2) {
+                document.getElementById('startButton').disabled = false;
+            }
+        }
+
+        function startBattle() {
+            if (!selectedFighter1 || !selectedFighter2) return;
+            
+            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('battleScreen').style.display = 'block';
+            
+            document.getElementById('fighter1Name').textContent = selectedFighter1.name;
+            document.getElementById('fighter2Name').textContent = selectedFighter2.name;
+            
+            battleStats = {
+                fighter1: { attacks: 0, specialsUsed: 0, damageDealt: 0, damageTaken: 0 },
+                fighter2: { attacks: 0, specialsUsed: 0, damageDealt: 0, damageTaken: 0 }
+            };
+            
+            addLog(`⚡ A batalha entre ${selectedFighter1.name} e ${selectedFighter2.name} começou!`, 'info');
+            
+            setTimeout(() => {
+                battleLoop();
+            }, 1000);
+        }
+
+        function battleLoop() {
+            if (selectedFighter1.hp <= 0 || selectedFighter2.hp <= 0) {
+                endBattle();
+                return;
+            }
+            
+            const turn = Math.random() < (selectedFighter1.speed / (selectedFighter1.speed + selectedFighter2.speed)) ? 1 : 2;
+            
+            if (turn === 1) {
+                executeTurn(selectedFighter1, selectedFighter2, 1);
+            } else {
+                executeTurn(selectedFighter2, selectedFighter1, 2);
+            }
+            
+            updateDisplay();
+            updateStats();
+            
+            setTimeout(battleLoop, 1500);
+        }
+
+        function executeTurn(attacker, defender, attackerNum) {
+            const defenderNum = attackerNum === 1 ? 2 : 1;
+            const stats = attackerNum === 1 ? battleStats.fighter1 : battleStats.fighter2;
+            const defenderStats = attackerNum === 1 ? battleStats.fighter2 : battleStats.fighter1;
+            
+            attacker.currentKI = Math.min(attacker.currentKI + 15, attacker.ki);
+            
+            const action = Math.random();
+            
+            if (action < 0.3 && attacker.currentKI >= 50) {
+                // Ataque especial
+                const baseDamage = attacker.specialDamage;
+                const actualDamage = Math.max(1, Math.floor(baseDamage - (defender.defense * 0.5) + (Math.random() * 20 - 10)));
+                
+                defender.hp = Math.max(0, defender.hp - actualDamage);
+                attacker.currentKI -= 50;
+                
+                stats.specialsUsed++;
+                stats.damageDealt += actualDamage;
+                defenderStats.damageTaken += actualDamage;
+                
+                addLog(`💥 ${attacker.name} usou ${attacker.special}! Causou ${actualDamage} de dano!`, 'special');
+            } else {
+                // Ataque normal
+                const baseDamage = attacker.attack;
+                const actualDamage = Math.max(1, Math.floor(baseDamage - (defender.defense * 0.3) + (Math.random() * 15 - 7)));
+                
+                defender.hp = Math.max(0, defender.hp - actualDamage);
+                
+                stats.attacks++;
+                stats.damageDealt += actualDamage;
+                defenderStats.damageTaken += actualDamage;
+                
+                const attacks = ['soco', 'chute', 'rajada de socos', 'joelhada', 'cotovelada'];
+                const attack = attacks[Math.floor(Math.random() * attacks.length)];
+                
+                addLog(`👊 ${attacker.name} acertou um ${attack}! ${actualDamage} de dano!`, 'attack');
+            }
+            
+            if (defender.hp > 0 && defender.hp < defender.maxHP * 0.3 && Math.random() < 0.2) {
+                const heal = Math.floor(defender.maxHP * 0.1);
+                defender.hp = Math.min(defender.hp + heal, defender.maxHP);
+                addLog(`✨ ${defender.name} recuperou ${heal} HP!`, 'heal');
+            }
+        }
+
+        function updateDisplay() {
+            const fighter1HPPercent = (selectedFighter1.hp / selectedFighter1.maxHP) * 100;
+            const fighter2HPPercent = (selectedFighter2.hp / selectedFighter2.maxHP) * 100;
+            
+            const fighter1HPBar = document.getElementById('fighter1HP');
+            const fighter2HPBar = document.getElementById('fighter2HP');
+            
+            fighter1HPBar.style.width = fighter1HPPercent + '%';
+            fighter1HPBar.textContent = `HP: ${Math.round(fighter1HPPercent)}%`;
+            fighter1HPBar.className = 'hp-bar' + (fighter1HPPercent < 30 ? ' low' : '');
+            
+            fighter2HPBar.style.width = fighter2HPPercent + '%';
+            fighter2HPBar.textContent = `HP: ${Math.round(fighter2HPPercent)}%`;
+            fighter2HPBar.className = 'hp-bar' + (fighter2HPPercent < 30 ? ' low' : '');
+            
+            const fighter1KIPercent = (selectedFighter1.currentKI / selectedFighter1.ki) * 100;
+            const fighter2KIPercent = (selectedFighter2.currentKI / selectedFighter2.ki) * 100;
+            
+            document.getElementById('fighter1KI').style.width = fighter1KIPercent + '%';
+            document.getElementById('fighter2KI').style.width = fighter2KIPercent + '%';
+            
+            document.getElementById('fighter1Stats').innerHTML = `
+                <div>💪 ATK: ${selectedFighter1.attack}</div>
+                <div>🛡️ DEF: ${selectedFighter1.defense}</div>
+                <div>⚡ SPD: ${selectedFighter1.speed}</div>
+                <div style="color: #00bfff;">🔮 KI: ${selectedFighter1.currentKI}/${selectedFighter1.ki}</div>
+            `;
+            
+            document.getElementById('fighter2Stats').innerHTML = `
+                <div>💪 ATK: ${selectedFighter2.attack}</div>
+                <div>🛡️ DEF: ${selectedFighter2.defense}</div>
+                <div>⚡ SPD: ${selectedFighter2.speed}</div>
+                <div style="color: #00bfff;">🔮 KI: ${selectedFighter2.currentKI}/${selectedFighter2.ki}</div>
+            `;
+        }
+
+        function updateStats() {
+            document.getElementById('stats1Content').innerHTML = `
+                <div class="stat-item"><span>Ataques Normais:</span><span>${battleStats.fighter1.attacks}</span></div>
+                <div class="stat-item"><span>Ataques Especiais:</span><span>${battleStats.fighter1.specialsUsed}</span></div>
+                <div class="stat-item"><span>Dano Causado:</span><span>${battleStats.fighter1.damageDealt}</span></div>
+                <div class="stat-item"><span>Dano Recebido:</span><span>${battleStats.fighter1.damageTaken}</span></div>
+            `;
+            
+            document.getElementById('stats2Content').innerHTML = `
+                <div class="stat-item"><span>Ataques Normais:</span><span>${battleStats.fighter2.attacks}</span></div>
+                <div class="stat-item"><span>Ataques Especiais:</span><span>${battleStats.fighter2.specialsUsed}</span></div>
+                <div class="stat-item"><span>Dano Causado:</span><span>${battleStats.fighter2.damageDealt}</span></div>
+                <div class="stat-item"><span>Dano Recebido:</span><span>${battleStats.fighter2.damageTaken}</span></div>
+            `;
+        }
+
+        function addLog(message, type) {
+            const logContent = document.getElementById('logContent');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = message;
+            
+            logContent.insertBefore(entry, logContent.firstChild);
+            
+            if (logContent.children.length > 50) {
+                logContent.removeChild(logContent.lastChild);
+            }
+        }
+
+        function endBattle() {
+            const winner = selectedFighter1.hp > 0 ? selectedFighter1 : selectedFighter2;
+            const winnerNum = selectedFighter1.hp > 0 ? 1 : 2;
+            
+            addLog(`🏆 ${winner.name} VENCEU A BATALHA!`, 'info');
+            
+            document.getElementById('winnerText').textContent = `${winner.name} é o vencedor!`;
+            document.getElementById('winnerAnnouncement').style.display = 'block';
+        }
+
+        function resetGame() {
+            selectedFighter1 = null;
+            selectedFighter2 = null;
+            
+            document.getElementById('winnerAnnouncement').style.display = 'none';
+            document.getElementById('battleScreen').style.display = 'none';
+            document.getElementById('selectionScreen').style.display = 'grid';
+            document.getElementById('startButton').disabled = true;
+            document.getElementById('logContent').innerHTML = '';
+            
+            document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
+        }
+
+        document.getElementById('startButton').addEventListener('click', startBattle);
+
+        initCharacterSelection();
+    </script>
+</body>
+</html>
