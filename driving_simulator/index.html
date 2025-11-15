@@ -133,6 +133,37 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+        // Game constants
+        const MAX_SCORE = 10;
+        const PLAYER_CAR_COLOR = 0x0000FF;
+        const AI_CAR_COLOR = 0xFF0000;
+        const COIN_COLOR = 0xFFD700;
+        const GROUND_COLOR = 0x228B22;
+        const ROAD_COLOR = 0x333333;
+        const ROAD_LINE_COLOR = 0xFFFFFF;
+        const CLOUD_COLOR = 0xFFFFFF;
+        const MOUNTAIN_COLOR = 0x8B4513;
+        const TREE_TRUNK_COLOR = 0x8B4513;
+        const TREE_LEAVES_COLOR = 0x228B22;
+        const TRAIN_TRACK_COLOR = 0x654321;
+        const TRAIN_BODY_COLOR = 0xFF0000;
+        const TRAIN_CHIMNEY_COLOR = 0x333333;
+        const PLAYER_ACCELERATION = 0.01;
+        const PLAYER_MAX_SPEED = 0.35;
+        const PLAYER_TURN_SPEED = 0.025;
+        const AI_SPEED = 0.35;
+        const AI_TURN_SPEED = 0.05;
+        const TRAIN_SPEED = 0.01;
+        const CAMERA_DISTANCE = 15;
+        const CAMERA_HEIGHT = 8;
+        const COIN_COUNT = 5;
+        const EXPLOSION_PARTICLE_COUNT = 10;
+        const MAP_LIMIT = 145;
+        const TRAIN_COLLISION_DISTANCE = 4;
+        const COIN_COLLISION_DISTANCE = 2.5;
+        const TRACK_RADIUS = 40;
+
+
         // Configuração inicial
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
@@ -157,7 +188,7 @@
 
         // Chão
         const groundGeometry = new THREE.PlaneGeometry(300, 300);
-        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: GROUND_COLOR });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
@@ -165,7 +196,7 @@
 
         // Estrada
         const roadGeometry = new THREE.PlaneGeometry(20, 300);
-        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const roadMaterial = new THREE.MeshLambertMaterial({ color: ROAD_COLOR });
         const road = new THREE.Mesh(roadGeometry, roadMaterial);
         road.rotation.x = -Math.PI / 2;
         road.position.y = 0.01;
@@ -175,7 +206,7 @@
         // Linhas da estrada
         for (let i = -140; i < 140; i += 20) {
             const lineGeometry = new THREE.PlaneGeometry(2, 10);
-            const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+            const lineMaterial = new THREE.MeshBasicMaterial({ color: ROAD_LINE_COLOR });
             const line = new THREE.Mesh(lineGeometry, lineMaterial);
             line.rotation.x = -Math.PI / 2;
             line.position.set(0, 0.02, i);
@@ -187,7 +218,7 @@
             const cloud = new THREE.Group();
             for (let i = 0; i < 5; i++) {
                 const cloudGeometry = new THREE.SphereGeometry(3 + Math.random() * 2, 8, 8);
-                const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+                const cloudMaterial = new THREE.MeshLambertMaterial({ color: CLOUD_COLOR });
                 const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial);
                 cloudPart.position.set(Math.random() * 8 - 4, Math.random() * 2, Math.random() * 8 - 4);
                 cloud.add(cloudPart);
@@ -208,7 +239,7 @@
         // Montanhas
         for (let i = 0; i < 8; i++) {
             const mountainGeometry = new THREE.ConeGeometry(15 + Math.random() * 10, 30 + Math.random() * 20, 4);
-            const mountainMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            const mountainMaterial = new THREE.MeshLambertMaterial({ color: MOUNTAIN_COLOR });
             const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
             const angle = (i / 8) * Math.PI * 2;
             mountain.position.set(Math.cos(angle) * 120, 15, Math.sin(angle) * 120);
@@ -220,14 +251,14 @@
         function createTree(x, z) {
             const tree = new THREE.Group();
             const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 5, 8);
-            const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            const trunkMaterial = new THREE.MeshLambertMaterial({ color: TREE_TRUNK_COLOR });
             const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
             trunk.position.y = 2.5;
             trunk.castShadow = true;
             tree.add(trunk);
 
             const leavesGeometry = new THREE.SphereGeometry(3, 8, 8);
-            const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+            const leavesMaterial = new THREE.MeshLambertMaterial({ color: TREE_LEAVES_COLOR });
             const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
             leaves.position.y = 6;
             leaves.castShadow = true;
@@ -246,9 +277,8 @@
         }
 
         // Trilho do trem (circular)
-        const trackRadius = 40;
-        const trackGeometry = new THREE.TorusGeometry(trackRadius, 0.3, 8, 50);
-        const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+        const trackGeometry = new THREE.TorusGeometry(TRACK_RADIUS, 0.3, 8, 50);
+        const trackMaterial = new THREE.MeshLambertMaterial({ color: TRAIN_TRACK_COLOR });
         const track = new THREE.Mesh(trackGeometry, trackMaterial);
         track.rotation.x = Math.PI / 2;
         track.position.y = 0.3;
@@ -257,18 +287,18 @@
         // Trem
         const trainGroup = new THREE.Group();
         const trainGeometry = new THREE.BoxGeometry(3, 2, 5);
-        const trainMaterial = new THREE.MeshLambertMaterial({ color: 0xFF0000 });
+        const trainMaterial = new THREE.MeshLambertMaterial({ color: TRAIN_BODY_COLOR });
         const trainBody = new THREE.Mesh(trainGeometry, trainMaterial);
         trainBody.castShadow = true;
         trainGroup.add(trainBody);
 
         const chimneyGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 8);
-        const chimneyMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const chimneyMaterial = new THREE.MeshLambertMaterial({ color: TRAIN_CHIMNEY_COLOR });
         const chimney = new THREE.Mesh(chimneyGeometry, chimneyMaterial);
         chimney.position.set(0, 1.75, 1.5);
         trainGroup.add(chimney);
 
-        trainGroup.position.set(trackRadius, 1, 0);
+        trainGroup.position.set(TRACK_RADIUS, 1, 0);
         scene.add(trainGroup);
 
         let trainAngle = 0;
@@ -309,11 +339,11 @@
             return car;
         }
 
-        const playerCar = createCar(0x0000FF);
+        const playerCar = createCar(PLAYER_CAR_COLOR);
         playerCar.position.set(-5, 0, -50);
         scene.add(playerCar);
 
-        const aiCar = createCar(0xFF0000);
+        const aiCar = createCar(AI_CAR_COLOR);
         aiCar.position.set(5, 0, -50);
         scene.add(aiCar);
 
@@ -321,7 +351,7 @@
         const coins = [];
         function createCoin() {
             const coinGeometry = new THREE.CylinderGeometry(1, 1, 0.3, 16);
-            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
+            const coinMaterial = new THREE.MeshLambertMaterial({ color: COIN_COLOR });
             const coin = new THREE.Mesh(coinGeometry, coinMaterial);
             
             let x, z;
@@ -336,7 +366,7 @@
             coins.push(coin);
         }
 
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < COIN_COUNT; i++) {
             createCoin();
         }
 
@@ -353,7 +383,7 @@
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             if (e.key === ' ') {
-                if (!gameState.started || gameState.playerScore >= 10 || gameState.aiScore >= 10) {
+                if (!gameState.started || gameState.playerScore >= MAX_SCORE || gameState.aiScore >= MAX_SCORE) {
                     resetGame();
                 }
             }
@@ -375,7 +405,7 @@
             
             coins.forEach(coin => scene.remove(coin));
             coins.length = 0;
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < COIN_COUNT; i++) {
                 createCoin();
             }
             
@@ -387,13 +417,13 @@
             document.getElementById('playerScore').textContent = gameState.playerScore;
             document.getElementById('aiScore').textContent = gameState.aiScore;
             
-            const playerPercent = (gameState.playerScore / 10) * 100;
-            const aiPercent = (gameState.aiScore / 10) * 100;
+            const playerPercent = (gameState.playerScore / MAX_SCORE) * 100;
+            const aiPercent = (gameState.aiScore / MAX_SCORE) * 100;
             
             document.getElementById('playerHealth').style.width = playerPercent + '%';
-            document.getElementById('playerHealth').textContent = gameState.playerScore + '/10';
+            document.getElementById('playerHealth').textContent = gameState.playerScore + `/${MAX_SCORE}`;
             document.getElementById('aiHealth').style.width = aiPercent + '%';
-            document.getElementById('aiHealth').textContent = gameState.aiScore + '/10';
+            document.getElementById('aiHealth').textContent = gameState.aiScore + `/${MAX_SCORE}`;
         }
 
         function showAIMessage() {
@@ -412,7 +442,7 @@
             
             // Efeito de explosão simples
             const particles = [];
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < EXPLOSION_PARTICLE_COUNT; i++) {
                 const particleGeometry = new THREE.SphereGeometry(0.2, 4, 4);
                 const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xFF6600 });
                 const particle = new THREE.Mesh(particleGeometry, particleMaterial);
@@ -435,7 +465,7 @@
             if (car === playerCar) gameState.playerSpeed = 0;
         }
 
-        function checkCollision(obj1, obj2, distance = 3) {
+        function checkCollision(obj1, obj2, distance) {
             return obj1.position.distanceTo(obj2.position) < distance;
         }
 
@@ -497,25 +527,28 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            if (gameState.started && gameState.playerScore < 10 && gameState.aiScore < 10) {
+            if (gameState.started && gameState.playerScore < MAX_SCORE && gameState.aiScore < MAX_SCORE) {
                 // Controle do jogador
+<<<<<<< Updated upstream
+=======
                 const acceleration = 0.01;
-                const maxSpeed = 0.5;
-                const turnSpeed = 0.05;
+                const maxSpeed = 0.35;
+                const turnSpeed = 0.015;
 
+>>>>>>> Stashed changes
                 if (keys['arrowup'] || keys['w']) {
-                    gameState.playerSpeed = Math.min(gameState.playerSpeed + acceleration, maxSpeed);
+                    gameState.playerSpeed = Math.min(gameState.playerSpeed + PLAYER_ACCELERATION, PLAYER_MAX_SPEED);
                 } else if (keys['arrowdown'] || keys['s']) {
-                    gameState.playerSpeed = Math.max(gameState.playerSpeed - acceleration, -maxSpeed / 2);
+                    gameState.playerSpeed = Math.max(gameState.playerSpeed - PLAYER_ACCELERATION, -PLAYER_MAX_SPEED / 2);
                 } else {
                     gameState.playerSpeed *= 0.95;
                 }
 
                 if (keys['arrowleft'] || keys['a']) {
-                    playerCar.rotation.y += turnSpeed;
+                    playerCar.rotation.y += PLAYER_TURN_SPEED;
                 }
                 if (keys['arrowright'] || keys['d']) {
-                    playerCar.rotation.y -= turnSpeed;
+                    playerCar.rotation.y -= PLAYER_TURN_SPEED;
                 }
 
                 playerCar.position.x += Math.sin(playerCar.rotation.y) * gameState.playerSpeed;
@@ -542,24 +575,23 @@
                     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
                     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                     
-                    aiCar.rotation.y += angleDiff * 0.05;
+                    aiCar.rotation.y += angleDiff * AI_TURN_SPEED;
                     
-                    const aiSpeed = 0.35;
-                    aiCar.position.x += Math.sin(aiCar.rotation.y) * aiSpeed;
-                    aiCar.position.z += Math.cos(aiCar.rotation.y) * aiSpeed;
+                    aiCar.position.x += Math.sin(aiCar.rotation.y) * AI_SPEED;
+                    aiCar.position.z += Math.cos(aiCar.rotation.y) * AI_SPEED;
                 }
 
                 // Limites do mapa
                 [playerCar, aiCar].forEach(car => {
-                    if (Math.abs(car.position.x) > 145) car.position.x = Math.sign(car.position.x) * 145;
-                    if (Math.abs(car.position.z) > 145) car.position.z = Math.sign(car.position.z) * 145;
+                    if (Math.abs(car.position.x) > MAP_LIMIT) car.position.x = Math.sign(car.position.x) * MAP_LIMIT;
+                    if (Math.abs(car.position.z) > MAP_LIMIT) car.position.z = Math.sign(car.position.z) * MAP_LIMIT;
                 });
 
                 // Colisão com trem
-                if (checkCollision(playerCar, trainGroup, 4)) {
+                if (checkCollision(playerCar, trainGroup, TRAIN_COLLISION_DISTANCE)) {
                     explode(playerCar);
                 }
-                if (checkCollision(aiCar, trainGroup, 4)) {
+                if (checkCollision(aiCar, trainGroup, TRAIN_COLLISION_DISTANCE)) {
                     explode(aiCar);
                 }
 
@@ -567,7 +599,7 @@
                 coins.forEach((coin, index) => {
                     coin.rotation.y += 0.05;
                     
-                    if (checkCollision(playerCar, coin, 2.5)) {
+                    if (checkCollision(playerCar, coin, COIN_COLLISION_DISTANCE)) {
                         gameState.playerScore++;
                         scene.remove(coin);
                         coins.splice(index, 1);
@@ -575,7 +607,7 @@
                         updateUI();
                     }
                     
-                    if (checkCollision(aiCar, coin, 2.5)) {
+                    if (checkCollision(aiCar, coin, COIN_COLLISION_DISTANCE)) {
                         gameState.aiScore++;
                         scene.remove(coin);
                         coins.splice(index, 1);
@@ -587,28 +619,26 @@
                 });
 
                 // Verificar vitória
-                if (gameState.playerScore >= 10) {
+                if (gameState.playerScore >= MAX_SCORE) {
                     document.getElementById('message').textContent = 'VOCÊ VENCEU! Pressione ESPAÇO para jogar novamente';
                     document.getElementById('message').style.display = 'block';
                 }
-                if (gameState.aiScore >= 10) {
+                if (gameState.aiScore >= MAX_SCORE) {
                     document.getElementById('message').textContent = 'IA VENCEU! Pressione ESPAÇO para jogar novamente';
                     document.getElementById('message').style.display = 'block';
                 }
             }
 
             // Animação do trem
-            trainAngle += 0.01;
-            trainGroup.position.x = Math.cos(trainAngle) * trackRadius;
-            trainGroup.position.z = Math.sin(trainAngle) * trackRadius;
+            trainAngle += TRAIN_SPEED;
+            trainGroup.position.x = Math.cos(trainAngle) * TRACK_RADIUS;
+            trainGroup.position.z = Math.sin(trainAngle) * TRACK_RADIUS;
             trainGroup.rotation.y = -trainAngle + Math.PI / 2;
 
             // Câmera seguindo o jogador
-            const cameraDistance = 15;
-            const cameraHeight = 8;
-            camera.position.x = playerCar.position.x - Math.sin(playerCar.rotation.y) * cameraDistance;
-            camera.position.z = playerCar.position.z - Math.cos(playerCar.rotation.y) * cameraDistance;
-            camera.position.y = playerCar.position.y + cameraHeight;
+            camera.position.x = playerCar.position.x - Math.sin(playerCar.rotation.y) * CAMERA_DISTANCE;
+            camera.position.z = playerCar.position.z - Math.cos(playerCar.rotation.y) * CAMERA_DISTANCE;
+            camera.position.y = playerCar.position.y + CAMERA_HEIGHT;
             camera.lookAt(playerCar.position);
 
             drawSpeedometer(Math.abs(gameState.playerSpeed));
