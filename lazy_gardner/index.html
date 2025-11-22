@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lazy Gardener: Jardim Zen</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #87CEEB; /* Céu inicial */ }
-        canvas { display: block; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            /* Céu inicial */
+        }
+
+        canvas {
+            display: block;
+        }
+
         #ui {
             position: absolute;
             top: 10px;
@@ -17,11 +27,13 @@
             font-family: sans-serif;
             color: #333;
         }
+
         #ui button {
             margin: 2px;
             padding: 5px 8px;
             cursor: pointer;
         }
+
         #notifications {
             position: absolute;
             bottom: 10px;
@@ -33,10 +45,12 @@
             font-family: sans-serif;
             font-size: 0.9em;
             max-width: 80%;
-            display: none; /* Começa escondido */
+            display: none;
+            /* Começa escondido */
         }
     </style>
 </head>
+
 <body>
     <div id="ui">
         <span>Plantar:</span>
@@ -44,6 +58,9 @@
         <button id="plantTree">Árvore (60s)</button>
         <button id="plantPineTree">Pinheiro (120s)</button>
         <button id="plantMushroom">Cogumelo (20s)</button>
+        <button id="plantBamboo">Bambu (40s)</button>
+        <button id="plantBerryBush">Arbusto de Bagas (80s)</button>
+        <button id="plantLotus">Lótus Flutuante (150s)</button>
         <br>
         <span id="weatherStatus">Clima: Ensolarado</span> |
         <span id="timeStatus">Hora: Dia</span>
@@ -93,8 +110,11 @@
         const growthTimes = { // Em segundos (reduzido para demonstração)
             flower: { seed: 0, sprout: 5, bud: 15, bloom: 30 },
             tree: { seed: 0, sapling: 10, growing: 30, mature: 60 },
-            pinetree: { seed: 0, sapling: 20, growing: 60, mature: 120, ancient: 180 }, // Adicionado o estágio "ancient" com 180s
-            mushroom: { spore: 0, small: 5, grown: 20 }
+            pinetree: { seed: 0, sapling: 20, growing: 60, mature: 120, ancient: 180 },
+            mushroom: { spore: 0, small: 5, grown: 20 },
+            bamboo: { seed: 0, shoot: 5, cluster: 15, dense: 40 },
+            berrybush: { seed: 0, sapling: 10, foliage: 35, berry: 80 },
+            lotus: { spore: 0, pad: 40, bud: 100, bloom: 150 }
         };
 
         const weatherChangeInterval = 30; // Mudar clima a cada 30 segundos
@@ -178,7 +198,7 @@
             ground.receiveShadow = true;
             scene.add(ground);
 
-             // Sky Dome (Simples)
+            // Sky Dome (Simples)
             const skyGeometry = new THREE.SphereGeometry(500, 32, 16); // Raio grande
             const skyMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide }); // Material visível por dentro
             sky = new THREE.Mesh(skyGeometry, skyMaterial);
@@ -186,7 +206,7 @@
             updateSkyColor(); // Definir cor inicial
 
             // --- Create initial clouds ---
-            for(let i=0; i<20; i++) {
+            for (let i = 0; i < 20; i++) {
                 addCloud();
             }
 
@@ -198,12 +218,15 @@
             document.getElementById('plantTree').addEventListener('click', () => setSeedType('tree'));
             document.getElementById('plantPineTree').addEventListener('click', () => setSeedType('pinetree'));
             document.getElementById('plantMushroom').addEventListener('click', () => setSeedType('mushroom'));
+            document.getElementById('plantBamboo').addEventListener('click', () => setSeedType('bamboo'));
+            document.getElementById('plantBerryBush').addEventListener('click', () => setSeedType('berrybush'));
+            document.getElementById('plantLotus').addEventListener('click', () => setSeedType('lotus'));
 
             // Iniciar loop de animação
             animate();
             updateWeather(); // Define o clima inicial
             updateAudio(); // Tenta iniciar o áudio
-            
+
             // Carregar o modelo do urso
             // loadBearModel();
         }
@@ -244,7 +267,24 @@
                     console.log(`Tocou na planta: ${plant.type}`);
                     // Aqui poderia tocar um som aleatório (Web Audio API seria melhor)
                     try { notificationSound.play(); } catch (e) { console.warn("Audio play failed", e); }
-                    showNotification(`🎶 Melodia suave da ${plant.type} 🎶`, 1500);
+
+                    if (plant.type === 'berrybush' && plant.growthStage === 3) {
+                        plant.growthStage = 2; // Voltar para 'foliage'
+                        scene.remove(plant.mesh);
+                        plant.mesh = createPlantMesh(plant);
+                        plant.mesh.position.copy(plant.position);
+                        if (plant.mesh.type === 'Group') {
+                            plant.mesh.position.y = plant.position.y;
+                        } else {
+                            plant.mesh.position.y = plant.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
+                        }
+                        plant.mesh.castShadow = true;
+                        plant.mesh.userData.plantData = plant;
+                        scene.add(plant.mesh);
+                        showNotification("Colheu bagas! A vida é doce. 🍒", 3000);
+                    } else {
+                        showNotification(`🎶 Melodia suave da ${plant.type} 🎶`, 1500);
+                    }
                 }
             }
         }
@@ -252,7 +292,7 @@
         function plantSeed(position, type) {
             // Adicionar variabilidade de tamanho para cada planta individual
             const sizeVariation = 0.85 + Math.random() * 0.3; // Variação de 85% a 115% do tamanho normal
-            
+
             const plantData = {
                 id: THREE.MathUtils.generateUUID(),
                 type: type,
@@ -269,110 +309,79 @@
             plantData.mesh.position.copy(position); // Colocar na posição correta
             plantData.mesh.position.y += 0.1; // Elevar um pouco para evitar z-fighting inicial
             plantData.mesh.castShadow = true;
-            plantData.mesh.userData.plantData = plantData; // Linkar dados de volta ao mesh
+
+            plantData.mesh.userData.plantData = plantData;
             scene.add(plantData.mesh);
             plants.push(plantData);
         }
 
         function getPlantStages(type) {
-            switch(type) {
+            switch (type) {
                 case 'flower': return ['seed', 'sprout', 'bud', 'bloom'];
                 case 'tree': return ['seed', 'sapling', 'growing', 'mature'];
-                case 'pinetree': return ['seed', 'sapling', 'growing', 'mature', 'ancient']; // Adicionado "ancient"
+                case 'pinetree': return ['seed', 'sapling', 'growing', 'mature', 'ancient'];
                 case 'mushroom': return ['spore', 'small', 'grown'];
+                case 'bamboo': return ['seed', 'shoot', 'cluster', 'dense'];
+                case 'berrybush': return ['seed', 'sapling', 'foliage', 'berry'];
+                case 'lotus': return ['spore', 'pad', 'bud', 'bloom'];
                 default: return [];
             }
         }
 
-         function getGrowthDuration(type, stageName) {
+        function getGrowthDuration(type, stageName) {
             if (growthTimes[type] && growthTimes[type][stageName] !== undefined) {
                 let duration = growthTimes[type][stageName];
                 // Modificador de clima
                 if (simulatedWeather === 'sunny' && type !== 'mushroom') duration *= 0.8; // Cresce 20% mais rápido no sol
                 if (simulatedWeather === 'rainy' && type === 'mushroom') duration *= 0.7; // Cogumelos 30% mais rápidos na chuva
-                if (simulatedWeather === 'rainy' && type !== 'mushroom') duration *= 1.2; // Outras plantas 20% mais lentas na chuva
+                if (simulatedWeather === 'rainy' && type === 'bamboo') duration *= 0.8; // Bambu 20% mais rápido na chuva
+                if (timeOfDay === 'day' && type === 'berrybush') duration *= 0.9; // Arbusto 10% mais rápido de dia
+                if (simulatedWeather === 'rainy' && type === 'lotus') duration *= 0.75; // Lótus 25% mais rápido na chuva
+                if (simulatedWeather === 'rainy' && type !== 'mushroom' && type !== 'bamboo' && type !== 'lotus') duration *= 1.2; // Outras plantas 20% mais lentas na chuva
                 return duration;
             }
-            return Infinity; // Ou algum valor grande
+            return Infinity;
         }
 
         function createCloudMesh() {
-            // Simple cloud using multiple slightly offset spheres
             const cloudGroup = new THREE.Group();
-            const cloudMaterial = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-                transparent: true,
-                opacity: 0.85,
-                flatShading: true, // Give a slightly stylized look
-                emissive: 0x111111 // Give a tiny bit of self-illumination
-            });
+            const cloudMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, transparent: true, opacity: 0.9 });
 
-            const puffCount = 3 + Math.floor(Math.random() * 4); // 3 to 6 puffs
-            for (let i = 0; i < puffCount; i++) {
-                const puffRadius = 2 + Math.random() * 3; // Size of each puff
-                const puffGeometry = new THREE.SphereGeometry(puffRadius, 8, 6); // Low poly spheres
-                const puffMesh = new THREE.Mesh(puffGeometry, cloudMaterial);
-
-                // Offset puffs slightly from group center
-                puffMesh.position.set(
-                    (Math.random() - 0.5) * puffRadius * 1.5,
-                    (Math.random() - 0.5) * puffRadius * 0.5,
-                    (Math.random() - 0.5) * puffRadius * 1.5
+            const numBlobs = 3 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < numBlobs; i++) {
+                const radius = 1 + Math.random() * 1.5;
+                const geometry = new THREE.SphereGeometry(radius, 8, 8);
+                const blob = new THREE.Mesh(geometry, cloudMaterial);
+                blob.position.set(
+                    (Math.random() - 0.5) * 3,
+                    (Math.random() - 0.5) * 1.5,
+                    (Math.random() - 0.5) * 2
                 );
-                // Random rotation for variety
-                puffMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-                puffMesh.castShadow = true; // Clouds can cast soft shadows
-                cloudGroup.add(puffMesh);
+                cloudGroup.add(blob);
             }
             return cloudGroup;
         }
 
         function addCloud() {
             const cloud = createCloudMesh();
-            const distance = 50 + Math.random() * 150; // Distance from center
-            const angle = Math.random() * Math.PI * 2; // Random angle
-            const height = 20 + Math.random() * 25; // Cloud height
-
             cloud.position.set(
-                Math.cos(angle) * distance,
-                height,
-                Math.sin(angle) * distance - distance * 0.5 // Bias towards distance Z
+                (Math.random() - 0.5) * 80,
+                15 + Math.random() * 10,
+                (Math.random() - 0.5) * 80
             );
-             // Random initial Z position within a range
-            cloud.position.z = (Math.random() - 0.5) * 200;
-            cloud.position.x = -100 - Math.random() * 100; // Start off-screen left
-
-            // Store speed for animation
-            cloud.userData.speed = 0.5 + Math.random() * 1.0; // Different speeds
-
-            clouds.push(cloud);
+            cloud.userData = {
+                speed: 0.5 + Math.random() * 1.5
+            };
             scene.add(cloud);
-            console.log("Cloud added");
+            clouds.push(cloud);
         }
 
         function updateClouds(deltaTime) {
-             const wrapX = 250; // X position to wrap around
-
-             // Add clouds periodically if needed (e.g., if they drift too far Z)
-             if (clouds.length < 8 && Math.random() < 0.003 && timeOfDay !== 'night') {
-                addCloud();
-             }
-
-            clouds.forEach((cloud, index) => {
-                cloud.position.x += cloud.userData.speed * deltaTime * (simulatedWeather === 'rainy' ? 1.5 : 1.0); // Move faster in rain
-
-                // Wrap clouds around horizontally
-                if (cloud.position.x > wrapX) {
-                    cloud.position.x = -wrapX - Math.random() * 50; // Reappear on the left
-                    // Maybe slightly change Z and Y upon wrapping?
-                    cloud.position.z = (Math.random() - 0.5) * 200;
-                    cloud.position.y = 20 + Math.random() * 25;
-                }
-
-                // Optional: Fade out/remove clouds during deep night?
-                if (cloud.material) { // Check if material exists (for groups, check children)
-                     //cloud.material.opacity = (timeOfDay === 'night') ? Math.max(0, cloud.material.opacity - 0.5 * deltaTime) : Math.min(0.85, cloud.material.opacity + 0.5*deltaTime);
-                     // Note: Changing opacity on Group material doesn't work directly, would need to iterate children. Simpler to just let them be.
+            clouds.forEach(cloud => {
+                cloud.position.x += cloud.userData.speed * deltaTime;
+                if (cloud.position.x > 50) {
+                    cloud.position.x = -50;
+                    cloud.position.z = (Math.random() - 0.5) * 80;
                 }
             });
         }
@@ -381,9 +390,6 @@
             const stages = getPlantStages(plantData.type);
             const stageName = stages[plantData.growthStage];
             let geometry, material, mesh;
-            const scaleFactor = 0.5 + plantData.growthStage * 0.5; // Aumenta tamanho com estágio
-            
-            // Obter a variação de tamanho desta planta específica (padrão: 1.0 se não definido)
             const sizeVariation = plantData.sizeVariation || 1.0;
 
             switch (plantData.type) {
@@ -391,19 +397,19 @@
                     material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
                     if (stageName === 'seed') {
                         geometry = new THREE.SphereGeometry(0.08 * sizeVariation, 8, 6);
-                        material.color.set(0x8B4513); // Brown
+                        material.color.set(0x8B4513);
                     } else if (stageName === 'sprout') {
                         geometry = new THREE.ConeGeometry(0.12 * sizeVariation, 0.3 * sizeVariation, 8);
-                        material.color.set(0x90EE90); // LightGreen
+                        material.color.set(0x90EE90);
                         mesh = new THREE.Mesh(geometry, material);
                         mesh.position.y = 0.15 * sizeVariation;
                         return mesh;
                     } else if (stageName === 'bud') {
                         geometry = new THREE.SphereGeometry(0.2 * sizeVariation, 8, 6);
-                        material.color.set(0xFFC0CB); // Pink
-                    } else { // bloom
+                        material.color.set(0xFFC0CB);
+                    } else {
                         geometry = new THREE.SphereGeometry(0.3 * sizeVariation, 16, 12);
-                        material.color.set(plantData.bloomColor || 0xFF69B4); // Use stored color, fallback to pink
+                        material.color.set(plantData.bloomColor || 0xFF69B4);
                     }
                     break;
 
@@ -412,123 +418,86 @@
                     const trunkHeight = [0.1, 0.8, 1.5, 3.0][plantData.growthStage] * sizeVariation;
                     const trunkRadius = [0.05, 0.1, 0.2, 0.4][plantData.growthStage] * sizeVariation;
                     const leavesRadius = [0.1, 0.5, 1.0, 1.8][plantData.growthStage] * sizeVariation;
-                    const leavesColor = stageName === 'seed' ? 0x8B4513 : 0x006400; // DarkGreen except seed
+                    const leavesColor = stageName === 'seed' ? 0x8B4513 : 0x006400;
 
                     const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.8, trunkRadius, trunkHeight, 8);
-                    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+                    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
                     const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
                     trunkMesh.castShadow = true;
-                    trunkMesh.position.y = trunkHeight / 2; // Base do tronco no chão
+                    trunkMesh.position.y = trunkHeight / 2;
 
-                    mesh = new THREE.Group(); // Usar grupo para tronco e folhas
+                    mesh = new THREE.Group();
                     mesh.add(trunkMesh);
 
                     if (stageName !== 'seed') {
                         const leavesGeo = new THREE.SphereGeometry(leavesRadius, 16, 12);
-                        // Também adicionar variação sutil na cor das folhas
-                        const colorVariation = -0.1 + Math.random() * 0.2; // -10% a +10% variação
+                        const colorVariation = -0.1 + Math.random() * 0.2;
                         const baseColor = new THREE.Color(leavesColor);
-                        // Ajustar levemente a cor para cada árvore
                         baseColor.r = Math.max(0, Math.min(1, baseColor.r * (1 + colorVariation * 0.3)));
                         baseColor.g = Math.max(0, Math.min(1, baseColor.g * (1 + colorVariation)));
                         baseColor.b = Math.max(0, Math.min(1, baseColor.b * (1 + colorVariation * 0.3)));
-                        
+
                         const leavesMat = new THREE.MeshStandardMaterial({ color: baseColor });
                         const leavesMesh = new THREE.Mesh(leavesGeo, leavesMat);
                         leavesMesh.castShadow = true;
-                        leavesMesh.position.y = trunkHeight + leavesRadius * 0.7; // Topo do tronco
+                        leavesMesh.position.y = trunkHeight + leavesRadius * 0.7;
                         mesh.add(leavesMesh);
                     }
-                    return mesh; // Retorna o Grupo
+                    return mesh;
 
                 case 'pinetree':
                     material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                    // Parâmetros do pinheiro aumentados drasticamente com fator de variação
                     const pineHeight = [0.1, 1.5, 3.0, 6.0, 11.0][plantData.growthStage] * sizeVariation;
                     const pineTrunkRadius = [0.05, 0.1, 0.2, 0.35, 0.5][plantData.growthStage] * sizeVariation;
-                    const pineTrunkColor = 0x5C4033; // Marrom mais escuro
-                    
-                    // Criar o tronco
-                    const pineTrunkGeo = new THREE.CylinderGeometry(pineTrunkRadius * 0.8, pineTrunkRadius, pineHeight, 10); // Aumentado polígonos
+                    const pineTrunkColor = 0x5C4033;
+
+                    const pineTrunkGeo = new THREE.CylinderGeometry(pineTrunkRadius * 0.8, pineTrunkRadius, pineHeight, 10);
                     const pineTrunkMat = new THREE.MeshStandardMaterial({ color: pineTrunkColor });
                     const pineTrunkMesh = new THREE.Mesh(pineTrunkGeo, pineTrunkMat);
                     pineTrunkMesh.castShadow = true;
                     pineTrunkMesh.position.y = pineHeight / 2;
-                    
+
                     mesh = new THREE.Group();
                     mesh.add(pineTrunkMesh);
-                    
+
                     if (stageName !== 'seed') {
-                        // Adicionar os níveis de "folhas" em formato de cones
-                        const numLayers = plantData.growthStage === 1 ? 1 : 
-                                          plantData.growthStage === 2 ? 3 : 
-                                          plantData.growthStage === 3 ? 4 : 5; // 5 camadas para o estágio "ancient"
-                        
-                        // Variação sutil na cor do pinheiro 
+                        const numLayers = plantData.growthStage === 1 ? 1 :
+                            plantData.growthStage === 2 ? 3 :
+                                plantData.growthStage === 3 ? 4 : 5;
+
                         let pineGreen = plantData.growthStage === 4 ? 0x1A4D2E : 0x2E8B57;
-                        // Pequena variação de cor para cada pinheiro
-                        const colorVariation = -0.1 + Math.random() * 0.2; // -10% a +10% variação
+                        const colorVariation = -0.1 + Math.random() * 0.2;
                         const baseColor = new THREE.Color(pineGreen);
                         baseColor.g = Math.max(0, Math.min(1, baseColor.g * (1 + colorVariation)));
                         baseColor.b = Math.max(0, Math.min(1, baseColor.b * (1 + colorVariation * 0.5)));
                         pineGreen = baseColor;
-                        
+
                         for (let i = 0; i < numLayers; i++) {
-                            // Para cada camada, criar um cone com leve variação de tamanho
-                            const layerVariation = 0.95 + Math.random() * 0.1; // Sutil variação entre camadas (95%-105%)
+                            const layerVariation = 0.95 + Math.random() * 0.1;
                             const layerHeight = pineHeight * (0.45 - i * 0.05) * layerVariation;
                             const layerRadius = pineHeight * (0.35 - i * 0.03) * layerVariation;
-                            
-                            // Posição Y vai subindo pelo tronco
-                            const layerY = pineHeight * (stageName === 'ancient' ? 
-                                                   (0.5 + i * 0.12) : // Distribuição para árvore antiga
-                                                   (0.55 + i * 0.15)); // Distribuição para outros estágios
-                            
-                            const coneGeo = new THREE.ConeGeometry(layerRadius, layerHeight, 10); // Aumentado polígonos
-                            const coneMat = new THREE.MeshStandardMaterial({ 
-                                color: pineGreen,
-                                roughness: 0.9,
-                                flatShading: true
-                            });
+                            const layerY = pineHeight * (stageName === 'ancient' ? (0.5 + i * 0.12) : (0.55 + i * 0.15));
+
+                            const coneGeo = new THREE.ConeGeometry(layerRadius, layerHeight, 10);
+                            const coneMat = new THREE.MeshStandardMaterial({ color: pineGreen, roughness: 0.9, flatShading: true });
                             const coneMesh = new THREE.Mesh(coneGeo, coneMat);
                             coneMesh.castShadow = true;
                             coneMesh.position.y = layerY;
-                            
                             mesh.add(coneMesh);
                         }
-                        
-                        // Para o estágio "ancient", adicione alguns detalhes extras (textura de casca)
+
                         if (stageName === 'ancient') {
-                            // Número de detalhes de casca varia por árvore
                             const barkDetails = 15 + Math.floor(Math.random() * 10);
-                            
                             for (let i = 0; i < barkDetails; i++) {
                                 const barkSize = (0.1 + Math.random() * 0.2) * sizeVariation;
                                 const barkGeo = new THREE.BoxGeometry(barkSize, barkSize * 0.5, barkSize);
-                                const barkMat = new THREE.MeshStandardMaterial({
-                                    color: 0x4B3621, // Tom marrom mais escuro para a casca
-                                    roughness: 1.0
-                                });
+                                const barkMat = new THREE.MeshStandardMaterial({ color: 0x4B3621, roughness: 1.0 });
                                 const barkMesh = new THREE.Mesh(barkGeo, barkMat);
-                                
-                                // Posicionar aleatoriamente ao redor do tronco
                                 const angle = Math.random() * Math.PI * 2;
                                 const trunkOffset = pineTrunkRadius * 0.9;
                                 const height = Math.random() * pineHeight * 0.8;
-                                
-                                barkMesh.position.set(
-                                    Math.cos(angle) * trunkOffset,
-                                    height, 
-                                    Math.sin(angle) * trunkOffset
-                                );
-                                
-                                // Rotação aleatória para parecer natural
-                                barkMesh.rotation.set(
-                                    Math.random() * 0.5,
-                                    Math.random() * Math.PI * 2,
-                                    Math.random() * 0.5
-                                );
-                                
+                                barkMesh.position.set(Math.cos(angle) * trunkOffset, height, Math.sin(angle) * trunkOffset);
+                                barkMesh.rotation.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5);
                                 mesh.add(barkMesh);
                             }
                         }
@@ -539,19 +508,12 @@
                     material = new THREE.MeshStandardMaterial({ roughness: 0.7 });
                     const mushStemHeight = [0.05, 0.2, 0.4][plantData.growthStage] * sizeVariation;
                     const mushCapRadius = [0.05, 0.25, 0.5][plantData.growthStage] * sizeVariation;
-                    
-                    // Variação sutil nas cores do cogumelo
-                    const stemHue = Math.random() * 0.1; // Variação da cor do caule
+
+                    const stemHue = Math.random() * 0.1;
                     const stemColor = new THREE.Color(0xFFFACD).lerp(new THREE.Color(0xFFF0C0), stemHue);
-                    
-                    const capHue = Math.random() * 0.2; // Variação da cor da tampa
+                    const capHue = Math.random() * 0.2;
                     const baseCapColor = stageName === 'spore' ? 0xD2B48C : 0xDC143C;
-                    const capColor = new THREE.Color(baseCapColor).lerp(
-                        stageName === 'spore' 
-                            ? new THREE.Color(0xC2A478) 
-                            : new THREE.Color(0xFF0000), 
-                        capHue
-                    );
+                    const capColor = new THREE.Color(baseCapColor).lerp(stageName === 'spore' ? new THREE.Color(0xC2A478) : new THREE.Color(0xFF0000), capHue);
 
                     const stemGeo = new THREE.CylinderGeometry(mushStemHeight * 0.3, mushStemHeight * 0.4, mushStemHeight, 8);
                     const stemMat = new THREE.MeshStandardMaterial({ color: stemColor });
@@ -563,95 +525,214 @@
                     mesh.add(stemMesh);
 
                     if (stageName !== 'spore') {
-                        // Chapéu como uma semi-esfera achatada
                         const capGeo = new THREE.SphereGeometry(mushCapRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
                         const capMat = new THREE.MeshStandardMaterial({ color: capColor });
                         const capMesh = new THREE.Mesh(capGeo, capMat);
                         capMesh.castShadow = true;
-                        capMesh.position.y = mushStemHeight; // No topo do caule
+                        capMesh.position.y = mushStemHeight;
                         mesh.add(capMesh);
                     }
-                    return mesh; // Retorna o Grupo
+                    return mesh;
+
+                case 'bamboo':
+                    material = new THREE.MeshStandardMaterial({ roughness: 0.6 });
+                    const bambooColor = 0x6B8E23;
+                    if (stageName === 'seed') {
+                        geometry = new THREE.SphereGeometry(0.05 * sizeVariation, 8, 6);
+                        material.color.set(0x8B4513);
+                    } else {
+                        mesh = new THREE.Group();
+                        const numStalks = stageName === 'shoot' ? 1 : (stageName === 'cluster' ? 4 : 10);
+                        const heightBase = stageName === 'shoot' ? 0.5 : (stageName === 'cluster' ? 1.2 : 2.5);
+
+                        for (let i = 0; i < numStalks; i++) {
+                            const h = heightBase * (0.8 + Math.random() * 0.4) * sizeVariation;
+                            const r = 0.03 * sizeVariation;
+                            const stalkGeo = new THREE.CylinderGeometry(r, r, h, 6);
+                            const stalkMat = new THREE.MeshStandardMaterial({ color: bambooColor });
+                            const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+                            stalk.castShadow = true;
+                            const offset = stageName === 'shoot' ? 0 : (0.1 + Math.random() * 0.2);
+                            const angle = Math.random() * Math.PI * 2;
+                            stalk.position.set(Math.cos(angle) * offset, h / 2, Math.sin(angle) * offset);
+                            stalk.rotation.x = (Math.random() - 0.5) * 0.2;
+                            stalk.rotation.z = (Math.random() - 0.5) * 0.2;
+                            mesh.add(stalk);
+
+                            if (stageName !== 'shoot') {
+                                const numLeaves = stageName === 'cluster' ? 2 : 5;
+                                for (let j = 0; j < numLeaves; j++) {
+                                    const leafGeo = new THREE.ConeGeometry(0.05, 0.2, 4);
+                                    const leafMat = new THREE.MeshStandardMaterial({ color: 0x9ACD32 });
+                                    const leaf = new THREE.Mesh(leafGeo, leafMat);
+                                    const leafH = Math.random() * h;
+                                    leaf.position.set(0, leafH - h / 2, 0);
+                                    leaf.rotation.z = Math.PI / 3;
+                                    leaf.rotation.y = Math.random() * Math.PI * 2;
+                                    stalk.add(leaf);
+                                }
+                            }
+                        }
+                        return mesh;
+                    }
+                    break;
+
+                case 'berrybush':
+                    material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
+                    if (stageName === 'seed') {
+                        geometry = new THREE.SphereGeometry(0.06 * sizeVariation, 8, 6);
+                        material.color.set(0x8B4513);
+                    } else if (stageName === 'sapling') {
+                        mesh = new THREE.Group();
+                        const trunkGeo = new THREE.CylinderGeometry(0.02 * sizeVariation, 0.03 * sizeVariation, 0.4 * sizeVariation, 6);
+                        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                        trunk.position.y = 0.2 * sizeVariation;
+                        mesh.add(trunk);
+
+                        const foliageGeo = new THREE.SphereGeometry(0.15 * sizeVariation, 8, 8);
+                        const foliageMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                        const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+                        foliage.position.y = 0.4 * sizeVariation;
+                        mesh.add(foliage);
+                        return mesh;
+                    } else {
+                        mesh = new THREE.Group();
+                        const mainBushGeo = new THREE.SphereGeometry(0.5 * sizeVariation, 16, 12);
+                        const bushColor = 0x006400;
+                        const bushMat = new THREE.MeshStandardMaterial({ color: bushColor, roughness: 1.0 });
+                        const mainBush = new THREE.Mesh(mainBushGeo, bushMat);
+                        mainBush.position.y = 0.4 * sizeVariation;
+                        mainBush.scale.y = 0.8;
+                        mesh.add(mainBush);
+
+                        if (stageName === 'berry') {
+                            const numBerries = 10 + Math.floor(Math.random() * 10);
+                            const berryGeo = new THREE.SphereGeometry(0.05 * sizeVariation, 6, 6);
+                            const berryMat = new THREE.MeshStandardMaterial({ color: 0xFF0000, roughness: 0.4 });
+
+                            for (let i = 0; i < numBerries; i++) {
+                                const berry = new THREE.Mesh(berryGeo, berryMat);
+                                const u = Math.random();
+                                const v = Math.random();
+                                const theta = 2 * Math.PI * u;
+                                const phi = Math.acos(2 * v - 1);
+                                const r = 0.45 * sizeVariation;
+                                berry.position.set(
+                                    r * Math.sin(phi) * Math.cos(theta),
+                                    0.4 * sizeVariation + r * Math.sin(phi) * Math.sin(theta) * 0.8,
+                                    r * Math.cos(phi)
+                                );
+                                mesh.add(berry);
+                            }
+                        }
+                        return mesh;
+                    }
+                    break;
+
+                case 'lotus':
+                    material = new THREE.MeshStandardMaterial({ roughness: 0.5 });
+                    if (stageName === 'spore') {
+                        geometry = new THREE.SphereGeometry(0.04 * sizeVariation, 8, 6);
+                        material.color.set(0x4B0082); // Indigo
+                    } else {
+                        mesh = new THREE.Group();
+
+                        // Pad (Folha)
+                        const padGeo = new THREE.CircleGeometry(0.3 * sizeVariation, 16);
+                        const padMat = new THREE.MeshStandardMaterial({ color: 0x228B22, side: THREE.DoubleSide });
+                        const pad = new THREE.Mesh(padGeo, padMat);
+                        pad.rotation.x = -Math.PI / 2;
+                        pad.position.y = 0.05; // Flutuando levemente
+                        mesh.add(pad);
+
+                        // Corte na folha (estilo vitória régia) - visual simples
+                        // (Poderia ser feito com geometria customizada, mas círculo serve por enquanto)
+
+                        if (stageName === 'bud' || stageName === 'bloom') {
+                            const budSize = stageName === 'bud' ? 0.1 : 0.25;
+                            const budColor = 0xFF69B4; // HotPink
+                            const budGeo = new THREE.SphereGeometry(budSize * sizeVariation, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+                            const budMat = new THREE.MeshStandardMaterial({ color: budColor });
+
+                            if (stageName === 'bloom') {
+                                budMat.emissive = new THREE.Color(0xFF1493); // Brilho base
+                                budMat.emissiveIntensity = 0.2;
+                                // Lógica de brilho noturno será tratada no updateTimeOfDay ou aqui se tiver acesso ao timeOfDay
+                            }
+
+                            const flower = new THREE.Mesh(budGeo, budMat);
+                            flower.position.y = 0.05;
+                            mesh.add(flower);
+                        }
+                        return mesh;
+                    }
+                    break;
             }
 
-            // Para flores e outros que não retornaram grupo
             if (!mesh && geometry) {
-                 mesh = new THREE.Mesh(geometry, material);
-                 mesh.position.y = (geometry.parameters.height || geometry.parameters.radius * 2 || 0.2) / 2; // Tenta centralizar um pouco acima do chão
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.position.y = (geometry.parameters.height || geometry.parameters.radius * 2 || 0.2) / 2;
             }
-
             return mesh;
         }
 
         function updatePlantGrowth(deltaTime) {
             const currentTime = clock.getElapsedTime();
-
             plants.forEach(plant => {
-                if (!plant.mesh) return; // Pular se não tiver mesh
-
+                if (!plant.mesh) return;
                 const stages = getPlantStages(plant.type);
                 const currentStageName = stages[plant.growthStage];
                 const timeElapsed = currentTime - plant.plantedTime;
 
-                // Verificar se pode avançar para o próximo estágio
                 if (plant.growthStage < stages.length - 1) {
                     const nextStageName = stages[plant.growthStage + 1];
-                    const timeToNextStage = getGrowthDuration(plant.type, nextStageName); // Usa a duração do *próximo* estágio
-
-                    // Acumular tempo desde o início para determinar o estágio atual
                     let cumulativeTime = 0;
                     for (let i = 1; i <= plant.growthStage + 1; i++) {
-                         cumulativeTime += getGrowthDuration(plant.type, stages[i]);
+                        cumulativeTime += getGrowthDuration(plant.type, stages[i]);
                     }
-
 
                     if (timeElapsed >= cumulativeTime) {
                         plant.growthStage++;
                         const newStageName = stages[plant.growthStage];
-                        console.log(`${plant.type} ${plant.id.substring(0,4)} advanced to ${newStageName}`);
+                        console.log(`${plant.type} ${plant.id.substring(0, 4)} advanced to ${newStageName}`);
 
                         scene.remove(plant.mesh);
                         plant.mesh = createPlantMesh(plant);
                         if (plant.mesh) {
                             plant.mesh.position.copy(plant.position);
-                             // Ajuste Y pode ser necessário dependendo da geometria criada
-                             plant.mesh.position.y = plant.mesh.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
-                             if (plant.mesh.type === 'Group') {
-                                // Para grupos, o y da posição base é 0, mas os objetos internos têm suas posições
-                                 plant.mesh.position.y = plant.position.y; // Resetar para a posição original no chão
-                             }
-
+                            if (plant.mesh.type === 'Group') {
+                                plant.mesh.position.y = plant.position.y;
+                            } else {
+                                plant.mesh.position.y = plant.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
+                            }
                             plant.mesh.castShadow = true;
-                            plant.mesh.userData.plantData = plant; // Relinkar dados
+                            plant.mesh.userData.plantData = plant;
                             scene.add(plant.mesh);
 
-                            // Notificação de marco importante (ex: florescer, amadurecer)
                             if ((plant.type === 'flower' && newStageName === 'bloom') ||
                                 (plant.type === 'tree' && newStageName === 'mature') ||
                                 (plant.type === 'pinetree' && (newStageName === 'mature' || newStageName === 'ancient')) ||
-                                (plant.type === 'mushroom' && newStageName === 'grown'))
-                            {
+                                (plant.type === 'mushroom' && newStageName === 'grown') ||
+                                (plant.type === 'bamboo' && newStageName === 'dense') ||
+                                (plant.type === 'berrybush' && newStageName === 'berry') ||
+                                (plant.type === 'lotus' && newStageName === 'bloom')) {
                                 if (!plant.notifiedStages[newStageName]) {
-                                     const messages = {
-                                         'flower': `Sua ${plant.type} desabrochou! 🌸`,
-                                         'tree': `Sua ${plant.type} está madura! 🌳`,
-                                         'pinetree': newStageName === 'ancient' ? 
-                                                    `Seu pinheiro se tornou uma árvore ancestral! 🌲` : 
-                                                    `Seu pinheiro atingiu o tamanho máximo! 🌲`,
-                                         'mushroom': `Seu ${plant.type} cresceu! 🍄`
-                                     };
-                                     // Usar a mensagem específica para pinheiro baseada no estágio
-                                     const message = plant.type === 'pinetree' ? 
-                                                    messages['pinetree'] : 
-                                                    messages[plant.type];
-                                     
-                                     showNotification(message, 5000);
-                                     try { notificationSound.play(); } catch(e) { console.warn("Audio play failed", e); }
-                                     plant.notifiedStages[newStageName] = true;
+                                    const messages = {
+                                        'flower': `Sua ${plant.type} desabrochou! 🌸`,
+                                        'tree': `Sua ${plant.type} está madura! 🌳`,
+                                        'pinetree': newStageName === 'ancient' ? `Seu pinheiro se tornou uma árvore ancestral! 🌲` : `Seu pinheiro atingiu o tamanho máximo! 🌲`,
+                                        'mushroom': `Seu ${plant.type} cresceu! 🍄`,
+                                        'bamboo': `Seu bambuzal está denso! 🎋`,
+                                        'berrybush': `Seu arbusto deu frutos! 🍒`,
+                                        'lotus': `Sua lótus desabrochou e brilha! 🪷`
+                                    };
+                                    const message = plant.type === 'pinetree' ? messages['pinetree'] : messages[plant.type];
+                                    showNotification(message, 5000);
+                                    try { notificationSound.play(); } catch (e) { console.warn("Audio play failed", e); }
+                                    plant.notifiedStages[newStageName] = true;
                                 }
                             }
-                        } else {
-                             console.error("Falha ao criar o mesh para o estágio:", newStageName);
                         }
                     }
                 }
@@ -659,45 +740,41 @@
         }
 
         function updateWeather(deltaTime = 0) {
-             timeSinceLastWeatherChange += deltaTime;
-
+            timeSinceLastWeatherChange += deltaTime;
             if (timeSinceLastWeatherChange > weatherChangeInterval) {
                 timeSinceLastWeatherChange = 0;
-                 const prevState = simulatedWeather;
-                // Simulação simples: 70% sol, 30% chuva
+                const prevState = simulatedWeather;
                 simulatedWeather = Math.random() < 0.7 ? 'sunny' : 'rainy';
                 console.log(`Weather changed to: ${simulatedWeather}`);
-                 if (prevState !== simulatedWeather) {
-                    updateAudio(); // Atualiza o som ambiente se o clima mudou
-                    updateSkyColor(); // Atualiza a cor do céu/luz
-                 }
-
+                if (prevState !== simulatedWeather) {
+                    updateAudio();
+                    updateSkyColor();
+                }
             }
-             weatherStatusElement.textContent = `Clima: ${simulatedWeather === 'sunny' ? 'Ensolarado ☀️' : 'Chuva Leve 🌧️'}`;
-              // Poderia adicionar efeitos visuais aqui (partículas de chuva, etc.)
+            weatherStatusElement.textContent = `Clima: ${simulatedWeather === 'sunny' ? 'Ensolarado ☀️' : 'Chuva Leve 🌧️'}`;
         }
 
         function updateTimeOfDay(deltaTime) {
-             timeAccumulator += deltaTime * timeSpeed;
-             const cycleTime = timeAccumulator % dayDuration; // Tempo dentro do ciclo atual
-             const dayProgress = cycleTime / dayDuration; // 0 a 1
+            timeAccumulator += deltaTime * timeSpeed;
+            const cycleTime = timeAccumulator % dayDuration;
+            const dayProgress = cycleTime / dayDuration;
 
             const prevTimeOfDay = timeOfDay;
 
-             if (dayProgress < 0.45 || dayProgress > 0.95) { // Dia (0-0.45) e (0.95-1 -> amanhecer)
-                 timeOfDay = 'day';
-             } else if (dayProgress >= 0.45 && dayProgress < 0.55) { // Crepúsculo (0.45-0.55)
+            if (dayProgress < 0.45 || dayProgress > 0.95) { // Dia (0-0.45) e (0.95-1 -> amanhecer)
+                timeOfDay = 'day';
+            } else if (dayProgress >= 0.45 && dayProgress < 0.55) { // Crepúsculo (0.45-0.55)
                 timeOfDay = 'evening';
             } else { // Noite (0.55 - 0.95)
-                 timeOfDay = 'night';
-             }
+                timeOfDay = 'night';
+            }
 
 
             if (prevTimeOfDay !== timeOfDay) {
                 console.log(`Time changed to: ${timeOfDay}`);
                 updateAudio(); // Atualiza o som ambiente
                 updateSkyColor();
-                
+
                 // Se mudou de noite para outro período, remove todos os vagalumes
                 if (prevTimeOfDay === 'night' && timeOfDay !== 'night') {
                     // Remover todos os vagalumes quando o dia começa
@@ -707,167 +784,126 @@
                     butterflies.length = 0; // Limpar o array
                 }
             }
-             timeStatusElement.textContent = `Hora: ${timeOfDay === 'day' ? 'Dia ☀️' : (timeOfDay === 'evening' ? 'Entardecer 🌇' : 'Noite 🌙')}`;
+            timeStatusElement.textContent = `Hora: ${timeOfDay === 'day' ? 'Dia ☀️' : (timeOfDay === 'evening' ? 'Entardecer 🌇' : 'Noite 🌙')}`;
 
-             // Atualizar luz direcional (simular sol/lua)
-             const sunAngle = dayProgress * Math.PI * 2 - Math.PI / 2; // Ciclo completo de 2PI, começando do horizonte leste
+            // Atualizar luz direcional (simular sol/lua)
+            const sunAngle = dayProgress * Math.PI * 2 - Math.PI / 2; // Ciclo completo de 2PI, começando do horizonte leste
             const light = scene.getObjectByProperty('isDirectionalLight', true);
-             if (light) {
+            if (light) {
                 light.position.set(Math.cos(sunAngle) * 15, Math.sin(sunAngle) * 10 + 5, 10); // Movimento no céu
-                 light.intensity = timeOfDay === 'night' ? 0.3 : (timeOfDay === 'evening' ? 0.8 : 1.5); // Mais fraco à noite
-                 light.color.set(timeOfDay === 'night' ? 0xaaaaff : (timeOfDay === 'evening' ? 0xffccaa : 0xffffff)); // Cor da luz
-                 light.target.position.set(0, 0, 0); // Manter olhando para o centro
-             }
-            const ambient = scene.getObjectByProperty('isAmbientLight', true);
-            if(ambient) {
-                 ambient.intensity = timeOfDay === 'night' ? 0.2 : (timeOfDay === 'evening' ? 0.4 : 0.6);
+                light.intensity = timeOfDay === 'night' ? 0.3 : (timeOfDay === 'evening' ? 0.8 : 1.5); // Mais fraco à noite
+                light.color.set(timeOfDay === 'night' ? 0xaaaaff : (timeOfDay === 'evening' ? 0xffccaa : 0xffffff)); // Cor da luz
+                light.target.position.set(0, 0, 0); // Manter olhando para o centro
             }
+            const ambient = scene.getObjectByProperty('isAmbientLight', true);
+            if (ambient) {
+                ambient.intensity = timeOfDay === 'night' ? 0.2 : (timeOfDay === 'evening' ? 0.4 : 0.6);
+            }
+
+            // Atualizar brilho da Lótus
+            plants.forEach(plant => {
+                if (plant.type === 'lotus' && plant.growthStage === 3 && plant.mesh) { // Bloom
+                    // Encontrar a parte da flor (último filho adicionado)
+                    const flower = plant.mesh.children[plant.mesh.children.length - 1];
+                    if (flower && flower.material) {
+                        flower.material.emissiveIntensity = timeOfDay === 'night' ? 1.0 : 0.2;
+                    }
+                }
+            });
         }
 
         function updateSkyColor() {
-             let skyCol = new THREE.Color(0x87CEEB); // Dia
+            let skyCol = new THREE.Color(0x87CEEB); // Dia
             let groundCol = new THREE.Color(0x228B22); // Grama dia
 
             if (timeOfDay === 'evening') {
                 skyCol.set(0xFF8C00); // Laranja
-                 groundCol.lerp(new THREE.Color(0x556B2F), 0.3); // Verde mais escuro
+                groundCol.lerp(new THREE.Color(0x556B2F), 0.3); // Verde mais escuro
             } else if (timeOfDay === 'night') {
-                 skyCol.set(0x000033); // Azul escuro
-                 groundCol.set(0x1A4D2E); // Verde bem escuro
-             }
+                skyCol.set(0x000033); // Azul escuro
+                groundCol.set(0x1A4D2E); // Verde bem escuro
+            }
 
-             // Modificador de chuva
-             if (simulatedWeather === 'rainy') {
-                 skyCol.lerp(new THREE.Color(0x778899), 0.6); // Cinza
-                 groundCol.lerp(new THREE.Color(0x1E5631), 0.4); // Verde mais escuro/molhado
-             }
+            // Modificador de chuva
+            if (simulatedWeather === 'rainy') {
+                skyCol.lerp(new THREE.Color(0x778899), 0.6); // Cinza
+                groundCol.lerp(new THREE.Color(0x1E5631), 0.4); // Verde mais escuro/molhado
+            }
 
             // scene.background = skyCol; // Muda o fundo da cena
             if (sky && sky.material) {
                 sky.material.color = skyCol; // Muda a cor do sky dome
             }
-
             if (ground && ground.material) {
-                 ground.material.color = groundCol;
-             }
+                ground.material.color = groundCol;
+            }
         }
 
-
         function updateButterflies(deltaTime) {
-            // Renomeado para vagalumes e só adicionamos à noite
-            if (butterflies.length < 8 && Math.random() < 0.01 && timeOfDay === 'night') {
+            if (timeOfDay !== 'night') return; // Apenas à noite
+
+            // Adicionar novos vagalumes ocasionalmente
+            if (butterflies.length < 15 && Math.random() < 0.05) {
                 addFirefly();
             }
 
-            const time = clock.getElapsedTime();
+            butterflies.forEach(firefly => {
+                firefly.userData.angle += deltaTime * firefly.userData.speed;
+                firefly.position.x += Math.cos(firefly.userData.angle) * 0.05;
+                firefly.position.z += Math.sin(firefly.userData.angle) * 0.05;
+                firefly.position.y += (Math.random() - 0.5) * 0.05;
 
-            for (let i = butterflies.length - 1; i >= 0; i--) {
-                const firefly = butterflies[i];
-                
-                // Movimento mais suave e pequeno para vagalumes
-                const speed = 0.3 + firefly.userData.speedOffset * 0.3;
-                const radius = 1 + firefly.userData.radiusOffset;
-                
-                // Movimento mais aleatório e orgânico
-                firefly.position.x = firefly.userData.originX + Math.cos(time * speed + firefly.userData.phaseOffset) * radius * 0.7;
-                firefly.position.z = firefly.userData.originZ + Math.sin(time * speed * 0.6 + firefly.userData.phaseOffset) * radius;
-                
-                // Movimento vertical suave como vagalumes
-                firefly.position.y = 1.0 + Math.sin(time * speed * 0.8 + firefly.userData.phaseOffset * 2) * 0.8;
-                
-                // Pulsar a intensidade da luz
-                const pulseIntensity = 0.7 + 0.3 * Math.sin(time * (speed * 2) + firefly.userData.phaseOffset * 3);
-                firefly.material.opacity = pulseIntensity;
-                
-                // Remover quando amanhece ou após tempo de vida
-                firefly.userData.lifeTime += deltaTime;
-                if (timeOfDay !== 'night' || firefly.userData.lifeTime > 20 || firefly.position.length() > 40) {
-                    scene.remove(firefly);
-                    butterflies.splice(i, 1);
-                }
-            }
+                // Manter dentro dos limites
+                if (firefly.position.y < 0.5) firefly.position.y = 0.5;
+                if (firefly.position.y > 4) firefly.position.y = 4;
+            });
         }
 
         function addFirefly() {
-            // Criar um material brilhante para o vagalume (efeito de glow)
-            const fireflyMaterial = new THREE.SpriteMaterial({
-                color: new THREE.Color(0xffffaa), // Cor amarela-esverdeada
-                transparent: true,
-                opacity: 0.9,
-                blending: THREE.AdditiveBlending, // Brilho mais intenso
-                depthTest: true, // Permitir que sejam ocultados por objetos na frente
-                sizeAttenuation: true // Diminuir com a distância
-            });
-            
-            const firefly = new THREE.Sprite(fireflyMaterial);
-            
-            // Tamanho pequeno
-            firefly.scale.set(0.3, 0.3, 0.3);
-            
-            // Posição aleatória mais distante e ao fundo
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 15 + Math.random() * 20; // Mais longe que as borboletas
+            const geometry = new THREE.SphereGeometry(0.05, 4, 4);
+            const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+            const firefly = new THREE.Mesh(geometry, material);
+
             firefly.position.set(
-                Math.cos(angle) * distance, 
-                0.5 + Math.random() * 3, // Altura variável mas baixa
-                Math.sin(angle) * distance - 5 // Tendendo a ficar mais ao fundo
+                (Math.random() - 0.5) * 20,
+                0.5 + Math.random() * 2,
+                (Math.random() - 0.5) * 20
             );
-            
-            // Dados para animação
+
             firefly.userData = {
-                originX: firefly.position.x,
-                originZ: firefly.position.z,
-                speedOffset: Math.random(), // Velocidade aleatória
-                radiusOffset: Math.random() * 1.5, // Raio mais curto
-                phaseOffset: Math.random() * Math.PI * 2,
-                lifeTime: 0
+                angle: Math.random() * Math.PI * 2,
+                speed: 0.5 + Math.random()
             };
-            
-            butterflies.push(firefly);
+
             scene.add(firefly);
-            console.log("Firefly added");
+            butterflies.push(firefly);
         }
 
-
-        let notificationTimeout = null;
-        function showNotification(message, duration = 4000) {
-            if (notificationTimeout) {
-                clearTimeout(notificationTimeout); // Limpar timeout anterior se houver
-            }
+        function showNotification(message, duration = 3000) {
             notificationElement.textContent = message;
             notificationElement.style.display = 'block';
-            notificationElement.style.opacity = 1;
-
-            notificationTimeout = setTimeout(() => {
-                notificationElement.style.opacity = 0;
-                // Esperar a transição de opacidade (se houver CSS) ou apenas esconder
-                setTimeout(() => notificationElement.style.display = 'none', 500); // Ajuste o tempo se usar transição CSS
+            setTimeout(() => {
+                notificationElement.style.display = 'none';
             }, duration);
         }
 
         function updateAudio() {
-            // Parar todos os sons primeiro (exceto notificação)
-            ambientSoundDay.pause();
-            ambientSoundNight.pause();
-            rainSound.pause();
+            // Lógica simples de áudio baseada no estado
+            if (simulatedWeather === 'rainy') {
+                rainSound.volume = 0.5;
+                if (rainSound.paused) rainSound.play().catch(e => { });
+            } else {
+                if (!rainSound.paused) rainSound.pause();
+            }
 
-            // Tentar tocar o som apropriado
-            // NOTA: Autoplay pode falhar se o usuário não interagiu com a página primeiro!
-            try {
-                if (simulatedWeather === 'rainy') {
-                    rainSound.currentTime = Math.random() * (rainSound.duration || 10); // Start random point
-                    rainSound.play().catch(e => console.warn("Rain audio play failed", e));
-                }
-
-                if (timeOfDay === 'night') {
-                    ambientSoundNight.currentTime = Math.random() * (ambientSoundNight.duration || 10);
-                    ambientSoundNight.play().catch(e => console.warn("Night audio play failed", e));
-                } else if (timeOfDay === 'day' && simulatedWeather !== 'rainy') { // Só toca som de dia se não estiver chovendo
-                    ambientSoundDay.currentTime = Math.random() * (ambientSoundDay.duration || 10);
-                    ambientSoundDay.play().catch(e => console.warn("Day audio play failed", e));
-                }
-            } catch (e) {
-                console.warn("Audio playback error:", e);
+            if (timeOfDay === 'day') {
+                ambientSoundDay.volume = 0.3;
+                if (ambientSoundDay.paused) ambientSoundDay.play().catch(e => { });
+                if (!ambientSoundNight.paused) ambientSoundNight.pause();
+            } else {
+                ambientSoundNight.volume = 0.3;
+                if (ambientSoundNight.paused) ambientSoundNight.play().catch(e => { });
+                if (!ambientSoundDay.paused) ambientSoundDay.pause();
             }
         }
 
@@ -875,7 +911,6 @@
             requestAnimationFrame(animate);
 
             const deltaTime = clock.getDelta();
-            const elapsedTime = clock.getElapsedTime();
 
             updatePlantGrowth(deltaTime);
             updateWeather(deltaTime);
@@ -883,115 +918,13 @@
             updateButterflies(deltaTime);
             updateClouds(deltaTime);
 
-            // --- Subtle Camera Look Movement ---
-            const lookAmplitude = 1.5; // How far left/right the camera looks (in world units at the look-at distance)
-            const lookSpeed = 0.15;   // How fast the camera sweeps side to side
-            // Calculate horizontal offset using a sine wave
-            const lookOffsetX = Math.sin(elapsedTime * lookSpeed) * lookAmplitude;
-
-            // Define the base point to look at (e.g., slightly above the ground center)
-            const baseLookAtPoint = new THREE.Vector3(0, 1.0, 0); // Y=1 looks slightly up from the ground
-
-            // Apply the horizontal offset to the base look-at point
-            const finalLookAtPoint = baseLookAtPoint.clone(); // Clone to avoid modifying the original vector
-            finalLookAtPoint.x += lookOffsetX;
-
-            // Make the camera look at the calculated point
-            camera.lookAt(finalLookAtPoint);
-            // --- End Camera Look Movement ---
-
-            // Animar o urso (movimento suave de balanço)
-            if (bearModel) {
-                // Leve balanço para frente e para trás
-                bearModel.rotation.z = Math.sin(elapsedTime * 0.3) * 0.05;
-                // Pequena variação na altura (como respiração)
-                bearModel.position.y = Math.sin(elapsedTime * 0.7) * 0.05;
-            }
-
             renderer.render(scene, camera);
         }
 
-        // --- Iniciar o jogo ---
+        // Iniciar
         init();
-        showNotification("Bem-vindo ao Lazy Gardener! Escolha uma semente e toque no chão.", 5000);
-
-        // Tentativa inicial de tocar áudio após um pequeno delay (pode falhar)
-        setTimeout(() => {
-             showNotification("Tentando iniciar áudio ambiente...", 2000);
-            updateAudio();
-        }, 1000);
-
-        function loadBearModel() {
-            const loader = new GLTFLoader();
-            
-            // Mostrar notificação de carregamento
-            showNotification("Carregando modelo do urso...", 2000);
-            
-            // Carregar o modelo urso.glb
-            loader.load(
-                // Caminho para o arquivo do modelo 
-                '../lazy_gardner/assets/urso.glb',
-                
-                // Callback chamado quando o modelo for carregado com sucesso
-                function(gltf) {
-                    bearModel = gltf.scene;
-                    
-                    // Ajustar a escala do modelo
-                    bearModel.scale.set(1.5, 1.5, 1.5);
-                    
-                    // Posicionar o urso no jardim
-                    bearModel.position.set(5, 0, 5);
-                    
-                    // Girar o urso para olhar para o centro
-                    bearModel.rotation.y = Math.PI / -2;
-                    
-                    // Habilitar sombras e corrigir materiais
-                    bearModel.traverse(function(node) {
-                        if (node.isMesh) {
-                            node.castShadow = true;
-                            node.receiveShadow = true;
-                            
-                            // Garantir que os materiais estejam configurados corretamente
-                            if (node.material) {
-                                // Configurar para usar as texturas corretamente
-                                node.material.needsUpdate = true;
-                                node.material.side = THREE.DoubleSide; // Renderizar ambos os lados
-                                
-                                // Se o material tiver mapa de normais, certifique-se de que está habilitado
-                                if (node.material.normalMap) {
-                                    node.material.normalScale.set(1, 1);
-                                }
-                                
-                                // Ajustar rugosidade e metalness para aparência mais realista
-                                if (node.material.roughness !== undefined) {
-                                    node.material.roughness = 0.7;
-                                }
-                                if (node.material.metalness !== undefined) {
-                                    node.material.metalness = 0.2;
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Adicionar o modelo à cena
-                    scene.add(bearModel);
-                    console.log("Modelo do urso carregado com sucesso!");
-                    showNotification("Urso adicionado ao jardim! 🐻", 3000);
-                },
-                
-                // Callback para progresso do carregamento
-                function(xhr) {
-                    console.log((xhr.loaded / xhr.total * 100) + '% carregado');
-                },
-                
-                // Callback para erros
-                function(error) {
-                    console.error('Erro ao carregar o modelo do urso:', error);
-                    showNotification("Não foi possível carregar o urso 😢", 3000);
-                }
-            );
-        }
 
     </script>
 </body>
+
 </html>
