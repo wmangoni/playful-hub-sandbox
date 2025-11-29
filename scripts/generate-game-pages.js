@@ -401,6 +401,30 @@ const gamesData = {
         ],
         tags: ['Pinball', 'Fliperama', 'Física', 'Arcade', 'Clássico'],
         relatedGames: ['space_shooter', 'snake', 'tetris']
+    },
+    'voxel_city': {
+        title: 'Voxel City Delivery',
+        description: 'Explore uma vibrante cidade voxel, colete pacotes e entregue-os neste jogo 3D de mundo aberto. Dirija carros, ande a pé e complete missões de entrega!',
+        keywords: 'voxel, cidade, delivery, entrega, 3D, mundo aberto, carros, simulação, PlayfulHub',
+        genre: 'Mundo Aberto / Simulação',
+        developer: 'PlayfulHub',
+        features: 'Gráficos 3D voxel, ciclo dia/noite, veículos dirigíveis, minimapa, missões de entrega',
+        objective: 'Encontre o alvo verde para pegar o pacote e entregue no alvo vermelho antes do tempo acabar!',
+        controls: [
+            { key: 'W/S', action: 'Mover frente/trás' },
+            { key: 'A/D', action: 'Mover para os lados (a pé)' },
+            { key: 'Mouse', action: 'Olhar ao redor / Girar' },
+            { key: 'Espaço', action: 'Entrar/Sair do carro' },
+            { key: 'Scroll', action: 'Zoom da câmera' }
+        ],
+        tips: [
+            'Use o minimapa no canto inferior direito para localizar os alvos de coleta (verde) e entrega (vermelho)',
+            'Carros são mais rápidos - aproxime-se de um e pressione Espaço para entrar',
+            'Fique atento ao ciclo dia/noite - as luzes da cidade ajudam na navegação noturna',
+            'Complete entregas rapidamente para acumular mais pontos!'
+        ],
+        tags: ['3D', 'Voxel', 'Mundo Aberto', 'Delivery', 'Carros', 'Simulação'],
+        relatedGames: ['driving_simulator', '3d_shooter', 'strategy_game']
     }
 };
 
@@ -447,7 +471,9 @@ function generateRelatedGamesHTML(relatedGames) {
             'poker': '♠️',
             'it_simulator': '🏢',
             'tabuleiro_galton': '🧔',
-            'pinball': '🎱'
+            'pinball': '🎱',
+            'voxel_city': '🏙️',
+            'driving_simulator': '🚗'
         };
         
         return `
