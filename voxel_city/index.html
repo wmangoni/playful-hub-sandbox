@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel City Delivery</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
+            font-weight: bold;
+        }
+
+        #minimap-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 200px;
+            border: 4px solid white;
+            border-radius: 50%;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.7);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .hud-item {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        #interaction-prompt {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: yellow;
+            font-size: 24px;
+            display: none;
+            text-shadow: 1px 1px 2px black;
+            font-weight: bold;
+        }
+
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 48px;
+            z-index: 10;
+        }
+
+        #restart-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 24px;
+            cursor: pointer;
+            background: #33aa33;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="game-container"></div>
+    <div id="hud">
+        <div class="hud-item">Score: <span id="score">0</span></div>
+        <div class="hud-item">Time: <span id="time">05:00</span></div>
+        <div class="hud-item" id="mission-text" style="color: #00ff00">Find the Pickup Target!</div>
+    </div>
+    <div id="minimap-container">
+        <canvas id="minimap-canvas" width="200" height="200"></canvas>
+    </div>
+    <div id="interaction-prompt">Press SPACE to Enter/Exit Car</div>
+
+    <div id="game-over">
+        <div>GAME OVER</div>
+        <div style="font-size: 32px">Final Score: <span id="final-score">0</span></div>
+        <button id="restart-btn">Play Again</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Constants ---
+        const CITY_SIZE = 15; // Blocks
+        const BLOCK_SIZE = 20; // Units per block (Wider)
+        const TOTAL_TIME = 300;
+
+        // --- Game State ---
+        const state = {
+            score: 0,
+            timeLeft: TOTAL_TIME,
+            inCar: false,
+            currentCar: null,
+            dayTime: 0,
+            hasPackage: false,
+            gameOver: false
+        };
+
+        // --- Input Handling ---
+        class Input {
+            constructor() {
+                this.keys = {};
+                this.mouseDown = false;
+                window.addEventListener('keydown', (e) => this.keys[e.code] = true);
+                window.addEventListener('keyup', (e) => this.keys[e.code] = false);
+                window.addEventListener('mousedown', () => this.mouseDown = true);
+                window.addEventListener('mouseup', () => this.mouseDown = false);
+            }
+        }
+
+        // --- World Generation ---
+        class World {
+            constructor(scene) {
+                this.scene = scene;
+                this.citySize = CITY_SIZE;
+                this.blockSize = BLOCK_SIZE;
+                this.roadWidth = 10; // Wider roads
+                this.buildings = []; // Array of Box3 for collision
+                this.roads = [];
+                this.intersections = [];
+
+                this.generateCity();
+            }
+
+            generateCity() {
+                const groundGeo = new THREE.PlaneGeometry(this.citySize * this.blockSize, this.citySize * this.blockSize);
+                const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a });
+                const ground = new THREE.Mesh(groundGeo, groundMat);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                this.scene.add(ground);
+
+                for (let x = -this.citySize / 2; x < this.citySize / 2; x++) {
+                    for (let z = -this.citySize / 2; z < this.citySize / 2; z++) {
+                        const px = x * this.blockSize + this.blockSize / 2;
+                        const pz = z * this.blockSize + this.blockSize / 2;
+
+                        if (Math.random() > 0.2) {
+                            this.createBuilding(px, pz);
+                        }
+                    }
+                }
+
+                this.createRoadNetwork();
+            }
+
+            createBuilding(x, z) {
+                const width = this.blockSize - this.roadWidth;
+                const depth = this.blockSize - this.roadWidth;
+                const height = Math.random() * 20 + 10;
+
+                const geometry = new THREE.BoxGeometry(width, height, depth);
+                const material = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color().setHSL(Math.random(), 0.5, 0.5),
+                    roughness: 0.7
+                });
+
+                const building = new THREE.Mesh(geometry, material);
+                building.position.set(x, height / 2, z);
+                building.castShadow = true;
+                building.receiveShadow = true;
+                this.scene.add(building);
+
+                // Add collision box
+                const box = new THREE.Box3().setFromObject(building);
+                // Shrink slightly to allow grazing
+                box.expandByScalar(-0.1);
+                this.buildings.push(box);
+            }
+
+            createRoadNetwork() {
+                for (let x = -this.citySize / 2; x <= this.citySize / 2; x++) {
+                    const roadX = x * this.blockSize;
+                    this.roads.push({
+                        start: new THREE.Vector3(roadX, 0, -this.citySize * this.blockSize / 2),
+                        end: new THREE.Vector3(roadX, 0, this.citySize * this.blockSize / 2),
+                        dir: new THREE.Vector3(0, 0, 1),
+                        axis: 'z',
+                        width: this.roadWidth
+                    });
+
+                    for (let z = -this.citySize / 2; z <= this.citySize / 2; z++) {
+                        const roadZ = z * this.blockSize;
+                        this.intersections.push({
+                            position: new THREE.Vector3(roadX, 0, roadZ),
+                            state: 'green'
+                        });
+                    }
+                }
+                for (let z = -this.citySize / 2; z <= this.citySize / 2; z++) {
+                    const roadZ = z * this.blockSize;
+                    this.roads.push({
+                        start: new THREE.Vector3(-this.citySize * this.blockSize / 2, 0, roadZ),
+                        end: new THREE.Vector3(this.citySize * this.blockSize / 2, 0, roadZ),
+                        dir: new THREE.Vector3(1, 0, 0),
+                        axis: 'x',
+                        width: this.roadWidth
+                    });
+                }
+            }
+
+            checkCollision(position) {
+                // Simple point check against building boxes
+                // For better player collision, we should check a small radius or box around player
+                // But point check is often enough if we keep player center away
+                const playerRadius = 0.5;
+                const point = position.clone();
+
+                for (const box of this.buildings) {
+                    // Expand box by player radius for check
+                    const expandedBox = box.clone().expandByScalar(playerRadius);
+                    if (expandedBox.containsPoint(point)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // --- Traffic System ---
+        class Car {
+            constructor(scene, road) {
+                this.scene = scene;
+                this.road = road;
+                this.speed = 8 + Math.random() * 5;
+                this.mesh = this.createCarMesh();
+
+                this.mesh.position.copy(road.start);
+                // Offset for 2-way traffic
+                const laneOffset = this.road.width / 4;
+                const offset = new THREE.Vector3(road.dir.z, 0, -road.dir.x).multiplyScalar(laneOffset);
+                this.mesh.position.add(offset);
+
+                this.mesh.lookAt(this.mesh.position.clone().add(road.dir));
+                this.scene.add(this.mesh);
+
+                this.stopped = false;
+            }
+
+            createCarMesh() {
+                const group = new THREE.Group();
+                const color = new THREE.Color().setHSL(Math.random(), 0.8, 0.5);
+                const bodyGeo = new THREE.BoxGeometry(2, 1.2, 4);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: color });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.6;
+                group.add(body);
+
+                const cabinGeo = new THREE.BoxGeometry(1.8, 1, 2);
+                const cabinMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+                const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+                cabin.position.y = 1.6;
+                group.add(cabin);
+
+                group.castShadow = true;
+                return group;
+            }
+
+            update(dt, intersections, otherCars, world) {
+                if (this.stopped && !state.inCar) return;
+
+                const moveDist = this.speed * dt;
+                const nextPos = this.mesh.position.clone().add(this.road.dir.clone().multiplyScalar(moveDist));
+
+                // Loop at edges
+                if (this.road.axis === 'z' && nextPos.z > this.road.end.z) {
+                    this.mesh.position.z = this.road.start.z;
+                    return;
+                }
+                if (this.road.axis === 'x' && nextPos.x > this.road.end.x) {
+                    this.mesh.position.x = this.road.start.x;
+                    return;
+                }
+
+                // Traffic Logic
+                let shouldStop = false;
+                for (const intersection of intersections) {
+                    const dist = this.mesh.position.distanceTo(intersection.position);
+                    if (dist < 15 && dist > 5) { // Adjusted for wider roads
+                        if (this.road.axis === 'z' && intersection.state !== 'green') shouldStop = true;
+                        if (this.road.axis === 'x' && intersection.state === 'green') shouldStop = true;
+                    }
+                }
+
+                for (const other of otherCars) {
+                    if (other === this) continue;
+                    const dist = this.mesh.position.distanceTo(other.mesh.position);
+                    if (dist < 8) {
+                        const dirToOther = other.mesh.position.clone().sub(this.mesh.position).normalize();
+                        if (dirToOther.dot(this.road.dir) > 0.8) {
+                            shouldStop = true;
+                        }
+                    }
+                }
+
+                if (!shouldStop) {
+                    // Collision check (rare for cars on rails, but good for safety)
+                    if (!world.checkCollision(nextPos)) {
+                        this.mesh.position.copy(nextPos);
+                    }
+                }
+            }
+        }
+
+        class TrafficSystem {
+            constructor(scene, world) {
+                this.scene = scene;
+                this.world = world;
+                this.cars = [];
+                this.timer = 0;
+
+                for (let i = 0; i < 50; i++) {
+                    const road = this.world.roads[Math.floor(Math.random() * this.world.roads.length)];
+                    const car = new Car(this.scene, road);
+                    const randDist = Math.random() * (this.world.citySize * this.world.blockSize);
+                    car.mesh.position.add(road.dir.clone().multiplyScalar(randDist));
+                    this.cars.push(car);
+                }
+            }
+
+            update(dt) {
+                this.timer += dt;
+                if (this.timer > 5) {
+                    this.timer = 0;
+                    for (const intersection of this.world.intersections) {
+                        intersection.state = intersection.state === 'green' ? 'red' : 'green';
+                    }
+                }
+
+                for (const car of this.cars) {
+                    if (state.inCar && state.currentCar === car) continue;
+                    car.update(dt, this.world.intersections, this.cars, this.world);
+                }
+            }
+        }
+
+        // --- Pedestrians ---
+        class Pedestrian {
+            constructor(scene, world) {
+                this.scene = scene;
+                this.world = world;
+                this.mesh = this.createMesh();
+                this.scene.add(this.mesh);
+
+                this.speed = 3;
+                this.target = this.getRandomPoint();
+                this.mesh.position.copy(this.getRandomPoint());
+            }
+
+            createMesh() {
+                const geometry = new THREE.BoxGeometry(0.6, 1.7, 0.6);
+                const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.y = 0.85;
+                mesh.castShadow = true;
+                return mesh;
+            }
+
+            getRandomPoint() {
+                let x, z;
+                let valid = false;
+                let attempts = 0;
+                while (!valid && attempts < 100) {
+                    attempts++;
+                    x = (Math.random() - 0.5) * this.world.citySize * this.world.blockSize;
+                    z = (Math.random() - 0.5) * this.world.citySize * this.world.blockSize;
+
+                    // Check collision
+                    const pos = new THREE.Vector3(x, 0, z);
+                    if (!this.world.checkCollision(pos)) {
+                        valid = true;
+                    }
+                }
+                return new THREE.Vector3(x, 0.85, z);
+            }
+
+            update(dt) {
+                const dir = this.target.clone().sub(this.mesh.position);
+                const dist = dir.length();
+
+                if (dist < 1) {
+                    this.target = this.getRandomPoint();
+                } else {
+                    dir.normalize();
+                    const nextPos = this.mesh.position.clone().add(dir.multiplyScalar(this.speed * dt));
+
+                    if (!this.world.checkCollision(nextPos)) {
+                        this.mesh.position.copy(nextPos);
+                        this.mesh.lookAt(this.target);
+                    } else {
+                        // Hit wall, pick new target
+                        this.target = this.getRandomPoint();
+                    }
+                }
+            }
+        }
+
+        // --- Mission Manager ---
+        class MissionManager {
+            constructor(scene, pedestrians) {
+                this.scene = scene;
+                this.pedestrians = pedestrians;
+                this.pickupTarget = null;
+                this.deliveryTarget = null;
+
+                this.markerMesh = this.createMarker();
+                this.scene.add(this.markerMesh);
+
+                this.startNewMission();
+            }
+
+            createMarker() {
+                const geo = new THREE.ConeGeometry(1, 2, 8);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.rotation.x = Math.PI;
+                return mesh;
+            }
+
+            startNewMission() {
+                state.hasPackage = false;
+                this.pickupTarget = this.pedestrians[Math.floor(Math.random() * this.pedestrians.length)];
+                let dt = this.pickupTarget;
+                while (dt === this.pickupTarget) {
+                    dt = this.pedestrians[Math.floor(Math.random() * this.pedestrians.length)];
+                }
+                this.deliveryTarget = dt;
+
+                this.updateHUDText();
+                this.markerMesh.material.color.setHex(0x00ff00); // Green for pickup
+            }
+
+            update(playerPos) {
+                if (state.gameOver) return;
+
+                const target = state.hasPackage ? this.deliveryTarget : this.pickupTarget;
+
+                // Update Marker Position
+                this.markerMesh.position.copy(target.mesh.position);
+                this.markerMesh.position.y += 4;
+                this.markerMesh.rotation.y += 0.05;
+
+                // Check distance
+                const dist = playerPos.distanceTo(target.mesh.position);
+                if (dist < 3) {
+                    if (!state.hasPackage) {
+                        state.hasPackage = true;
+                        this.markerMesh.material.color.setHex(0xff0000); // Red for delivery
+                        this.updateHUDText();
+                    } else {
+                        // Delivered!
+                        state.score += 10;
+                        document.getElementById('score').innerText = state.score;
+                        this.startNewMission();
+                    }
+                }
+            }
+
+            updateHUDText() {
+                const text = document.getElementById('mission-text');
+                if (state.hasPackage) {
+                    text.innerText = "Deliver the package!";
+                    text.style.color = "#ff0000";
+                } else {
+                    text.innerText = "Find the pickup target!";
+                    text.style.color = "#00ff00";
+                }
+            }
+        }
+
+        // --- Player Controller ---
+        class Player {
+            constructor(scene, camera, input, trafficSystem, world) {
+                this.scene = scene;
+                this.camera = camera;
+                this.input = input;
+                this.trafficSystem = trafficSystem;
+                this.world = world;
+
+                this.mesh = this.createVoxelCharacter();
+
+                // Spawn at a random intersection to ensure we are on the road
+                if (this.world.intersections.length > 0) {
+                    const spawnIndex = Math.floor(Math.random() * this.world.intersections.length);
+                    const spawnPos = this.world.intersections[spawnIndex].position.clone();
+                    this.mesh.position.copy(spawnPos);
+                }
+
+                this.scene.add(this.mesh);
+
+                this.speed = 15;
+                this.currentZoom = 15;
+                this.minZoom = 5;
+                this.maxZoom = 40;
+                this.yaw = 0;
+                this.pitch = -0.5;
+
+                document.addEventListener('wheel', (e) => this.onScroll(e));
+                document.addEventListener('mousemove', (e) => this.onMouseMove(e));
+
+                this.scene.userData.canvas = document.querySelector('canvas');
+                this.scene.userData.canvas.addEventListener('click', () => {
+                    this.scene.userData.canvas.requestPointerLock();
+                });
+
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space') this.tryInteract();
+                });
+            }
+
+            createVoxelCharacter() {
+                const group = new THREE.Group();
+                const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 1.4;
+                group.add(head);
+
+                const bodyGeo = new THREE.BoxGeometry(1, 1, 0.6);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3366ff });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.5;
+                group.add(body);
+
+                group.castShadow = true;
+                return group;
+            }
+
+            onScroll(e) {
+                this.currentZoom += e.deltaY * 0.01;
+                this.currentZoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.currentZoom));
+            }
+
+            onMouseMove(e) {
+                if (document.pointerLockElement === this.scene.userData.canvas) {
+                    this.yaw -= e.movementX * 0.002;
+                    this.pitch -= e.movementY * 0.002;
+                    this.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.pitch));
+                }
+            }
+
+            tryInteract() {
+                if (state.inCar) {
+                    state.inCar = false;
+                    state.currentCar = null;
+                    this.mesh.visible = true;
+                    this.mesh.position.add(new THREE.Vector3(3, 0, 0));
+                } else {
+                    let closestCar = null;
+                    let minDst = 8;
+                    for (const car of this.trafficSystem.cars) {
+                        const dst = this.mesh.position.distanceTo(car.mesh.position);
+                        if (dst < minDst) {
+                            minDst = dst;
+                            closestCar = car;
+                        }
+                    }
+
+                    if (closestCar) {
+                        state.inCar = true;
+                        state.currentCar = closestCar;
+                        this.mesh.visible = false;
+                    }
+                }
+            }
+
+            update(dt) {
+                if (state.inCar) {
+                    this.mesh.position.copy(state.currentCar.mesh.position);
+
+                    const car = state.currentCar;
+                    const carSpeed = 25;
+                    const turnSpeed = 2;
+
+                    // Car movement with collision check
+                    const oldPos = car.mesh.position.clone();
+                    const oldRot = car.mesh.rotation.clone();
+
+                    if (this.input.keys['KeyW']) car.mesh.translateZ(carSpeed * dt);
+                    if (this.input.keys['KeyS']) car.mesh.translateZ(-carSpeed * dt);
+                    if (this.input.keys['KeyA']) car.mesh.rotateY(turnSpeed * dt);
+                    if (this.input.keys['KeyD']) car.mesh.rotateY(-turnSpeed * dt);
+
+                    if (this.world.checkCollision(car.mesh.position)) {
+                        // Revert if hit building
+                        car.mesh.position.copy(oldPos);
+                        car.mesh.rotation.copy(oldRot);
+                    }
+
+                    const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
+                    const camY = car.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
+                    const camZ = car.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
+                    this.camera.position.set(camX, camY, camZ);
+                    this.camera.lookAt(car.mesh.position);
+
+                    return;
+                }
+
+                this.mesh.visible = true;
+
+                const moveDir = new THREE.Vector3();
+                if (this.input.keys['KeyW']) moveDir.z -= 1;
+                if (this.input.keys['KeyS']) moveDir.z += 1;
+                if (this.input.keys['KeyA']) moveDir.x -= 1;
+                if (this.input.keys['KeyD']) moveDir.x += 1;
+
+                if (moveDir.length() > 0) {
+                    moveDir.normalize();
+                    moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+
+                    const nextPos = this.mesh.position.clone().add(moveDir.multiplyScalar(this.speed * dt));
+
+                    if (!this.world.checkCollision(nextPos)) {
+                        this.mesh.position.copy(nextPos);
+                    }
+
+                    this.mesh.rotation.y = Math.atan2(moveDir.x, moveDir.z) + Math.PI;
+                }
+
+                const camX = this.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
+                const camY = this.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
+                const camZ = this.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
+
+                this.camera.position.set(camX, camY, camZ);
+                this.camera.lookAt(this.mesh.position.clone().add(new THREE.Vector3(0, 1, 0)));
+
+                const prompt = document.getElementById('interaction-prompt');
+                let nearCar = false;
+                for (const car of this.trafficSystem.cars) {
+                    if (this.mesh.position.distanceTo(car.mesh.position) < 8) {
+                        nearCar = true;
+                        break;
+                    }
+                }
+                prompt.style.display = nearCar ? 'block' : 'none';
+            }
+        }
+
+        // --- HUD Manager ---
+        class HUD {
+            constructor(missionManager, player, world) {
+                this.missionManager = missionManager;
+                this.player = player;
+                this.world = world;
+                this.canvas = document.getElementById('minimap-canvas');
+                this.ctx = this.canvas.getContext('2d');
+            }
+
+            update() {
+                // Update Timer
+                const min = Math.floor(state.timeLeft / 60);
+                const sec = Math.floor(state.timeLeft % 60);
+                document.getElementById('time').innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+
+                // Draw Minimap
+                const ctx = this.ctx;
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const mapScale = 1.5;
+
+                ctx.clearRect(0, 0, w, h);
+
+                const px = this.player.mesh.position.x;
+                const pz = this.player.mesh.position.z;
+
+                ctx.save();
+                ctx.translate(w / 2, h / 2);
+                ctx.rotate(-this.player.yaw);
+                ctx.scale(mapScale, mapScale);
+                ctx.translate(-px, -pz);
+
+                // Draw Roads
+                ctx.fillStyle = "#555";
+                for (const road of this.world.roads) {
+                    // Draw road as rectangle
+                    const rw = road.width;
+                    const rLen = road.start.distanceTo(road.end);
+                    const cx = (road.start.x + road.end.x) / 2;
+                    const cz = (road.start.z + road.end.z) / 2;
+
+                    ctx.save();
+                    ctx.translate(cx, cz);
+                    if (road.axis === 'x') {
+                        ctx.fillRect(-rLen / 2, -rw / 2, rLen, rw);
+                    } else {
+                        ctx.fillRect(-rw / 2, -rLen / 2, rw, rLen);
+                    }
+                    ctx.restore();
+                }
+
+                // Draw Target
+                const target = state.hasPackage ? this.missionManager.deliveryTarget : this.missionManager.pickupTarget;
+                if (target) {
+                    ctx.fillStyle = state.hasPackage ? "red" : "green";
+                    ctx.beginPath();
+                    ctx.arc(target.mesh.position.x, target.mesh.position.z, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+
+                // Draw Player Arrow
+                ctx.fillStyle = "white";
+                ctx.beginPath();
+                ctx.moveTo(w / 2, h / 2 - 5);
+                ctx.lineTo(w / 2 - 4, h / 2 + 5);
+                ctx.lineTo(w / 2 + 4, h / 2 + 5);
+                ctx.fill();
+            }
+        }
+
+        // --- Main Game Class ---
+        class Game {
+            constructor() {
+                this.container = document.getElementById('game-container');
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87CEEB);
+                this.scene.fog = new THREE.Fog(0x87CEEB, 20, 150);
+
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.container.appendChild(this.renderer.domElement);
+
+                // Lighting
+                this.sunLight = new THREE.DirectionalLight(0xffffff, 1);
+                this.sunLight.position.set(50, 100, 50);
+                this.sunLight.castShadow = true;
+                this.sunLight.shadow.mapSize.width = 2048;
+                this.sunLight.shadow.mapSize.height = 2048;
+                this.sunLight.shadow.camera.near = 0.5;
+                this.sunLight.shadow.camera.far = 500;
+                this.sunLight.shadow.camera.left = -150;
+                this.sunLight.shadow.camera.right = 150;
+                this.sunLight.shadow.camera.top = 150;
+                this.sunLight.shadow.camera.bottom = -150;
+                this.scene.add(this.sunLight);
+
+                this.ambientLight = new THREE.AmbientLight(0x404040);
+                this.scene.add(this.ambientLight);
+
+                // Initialize Systems
+                this.input = new Input();
+                this.world = new World(this.scene);
+                this.trafficSystem = new TrafficSystem(this.scene, this.world);
+                this.player = new Player(this.scene, this.camera, this.input, this.trafficSystem, this.world);
+
+                this.pedestrians = [];
+                for (let i = 0; i < 40; i++) {
+                    this.pedestrians.push(new Pedestrian(this.scene, this.world));
+                }
+
+                this.missionManager = new MissionManager(this.scene, this.pedestrians);
+                this.hud = new HUD(this.missionManager, this.player, this.world);
+
+                this.setupEventListeners();
+                this.clock = new THREE.Clock();
+
+                document.getElementById('restart-btn').addEventListener('click', () => {
+                    location.reload();
+                });
+
+                this.animate();
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.onWindowResize(), false);
+            }
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            update(dt) {
+                if (state.gameOver) return;
+
+                state.timeLeft -= dt;
+                if (state.timeLeft <= 0) {
+                    state.gameOver = true;
+                    document.getElementById('game-over').style.display = 'flex';
+                    document.getElementById('final-score').innerText = state.score;
+                    document.exitPointerLock();
+                }
+
+                this.player.update(dt);
+                this.trafficSystem.update(dt);
+                this.pedestrians.forEach(p => p.update(dt));
+                this.missionManager.update(this.player.mesh.position);
+                this.hud.update();
+
+                // Day/Night Cycle
+                state.dayTime += dt * 0.05;
+                const sunX = Math.cos(state.dayTime) * 100;
+                const sunY = Math.sin(state.dayTime) * 100;
+                this.sunLight.position.set(sunX, sunY, 50);
+
+                if (sunY < 0) {
+                    this.scene.background.setHex(0x000022);
+                    this.sunLight.intensity = 0;
+                    this.ambientLight.intensity = 0.1;
+                    this.scene.fog.color.setHex(0x000022);
+                } else {
+                    this.scene.background.setHex(0x87CEEB);
+                    this.sunLight.intensity = 1;
+                    this.ambientLight.intensity = 0.4;
+                    this.scene.fog.color.setHex(0x87CEEB);
+                }
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                const dt = this.clock.getDelta();
+                this.update(dt);
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        window.onload = () => {
+            const game = new Game();
+        };
+    </script>
+</body>
+
+</html>
