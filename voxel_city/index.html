@@ -162,6 +162,8 @@
                 this.buildings = []; // Array of Box3 for collision
                 this.roads = [];
                 this.intersections = [];
+                this.streetLights = [];
+                this.streetLampMaterial = null;
 
                 this.generateCity();
             }
@@ -186,6 +188,7 @@
                 }
 
                 this.createRoadNetwork();
+                this.createStreetLights();
             }
 
             createBuilding(x, z) {
@@ -243,6 +246,64 @@
                 }
             }
 
+            createStreetLights() {
+                const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 8, 8);
+                const lampGeo = new THREE.SphereGeometry(0.5, 10, 10);
+                const poleMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.8 });
+                this.streetLampMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xfff2c2,
+                    emissive: 0xfff2c2,
+                    emissiveIntensity: 0.3,
+                    roughness: 0.2
+                });
+
+                const offset = this.roadWidth / 2 + 2;
+
+                this.intersections.forEach((intersection, index) => {
+                    const gridX = Math.round(intersection.position.x / this.blockSize);
+                    const gridZ = Math.round(intersection.position.z / this.blockSize);
+                    // Skip some intersections to avoid too many lights
+                    if ((Math.abs(gridX) + Math.abs(gridZ)) % 3 !== 0) return;
+
+                    const basePos = intersection.position.clone().add(new THREE.Vector3(offset, 0, offset));
+
+                    const pole = new THREE.Mesh(poleGeo, poleMat);
+                    pole.position.set(basePos.x, 4, basePos.z);
+                    pole.castShadow = false;
+                    this.scene.add(pole);
+
+                    const lamp = new THREE.Mesh(lampGeo, this.streetLampMaterial);
+                    lamp.position.set(basePos.x, 8, basePos.z);
+                    this.scene.add(lamp);
+
+                    const light = new THREE.PointLight(0xfff6d0, 0, 70, 1.5);
+                    light.position.set(basePos.x, 8.2, basePos.z);
+                    light.castShadow = false;
+                    light.visible = false;
+                    light.userData.baseIntensity = 2.5;
+                    this.scene.add(light);
+                    this.streetLights.push(light);
+                });
+            }
+
+            setNightFactor(amount, playerPosition) {
+                const factor = THREE.MathUtils.clamp(amount, 0, 1);
+                const playerPos = playerPosition || null;
+                this.streetLights.forEach(light => {
+                    let proximity = 1;
+                    if (playerPos) {
+                        const dist = playerPos.distanceTo(light.position);
+                        proximity = THREE.MathUtils.clamp(1 - dist / 120, 0, 1);
+                    }
+                    const intensity = light.userData.baseIntensity * factor * proximity;
+                    light.intensity = intensity;
+                    light.visible = intensity > 0.05;
+                });
+                if (this.streetLampMaterial) {
+                    this.streetLampMaterial.emissiveIntensity = THREE.MathUtils.lerp(0.2, 1.5, factor);
+                }
+            }
+
             checkCollision(position) {
                 // Simple point check against building boxes
                 // For better player collision, we should check a small radius or box around player
@@ -268,6 +329,8 @@
                 this.road = road;
                 this.speed = 8 + Math.random() * 5;
                 this.mesh = this.createCarMesh();
+                this.headLights = [];
+                this.tailLights = [];
 
                 this.mesh.position.copy(road.start);
                 // Offset for 2-way traffic
@@ -279,6 +342,8 @@
                 this.scene.add(this.mesh);
 
                 this.stopped = false;
+                this.baseHeadlightIntensity = 1.4;
+                this.baseTaillightIntensity = 0.5;
             }
 
             createCarMesh() {
@@ -296,8 +361,65 @@
                 cabin.position.y = 1.6;
                 group.add(cabin);
 
+                const headlightGlassMat = new THREE.MeshStandardMaterial({
+                    color: 0xfffff0,
+                    emissive: 0xfffff0,
+                    emissiveIntensity: 0.3
+                });
+                const tailLightGlassMat = new THREE.MeshStandardMaterial({
+                    color: 0xff3300,
+                    emissive: 0xff3300,
+                    emissiveIntensity: 0.3
+                });
+                const lightGeo = new THREE.BoxGeometry(0.2, 0.3, 0.1);
+                const headlightPositions = [0.7, -0.7];
+
+                this.headLights = [];
+                this.tailLights = [];
+
+                headlightPositions.forEach(x => {
+                    const glass = new THREE.Mesh(lightGeo, headlightGlassMat);
+                    glass.position.set(x, 0.8, -2.05);
+                    group.add(glass);
+
+                    const spotlight = new THREE.SpotLight(0xfff7cf, 0, 30, Math.PI / 6, 0.5, 1.5);
+                    spotlight.position.set(x, 0.8, -2.2);
+                    spotlight.target.position.set(x, 0.5, -6);
+                    spotlight.visible = false;
+                    group.add(spotlight);
+                    group.add(spotlight.target);
+                    this.headLights.push(spotlight);
+                });
+
+                headlightPositions.forEach(x => {
+                    const glass = new THREE.Mesh(lightGeo, tailLightGlassMat);
+                    glass.position.set(x, 0.8, 2.05);
+                    group.add(glass);
+
+                    const point = new THREE.PointLight(0xff3300, 0, 10, 2);
+                    point.position.set(x, 0.8, 2.2);
+                    point.visible = false;
+                    group.add(point);
+                    this.tailLights.push(point);
+                });
+
                 group.castShadow = true;
                 return group;
+            }
+
+            setLightPower(nightFactor, proximity = 1) {
+                const factor = THREE.MathUtils.clamp(nightFactor, 0, 1) * THREE.MathUtils.clamp(proximity, 0, 1);
+                const headIntensity = this.baseHeadlightIntensity * factor;
+                const tailIntensity = this.baseTaillightIntensity * factor;
+
+                this.headLights.forEach(light => {
+                    light.intensity = headIntensity;
+                    light.visible = headIntensity > 0.05;
+                });
+                this.tailLights.forEach(light => {
+                    light.intensity = tailIntensity;
+                    light.visible = tailIntensity > 0.05;
+                });
             }
 
             update(dt, intersections, otherCars, world) {
@@ -359,6 +481,7 @@
                     const randDist = Math.random() * (this.world.citySize * this.world.blockSize);
                     car.mesh.position.add(road.dir.clone().multiplyScalar(randDist));
                     this.cars.push(car);
+                    car.setLightPower(0, 0);
                 }
             }
 
@@ -375,6 +498,18 @@
                     if (state.inCar && state.currentCar === car) continue;
                     car.update(dt, this.world.intersections, this.cars, this.world);
                 }
+            }
+
+            setNightFactor(factor, playerPosition) {
+                const playerPos = playerPosition || null;
+                this.cars.forEach(car => {
+                    let proximity = 1;
+                    if (playerPos) {
+                        const dist = playerPos.distanceTo(car.mesh.position);
+                        proximity = THREE.MathUtils.clamp(1 - dist / 80, 0, 1);
+                    }
+                    car.setLightPower(factor, proximity);
+                });
             }
         }
 
@@ -532,11 +667,11 @@
 
                 this.scene.add(this.mesh);
 
-                this.speed = 15;
+                this.speed = 10;
                 this.currentZoom = 15;
                 this.minZoom = 5;
                 this.maxZoom = 40;
-                this.yaw = 0;
+                this.yaw = Math.PI;
                 this.pitch = -0.5;
 
                 document.addEventListener('wheel', (e) => this.onScroll(e));
@@ -613,22 +748,27 @@
                     this.mesh.position.copy(state.currentCar.mesh.position);
 
                     const car = state.currentCar;
-                    const carSpeed = 25;
-                    const turnSpeed = 2;
+                    const carSpeed = 40;
 
-                    // Car movement with collision check
+                    // Car movement with mouse control (same as walking)
                     const oldPos = car.mesh.position.clone();
-                    const oldRot = car.mesh.rotation.clone();
 
-                    if (this.input.keys['KeyW']) car.mesh.translateZ(carSpeed * dt);
-                    if (this.input.keys['KeyS']) car.mesh.translateZ(-carSpeed * dt);
-                    if (this.input.keys['KeyA']) car.mesh.rotateY(turnSpeed * dt);
-                    if (this.input.keys['KeyD']) car.mesh.rotateY(-turnSpeed * dt);
+                    // Update car rotation to match player yaw
+                    car.mesh.rotation.y = this.yaw;
+
+                    // Move forward/backward based on yaw direction
+                    const moveDir = new THREE.Vector3();
+                    if (this.input.keys['KeyW']) moveDir.z -= 1;
+                    if (this.input.keys['KeyS']) moveDir.z += 1;
+
+                    if (moveDir.length() > 0) {
+                        moveDir.normalize();
+                        moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+                        car.mesh.position.add(moveDir.multiplyScalar(carSpeed * dt));
+                    }
 
                     if (this.world.checkCollision(car.mesh.position)) {
-                        // Revert if hit building
                         car.mesh.position.copy(oldPos);
-                        car.mesh.rotation.copy(oldRot);
                     }
 
                     const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
@@ -709,7 +849,7 @@
 
                 ctx.save();
                 ctx.translate(w / 2, h / 2);
-                ctx.rotate(-this.player.yaw);
+                ctx.rotate(this.player.yaw);
                 ctx.scale(mapScale, mapScale);
                 ctx.translate(-px, -pz);
 
@@ -842,18 +982,22 @@
                 const sunX = Math.cos(state.dayTime) * 100;
                 const sunY = Math.sin(state.dayTime) * 100;
                 this.sunLight.position.set(sunX, sunY, 50);
+                const nightFactor = THREE.MathUtils.clamp((-sunY) / 80, 0, 1);
 
                 if (sunY < 0) {
-                    this.scene.background.setHex(0x000022);
-                    this.sunLight.intensity = 0;
-                    this.ambientLight.intensity = 0.1;
-                    this.scene.fog.color.setHex(0x000022);
+                    this.scene.background.setHex(0x0a1428);
+                    this.sunLight.intensity = 0.1;
+                    this.ambientLight.intensity = 0.5;
+                    this.scene.fog.color.setHex(0x0a1428);
                 } else {
                     this.scene.background.setHex(0x87CEEB);
                     this.sunLight.intensity = 1;
                     this.ambientLight.intensity = 0.4;
                     this.scene.fog.color.setHex(0x87CEEB);
                 }
+
+                this.world.setNightFactor(nightFactor, this.player.mesh.position);
+                this.trafficSystem.setNightFactor(nightFactor, this.player.mesh.position);
             }
 
             animate() {

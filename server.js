@@ -30,8 +30,20 @@ app.use(cors({
 // Middleware para processar JSON
 app.use(express.json());
 
-// Servir arquivos estáticos da pasta raiz
-app.use(express.static('./'));
+// Servir arquivos estáticos da pasta raiz com cache
+app.use(express.static('./', {
+    maxAge: '1h', // Cache de 1 hora para assets estáticos
+    etag: true,
+    lastModified: true
+}));
+
+// Cache headers para páginas HTML
+app.use((req, res, next) => {
+    if (req.path.endsWith('.html') || req.path.startsWith('/jogos/')) {
+        res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutos para HTML
+    }
+    next();
+});
 
 // Rota específica para ads.txt (importante para AdSense)
 app.get('/ads.txt', (req, res) => {
@@ -105,6 +117,7 @@ createHtmlRoute('/jogos/poker', 'jogos/poker.html');
 createHtmlRoute('/jogos/it_simulator', 'jogos/it_simulator.html');
 createHtmlRoute('/jogos/tabuleiro_galton', 'jogos/tabuleiro_galton.html');
 createHtmlRoute('/jogos/pinball', 'jogos/pinball.html');
+createHtmlRoute('/jogos/voxel_city', 'jogos/voxel_city.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -126,6 +139,7 @@ createHtmlRoute('/tabuleiro_galton', 'tabuleiro_galton/index.html');
 createHtmlRoute('/visual_effects', 'visual_effects/index.html');
 createHtmlRoute('/chess', 'chess/index.html');
 createHtmlRoute('/lazy_gardner', 'lazy_gardner/index.html');
+createHtmlRoute('/voxel_city', 'voxel_city/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
