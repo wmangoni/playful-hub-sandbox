@@ -30,8 +30,20 @@ app.use(cors({
 // Middleware para processar JSON
 app.use(express.json());
 
-// Servir arquivos estáticos da pasta raiz
-app.use(express.static('./'));
+// Servir arquivos estáticos da pasta raiz com cache
+app.use(express.static('./', {
+    maxAge: '1h', // Cache de 1 hora para assets estáticos
+    etag: true,
+    lastModified: true
+}));
+
+// Cache headers para páginas HTML
+app.use((req, res, next) => {
+    if (req.path.endsWith('.html') || req.path.startsWith('/jogos/')) {
+        res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutos para HTML
+    }
+    next();
+});
 
 // Rota específica para ads.txt (importante para AdSense)
 app.get('/ads.txt', (req, res) => {
