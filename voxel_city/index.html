@@ -667,7 +667,7 @@
 
                 this.scene.add(this.mesh);
 
-                this.speed = 15;
+                this.speed = 10;
                 this.currentZoom = 15;
                 this.minZoom = 5;
                 this.maxZoom = 40;
@@ -748,22 +748,27 @@
                     this.mesh.position.copy(state.currentCar.mesh.position);
 
                     const car = state.currentCar;
-                    const carSpeed = 25;
-                    const turnSpeed = 2;
+                    const carSpeed = 40;
 
-                    // Car movement with collision check
+                    // Car movement with mouse control (same as walking)
                     const oldPos = car.mesh.position.clone();
-                    const oldRot = car.mesh.rotation.clone();
 
-                    if (this.input.keys['KeyW']) car.mesh.translateZ(carSpeed * dt);
-                    if (this.input.keys['KeyS']) car.mesh.translateZ(-carSpeed * dt);
-                    if (this.input.keys['KeyA']) car.mesh.rotateY(turnSpeed * dt);
-                    if (this.input.keys['KeyD']) car.mesh.rotateY(-turnSpeed * dt);
+                    // Update car rotation to match player yaw
+                    car.mesh.rotation.y = this.yaw;
+
+                    // Move forward/backward based on yaw direction
+                    const moveDir = new THREE.Vector3();
+                    if (this.input.keys['KeyW']) moveDir.z -= 1;
+                    if (this.input.keys['KeyS']) moveDir.z += 1;
+
+                    if (moveDir.length() > 0) {
+                        moveDir.normalize();
+                        moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+                        car.mesh.position.add(moveDir.multiplyScalar(carSpeed * dt));
+                    }
 
                     if (this.world.checkCollision(car.mesh.position)) {
-                        // Revert if hit building
                         car.mesh.position.copy(oldPos);
-                        car.mesh.rotation.copy(oldRot);
                     }
 
                     const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
