@@ -279,17 +279,28 @@
                     const light = new THREE.PointLight(0xfff6d0, 0, 55, 2);
                     light.position.set(basePos.x, 8.2, basePos.z);
                     light.castShadow = false;
+                    light.visible = false;
+                    light.userData.baseIntensity = 1.2;
                     this.scene.add(light);
                     this.streetLights.push(light);
                 });
             }
 
-            setNightFactor(amount) {
+            setNightFactor(amount, playerPosition) {
                 const factor = THREE.MathUtils.clamp(amount, 0, 1);
-                const targetIntensity = THREE.MathUtils.lerp(0, 1.1, factor);
-                this.streetLights.forEach(light => light.intensity = targetIntensity);
+                const playerPos = playerPosition || null;
+                this.streetLights.forEach(light => {
+                    let proximity = 1;
+                    if (playerPos) {
+                        const dist = playerPos.distanceTo(light.position);
+                        proximity = THREE.MathUtils.clamp(1 - dist / 120, 0, 1);
+                    }
+                    const intensity = light.userData.baseIntensity * factor * proximity;
+                    light.intensity = intensity;
+                    light.visible = intensity > 0.05;
+                });
                 if (this.streetLampMaterial) {
-                    this.streetLampMaterial.emissiveIntensity = THREE.MathUtils.lerp(0.1, 1.5, factor);
+                    this.streetLampMaterial.emissiveIntensity = THREE.MathUtils.lerp(0.2, 1.5, factor);
                 }
             }
 
@@ -374,6 +385,7 @@
                     const spotlight = new THREE.SpotLight(0xfff7cf, 0, 30, Math.PI / 6, 0.5, 1.5);
                     spotlight.position.set(x, 0.8, -2.2);
                     spotlight.target.position.set(x, 0.5, -6);
+                    spotlight.visible = false;
                     group.add(spotlight);
                     group.add(spotlight.target);
                     this.headLights.push(spotlight);
@@ -386,6 +398,7 @@
 
                     const point = new THREE.PointLight(0xff3300, 0, 10, 2);
                     point.position.set(x, 0.8, 2.2);
+                    point.visible = false;
                     group.add(point);
                     this.tailLights.push(point);
                 });
@@ -394,13 +407,19 @@
                 return group;
             }
 
-            setLightPower(nightFactor) {
-                const factor = THREE.MathUtils.clamp(nightFactor, 0, 1);
-                const headIntensity = THREE.MathUtils.lerp(0.1, this.baseHeadlightIntensity, factor);
-                const tailIntensity = THREE.MathUtils.lerp(0.05, this.baseTaillightIntensity, factor);
+            setLightPower(nightFactor, proximity = 1) {
+                const factor = THREE.MathUtils.clamp(nightFactor, 0, 1) * THREE.MathUtils.clamp(proximity, 0, 1);
+                const headIntensity = this.baseHeadlightIntensity * factor;
+                const tailIntensity = this.baseTaillightIntensity * factor;
 
-                this.headLights.forEach(light => light.intensity = headIntensity);
-                this.tailLights.forEach(light => light.intensity = tailIntensity);
+                this.headLights.forEach(light => {
+                    light.intensity = headIntensity;
+                    light.visible = headIntensity > 0.05;
+                });
+                this.tailLights.forEach(light => {
+                    light.intensity = tailIntensity;
+                    light.visible = tailIntensity > 0.05;
+                });
             }
 
             update(dt, intersections, otherCars, world) {
@@ -462,7 +481,7 @@
                     const randDist = Math.random() * (this.world.citySize * this.world.blockSize);
                     car.mesh.position.add(road.dir.clone().multiplyScalar(randDist));
                     this.cars.push(car);
-                    car.setLightPower(0);
+                    car.setLightPower(0, 0);
                 }
             }
 
@@ -481,8 +500,16 @@
                 }
             }
 
-            setNightFactor(factor) {
-                this.cars.forEach(car => car.setLightPower(factor));
+            setNightFactor(factor, playerPosition) {
+                const playerPos = playerPosition || null;
+                this.cars.forEach(car => {
+                    let proximity = 1;
+                    if (playerPos) {
+                        const dist = playerPos.distanceTo(car.mesh.position);
+                        proximity = THREE.MathUtils.clamp(1 - dist / 80, 0, 1);
+                    }
+                    car.setLightPower(factor, proximity);
+                });
             }
         }
 
@@ -964,8 +991,8 @@
                     this.scene.fog.color.setHex(0x87CEEB);
                 }
 
-                this.world.setNightFactor(nightFactor);
-                this.trafficSystem.setNightFactor(nightFactor);
+                this.world.setNightFactor(nightFactor, this.player.mesh.position);
+                this.trafficSystem.setNightFactor(nightFactor, this.player.mesh.position);
             }
 
             animate() {
