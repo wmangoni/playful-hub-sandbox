@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel Arena</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* HUD */
+        #hud-top {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #d4af37;
+            font-size: 32px;
+            text-shadow: 0 0 10px #000;
+        }
+
+        #hud-stats {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .bar-container {
+            width: 300px;
+            height: 20px;
+            background: #333;
+            border: 2px solid #555;
+            position: relative;
+            transform: skewX(-20deg);
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.2s;
+        }
+
+        #health-fill {
+            background: linear-gradient(to right, #c0392b, #e74c3c);
+            width: 100%;
+        }
+
+        #stamina-fill {
+            background: linear-gradient(to right, #2980b9, #3498db);
+            width: 100%;
+        }
+
+        #xp-fill {
+            background: linear-gradient(to right, #f1c40f, #f39c12);
+            width: 0%;
+        }
+
+        #skills-container {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .skill-slot {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #777;
+            border-radius: 5px;
+            /* Circular look comes from cooldown overlay if we want, but keeping square with radial fill is fine too. Let's make it slightly rounded. */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            /* Ensure cooldown stays inside */
+        }
+
+        .skill-cooldown {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: conic-gradient(rgba(255, 255, 255, 0.5) 0%, transparent 0%);
+            /* transition: none;  We update manually */
+        }
+
+        .key-hint {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        h1 {
+            color: #d4af37;
+            font-size: 64px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 20px #d4af37;
+        }
+
+        button {
+            background: linear-gradient(to bottom, #555, #222);
+            color: #fff;
+            border: 2px solid #d4af37;
+            padding: 15px 40px;
+            font-family: 'Cinzel', serif;
+            font-size: 24px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            margin: 10px;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background: #444;
+            box-shadow: 0 0 15px #d4af37;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="game-container"></div>
+
+    <div id="ui-layer">
+        <div id="hud-top">
+            <div id="timer">05:00</div>
+            <div id="wave-info" style="font-size: 18px; color: #aaa;">Wave 1</div>
+        </div>
+
+        <div id="hud-stats">
+            <div class="bar-container">
+                <div id="health-fill" class="bar-fill"></div>
+            </div>
+            <div class="bar-container">
+                <div id="stamina-fill" class="bar-fill"></div>
+            </div>
+            <div class="bar-container" style="height: 10px; width: 200px; margin-top: 5px;">
+                <div id="xp-fill" class="bar-fill"></div>
+            </div>
+        </div>
+
+        <div id="skills-container">
+            <div class="skill-slot"><span class="key-hint">1</span>
+                <div class="skill-cooldown"></div>
+            </div>
+            <div class="skill-slot"><span class="key-hint">2</span>
+                <div class="skill-cooldown"></div>
+            </div>
+            <div class="skill-slot"><span class="key-hint">3</span>
+                <div class="skill-cooldown"></div>
+            </div>
+            <div class="skill-slot"><span class="key-hint">4</span>
+                <div class="skill-cooldown"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>Voxel Arena</h1>
+        <div style="margin-bottom: 30px; text-align: center; color: #ccc; font-size: 18px; line-height: 1.6;">
+            <p><strong>WASD</strong> to Move | <strong>Mouse</strong> to Look</p>
+            <p><strong>Left Click</strong> to Attack | <strong>Right Click</strong> to Defend</p>
+            <p><strong>1</strong>: Spin Attack | <strong>2</strong>: Dash</p>
+            <p><strong>3</strong>: Heal | <strong>4</strong>: Ultimate</p>
+        </div>
+        <button id="start-btn">Enter Arena</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 id="go-title">Defeated</h1>
+        <div id="bonus-selection" style="display: flex; gap: 20px;">
+            <!-- Bonuses injected here -->
+        </div>
+        <button id="restart-btn" class="hidden">Try Again</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Game Constants ---
+        const ARENA_SIZE = 100;
+
+        // --- Classes ---
+
+        class Input {
+            constructor() {
+                this.keys = {};
+                this.mouseDown = false;
+                this.mouseRightDown = false;
+                this.scroll = 0;
+                this.mouseX = 0;
+                this.mouseY = 0;
+
+                document.addEventListener('keydown', (e) => this.keys[e.code] = true);
+                document.addEventListener('keyup', (e) => this.keys[e.code] = false);
+                document.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) this.mouseDown = true;
+                    if (e.button === 2) this.mouseRightDown = true;
+                });
+                document.addEventListener('mouseup', (e) => {
+                    if (e.button === 0) this.mouseDown = false;
+                    if (e.button === 2) this.mouseRightDown = false;
+                });
+                document.addEventListener('wheel', (e) => {
+                    this.scroll = Math.sign(e.deltaY);
+                });
+                document.addEventListener('mousemove', (e) => {
+                    this.mouseX = e.movementX;
+                    this.mouseY = e.movementY;
+                });
+            }
+
+            resetFrame() {
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.scroll = 0;
+            }
+        }
+
+        class Arena {
+            constructor(scene) {
+                this.scene = scene;
+                this.createFloor();
+                this.createWalls();
+                this.createEnvironment();
+            }
+
+            createFloor() {
+                const geo = new THREE.PlaneGeometry(ARENA_SIZE, ARENA_SIZE);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x3a5f0b, roughness: 0.8 }); // Darker green
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.rotation.x = -Math.PI / 2;
+                this.mesh.receiveShadow = true;
+                this.scene.add(this.mesh);
+
+                // Grid helper for style
+                const grid = new THREE.GridHelper(ARENA_SIZE, 20, 0x444444, 0x333333);
+                this.scene.add(grid);
+            }
+
+            createWalls() {
+                const wallHeight = 10;
+                const halfSize = ARENA_SIZE / 2;
+                const wallGeo = new THREE.BoxGeometry(ARENA_SIZE, wallHeight, 2);
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+
+                const walls = [
+                    { pos: [0, wallHeight / 2, -halfSize], rot: 0 },
+                    { pos: [0, wallHeight / 2, halfSize], rot: 0 },
+                    { pos: [-halfSize, wallHeight / 2, 0], rot: Math.PI / 2 },
+                    { pos: [halfSize, wallHeight / 2, 0], rot: Math.PI / 2 }
+                ];
+
+                walls.forEach(w => {
+                    const mesh = new THREE.Mesh(wallGeo, wallMat);
+                    mesh.position.set(...w.pos);
+                    mesh.rotation.y = w.rot;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                });
+            }
+
+            createEnvironment() {
+                // Trees
+                const treeGeo = new THREE.BoxGeometry(1, 4, 1);
+                const treeMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const leafGeo = new THREE.BoxGeometry(3, 3, 3);
+                const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+
+                for (let i = 0; i < 20; i++) {
+                    const x = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
+                    const z = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
+                    if (Math.abs(x) < 10 && Math.abs(z) < 10) continue; // Avoid center
+
+                    const trunk = new THREE.Mesh(treeGeo, treeMat);
+                    trunk.position.set(x, 2, z);
+                    trunk.castShadow = true;
+                    trunk.receiveShadow = true;
+                    this.scene.add(trunk);
+
+                    const leaves = new THREE.Mesh(leafGeo, leafMat);
+                    leaves.position.set(x, 5, z);
+                    leaves.castShadow = true;
+                    leaves.receiveShadow = true;
+                    this.scene.add(leaves);
+                }
+
+                // Rocks
+                const rockGeo = new THREE.DodecahedronGeometry(1);
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+
+                for (let i = 0; i < 15; i++) {
+                    const x = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
+                    const z = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
+                    if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+
+                    const rock = new THREE.Mesh(rockGeo, rockMat);
+                    const scale = 1 + Math.random() * 2;
+                    rock.scale.set(scale, scale, scale);
+                    rock.position.set(x, scale / 2, z);
+                    rock.castShadow = true;
+                    rock.receiveShadow = true;
+                    this.scene.add(rock);
+                }
+            }
+        }
+
+        class Player {
+            constructor(scene, camera) {
+                this.scene = scene;
+                this.camera = camera;
+                this.mesh = this.createMesh();
+                this.scene.add(this.mesh);
+
+                this.stats = { hp: 100, maxHp: 100, stamina: 100, maxStamina: 100 };
+                this.position = new THREE.Vector3(0, 0, 0);
+                this.rotation = 0;
+
+                // Camera State
+                this.yaw = 0;
+                this.pitch = -0.5;
+                this.zoom = 15;
+
+                // Combat State
+                this.isAttacking = false;
+                this.isDefending = false;
+                this.isDodging = false;
+                this.attackCooldown = 0;
+                this.dodgeCooldown = 0;
+                this.enemyManager = null; // Set by Game
+
+                this.skills = [
+                    { name: 'Spin', cooldown: 0, maxCooldown: 5 },
+                    { name: 'Dash', cooldown: 0, maxCooldown: 3 },
+                    { name: 'Heal', cooldown: 0, maxCooldown: 10 },
+                    { name: 'Ult', cooldown: 0, maxCooldown: 30 }
+                ];
+            }
+
+            createMesh() {
+                const group = new THREE.Group();
+
+                // Colors
+                const armorColor = 0x3498db;
+                const skinColor = 0xffccaa;
+                const darkColor = 0x2c3e50;
+
+                // Body
+                const bodyGeo = new THREE.BoxGeometry(0.8, 1.0, 0.5);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: armorColor });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 1.2;
+                body.castShadow = true;
+                group.add(body);
+
+                // Head
+                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const headMat = new THREE.MeshStandardMaterial({ color: skinColor });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 2.0;
+                head.castShadow = true;
+                group.add(head);
+
+                // Helmet/Hair (Top of head)
+                const helmGeo = new THREE.BoxGeometry(0.55, 0.2, 0.55);
+                const helmMat = new THREE.MeshStandardMaterial({ color: darkColor });
+                const helm = new THREE.Mesh(helmGeo, helmMat);
+                helm.position.y = 2.2;
+                group.add(helm);
+
+                // Eyes
+                const eyeGeo = new THREE.BoxGeometry(0.1, 0.05, 0.05);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.15, 2.0, -0.26);
+                group.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.15, 2.0, -0.26);
+                group.add(rightEye);
+
+                // Arms
+                const armGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25);
+                const armMat = new THREE.MeshStandardMaterial({ color: armorColor });
+
+                const leftArm = new THREE.Mesh(armGeo, armMat);
+                leftArm.position.set(-0.6, 1.2, 0);
+                group.add(leftArm);
+
+                const rightArm = new THREE.Mesh(armGeo, armMat);
+                rightArm.position.set(0.6, 1.2, 0);
+                group.add(rightArm);
+
+                // Legs
+                const legGeo = new THREE.BoxGeometry(0.3, 0.9, 0.3);
+                const legMat = new THREE.MeshStandardMaterial({ color: darkColor });
+
+                const leftLeg = new THREE.Mesh(legGeo, legMat);
+                leftLeg.position.set(-0.25, 0.45, 0);
+                group.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(legGeo, legMat);
+                rightLeg.position.set(0.25, 0.45, 0);
+                group.add(rightLeg);
+
+                // Weapon (Sword) attached to Right Arm
+                const swordGeo = new THREE.BoxGeometry(0.1, 1.8, 0.1);
+                const swordMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
+                const sword = new THREE.Mesh(swordGeo, swordMat);
+                sword.position.set(0, -0.4, -0.5); // Relative to arm (Front)
+                sword.rotation.x = -Math.PI / 2; // Point Forward (-Z)
+                rightArm.add(sword); // Add to arm for animation
+                this.rightArm = rightArm; // Save ref for animation
+
+                return group;
+            }
+
+            update(dt, input) {
+                // Cooldowns
+                if (this.attackCooldown > 0) this.attackCooldown -= dt;
+                if (this.dodgeCooldown > 0) this.dodgeCooldown -= dt;
+
+                // Actions
+                if (input.mouseDown && this.attackCooldown <= 0 && !this.isAttacking) {
+                    this.attack();
+                }
+                this.isDefending = input.mouseRightDown;
+
+                // Skills
+                if (input.keys['Digit1']) this.useSkill(0);
+                if (input.keys['Digit2']) this.useSkill(1);
+                if (input.keys['Digit3']) this.useSkill(2);
+                if (input.keys['Digit4']) this.useSkill(3);
+
+                // Update Cooldowns
+                this.skills.forEach(s => {
+                    if (s.cooldown > 0) s.cooldown -= dt;
+                });
+
+                // Zoom
+                if (input.scroll !== 0) {
+                    this.zoom += input.scroll * 2;
+                    this.zoom = Math.max(5, Math.min(30, this.zoom));
+                }
+
+                // Rotation (Camera)
+                if (document.pointerLockElement) {
+                    this.yaw -= input.mouseX * 0.002;
+                    this.pitch -= input.mouseY * 0.002;
+                    this.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.pitch));
+                }
+
+                // Movement
+                let speed = 10;
+                if (this.isDefending) speed = 5;
+
+                const moveDir = new THREE.Vector3();
+                if (input.keys['KeyW']) moveDir.z -= 1;
+                if (input.keys['KeyS']) moveDir.z += 1;
+                if (input.keys['KeyA']) moveDir.x -= 1;
+                if (input.keys['KeyD']) moveDir.x += 1;
+
+                if (moveDir.length() > 0) {
+                    moveDir.normalize();
+                    // Rotate moveDir by Camera Yaw
+                    moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+
+                    this.mesh.position.add(moveDir.multiplyScalar(speed * dt));
+
+                    // Clamp to Arena
+                    const halfSize = ARENA_SIZE / 2 - 2;
+                    this.mesh.position.x = Math.max(-halfSize, Math.min(halfSize, this.mesh.position.x));
+                    this.mesh.position.z = Math.max(-halfSize, Math.min(halfSize, this.mesh.position.z));
+
+                    // Rotate player mesh to face movement direction
+                    const angle = Math.atan2(moveDir.x, moveDir.z);
+                    this.mesh.rotation.y = angle + Math.PI;
+                }
+
+                // Camera Follow
+                const camX = this.mesh.position.x + this.zoom * Math.sin(this.yaw) * Math.cos(this.pitch);
+                const camY = this.mesh.position.y + this.zoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
+                const camZ = this.mesh.position.z + this.zoom * Math.cos(this.yaw) * Math.cos(this.pitch);
+
+                this.camera.position.set(camX, camY, camZ);
+                this.camera.lookAt(this.mesh.position.clone().add(new THREE.Vector3(0, 2, 0)));
+            }
+
+            attack() {
+                this.isAttacking = true;
+                this.attackCooldown = 0.5;
+
+                // Animation (Rotate Arm)
+                const startRot = 0;
+                const endRot = -Math.PI / 2;
+
+                let t = 0;
+                const anim = () => {
+                    t += 0.15;
+                    if (t <= 1) {
+                        this.rightArm.rotation.x = THREE.MathUtils.lerp(startRot, endRot, Math.sin(t * Math.PI));
+                        requestAnimationFrame(anim);
+                    } else {
+                        this.isAttacking = false;
+                        this.rightArm.rotation.x = startRot;
+                    }
+                };
+                anim();
+
+                // Hit Detection (Directional)
+                if (this.enemyManager) {
+                    const playerFwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw).normalize();
+                    // Pass player forward vector to checkHit for angle check
+                    this.enemyManager.checkHit(this.mesh.position, 4, 10, playerFwd);
+                }
+            }
+
+            heal(amount) {
+                this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
+            }
+
+            takeDamage(amount) {
+                if (this.isDodging) return;
+
+                this.stats.hp -= amount;
+
+                // Visual feedback (flash red)
+                if (this.mesh.children[0].material) {
+                    const oldColor = this.mesh.children[0].material.color.getHex();
+                    this.mesh.children[0].material.color.setHex(0xff0000);
+                    setTimeout(() => {
+                        if (this.mesh && this.mesh.children[0]) {
+                            this.mesh.children[0].material.color.setHex(oldColor);
+                        }
+                    }, 100);
+                }
+
+                if (this.stats.hp <= 0) {
+                    this.stats.hp = 0;
+                    if (this.scene.game) this.scene.game.endGame(false);
+                }
+            }
+
+            useSkill(index) {
+                const skill = this.skills[index];
+                if (skill.cooldown > 0) return;
+
+                skill.cooldown = skill.maxCooldown;
+
+                if (index === 0) { // Spin
+                    this.enemyManager.checkHit(this.mesh.position, 8, 20);
+                    // Visual
+                    const ringGeo = new THREE.RingGeometry(6, 7, 32);
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.rotation.x = -Math.PI / 2;
+                    ring.position.copy(this.mesh.position);
+                    this.scene.add(ring);
+                    setTimeout(() => this.scene.remove(ring), 200);
+                } else if (index === 1) { // Dash
+                    const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+                    this.mesh.position.add(fwd.multiplyScalar(10));
+                    this.enemyManager.checkHit(this.mesh.position, 5, 15);
+                } else if (index === 2) { // Heal
+                    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 30);
+                } else if (index === 3) { // Ult
+                    this.enemyManager.checkHit(this.mesh.position, 25, 100);
+                    // Visual
+                    const sphereGeo = new THREE.SphereGeometry(20, 32, 32);
+                    const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
+                    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+                    sphere.position.copy(this.mesh.position);
+                    this.scene.add(sphere);
+                    setTimeout(() => this.scene.remove(sphere), 500);
+                }
+            }
+        }
+
+        class Enemy {
+            constructor(scene, position, type = 'basic') {
+                this.scene = scene;
+                this.type = type;
+                this.mesh = this.createMesh();
+                this.mesh.position.copy(position);
+                this.scene.add(this.mesh);
+
+                this.hp = type === 'basic' ? 30 : 60;
+                this.speed = type === 'basic' ? 6 : 4;
+                this.damage = 5; // Nerfed from 10
+                this.isDead = false;
+                this.attackCooldown = 0;
+            }
+
+            createMesh() {
+                const color = this.type === 'basic' ? 0xff0000 : 0x880000;
+                const geo = new THREE.BoxGeometry(1.2, 2.2, 1.2);
+                const mat = new THREE.MeshStandardMaterial({ color: color });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.y = 1.1;
+                mesh.castShadow = true;
+                return mesh;
+            }
+
+            update(dt, playerPos) {
+                if (this.isDead) return;
+
+                if (this.attackCooldown > 0) this.attackCooldown -= dt;
+
+                const dir = playerPos.clone().sub(this.mesh.position);
+                dir.y = 0;
+                const dist = dir.length();
+
+                if (dist > 2.5) { // Increased range to account for collision radius
+                    dir.normalize();
+                    this.mesh.position.add(dir.multiplyScalar(this.speed * dt));
+                    this.mesh.lookAt(playerPos);
+                } else if (this.attackCooldown <= 0) {
+                    this.attack();
+                }
+            }
+
+            attack() {
+                this.attackCooldown = 1.5; // Nerfed from 0.5
+                // Simple attack animation (bump forward)
+                const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+                this.mesh.position.add(fwd.multiplyScalar(0.5));
+                setTimeout(() => this.mesh.position.sub(fwd.multiplyScalar(0.5)), 100);
+
+                if (this.scene.game && this.scene.game.player) {
+                    this.scene.game.player.takeDamage(this.damage);
+                }
+            }
+
+            takeDamage(amount) {
+                this.hp -= amount;
+                this.mesh.material.color.setHex(0xffffff);
+                setTimeout(() => {
+                    if (!this.isDead) this.mesh.material.color.setHex(this.type === 'basic' ? 0xff0000 : 0x880000);
+                }, 100);
+
+                if (this.hp <= 0) {
+                    this.die();
+                }
+            }
+
+            die() {
+                this.isDead = true;
+                this.scene.remove(this.mesh);
+
+                // Drop Item (30% chance)
+                if (Math.random() < 0.3 && this.scene.game && this.scene.game.itemManager) {
+                    this.scene.game.itemManager.spawnItem(this.mesh.position);
+                }
+            }
+        }
+
+        class EnemyManager {
+            constructor(scene, player) {
+                this.scene = scene;
+                this.player = player;
+                this.enemies = [];
+                this.spawnTimer = 0;
+            }
+
+            update(dt) {
+                this.spawnTimer += dt;
+                if (this.spawnTimer > 3) {
+                    this.spawnTimer = 0;
+                    this.spawnEnemy();
+                }
+
+                this.enemies.forEach(e => e.update(dt, this.player.mesh.position));
+                this.enemies = this.enemies.filter(e => !e.isDead);
+            }
+
+            spawnEnemy() {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 30 + Math.random() * 10;
+                const x = Math.cos(angle) * dist;
+                const z = Math.sin(angle) * dist;
+                const pos = new THREE.Vector3(x, 0, z).add(this.player.mesh.position);
+
+                const half = ARENA_SIZE / 2 - 2;
+                pos.x = Math.max(-half, Math.min(half, pos.x));
+                pos.z = Math.max(-half, Math.min(half, pos.z));
+
+                this.enemies.push(new Enemy(this.scene, pos));
+            }
+
+            checkHit(origin, range, damage, direction = null) {
+                this.enemies.forEach(e => {
+                    const toEnemy = e.mesh.position.clone().sub(origin);
+                    const dist = toEnemy.length();
+
+                    if (dist < range) {
+                        let hit = true;
+                        if (direction) {
+                            // Check angle (dot product)
+                            toEnemy.normalize();
+                            const angle = direction.angleTo(toEnemy);
+                            if (angle > Math.PI / 3) hit = false; // 60 degree cone
+                        }
+
+                        if (hit) {
+                            e.takeDamage(damage);
+                        }
+                    }
+                });
+            }
+        }
+
+        class Item {
+            constructor(scene, position, type = 'health') {
+                this.scene = scene;
+                this.type = type;
+                this.mesh = this.createMesh();
+                this.mesh.position.copy(position);
+                this.mesh.position.y = 0.5;
+                this.scene.add(this.mesh);
+                this.active = true;
+            }
+
+            createMesh() {
+                const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 0.5 });
+                const mesh = new THREE.Mesh(geo, mat);
+
+                // Floating animation
+                this.time = Math.random() * 100;
+                this.baseY = 0.5;
+
+                return mesh;
+            }
+
+            update(dt) {
+                this.time += dt * 2;
+                this.mesh.position.y = this.baseY + Math.sin(this.time) * 0.2;
+                this.mesh.rotation.y += dt;
+            }
+
+            pickup() {
+                this.active = false;
+                this.scene.remove(this.mesh);
+            }
+        }
+
+        class ItemManager {
+            constructor(scene, player) {
+                this.scene = scene;
+                this.player = player;
+                this.items = [];
+            }
+
+            spawnItem(position) {
+                this.items.push(new Item(this.scene, position));
+            }
+
+            update(dt) {
+                this.items.forEach(item => {
+                    item.update(dt);
+                    if (item.mesh.position.distanceTo(this.player.mesh.position) < 1.5) {
+                        this.player.heal(20);
+                        item.pickup();
+                    }
+                });
+                this.items = this.items.filter(i => i.active);
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.container = document.getElementById('game-container');
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x201005); // Dark orange/brown sky
+                this.scene.fog = new THREE.Fog(0x201005, 20, 60);
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 15, 15);
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.container.appendChild(this.renderer.domElement);
+
+                // Lights
+                const ambient = new THREE.AmbientLight(0xffccaa, 0.6); // Warm ambient
+                this.scene.add(ambient);
+
+                const dirLight = new THREE.DirectionalLight(0xffaa00, 1.5); // Sunset orange
+                dirLight.position.set(-20, 10, -20); // Lower angle
+                dirLight.castShadow = true;
+                dirLight.shadow.camera.left = -50;
+                dirLight.shadow.camera.right = 50;
+                dirLight.shadow.camera.top = 50;
+                dirLight.shadow.camera.bottom = -50;
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                this.scene.add(dirLight);
+
+                // Systems
+                this.input = new Input();
+                this.arena = new Arena(this.scene);
+                this.player = new Player(this.scene, this.camera);
+                this.itemManager = new ItemManager(this.scene, this.player);
+                this.scene.game = this; // Allow access from Enemy
+                this.enemyManager = new EnemyManager(this.scene, this.player);
+                this.player.enemyManager = this.enemyManager;
+
+                this.clock = new THREE.Clock();
+                this.isRunning = false;
+                this.timeLeft = 300; // 5 mins
+                this.gameOver = false;
+
+                // Events
+                window.addEventListener('resize', () => this.onResize());
+                document.getElementById('start-btn').addEventListener('click', () => this.start());
+
+                // Pointer Lock
+                this.renderer.domElement.addEventListener('click', () => {
+                    if (this.isRunning) this.renderer.domElement.requestPointerLock();
+                });
+
+                this.animate();
+            }
+
+            start() {
+                document.getElementById('start-screen').classList.add('hidden');
+                this.isRunning = true;
+            }
+
+            onResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const dt = this.clock.getDelta();
+
+                if (this.isRunning && !this.gameOver) {
+                    this.timeLeft -= dt;
+                    if (this.timeLeft <= 0) {
+                        this.endGame(true);
+                    }
+
+                    this.player.update(dt, this.input);
+                    this.enemyManager.update(dt);
+                    this.itemManager.update(dt);
+                    this.input.resetFrame();
+
+                    // Update UI
+                    const min = Math.floor(this.timeLeft / 60);
+                    const sec = Math.floor(this.timeLeft % 60);
+                    document.getElementById('timer').innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+
+                    const hpPct = (this.player.stats.hp / this.player.stats.maxHp) * 100;
+                    document.getElementById('health-fill').style.width = `${hpPct}%`;
+
+                    const stamPct = (this.player.stats.stamina / this.player.stats.maxStamina) * 100;
+                    document.getElementById('stamina-fill').style.width = `${stamPct}%`;
+
+                    // Update Skill Cooldowns
+                    this.player.skills.forEach((s, i) => {
+                        const el = document.querySelectorAll('.skill-cooldown')[i];
+                        const pct = (s.cooldown / s.maxCooldown) * 100;
+                        // Use a more visible color (white/red overlay)
+                        el.style.background = `conic-gradient(rgba(255, 255, 255, 0.5) ${pct}%, transparent ${pct}%)`;
+                    });
+
+                    // Collision Player vs Enemy
+                    const playerRadius = 1.0;
+                    const enemyRadius = 1.0;
+
+                    this.enemyManager.enemies.forEach(e => {
+                        const dist = this.player.mesh.position.distanceTo(e.mesh.position);
+                        if (dist < playerRadius + enemyRadius) {
+                            const dir = this.player.mesh.position.clone().sub(e.mesh.position).normalize();
+                            if (dir.length() === 0) dir.set(1, 0, 0); // Prevent zero vector
+                            const push = dir.multiplyScalar((playerRadius + enemyRadius - dist) / 2);
+                            this.player.mesh.position.add(push);
+                            e.mesh.position.sub(push);
+                        }
+                    });
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            endGame(win) {
+                this.gameOver = true;
+                document.exitPointerLock();
+                const screen = document.getElementById('game-over-screen');
+                screen.classList.remove('hidden');
+                document.getElementById('go-title').innerText = win ? "Victory!" : "Defeated";
+                document.getElementById('restart-btn').classList.remove('hidden');
+                document.getElementById('restart-btn').onclick = () => location.reload();
+            }
+        }
+
+        window.onload = () => {
+            new Game();
+        };
+    </script>
+</body>
+
+</html>
