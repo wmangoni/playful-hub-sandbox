@@ -54,3 +54,140 @@
 *   **Prioridade**: Média (Muito atrativo visualmente, mas focado no nicho de jogos rítmicos).
 *   **Esforço Estimado**: Alta (Requer sincronização estrita de milissegundos na reprodução de áudio e renderização no canvas).
 *   **Área**: Front-end / Web Audio API / Sincronia de Renderização.
+
+---
+
+## ⚙️ Refinamento Técnico
+
+Para implementar os requisitos descritos pelo PO no jogo **String Catcher**, utilizaremos uma arquitetura robusta voltada para jogos rítmicos na web e visualizações reativas. Abaixo estão as especificações detalhadas e o plano de implementação.
+
+### 1. Sistema de Importação Customizada e Engine Sincronizada com Áudio
+
+Atualmente, o jogo gera notas de forma randômica por timers. Para suportar faixas customizadas de maneira precisa e profissional, mudaremos a engine para um modelo **Time-Driven** baseado no `currentTime` do elemento HTML5 Audio.
+
+#### A. Componentes de Interface de Upload e Template
+*   **Modificações na Tela Inicial (`addStartGameButton`)**:
+    *   Adicionar um botão elegante `Carregar Música Customizada` ao lado do botão "Começar Jogo". Ele deve usar o mesmo estilo neon verde mas em tons ciano/azul para destaque.
+    *   Ao clicar, exibir um formulário modal limpo contendo:
+        1.  Área de Drag & Drop ou Input estilizado para arquivo de áudio (`.mp3` ou `.ogg`).
+        2.  Input estilizado para arquivo de mapeamento JSON (`.json`).
+        3.  Link de download para o arquivo `template.json`.
+*   **Geração Dinâmica do Template**:
+    *   Fornecer um link de download com formato URI de dados (`data:text/json;charset=utf-8`) contendo o template base:
+        ```json
+        {
+          "songName": "Minha Musica Customizada",
+          "notes": [
+            { "time": 2.0, "lane": 0, "type": "normal" },
+            { "time": 3.5, "lane": 1, "type": "hold", "duration": 1.5 },
+            { "time": 5.0, "lane": 2, "type": "obstacle" }
+          ]
+        }
+        ```
+
+#### B. Sincronização Precisa de Notas (Time-Driven Spawning)
+Para evitar dessincronização por lag de frame (FPS instável), o posicionamento e spawn das notas devem ser baseados no `currentTime` da música ativa.
+*   **Fórmulas Físicas de Posicionamento**:
+    *   Definiremos um tempo de visibilidade antecipada ($T_{view} = 2.0$ segundos). As notas aparecem no lado esquerdo ($x = 0$) exatamente $2.0$ segundos antes de chegarem à zona de captura ($X_{capture} = \text{canvas.width} \times 0.8$).
+    *   No frame $t_{current} = \text{backgroundMusic.currentTime}$, a posição de uma nota que deve ser acertada no tempo $t_{note}$ é:
+        $$x = X_{capture} \times \left(1 - \frac{t_{note} - t_{current}}{T_{view}}\right)$$
+    *   Se $t_{current} \ge t_{note} + 0.15$ segundos (tolerância de atraso) e a nota não foi capturada, ela é marcada como inativa e dispara o evento `notePassed`.
+    *   Esse cálculo garante sincronia absoluta independente de variações na taxa de frames.
+
+---
+
+### 2. Novas Mecânicas e Renderização de Notas
+
+Modificaremos o loop de notas e a detecção de colisões para suportar os novos tipos:
+
+#### A. Nota Sustentada (Hold Note - Amarela)
+*   **Visual**:
+    *   A cabeça é um círculo amarelo com brilho neon ciano/dourado.
+    *   A cauda é um retângulo semi-transparente amarelo desenhado ao longo do fio da corda, ligando a cabeça ao fim da nota ($t_{note} + \text{duration}$).
+    *   O comprimento visual da cauda é calculado por:
+        $$\text{length} = X_{capture} \times \frac{\text{duration}}{T_{view}}$$
+*   **Mecânica de Captura**:
+    *   O jogador deve clicar na cabeça quando ela entra na zona de captura e manter o mouse pressionado.
+    *   Monitoraremos os eventos `mousedown`, `mousemove` e `mouseup` no Canvas.
+    *   Se o mouse estiver pressionado dentro da zona da corda durante a passagem da cauda, o jogador ganha pontuação contínua (+5 pontos por frame de sustentação) e mantém o combo.
+    *   Se soltar ou sair da corda antes do fim, a cauda fica cinza, quebra o combo e gera o feedback visual "BREAK!".
+
+#### B. Nota Mina (Obstáculo - Vermelha Piscante)
+*   **Visual**:
+    *   Círculo vermelho piscando dinamicamente. A opacidade e o raio do brilho piscam com base em `Math.sin(Date.now() * 0.02)`.
+*   **Mecânica**:
+    *   O jogador deve ativamente evitação e **NÃO** clicar.
+    *   Se o jogador clicar nela, a função `checkNoteCapture` a detectará, executará o som `obstacleHitSound`, deduzirá **150 pontos** do score (garantindo que o score não fique negativo), zerará o combo, mas não reduzirá vidas (pois é uma mina e não uma nota perdida).
+
+---
+
+### 3. Integração com Web Audio API para Efeitos Reativos
+
+Criaremos um analisador de frequências em tempo real para transformar o jogo em um visualizador reativo dinâmico de altíssimo nível.
+
+#### A. Inicialização Segura da Web Audio API
+Como os navegadores bloqueiam contextos de áudio sem interação prévia do usuário, inicializaremos os nós no clique de início do jogo:
+```javascript
+let audioCtx = null;
+let analyser = null;
+let sourceNode = null;
+let dataArray = null;
+
+function initAudioAnalysis(audioElement) {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    
+    sourceNode = audioCtx.createMediaElementSource(audioElement);
+    sourceNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+}
+```
+
+#### B. Algoritmo de Extração de Frequências (Animação)
+A cada frame no loop `animate()`, executaremos:
+```javascript
+if (analyser) {
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Graves (Beats primários - batida de bumbo e baixo)
+    const bassAvg = calculateAverage(dataArray, 0, 10) / 255; 
+    // Agudos (Hi-hats, vocais, pratos)
+    const trebleAvg = calculateAverage(dataArray, 80, 120) / 255;
+    
+    applyAudioReactivity(bassAvg, trebleAvg);
+}
+```
+
+#### C. Efeitos Visuais Reativos Aplicados
+1.  **Fundo Dinâmico (Beat Pulse)**:
+    *   O fundo será limpo com uma cor interpolada suavemente de acordo com a batida dos graves:
+        ```javascript
+        const baseColor = params.backgroundColor; // ex: #111111
+        // Pulsação suave em direção a um roxo escuro no grave
+        ctx.fillStyle = blendColors(baseColor, '#1d0c24', bassAvg * 0.4);
+        ```
+2.  **Corda Vibrante e Neon Glow Reativo**:
+    *   Adicionar `bassAvg * params.vibrationAmplitude * 0.15` à vibração natural de todas as cordas no frame.
+    *   O brilho neon (`ctx.shadowBlur` e `ctx.shadowColor`) das cordas e da zona de captura aumentará com a intensidade dos graves:
+        ```javascript
+        ctx.shadowBlur = 10 + bassAvg * 25;
+        ```
+3.  **Partículas de Agudos (Treble Sparkles)**:
+    *   Implementar um emissor de pequenas partículas de poeira estelar (sparkles) que piscam e sobem na tela aceleradas pelo ritmo dos agudos (`trebleAvg`).
+
+---
+
+### 4. Plano de Alterações nos Arquivos
+
+*   **[`visual_effects/index.html`](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/visual_effects/index.html)**:
+    *   Adicionar UI do modal de upload, botão customizado no menu inicial e botão de baixar template.
+    *   Integrar os manipuladores de arquivos via `FileReader`.
+    *   Refatorar a engine principal para processar tanto o áudio default (com geração procedural de notas e obstáculos) quanto o áudio customizado (usando a fila baseada em tempo de áudio).
+    *   Criar classes/estruturas de dados para gerenciar a cabeça e a cauda da `HoldNote` e a lógica de persistência do clique.
+    *   Adicionar a inicialização do `AudioContext`, o mapeamento do analisador e os filtros de frequência para modular a renderização do Canvas.
+
+Com este refinamento técnico, a tarefa está pronta para desenvolvimento com sincronia estrita de áudio, alta fidelidade reativa e mecânicas completas para os minijogos rítmicos.

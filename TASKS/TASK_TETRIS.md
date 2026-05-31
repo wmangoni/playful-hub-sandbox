@@ -53,3 +53,211 @@
 *   **Prioridade**: Alta (A Peça Fantasma é padrão de acessibilidade em jogos modernos de Tetris).
 *   **Esforço Estimado**: Média (A lógica de colisão para a peça sombra reutiliza o validador de posição existente).
 *   **Área**: Front-end / Canvas 2D / Lógica de Áudio.
+
+---
+
+## 🛠️ Refinamento Técnico (Technical Refinement)
+
+Abaixo estão detalhados os passos, a modelagem e os trechos de código estruturados necessários para implementar cada um dos requisitos da história de usuário, garantindo compatibilidade com o loop de jogo existente e uma excelente experiência de usuário (premium aesthetics).
+
+### 1. Peça Fantasma (Ghost Piece)
+*   **Mecânica de Detecção**:
+    Para encontrar a projeção vertical onde a peça atual irá aterrissar:
+    1. Criar uma função dedicada `getGhostPositionY()` que clona a posição da peça atual.
+    2. Incrementar recursivamente `ghostY` enquanto `checkCollision()` não retornar verdadeiro para essa posição temporária.
+    3. Retornar `ghostY - 1`.
+    
+    ```javascript
+    function getGhostPositionY() {
+        if (!piece) return 0;
+        
+        // Criar um clone temporário da peça para simular a queda
+        const tempPiece = {
+            pos: { x: piece.pos.x, y: piece.pos.y },
+            shape: piece.shape,
+            type: piece.type
+        };
+        
+        // Simular descida
+        while (!checkGhostCollision(tempPiece)) {
+            tempPiece.pos.y++;
+        }
+        return tempPiece.pos.y - 1;
+    }
+
+    function checkGhostCollision(tempPiece) {
+        for (let y = 0; y < tempPiece.shape.length; y++) {
+            for (let x = 0; x < tempPiece.shape[y].length; x++) {
+                if (tempPiece.shape[y][x] !== 0) {
+                    const boardX = x + tempPiece.pos.x;
+                    const boardY = y + tempPiece.pos.y;
+                    
+                    if (
+                        boardX < 0 || 
+                        boardX >= COLS || 
+                        boardY >= ROWS ||
+                        (boardY >= 0 && board[boardY][boardX] !== 0)
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    ```
+
+*   **Estilização Visual**:
+    *   Para manter o visual premium neon, em vez de um bloco cinza genérico, a sombra será desenhada como um contorno tracejado ou bloco semitransparente usando a própria cor da peça ativa com 20% de opacidade (`rgba(...)`).
+    *   No loop de desenho (`draw`), renderizar a sombra **antes** de renderizar a peça real ativa, para que a peça real sobreponha a sombra caso estejam na mesma linha.
+    
+    ```javascript
+    function drawGhostPiece() {
+        if (!piece) return;
+        const ghostY = getGhostPositionY();
+        
+        piece.shape.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    // Cor com baixa opacidade (20% alpha)
+                    ctx.fillStyle = COLORS[piece.type] + "33"; // Hex com alpha 0x33 ~ 20%
+                    ctx.fillRect(x + piece.pos.x, y + ghostY, 1, 1);
+                    
+                    // Contorno tracejado ou sutil
+                    ctx.strokeStyle = COLORS[piece.type] + "88"; // Hex com alpha 0x88 ~ 50%
+                    ctx.lineWidth = 0.05;
+                    ctx.strokeRect(x + piece.pos.x, y + ghostY, 1, 1);
+                }
+            });
+        });
+    }
+    ```
+
+### 2. Modo Contra o Tempo (Time Attack)
+*   **Alterações de UI / HTML**:
+    *   Criar uma seção no painel lateral com controle para selecionar o modo de jogo antes de iniciar:
+        ```html
+        <div class="mode-selection" style="background-color: #2d2d2d; border-radius: 5px; padding: 10px;">
+            <h2>MODO DE JOGO</h2>
+            <select id="gameModeSelect" style="width: 100%; padding: 8px; background: #1e1e1e; color: white; border: 1px solid #444; border-radius: 5px; font-family: inherit;">
+                <option value="endless">Infinito Clássico</option>
+                <option value="timeattack">Contra o Tempo (2 min)</option>
+            </select>
+        </div>
+        
+        <div id="timerBox" class="lines-box" style="display: none; background-color: #e53935;">
+            <h2>TEMPO RESTANTE</h2>
+            <div id="timer" class="value">120s</div>
+        </div>
+        ```
+    *   Aplicar o estilo visual correspondente nas caixas no CSS para que as fontes sigam a identidade premium da plataforma.
+
+*   **Variáveis e Lógica do Cronômetro**:
+    *   Adicionar variáveis globais: `gameMode = 'endless'`, `timeLeft = 120`, e `timerInterval = null`.
+    *   No `startGame()`, ler o valor do `gameModeSelect`. Se for `timeattack`:
+        1. Definir `timeLeft = 120` e exibir a caixa `#timerBox`.
+        2. Inicializar o `timerInterval` decrementando `timeLeft` a cada 1 segundo.
+        3. Atualizar o elemento `#timer` com `timeLeft` formatado (`MM:SS` ou `120s`).
+        4. Se `timeLeft <= 0`, parar o jogo, limpar o intervalo e disparar o Game Over.
+    *   No `togglePause()`, certificar-se de pausar/despausar também o `timerInterval`.
+    *   No `showGameOver()`, se o modo for Time Attack e o tempo acabou, definir uma mensagem amigável: `GAME OVER: TEMPO ESGOTADO!`.
+
+### 3. Efeitos Sonoros Retro (Web Audio API)
+*   **Classe SoundSynth (Módulo de Áudio Autónomo)**:
+    Implementar uma classe nativa em JavaScript puro para evitar carregamento de arquivos pesados, utilizando osciladores do navegador para gerar as ondas senoidal, dente de serra e triangular, com controle fino de ganho (envelope ADSR básico) para evitar cliques de áudio.
+
+    ```javascript
+    const SoundSynth = {
+        ctx: null,
+        
+        init() {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        },
+        
+        playRotate() {
+            try {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sine'; // Onda senoidal para um som mais suave
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                // Rampa rápida de frequência ascendente
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.08);
+                
+                gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            } catch (e) {
+                console.error("Falha ao tocar áudio de rotação:", e);
+            }
+        },
+        
+        playDrop() {
+            try {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sawtooth'; // Onda dente de serra para som seco/impactante
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                // Rampa descendente de frequência
+                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.12);
+                
+                gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            } catch (e) {
+                console.error("Falha ao tocar áudio de encaixe:", e);
+            }
+        },
+        
+        playLine() {
+            try {
+                this.init();
+                const now = this.ctx.currentTime;
+                const notes = [261.63, 329.63, 392.00, 523.25]; // Acorde C Maior Arpejado (C4, E4, G4, C5)
+                
+                notes.forEach((freq, index) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'triangle'; // Som de flauta retrô 8-bit nostálgico
+                    osc.frequency.setValueAtTime(freq, now + index * 0.08);
+                    
+                    gain.gain.setValueAtTime(0.08, now + index * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.12);
+                    
+                    osc.start(now + index * 0.08);
+                    osc.stop(now + index * 0.08 + 0.12);
+                });
+            } catch (e) {
+                console.error("Falha ao tocar áudio de linhas:", e);
+            }
+        }
+    };
+    ```
+
+*   **Pontos de Injeção no Código**:
+    *   No `rotatePiece()` e no `keydown` (quando rotaciona via Espaço ou Seta Cima): Chamar `SoundSynth.playRotate()`.
+    *   No `mergePiece()` (assim que a peça colide e se consolida no board): Chamar `SoundSynth.playDrop()`.
+    *   No `clearLines()` (dentro da checagem de linhas, logo após `linesCleared > 0`): Chamar `SoundSynth.playLine()`.
+
