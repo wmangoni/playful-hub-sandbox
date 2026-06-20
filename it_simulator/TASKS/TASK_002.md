@@ -629,3 +629,102 @@ Apresentaremos a equipe em uma seção de gerenciamento rica e fluida. Cada func
 
 A inclusão deste refinamento de alta precisão técnica deixará a tarefa perfeitamente clara e desenhada, garantindo que qualquer desenvolvedor possa implementá-la com o máximo de fidelidade e perfeição visual.
 
+---
+
+## ❓ Dúvidas para o TL ou o PO
+
+Durante a análise técnica aprofundada da base de código legada em [index.html](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/it_simulator/index.html) e dos requisitos de arquitetura especificados na tarefa, identifiquei alguns pontos críticos de consistência de dados e engenharia de software que requerem o alinhamento e decisão do Tech Lead ou Product Owner antes de prosseguirmos com a codificação.
+
+### 1. Retrocompatibilidade e Modificação Direta de `this.employees`
+No código original de [index.html](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/it_simulator/index.html), a variável `this.employees` sofre atribuições diretas de incremento e decremento em pontos críticos da simulação (como `this.employees += 1` ao contratar, ou `this.employees -= 1` em eventos aleatórios de demissão). 
+Ao converter `this.employees` em um **getter procedural** (para manter a consistência com o novo array `this.developers`), qualquer tentativa de reatribuir ou decrementar essa variável diretamente falhará silenciosamente (ou gerará um erro de execução em strict mode).
+*   **Pergunta**: Devemos implementar também um **setter** para `this.employees` ou refatorar todas as ocorrências de alteração direta no código?
+*   **Proposta do Desenvolvedor**: O mais elegante e robusto é implementar um `setter` para interceptar reatribuições e gerenciar o array de forma inteligente:
+    *   **Se decrementado (`this.employees--` ou `employees = valor_menor`)**: Removemos automaticamente o desenvolvedor com maior nível de estresse da equipe (representando um pedido de demissão voluntária por esgotamento) ou o último contratado.
+    *   **Se incrementado (`this.employees++` ou `employees = valor_maior`)**: Instanciamos um novo desenvolvedor permanente com dados aleatórios procedurais e adicionamos ao array.
+    *   Desta forma, garantimos retrocompatibilidade com qualquer modificação futura ou legado sem quebrar a reatividade.
+
+### 2. Persistência de Dados (Save/Load com `localStorage`)
+O jogo possui mecanismos de save e load do estado da empresa através do `localStorage` (linhas 1726-1727 e 1810-1811). A serialização atual salva e restaura dados primitivos. Com a introdução do array complexo `this.developers` de instâncias da classe `Developer`, precisamos garantir que o carregamento reconstrói os objetos corretamente e não perca os dados de estresse, burnout ou status de freelancers.
+*   **Pergunta**: O escopo desta tarefa deve abranger a refatoração do Save/Load para serializar/desserializar o array `this.developers` reconstruindo as instâncias da classe `Developer`?
+*   **Proposta do Desenvolvedor**: Sim, devemos atualizar a serialização para incluir o array de desenvolvedores e, no carregamento, mapear o JSON cru de volta para instâncias da classe `Developer` para preservar os métodos e propriedades em runtime.
+
+### 3. Aplicação do Estresse Adicional na Ação "Develop Product"
+A especificação dita que a ação "Develop Product" aplica **20% de estresse adicional** nos desenvolvedores ativos.
+*   **Pergunta**: Esse estresse adicional deve ser aplicado apenas à equipe fixa permanente, ou também aos freelancers temporários que estiverem ativos? E os profissionais que já estão de folga (`onDayOff = true`) ou em Burnout devem ser poupados desse acréscimo?
+*   **Proposta do Desenvolvedor**: Aplicar a penalidade a todos os desenvolvedores cujo status atual seja de trabalho ativo (ou seja, que não estejam em Burnout nem de Day Off), incluindo freelancers, pois todos sofrem com o crunch time de entrega do produto.
+
+### 4. Bloqueio e Escopo do Modal de Crises (Production Outages)
+Os eventos aleatórios com modais pop-up adicionam excelente dinamismo à jogabilidade.
+*   **Pergunta**: O modal de crise deve ser **bloqueante (modal síncrono)**, impedindo que o jogador continue clicando em outras ações ou avance o tempo até que tome uma decisão?
+*   **Proposta do Desenvolvedor**: Sim, o modal deve cobrir a tela e bloquear interações de fundo com uma overlay escura glassmorphic para forçar a resolução do incidente, simulando com fidelidade o pânico de uma queda em produção de verdade.
+
+---
+
+## 💬 Decisão e Direcionamento do Tech Lead (TL)
+
+Como **Tech Lead** do projeto, analisei os desafios de engenharia e as dúvidas apresentadas pela equipe de desenvolvimento para a implementação do Sistema de Estresse, Burnout, Crises e Freelancers. Abaixo estão as diretrizes arquiteturais oficiais para a execução segura da tarefa:
+
+### 1. Retrocompatibilidade com `this.employees` ✅ APROVADO
+*   **Decisão**: **Implementar o `setter` de `this.employees`**, exatamente como proposto pela engenharia.
+*   **Diretriz Técnica**:
+    *   Ao interceptar um decremento (`this.employees--`), remova do array `this.developers` o desenvolvedor permanente com maior estresse (pedindo demissão) ou o último adicionado.
+    *   Ao interceptar um incremento (`this.employees++`), adicione um novo desenvolvedor permanente procedimental com nome/avatar randômico.
+    *   Isso protege a integridade do estado legado e facilita a manutenção do código sem acoplamento de arquivos externos.
+
+### 2. Persistência de Dados (Save/Load com `localStorage`) ✅ APROVADO
+*   **Decisão**: **Sim, o escopo deve abranger a atualização completa de serialização e desserialização**.
+*   **Diretriz Técnica**:
+    *   No método que salva o jogo no `localStorage`, garanta a serialização de `this.developers`, preservando as propriedades (`stress`, `isBurnedOut`, `burnoutCooldown`, `type`, `daysRemaining`, etc.).
+    *   No carregamento (`load`), o JSON bruto deve ser mapeado de volta para instâncias completas da classe `Developer`. Não aceitaremos objetos crus sem protótipo, pois isso inviabiliza o uso de métodos em runtime e gera riscos de regressão e bugs de tipagem implícita.
+
+### 3. Stress Crunch em "Develop Product" ✅ APROVADO
+*   **Decisão**: **A penalidade de +20% de estresse deve ser aplicada a todos os profissionais que de fato estiverem codando no produto nesta rodada**.
+*   **Diretriz Técnica**:
+    *   Aplica-se a desenvolvedores permanentes e freelancers ativos.
+    *   **Exclusão**: Desenvolvedores em **Burnout** ou que foram enviados para **Day Off** no início da rodada **não** sofrem esse incremento, pois não estão trabalhando.
+
+### 4. Bloqueio e Escopo do Modal de Crises (Production Outages) ✅ APROVADO
+*   **Decisão**: **O modal de crises deve ser estritamente bloqueante (modal síncrono)**.
+*   **Diretriz Técnica**:
+    *   A overlay escura com desfoque de fundo (glassmorphic blur) deve impedir cliques e eventos em qualquer outra aba da interface (Develop, Hire, Upgrade, etc.) até que a decisão seja processada.
+    *   Isso é vital do ponto de vista de sincronização do estado e jogabilidade: uma crise em produção consome toda a atenção operacional da startup.
+
+---
+
+**Com estas respostas, a tarefa é direcionada para execução. Status alterado para `In Progress` no backlog central.**
+
+*Assinado: Tech Lead do Playful Hub*
+
+---
+
+## 🧪 Observação QA
+
+**Data**: 31/05/2026  
+**Analista de QA**: Antigravity (QA)  
+
+### 📋 Status da Validação
+*   **Testável**: ❌ Não
+*   **Motivo**: A funcionalidade (Sistema de Estresse/Burnout, Crises Satíricas em Produção e Contratação de Freelancers) ainda está no status **`In Progress`** no backlog global e **não foi implementada** no código-fonte do jogo (`it_simulator/index.html`).
+*   **Ação**: A tarefa deve ser concluída pelo desenvolvedor, passar por Code Review pelo Tech Lead, ser aprovada e movida para `Ready for QA` antes que os testes em navegador possam ser efetuados e suas evidências registradas.
+
+### 🎯 Plano de Testes Futuro (Critérios a validar)
+Quando a tarefa estiver pronta para QA, as seguintes validações deverão ser realizadas no navegador:
+1.  **Gerenciamento de Estresse & Burnout**:
+    *   Verificar se a aba "Engineering Team Management" exibe corretamente a lista de desenvolvedores com seus avatares, nomes, status reativos e barras de estresse coloridas dinamicamente (verde, amarelo, vermelho).
+    *   Testar se a ação "Develop Product" adiciona corretamente a penalidade de +20% de estresse para desenvolvedores em atividade de código.
+    *   Validar o acionamento do estado de Burnout quando o estresse de um desenvolvedor atinge 100%, reduzindo a produtividade geral, desativando os controles individuais e iniciando a contagem regressiva de recuperação (burnoutCooldown).
+    *   Confirmar se a ação de enviar um desenvolvedor para "Day Off" zera seu estresse e o remove temporariamente do fluxo de trabalho sem aplicar a penalidade de estresse do desenvolvimento do produto.
+2.  **Melhorias do Escritório (Coffee Machine & Foosball)**:
+    *   Verificar se a compra da "Cafeteira Premium" e "Mesa de Pebolim" reduz o saldo da empresa ($5,000 e $8,000 respectivamente) e se o bônus passivo de redução de estresse por turno é aplicado corretamente no estado global.
+    *   Garantir o bloqueio reativo dos botões de compra após a aquisição ativa.
+3.  **Contratação de Freelancers**:
+    *   Verificar se a contratação de freelancers ($4,000) adiciona um novo desenvolvedor temporário ao array global por 3 turnos e se ele é removido e limpo automaticamente da memória e do DOM ao término do contrato.
+4.  **Sistema de Crises de Quedas de Produção (Production Outages)**:
+    *   Simular o disparo de eventos aleatórios de crises (10% de chance a cada avanço) e validar se a overlay glassmorphic bloqueia completamente a interação de fundo com as outras abas.
+    *   Testar as consequências de cada opção nas estatísticas do jogo (Reputação, Dinheiro e Estresse dos desenvolvedores), fechando o modal e atualizando a tela reativamente ao selecionar uma opção.
+5.  **Retrocompatibilidade e Persistência**:
+    *   Garantir a integridade da propriedade legacy `this.employees` através de seu setter procedural ao incrementar ou decrementar a equipe.
+    *   Validar a persistência completa do array complexo `this.developers` de objetos instanciados da classe `Developer` ao salvar e carregar via `localStorage`.
+
+

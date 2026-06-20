@@ -1225,6 +1225,44 @@
         }
 
         function startNewHand() {
+            // Remover bots/oponentes falidos (chips <= 0)
+            const initialPlayers = [...gameState.players];
+            const bankruptOpponents = initialPlayers.filter(p => !p.isHuman && p.chips <= 0);
+            const humanPlayer = initialPlayers.find(p => p.isHuman);
+            
+            // Se o jogador humano faliu
+            if (humanPlayer && humanPlayer.chips <= 0) {
+                showGameMessage('Você faliu! Fim de jogo.', 0);
+                setTimeout(() => {
+                    alert('Você faliu! Fim de jogo.');
+                    resetToMainMenu();
+                }, 3000);
+                return;
+            }
+            
+            // Filtrar jogadores mantendo o humano e oponentes com fichas
+            const activeOpponents = initialPlayers.filter(p => !p.isHuman && p.chips > 0);
+            
+            // Se todos os oponentes faliram
+            if (activeOpponents.length === 0) {
+                showGameMessage('Você venceu o jogo! Todos os oponentes faliram.', 0);
+                setTimeout(() => {
+                    alert('Parabéns! Você venceu o jogo! Todos os oponentes faliram.');
+                    resetToMainMenu();
+                }, 3000);
+                return;
+            }
+            
+            // Atualizar o array de players no estado do jogo
+            gameState.players = [humanPlayer, ...activeOpponents];
+            
+            // Mostrar mensagem se algum oponente faliu nesta rodada
+            let msg = 'Nova mão iniciada!';
+            if (bankruptOpponents.length > 0) {
+                const names = bankruptOpponents.map(b => b.name).join(', ');
+                msg = `${names} faliu e saiu do jogo! ` + msg;
+            }
+            
             // Incrementar o contador de rodadas
             gameState.round = (gameState.round || 0) + 1;
             
@@ -1250,7 +1288,7 @@
             // Deal cards
             dealCards();
             
-            showGameMessage('Nova mão iniciada!', 3000);
+            showGameMessage(msg, 3000);
             
             if (gameState.players[gameState.currentPlayerIndex].isAI) {
                 setTimeout(playAITurn, 1500);
@@ -1898,6 +1936,17 @@
             });
             
             gameState.socket = ws;
+        }
+
+        function resetToMainMenu() {
+            modeSelect.style.display = 'flex';
+            gameState.players = [];
+            gameState.communityCards = [];
+            gameState.pot = 0;
+            gameState.currentBet = 0;
+            gameState.phase = 'waiting';
+            updateUI();
+            init();
         }
 
         // Inicializar a página

@@ -2,7 +2,7 @@
 
 Bem-vindo ao Backlog do **Playful Hub**, mantido pelo Product Owner do projeto. Aqui estão listadas as tarefas planejadas, em andamento e concluídas para aprimorar, refatorar ou expandir o catálogo de minijogos e a plataforma principal.
 
-Cada tarefa possui uma especificação completa e detalhada de requisitos, critérios de aceitação e diretrizes técnicas na pasta `TASKS/` no formato `TASK_<codigo>.md`.
+Cada tarefa possui uma especificação completa e detalhada de requisitos, critérios de aceitação e diretrizes técnicas na pasta `TASKS/` de seu respectivo jogo, no formato `TASK_002.md`.
 
 ---
 
@@ -10,28 +10,35 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 
 | Código da Task | Jogo / Módulo | Título da Task | Status | Prioridade | Link da Especificação |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `TASK-3D_SHOOTER` | 3D Shooter | Melhoria Visual e Sistema de Partículas Dinâmicas | ✅ Refined | Alta | [TASK_3D_SHOOTER.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_3D_SHOOTER.md) |
-| `TASK-DED` | RPG Adventure Quest | Sistema de Inventário Visual e Combates Baseados em Atributos (Rolagem D20) | ✅ Refined | Muito Alta | [TASK_DED.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_DED.md) |
-| `TASK-SPACE_SHOOTER` | Space Shooter | Sistema de Power-Ups, Naves Desbloqueáveis e Placar de Recordes Local | ✅ Refined | Alta | [TASK_SPACE_SHOOTER.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_SPACE_SHOOTER.md) |
-| `TASK-STRATEGY_GAME` | Strategy Empire | Sistema de Névoa de Guerra (Fog of War) e Diplomacia Básica com IA | ✅ Refined | Alta | [TASK_STRATEGY_GAME.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_STRATEGY_GAME.md) |
-| `TASK-IT_SIMULATOR` | Company Simulator | Sistema de Estresse/Burnout, Crises Satíricas em Produção e Contratação de Freelancers | ✅ Refined | Muito Alta | [TASK_IT_SIMULATOR.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_IT_SIMULATOR.md) |
-| `TASK-ARCHER` | The Archer | Vento Lateral Dinâmico, Balões Especiais e Multiplicador de Combo | ✅ Refined | Média-Alta | [TASK_ARCHER.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_ARCHER.md) |
-| `TASK-TETRIS` | Tetris | Peça Fantasma (Ghost Piece), Modo Contra o Tempo (Time Attack) e Áudio Retro Sintético | ✅ Refined | Alta | [TASK_TETRIS.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_TETRIS.md) |
-| `TASK-POKER` | Poker Texas Hold'em | Personalidades de IA, Sistema de Blefe e Assistente de Probabilidade (Hand Tracker) | ✅ Refined | Alta | [TASK_POKER.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_POKER.md) |
-| `TASK-VISUAL_EFFECTS` | String Catcher | Upload de Músicas Customizadas, Novas Notas Rítmicas e Efeitos Reativos de Áudio | ✅ Refined | Média | [TASK_VISUAL_EFFECTS.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_VISUAL_EFFECTS.md) |
-| `TASK-SNAKE` | Snake Game | Modo Labirinto (Grid Obstacles), Frutas Especiais Temporárias e Speed Boost | ✅ Refined | Alta | [TASK_SNAKE.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_SNAKE.md) |
-| `TASK-LAZY_GARDENER` | Lazy Gardener | Clima Dinâmico, Pragas de Insetos e Ajudantes Ociosos Automáticos | ✅ Refined | Muito Alta | [TASK_LAZY_GARDENER.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_LAZY_GARDENER.md) |
-| `TASK-GAMEOFLIFE` | Conway's Game of Life | Biblioteca de Padrões Clássicos, Gradiente por Idade Celular e Customização de Regras | ✅ Refined | Média | [TASK_GAMEOFLIFE.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_GAMEOFLIFE.md) |
-| `TASK-RUBIKS_CUBE` | Rubik's Cube | Resolvedor Automático de Cubo Mágico, Cronômetro Oficial Speedcubing e Estatísticas (Ao5 / Ao12) | ✅ Refined | Muito Alta | [TASK_RUBIKS_CUBE.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_RUBIKS_CUBE.md) |
-| `TASK-DRIVING_SIMULATOR` | Driving Simulator | Tráfego de Veículos com IA, Ciclo Dia/Noite e Hangar de Modelos de Carros | 📋 Backlog | Alta | [TASK_DRIVING_SIMULATOR.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_DRIVING_SIMULATOR.md) |
-| `TASK-TABULEIRO_GALTON` | Galton Board | Curva Teórica Gaussiana, Distribuições Alternativas e Controles de Física | 📋 Backlog | Média-Alta | [TASK_TABULEIRO_GALTON.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_TABULEIRO_GALTON.md) |
-| `TASK-CHESS` | Chess | Motor de Análise (Stockfish.js), Importador/Exportador PGN e Temas de Tabuleiro | ✅ Refined | Alta | [TASK_CHESS.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_CHESS.md) |
-| `TASK-VOXEL_CITY` | Voxel City | Lógica RCI (Demanda), Simulação de Impostos e Desastres em Voxel | 📋 Backlog | Muito Alta | [TASK_VOXEL_CITY.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_VOXEL_CITY.md) |
-| `TASK-REDE_NEURAL_EVOLUTIVA` | Rede Neural Evolutiva | Visualizador de Topologia do Cérebro, Exportação de Genoma JSON e Gráficos Analíticos | 📋 Backlog | Alta | [TASK_REDE_NEURAL_EVOLUTIVA.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_REDE_NEURAL_EVOLUTIVA.md) |
-| `TASK-THREEJS_EARTH` | Three.js Earth | Satélites e Órbitas Dinâmicas, Geolocalização 3D e Atmosfera Volumétrica Glow | 📋 Backlog | Média-Alta | [TASK_THREEJS_EARTH.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/TASKS/TASK_THREEJS_EARTH.md) |
-
-
-
+| `TASK_002.md` | 3D Shooter | Melhoria Visual e Sistema de Partículas Dinâmicas | 🎉 Ready for deploy | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/3d_shooter/TASKS/TASK_002.md) |
+| `TASK_002.md` | RPG Adventure Quest | Sistema de Inventário Visual e Combates Baseados em Atributos (Rolagem D20) | 🎉 Ready for deploy | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_002.md) |
+| `TASK_002.md` | Space Shooter | Sistema de Power-Ups, Naves Desbloqueáveis e Placar de Recordes Local | In Progress | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_002.md) |
+| `TASK_002.md` | Strategy Empire | Sistema de Névoa de Guerra (Fog of War) e Diplomacia Básica com IA | In Progress | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/strategy_game/TASKS/TASK_002.md) |
+| `TASK_002.md` | Company Simulator | Sistema de Estresse/Burnout, Crises Satíricas em Produção e Contratação de Freelancers | In Progress | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/it_simulator/TASKS/TASK_002.md) |
+| `TASK_002.md` | The Archer | Vento Lateral Dinâmico, Balões Especiais e Multiplicador de Combo | In Progress | Média-Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/archer/TASKS/TASK_002.md) |
+| `TASK_002.md` | Tetris | Peça Fantasma (Ghost Piece), Modo Contra o Tempo (Time Attack) e Áudio Retro Sintético | Dev complete | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tetris/TASKS/TASK_002.md) |
+| `TASK_002.md` | Poker Texas Hold'em | Personalidades de IA, Sistema de Blefe e Assistente de Probabilidade (Hand Tracker) | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/poker/TASKS/TASK_002.md) |
+| `TASK_002.md` | String Catcher | Upload de Músicas Customizadas, Novas Notas Rítmicas e Efeitos Reativos de Áudio | ✅ Refined | Média | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/visual_effects/TASKS/TASK_002.md) |
+| `TASK_002.md` | Snake Game | Modo Labirinto (Grid Obstacles), Frutas Especiais Temporárias e Speed Boost | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/snake/TASKS/TASK_002.md) |
+| `TASK_002.md` | Lazy Gardener | Clima Dinâmico, Pragas de Insetos e Ajudantes Ociosos Automáticos | ✅ Refined | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/lazy_gardner/TASKS/TASK_002.md) |
+| `TASK_002.md` | Conway's Game of Life | Biblioteca de Padrões Clássicos, Gradiente por Idade Celular e Customização de Regras | ✅ Refined | Média | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/gameoflife/TASKS/TASK_002.md) |
+| `TASK_002.md` | Rubik's Cube | Resolvedor Automático de Cubo Mágico, Cronômetro Oficial Speedcubing e Estatísticas (Ao5 / Ao12) | ✅ Refined | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/rubiks_cube/TASKS/TASK_002.md) |
+| `TASK_002.md` | Driving Simulator | Tráfego de Veículos com IA, Ciclo Dia/Noite e Hangar de Modelos de Carros | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_002.md) |
+| `TASK_002.md` | Galton Board | Curva Teórica Gaussiana, Distribuições Alternativas e Controles de Física | ✅ Refined | Média-Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tabuleiro_galton/TASKS/TASK_002.md) |
+| `TASK_002.md` | Chess | Motor de Análise (Stockfish.js), Importador/Exportador PGN e Temas de Tabuleiro | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/chess/TASKS/TASK_002.md) |
+| `TASK_002.md` | Voxel City | Sistema de Perseguição Policial, Upgrade de Carros e Cargas Especiais (Crazy Taxi/GTA Style) | ✅ Refined | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_city/TASKS/TASK_002.md) |
+| `TASK_002.md` | Rede Neural Evolutiva | Visualizador de Topologia do Cérebro, Exportação de Genoma JSON e Gráficos Analíticos | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/rede_neural_evolutiva/TASKS/TASK_002.md) |
+| `TASK_002.md` | Three.js Earth | Satélites e Órbitas Dinâmicas, Geolocalização 3D e Atmosfera Volumétrica Glow | ✅ Refined | Média-Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/threejs-earth-main/TASKS/TASK_002.md) |
+| `TASK_003.md` | Tetris | Progresso e Gravidade Inteligente, Detecção de T-Spin e Modo Desafio "Sobrevivência sob Pressão" | ✅ Refined | Alta | [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tetris/TASKS/TASK_003.md) |
+| `TASK_003.md` | Driving Simulator | Obstáculos Interativos, Pit Stop de Abastecimento/Reparo e Modo Contra o Tempo (Time Trial) com Fantasma de Drift | ✅ Refined | Alta | [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_003.md) |
+| `TASK_003.md` | Snake Game | Portais Dimensionais, Cobra Rival IA e Efeitos Visuais Premium (Neon Trails & Screen Shake) | ✅ Refined | Alta | [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/snake/TASKS/TASK_003.md) |
+| `TASK_003.md` | Space Shooter | Chefe de 3 Fases (Dreadnought Prime), Chuva de Meteoros Fragmentáveis, Formações Inimigas e Efeitos de Juiciness Avançados | ✅ Refined | Alta | [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_003.md) |
+| `TASK_001.md` | Voxel Arena | Melhoria Visual: Dungeon Crawler Épico Sombrio | ✅ Refined | Alta | [TASK_001.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_arena/TASKS/TASK_001.md) |
+| `TASK_002.md` | Voxel Arena | Progressão Roguelite: XP Orbs Magnéticos, Ondas Dinâmicas de Elites/Stalkers e Draft de Upgrades | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_arena/TASKS/TASK_002.md) |
+| `TASK_001.md` | Pinball | Melhoria Visual: Máquina de Pinball Retro Arcade | ✅ Refined | Média | [TASK_001.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/pinball/TASKS/TASK_001.md) |
+| `TASK_001.md` | Puzzle | Melhoria Visual: Quebra-Cabeça Clássico Casual | ✅ Refined | Média | [TASK_001.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/puzzle/TASKS/TASK_001.md) |
+| `TASK_002.md` | Pinball | Sistema de Missões Ciber-Sintéticas, Mecânica de Multibolas (Multiball) e Modos de Gravidade Mutáveis | ✅ Refined | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/pinball/TASKS/TASK_002.md) |
+| `TASK_003.md` | Chess | Relógio de Xadrez Dinâmico, Desafios Táticos (Modo Puzzle) e Efeitos Premium de Juiciness & Áudio Sintetizado | 📋 Backlog | Alta | [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/chess/TASKS/TASK_003.md) |
 
 
 

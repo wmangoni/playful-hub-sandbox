@@ -261,3 +261,60 @@ Abaixo estão detalhados os passos, a modelagem e os trechos de código estrutur
     *   No `mergePiece()` (assim que a peça colide e se consolida no board): Chamar `SoundSynth.playDrop()`.
     *   No `clearLines()` (dentro da checagem de linhas, logo após `linesCleared > 0`): Chamar `SoundSynth.playLine()`.
 
+---
+
+## ❓ Dúvidas para o TL ou o PO
+
+Abaixo estão listadas as dúvidas técnicas e de design identificadas durante a análise inicial da base de código do jogo, seguidas pelas resoluções oficiais do Tech Lead (TL):
+
+1. **Lógica de Hard Drop (Mapeamento de Teclas)**:
+   * *Dúvida*: A especificação da Peça Fantasma menciona "...caso o jogador execute um *Hard Drop*". No entanto, a base de código do Tetris (`index.html`) atualmente não possui suporte para a mecânica de *Hard Drop* (apenas queda acelerada com seta para baixo e rotações). Devemos implementar essa mecânica nesta tarefa? Em caso afirmativo, qual tecla deve ser associada?
+   * *Proposta*: Sim, sugerimos implementar o *Hard Drop* clássico mapeado na barra de **Espaço** (que atualmente compartilha a rotação com a Seta para Cima). Mapeando o *Hard Drop* no **Espaço** e deixando a rotação exclusivamente na **Seta para Cima (`ArrowUp`)**, alinhamos o jogo ao padrão do Tetris clássico/moderno e fornecemos a utilidade máxima para o uso da Peça Fantasma.
+   * *Resolução do Tech Lead (TL)*: **APROVADO**. A proposta faz total sentido técnico e de design de jogo. Um sistema de "Peça Fantasma" é substancialmente subutilizado se o jogador não puder despachar a peça imediatamente para aquela posição (Hard Drop). Portanto, implemente o Hard Drop mapeado na tecla **Espaço** e deixe a rotação exclusivamente na **Seta para Cima (ArrowUp)**. **Importante**: lembre-se de atualizar o arquivo HTML/DOM correspondente (como textos de instruções ou caixas de ajuda na tela) para atualizar as descrições dos controles para o jogador, mantendo a documentação e usabilidade transparentes.
+
+2. **Inicialização do Contexto de Áudio (Web Audio API Autoplay Policy)**:
+   * *Dúvida*: Os navegadores modernos restringem a execução da Web Audio API até que haja uma interação física direta do usuário. Se o `SoundSynth` for disparado automaticamente, gerará avisos e falhas de som.
+   * *Proposta*: Inicializar/Retomar (`init()`) o `SoundSynth` associado aos cliques nos botões "NOVO JOGO" (`#startBtn`) e "JOGAR NOVAMENTE" (`#restartBtn`), bem como na primeira tecla de movimentação pressionada no teclado, garantindo uma ativação de áudio fluida e em total conformidade com as políticas do navegador.
+   * *Resolução do Tech Lead (TL)*: **APROVADO**. É uma prática de segurança e robustez essencial para aplicações web modernas. Certifique-se de que a chamada do `SoundSynth.init()` seja segura (idempotente) e que capture possíveis exceções silenciosamente caso o contexto de áudio não possa ser inicializado, evitando travar a execução lógica principal do jogo por causa de políticas restritivas de navegadores específicos.
+
+3. **Efeito de Fim de Jogo (Game Over)**:
+   * *Dúvida*: Além dos sons de Giro, Encaixe e Linha, há interesse em adicionar um efeito sonoro de derrota?
+   * *Proposta*: Sugerimos criar um pequeno som sintetizado descendente e grave (onda dente de serra) tocado imediatamente ao disparar a tela de Game Over para enriquecer a ambientação de áudio retro.
+   * *Resolução do Tech Lead (TL)*: **APROVADO**. A adição de um efeito sonoro de derrota (Game Over) enriquece consideravelmente o "juice" e o feedback do jogo sem adicionar complexidade técnica excessiva. A lógica proposta de uma rampa descendente com onda dente de serra se alinha perfeitamente ao estilo de áudio clássico pretendido.
+
+---
+
+*Despacho emitido por: Antigravity - Veteran Game Tech Lead (TL)*
+
+---
+
+### 💻 Observações do Programador (Desenvolvimento Concluído)
+
+Todas as diretrizes técnicas e resoluções do Tech Lead (TL) foram seguidas à risca e implementadas com total êxito na base de código do minijogo **Tetris** (`/tetris/index.html`):
+
+1. **Peça Fantasma (Ghost Piece) & Hard Drop**:
+   * Implementamos o cálculo dinâmico da projeção de queda (`getGhostPositionY()`) que simula a aterrissagem em tempo de execução sem afetar a peça ativa original.
+   * Renderizamos a sombra com 20% de opacidade utilizando a própria cor vibrante neon da peça ativa e contornos sutis de 50% de opacidade, desenhada imediatamente antes da renderização da peça real.
+   * Mapeamos a rotação de forma exclusiva na tecla **Seta para Cima (ArrowUp)**.
+   * Criamos a mecânica de queda instantânea (**Hard Drop**) mapeada na tecla **Espaço (Space)**, otimizando a usabilidade da Peça Fantasma.
+   * Atualizamos a legenda de controles no DOM para manter a usabilidade clara e transparente para o usuário final.
+
+2. **Modo Contra o Tempo (Time Attack)**:
+   * Acrescentamos um seletor visual na barra lateral do painel para escolha entre *Infinito Clássico* ou *Contra o Tempo (2 min)*.
+   * Desenvolvemos o cronômetro regressivo destacado de 120 segundos que se integra de forma transparente às mecânicas de pausa (`togglePause`) e reinício de rodadas.
+   * Ao zerar o tempo limite, o jogo é interrompido instantaneamente com a mensagem `"TEMPO ESGOTADO!"` e a exibição da tela de pontuação final.
+
+3. **Sintetizador Retro (Web Audio API)**:
+   * Construímos a classe utilitária de som `SoundSynth` encapsulando as oscilações procedurais nativas do navegador sem depender de recursos de áudio estáticos de terceiros.
+   * Desenvolvemos e injetamos as assinaturas sonoras exclusivas:
+     * *Giro de Peça*: Onda senoidal curta ascendente rápida (300Hz ➡️ 600Hz em 80ms).
+     * *Encaixe de Peça (Merge)*: Onda dente de serra descendente curta (150Hz ➡️ 60Hz em 120ms).
+     * *Linha Concluída (Clear Lines)*: Arpejo festivo e vibrante em acorde de Dó Maior (C4, E4, G4, C5) tocado com onda triangular retrô suave.
+     * *Derrota / Fim de Jogo (Game Over)*: Onda dente de serra grave descendente dramática (220Hz ➡️ 80Hz em 600ms) para excelente feedback de fracasso.
+   * Garantimos total conformidade com a *Autoplay Policy* dos navegadores modernos ativando/retomando de forma segura o `AudioContext` a partir de qualquer interação física (cliques nos botões de Novo Jogo/Jogar Novamente ou pressionamento de teclas no teclado).
+
+O código foi rigorosamente estruturado sob práticas recomendadas de Clean Code e Clean Architecture. O status da tarefa no `BACKLOG.md` foi promovido para `Dev complete`.
+
+*Relatório de progresso concluído por: Antigravity - Software Engineer*
+
+

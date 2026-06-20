@@ -695,3 +695,119 @@ Para garantir o wow factor e enriquecer a jogabilidade visualmente (em harmonia 
 2. **Escudo Cintilante**: O elemento `#player.shielded::after` aplicará um degradê rotativo com brilho neon usando `box-shadow` e animação CSS Keyframe para criar um escudo volumétrico ativo.
 3. **Notificação Flutuante no Centro**: A função `showNotification(msg, color)` criará mensagens rápidas elegantes que deslizam do centro da tela para cima e desaparecem com fade-out, mantendo o jogador constantemente ciente do status das melhorias temporárias.
 
+---
+
+## ❓ Dúvidas para o TL ou o PO
+
+Para garantir que a implementação seja estável, de alta qualidade e totalmente alinhada com as diretrizes do projeto, levantamos as seguintes dúvidas técnicas e de design:
+
+1. **Coexistência ou Substituição do Sistema de Tiro Especial**: O `index.html` já possui um sistema de "Tiro Especial" ativado com a barra de espaço, que consome cargas limitadas (`specialCharges`) e dura 2 segundos. O novo power-up de "Tiro Triplo" (Azul) é ativado por coleta, dura 8 segundos e não consome cargas. Como esses sistemas devem interagir? 
+   * A coleta do power-up de Tiro Triplo deve apenas habilitar o disparo triplo de forma passiva temporária por 8 segundos (sem interferir nas cargas especiais de espaço)?
+   * Ou o novo power-up deve substituir completamente o sistema anterior?
+
+2. **Remoção ou Manutenção dos Power-ups Antigos**: A especificação de probabilidade de drop no refinamento cobre apenas os três novos power-ups (`triple_shot`, `energy_shield`, `fusion_bomb`). Isso significa que os power-ups anteriores do jogo (`health` / restauração de vida, `homing` / tiros guiados, `special` / recarga de tiro especial) devem ser completamente removidos das mecânicas de spawn, ou devemos integrá-los à nova probabilidade de drop?
+   * *Sugestão do Desenvolvedor*: Seria interessante manter pelo menos o de `health` (com chance reduzida) para que o jogador tenha como recuperar vida durante a partida.
+
+3. **Migração de Recorde Único no Leaderboard (Top 5)**: O sistema legado gerencia apenas uma pontuação máxima (`spaceShooterHighScore`). Na nova tabela de líderes local (Top 5), devemos tentar carregar esse valor antigo como um recorde inicial (ex: "PIL - [High Score antigo]") ou podemos iniciar a lista de recordes totalmente zerada para novos registros? Além disso, o rótulo "High Score" estático na tela de Game Over deve ser substituído pela pontuação do jogador na primeira posição (#1) do Leaderboard?
+
+---
+
+## 📢 Respostas do Tech Lead (TL)
+
+Abaixo estão as definições estratégicas e de arquitetura para sanar as dúvidas levantadas. Lembre-se de manter o foco na **estabilidade do game loop** e em **boas práticas de Clean Code**:
+
+### 1. Coexistência do Sistema de Tiro Especial
+* **Decisão**: **Coexistência Passiva**.
+* **Como implementar**: O power-up **Tiro Triplo (Azul)** deve atuar como um modificador temporário do tiro normal. Ele não consome e não interage com as cargas do `specialCharges` (ativado pelo Espaço).
+* **Tratamento de Concorrência**: 
+  * Se o jogador estiver com o *Tiro Triplo* ativo e pressionar Espaço para ativar o *Tiro Especial* legado, o Tiro Especial (que dura 2 segundos) terá prioridade máxima na renderização e tipo de projétil (tiros especiais azuis em leque de 3 lasers pesados com dano ampliado).
+  * O temporizador de 8 segundos do *Tiro Triplo* continuará correndo normalmente em segundo plano. Assim que os 2 segundos do Tiro Especial terminarem, se ainda restar tempo no Tiro Triplo, a nave volta a disparar o Tiro Triplo passivo até expirar.
+
+### 2. Integração e Balanceamento dos Power-ups
+* **Decisão**: **Manutenção Balanceada dos Itens Legados**.
+* **Como implementar**: Para manter o loop de sobrevivência saudável (especialmente o de cura), não removeremos os itens antigos. A taxa de drop global de **15%** dos inimigos destruídos é mantida, mas a distribuição interna dos itens será a seguinte:
+  * **Novos Power-ups (60% do total dropado)**:
+    * `triple_shot` (Tiro Triplo - Azul): **25%**
+    * `energy_shield` (Escudo - Amarelo): **25%**
+    * `fusion_bomb` (Bomba de Fusão - Vermelho): **10%**
+  * **Itens Clássicos/Legados (40% do total dropado)**:
+    * `health` (Cura/Vida): **20%** (Garante sustentabilidade nas fases avançadas)
+    * `homing` (Tiro Guiado): **10%**
+    * `special` (Recarga de Tiro Especial): **10%**
+
+### 3. Migração do Recorde Único e UI do Leaderboard
+* **Decisão**: **Migração Elegante sem Perda de Dados**.
+* **Como implementar**:
+  * No carregamento inicial do jogo (`window.onload` ou na inicialização da pontuação), verifique se existe a chave `spaceShooterHighScore` no `localStorage`.
+  * Se ela existir e a nova lista de líderes (`spaceShooterLeaderboard`) ainda não estiver criada, inicialize a lista contendo uma única entrada de recorde: `{ name: "LEG", score: highScoreLegado, date: new Date().toLocaleDateString() }`.
+  * O elemento `#high-score` no menu de Game Over e HUD deve ler dinamicamente o valor da **posição #1 (primeiro elemento)** da tabela de recordes. Se a tabela estiver vazia, faça o fallback para `spaceShooterHighScore` ou `0`.
+
+---
+*Assinado: Antigravity - Tech Lead*
+
+---
+
+## ❓ Novas Dúvidas do Desenvolvedor para o TL ou o PO
+
+Durante a preparação do ambiente e planejamento detalhado do código da tarefa, identificamos alguns pontos de comportamento que exigem alinhamento com o TL ou o PO para garantir a estabilidade do minijogo:
+
+1. **Critério de desempate no Leaderboard**: Se dois jogadores atingirem a mesma pontuação exata, como deve se comportar a ordenação do Top 5? O recorde mais antigo deve ficar acima (prioridade cronológica) ou o mais recente deve passar à frente?
+2. **Tratamento de Iniciais em Branco ou Cancelamento**: Se o jogador se qualificar para o Top 5, mas clicar em "SALVAR" deixando as iniciais em branco ou não digitando os 3 caracteres, devemos persistir a pontuação com as iniciais padrão `'PIL'` ou ignorar o salvamento?
+3. **Persistência Limpa (Migração)**: Após realizarmos a migração da pontuação máxima do recorde legado (`spaceShooterHighScore`) para a nova tabela no `localStorage`, é recomendado remover a chave legado ou mantê-la ativa para retrocompatibilidade em eventuais rollbacks?
+
+---
+
+## 📢 Respostas do Tech Lead (TL) às Novas Dúvidas (Fase 2)
+
+Abaixo estão as decisões técnicas tomadas para garantir estabilidade e o melhor fluxo para o jogador:
+
+### 1. Critério de Desempate no Leaderboard
+* **Decisão**: **Prioridade Cronológica (Mais Antigo Fica Acima)**.
+* **Motivo**: Respeito ao feito histórico do jogador que alcançou a pontuação primeiro. Um novo jogador só "rouba" a posição se superar o score anterior.
+* **Como implementar**: A ordenação principal deve ser por pontuação (decrescente). Em caso de empate, utilizaremos um carimbo de data/hora (timestamp) salvo no registro para manter o mais antigo no topo. Se a data estiver formatada apenas como string de exibição local, recomendo adicionar um campo `timestamp: Date.now()` em cada entrada da lista para facilitar a comparação matemática precisa de desempate.
+
+### 2. Tratamento de Iniciais em Branco ou Curtas
+* **Decisão**: **Sanitização Robustecida com Fallback Automático para 'PIL'**.
+* **Motivo**: Jamais frustrar o jogador perdendo sua pontuação histórica por um erro ou clique acidental no botão "SALVAR".
+* **Como implementar**: 
+  * Remova espaços extras e caracteres não-alfanuméricos usando Expressões Regulares: `let initials = initialsInput.value.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();`.
+  * Se o resultado estiver vazio, defina como `'PIL'`.
+  * Se o resultado tiver menos de 3 caracteres, complete o restante com a letra `'A'` (ex: "WI" vira "WIA") ou simplesmente aceite o tamanho menor se preferir, mas para manter a consistência estética de 3 colunas fixas no placar, completar com caracteres de preenchimento ou aplicar fallback para `'PIL'` é o ideal.
+
+### 3. Persistência Limpa (Migração de Chave Legada)
+* **Decisão**: **Manutenção da Chave Legada para Retrocompatibilidade (Read-Only)**.
+* **Motivo**: Abordagem conservadora de segurança. Caso haja qualquer problema com a atualização (por exemplo, necessidade urgente de rollback da feature), as pontuações antigas dos jogadores estarão seguras.
+* **Como implementar**: Após realizar a migração inicial bem-sucedida do recorde antigo para a nova estrutura de dados, **não remova** a chave `spaceShooterHighScore`. Deixe-a lá intocada. Novos recordes serão escritos unicamente na chave `spaceShooterLeaderboard`, e o HUD lerá da posição #1 dessa lista, mas a chave antiga permanecerá persistida como backup passivo.
+
+---
+*Assinado: Antigravity - Tech Lead*
+
+---
+
+## 🧪 Observação QA
+
+**Data**: 31/05/2026  
+**Analista de QA**: Antigravity (QA)  
+
+### 📋 Status da Validação
+*   **Testável**: ❌ Não
+*   **Motivo**: A funcionalidade (Sistema de Power-Ups, Naves Desbloqueáveis e Placar de Recordes Local) ainda está no status **`In Progress`** no backlog global e **não foi implementada** no código-fonte do jogo (`space_shooter/index.html`).
+*   **Ação**: A tarefa deve ser concluída pelo desenvolvedor, passar por Code Review pelo Tech Lead, ser aprovada e movida para `Ready for QA` antes que os testes automatizados e manuais possam ser efetuados e suas evidências registradas.
+
+### 🎯 Plano de Testes Futuro (Critérios a validar)
+Quando a tarefa estiver pronta para QA, as seguintes validações deverão ser realizadas no navegador (Playwright/Puppeteer/Manual):
+1.  **Drop e Efeito dos Power-Ups (Azul, Amarelo e Vermelho)**:
+    *   Verificar se inimigos destruídos soltam power-ups com 15% de chance.
+    *   **Tiro Triplo (Azul)**: Validar se a nave dispara 3 feixes de laser em leque por 8 segundos. Verificar o comportamento de concorrência com o Tiro Especial (Espaço) garantindo prioridade máxima para o Tiro Especial (2s) e retorno para o Tiro Triplo passivo se ainda houver tempo.
+    *   **Escudo de Energia (Amarelo)**: Validar se absorve exatamente 1 colisão de inimigo/tiro e dura no máximo 12 segundos, adicionando a classe `.shielded` e concedendo o frame de invulnerabilidade (800ms) pós-explosão do escudo.
+    *   **Bomba de Fusão (Vermelho)**: Confirmar a limpeza instantânea de todos os inimigos normais e lacaios na tela com efeito visual de flash e tremor. No caso de Boss, garantir que causa 100 pontos de dano em vez de morte instantânea.
+2.  **Sistema de Hangar e Frotas**:
+    *   Acessar o Hangar a partir da tela de menu.
+    *   Tentar selecionar/comprar os modelos *Interceptor*, *Dreadnought* (150 moedas, disparo duplo nativo permanente) e *Phantasm* (300 moedas, maior velocidade, menor hitbox).
+    *   Confirmar que o saldo de moedas no display da tela inicial e no Hangar é atualizado e as naves são salvas no `localStorage`.
+3.  **Leaderboard Local (Top 5)**:
+    *   Registrar novas pontuações e verificar se apenas as 5 maiores são ordenadas e persistidas no `localStorage` com 3 iniciais.
+    *   Confirmar a migração do recorde legado `spaceShooterHighScore` se a lista estiver vazia.
+    *   Verificar o critério de desempate cronológico (em caso de pontuações idênticas, o registro mais antigo deve ficar acima).
+    *   Validar a sanitização das iniciais (com fallback automático para `'PIL'` para entradas vazias e preenchimento com `'A'` se menor que 3 caracteres).
+

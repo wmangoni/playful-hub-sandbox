@@ -494,3 +494,116 @@ function initGame() {
 }
 ```
 
+---
+
+## ❓ Dúvidas para o TL ou o PO
+
+Para garantir uma implementação precisa, robusta e alinhada com as expectativas de Game Design do **Playful Hub**, levantamos as seguintes dúvidas arquiteturais e de regras de negócio:
+
+### 1. Comportamento do Combo com Balões Explosivos
+* **Dúvida**: Quando um *Balão de Hélio Instável (Explosivo)* é destruído e detona balões adjacentes (raio de 100px), os balões eliminados pela reação em cadeia devem contar para o **Combo Streak**?
+* **Cenário A**: Apenas o acerto direto do jogador com a flecha incrementa o combo (`comboCount++`), enquanto as explosões secundárias apenas pontuam normalmente sem resetar ou incrementar o multiplicador de combo (conforme a indicação da linha 364 da especificação: `popSpecificBalloon(b.id, false)`).
+* **Cenário B**: Cada balão destruído na explosão incrementa o combo.
+* **Recomendação de Engenharia**: Recomendamos o **Cenário A** para valorizar a mira direta e a habilidade de precisão do jogador, evitando combos inflados artificialmente por uma única explosão.
+* **Multiplicação de Pontos**: Os pontos obtidos pelos balões destruídos pela explosão secundária devem ser multiplicados pelo multiplicador de combo ativo no momento da explosão?
+
+### 2. Definição de "Rodada" para Mudança de Vento
+* **Dúvida**: A especificação indica que o vento muda a cada 3 tiros ou "a cada rodada". Qual a definição precisa de "rodada" no contexto de *The Archer*?
+* **Opções**:
+  * **Opção A**: Uma rodada é equivalente a uma partida inteira. Ou seja, o vento só muda se a partida for reiniciada ou a cada 3 disparos efetuados.
+  * **Opção B**: Uma rodada termina quando todas as flechas acabam (`arrowsLeft = 0`), e iniciar uma nova rodada significa o reinício do ciclo de jogo.
+  * **Recomendação de Engenharia**: Recomendamos a **Opção B**, integrando a mudança de vento ao ciclo de tiros (a cada 3 disparos) e ao reinício do jogo, mantendo a simplicidade do ciclo de vida atual da engine.
+
+### 3. Colisão com o Chão (Combo Break)
+* **Dúvida**: A regra de redefinição de combo para 1x ao "cair no chão" deve considerar uma colisão física real com o elemento `#ground` (que tem 50px de altura no CSS/DOM) ou basta manter a validação clássica de sair pela borda inferior (`arrowRect.bottom > containerRect.bottom`)?
+* **Recomendação de Engenharia**: Implementar uma verificação de altura real (se `arrowY <= 0` ou se colidir com a área física do `#ground`), para que a flecha seja desativada visualmente fincada no chão e quebre o combo imediatamente antes mesmo de sair do canvas, gerando um feedback visual de erro muito mais imediato e premium.
+
+### 4. Acúmulo de Multiplicador com o Balão da Fortuna
+* **Dúvida**: A pontuação do *Balão da Fortuna (Dourado)* é de `pontos_base * 5`. Esse fator de 5x acumula de forma multiplicativa com o multiplicador de combo ativo?
+* **Exemplo**: Se o jogador atingir o balão dourado com um Combo Streak de 10 acertos (multiplicador de 5x), a pontuação final do acerto será de $100 \text{ pts} \times 5 \text{ (Combo)} \times 5 \text{ (Fortune)} = 2500 \text{ pts}$?
+* **Recomendação de Engenharia**: Sim, deve acumular de forma multiplicativa para incentivar o jogador a manter o combo alto para quando o balão dourado (raro e rápido) surgir na tela.
+
+---
+
+## 💬 Resoluções do Tech Lead (TL)
+
+Como Tech Lead do projeto **Playful Hub**, analisei detalhadamente as dúvidas arquiteturais levantadas e as recomendações de engenharia propostas para o minijogo **The Archer**. As diretrizes de implementação estão consolidadas abaixo, com foco em estabilidade, balanceamento de jogo competitivo e experiência do jogador (*juiciness*):
+
+### 1. Comportamento do Combo com Balões Explosivos
+*   **Decisão**: **Aprovado o Cenário A (Recomendado)**. Apenas o acerto direto com a flecha deve incrementar o contador `comboCount++`.
+*   **Multiplicação de Pontos**: **Sim**. A pontuação obtida de cada balão explodido na reação em cadeia secundária (100px) deve herdar e ser multiplicada pelo multiplicador de combo que estava ativo no exato momento em que o balão explosivo principal foi atingido. Isso incentiva o planejamento tático de estourar explosivos em momentos de combo alto!
+
+### 2. Definição de "Rodada" para Mudança de Vento
+*   **Decisão**: **Aprovada a Opção B (Recomendada)**. O vento deve mudar dinamicamente a cada **3 disparos efetuados** pelo jogador ou quando a partida for completamente reiniciada (`initGame()`). O término de uma rodada física de tiros (quando as flechas acabam) também forçará um reset de vento na inicialização seguinte, o que se alinha perfeitamente com o ciclo de vida simplificado e robusto da engine.
+
+### 3. Colisão com o Chão (Combo Break)
+*   **Decisão**: **Aprovada a Recomendação de Engenharia**. Devemos rastrear o impacto físico real no solo (se `arrowY <= 0` ou colisão com a área geométrica do `#ground`). A flecha deve parar visualmente e ficar "fincada" no local do impacto terrestre por um breve período de feedback e então sumir, quebrando o combo imediatamente e mostrando o alerta flutuante de `"COMBO BREAK"`. Isso garante um retorno sensorial e visual premium.
+
+### 4. Acúmulo de Multiplicador com o Balão da Fortuna
+*   **Decisão**: **Aprovado o Acúmulo Multiplicativo (Recomendado)**. O fator bônus de **5x** do Balão da Fortuna deve acumular multiplicativamente com o multiplicador de combo ativo. Exemplo: um balão dourado (Fortune) atingido com combo de 10x (multiplicador 5x) concede $100 \text{ pts} \times 5 \text{ (Combo)} \times 5 \text{ (Fortune)} = 2500 \text{ pts}$. Essa mecânica cria momentos épicos de "hype" e recompensa diretamente a alta habilidade.
+
+---
+
+> [!NOTE]
+> **Próximos Passos**: Com todas as dúvidas técnica e estrategicamente esclarecidas, a tarefa está oficialmente aprovada para a fase de desenvolvimento. Seu status foi atualizado para `✅ Refined` (ou `In Progress` pelo desenvolvedor). Excelente levantamento e modelagem física dos requisitos!
+
+---
+
+## ❓ Dúvidas e Observações do Desenvolvedor (Dev)
+
+Como Engenheiro de Software assumindo esta tarefa para desenvolvimento (`In Progress`), fiz uma revisão minuciosa da base de código do minijogo **The Archer** e da excelente especificação técnica e de arquitetura elaborada acima. Registrei abaixo as seguintes dúvidas de experiência e observações de engenharia para o TL e o PO responderem/validarem durante as iterações de desenvolvimento:
+
+### 1. Indicador de Vento Cruzado na Tela (Juiciness Estético)
+* **Dúvida/Proposta**: Para tornar a influência da física do vento lateral muito mais intuitiva e imersiva para o jogador (além do HUD textual e da biruta de seta), podemos spawnar pequenas partículas procedurais translúcidas e horizontais (representando brisas/folhas carregadas pelo vento) que cruzam a tela na direção e velocidade proporcionais ao `windSpeed` atual?
+* **Motivação**: Isso proporcionaria um feedback visual orgânico brilhante e premium (em sintonia com a nossa exigência de *Rich Aesthetics*), ajudando o jogador a antecipar o desvio antes de soltar a corda do arco. Há alguma restrição de performance ou preferência de design sobre essas partículas de ambiente?
+
+### 2. Tratamento de Múltiplas Explosões Simultâneas (Chain Reactions)
+* **Observação Técnica**: No algoritmo de detonação em cadeia do *Balão de Hélio Instável (Explosivo)*, se um balão explosivo A detonar outro balão explosivo B dentro do raio de 100px, implementaremos um disparo recursivo da função `triggerVisualExplosion()` com um pequeno delay assíncrono de `60ms` usando `setTimeout`.
+* **Motivação**: Isso criará um efeito de cascata visual de explosões em cadeia absurdamente satisfatório, ao invés de estourar tudo instantaneamente de uma vez só, elevando o valor de *juiciness* do jogo.
+
+### 3. Frequência de Spawning e Garantia de Alvos na Tela
+* **Observação de Gameplay**: Para evitar que a tela fique completamente vazia se o jogador estourar os balões ativos de forma extremamente ágil ou no início do jogo, colocaremos uma verificação no loop de física. Se `activeBalloons.length === 0`, forçaremos o spawn imediato de um balão para manter o fluxo contínuo de alvos dinâmicos.
+* **Calibração de Limites**: O limite máximo de balões ativos simultâneos na tela será calibrado em **4 balões** para manter a tela limpa, tática e com performance impecável a 60 FPS.
+
+---
+
+## 📢 Respostas do Tech Lead (TL) às Dúvidas do Desenvolvedor (Fase 2)
+
+Como **Tech Lead** do projeto, fiz uma avaliação minuciosa das propostas de engenharia e melhorias de gameplay apresentadas pela equipe de desenvolvimento para o minijogo **The Archer**. As decisões arquiteturais e de game design estão oficializadas abaixo:
+
+### 1. Indicador de Vento Cruzado na Tela (Juiciness Estético)
+*   **Decisão**: **Totalmente Aprovado!** A ideia de renderizar brisas translúcidas cruzando a tela horizontalmente é genial e se alinha perfeitamente com a diretriz de **Rich Aesthetics** do Playful Hub.
+*   **Arquitetura e Limitações**:
+    *   Como a engine do jogo é baseada em manipulação de elementos DOM absolutos, cada partícula deve ser um `div` leve com classe `.wind-particle` (estilizada com `width` dinâmico de 15px a 40px, `height: 1px`, `background: rgba(255,255,255,0.18)` e `border-radius: 1px`).
+    *   **Controle de Pool**: Para preservar 100% de estabilidade de FPS e CPU, limite o pool a no máximo **12 partículas ativas** simultaneamente.
+    *   **Atualização de Física**: Insira um método `updateWindParticles()` no loop principal de física. Quando uma partícula cruzar totalmente a borda lateral (esquerda ou direita, dependendo do sinal do `windSpeed`), ela deve reaparecer na borda oposta com coordenadas verticais `Y` e velocidades ligeiramente aleatórias para evitar padrões robóticos.
+
+### 2. Tratamento de Múltiplas Explosões Simultâneas (Chain Reactions)
+*   **Decisão**: **Excelente proposta de Game Design!** O delay assíncrono de `60ms` no disparo da reação em cadeia das explosões dos balões de hélio instável trará um feedback sensorial fenomenal (efeito cascata) digno de jogos premium.
+*   **Controle de Estado Contra Loop Infinito**: 
+    *   Para evitar recursão infinita ou detonação repetida de balões já atingidos, cada balão selecionado para explosão secundária deve ter seu status alterado imediatamente para `popping` ou `isDead = true` *antes* de executar o `setTimeout` de `60ms`.
+    *   O algoritmo de varredura radial deve desconsiderar balões com status `isDead === true`.
+
+### 3. Frequência de Spawning e Garantia de Alvos na Tela
+*   **Decisão**: **Aprovado com Louvor**. Manter um fluxo dinâmico sem telas vazias é essencial para a retenção do jogador.
+*   **Calibração**:
+    *   A garantia de spawn imediato caso `activeBalloons.length === 0` deve ser verificada a cada frame de física.
+    *   O limite máximo de **4 balões** ativos simultaneamente na tela está ideal e balanceado para o tamanho do canvas de 800x500px.
+    *   Certifique-se de que a posição horizontal de cada spawn (`posX`) possua uma dispersão randômica bem distribuída para evitar sobreposição visual de múltiplos balões subindo juntos.
+
+---
+
+> [!NOTE]
+> **Próximos Passos**: Com todas as diretrizes de desenvolvimento 100% alinhadas, o desenvolvedor está totalmente autorizado a prosseguir com a implementação física destas mecânicas no arquivo [index.html](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/archer/index.html).
+
+---
+
+## 🧪 Observação QA
+
+**Data**: 31/05/2026  
+**Analista de QA**: Antigravity (QA)  
+
+### 📋 Status da Validação
+*   **Testável**: ❌ Não
+*   **Motivo**: A funcionalidade (Vento Lateral Dinâmico, Balões Especiais e Multiplicador de Combo) está no status **`In Progress`** no backlog global e **não foi implementada** no código-fonte do minijogo (`archer/index.html`).
+*   **Ação**: A tarefa deve ser concluída pelo desenvolvedor, passar por Code Review pelo Tech Lead, ser aprovada e movida para `Ready for QA` antes que os testes no navegador possam ser efetuados e suas evidências registradas.
