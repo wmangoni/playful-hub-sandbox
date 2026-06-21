@@ -384,3 +384,32 @@ Abaixo estão as diretrizes finais alinhadas com a arquitetura:
 
 3. **Retorno das Partículas de Rastro (Drift Marks) no Pouso**:
    * **Decisão**: Ao aterrissar de um Stunt Jump, aplique faíscas amarelas neon brilhantes nos eixos traseiros e adicione marcas de pneu escuras por 0.8s para sinalizar o atrito e amortecimento dinâmico.
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `driving_simulator/index.html` sobre a TASK_002 (tráfego, dia/noite, faróis, garagem). Todos os critérios e decisões do TL atendidos e validados localmente (preview + testes via console). Nenhum erro de runtime.
+
+### O que foi entregue
+1.  **Level design interativo**: 15 cones destrutíveis (impulso elástico + rotação + fade-out + respawn à frente); 5 poças de óleo (spin-out de 1.2s ignorando controles, ½ velocidade); 3 rampas neon com voo parabólico (impulso Y proporcional à velocidade), **bullet-time** (`timeScale=0.4`), tremor de câmera e faíscas/marcas no pouso.
+2.  **Ciclo dano/combustível/pit stop**: `playerHealth`/`playerFuel`/`aiHealth`; fumaça cinza <50% e fogo+penalidade de −40% de velocidade <25%; combustível drena ao acelerar e, em 0%, limita a 10% da velocidade; Pit Stop pad (anel neon) que repara e reabastece +25%/s com carro parado + anéis de cura.
+3.  **Time Trial + Drift Ghost**: seletor de modo na garagem (Coleta de Moedas / Time Trial); gravação frame-a-frame da volta; detecção de volta (afastar z>50 e cruzar a linha z≤−50); carro fantasma ciano semitransparente (`AdditiveBlending`) que repete a melhor volta; `bestLapTime` persistido no `localStorage`.
+
+### Decisões do TL implementadas
+*   **Persistência**: apenas `bestLapTime` (ms) vai ao `localStorage`; o replay (`lapReplayData`) fica só em RAM na sessão.
+*   **Dano na IA**: a IA também sofre dano por trem, tráfego e cones.
+*   **Pouso**: faíscas amarelas + marcas de pneu ao aterrissar.
+
+### Validações executadas (console, via hook `window.__drive`)
+*   Dano: 100 → 20 após 80 de dano; spin-out ativa (timer 72) e rotaciona o carro.
+*   Rampa: entra em voo com `timeScale=0.4`; após ~52 frames pousa e `timeScale` volta a 1.0.
+*   Pit stop: 50%→75% de integridade e combustível em 1s.
+*   Time trial: volta armada e completada (960ms), ghost criado, recorde persistido no `localStorage`, replay do ghost funcionando.
+*   Estruturas no init: 15 cones, 5 poças, 3 rampas, pad de reparo, HUD e botões de modo.
+
+### Observações para o TL
+*   **Bullet-time** aplicado via multiplicador `ts` (`timeScale`) nos deslocamentos do jogador, IA e cones; trem/dia-noite seguem em tempo real (efeito breve, foco no salto do jogador).
+*   **Detecção de volta** adaptada ao mapa de estrada reta: "ida e volta" cruzando a linha de partida (z=−50). Como o jogo não tem um circuito fechado, essa é a interpretação estável de "1 volta".
+*   No **Time Trial**, ocultei a IA e não spawno moedas (foco no tempo de volta); o modo Coleta de Moedas permanece intacto.
+*   Hook `window.__drive` estendido (debug/QA), removível no cleanup. rAF fica pausado no preview headless — a verificação foi feita acionando as funções de update manualmente; no navegador real roda a 60 FPS.

@@ -246,6 +246,21 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
 
+    <div class="menu-selection" style="background-color: rgba(0, 0, 0, 0.4); border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.2); width: 90%; max-width: 600px; display: flex; justify-content: space-around; align-items: center; gap: 10px;">
+        <div style="display: flex; flex-direction: column;">
+            <label for="mazeSelect" style="font-family: 'Press Start 2P', cursive; font-size: 10px; color: var(--score-color); margin-bottom: 5px;">LABIRINTO / MAPA:</label>
+            <select id="mazeSelect" style="padding: 6px; font-family: 'Roboto', sans-serif; font-weight: bold; background: #16213e; color: #fff; border: 1px solid var(--score-color); border-radius: 4px; outline: none; cursor: pointer;">
+                <option value="classic">Clássico (Sem Paredes)</option>
+                <option value="box">Caixa Fechada</option>
+                <option value="corners">Quatro Cantos</option>
+                <option value="spiral">Grande Espiral</option>
+            </select>
+        </div>
+        <div style="font-family: var(--font-sans); font-size: 12px; color: #ccc; max-width: 280px;">
+            Espaço = acelerar (−1 ponto/1.5s). A cada 5 frutas surge uma especial: 👻 Fantasma, ⚡ Aceleração, ✂️ Corte de cauda.
+        </div>
+    </div>
+
     <div id="gameContainer">
         <canvas id="gameCanvas" width="400" height="400"></canvas>
         <!-- Game Over Overlay -->
@@ -260,6 +275,9 @@
 
     <div id="uiContainer">
          <div id="scoreDisplay">
+             <div id="statusBadge" style="display: none; font-family: 'Press Start 2P', cursive; font-size: 10px; padding: 8px 12px; border-radius: 6px; text-align: center; margin-bottom: 10px; border: 2px solid white; transition: all 0.3s ease;">
+                 ATIVO: <span id="statusText">NENHUM</span>
+             </div>
              <div id="score">Score: 0</div>
          </div>
          <div id="highScores">
@@ -301,6 +319,72 @@
          const foodGlowColor = getComputedStyle(document.documentElement).getPropertyValue('--food-glow').trim();
          const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
          const canvasBgColor = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+
+        // === TASK_002: definição dos labirintos (grid 20x20, coords 0..19) ===
+        const MAZES = {
+            classic: [],
+            box: [
+                ...Array.from({ length: 20 }, (_, i) => ({ x: i, y: 0 })),
+                ...Array.from({ length: 20 }, (_, i) => ({ x: i, y: 19 })),
+                ...Array.from({ length: 18 }, (_, i) => ({ x: 0, y: i + 1 })),
+                ...Array.from({ length: 18 }, (_, i) => ({ x: 19, y: i + 1 }))
+            ],
+            corners: [
+                { x: 3, y: 3 }, { x: 3, y: 4 }, { x: 3, y: 5 }, { x: 4, y: 3 }, { x: 5, y: 3 },
+                { x: 16, y: 3 }, { x: 16, y: 4 }, { x: 16, y: 5 }, { x: 15, y: 3 }, { x: 14, y: 3 },
+                { x: 3, y: 16 }, { x: 3, y: 15 }, { x: 3, y: 14 }, { x: 4, y: 16 }, { x: 5, y: 16 },
+                { x: 16, y: 16 }, { x: 16, y: 15 }, { x: 16, y: 14 }, { x: 15, y: 16 }, { x: 14, y: 16 }
+            ],
+            spiral: [
+                { x: 5, y: 5 }, { x: 6, y: 5 }, { x: 7, y: 5 }, { x: 8, y: 5 }, { x: 9, y: 5 }, { x: 10, y: 5 }, { x: 11, y: 5 }, { x: 12, y: 5 }, { x: 13, y: 5 }, { x: 14, y: 5 },
+                { x: 14, y: 6 }, { x: 14, y: 7 }, { x: 14, y: 8 }, { x: 14, y: 9 }, { x: 14, y: 10 }, { x: 14, y: 11 }, { x: 14, y: 12 }, { x: 14, y: 13 }, { x: 14, y: 14 },
+                { x: 13, y: 14 }, { x: 12, y: 14 }, { x: 11, y: 14 }, { x: 10, y: 14 }, { x: 9, y: 14 }, { x: 8, y: 14 }, { x: 7, y: 14 }, { x: 6, y: 14 }, { x: 5, y: 14 },
+                { x: 5, y: 13 }, { x: 5, y: 12 }, { x: 5, y: 11 }, { x: 5, y: 10 }, { x: 5, y: 9 }, { x: 5, y: 8 }, { x: 5, y: 7 },
+                { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 9, y: 7 }, { x: 10, y: 7 }, { x: 11, y: 7 }, { x: 11, y: 8 }, { x: 11, y: 9 }, { x: 11, y: 10 }, { x: 11, y: 11 },
+                { x: 10, y: 11 }, { x: 9, y: 11 }, { x: 8, y: 11 }, { x: 7, y: 11 }, { x: 7, y: 10 }, { x: 7, y: 9 }
+            ]
+        };
+
+        function getCurrentMaze() {
+            const sel = document.getElementById('mazeSelect');
+            return (sel && MAZES[sel.value]) || [];
+        }
+
+        // Evita que a cobra nasça de frente para uma parede (ex.: centro da espiral)
+        function pickSafeStartDirection() {
+            const maze = getCurrentMaze();
+            const options = [
+                { d: 'right', x: 11, y: 10 },
+                { d: 'up',    x: 10, y: 9  },
+                { d: 'left',  x: 9,  y: 10 },
+                { d: 'down',  x: 10, y: 11 }
+            ];
+            for (const o of options) {
+                if (!maze.some(w => w.x === o.x && w.y === o.y)) return o.d;
+            }
+            return 'right';
+        }
+
+        // === TASK_002: estados de power-up / aceleração ===
+        let normalFoodEaten = 0;     // contador de frutas comuns
+        let isGhostMode = false;     // atravessa paredes/corpo
+        let isSpeedBoostActive = false; // 2x velocidade e 2x pontos
+        let ghostTimeout = null;
+        let speedTimeout = null;
+        let isSpacePressed = false;
+        let lastScoreDeductionTime = 0;
+        let badgeCountdownInterval = null;
+
+        // === TASK_003: Portais, Cobra Rival, Partículas e Screen Shake ===
+        let portalsActive = false;
+        const portalA = { x: 2, y: 10, color: '#00d2ff', glowColor: 'rgba(0, 210, 255, 0.8)' };
+        const portalB = { x: 17, y: 10, color: '#ff9f43', glowColor: 'rgba(255, 159, 67, 0.8)' };
+        let rivalSnake = null;            // null até score >= 20
+        let rivalDirection = 'left';
+        let rivalRespawnTime = 0;         // timestamp para respawn (cooldown)
+        let goldenApples = [];            // {x,y,value,spawnTime}
+        const particles = [];             // rastro neon
+        let shakeDuration = 0;            // ms restantes de tremor
 
         let snake = [{x: 10, y: 10}];
         let direction = 'right';
@@ -385,17 +469,29 @@
         // --- Game Logic ---
 
         function generateFood() {
-             // (Same as before)
              let foodX, foodY;
              let validPosition = false;
+             const currentMaze = getCurrentMaze();
+
              while (!validPosition) {
                  foodX = Math.floor(Math.random() * tileCount);
                  foodY = Math.floor(Math.random() * tileCount);
-                 if (!snake.some(segment => segment.x === foodX && segment.y === foodY)) {
+                 const inSnake = snake.some(segment => segment.x === foodX && segment.y === foodY);
+                 const inMaze = currentMaze.some(wall => wall.x === foodX && wall.y === foodY);
+                 if (!inSnake && !inMaze) {
                      validPosition = true;
                  }
              }
-             return {x: foodX, y: foodY};
+
+             // A cada 5 frutas normais, spawnar uma fruta especial
+             if (normalFoodEaten >= 5) {
+                 normalFoodEaten = 0;
+                 const specialTypes = ['ghost', 'speed', 'shrink'];
+                 const chosenType = specialTypes[Math.floor(Math.random() * specialTypes.length)];
+                 return { x: foodX, y: foodY, isSpecial: true, type: chosenType };
+             }
+
+             return { x: foodX, y: foodY, isSpecial: false };
          }
 
         function handleKeyPress(event) {
@@ -427,31 +523,303 @@
         }
 
         function update() {
-            // (Most logic is the same as before)
             if (isGameOver) return;
+
+            // Punição dinâmica por aceleração manual (Barra de Espaço)
+            if (isSpacePressed && score > 0) {
+                const now = Date.now();
+                if (now - lastScoreDeductionTime >= 1500) {
+                    score = Math.max(0, score - 1);
+                    scoreElement.textContent = `Score: ${score}`;
+                    lastScoreDeductionTime = now;
+                    scoreElement.style.color = '#ff4757';
+                    setTimeout(() => { scoreElement.style.color = 'var(--score-color)'; }, 200);
+                }
+            }
+
+            // TASK_003: ativar portais (>=10 pts) e spawnar a cobra rival (>=20 pts)
+            portalsActive = score >= 10;
+            if (score >= 20 && !rivalSnake && Date.now() >= rivalRespawnTime) spawnRival();
+
             direction = requestedDirection;
             let head = { ...snake[0] };
-            switch (direction) { /* ... move head ... */
+            switch (direction) {
                 case 'up': head.y--; break;
                 case 'down': head.y++; break;
                 case 'left': head.x--; break;
                 case 'right': head.x++; break;
             }
-            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+
+            // TASK_003: teletransporte por portais (mantém a direção)
+            if (portalsActive) {
+                let teleported = false;
+                if (head.x === portalA.x && head.y === portalA.y) { head.x = portalB.x; head.y = portalB.y; teleported = true; }
+                else if (head.x === portalB.x && head.y === portalB.y) { head.x = portalA.x; head.y = portalA.y; teleported = true; }
+                if (teleported) { triggerScreenShake(150); createPortalBurst(head.x, head.y); }
+            }
+
+            // Bordas: sempre atravessam para o lado oposto (screen wrap).
+            // O mapa "Caixa Fechada" continua matando porque suas paredes de
+            // perímetro são tratadas pela colisão de labirinto logo abaixo.
+            if (head.x < 0) head.x = tileCount - 1;
+            else if (head.x >= tileCount) head.x = 0;
+            if (head.y < 0) head.y = tileCount - 1;
+            else if (head.y >= tileCount) head.y = 0;
+
+            // Colisão com paredes do labirinto (ignorada no modo fantasma)
+            const currentMaze = getCurrentMaze();
+            if (!isGhostMode && currentMaze.some(wall => wall.x === head.x && wall.y === head.y)) {
                 triggerGameOver(); return;
             }
-            if (snake.length > 1 && snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
+
+            // Colisão com o próprio corpo (ignorada no modo fantasma)
+            if (!isGhostMode && snake.length > 1 &&
+                snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
                 triggerGameOver(); return;
             }
+
+            // TASK_003: colisão com a cobra rival = Game Over (ignorada no modo fantasma)
+            if (!isGhostMode && rivalSnake && rivalSnake.some(seg => seg.x === head.x && seg.y === head.y)) {
+                triggerScreenShake(200);
+                triggerGameOver(); return;
+            }
+
             snake.unshift(head);
-            if (head.x === food.x && head.y === food.y) {
-                score++;
+
+            // TASK_003: comer Maçã Dourada (3 pts; cresce e não dá pop)
+            const gaIdx = goldenApples.findIndex(a => a.x === head.x && a.y === head.y);
+            if (gaIdx !== -1) {
+                score += goldenApples[gaIdx].value * (isSpeedBoostActive ? 2 : 1);
+                goldenApples.splice(gaIdx, 1);
+                scoreElement.textContent = `Score: ${score}`;
+                triggerScreenShake(150);
+                createExplosionParticles(head.x, head.y, '#f1c40f');
+                scoreElement.style.transform = 'scale(1.1)';
+                setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
+            } else if (head.x === food.x && head.y === food.y) {
+                const pointsAwarded = isSpeedBoostActive ? 2 : 1;
+
+                if (food.isSpecial) {
+                    applySpecialFood(food);
+                    triggerScreenShake(200); // juice ao pegar fruta especial
+                } else {
+                    normalFoodEaten++;
+                }
+
+                score += pointsAwarded;
                 scoreElement.textContent = `Score: ${score}`;
                 food = generateFood();
                 scoreElement.style.transform = 'scale(1.1)';
                 setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
             } else {
                 snake.pop();
+            }
+
+            // TASK_003: IA rival, maçãs douradas e rastro de partículas
+            updateRivalAI();
+            updateGoldenApples();
+            const tail = snake[snake.length - 1];
+            if (tail) spawnParticle(tail.x, tail.y, snakeBodyColorEnd);
+        }
+
+        // Aplica o efeito de uma fruta especial consumida
+        function applySpecialFood(food) {
+            if (food.type === 'ghost') {
+                isGhostMode = true;
+                showStatusBadge('FANTASMA 👻', '#9b59b6', 5);
+                if (ghostTimeout) clearTimeout(ghostTimeout);
+                ghostTimeout = setTimeout(() => { isGhostMode = false; hideStatusBadge(); }, 5000);
+            } else if (food.type === 'speed') {
+                isSpeedBoostActive = true;
+                showStatusBadge('ACELERAÇÃO ⚡', '#2980b9', 8);
+                if (speedTimeout) clearTimeout(speedTimeout);
+                speedTimeout = setTimeout(() => { isSpeedBoostActive = false; hideStatusBadge(); }, 8000);
+            } else if (food.type === 'shrink') {
+                if (snake.length > 6) {
+                    snake = snake.slice(0, -3); // remove 3 segmentos da cauda
+                    showStatusBadge('CORTE DE CAUDA ✂️', '#2ecc71', 1.5);
+                } else {
+                    showStatusBadge('TAMANHO MÍNIMO!', '#7f8c8d', 1.5);
+                }
+            }
+        }
+
+        // Badge de status do power-up ativo (com contagem regressiva)
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        function showStatusBadge(text, color, seconds) {
+            statusBadge.style.display = 'block';
+            statusBadge.style.borderColor = color;
+            statusBadge.style.backgroundColor = color + '33';
+            statusBadge.style.color = '#fff';
+            if (badgeCountdownInterval) clearInterval(badgeCountdownInterval);
+            let remaining = seconds;
+            const render = () => { statusText.textContent = `${text} (${remaining.toFixed(1)}s)`; };
+            render();
+            badgeCountdownInterval = setInterval(() => {
+                remaining -= 0.1;
+                if (remaining <= 0) {
+                    clearInterval(badgeCountdownInterval);
+                    badgeCountdownInterval = null;
+                    if (!isGhostMode && !isSpeedBoostActive) statusBadge.style.display = 'none';
+                } else {
+                    render();
+                }
+            }, 100);
+        }
+        function hideStatusBadge() {
+            // Não esconde se ainda houver power-up ativo (caso power-ups sobrepostos)
+            if (isGhostMode || isSpeedBoostActive) return;
+            if (badgeCountdownInterval) { clearInterval(badgeCountdownInterval); badgeCountdownInterval = null; }
+            statusBadge.style.display = 'none';
+        }
+
+        function resetPowerUps() {
+            isGhostMode = false;
+            isSpeedBoostActive = false;
+            isSpacePressed = false;
+            normalFoodEaten = 0;
+            if (ghostTimeout) clearTimeout(ghostTimeout);
+            if (speedTimeout) clearTimeout(speedTimeout);
+            if (badgeCountdownInterval) { clearInterval(badgeCountdownInterval); badgeCountdownInterval = null; }
+            hideStatusBadge();
+        }
+
+        // ===================== TASK_003 =====================
+        function triggerScreenShake(ms) { shakeDuration = Math.max(shakeDuration, ms); }
+
+        // --- Partículas neon ---
+        function spawnParticle(gx, gy, color) {
+            particles.push({
+                x: gx * gridSize + gridSize / 2, y: gy * gridSize + gridSize / 2,
+                vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                size: Math.random() * 3 + 2, color, alpha: 1.0, decay: Math.random() * 0.05 + 0.02
+            });
+        }
+        function createPortalBurst(gx, gy) {
+            for (let i = 0; i < 14; i++) spawnParticle(gx, gy, i % 2 ? '#00d2ff' : '#ff9f43');
+        }
+        function createExplosionParticles(gx, gy, color) {
+            for (let i = 0; i < 10; i++) spawnParticle(gx, gy, color);
+        }
+        function updateAndDrawParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+                if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.shadowBlur = 5; ctx.shadowColor = p.color;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        // --- Portais dimensionais ---
+        function drawPortals() {
+            if (!portalsActive) return;
+            [portalA, portalB].forEach(portal => {
+                const px = (portal.x + 0.5) * gridSize;
+                const py = (portal.y + 0.5) * gridSize;
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(Date.now() / 200);
+                ctx.shadowBlur = 15; ctx.shadowColor = portal.glowColor;
+                ctx.strokeStyle = portal.color; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.ellipse(0, 0, gridSize * 0.4, gridSize * 0.6, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.beginPath(); ctx.ellipse(0, 0, gridSize * 0.4 - 2, gridSize * 0.6 - 2, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        // --- Cobra Rival (IA) ---
+        function spawnRival() {
+            const maze = getCurrentMaze();
+            let rx, ry, tries = 0;
+            do {
+                rx = Math.floor(Math.random() * tileCount);
+                ry = Math.floor(Math.random() * tileCount);
+                tries++;
+            } while (tries < 80 && (
+                maze.some(w => w.x === rx && w.y === ry) ||
+                snake.some(s => s.x === rx && s.y === ry) ||
+                (Math.abs(rx - snake[0].x) + Math.abs(ry - snake[0].y) < 6)
+            ));
+            rivalSnake = [{ x: rx, y: ry }];
+            rivalDirection = 'left';
+        }
+        function updateRivalAI() {
+            if (!rivalSnake || rivalSnake.length === 0) return;
+            const head = rivalSnake[0];
+            const maze = getCurrentMaze();
+            const moves = [
+                { dir: 'up', x: head.x, y: head.y - 1 },
+                { dir: 'down', x: head.x, y: head.y + 1 },
+                { dir: 'left', x: head.x - 1, y: head.y },
+                { dir: 'right', x: head.x + 1, y: head.y }
+            ];
+            const valid = moves.filter(m => {
+                if (m.x < 0 || m.x >= tileCount || m.y < 0 || m.y >= tileCount) return false;
+                if (maze.some(w => w.x === m.x && w.y === m.y)) return false;
+                if (rivalSnake.some(s => s.x === m.x && s.y === m.y)) return false;
+                if (snake.some(s => s.x === m.x && s.y === m.y)) return false;
+                return true;
+            });
+            if (valid.length === 0) { triggerRivalDeath(); return; }
+            let best = valid[0], minDist = Infinity;
+            valid.forEach(m => {
+                const d = Math.abs(m.x - food.x) + Math.abs(m.y - food.y);
+                if (d < minDist) { minDist = d; best = m; }
+            });
+            rivalDirection = best.dir;
+            const newHead = { x: best.x, y: best.y };
+            rivalSnake.unshift(newHead);
+            if (newHead.x === food.x && newHead.y === food.y) {
+                food = generateFood();
+                createPortalBurst(newHead.x, newHead.y);
+                // rival cresce (sem pop)
+            } else {
+                rivalSnake.pop();
+            }
+        }
+        function triggerRivalDeath() {
+            if (!rivalSnake) return;
+            triggerScreenShake(300);
+            rivalSnake.forEach(seg => {
+                goldenApples.push({ x: seg.x, y: seg.y, value: 3, spawnTime: Date.now() });
+                createExplosionParticles(seg.x, seg.y, '#f1c40f');
+            });
+            rivalSnake = null;
+            rivalRespawnTime = Date.now() + 15000;
+        }
+        function drawRival() {
+            if (!rivalSnake) return;
+            const cr = gridSize * 0.3;
+            rivalSnake.forEach((seg, i) => {
+                ctx.fillStyle = i === 0 ? '#e74c3c' : '#c0392b';
+                ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(231, 76, 60, 0.6)';
+                drawRoundedRect(ctx, seg.x * gridSize + 1, seg.y * gridSize + 1, gridSize - 2, gridSize - 2, cr);
+            });
+            ctx.shadowBlur = 0;
+        }
+        function drawGoldenApples() {
+            goldenApples.forEach(a => {
+                const ax = (a.x + 0.5) * gridSize, ay = (a.y + 0.5) * gridSize;
+                const pulse = 0.15 * Math.sin(Date.now() / 120);
+                ctx.fillStyle = '#f1c40f';
+                ctx.shadowBlur = 14; ctx.shadowColor = 'rgba(241, 196, 15, 0.9)';
+                ctx.beginPath(); ctx.arc(ax, ay, (gridSize / 2.6) * (1 + pulse), 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+        }
+        function updateGoldenApples() {
+            const now = Date.now();
+            for (let i = goldenApples.length - 1; i >= 0; i--) {
+                if (now - goldenApples[i].spawnTime > 8000) goldenApples.splice(i, 1);
             }
         }
 
@@ -480,9 +848,16 @@
          }
 
         function draw() {
-            // Clear canvas
+            // Clear canvas (sem tremor, para limpar a tela inteira)
             ctx.fillStyle = canvasBgColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // TASK_003: Screen shake — desloca o contexto durante o impacto
+            ctx.save();
+            if (shakeDuration > 0) {
+                ctx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+                shakeDuration -= 16.66;
+            }
 
             // Draw subtle grid
             ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
@@ -491,13 +866,30 @@
                 ctx.beginPath(); ctx.moveTo(0, i * gridSize); ctx.lineTo(canvas.width, i * gridSize); ctx.stroke();
             }
 
-            // Draw food with glow and gradient
+            // Draw maze walls (neon magenta)
+            drawMaze();
+
+            // TASK_003: portais e maçãs douradas (atrás da cobra)
+            drawPortals();
+            drawGoldenApples();
+
+            // Draw food with glow and gradient (special foods use unique colors)
             const foodX = (food.x + 0.5) * gridSize; const foodY = (food.y + 0.5) * gridSize;
             const baseFoodRadius = gridSize / 2.5; const pulse = 0.1 * Math.sin(Date.now() / 150);
             const foodRadius = baseFoodRadius * (1 + pulse);
-            ctx.shadowBlur = 15; ctx.shadowColor = foodGlowColor;
+
+            let colorPrimary = foodColor;
+            let colorGlow = foodGlowColor;
+            const colorInner = 'white';
+            if (food.isSpecial) {
+                if (food.type === 'ghost') { colorPrimary = '#9b59b6'; colorGlow = 'rgba(155, 89, 182, 0.8)'; }
+                else if (food.type === 'speed') { colorPrimary = '#2980b9'; colorGlow = 'rgba(41, 128, 185, 0.8)'; }
+                else if (food.type === 'shrink') { colorPrimary = '#2ecc71'; colorGlow = 'rgba(46, 204, 113, 0.8)'; }
+            }
+
+            ctx.shadowBlur = food.isSpecial ? 20 : 15; ctx.shadowColor = colorGlow;
             const gradient = ctx.createRadialGradient(foodX - foodRadius * 0.2, foodY - foodRadius * 0.2, foodRadius * 0.1, foodX, foodY, foodRadius * 1.2);
-            gradient.addColorStop(0, 'white'); gradient.addColorStop(0.7, foodColor); gradient.addColorStop(1, foodColor);
+            gradient.addColorStop(0, colorInner); gradient.addColorStop(0.7, colorPrimary); gradient.addColorStop(1, colorPrimary);
             ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(foodX, foodY, foodRadius, 0, 2 * Math.PI); ctx.fill();
             ctx.shadowBlur = 0; // Reset shadow
 
@@ -508,6 +900,8 @@
 
              snake.forEach((segment, index) => { /* ... Draw head and body (same as before)... */
                 const segmentX = segment.x * gridSize; const segmentY = segment.y * gridSize;
+                // Efeito translúcido piscante no modo fantasma
+                ctx.globalAlpha = (isGhostMode && Math.floor(Date.now() / 150) % 2 === 0) ? 0.3 : 1.0;
                 if (index === 0) {
                     ctx.fillStyle = snakeHeadColor;
                     drawRoundedRect(ctx, segmentX, segmentY, gridSize, gridSize, cornerRadius * 1.2);
@@ -529,6 +923,25 @@
                       }
                 }
             });
+            ctx.globalAlpha = 1.0; // Garantir reset após o modo fantasma
+
+            // TASK_003: cobra rival, partículas e fim do screen shake
+            drawRival();
+            updateAndDrawParticles();
+            ctx.restore();
+        }
+
+        // Desenha as paredes do labirinto ativo com visual neon magenta
+        function drawMaze() {
+            const walls = getCurrentMaze();
+            if (!walls.length) return;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(255, 0, 255, 0.7)';
+            ctx.fillStyle = '#ff00ff';
+            walls.forEach(wall => {
+                drawRoundedRect(ctx, wall.x * gridSize + 1, wall.y * gridSize + 1, gridSize - 2, gridSize - 2, 4);
+            });
+            ctx.shadowBlur = 0; // Reset
         }
 
         function triggerGameOver() {
@@ -575,12 +988,27 @@
          }
 
         function restartGame() {
+             // Evita loops duplicados se reiniciado no meio de uma partida (ex.: troca de labirinto)
+             clearTimeout(gameLoopTimeout);
+
+             // Reset power-ups e cronômetros pendentes
+             resetPowerUps();
+
+             // TASK_003: reset de portais, rival, maçãs, partículas e tremor
+             portalsActive = false;
+             rivalSnake = null;
+             rivalRespawnTime = 0;
+             goldenApples = [];
+             particles.length = 0;
+             shakeDuration = 0;
+
              // Reset game state
              snake = [{x: 10, y: 10}];
-             direction = 'right';
-             requestedDirection = 'right';
+             direction = pickSafeStartDirection();
+             requestedDirection = direction;
              food = generateFood();
              score = 0;
+             scoreElement.style.color = 'var(--score-color)';
              scoreElement.textContent = `Score: ${score}`;
              isGameOver = false;
 
@@ -602,8 +1030,12 @@
              if (isGameOver) return;
              update();
              draw();
-             let speed = 150 - Math.min(score * 2, 80); // Dynamic speed
-             gameLoopTimeout = setTimeout(gameLoop, speed);
+             let baseSpeed = 150 - Math.min(score * 2, 80); // Dynamic speed
+             let speedMultiplier = 1.0;
+             if (isSpacePressed) speedMultiplier *= 0.5;      // aceleração manual
+             if (isSpeedBoostActive) speedMultiplier *= 0.5;  // power-up de aceleração
+             const finalSpeed = baseSpeed * speedMultiplier;
+             gameLoopTimeout = setTimeout(gameLoop, finalSpeed);
         }
 
         // --- Initialization ---
@@ -621,9 +1053,47 @@
          // Add keydown listener for global input
          document.addEventListener('keydown', handleKeyPress);
 
+         // Speed Boost manual (Barra de Espaço)
+         document.addEventListener('keydown', (e) => {
+             if (e.key === ' ' || e.code === 'Space') {
+                 if (!isGameOver) {
+                     if (!isSpacePressed) lastScoreDeductionTime = Date.now();
+                     isSpacePressed = true;
+                     e.preventDefault(); // impede rolagem da página
+                 }
+             }
+         });
+         document.addEventListener('keyup', (e) => {
+             if (e.key === ' ' || e.code === 'Space') isSpacePressed = false;
+         });
+
+         // Trocar o labirinto reinicia a partida (evita a cobra presa dentro de parede)
+         const mazeSelect = document.getElementById('mazeSelect');
+         if (mazeSelect) {
+             mazeSelect.addEventListener('change', () => { restartGame(); });
+         }
+
          // Initial setup
          displayHighScores(); // Load and display scores on page load
+         direction = requestedDirection = pickSafeStartDirection();
          gameLoop(); // Start the game
+
+         // Hook de depuração/teste (TASK_003)
+         window.__snake3 = {
+             getState: () => ({ score, portalsActive, hasRival: !!rivalSnake, rivalLen: rivalSnake ? rivalSnake.length : 0, goldenApples: goldenApples.length, particles: particles.length, shake: shakeDuration }),
+             portalA, portalB,
+             setScore: (s) => { score = s; },
+             setSnake: (s) => { snake = s; },
+             getSnake: () => snake,
+             setFood: (f) => { food = f; },
+             getFood: () => food,
+             getRival: () => rivalSnake,
+             setRival: (r) => { rivalSnake = r; },
+             getGolden: () => goldenApples,
+             spawnRival, updateRivalAI, triggerRivalDeath, update,
+             setMaze: (m) => { document.getElementById('mazeSelect').value = m; },
+             tileCount
+         };
 
     </script>
 </body>

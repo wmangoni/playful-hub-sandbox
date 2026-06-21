@@ -408,3 +408,30 @@ function resetPowerUps() {
 ```
 Essa chamada deve ser adicionada no início de `restartGame()`.
 
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `snake/index.html`. Todos os critérios atendidos e validados localmente (preview + testes unitários das mecânicas via console). Nenhum erro de runtime.
+
+### O que foi entregue
+1.  **Maze Mode**: `MAZES` (classic/box/corners/spiral) + `<select id="mazeSelect">` no menu. `drawMaze()` pinta paredes em magenta neon; `update()` dispara Game Over ao colidir com parede. Trocar o mapa reinicia a partida (`change` → `restartGame()`), com `clearTimeout` para não duplicar o game loop.
+2.  **Frutas especiais (a cada 5 normais)**: `generateFood()` evita paredes e corpo, e gera fruta especial (`ghost`/`speed`/`shrink`) com cores/gradientes próprios. Efeitos em `applySpecialFood()`: Fantasma (5s, atravessa paredes/corpo + screen-wrap + cobra piscando), Aceleração (8s, 2× velocidade e 2× pontos), Corte (−3 segmentos se `length > 6`).
+3.  **Speed Boost manual**: barra de espaço dobra a velocidade (multiplicador 0.5 no delay do loop) e consome 1 ponto a cada 1.5s. Badge `#statusBadge` mostra o power-up ativo com contagem regressiva.
+4.  **Reset de estado**: `resetPowerUps()` chamado no início de `restartGame()` limpa flags, cronômetros e o badge.
+
+### Validações executadas (console)
+*   Colisão com parede (box) → Game Over; modo fantasma atravessa parede e faz wrap de tela.
+*   Fruta de aceleração ativa boost e dobra pontos das frutas seguintes (normal → +2).
+*   Fruta de corte: cobra 8 → 6 segmentos.
+*   `generateFood` em 200 amostras nunca caiu sobre parede; fruta especial garantida após 5 normais.
+*   Multiplicador de velocidade (espaço + boost) = 0.25× do delay base.
+
+### Decisão de implementação (atenção do TL)
+*   **Spawn seguro**: a cobra nasce em (10,10) virada para a direita por padrão, mas no labirinto **Espiral** a célula (11,10) é parede — isso causava morte instantânea no 1º frame. Adicionei `pickSafeStartDirection()` que escolhe uma direção inicial livre conforme o mapa ativo (mantém "right" quando possível). O Espiral continua desafiador (corredor estreito), mas é navegável e não mata na largada. Decisão conservadora para preservar a jogabilidade sem alterar as coordenadas do mapa definidas no refinamento.
+
+### 🔧 Correção pós-feedback (bug do modo "Sem Paredes")
+*   **Reportado**: no modo **Clássico (Sem Paredes)** a cobra morria ao tocar a borda do canvas, em vez de atravessar para o lado oposto.
+*   **Causa**: o `update()` só fazia *screen wrap* no modo Fantasma; nos demais casos, a borda disparava Game Over (comportamento herdado do jogo original).
+*   **Correção**: a borda agora **sempre** faz wrap para o lado oposto. O mapa **Caixa Fechada** continua matando na borda porque suas paredes de perímetro são tratadas pela colisão de labirinto (a cobra morre na parede em x/y=19, um passo antes do wrap). Validado: Clássico atravessa as 4 bordas; Caixa Fechada continua morrendo na parede.
+

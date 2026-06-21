@@ -566,10 +566,16 @@ Para manter o alinhamento rigoroso antes do desenvolvimento da tarefa, formulei 
 1.  **Compatibilidade do Incremento de Fischer (chessTimer)**:
     *   *Pergunta*: O incremento de tempo deve ser adicionado *imediatamente* no momento do clique de soltar a peça (`onSnapEnd`) ou apenas quando o motor de xadrez confirma a legalidade lógica da jogada?
     *   *Recomendação*: Executar a adição de tempo somente após a confirmação lógica da jogada para evitar que lances ilegais devolvidos ao tabuleiro concedam incrementos indevidos ao jogador.
+    *   *Resolução do Tech Lead (TL)*: **APROVADO**. O incremento de tempo deve ser adicionado estritamente após a confirmação da legalidade do lance pelo motor Chess.js, no momento em que o movimento é de fato consolidado na partida. Isso impede que lances inválidos concedam incrementos indevidos de tempo.
 2.  **Web Audio API Autoplay Restrictions**:
     *   *Pergunta*: A inicialização do `AudioContext` deve ser associada a um botão explícito de "Habilitar Som / Iniciar Jogo" ou podemos associá-la implicitamente a qualquer interação com o tabuleiro?
     *   *Recomendação*: Utilizar o próprio clique no tabuleiro ou nos botões de controle de tempo para disparar o `resume()` do AudioContext de forma imperceptível e livre de erros.
+    *   *Resolução do Tech Lead (TL)*: **APROVADO**. A inicialização do context de áudio deve ser realizada de forma preguiçosa e imperceptível, ativada por qualquer interação direta do usuário (como clicar em presets de tempo, mover peças ou interagir com o tabuleiro). É crucial encapsular as chamadas com tratamento de erros `try/catch` para que restrições de navegadores específicos nunca travem o loop de jogo.
 
 ---
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+*Despacho emitido por: Antigravity - Veteran Game Tech Lead (TL)*

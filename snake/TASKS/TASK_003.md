@@ -310,3 +310,27 @@ Abaixo estão detalhados os passos de implementação, a arquitetura matemática
     // No final do método draw():
     ctx.restore();
     ```
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `snake/index.html` sobre a TASK_002 (labirintos, frutas especiais, speed boost). Todos os critérios atendidos e validados localmente (preview + testes via console). Nenhum erro de runtime.
+
+### O que foi entregue
+1.  **Portais Dimensionais**: ativam ao atingir 10 pts; `portalA` (2,10) azul e `portalB` (17,10) âmbar (coords fixas seguras em todos os 4 labirintos). Ao entrar com a cabeça, teletransporta para o portal oposto mantendo a direção, com screen shake + burst de partículas. Renderizados como elipses neon pulsantes/rotativas.
+2.  **Cobra Rival IA**: spawna em 20 pts numa posição segura longe do jogador; navega por heurística Manhattan filtrando colisões (bordas, labirinto, próprio corpo e corpo do jogador). Compete pela comida (cresce ao comer). Sem movimento válido → explode em **Maçãs Douradas** (3 pts cada, somem em 8s); respawn 15s depois. Player encostar na rival = Game Over.
+3.  **Juiciness**: `ParticleSystem` emite rastro neon da cauda a cada frame (decai por alpha); `triggerScreenShake(ms)` translada o canvas (envolto em `save/restore` no `draw()`) em teletransporte, fruta especial, maçã dourada e explosão da rival.
+
+### Validações executadas (console, via hook `window.__snake3`)
+*   Portais: ativam em 10 pts; cabeça em (1,10)→(2,10)=A teletransporta para (17,10)=B; screen shake disparado.
+*   Rival: spawna em 20 pts (len 1); IA move-se em direção à comida (Manhattan).
+*   Morte da rival: 3 segmentos → 3 maçãs douradas; rival = null (respawn agendado).
+*   Comer maçã dourada: +3 pontos e remoção da maçã.
+*   Rastro de partículas acumulando desde o load; render de portais/rival/maçãs/partículas sem erros.
+
+### Observações para o TL
+*   **Coords fixas dos portais** (2,10)/(17,10) foram verificadas como livres de parede nos 4 mapas (classic/box/corners/spiral), atendendo "não spawnar sobre paredes" sem reposicionamento dinâmico.
+*   **Modo fantasma** também ignora a colisão com a rival (consistente com a invencibilidade visual piscante do power-up).
+*   **Screen shake** envolve todo o `draw()` em `save/translate/restore`, mas o `clearRect` ocorre antes (em espaço não transladado) para não deixar bordas sujas.
+*   Hook `window.__snake3` deixado exposto (debug/QA), removível no cleanup. rAF/loop roda no preview headless (o rastro de partículas confirma), então a verificação combinou observação ao vivo + chamadas determinísticas de `update()`/IA.

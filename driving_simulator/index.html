@@ -104,6 +104,83 @@
             font-weight: bold;
             display: none;
         }
+
+        /* === TASK_002: HUD de hora + botão de farol === */
+        #timeIndicator {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        #headlightBtn {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.6);
+            color: #ffe08a;
+            border: 1px solid rgba(255, 224, 138, 0.5);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #headlightBtn.on { background: rgba(255, 224, 138, 0.25); box-shadow: 0 0 14px rgba(255,224,138,0.5); }
+
+        /* === TASK_002: Garagem (glassmorphism) === */
+        #garageScreen {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 10, 20, 0.82);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            pointer-events: auto;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #garageScreen h2 { font-size: 30px; letter-spacing: 2px; margin-bottom: 6px; color: #e8f0ff; }
+        #garageScreen .sub { color: #8fa3c7; margin-bottom: 24px; font-size: 14px; }
+        .card-container { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; max-width: 800px; }
+        .car-card {
+            width: 210px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            padding: 18px;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+        .car-card:hover { transform: translateY(-4px); }
+        .car-card.selected { border-color: #ffd54a; box-shadow: 0 0 22px rgba(255, 213, 74, 0.4); }
+        .car-card .swatch { width: 100%; height: 70px; border-radius: 8px; margin-bottom: 12px; }
+        .car-card .name { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+        .car-card .stats { font-size: 12px; color: #b8c4d8; line-height: 1.7; }
+        .car-card .stat-bar { height: 6px; background: rgba(255,255,255,0.15); border-radius: 3px; margin-top: 2px; overflow: hidden; }
+        .car-card .stat-bar > div { height: 100%; background: linear-gradient(90deg,#4CAF50,#8BC34A); }
+        #selectCarBtn {
+            margin-top: 26px;
+            pointer-events: auto;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 34px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #selectCarBtn:hover { background: #45a049; }
     </style>
 </head>
 <body>
@@ -114,6 +191,8 @@
         </div>
         <div id="message">Pressione ESPAÇO para iniciar</div>
         <div id="aiMessage"></div>
+        <div id="timeIndicator">☀️ Dia</div>
+        <button id="headlightBtn">💡 Faróis (F)</button>
         <canvas id="speedometer"></canvas>
         <div id="healthBars">
             <div class="healthBar">
@@ -128,7 +207,39 @@
                     <div class="healthBarFill" id="aiHealth" style="width: 0%;">0/30</div>
                 </div>
             </div>
+            <!-- TASK_003: integridade e combustível -->
+            <div class="healthBar">
+                <label>🔧 INTEGRIDADE</label>
+                <div class="healthBarContainer">
+                    <div class="healthBarFill" id="carHealthBar" style="width: 100%; background: linear-gradient(90deg,#e53935,#fb8c00,#43a047);">100%</div>
+                </div>
+            </div>
+            <div class="healthBar">
+                <label>⛽ COMBUSTÍVEL</label>
+                <div class="healthBarContainer">
+                    <div class="healthBarFill" id="fuelBar" style="width: 100%; background: linear-gradient(90deg,#0288d1,#26c6da);">100%</div>
+                </div>
+            </div>
         </div>
+
+        <!-- TASK_003: HUD do Time Trial -->
+        <div id="lapHud" style="position:absolute; top:20px; left:20px; background:rgba(0,0,0,0.7); color:#fff; padding:10px 16px; border-radius:8px; font-weight:bold; display:none;">
+            <div style="font-size:13px; color:#9fe6b8;">⏱️ VOLTA ATUAL</div>
+            <div id="lapTimeDisplay" style="font-size:22px; font-family:monospace;">0.000s</div>
+            <div style="font-size:12px; color:#ffd54a; margin-top:4px;">🏆 Melhor: <span id="bestLapDisplay">--</span></div>
+        </div>
+    </div>
+
+    <div id="garageScreen">
+        <h2>🏁 SELECIONE SEU VEÍCULO</h2>
+        <div class="sub">Cada modelo tem física única. Coletar moedas exige sair na grama — cuidado com a penalidade!</div>
+        <div class="card-container" id="carCards"></div>
+        <div style="margin-top:22px; display:flex; gap:10px; align-items:center;">
+            <span style="color:#8fa3c7; font-size:14px;">Modo:</span>
+            <button id="modeCoins" class="mode-btn" data-mode="coins" style="pointer-events:auto; background:#4CAF50; color:#fff; border:none; border-radius:8px; padding:8px 16px; cursor:pointer; outline:2px solid #ffd54a;">🪙 Coleta de Moedas</button>
+            <button id="modeTrial" class="mode-btn" data-mode="time_trial" style="pointer-events:auto; background:#37474f; color:#fff; border:none; border-radius:8px; padding:8px 16px; cursor:pointer;">⏱️ Time Trial (Drift Ghost)</button>
+        </div>
+        <button id="selectCarBtn">INICIAR CORRIDA</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -162,6 +273,44 @@
         const TRAIN_COLLISION_DISTANCE = 4;
         const COIN_COLLISION_DISTANCE = 2.5;
         const TRACK_RADIUS = 40;
+
+        // === TASK_002: Modelos de carro (garagem) ===
+        const CAR_MODELS = {
+            apex:    { id: 'apex',    name: 'Apex Sport',    color: 0xff3030, accel: 0.016, maxSpd: 0.38, turn: 0.024, grassPenalty: 0.50, desc: 'Veloz e ágil, derrapa em curvas. Penalidade alta na grama.' },
+            cruiser: { id: 'cruiser', name: 'Cruiser Sedan', color: 0x3050ff, accel: 0.010, maxSpd: 0.30, turn: 0.020, grassPenalty: 0.35, desc: 'Equilibrado e estável. Penalidade média na grama.' },
+            atlas:   { id: 'atlas',   name: 'Atlas SUV',     color: 0x30b050, accel: 0.007, maxSpd: 0.22, turn: 0.015, grassPenalty: 0.00, desc: 'Pesado e lento, mas IMUNE à grama (tração integral).' }
+        };
+        let playerPhysics = CAR_MODELS.cruiser; // padrão até o jogador escolher
+
+        // === TASK_002: Tráfego de IA ===
+        const TRAFFIC_POOL = 6;
+        const ROAD_HALF_WIDTH = 10;       // estrada de 20 de largura (x ∈ [-10,10])
+        const TRAFFIC_LANES = { left: -5, right: 5 };
+        const TRAFFIC_COLLISION_DISTANCE = 3.2;
+        const traffic = [];
+
+        // === TASK_002: Ciclo dia/noite + faróis ===
+        const DAY_CYCLE = 120;            // segundos por ciclo completo
+        let timeOfDay = 0;                // 0..120
+        let headlightsOn = false;
+        let headlightsAuto = true;        // auto liga à noite; F faz override manual
+        let headlight = null, lightCone = null;
+        let lastFrameTime = performance.now();
+        let skidMarks = [];
+
+        // === TASK_003: obstáculos, dano/combustível, pit stop, time trial ===
+        const GRAVITY_AIR = 0.008;
+        let isSpunOut = false, spinTimer = 0;
+        let isAirborne = false, verticalVelocity = 0;
+        let timeScale = 1.0, shakeIntensity = 0;
+        const activeCones = [], oilPuddles = [], ramps = [], smokeParticles = [], healingRings = [];
+        let raceMode = 'coins';            // 'coins' | 'time_trial'
+        let activeLapTime = 0;             // ms da volta atual
+        let bestLapTime = parseFloat(localStorage.getItem('driving_bestLapTime')) || null;
+        let lapReplayData = [];            // melhor volta (frames {x,y,z,rotY}) - só em RAM
+        let activeLapFrames = [];
+        let ghostMesh = null, ghostFrameIdx = 0;
+        let lapStartZ = -50, lapArmed = false; // detecção de volta (cruzar a linha de partida)
 
 
         // Configuração inicial
@@ -343,6 +492,45 @@
         playerCar.position.set(-5, 0, -50);
         scene.add(playerCar);
 
+        // === TASK_002: Faróis do jogador (SpotLight + cone volumétrico) ===
+        function setupHeadlights() {
+            headlight = new THREE.SpotLight(0xFFFFE0, 5.0, 60, Math.PI / 6, 0.8, 1);
+            headlight.castShadow = true; // só o jogador projeta sombra (otimização do TL)
+            headlight.shadow.mapSize.width = 1024;
+            headlight.shadow.mapSize.height = 1024;
+            headlight.position.set(0, 0.9, 1.6);
+            playerCar.add(headlight);
+
+            const headlightTarget = new THREE.Object3D();
+            headlightTarget.position.set(0, 0.5, 12);
+            playerCar.add(headlightTarget);
+            headlight.target = headlightTarget;
+
+            // Feixe volumétrico semitransparente
+            const coneGeom = new THREE.ConeGeometry(5, 40, 16, 1, true);
+            coneGeom.translate(0, -20, 0);   // pivô na ponta
+            coneGeom.rotateX(Math.PI / 2);   // aponta para +Z (frente)
+            const coneMat = new THREE.MeshBasicMaterial({
+                color: 0xFFFFDD, transparent: true, opacity: 0.12,
+                blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+            });
+            lightCone = new THREE.Mesh(coneGeom, coneMat);
+            lightCone.position.set(0, 0.8, 20);
+            playerCar.add(lightCone);
+
+            headlight.visible = false;
+            lightCone.visible = false;
+        }
+        setupHeadlights();
+
+        function setHeadlights(on) {
+            headlightsOn = on;
+            if (headlight) headlight.visible = on;
+            if (lightCone) lightCone.visible = on;
+            const btn = document.getElementById('headlightBtn');
+            if (btn) btn.classList.toggle('on', on);
+        }
+
         const aiCar = createCar(AI_CAR_COLOR);
         aiCar.position.set(5, 0, -50);
         scene.add(aiCar);
@@ -383,10 +571,12 @@
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             if (e.key === ' ') {
-                if (!gameState.started || gameState.playerScore >= MAX_SCORE || gameState.aiScore >= MAX_SCORE) {
+                // Só reinicia depois de escolher o carro na garagem
+                if (carChosen && (!gameState.started || gameState.playerScore >= MAX_SCORE || gameState.aiScore >= MAX_SCORE)) {
                     resetGame();
                 }
             }
+            if (e.key.toLowerCase() === 'f') { toggleHeadlightsManual(); }
         });
         window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
@@ -396,20 +586,47 @@
                 playerScore: 0,
                 aiScore: 0,
                 playerSpeed: 0,
-                aiTarget: null
+                aiTarget: null,
+                playerHealth: 100,   // TASK_003
+                playerFuel: 100,
+                aiHealth: 100
             };
             playerCar.position.set(-5, 0, -50);
-            playerCar.rotation.y = 0;
+            playerCar.rotation.set(0, 0, 0);
             aiCar.position.set(5, 0, -50);
-            aiCar.rotation.y = 0;
-            
+            aiCar.rotation.set(0, 0, 0);
+
+            // TASK_003: reset de estados de física/efeitos
+            isSpunOut = false; spinTimer = 0; isAirborne = false; verticalVelocity = 0;
+            timeScale = 1.0; shakeIntensity = 0;
+            activeLapTime = 0; activeLapFrames = []; lapArmed = false; ghostFrameIdx = 0;
+            smokeParticles.forEach(p => scene.remove(p)); smokeParticles.length = 0;
+            healingRings.forEach(r => scene.remove(r)); healingRings.length = 0;
+
+            // Modo de corrida
             coins.forEach(coin => scene.remove(coin));
             coins.length = 0;
-            for (let i = 0; i < COIN_COUNT; i++) {
-                createCoin();
+            const lapHud = document.getElementById('lapHud');
+            if (raceMode === 'time_trial') {
+                aiCar.visible = false;
+                if (lapHud) lapHud.style.display = 'block';
+                if (ghostMesh) ghostMesh.visible = true;
+            } else {
+                aiCar.visible = true;
+                for (let i = 0; i < COIN_COUNT; i++) createCoin();
+                if (lapHud) lapHud.style.display = 'none';
             }
-            
+
+            // TASK_002: reset de tráfego, ciclo de tempo e faróis
+            timeOfDay = 0;
+            headlightsAuto = true;
+            setHeadlights(false);
+            initTraffic();
+            skidMarks.forEach(s => scene.remove(s.mesh));
+            skidMarks.length = 0;
+
             updateUI();
+            updateTask3HUD();
             document.getElementById('message').style.display = 'none';
         }
 
@@ -523,30 +740,541 @@
             speedCtx.fillText(Math.round(speed * 100) + ' km/h', centerX, centerY + 30);
         }
 
+        // === TASK_002: Tráfego de IA ===
+        const TRAFFIC_COLORS = [0xffa500, 0x9b59b6, 0x1abc9c, 0xecf0f1, 0xe67e22, 0x34495e];
+        function createTrafficCar() {
+            const mesh = createCar(TRAFFIC_COLORS[Math.floor(Math.random() * TRAFFIC_COLORS.length)]);
+            scene.add(mesh);
+            return { mesh, speed: 0, direction: 1, lane: 'right', isOvertaking: false, overtakeTimer: 0, targetX: 0 };
+        }
+        function spawnTrafficCar(t, aheadOverride) {
+            t.direction = Math.random() < 0.5 ? 1 : -1;
+            t.lane = Math.random() < 0.5 ? 'left' : 'right';
+            t.isOvertaking = false;
+            t.overtakeTimer = 0;
+            t.speed = 0.12 + Math.random() * 0.18;
+            const ahead = aheadOverride !== undefined ? aheadOverride : (Math.random() < 0.5);
+            const distance = 90 + Math.random() * 60;
+            t.mesh.position.set(TRAFFIC_LANES[t.lane], 0, playerCar.position.z + (ahead ? distance : -distance));
+            t.targetX = TRAFFIC_LANES[t.lane];
+            t.mesh.rotation.y = t.direction === 1 ? 0 : Math.PI;
+        }
+        function initTraffic() {
+            traffic.forEach(t => scene.remove(t.mesh));
+            traffic.length = 0;
+            for (let i = 0; i < TRAFFIC_POOL; i++) {
+                const t = createTrafficCar();
+                spawnTrafficCar(t);
+                traffic.push(t);
+            }
+        }
+        function updateTraffic(dt) {
+            const pz = playerCar.position.z;
+            traffic.forEach(t => {
+                t.mesh.position.z += t.direction * t.speed;
+
+                // IA de ultrapassagem
+                if (!t.isOvertaking) {
+                    for (const other of traffic) {
+                        if (other === t || other.lane !== t.lane) continue;
+                        if (Math.sign(other.direction) !== Math.sign(t.direction)) continue;
+                        const dz = (other.mesh.position.z - t.mesh.position.z) * t.direction;
+                        if (dz > 0 && dz < 20 && other.speed < t.speed) {
+                            t.isOvertaking = true;
+                            t.overtakeTimer = 0;
+                            t.lane = (t.lane === 'left') ? 'right' : 'left';
+                            t.targetX = TRAFFIC_LANES[t.lane];
+                            break;
+                        }
+                    }
+                }
+                if (t.isOvertaking) {
+                    t.overtakeTimer += dt;
+                    t.mesh.position.x = THREE.MathUtils.lerp(t.mesh.position.x, t.targetX, 0.12);
+                    if (t.overtakeTimer >= 1.5) { t.isOvertaking = false; t.mesh.position.x = t.targetX; }
+                }
+
+                // reciclagem
+                if (Math.abs(t.mesh.position.z - pz) > 150) spawnTrafficCar(t);
+
+                // colisão com o jogador -> freada drástica + dano (TASK_003)
+                if (gameState.started && t.mesh.position.distanceTo(playerCar.position) < TRAFFIC_COLLISION_DISTANCE) {
+                    gameState.playerSpeed *= 0.2;
+                    if (gameState.playerHealth !== undefined) applyDamage('player', 15);
+                    flashCollision();
+                }
+                // colisão com a IA -> dano (TL: IA também sofre)
+                if (gameState.started && t.mesh.position.distanceTo(aiCar.position) < TRAFFIC_COLLISION_DISTANCE) {
+                    if (gameState.aiHealth !== undefined) applyDamage('ai', 15);
+                }
+            });
+        }
+        function flashCollision() {
+            let f = document.getElementById('collisionFlash');
+            if (!f) {
+                f = document.createElement('div');
+                f.id = 'collisionFlash';
+                f.style.cssText = 'position:absolute;inset:0;background:rgba(255,0,0,0.28);pointer-events:none;z-index:40;opacity:0;transition:opacity 0.3s;';
+                document.getElementById('ui').appendChild(f);
+            }
+            f.style.opacity = '1';
+            clearTimeout(f._t);
+            f._t = setTimeout(() => { f.style.opacity = '0'; }, 110);
+        }
+
+        // === TASK_002: Ciclo Dia/Noite ===
+        const _dayBg = new THREE.Color(0x87CEEB), _sunsetBg = new THREE.Color(0xFD5E53),
+              _nightBg = new THREE.Color(0x07090e), _dawnBg = new THREE.Color(0xFFC0CB);
+        function getDayNightState(time) {
+            let bg, dirInt, ambInt, label;
+            if (time < 40) { bg = _dayBg.clone(); dirInt = 0.8; ambInt = 0.6; label = '☀️ Dia'; }
+            else if (time < 60) { const k = (time - 40) / 20; bg = _dayBg.clone().lerp(_sunsetBg, k); dirInt = 0.8 - 0.6 * k; ambInt = 0.6 - 0.3 * k; label = '🌇 Entardecer'; }
+            else if (time < 100) { const k = Math.min(1, (time - 60) / 10); bg = _sunsetBg.clone().lerp(_nightBg, k); dirInt = 0.2 * (1 - k); ambInt = 0.3 - 0.22 * k; label = '🌙 Noite'; }
+            else { const k = (time - 100) / 20; bg = _nightBg.clone().lerp(_dawnBg, k); dirInt = 0.8 * k; ambInt = 0.08 + 0.52 * k; label = '🌅 Amanhecer'; }
+            const dark = time >= 50 && time < 105; // janela de faróis automáticos (decisão do TL)
+            return { bg, dirInt, ambInt, label, dark };
+        }
+        function updateDayNight(dt) {
+            timeOfDay = (timeOfDay + dt) % DAY_CYCLE;
+            const s = getDayNightState(timeOfDay);
+            scene.background.copy(s.bg);
+            scene.fog.color.copy(s.bg);
+            scene.fog.far = 80 + (s.ambInt / 0.6) * 420; // visibilidade cai à noite
+            dirLight.intensity = s.dirInt;
+            ambientLight.intensity = s.ambInt;
+            const ti = document.getElementById('timeIndicator');
+            if (ti) ti.textContent = s.label;
+            if (headlightsAuto) setHeadlights(s.dark);
+        }
+        function toggleHeadlightsManual() {
+            headlightsAuto = false;
+            setHeadlights(!headlightsOn);
+        }
+
+        // === TASK_002: Marcas de derrapagem (Apex drift) ===
+        function addSkidMark() {
+            const mark = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.3, 1.2),
+                new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.5, depthWrite: false })
+            );
+            mark.rotation.x = -Math.PI / 2;
+            mark.position.set(
+                playerCar.position.x - Math.sin(playerCar.rotation.y) * 1.2,
+                0.03,
+                playerCar.position.z - Math.cos(playerCar.rotation.y) * 1.2
+            );
+            scene.add(mark);
+            skidMarks.push({ mesh: mark, life: 3 });
+            if (skidMarks.length > 120) { const old = skidMarks.shift(); scene.remove(old.mesh); }
+        }
+        function updateSkidMarks(dt) {
+            for (let i = skidMarks.length - 1; i >= 0; i--) {
+                const s = skidMarks[i];
+                s.life -= dt;
+                s.mesh.material.opacity = Math.max(0, 0.5 * (s.life / 3));
+                if (s.life <= 0) { scene.remove(s.mesh); skidMarks.splice(i, 1); }
+            }
+        }
+
+        // === TASK_002: Garagem ===
+        let selectedCarId = 'cruiser';
+        let selectedMode = 'coins'; // TASK_003: 'coins' | 'time_trial'
+        let carChosen = false;
+        function buildGarage() {
+            const cards = document.getElementById('carCards');
+            cards.innerHTML = '';
+            Object.values(CAR_MODELS).forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'car-card' + (m.id === selectedCarId ? ' selected' : '');
+                const hex = '#' + m.color.toString(16).padStart(6, '0');
+                const spd = Math.round(m.maxSpd / 0.38 * 100), acc = Math.round(m.accel / 0.016 * 100), grip = Math.round((1 - m.grassPenalty) * 100);
+                card.innerHTML = `
+                    <div class="swatch" style="background:${hex}"></div>
+                    <div class="name">${m.name}</div>
+                    <div class="stats">
+                      Velocidade <div class="stat-bar"><div style="width:${spd}%"></div></div>
+                      Aceleração <div class="stat-bar"><div style="width:${acc}%"></div></div>
+                      Tração na grama <div class="stat-bar"><div style="width:${grip}%"></div></div>
+                      <div style="margin-top:8px;color:#8fa3c7">${m.desc}</div>
+                    </div>`;
+                card.addEventListener('click', () => {
+                    selectedCarId = m.id;
+                    document.querySelectorAll('.car-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                });
+                cards.appendChild(card);
+            });
+        }
+        function recolorPlayerCar(color) {
+            const body = playerCar.children[0]; // body e top compartilham material
+            if (body && body.material) body.material.color.setHex(color);
+        }
+        function startFromGarage() {
+            playerPhysics = CAR_MODELS[selectedCarId];
+            recolorPlayerCar(playerPhysics.color);
+            raceMode = selectedMode; // TASK_003
+            carChosen = true;
+            document.getElementById('garageScreen').style.display = 'none';
+            resetGame();
+        }
+
+        // ===================== TASK_003 =====================
+
+        // --- Dano e combustível ---
+        function applyDamage(who, amount) {
+            if (who === 'player') {
+                gameState.playerHealth = Math.max(0, gameState.playerHealth - amount);
+            } else {
+                gameState.aiHealth = Math.max(0, gameState.aiHealth - amount);
+            }
+        }
+
+        function spawnSmoke() {
+            if (gameState.playerHealth >= 50) return;
+            const count = gameState.playerHealth < 25 ? 3 : 1;
+            for (let i = 0; i < count; i++) {
+                const color = (gameState.playerHealth < 25 && Math.random() > 0.5) ? 0xFF3300 : 0x777777;
+                const p = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 4, 4),
+                    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 })
+                );
+                const forward = new THREE.Vector3(0, 0.8, 1.5).applyQuaternion(playerCar.quaternion);
+                p.position.copy(playerCar.position).add(forward);
+                p.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.05, 0.05 + Math.random() * 0.05, (Math.random() - 0.5) * 0.05);
+                p.life = 1.0;
+                scene.add(p);
+                smokeParticles.push(p);
+            }
+        }
+        function updateSmoke() {
+            for (let i = smokeParticles.length - 1; i >= 0; i--) {
+                const p = smokeParticles[i];
+                p.position.add(p.velocity);
+                p.scale.multiplyScalar(1.02);
+                p.life -= 0.03;
+                p.material.opacity = Math.max(0, p.life);
+                if (p.life <= 0) { scene.remove(p); smokeParticles.splice(i, 1); }
+            }
+        }
+
+        // --- Cones destrutíveis ---
+        function makeCone() {
+            const cone = new THREE.Mesh(
+                new THREE.CylinderGeometry(0, 0.4, 1.2, 8),
+                new THREE.MeshLambertMaterial({ color: 0xFF5722 })
+            );
+            cone.physics = { velocity: new THREE.Vector3(), angularVelocity: new THREE.Vector3(), isHit: false, opacity: 1.0 };
+            return cone;
+        }
+        function placeCone(cone, nearZ) {
+            cone.position.set(Math.random() * 16 - 8, 0.6, (nearZ !== undefined ? nearZ : (Math.random() * 200 - 100)));
+            cone.physics.isHit = false; cone.physics.opacity = 1.0;
+            cone.material.opacity = 1.0; cone.material.transparent = false;
+            cone.rotation.set(0, 0, 0);
+        }
+        function spawnCones() {
+            for (let i = 0; i < 15; i++) { const c = makeCone(); placeCone(c); scene.add(c); activeCones.push(c); }
+        }
+        function hitCone(cone, car) {
+            cone.physics.isHit = true;
+            const away = cone.position.clone().sub(car.position).setY(0).normalize().multiplyScalar(0.4 + Math.random() * 0.3);
+            cone.physics.velocity.set(away.x, 0.25, away.z);
+            cone.physics.angularVelocity.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, 0);
+        }
+        function updateCones(ts) {
+            for (let idx = activeCones.length - 1; idx >= 0; idx--) {
+                const cone = activeCones[idx];
+                // colisão (apenas cones não atingidos)
+                if (!cone.physics.isHit && gameState.started) {
+                    if (playerCar.position.distanceTo(cone.position) < 2.0) { hitCone(cone, playerCar); gameState.playerSpeed *= 0.85; applyDamage('player', 3); }
+                    else if (aiCar.position.distanceTo(cone.position) < 2.0) { hitCone(cone, aiCar); applyDamage('ai', 3); }
+                }
+                if (cone.physics.isHit) {
+                    cone.position.addScaledVector(cone.physics.velocity, ts);
+                    cone.rotation.x += cone.physics.angularVelocity.x * ts;
+                    cone.rotation.y += cone.physics.angularVelocity.y * ts;
+                    cone.physics.velocity.y -= 0.01 * ts;
+                    if (cone.position.y < 0.1) { cone.position.y = 0.1; cone.physics.velocity.set(0, 0, 0); }
+                    cone.physics.opacity -= 0.02;
+                    cone.material.transparent = true;
+                    cone.material.opacity = cone.physics.opacity;
+                    if (cone.physics.opacity <= 0) {
+                        scene.remove(cone); activeCones.splice(idx, 1);
+                        const nc = makeCone(); placeCone(nc, playerCar.position.z + 120); scene.add(nc); activeCones.push(nc);
+                    }
+                }
+            }
+        }
+
+        // --- Poças de óleo (spin-out) ---
+        function createOilPuddles() {
+            for (let i = 0; i < 5; i++) {
+                const puddle = new THREE.Mesh(
+                    new THREE.CircleGeometry(2, 24),
+                    new THREE.MeshBasicMaterial({ color: 0x0a0a0a, transparent: true, opacity: 0.85 })
+                );
+                puddle.rotation.x = -Math.PI / 2;
+                puddle.position.set(Math.random() * 14 - 7, 0.03, Math.random() * 200 - 100);
+                scene.add(puddle);
+                oilPuddles.push(puddle);
+            }
+        }
+        function checkOilCollisions() {
+            if (isSpunOut || !gameState.started) return;
+            for (const puddle of oilPuddles) {
+                if (playerCar.position.distanceTo(puddle.position) < 2.0) {
+                    isSpunOut = true; spinTimer = 72; gameState.playerSpeed *= 0.5; break;
+                }
+            }
+        }
+        function handlePlayerSpin() {
+            if (isSpunOut && spinTimer > 0) {
+                spinTimer--;
+                playerCar.rotation.y += 0.25;
+                if (spinTimer === 0) isSpunOut = false;
+            }
+        }
+
+        // --- Rampas + voo parabólico + bullet-time ---
+        function createRamps() {
+            const positions = [{ x: 0, z: 30 }, { x: -6, z: -40 }, { x: 6, z: 90 }];
+            positions.forEach(pos => {
+                const ramp = new THREE.Mesh(
+                    new THREE.BoxGeometry(6, 0.5, 12),
+                    new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x004055, metalness: 0.4, roughness: 0.3 })
+                );
+                ramp.position.set(pos.x, 1.0, pos.z);
+                ramp.rotation.x = -Math.PI / 12; // leve inclinação
+                scene.add(ramp);
+                ramps.push(ramp);
+            });
+        }
+        function triggerBulletTime() { timeScale = 0.4; shakeIntensity = 0.15; }
+        function resetBulletTime() { timeScale = 1.0; shakeIntensity = 0.3; }
+        function updateCameraShake() {
+            if (shakeIntensity > 0.005) {
+                camera.position.x += (Math.random() - 0.5) * shakeIntensity;
+                camera.position.y += (Math.random() - 0.5) * shakeIntensity;
+                shakeIntensity *= 0.9;
+            }
+        }
+        function checkRampCollision() {
+            if (isAirborne) return;
+            for (const ramp of ramps) {
+                const dx = playerCar.position.x - ramp.position.x;
+                const dz = playerCar.position.z - ramp.position.z;
+                if (Math.abs(dx) < 3 && Math.abs(dz) < 6) {
+                    const relativeZ = (dz + 6) / 12;
+                    if (relativeZ >= 0 && relativeZ <= 1) {
+                        playerCar.position.y = THREE.MathUtils.lerp(0, 3.5, relativeZ);
+                        if (relativeZ > 0.9 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.7 && !isAirborne) {
+                            isAirborne = true;
+                            verticalVelocity = Math.abs(gameState.playerSpeed) * 0.45;
+                            triggerBulletTime();
+                        }
+                    }
+                }
+            }
+        }
+        function updateAirbornePhysics(ts) {
+            if (!isAirborne) return;
+            playerCar.position.y += verticalVelocity;
+            verticalVelocity -= GRAVITY_AIR;
+            playerCar.rotation.x = -verticalVelocity * 2.0;
+            if (playerCar.position.y <= 0) {
+                playerCar.position.y = 0;
+                playerCar.rotation.x = 0;
+                isAirborne = false;
+                resetBulletTime();
+                // (TL) faíscas amarelas + marcas ao pousar
+                for (let i = 0; i < 8; i++) addSkidMark();
+                createLandingParticles();
+            }
+        }
+        function createLandingParticles() {
+            for (let i = 0; i < 12; i++) {
+                const spark = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08, 4, 4),
+                    new THREE.MeshBasicMaterial({ color: 0xffee33, transparent: true, opacity: 1 })
+                );
+                spark.position.copy(playerCar.position).add(new THREE.Vector3(0, 0.3, -1.2));
+                spark.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.3, Math.random() * 0.2, -(Math.random() * 0.3));
+                spark.life = 1.0;
+                scene.add(spark);
+                smokeParticles.push(spark); // reaproveita o updater de partículas
+            }
+        }
+
+        // --- Pit Stop (reparo/reabastecimento) ---
+        const repairPad = { position: new THREE.Vector3(-15, 0.02, 0), radius: 5.0, mesh: null };
+        function initRepairPad() {
+            if (repairPad.mesh) return;
+            repairPad.mesh = new THREE.Mesh(
+                new THREE.RingGeometry(0.5, repairPad.radius, 32),
+                new THREE.MeshBasicMaterial({ color: 0x00E676, side: THREE.DoubleSide, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending })
+            );
+            repairPad.mesh.rotation.x = -Math.PI / 2;
+            repairPad.mesh.position.copy(repairPad.position);
+            scene.add(repairPad.mesh);
+        }
+        function updatePitStop(dt) {
+            if (!repairPad.mesh) return;
+            repairPad.mesh.rotation.z += 0.01;
+            if (!gameState.started) return;
+            const dist = playerCar.position.distanceTo(repairPad.position);
+            if (dist < repairPad.radius && Math.abs(gameState.playerSpeed) < 0.03) {
+                gameState.playerHealth = Math.min(100, gameState.playerHealth + 25 * dt);
+                gameState.playerFuel = Math.min(100, gameState.playerFuel + 25 * dt);
+                if (Math.random() < 0.15) spawnHealingRing();
+            }
+        }
+        function spawnHealingRing() {
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.8, 1.0, 24),
+                new THREE.MeshBasicMaterial({ color: 0x00E676, side: THREE.DoubleSide, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.copy(playerCar.position).setY(0.1);
+            ring.life = 1.0;
+            scene.add(ring);
+            healingRings.push(ring);
+        }
+        function updateHealingRings() {
+            for (let i = healingRings.length - 1; i >= 0; i--) {
+                const r = healingRings[i];
+                r.position.y += 0.05;
+                r.scale.multiplyScalar(1.03);
+                r.life -= 0.03;
+                r.material.opacity = Math.max(0, r.life * 0.8);
+                if (r.life <= 0) { scene.remove(r); healingRings.splice(i, 1); }
+            }
+        }
+
+        // --- Time Trial + Carro Fantasma ---
+        function createGhostMesh() {
+            if (ghostMesh) scene.remove(ghostMesh);
+            ghostMesh = createCar(0x00FFFF);
+            ghostMesh.traverse(child => {
+                if (child.isMesh) {
+                    child.material = new THREE.MeshBasicMaterial({ color: 0x00FFFF, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending });
+                }
+            });
+            scene.add(ghostMesh);
+        }
+        function recordFrame() {
+            if (raceMode !== 'time_trial') return;
+            activeLapFrames.push({ x: playerCar.position.x, y: playerCar.position.y, z: playerCar.position.z, rotY: playerCar.rotation.y });
+        }
+        function updateGhostCar() {
+            if (!ghostMesh || lapReplayData.length === 0) return;
+            const frame = lapReplayData[ghostFrameIdx];
+            if (frame) {
+                ghostMesh.position.set(frame.x, frame.y, frame.z);
+                ghostMesh.rotation.y = frame.rotY;
+                ghostFrameIdx = (ghostFrameIdx + 1) % lapReplayData.length;
+            }
+        }
+        function formatLapTime(ms) {
+            const s = ms / 1000;
+            return s.toFixed(3) + 's';
+        }
+        function completeLap() {
+            if (bestLapTime === null || activeLapTime < bestLapTime) {
+                bestLapTime = activeLapTime;
+                localStorage.setItem('driving_bestLapTime', String(bestLapTime)); // (TL) só o tempo é persistido
+                lapReplayData = activeLapFrames.slice();
+                createGhostMesh();
+            }
+            activeLapFrames = [];
+            activeLapTime = 0;
+            ghostFrameIdx = 0;
+        }
+        function updateLapTimer(dtMs) {
+            if (raceMode !== 'time_trial' || !gameState.started) return;
+            activeLapTime += dtMs;
+            recordFrame();
+            const z = playerCar.position.z;
+            if (!lapArmed && z > 50) lapArmed = true;               // afastou-se da largada
+            if (lapArmed && z <= lapStartZ) { lapArmed = false; completeLap(); } // cruzou a linha de volta
+        }
+
+        // --- HUD da TASK_003 ---
+        function updateTask3HUD() {
+            const hp = Math.round(gameState.playerHealth ?? 100);
+            const fuel = Math.round(gameState.playerFuel ?? 100);
+            const hb = document.getElementById('carHealthBar');
+            const fb = document.getElementById('fuelBar');
+            if (hb) { hb.style.width = hp + '%'; hb.textContent = hp + '%'; }
+            if (fb) { fb.style.width = fuel + '%'; fb.textContent = fuel + '%'; }
+            if (raceMode === 'time_trial') {
+                const lt = document.getElementById('lapTimeDisplay');
+                const bl = document.getElementById('bestLapDisplay');
+                if (lt) lt.textContent = formatLapTime(activeLapTime);
+                if (bl) bl.textContent = bestLapTime !== null ? formatLapTime(bestLapTime) : '--';
+            }
+        }
+
         // Loop de animação
         function animate() {
             requestAnimationFrame(animate);
 
+            const now = performance.now();
+            const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+            lastFrameTime = now;
+            const ts = timeScale; // bullet-time
+
+            // Ciclo dia/noite roda sempre (inclusive na garagem)
+            updateDayNight(dt);
+
             if (gameState.started && gameState.playerScore < MAX_SCORE && gameState.aiScore < MAX_SCORE) {
-                // Controle do jogador
+                // Controle do jogador (física por modelo + penalidade de grama)
+                const onGrass = Math.abs(playerCar.position.x) > ROAD_HALF_WIDTH;
+                const grassMul = onGrass ? (1 - playerPhysics.grassPenalty) : 1;
+                let accel = playerPhysics.accel * grassMul;
+                let maxSpd = playerPhysics.maxSpd * grassMul;
+                // TASK_003: penalidades de dano crítico e combustível esgotado
+                if (gameState.playerHealth < 25) maxSpd *= 0.6;
+                if (gameState.playerFuel <= 0) maxSpd = playerPhysics.maxSpd * 0.1;
+                const turnSpd = playerPhysics.turn;
+                let turning = 0;
 
-                if (keys['arrowup'] || keys['w']) {
-                    gameState.playerSpeed = Math.min(gameState.playerSpeed + PLAYER_ACCELERATION, PLAYER_MAX_SPEED);
-                } else if (keys['arrowdown'] || keys['s']) {
-                    gameState.playerSpeed = Math.max(gameState.playerSpeed - PLAYER_ACCELERATION, -PLAYER_MAX_SPEED / 2);
+                if (!isSpunOut) {
+                    if (keys['arrowup'] || keys['w']) {
+                        gameState.playerSpeed = Math.min(gameState.playerSpeed + accel, maxSpd);
+                        if (gameState.playerFuel > 0) gameState.playerFuel = Math.max(0, gameState.playerFuel - 1.5 * dt);
+                    } else if (keys['arrowdown'] || keys['s']) {
+                        gameState.playerSpeed = Math.max(gameState.playerSpeed - accel, -maxSpd / 2);
+                        if (gameState.playerFuel > 0) gameState.playerFuel = Math.max(0, gameState.playerFuel - 1.0 * dt);
+                    } else {
+                        gameState.playerSpeed *= 0.95;
+                    }
+                    if (keys['arrowleft'] || keys['a']) { playerCar.rotation.y += turnSpd; turning = 1; }
+                    if (keys['arrowright'] || keys['d']) { playerCar.rotation.y -= turnSpd; turning = -1; }
+
+                    // Apex Sport: drift + marcas em curva fechada acima de 75% da vel. máx.
+                    if (playerPhysics.id === 'apex' && turning !== 0 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.75) {
+                        playerCar.position.x += turning * 0.06;
+                        addSkidMark();
+                    }
                 } else {
-                    gameState.playerSpeed *= 0.95;
+                    gameState.playerSpeed *= 0.97; // sem controle durante o rodopio
                 }
 
-                if (keys['arrowleft'] || keys['a']) {
-                    playerCar.rotation.y += PLAYER_TURN_SPEED;
-                }
-                if (keys['arrowright'] || keys['d']) {
-                    playerCar.rotation.y -= PLAYER_TURN_SPEED;
-                }
+                handlePlayerSpin(); // TASK_003: rodopio da poça de óleo
 
-                playerCar.position.x += Math.sin(playerCar.rotation.y) * gameState.playerSpeed;
-                playerCar.position.z += Math.cos(playerCar.rotation.y) * gameState.playerSpeed;
+                // Movimento do jogador (afetado pelo bullet-time)
+                playerCar.position.x += Math.sin(playerCar.rotation.y) * gameState.playerSpeed * ts;
+                playerCar.position.z += Math.cos(playerCar.rotation.y) * gameState.playerSpeed * ts;
+
+                // TASK_003: obstáculos interativos e física aérea
+                checkOilCollisions();
+                checkRampCollision();
+                updateAirbornePhysics(ts);
+                updateCones(ts);
+
+                // Tráfego e marcas
+                updateTraffic(dt);
+                updateSkidMarks(dt);
 
                 // IA
                 if (!gameState.aiTarget || !coins.includes(gameState.aiTarget)) {
@@ -570,9 +1298,17 @@
                     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                     
                     aiCar.rotation.y += angleDiff * AI_TURN_SPEED;
-                    
-                    aiCar.position.x += Math.sin(aiCar.rotation.y) * AI_SPEED;
-                    aiCar.position.z += Math.cos(aiCar.rotation.y) * AI_SPEED;
+
+                    aiCar.position.x += Math.sin(aiCar.rotation.y) * AI_SPEED * ts;
+                    aiCar.position.z += Math.cos(aiCar.rotation.y) * AI_SPEED * ts;
+
+                    // (TL) IA evita o tráfego: repulsão lateral se houver carro a < 12 unidades
+                    for (const t of traffic) {
+                        if (aiCar.position.distanceTo(t.mesh.position) < 12) {
+                            const push = (aiCar.position.x - t.mesh.position.x) >= 0 ? 1 : -1;
+                            aiCar.position.x += push * 0.15;
+                        }
+                    }
                 }
 
                 // Limites do mapa
@@ -581,11 +1317,13 @@
                     if (Math.abs(car.position.z) > MAP_LIMIT) car.position.z = Math.sign(car.position.z) * MAP_LIMIT;
                 });
 
-                // Colisão com trem
+                // Colisão com trem (colisão grave: dano + explosão)
                 if (checkCollision(playerCar, trainGroup, TRAIN_COLLISION_DISTANCE)) {
+                    applyDamage('player', 20);
                     explode(playerCar);
                 }
                 if (checkCollision(aiCar, trainGroup, TRAIN_COLLISION_DISTANCE)) {
+                    applyDamage('ai', 20);
                     explode(aiCar);
                 }
 
@@ -612,12 +1350,21 @@
                     }
                 });
 
-                // Verificar vitória
-                if (gameState.playerScore >= MAX_SCORE) {
+                // TASK_003: pit stop, fumaça de dano, cura, fantasma, cronômetro de volta
+                updatePitStop(dt);
+                if (Math.random() < 0.3) spawnSmoke();
+                updateSmoke();
+                updateHealingRings();
+                updateGhostCar();
+                updateLapTimer(dt * 1000);
+                updateTask3HUD();
+
+                // Verificar vitória (modo Coleta de Moedas)
+                if (raceMode === 'coins' && gameState.playerScore >= MAX_SCORE) {
                     document.getElementById('message').textContent = 'VOCÊ VENCEU! Pressione ESPAÇO para jogar novamente';
                     document.getElementById('message').style.display = 'block';
                 }
-                if (gameState.aiScore >= MAX_SCORE) {
+                if (raceMode === 'coins' && gameState.aiScore >= MAX_SCORE) {
                     document.getElementById('message').textContent = 'IA VENCEU! Pressione ESPAÇO para jogar novamente';
                     document.getElementById('message').style.display = 'block';
                 }
@@ -634,6 +1381,7 @@
             camera.position.z = playerCar.position.z - Math.cos(playerCar.rotation.y) * CAMERA_DISTANCE;
             camera.position.y = playerCar.position.y + CAMERA_HEIGHT;
             camera.lookAt(playerCar.position);
+            updateCameraShake(); // TASK_003: tremor no salto/aterrissagem
 
             drawSpeedometer(Math.abs(gameState.playerSpeed));
 
@@ -646,8 +1394,51 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        document.getElementById('message').style.display = 'block';
+        // === TASK_002: inicialização da garagem e controles ===
+        buildGarage();
+        document.getElementById('selectCarBtn').addEventListener('click', startFromGarage);
+        document.getElementById('headlightBtn').addEventListener('click', toggleHeadlightsManual);
+
+        // === TASK_003: obstáculos do cenário e seleção de modo ===
+        spawnCones();
+        createOilPuddles();
+        createRamps();
+        initRepairPad();
+        document.getElementById('bestLapDisplay').textContent = bestLapTime !== null ? formatLapTime(bestLapTime) : '--';
+
+        function selectModeUI(mode) {
+            selectedMode = mode;
+            const coinsBtn = document.getElementById('modeCoins');
+            const trialBtn = document.getElementById('modeTrial');
+            coinsBtn.style.background = mode === 'coins' ? '#4CAF50' : '#37474f';
+            coinsBtn.style.outline = mode === 'coins' ? '2px solid #ffd54a' : 'none';
+            trialBtn.style.background = mode === 'time_trial' ? '#4CAF50' : '#37474f';
+            trialBtn.style.outline = mode === 'time_trial' ? '2px solid #ffd54a' : 'none';
+        }
+        document.getElementById('modeCoins').addEventListener('click', () => selectModeUI('coins'));
+        document.getElementById('modeTrial').addEventListener('click', () => selectModeUI('time_trial'));
+
+        document.getElementById('message').style.display = 'none'; // garagem cobre a tela inicialmente
         animate();
+
+        // Hook de depuração/teste (TASK_002 + TASK_003)
+        window.__drive = {
+            CAR_MODELS, getDayNightState, traffic, gameStateRef: () => gameState,
+            getPhysics: () => playerPhysics, getTimeOfDay: () => timeOfDay,
+            setTimeOfDay: (t) => { timeOfDay = t; },
+            isHeadlightsOn: () => headlightsOn, headlightsAutoRef: () => headlightsAuto,
+            startFromGarage, selectCar: (id) => { selectedCarId = id; },
+            initTraffic, updateTraffic, updateDayNight, toggleHeadlightsManual, setHeadlights,
+            playerCar,
+            // TASK_003
+            activeCones, oilPuddles, ramps, repairPad, smokeParticles,
+            applyDamage, checkOilCollisions, handlePlayerSpin, checkRampCollision,
+            updateAirbornePhysics, updateCones, updatePitStop, completeLap,
+            selectMode: (m) => { selectedMode = m; raceMode = m; },
+            getRaceMode: () => raceMode, getBestLap: () => bestLapTime,
+            getFlags: () => ({ isSpunOut, isAirborne, timeScale, verticalVelocity, spinTimer, lapArmed, activeLapTime, ghostExists: !!ghostMesh, lapFrames: activeLapFrames.length }),
+            setLapReplay: (d) => { lapReplayData = d; }, createGhostMesh, updateGhostCar, updateLapTimer
+        };
     </script>
 </body>
 </html>

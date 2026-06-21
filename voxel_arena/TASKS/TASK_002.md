@@ -378,3 +378,41 @@ O multiplicador de velocidade ganho no draft roguelite (`speedMultiplier`) deve 
 *   **Destino**: O arquivo `TASK_002.md` está pronto e homologado para ser puxado para desenvolvimento.
 
 *Assinado: Product Owner (PO) - Antigravity*
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev Complete)
+
+**Arquivo alterado**: `voxel_arena/index.html` (Three.js r160, ES module). Construído sobre a TASK_001 (que estava `Dev complete`). Todas as adições marcadas com `=== TASK_002 ===` / `TASK_002:`.
+
+### 1. Sistema de Ondas Dinâmicas
+*   `WAVE_CONFIG` (5 ondas × 60 s) com `spawnInterval`, `maxEnemies`, `ratios` e flag `elite`. A onda é derivada do tempo decorrido (`floor((300−timeLeft)/60)+1`, teto 5); vitória ao fim da onda 5 (mecânica de 300 s preexistente).
+*   `Game.showWaveBanner()` exibe banner neon CSS (`@keyframes waveBannerAnim`) com subtítulo temático a cada transição; `#wave-info` atualizado.
+*   **Dúvida #2 (TL aprovou)**: `flashFog(0x3a0000)` por 500 ms na entrada de ondas com elites (decai de volta a `#0a0c16` no loop).
+
+### 2. Novos Inimigos (config-driven)
+*   `Enemy` refatorado para ler `ENEMY_CONFIG[type]` (hp/speed/damage/attackCd/scale/cores/olhos/xp). `createMesh()` aplica cor de armadura, **olhos emissivos por tipo** e `scale` do grupo. `attack()` usa `attackCdMax` (Stalker ataca a 0.8 s).
+*   **Brute** (escala 1.8×, armadura `#4a0a0a`, olhos âmbar `#ffcc00` int. 3.5, 120 HP, vel 3, dano 15) · **Stalker** (escala 0.7×, `#052410`, olhos ciano `#00ffff` int. 3.5, 25 HP, vel 9, dano 6). `EnemyManager.selectEnemyType()` faz seleção ponderada pelos ratios.
+
+### 3. XP Orbs com Atração Magnética
+*   Classes `XpOrb` (octaedro dourado giratório, flutuação senoidal) + `XpOrbManager`. **Dúvida #1 (TL aprovou)**: magnetismo com **aceleração progressiva** (`magneticSpeed += dt·30`) dentro de 8 u; absorção em <1.2 u concede XP por tipo (basic 15 / stalker 20 / brute 40). `Enemy.die()` dropa orb no local + faz `dispose()` da malha do beast. **Cap de 40 orbs** (TL): o mais antigo é destruído ao exceder.
+
+### 4. Draft Roguelite (Level Up)
+*   `Player.gainXP()`/`levelUp()` com `XP_req = level×120`; ao subir, `Game.triggerUpgradeDraft()` **pausa** (`isRunning=false`), libera o ponteiro e exibe modal glassmorphic com **3 cartas aleatórias distintas** do `UPGRADE_POOL` (8 upgrades). Selecionar aplica o modificador, esconde a modal, retoma o jogo e re-trava o ponteiro. XP excedente é mantido.
+
+### 5. Combate Tático & Stamina
+*   `Player.trySpendStamina(cost)` bloqueia a ação se insuficiente e dispara `Game.flashStamina()` (`@keyframes staminaPulse` vermelho). Custos: ataque 8 / defesa 15·s⁻¹ / Spin 20 / Dash 15 / Heal 30 / Ult 50. Regen 25·s⁻¹ (45·s⁻¹ parado >1 s, sem regen enquanto defende), modulada por `staminaRegenBonus`.
+*   Modificadores roguelite aplicados nos cálculos: `damageMultiplier` (ataque/spin/dash/ult), `speedMultiplier` (movimento), `skills[i].cdMult` (cooldowns), `dashRangeMult` (distância base fixa 10 u — decisão #2 do TL p/ não estourar o mapa), `healMult`, `ultMult` (raio+dano).
+
+### ✅ Verificação local (preview headless via hook `window.__arena`)
+*   **Inimigos** (valores exatos): basic 30/6/5/cd1.5/×1.0/15xp olhos `#ff0000`@2.0; brute 120/3/15/cd1.5/×1.8/40xp olhos `#ffcc00`@3.5; stalker 25/9/6/cd0.8/×0.7/20xp olhos `#00ffff`@3.5.
+*   **XP Orb**: atração 5.04 u → 0.99 u em 0.5 s; absorção concede +40 XP e remove o orb; **cap respeitado em 40**.
+*   **Ondas**: `selectEnemyType(1)` = 100% basic; `selectEnemyType(5)` = mix (≈106/109/85); `EnemyManager.update` respeita `maxEnemies=25` na onda 5; banner anima; névoa faz flash p/ `#3a0000`.
+*   **Draft**: `gainXP(120)` ⇒ nível 2, modal visível com **3 cartas**, jogo **pausado**, badge "LEVEL 2"; clique aplica modificador, esconde modal e **retoma**. Os 8 upgrades aplicam sem erro.
+*   **Stamina**: custo bloqueado quando insuficiente (10<50) com flash de exaustão; gasta normalmente quando há saldo (100→50).
+*   **Morte real** dropa orb (brute ⇒ 40 XP); `renderer.render()` com tudo em cena **sem erro**. **Zero erros no console.**
+
+> Nota: `preview_screenshot` expira neste ambiente headless (jogos `requestAnimationFrame`) — limitação do harness. Verificação feita por inspeção funcional/estado via debug hook, dirigindo managers manualmente.
+
+*Status: 🚀 Dev complete — pronto para Code Review (TL).*
+*Responsável: Programador Sênior (Agente Dev)*

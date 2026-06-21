@@ -118,6 +118,7 @@ createHtmlRoute('/jogos/it_simulator', 'jogos/it_simulator.html');
 createHtmlRoute('/jogos/tabuleiro_galton', 'jogos/tabuleiro_galton.html');
 createHtmlRoute('/jogos/pinball', 'jogos/pinball.html');
 createHtmlRoute('/jogos/voxel_city', 'jogos/voxel_city.html');
+createHtmlRoute('/jogos/rede_neural_evolutiva', 'jogos/rede_neural_evolutiva.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -140,6 +141,7 @@ createHtmlRoute('/visual_effects', 'visual_effects/index.html');
 createHtmlRoute('/chess', 'chess/index.html');
 createHtmlRoute('/lazy_gardner', 'lazy_gardner/index.html');
 createHtmlRoute('/voxel_city', 'voxel_city/index.html');
+createHtmlRoute('/rede_neural_evolutiva', 'rede_neural_evolutiva/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
@@ -154,12 +156,15 @@ app.use(helmet());
 app.use(
   helmet.contentSecurityPolicy({
     directives: {
-      defaultSrc: ["'self'"], // Permite carregar recursos do mesmo domínio
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Permite scripts do mesmo domínio e inline (AJUSTE CONFORME NECESSÁRIO)
-      // Adicione outras diretivas conforme necessário (styleSrc, imgSrc, etc.)
+      defaultSrc: ["'self'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "blob:"],
+      workerSrc: ["'self'", "blob:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https://unpkg.com", "https://chessboardjs.com", "https://chessboardjs.com/img/"],
     },
   })
 );
+
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
