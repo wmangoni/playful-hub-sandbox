@@ -6,7 +6,7 @@ let browser;
 let page;
 let puppeteer;
 
-const PORT = 3003;
+const PORT = process.env.TEST_PORT || 3088;
 
 async function startServer() {
   return new Promise((resolve) => {
@@ -58,8 +58,8 @@ async function runTests() {
   // Check players count initially
   let playersCount = await page.evaluate(() => gameState.players.length);
   console.log(`Initial players count: ${playersCount}`);
-  if (playersCount !== 3) {
-    throw new Error(`Expected 3 players initially, got ${playersCount}`);
+  if (playersCount !== 4) {
+    throw new Error(`Expected 4 players initially, got ${playersCount}`);
   }
 
   // 2. Test Case 1: Mock bot 1 bankruptcy
@@ -74,10 +74,10 @@ async function runTests() {
 
   playersCount = await page.evaluate(() => gameState.players.length);
   console.log(`Players count after AI 1 bankruptcy: ${playersCount}`);
-  if (playersCount !== 2) {
-    throw new Error(`Expected 2 players after AI 1 bankruptcy, got ${playersCount}`);
+  if (playersCount !== 3) {
+    throw new Error(`Expected 3 players after AI 1 bankruptcy, got ${playersCount}`);
   }
-  let ai1Present = await page.evaluate(() => gameState.players.some(p => p.name === 'AI 1'));
+  let ai1Present = await page.evaluate(() => gameState.players.some(p => p.name === 'Arthur "The Shark"'));
   console.log(`Is AI 1 still in the game? ${ai1Present}`);
   if (ai1Present) {
     throw new Error('AI 1 should have been removed from gameState.players');
@@ -86,9 +86,10 @@ async function runTests() {
   // 3. Test Case 2: Mock bot 2 bankruptcy -> Victory!
   console.log('\n--- Test Case 2: AI 2 goes bankrupt (Human Victory) ---');
   await page.evaluate(() => {
-    // Set AI 2 (which is now index 1) chips to 0
+    // Set both remaining AI opponents (indices 1 and 2) chips to 0
     gameState.players[1].chips = 0;
-    console.log('Set AI 2 chips to 0.');
+    gameState.players[2].chips = 0;
+    console.log('Set remaining AIs chips to 0.');
     startNewHand();
   });
   await new Promise(r => setTimeout(r, 4000)); // wait for alerts/timers

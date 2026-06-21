@@ -1,5 +1,7 @@
 # 📝 TASK-POKER: Personalidades de IA, Sistema de Blefe e Assistente de Probabilidade (Hand Tracker)
 
+**Status:** 🎉 Ready for deploy
+
 ## 👤 User Story
 *   **Como** jogador estratégico no minijogo **Poker Texas Hold'em**,
 *   **Eu quero** enfrentar adversários controlados por IA com diferentes comportamentos de aposta e blefe, além de visualizar um rastreador dinâmico que exiba a força estatística da minha mão atual,
@@ -421,4 +423,254 @@ Implementado em `poker/index.html`. Todos os critérios de aceitação atendidos
 *   **NÃO corrigido (fora do escopo — para o TL avaliar)**:
     1.  `dealCards()` é chamado **depois** de postar os blinds em `startNewHand()` e reseta `player.bet = 0` para todos, apagando o registro de aposta dos blinds (o big blind acaba "pagando" novamente para igualar a aposta). Não toquei na ordem deal/blind para não desestabilizar o fluxo de apostas.
     2.  Em `determineWinner()`, o ramo de **showdown real** (não-fold) usa a mensagem/histórico hardcoded "todos desistiram". O pagamento está correto, mas o texto exibido fica errado num showdown verdadeiro.
+
+
+## 🔍 Code Review
+
+### 🚨 Pontos Críticos Identificados para Correção:
+
+1. **Desvio Precoce no Showdown (`determineWinner`)**:
+   - A função `determineWinner()` possui um retorno precoce logo após calcular os empates (`tiedPlayers`). Ela atribui todo o pote ao primeiro jogador do array ordenado (`winner`), ignorando a lógica de divisão de pote (split pot) quando existem múltiplos jogadores empatados com a mesma força de mão.
+   - O restante do código de distribuição e desempate ficou inacessível (código morto após a linha 1767).
+
+2. **Mensagem e Histórico de Showdown Incorretos**:
+   - Mesmo em um showdown real (quando a rodada vai até o fim com múltiplos jogadores ativos), o jogo exibe a mensagem de que todos os outros desistiram (`"todos os outros jogadores desistiram"`) e grava no histórico `"todos desistiram"`.
+   - A combinação real do vencedor (ex: "Dois Pares", "Trinca") nunca é mostrada na mensagem ou gravada no histórico do showdown.
+.speech-bubble.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-5px);
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px 6px 0;
+    border-style: solid;
+    border-color: var(--accent-color) transparent;
+    display: block;
+    width: 0;
+}
+```
+
+#### Função de Disparo de Mensagens:
+```javascript
+function showAIDialogue(playerIndex, text, customColor) {
+    const playerEl = document.querySelector(`.player:nth-child(${playerIndex + 1})`);
+    if (!playerEl) return;
+    
+    let bubble = playerEl.querySelector('.speech-bubble');
+    if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.className = 'speech-bubble';
+        playerEl.appendChild(bubble);
+    }
+    
+    bubble.textContent = text;
+    if (customColor) {
+        bubble.style.borderColor = customColor;
+    }
+    
+    bubble.classList.add('visible');
+    
+    // Ocultar automaticamente após 3.5 segundos
+    setTimeout(() => {
+        bubble.classList.remove('visible');
+    }, 3500);
+}
+```
+
+---
+
+### 4. Hand Tracker / Calculadora de Mãos do Jogador
+Implementaremos um painel dinâmico posicionado ao lado do Jogador Humano que calcula em tempo real o melhor jogo possível com as cartas atuais e o potencial de draws para sequências/flushes.
+
+#### Estrutura do Painel HTML:
+```html
+<div class="hand-tracker-panel" id="hand-tracker">
+    <div class="tracker-header">🔍 Análise de Força</div>
+    <div class="tracker-body">
+        <div class="stat-item">
+            <span>Combinação Atual:</span>
+            <strong id="tracker-hand-name">High Card</strong>
+        </div>
+        <div class="stat-item">
+            <span>Potencial de Mão:</span>
+            <span id="tracker-draw-name">Nenhum</span>
+        </div>
+        <div class="strength-bar-container">
+            <div class="strength-bar-fill" id="tracker-strength-bar"></div>
+        </div>
+        <div class="strength-label" id="tracker-strength-text">Força: 0% (Fraca)</div>
+    </div>
+</div>
+```
+
+#### Algoritmo de Cálculo Dinâmico (Hand Tracker Engine):
+```javascript
+function updateHandTracker() {
+    const player = gameState.players[0]; // Jogador Humano
+    if (!player || player.folded || gameState.phase === 'waiting' || gameState.phase === 'showdown') {
+        document.getElementById('hand-tracker').style.display = 'none';
+        return;
+    }
+    
+    document.getElementById('hand-tracker').style.display = 'block';
+    
+    const playerCards = player.cards;
+    const communityCards = gameState.communityCards.filter(c => c);
+    const allCards = [...playerCards, ...communityCards];
+    
+    // 1. Obter a classificação atual
+    const evaluation = evaluateHand(allCards);
+    document.getElementById('tracker-hand-name').textContent = evaluation.name;
+    
+    // 2. Detectar Draws (Flush Draw, Straight Draw)
+    let drawText = "Nenhum";
+    let isDraw = false;
+    
+    // Flush Draw Check (4 cartas de mesmo naipe)
+    const suits = {};
+    allCards.forEach(c => suits[c.suit] = (suits[c.suit] || 0) + 1);
+    for (const suit in suits) {
+        if (suits[suit] === 4) {
+            drawText = `Flush Draw (4 de 5 ${suit})`;
+            isDraw = true;
+        }
+    }
+    
+    // Straight Draw Check (4 cartas consecutivas)
+    if (!isDraw) {
+        const uniqueValues = [...new Set(allCards.map(c => getCardValue(c)))].sort((a, b) => a - b);
+        for (let i = 0; i <= uniqueValues.length - 4; i++) {
+            const slice = uniqueValues.slice(i, i + 4);
+            if (slice[3] - slice[0] === 3) {
+                drawText = "Straight Draw (4 sequenciais)";
+                isDraw = true;
+                break;
+            }
+        }
+    }
+    
+    document.getElementById('tracker-draw-name').textContent = drawText;
+    
+    // 3. Força Relativa e Coloração da Barra
+    let strengthPct = 0;
+    let label = "Fraca";
+    let barColor = "#e74c3c"; // Vermelho
+    
+    // Cálculo da porcentagem baseada no ranking da mão + draws ativos
+    if (evaluation.rank >= 5) { // Flush ou maior
+        strengthPct = 85 + (evaluation.rank - 5) * 3;
+        label = "Excelente (Forte)";
+        barColor = "#2ecc71"; // Verde
+    } else if (evaluation.rank >= 3) { // Three of a Kind, Straight, Two Pair
+        strengthPct = 60 + (evaluation.rank - 3) * 10;
+        label = "Boa (Média)";
+        barColor = "#3498db"; // Azul
+    } else if (evaluation.rank >= 1) { // One Pair
+        const isHighPair = evaluation.primaryValue >= 9; // Par de Valetes ou maior
+        strengthPct = isHighPair ? 50 : 35;
+        label = isHighPair ? "Par Alto (Médio)" : "Par Baixo (Fraco)";
+        barColor = isHighPair ? "#f1c40f" : "#e67e22"; // Amarelo ou Laranja
+    } else { // High Card
+        strengthPct = isDraw ? 25 : 10;
+        label = isDraw ? "Desenho Ativo (Fraco)" : "Mão Típica (Muito Fraca)";
+        barColor = isDraw ? "#e67e22" : "#e74c3c";
+    }
+    
+    // Atualizar Elementos Visuais da Barra
+    const barFill = document.getElementById('tracker-strength-bar');
+    barFill.style.width = `${strengthPct}%`;
+    barFill.style.backgroundColor = barColor;
+    
+    const strengthText = document.getElementById('tracker-strength-text');
+    strengthText.textContent = `Força: ${strengthPct}% (${label})`;
+    strengthText.style.color = barColor;
+}
+```
+
+---
+
+### 5. Plano de Integração e UI/UX Premium (WOW Factor)
+Para garantir um visual moderno e estimulante para o usuário:
+1.  **Fidelidade Visual dos Avatares**: No painel de cada IA, exibir o avatar redondo flutuante com a cor correspondente de seu perfil como uma borda brilhante neon em torno de sua área ativa (`border: 2px solid ${profile.color}; box-shadow: 0 0 10px ${profile.color}`).
+2.  **Entradas Suaves para Balões**: Utilizar animações CSS `@keyframes popIn` que escalam o balão de `scale(0)` para `scale(1)` com efeito de "bounce" suave de forma rápida ao disparar diálogos.
+3.  **Responsividade**: O painel do `Hand Tracker` deve ficar convenientemente posicionado de forma fixa ou lateral no desktop, e se ajustar de forma flexível logo abaixo das cartas do jogador em dispositivos móveis, sem obstruir a visão da mesa principal de feltro do Poker.
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `poker/index.html`. Todos os critérios de aceitação atendidos e validados localmente via navegador (preview + testes unitários do avaliador via console).
+
+### O que foi entregue
+1.  **3 oponentes de IA com personalidade** (`AI_PROFILES`): Arthur "The Shark" 🦈 (agressivo-seletivo), Beatriz "Calling Station" 🐢 (passiva), Caio "The Maniac" 🤪 (agressivo/blefador). Cada perfil tem cor, avatar e pesos de `aggressiveness`/`bluffFrequency`/`callingRate`. Avatares exibidos com borda neon na cor do perfil (WOW factor).
+2.  **Decisão da IA com blefe** (`playAITurn` reescrita): score de decisão = força real da mão (`evaluateHand`) + fator de blefe ponderado pela personalidade e pelo potencial de flush draw visível na mesa.
+3.  **Balões de fala** (`showAIDialogue`): renderizados a partir do **estado** (`player._dialogue`) e não por append direto ao DOM — assim sobrevivem aos re-renders de `updatePlayers()`. Diálogos contextuais (raise / bluff / strongHand / call / fold), animação `bubblePopIn` (scale 0→1 com bounce).
+4.  **Hand Tracker** (`updateHandTracker`): painel fixo (lateral no desktop, em fluxo no mobile via media query) mostrando combinação atual (PT-BR), draws (Flush/Straight Draw) e barra de força colorida por faixa.
+
+### ⚠️ Bugs PRÉ-EXISTENTES corrigidos / encontrados
+*   **Corrigido (necessário p/ Critério 3)**: o `evaluateHand` antigo usava `parseInt('A'|'K'|'Q'|'J')` → `NaN` e comparava `card.value` (string) como número. Resultado: **straights com figuras nunca eram detectados** (ex.: 10‑J‑Q‑K‑A virava "High Card"), **trinca de figuras virava "Full House"** e **Royal Flush virava "Flush"**. Reescrevi o avaliador para usar valores numéricos consistentes (2..14 via `getCardValue`), mantendo o contrato `{name, rank, primaryValue, secondaryValue, kickers}`. Validei as 10 categorias + roda (A‑2‑3‑4‑5) + melhor‑de‑7. Isso também corrige o **showdown** do jogo.
+*   **NÃO corrigido (fora do escopo — para o TL avaliar)**:
+    1.  `dealCards()` é chamado **depois** de postar os blinds em `startNewHand()` e reseta `player.bet = 0` para todos, apagando o registro de aposta dos blinds (o big blind acaba "pagando" novamente para igualar a aposta). Não toquei na ordem deal/blind para não desestabilizar o fluxo de apostas.
+    2.  Em `determineWinner()`, o ramo de **showdown real** (não-fold) usa a mensagem/histórico hardcoded "todos desistiram". O pagamento está correto, mas o texto exibido fica errado num showdown verdadeiro.
+
+
+## 🔍 Code Review
+
+### 🚨 Pontos Críticos Identificados para Correção:
+
+1. **Desvio Precoce no Showdown (`determineWinner`)**:
+   - A função `determineWinner()` possui um retorno precoce logo após calcular os empates (`tiedPlayers`). Ela atribui todo o pote ao primeiro jogador do array ordenado (`winner`), ignorando a lógica de divisão de pote (split pot) quando existem múltiplos jogadores empatados com a mesma força de mão.
+   - O restante do código de distribuição e desempate ficou inacessível (código morto após a linha 1767).
+
+2. **Mensagem e Histórico de Showdown Incorretos**:
+   - Mesmo em um showdown real (quando a rodada vai até o fim com múltiplos jogadores ativos), o jogo exibe a mensagem de que todos os outros desistiram (`"todos os outros jogadores desistiram"`) e grava no histórico `"todos desistiram"`.
+   - A combinação real do vencedor (ex: "Dois Pares", "Trinca") nunca é mostrada na mensagem ou gravada no histórico do showdown.
+
+3. **Reset de Apostas dos Blinds em `dealCards()`**:
+   - Em `startNewHand()`, os blinds são coletados dos jogadores e suas respectivas propriedades `player.bet` e `gameState.pot` são configuradas. Porém, `dealCards()` é invocado em seguida e redefine `player.bet = 0` para todos os jogadores. Isso limpa a informação de quem postou os blinds, forçando o big blind a pagar novamente para igualar a aposta.
+   - A ordem de execução ou a lógica de limpeza de apostas no início da mão precisa ser corrigida para preservar os blinds coletados.
+
+### 💡 Recomendações:
+- Corrigir a lógica de distribuição de pote para suportar empate perfeito e dividir o pote igualmente entre os vencedores (`tiedPlayers`).
+- Ajustar a mensagem do showdown e do histórico para exibir a combinação vencedora real calculada (ex: `"${winner.name} vence com Par de Ases!"`).
+- Corrigir a inicialização da mão em `startNewHand()` / `dealCards()` para que os blinds sejam preservados ou as apostas sejam devidamente rastreadas.
+
+---
+
+### 📢 Atualização da Revisão (Aprovado):
+- **Desvio Precoce no Showdown (`determineWinner`)**: Corrigido. A lógica de desempate e split pot foi implementada corretamente. Fichas de potes ímpares são conservadas e divididas igualmente entre os vencedores de empate perfeito, com a sobra de moedas concedida ao primeiro vencedor.
+- **Mensagem e Histórico de Showdown**: Corrigido. A combinação vencedora traduzida é exibida nas mensagens e gravada no painel de histórico (com tipo `showdown`). Os nomes da mão no feltro dos jogadores agora são mostrados em português na interface gráfica.
+- **Reset de Apostas dos Blinds em `dealCards()`**: Corrigido. A ordem de execução foi ajustada em `startNewHand()`. Agora as cartas são distribuídas e o estado é resetado *antes* da cobrança dos blinds, e a UI é atualizada adequadamente após a configuração dos blinds.
+
+**Revisão concluída com sucesso. Código verificado e aprovado.**
+*Enviado para a fila de testes de qualidade (Ready for QA).*
+*Assinado: Tech Lead (Antigravity) - 2026-06-21*
+
+---
+
+## 🧪 Resultado dos testes
+
+### ⚙️ Metodologia de Testes:
+Os testes foram realizados de forma automatizada (usando Puppeteer/Node.js) e manual.
+
+1. **Testes Automatizados de Regressão (`tests/qa_poker.test.js`)**:
+   - Execução em ambiente isolado (`cross-env NODE_ENV=test`).
+   - **Caso de Teste 1 (Falência do Bot)**: Simulação de saldo $0 para `Arthur "The Shark"`. O sistema o removeu corretamente da lista de jogadores ativos ao iniciar a nova mão, prosseguindo com os oponentes remanescentes.
+   - **Caso de Teste 2 (Vitória do Humano)**: Simulação de falência de todos os bots. O jogo exibiu a caixa de alerta de vitória e retornou com sucesso para a tela de seleção de modos.
+   - **Caso de Teste 3 (Derrota do Humano)**: Simulação de saldo $0 para o jogador humano. O jogo encerrou e resetou para o menu inicial.
+   - **Resultado**: 🎉 **TODOS OS TESTES AUTOMATIZADOS PASSARAM COM SUCESSO!**
+
+2. **Testes de Integração e Funcionalidades Críticas**:
+   - **Divisão de Pote (Split Pot)**: Validado o cálculo de divisão em caso de empate perfeito. A conservação de fichas foi garantida (com a sobra de moedas distribuída ao primeiro vencedor).
+   - **Ordem de Apostas de Blinds**: Validado que `startNewHand()` agora preserva os blinds postados de $10 e $20, evitando cobranças duplicadas do Big Blind.
+   - **Tradução no Showdown**: A interface e o painel de histórico passaram a exibir corretamente os nomes das mãos e dos vencedores em português.
+
+**Status dos Testes:** ✅ **APROVADO (QA Passed)**
+*Assinado: Analista de QA (Antigravity) - 2026-06-21*
 
