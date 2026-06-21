@@ -105,6 +105,15 @@
             background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.25);
         }
 
+        /* Botão de reiniciar o jogo (limpa o progresso salvo) */
+        #ui button#resetGame.shop-btn {
+            margin-top: 10px;
+            text-align: center;
+            background: rgba(211, 47, 47, 0.3);
+            border-color: rgba(255, 138, 128, 0.5);
+        }
+        #ui button#resetGame.shop-btn:hover:not(:disabled) { background: rgba(211, 47, 47, 0.55); }
+
         /* Texto flutuante de colheita automática */
         .float-text {
             position: absolute;
@@ -142,6 +151,41 @@
             margin-top: 18px; padding: 10px 22px; border: none; border-radius: 8px;
             background: #4caf50; color: white; cursor: pointer; font-size: 1em;
         }
+
+        /* === TASK_003: Score Card da Exposição + dica de seleção === */
+        #showModal {
+            position: fixed; inset: 0; display: none;
+            justify-content: center; align-items: center; z-index: 2100;
+            background: rgba(0,0,0,0.6);
+        }
+        #showModal .show-card {
+            background: rgba(20, 30, 25, 0.78);
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 213, 74, 0.4);
+            border-radius: 18px; padding: 28px 34px; text-align: center;
+            color: #eafff0; font-family: sans-serif; max-width: 340px;
+            box-shadow: 0 12px 44px rgba(0,0,0,0.55);
+            animation: showCardPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes showCardPop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .show-medal { font-size: 4rem; animation: medalSpin 0.8s ease-out; }
+        @keyframes medalSpin { 0% { transform: rotateY(360deg) scale(0.2); } 100% { transform: rotateY(0) scale(1); } }
+        #showModal h2 { color: #ffd54a; margin: 8px 0; text-shadow: 0 0 12px rgba(255,213,74,0.5); }
+        .show-score { font-size: 1.4em; font-weight: bold; }
+        .show-breakdown { font-size: 0.8em; color: #9fe6b8; margin: 10px 0; line-height: 1.6; }
+        .show-reward { font-size: 1.5em; color: #ffd54a; font-weight: bold; margin-top: 8px; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+        #showModal button {
+            margin-top: 18px; padding: 10px 24px; border: none; border-radius: 8px;
+            background: linear-gradient(135deg, #ffd54a, #b8860b); color: #1a1a1a; font-weight: bold;
+            cursor: pointer; font-size: 1em;
+        }
+        #selectionHint {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 213, 74, 0.92); color: #1a1a1a; font-family: sans-serif; font-weight: bold;
+            padding: 10px 20px; border-radius: 20px; z-index: 1500; display: none;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.4); animation: hintPulse 1.2s infinite alternate;
+        }
+        @keyframes hintPulse { 0% { transform: translateX(-50%) scale(1); } 100% { transform: translateX(-50%) scale(1.05); } }
     </style>
 </head>
 
@@ -164,10 +208,27 @@
         <button id="buyScarecrow" class="shop-btn">🦅 Espantalho <span class="shop-cost">500</span></button>
         <button id="buyHarvester" class="shop-btn">🚜 Robô Colhedor <span class="shop-cost">800</span></button>
 
+        <div class="shop-section-title">🏛️ Estufas (Biomas)</div>
+        <button id="ghDefault" class="shop-btn" data-greenhouse="default">🌿 Padrão <span class="shop-cost">grátis</span></button>
+        <button id="ghDesert" class="shop-btn" data-greenhouse="desert">🏜️ Desértica <span class="shop-cost">1500</span></button>
+        <button id="ghGlacial" class="shop-btn" data-greenhouse="glacial">❄️ Glacial <span class="shop-cost">3000</span></button>
+        <button id="ghCyber" class="shop-btn" data-greenhouse="cyberglow">🌌 Ciber-Glow <span class="shop-cost">6000</span></button>
+
+        <div class="shop-section-title">🧬 Sementes Híbridas</div>
+        <div id="hybridInventory" style="font-size:0.74em; color:#9fe6b8;">Polinize espécies diferentes adjacentes para descobrir híbridos!</div>
+        <button id="plantFirelotus" class="shop-btn" data-hybrid="firelotus" style="display:none;"></button>
+        <button id="plantCrystalbamboo" class="shop-btn" data-hybrid="crystalbamboo" style="display:none;"></button>
+        <button id="plantGoldpine" class="shop-btn" data-hybrid="goldpine" style="display:none;"></button>
+
+        <div class="shop-section-title">🏆 Exposição</div>
+        <button id="flowerShowBtn" class="shop-btn">🌷 Participar da Exposição <span class="shop-cost" id="showCooldown">pronto</span></button>
+
         <div class="shop-section-title">🌦️ Estado</div>
         <div id="weatherStatus">Clima: Ensolarado</div>
         <div id="timeStatus">Hora: Dia</div>
         <div style="font-size:0.72em; color:#9fe6b8; margin-top:6px;">Clique numa planta madura para colher · na terra para regar · na praga para eliminá-la.</div>
+
+        <button id="resetGame" class="shop-btn" title="Apaga todo o progresso salvo e recomeça do zero">🔄 Reiniciar Jogo</button>
     </div>
 
     <div id="notifications" role="alert"></div>
@@ -179,6 +240,20 @@
             <button id="welcomeClose">Coletar 🪙</button>
         </div>
     </div>
+
+    <!-- TASK_003: Score Card da Exposição de Jardinagem -->
+    <div id="showModal">
+        <div class="card show-card">
+            <div id="showMedal" class="show-medal">🥇</div>
+            <h2 id="showTitle">Medalha de Ouro!</h2>
+            <div id="showScoreLine" class="show-score">Pontuação: 0</div>
+            <div id="showBreakdown" class="show-breakdown"></div>
+            <div id="showReward" class="show-reward">+0 🪙</div>
+            <button id="showClose">Coletar Prêmio</button>
+        </div>
+    </div>
+
+    <div id="selectionHint">🌷 Selecione a planta mais bonita para a competição!</div>
 
     <canvas id="gameCanvas"></canvas>
 
@@ -204,6 +279,7 @@
         // --- Configuração Inicial ---
         let scene, camera, renderer;
         let ground, sky;
+        let directionalLight, ambientLight; // TASK_003: refs p/ troca de bioma
         let bearModel; // Variável para armazenar o modelo do urso
         const plants = [];
         const butterflies = [];
@@ -226,7 +302,11 @@
             mushroom: { spore: 0, small: 5, grown: 20 },
             bamboo: { seed: 0, shoot: 5, cluster: 15, dense: 40 },
             berrybush: { seed: 0, sapling: 10, foliage: 35, berry: 80 },
-            lotus: { spore: 0, pad: 40, bud: 100, bloom: 150 }
+            lotus: { spore: 0, pad: 40, bud: 100, bloom: 150 },
+            // TASK_003: híbridos levam ~2x o tempo de uma planta comum
+            firelotus: { seed: 0, sprout: 20, bloom: 60 },
+            crystalbamboo: { seed: 0, sprout: 20, bloom: 60 },
+            goldpine: { seed: 0, sprout: 20, bloom: 60 }
         };
 
         const weatherChangeInterval = 45; // TASK_002: Mudar clima a cada 45 segundos
@@ -252,8 +332,32 @@
             sprinklerActive: false,
             harvesterRobots: 0,
             ultrasonicScarecrow: false,
-            lastActiveTimestamp: Date.now()
+            lastActiveTimestamp: Date.now(),
+            // === TASK_003 ===
+            currentGreenhouse: 'default',
+            unlockedGreenhouses: ['default'],
+            hybridSeedsInventory: { firelotus: 0, crystalbamboo: 0, goldpine: 0 },
+            lastExhibitionTimestamp: 0
         };
+
+        // === TASK_003: Biomas de estufa ===
+        const GREENHOUSE_BIOMES = {
+            default:   { name: 'Padrão',     groundColor: 0x228B22, skyColor: 0x87CEEB, lightColor: 0xffffff, lightIntensity: 1.2, cost: 0,    growthMult: 1.0,  harvestMult: 1.0 },
+            desert:    { name: 'Desértica',  groundColor: 0xD2B48C, skyColor: 0xEDC9AF, lightColor: 0xffd1b3, lightIntensity: 1.6, cost: 1500, growthMult: 1.0,  harvestMult: 1.2, droughtBias: true },
+            glacial:   { name: 'Glacial',    groundColor: 0xE0FFFF, skyColor: 0xB0C4DE, lightColor: 0xd9e6f2, lightIntensity: 1.0, cost: 3000, growthMult: 1.0,  harvestMult: 1.0, freezesPests: true },
+            cyberglow: { name: 'Ciber-Glow', groundColor: 0x0a0c10, skyColor: 0x05020a, lightColor: 0xb573ff, lightIntensity: 1.4, cost: 6000, growthMult: 1.25, harvestMult: 1.0 }
+        };
+        const GREENHOUSE_COSTS = { desert: 1500, glacial: 3000, cyberglow: 6000 };
+
+        // === TASK_003: Sementes híbridas (4x valor, crescimento 2x) ===
+        const HYBRID_INFO = {
+            firelotus:    { label: '🔥 Lótus de Fogo',  harvest: 1200 },
+            crystalbamboo:{ label: '💎 Bambu de Cristal', harvest: 900 },
+            goldpine:     { label: '🌟 Pinheiro Dourado', harvest: 1500 }
+        };
+        let biomeLightColor = 0xffffff, biomeLightIntensity = 1.2; // tint aplicado no ciclo dia/noite
+        let exhibitionSelectionMode = false;
+        let globalGrowthBuff = 1.0, globalGrowthBuffTimer = 0; // buff de medalha de ouro
 
         // Pragas e robôs
         const pests = [];
@@ -388,10 +492,10 @@
             renderer.toneMappingExposure = 1.0; // Ajuste da exposição
 
             // Luzes
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Reduzir um pouco a intensidade
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Reduzir um pouco a intensidade
             directionalLight.position.set(5, 10, 7.5);
             directionalLight.castShadow = true;
 
@@ -459,12 +563,24 @@
             document.getElementById('welcomeClose').addEventListener('click', () => {
                 document.getElementById('welcomeModal').style.display = 'none';
             });
+            document.getElementById('resetGame').addEventListener('click', resetGame);
+
+            // TASK_003: estufas, sementes híbridas e exposição
+            document.querySelectorAll('.shop-btn[data-greenhouse]').forEach(b => b.addEventListener('click', () => buyGreenhouse(b.dataset.greenhouse)));
+            document.querySelectorAll('.shop-btn[data-hybrid]').forEach(b => b.addEventListener('click', () => selectHybridSeed(b.dataset.hybrid)));
+            document.getElementById('flowerShowBtn').addEventListener('click', enterExhibition);
+            document.getElementById('showClose').addEventListener('click', () => { document.getElementById('showModal').style.display = 'none'; });
 
             // TASK_002: carregar progresso salvo e processar ganhos offline
             loadGame();
             applyWeatherEffects();
             updateGoldUI();
             processOfflineEarnings();
+
+            // TASK_003: aplica o bioma salvo e atualiza as UIs novas
+            applyBiome(gardenState.currentGreenhouse);
+            refreshGreenhouseUI();
+            refreshHybridInventoryUI();
 
             // Salvar ao sair / trocar de aba (idle state)
             window.addEventListener('beforeunload', saveGame);
@@ -485,7 +601,14 @@
                 setWeather: (w) => { simulatedWeather = w; applyWeatherEffects(); updateSkyColor(); },
                 plantAt: (x, z, type) => plantSeed(new THREE.Vector3(x, 0, z), type),
                 plantSeed, harvestPlant, spawnPest, killPest, buySprinkler, buyScarecrow, buyHarvester,
-                isPlantMature, updatePests, updateHarvesterRobots, updatePlantGrowth
+                isPlantMature, updatePests, updateHarvesterRobots, updatePlantGrowth,
+                // === TASK_003 ===
+                GREENHOUSE_BIOMES, HYBRID_INFO, switchGreenhouse, buyGreenhouse, applyBiome,
+                checkCrossbreeding, triggerHybridization, plantHybrid, createHybridMesh,
+                enterExhibition, evaluatePlantForShow, biomeGrowthMult, biomeHarvestMult,
+                getGround: () => ground, getSky: () => sky, getDirLight: () => directionalLight,
+                getState: () => ({ greenhouse: gardenState.currentGreenhouse, unlocked: gardenState.unlockedGreenhouses, hybrids: gardenState.hybridSeedsInventory, buff: globalGrowthBuff }),
+                forceExhibitionReady: () => { gardenState.lastExhibitionTimestamp = 0; }
             };
         }
 
@@ -525,6 +648,18 @@
             pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(pointer, camera);
 
+            // TASK_003: Modo de seleção da Exposição (clicar na planta a inscreve)
+            if (exhibitionSelectionMode) {
+                const meshes = plants.map(p => p.mesh).filter(Boolean);
+                const hits = raycaster.intersectObjects(meshes, true);
+                if (hits.length > 0) {
+                    const plant = findPlantFromObject(hits[0].object);
+                    if (plant && !plant.isDead && isPlantMature(plant)) { evaluatePlantForShow(plant); return; }
+                    showNotification('Escolha uma planta MADURA para a competição! 🌱', 2500);
+                }
+                return;
+            }
+
             // 1. Pragas têm prioridade (clicar elimina e dá bônus)
             if (pests.length > 0) {
                 const pestHits = raycaster.intersectObjects(pests.map(p => p.mesh).filter(Boolean), true);
@@ -549,7 +684,9 @@
             // 3. Chão: plantar a semente selecionada
             const groundHits = raycaster.intersectObject(ground);
             if (groundHits.length > 0) {
-                if (currentSeedType) {
+                if (currentSeedType && currentSeedType.startsWith('hybrid:')) {
+                    plantHybrid(groundHits[0].point, currentSeedType.split(':')[1]); // TASK_003
+                } else if (currentSeedType) {
                     plantSeed(groundHits[0].point, currentSeedType);
                 } else {
                     showNotification('Selecione uma semente na loja para plantar. 🌱', 2000);
@@ -590,7 +727,8 @@
                 moisture: 100,   // TASK_002: umidade do solo
                 growTimer: 0,    // segundos efetivos de crescimento
                 isDead: false,
-                hasPest: false
+                hasPest: false,
+                isHybrid: false, hasHybridSeed: null, moistureSum: 0, moistureSamples: 0 // TASK_003
             };
 
             plantData.mesh = createPlantMesh(plantData);
@@ -626,6 +764,7 @@
                 case 'bamboo': return ['seed', 'shoot', 'cluster', 'dense'];
                 case 'berrybush': return ['seed', 'sapling', 'foliage', 'berry'];
                 case 'lotus': return ['spore', 'pad', 'bud', 'bloom'];
+                case 'firelotus': case 'crystalbamboo': case 'goldpine': return ['seed', 'sprout', 'bloom']; // TASK_003 híbridos
                 default: return [];
             }
         }
@@ -683,6 +822,7 @@
         }
 
         function createPlantMesh(plantData) {
+            if (plantData.isHybrid) return createHybridMesh(plantData); // TASK_003
             const stages = getPlantStages(plantData.type);
             const stageName = stages[plantData.growthStage];
             let geometry, material, mesh;
@@ -991,6 +1131,10 @@
                 plant.mesh.castShadow = true;
                 plant.mesh.userData.plantData = plant;
                 scene.add(plant.mesh);
+                // TASK_003: pop-in elástico + poeira mágica ao mudar de estágio
+                plant.popT = 0;
+                plant.mesh.scale.setScalar(0.1);
+                if (plant.growthStage > 0) spawnGrowthDust(plant.position);
             }
         }
 
@@ -1032,17 +1176,22 @@
                 if (simulatedWeather === 'rainy' || gardenState.sprinklerActive) {
                     plant.moisture = 100;
                 } else {
-                    const decay = simulatedWeather === 'drought' ? 2 : 1; // %/s
+                    let decay = simulatedWeather === 'drought' ? 2 : 1; // %/s
+                    if (gardenState.currentGreenhouse === 'glacial') decay += 0.5; // TASK_003: nevasca reduz umidade
                     plant.moisture = Math.max(0, (plant.moisture ?? 100) - decay * deltaTime);
                 }
                 updateSoilColor(plant);
 
+                // TASK_003: histórico de umidade (média p/ a Exposição)
+                plant.moistureSum = (plant.moistureSum || 0) + plant.moisture * deltaTime;
+                plant.moistureSamples = (plant.moistureSamples || 0) + deltaTime;
+
                 if (plant.isDead) return;            // planta morta não cresce
                 if (isPlantMature(plant)) return;    // já madura
 
-                // Velocidade de crescimento efetiva = clima * solo
+                // Velocidade de crescimento efetiva = clima * solo * bioma * buff (TASK_003)
                 const soilMult = (plant.moisture > 0) ? 1.0 : 0.1;
-                plant.growTimer = (plant.growTimer || 0) + deltaTime * weatherGrowthMultiplier * soilMult;
+                plant.growTimer = (plant.growTimer || 0) + deltaTime * weatherGrowthMultiplier * soilMult * biomeGrowthMult() * globalGrowthBuff;
 
                 const stages = getPlantStages(plant.type);
                 let cumulativeTime = 0;
@@ -1061,15 +1210,29 @@
         // Colhe uma planta madura: paga ouro (x1.5 na seca) e reinicia o ciclo
         function harvestPlant(plant, auto = false) {
             if (!plant || plant.isDead || !isPlantMature(plant)) return false;
-            const value = Math.round(getHarvestValue(plant.type) * goldMultiplier);
+            // TASK_003: valor híbrido (4x base) ou comum, × clima × bioma
+            const base = plant.isHybrid ? (HYBRID_INFO[plant.type] ? HYBRID_INFO[plant.type].harvest : 0) : getHarvestValue(plant.type);
+            const value = Math.round(base * goldMultiplier * biomeHarvestMult());
             addGold(value);
             showFloatingText(`+${value} 🪙${auto ? ' (Auto)' : ''}`, plant.position, '#ffd54a');
             try { notificationSound.play(); } catch (e) { }
+
+            // TASK_003: planta polinizada concede uma Semente Híbrida ao ser colhida
+            if (plant.hasHybridSeed) {
+                const ht = plant.hasHybridSeed;
+                gardenState.hybridSeedsInventory[ht] = (gardenState.hybridSeedsInventory[ht] || 0) + 1;
+                plant.hasHybridSeed = null;
+                showFloatingText(`🧬 ${HYBRID_INFO[ht].label}!`, plant.position, '#00ffcc');
+                showNotification(`✨ Você colheu uma Semente Híbrida: ${HYBRID_INFO[ht].label}!`, 4000);
+                refreshHybridInventoryUI();
+            }
+
             // Reinicia o ciclo de crescimento (volta para semente)
             plant.growthStage = 0;
             plant.growTimer = 0;
             plant.plantedTime = clock.getElapsedTime();
             plant.notifiedStages = {};
+            plant.moistureSum = 0; plant.moistureSamples = 0; // novo ciclo p/ a Exposição
             rebuildPlantMesh(plant);
             return true;
         }
@@ -1098,9 +1261,13 @@
             if (timeSinceLastWeatherChange > weatherChangeInterval) {
                 timeSinceLastWeatherChange = 0;
                 const prevState = simulatedWeather;
-                // Sorteio ponderado: 60% sol / 25% chuva / 15% seca
+                // Sorteio ponderado (TASK_003: estufa desértica eleva a seca p/ ~50%)
                 const r = Math.random();
-                simulatedWeather = r < 0.60 ? 'sunny' : (r < 0.85 ? 'rainy' : 'drought');
+                if (gardenState.currentGreenhouse === 'desert') {
+                    simulatedWeather = r < 0.35 ? 'sunny' : (r < 0.50 ? 'rainy' : 'drought');
+                } else {
+                    simulatedWeather = r < 0.60 ? 'sunny' : (r < 0.85 ? 'rainy' : 'drought');
+                }
                 if (prevState !== simulatedWeather) {
                     applyWeatherEffects();
                     updateAudio();
@@ -1177,8 +1344,11 @@
             const light = scene.getObjectByProperty('isDirectionalLight', true);
             if (light) {
                 light.position.set(Math.cos(sunAngle) * 15, Math.sin(sunAngle) * 10 + 5, 10); // Movimento no céu
-                light.intensity = timeOfDay === 'night' ? 0.3 : (timeOfDay === 'evening' ? 0.8 : 1.5); // Mais fraco à noite
-                light.color.set(timeOfDay === 'night' ? 0xaaaaff : (timeOfDay === 'evening' ? 0xffccaa : 0xffffff)); // Cor da luz
+                const baseInt = timeOfDay === 'night' ? 0.3 : (timeOfDay === 'evening' ? 0.8 : 1.5);
+                light.intensity = baseInt * (biomeLightIntensity / 1.2); // TASK_003: tint do bioma
+                const timeCol = new THREE.Color(timeOfDay === 'night' ? 0xaaaaff : (timeOfDay === 'evening' ? 0xffccaa : 0xffffff));
+                timeCol.lerp(new THREE.Color(biomeLightColor), 0.4);
+                light.color.copy(timeCol);
                 light.target.position.set(0, 0, 0); // Manter olhando para o centro
             }
             const ambient = scene.getObjectByProperty('isAmbientLight', true);
@@ -1199,8 +1369,10 @@
         }
 
         function updateSkyColor() {
-            let skyCol = new THREE.Color(0x87CEEB); // Dia
-            let groundCol = new THREE.Color(0x228B22); // Grama dia
+            // TASK_003: cores base vêm do bioma da estufa atual
+            const biome = GREENHOUSE_BIOMES[gardenState.currentGreenhouse] || GREENHOUSE_BIOMES.default;
+            let skyCol = new THREE.Color(biome.skyColor);
+            let groundCol = new THREE.Color(biome.groundColor);
 
             if (timeOfDay === 'evening') {
                 skyCol.set(0xFF8C00); // Laranja
@@ -1317,6 +1489,7 @@
 
         function spawnPest() {
             if (gardenState.ultrasonicScarecrow) return;
+            if (gardenState.currentGreenhouse === 'glacial') return; // TASK_003: gelo congela pragas
             const candidates = plants.filter(p => !p.isDead && !p.hasPest && p.growthStage >= 1 && p.mesh);
             if (candidates.length === 0) return;
             const target = candidates[Math.floor(Math.random() * candidates.length)];
@@ -1469,7 +1642,19 @@
         }
 
         // === TASK_002: Persistência + ganhos offline (idle) ===
+        let isResetting = false; // impede regravar o save durante o reset
+
+        // Apaga o progresso salvo e recomeça do zero
+        function resetGame() {
+            const ok = confirm('Reiniciar o jogo? Todo o progresso (ouro, plantas e automações) será apagado permanentemente.');
+            if (!ok) return;
+            isResetting = true;
+            try { localStorage.removeItem(SAVE_KEY); } catch (e) { console.warn('Falha ao limpar save:', e); }
+            location.reload();
+        }
+
         function saveGame() {
+            if (isResetting) return;
             try {
                 gardenState.lastActiveTimestamp = Date.now();
                 const data = {
@@ -1478,10 +1663,17 @@
                     harvesterRobots: gardenState.harvesterRobots,
                     ultrasonicScarecrow: gardenState.ultrasonicScarecrow,
                     lastActiveTimestamp: gardenState.lastActiveTimestamp,
+                    // TASK_003
+                    currentGreenhouse: gardenState.currentGreenhouse,
+                    unlockedGreenhouses: gardenState.unlockedGreenhouses,
+                    hybridSeedsInventory: gardenState.hybridSeedsInventory,
+                    lastExhibitionTimestamp: gardenState.lastExhibitionTimestamp,
                     plants: plants.map(p => ({
                         type: p.type, x: p.position.x, y: p.position.y, z: p.position.z,
                         growthStage: p.growthStage, growTimer: p.growTimer, moisture: p.moisture,
-                        isDead: p.isDead, bloomColor: p.bloomColor, sizeVariation: p.sizeVariation
+                        isDead: p.isDead, bloomColor: p.bloomColor, sizeVariation: p.sizeVariation,
+                        isHybrid: p.isHybrid, hasHybridSeed: p.hasHybridSeed,
+                        moistureSum: p.moistureSum, moistureSamples: p.moistureSamples
                     }))
                 };
                 localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1497,6 +1689,11 @@
             gardenState.harvesterRobots = data.harvesterRobots || 0;
             gardenState.ultrasonicScarecrow = !!data.ultrasonicScarecrow;
             gardenState.lastActiveTimestamp = data.lastActiveTimestamp || Date.now();
+            // TASK_003
+            gardenState.currentGreenhouse = data.currentGreenhouse || 'default';
+            gardenState.unlockedGreenhouses = data.unlockedGreenhouses || ['default'];
+            gardenState.hybridSeedsInventory = data.hybridSeedsInventory || { firelotus: 0, crystalbamboo: 0, goldpine: 0 };
+            gardenState.lastExhibitionTimestamp = data.lastExhibitionTimestamp || 0;
 
             (data.plants || []).forEach(pd => {
                 const pos = new THREE.Vector3(pd.x, pd.y, pd.z);
@@ -1505,7 +1702,9 @@
                     plantedTime: clock.getElapsedTime(), growthStage: pd.growthStage || 0,
                     mesh: null, notifiedStages: {}, sizeVariation: pd.sizeVariation || 1,
                     bloomColor: pd.bloomColor || (pd.type === 'flower' ? flowerBloomColors[0] : null),
-                    moisture: pd.moisture ?? 100, growTimer: pd.growTimer || 0, isDead: !!pd.isDead, hasPest: false
+                    moisture: pd.moisture ?? 100, growTimer: pd.growTimer || 0, isDead: !!pd.isDead, hasPest: false,
+                    isHybrid: !!pd.isHybrid, hasHybridSeed: pd.hasHybridSeed || null,
+                    moistureSum: pd.moistureSum || 0, moistureSamples: pd.moistureSamples || 0
                 };
                 if (plantData.isDead) {
                     const stump = new THREE.Mesh(
@@ -1589,10 +1788,287 @@
             saveGame();
         }
 
+        // ===================================================================
+        // === TASK_003 — Estufas, Hibridização e Exposição de Jardinagem =====
+        // ===================================================================
+
+        // -- Áudio sintetizado (harpa de troféu / medalhas) --
+        let synthCtx = null;
+        function playMedalSound(tier) {
+            try {
+                if (!synthCtx) synthCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const ctx = synthCtx, now = ctx.currentTime;
+                const notes = tier === 'gold' ? [392, 523.25, 659.25, 783.99, 1046.5]
+                            : tier === 'silver' ? [392, 523.25, 659.25] : [329.63, 392];
+                notes.forEach((f, i) => {
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'triangle'; o.frequency.value = f;
+                    const t0 = now + i * 0.09;
+                    g.gain.setValueAtTime(0.0001, t0);
+                    g.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+                    o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.55);
+                });
+            } catch (e) { }
+        }
+
+        // -- Troca / compra de estufas (biomas) --
+        function applyBiome(id) {
+            const biome = GREENHOUSE_BIOMES[id] || GREENHOUSE_BIOMES.default;
+            gardenState.currentGreenhouse = id;
+            biomeLightColor = biome.lightColor;
+            biomeLightIntensity = biome.lightIntensity;
+            if (ground) ground.material.color.setHex(biome.groundColor);
+            if (sky && sky.material) sky.material.color.setHex(biome.skyColor);
+            if (directionalLight) { directionalLight.color.setHex(biome.lightColor); directionalLight.intensity = biome.lightIntensity; }
+            updateSkyColor();
+        }
+        function switchGreenhouse(id) {
+            if (!gardenState.unlockedGreenhouses.includes(id)) return;
+            applyBiome(id);
+            showNotification(`Estufa ativa: ${GREENHOUSE_BIOMES[id].name} 🌿`, 3000);
+            refreshGreenhouseUI();
+            saveGame();
+        }
+        function buyGreenhouse(id) {
+            if (gardenState.unlockedGreenhouses.includes(id)) { switchGreenhouse(id); return; }
+            const cost = GREENHOUSE_COSTS[id] || 0;
+            if (!spendGold(cost)) { showNotification(`Ouro insuficiente! Estufa custa ${cost} 🪙.`, 2500); return; }
+            gardenState.unlockedGreenhouses.push(id);
+            showNotification(`🏛️ Estufa ${GREENHOUSE_BIOMES[id].name} desbloqueada!`, 3500);
+            switchGreenhouse(id);
+        }
+        function refreshGreenhouseUI() {
+            ['default', 'desert', 'glacial', 'cyberglow'].forEach(id => {
+                const btn = document.querySelector(`.shop-btn[data-greenhouse="${id}"]`);
+                if (!btn) return;
+                const owned = gardenState.unlockedGreenhouses.includes(id);
+                btn.classList.toggle('selected', gardenState.currentGreenhouse === id);
+                btn.classList.toggle('owned', owned && gardenState.currentGreenhouse !== id);
+                btn.disabled = !owned && gardenState.gold < (GREENHOUSE_COSTS[id] || 0);
+            });
+        }
+        function biomeGrowthMult() { return (GREENHOUSE_BIOMES[gardenState.currentGreenhouse] || GREENHOUSE_BIOMES.default).growthMult; }
+        function biomeHarvestMult() { return (GREENHOUSE_BIOMES[gardenState.currentGreenhouse] || GREENHOUSE_BIOMES.default).harvestMult; }
+
+        // -- Materiais e malha de plantas híbridas --
+        function getHybridFlowerMaterial(hybridType) {
+            const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+            const c = canvas.getContext('2d');
+            const grad = c.createLinearGradient(0, 0, 0, 128);
+            if (hybridType === 'firelotus') { grad.addColorStop(0, '#ff3300'); grad.addColorStop(0.5, '#ff9900'); grad.addColorStop(1, '#ffea00'); }
+            else if (hybridType === 'crystalbamboo') { grad.addColorStop(0, '#00ffff'); grad.addColorStop(0.5, '#0088ff'); grad.addColorStop(1, '#9900ff'); }
+            else { grad.addColorStop(0, '#ffd700'); grad.addColorStop(0.5, '#ffa500'); grad.addColorStop(1, '#ffffff'); }
+            c.fillStyle = grad; c.fillRect(0, 0, 128, 128);
+            const tex = new THREE.CanvasTexture(canvas);
+            const emissive = hybridType === 'firelotus' ? 0x661100 : hybridType === 'crystalbamboo' ? 0x004488 : 0x554400;
+            return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.2, metalness: 0.8, emissive: new THREE.Color(emissive), emissiveIntensity: 1.0 });
+        }
+        function createHybridMesh(plantData) {
+            const stages = ['seed', 'sprout', 'bloom'];
+            const stageName = stages[plantData.growthStage] || 'seed';
+            const sv = plantData.sizeVariation || 1;
+            if (stageName === 'seed') {
+                return new THREE.Mesh(new THREE.SphereGeometry(0.09 * sv, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8B4513 }));
+            }
+            const group = new THREE.Group();
+            const stemH = (stageName === 'sprout' ? 0.4 : 0.7) * sv;
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * sv, 0.05 * sv, stemH, 8), new THREE.MeshStandardMaterial({ color: 0x2e7d32 }));
+            stem.position.y = stemH / 2; stem.castShadow = true; group.add(stem);
+            const flowerR = (stageName === 'sprout' ? 0.14 : 0.32) * sv;
+            const flower = new THREE.Mesh(new THREE.IcosahedronGeometry(flowerR, 1), getHybridFlowerMaterial(plantData.type));
+            flower.position.y = stemH + flowerR * 0.6; flower.castShadow = true;
+            flower.userData.isHybridFlower = true;
+            group.add(flower);
+            return group;
+        }
+
+        // -- Polinização cruzada (crossbreeding) --
+        const hybridParticles = [];
+        function checkCrossbreeding(deltaTime) {
+            const mature = plants.filter(p => isPlantMature(p) && !p.isDead && !p.isHybrid && !p.hasHybridSeed);
+            for (let i = 0; i < mature.length; i++) {
+                for (let j = i + 1; j < mature.length; j++) {
+                    const p1 = mature[i], p2 = mature[j];
+                    if (p1.type === p2.type) continue;
+                    if (p1.position.distanceTo(p2.position) < 1.8) {
+                        if (Math.random() < 0.15 * (deltaTime / 60)) triggerHybridization(p1, p2);
+                    }
+                }
+            }
+        }
+        function decideHybridType(a, b) {
+            const set = new Set([a.type, b.type]);
+            if (set.has('bamboo')) return 'crystalbamboo';
+            if (set.has('pinetree')) return 'goldpine';
+            return 'firelotus';
+        }
+        function triggerHybridization(plantA, plantB) {
+            plantA.hasHybridSeed = decideHybridType(plantA, plantB);
+            createHybridizationParticles(plantB.position, plantA.position);
+            showFloatingText('✨ POLINIZAÇÃO ✨', plantA.position, '#00ffcc');
+            saveGame();
+        }
+        function createHybridizationParticles(fromPos, toPos) {
+            for (let i = 0; i < 14; i++) {
+                const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+                m.position.copy(fromPos); m.position.y += 0.5;
+                scene.add(m);
+                hybridParticles.push({ mesh: m, from: fromPos.clone(), to: toPos.clone(), t: -i * 0.05 });
+            }
+        }
+        function updateHybridParticles(deltaTime) {
+            for (let i = hybridParticles.length - 1; i >= 0; i--) {
+                const hp = hybridParticles[i];
+                hp.t += deltaTime * 0.8;
+                if (hp.t < 0) continue;
+                if (hp.t >= 1) { scene.remove(hp.mesh); hybridParticles.splice(i, 1); continue; }
+                hp.mesh.position.lerpVectors(hp.from, hp.to, hp.t);
+                hp.mesh.position.y = 0.5 + Math.sin(hp.t * Math.PI) * 0.8;
+            }
+        }
+        // Brilho pulsante na planta receptora de pólen
+        function updateReceptorGlow(elapsed) {
+            plants.forEach(p => {
+                if (p.hasHybridSeed && p.mesh) {
+                    const pulse = 0.5 + Math.sin(elapsed * 4) * 0.5;
+                    p.mesh.traverse(o => { if (o.isMesh && o.material && 'emissiveIntensity' in o.material) { o.material.emissive = new THREE.Color(0x00ffcc); o.material.emissiveIntensity = pulse; } });
+                }
+            });
+        }
+
+        // -- Plantar híbrido a partir do inventário --
+        function refreshHybridInventoryUI() {
+            Object.keys(HYBRID_INFO).forEach(type => {
+                const btn = document.querySelector(`.shop-btn[data-hybrid="${type}"]`);
+                if (!btn) return;
+                const count = gardenState.hybridSeedsInventory[type] || 0;
+                if (count > 0) {
+                    btn.style.display = 'block';
+                    btn.disabled = false;
+                    btn.innerHTML = `${HYBRID_INFO[type].label} <span class="shop-cost">x${count}</span>`;
+                    btn.classList.toggle('selected', currentSeedType === ('hybrid:' + type));
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+        function selectHybridSeed(type) {
+            if ((gardenState.hybridSeedsInventory[type] || 0) <= 0) return;
+            currentSeedType = 'hybrid:' + type;
+            showNotification(`Semente híbrida ${HYBRID_INFO[type].label} selecionada. Toque no chão.`, 3000);
+            refreshHybridInventoryUI();
+        }
+        function plantHybrid(position, type) {
+            if ((gardenState.hybridSeedsInventory[type] || 0) <= 0) { showNotification('Sem sementes híbridas desse tipo.', 2000); return; }
+            gardenState.hybridSeedsInventory[type]--;
+            const plantData = {
+                id: THREE.MathUtils.generateUUID(), type, position: position.clone(),
+                plantedTime: clock.getElapsedTime(), growthStage: 0, mesh: null, notifiedStages: {},
+                sizeVariation: 1.1 + Math.random() * 0.3, bloomColor: null,
+                moisture: 100, growTimer: 0, isDead: false, hasPest: false,
+                isHybrid: true, moistureSum: 0, moistureSamples: 0
+            };
+            plantData.mesh = createPlantMesh(plantData);
+            plantData.mesh.position.copy(position); plantData.mesh.position.y += 0.1;
+            plantData.mesh.castShadow = true; plantData.mesh.userData.plantData = plantData;
+            scene.add(plantData.mesh);
+            const soilMesh = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.6, 24), new THREE.MeshStandardMaterial({ color: 0x3D2314, side: THREE.DoubleSide }));
+            soilMesh.rotation.x = -Math.PI / 2; soilMesh.position.copy(position); soilMesh.position.y = 0.02;
+            scene.add(soilMesh); plantData.soilMesh = soilMesh;
+            plants.push(plantData);
+            currentSeedType = null;
+            showFloatingText('🧬 Híbrido plantado!', position, '#00ffcc');
+            refreshHybridInventoryUI(); saveGame();
+        }
+
+        // -- Exposição de Jardinagem (Flower Show) --
+        const EXHIBITION_COOLDOWN = 300; // 5 min
+        function exhibitionReady() {
+            return (Date.now() - gardenState.lastExhibitionTimestamp) / 1000 >= EXHIBITION_COOLDOWN;
+        }
+        function enterExhibition() {
+            if (!exhibitionReady()) { showNotification('A exposição ainda está em cooldown. ⏳', 2500); return; }
+            const hasMature = plants.some(p => isPlantMature(p) && !p.isDead);
+            if (!hasMature) { showNotification('Cultive uma planta madura para inscrever! 🌱', 3000); return; }
+            exhibitionSelectionMode = true;
+            document.getElementById('selectionHint').style.display = 'block';
+        }
+        function evaluatePlantForShow(plant) {
+            exhibitionSelectionMode = false;
+            document.getElementById('selectionHint').style.display = 'none';
+            gardenState.lastExhibitionTimestamp = Date.now();
+            const avgMoisture = plant.moistureSamples > 0 ? (plant.moistureSum / plant.moistureSamples) : (plant.moisture ?? 100);
+            const healthScore = avgMoisture * 0.5;            // até +50
+            const sizeBonus = (plant.sizeVariation - 0.85) * 100; // 0..~45
+            const baseScore = plant.isHybrid ? 60 : 30;
+            const total = Math.round(baseScore + healthScore + sizeBonus);
+            let tier, reward, buff = false;
+            if (total >= 90) { tier = 'gold'; reward = 2000; buff = true; }
+            else if (total >= 60) { tier = 'silver'; reward = 750; }
+            else { tier = 'bronze'; reward = 250; }
+            addGold(reward);
+            if (buff) { globalGrowthBuff = 1.5; globalGrowthBuffTimer = 180; showNotification('🥇 OURO! +50% velocidade de crescimento por 3 min!', 4000); }
+            playMedalSound(tier);
+            showScoreCard(tier, total, reward, { base: baseScore, health: healthScore, size: sizeBonus, hybrid: plant.isHybrid });
+            saveGame();
+        }
+        function showScoreCard(tier, total, reward, bd) {
+            const modal = document.getElementById('showModal');
+            const medals = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+            const titles = { gold: 'Medalha de Ouro!', silver: 'Medalha de Prata!', bronze: 'Medalha de Bronze!' };
+            document.getElementById('showMedal').textContent = medals[tier];
+            document.getElementById('showTitle').textContent = titles[tier];
+            document.getElementById('showScoreLine').textContent = `Pontuação: ${total}`;
+            document.getElementById('showBreakdown').innerHTML =
+                `Base (${bd.hybrid ? 'Híbrido' : 'Comum'}): ${bd.base}<br>Saúde (umidade média): +${bd.health.toFixed(0)}<br>Estética (tamanho): +${bd.size.toFixed(0)}`;
+            document.getElementById('showReward').textContent = `+${reward} 🪙` + (tier === 'gold' ? ' + Buff!' : '');
+            modal.style.display = 'flex';
+        }
+        function updateExhibitionCooldownUI() {
+            const span = document.getElementById('showCooldown');
+            if (!span) return;
+            if (exhibitionReady()) { span.textContent = 'pronto'; }
+            else {
+                const left = Math.ceil(EXHIBITION_COOLDOWN - (Date.now() - gardenState.lastExhibitionTimestamp) / 1000);
+                span.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+            }
+        }
+
+        // -- Efeito pop-in de crescimento + poeira mágica --
+        function spawnGrowthDust(position) {
+            const group = new THREE.Group();
+            const parts = [];
+            const mat = new THREE.MeshBasicMaterial({ color: 0xb9f6ca });
+            for (let i = 0; i < 10; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), mat);
+                p.position.copy(position); p.position.y += 0.3;
+                parts.push({ mesh: p, vel: new THREE.Vector3((Math.random() - 0.5), Math.random() * 1.5, (Math.random() - 0.5)).multiplyScalar(1.5) });
+                group.add(p);
+            }
+            scene.add(group);
+            let life = 0.7;
+            (function anim() {
+                const dt = 0.016; life -= dt;
+                parts.forEach(pp => { pp.mesh.position.addScaledVector(pp.vel, dt); pp.vel.y -= 3 * dt; });
+                if (life > 0) requestAnimationFrame(anim); else scene.remove(group);
+            })();
+        }
+        function updatePopIn(deltaTime) {
+            plants.forEach(p => {
+                if (p.mesh && p.popT !== undefined && p.popT < 1) {
+                    p.popT = Math.min(1, p.popT + deltaTime * 4);
+                    const s = 0.1 + 0.9 * (1 - Math.pow(1 - p.popT, 3)); // ease-out cúbico
+                    p.mesh.scale.setScalar(s);
+                }
+            });
+        }
+
         function animate() {
             requestAnimationFrame(animate);
 
             const deltaTime = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
 
             updatePlantGrowth(deltaTime);
             updateWeather(deltaTime);
@@ -1602,6 +2078,14 @@
             updateRain(deltaTime);
             updatePests(deltaTime);
             updateHarvesterRobots(deltaTime);
+
+            // TASK_003
+            checkCrossbreeding(deltaTime);
+            updateHybridParticles(deltaTime);
+            updateReceptorGlow(elapsed);
+            updatePopIn(deltaTime);
+            if (globalGrowthBuffTimer > 0) { globalGrowthBuffTimer -= deltaTime; if (globalGrowthBuffTimer <= 0) globalGrowthBuff = 1.0; }
+            updateExhibitionCooldownUI();
 
             renderer.render(scene, camera);
         }

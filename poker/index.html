@@ -711,6 +711,108 @@
                 margin: 15px auto 0;
             }
         }
+        /* =====================================================================
+           === TASK_003 — Torneios, Fichas 3D, Cartas 3D, Tells, Stats
+           ===================================================================== */
+        /* Fichas físicas empilhadas */
+        .chip-stack-wrapper { display: flex; gap: 6px; align-items: flex-end; justify-content: center; height: 34px; }
+        .chip-stack { position: relative; width: 22px; height: 34px; }
+        .poker-chip {
+            position: absolute; left: 0; width: 22px; height: 8px; border-radius: 50%;
+            border: 1px dashed rgba(255,255,255,0.55);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.25);
+        }
+        .chip-red { background: radial-gradient(circle, #ff5b5b, #b71c1c); }
+        .chip-blue { background: radial-gradient(circle, #5b8bff, #1a3fb7); }
+        .chip-green { background: radial-gradient(circle, #5bff8b, #1ab74f); }
+        .chip-black { background: radial-gradient(circle, #555, #111); }
+
+        /* Tells: troca de emoji + barra de tensão */
+        .tell-emoji { animation: tellPop 0.4s ease; }
+        @keyframes tellPop { 0% { transform: scale(0.4); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        .tension-bar-bg { width: 60px; height: 5px; background: rgba(0,0,0,0.5); border-radius: 3px; margin: 3px auto 0; overflow: hidden; }
+        .tension-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ffb300, #ff5722); transition: width 0.3s ease; box-shadow: 0 0 6px #ff9800; }
+
+        /* All-in screen shake */
+        .allin-shake { animation: allinShake 0.6s cubic-bezier(.36,.07,.19,.97); }
+        @keyframes allinShake {
+            10%,90% { transform: translate3d(-2px,0,0); } 20%,80% { transform: translate3d(5px,0,0); }
+            30%,50%,70% { transform: translate3d(-8px,0,0); } 40%,60% { transform: translate3d(8px,0,0); }
+        }
+
+        /* Cartas 3D (flip + deal-in) */
+        .card-container { perspective: 1000px; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s cubic-bezier(0.4,0,0.2,1); transform-style: preserve-3d; }
+        .card-inner.is-flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; }
+        .card-back { background: repeating-linear-gradient(45deg, #1a365d, #1a365d 6px, #24477a 6px, #24477a 12px); transform: rotateY(180deg); }
+        .card.dealing { animation: dealIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both; }
+        @keyframes dealIn { 0% { transform: translate(140px,-120px) rotate(360deg) scale(0.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+        /* HUD de blinds (torneio) */
+        #blindsHud {
+            position: absolute; top: 12px; right: 12px; z-index: 60; display: none;
+            background: rgba(10, 20, 30, 0.7); backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 10px; padding: 8px 14px;
+            color: #d6f5ff; font-size: 0.82em; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+        }
+        #blindsHud .bh-blinds { font-size: 1.2em; font-weight: bold; color: #00f0ff; text-shadow: 0 0 8px rgba(0,240,255,0.6); }
+        #blindsUpFlash {
+            position: fixed; top: 40%; left: 50%; transform: translate(-50%,-50%) scale(0.6);
+            font-size: 3em; font-weight: bold; color: #00f0ff; text-shadow: 0 0 24px #00f0ff; z-index: 1200;
+            opacity: 0; pointer-events: none; font-family: 'Arial Black', sans-serif; letter-spacing: 3px;
+        }
+        #blindsUpFlash.show { animation: blindsUp 1.8s ease-out; }
+        @keyframes blindsUp { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0.6); } 25% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* Botões de Dealer / SB / BB */
+        .blind-token {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 50%; font-size: 0.62em; font-weight: bold; color: #111;
+            margin: 2px auto; box-shadow: 0 0 8px currentColor;
+        }
+        .token-D { background: #fff; color: #111; }
+        .token-SB { background: #ffe082; color: #5d4000; }
+        .token-BB { background: #ffab40; color: #5d2c00; }
+
+        /* Tela de seleção de torneio + modal de perfil/stats (glassmorphism) */
+        .glass-overlay {
+            position: fixed; inset: 0; display: none; z-index: 1500;
+            justify-content: center; align-items: center; background: rgba(0,0,0,0.65);
+        }
+        .glass-overlay.show { display: flex; }
+        .glass-card {
+            background: rgba(18, 26, 38, 0.78); backdrop-filter: blur(16px);
+            border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 18px; padding: 26px 30px;
+            color: #eafff0; max-width: 560px; width: 90%; box-shadow: 0 14px 44px rgba(0,0,0,0.55); text-align: center;
+        }
+        .glass-card h2 { color: #d4af37; letter-spacing: 1px; margin-top: 0; }
+        .tournament-grid { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin: 18px 0; }
+        .tournament-card {
+            flex: 1 1 150px; min-width: 150px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px; padding: 14px; cursor: pointer; transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+        }
+        .tournament-card:hover:not(.locked) { transform: translateY(-6px); border-color: #d4af37; box-shadow: 0 8px 24px rgba(212,175,55,0.3); }
+        .tournament-card.locked { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.7); }
+        .tournament-card .t-trophy { font-size: 2.4em; }
+        .tournament-card .t-name { font-weight: bold; color: #d4af37; margin: 6px 0; }
+        .tournament-card .t-detail { font-size: 0.78em; color: #b8c6d0; line-height: 1.5; }
+        .trophy-gallery { display: flex; gap: 18px; justify-content: center; margin: 16px 0; }
+        .trophy-slot { font-size: 3em; filter: grayscale(1) brightness(0.4); transition: filter 0.4s; }
+        .trophy-slot.earned { filter: none; text-shadow: 0 0 18px #ffd54a; animation: trophyGlow 1.5s infinite alternate; }
+        @keyframes trophyGlow { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; text-align: left; }
+        .stat-row { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 12px; font-size: 0.9em; }
+        .stat-row strong { color: #d4af37; display: block; font-size: 1.2em; }
+        .glass-card button {
+            margin: 8px 6px 0; padding: 10px 22px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+            background: linear-gradient(135deg, #d4af37, #b8860b); color: #1a1a1a;
+        }
+        .glass-card button.secondary { background: rgba(255,255,255,0.15); color: #eafff0; }
+        #openProfileBtn {
+            position: absolute; top: 12px; left: 12px; z-index: 60; padding: 8px 12px; border-radius: 8px;
+            border: 1px solid rgba(212,175,55,0.5); background: rgba(18,26,38,0.7); color: #d4af37; cursor: pointer; font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -737,6 +839,7 @@
             <h2>Escolha o Modo de Jogo</h2>
             <div class="game-modes">
                 <button id="single-player" class="mode-button">Single Player</button>
+                <button id="tournament-mode" class="mode-button">🏆 Modo Torneio</button>
                 <button id="multiplayer" class="mode-button disabled">Multiplayer</button>
             </div>
             <div class="online-options">
@@ -747,11 +850,23 @@
             </div>
         </div>
 
+        <button id="openProfileBtn">👤 Perfil & Troféus</button>
+
+        <!-- TASK_003: HUD de blinds do torneio -->
+        <div id="blindsHud">
+            <div>BLINDS</div>
+            <div class="bh-blinds" id="bhBlinds">10 / 20</div>
+            <div id="bhAnte"></div>
+            <div id="bhNext" style="font-size:0.9em;color:#9fd8e6;"></div>
+        </div>
+        <div id="blindsUpFlash">BLINDS UP!</div>
+
         <div class="table">
             <div class="community-cards">
                 <!-- Cartas comunitárias serão adicionadas aqui -->
             </div>
             <div class="pot">Pot: $0</div>
+            <div id="potChips"></div>
         </div>
 
         <div class="player-area">
@@ -780,6 +895,27 @@
             <span class="history-toggle" id="history-toggle">▼</span>
         </div>
         <div id="history-container"></div>
+    </div>
+
+    <!-- TASK_003: Seleção de Torneio -->
+    <div class="glass-overlay" id="tournamentOverlay">
+        <div class="glass-card">
+            <h2>🏆 Circuito de Torneios</h2>
+            <div style="font-size:0.85em;color:#b8c6d0;">Carteira: <strong id="walletDisplay" style="color:#d4af37;">$1000</strong></div>
+            <div class="tournament-grid" id="tournamentGrid"></div>
+            <button class="secondary" id="tournamentClose">Voltar</button>
+        </div>
+    </div>
+
+    <!-- TASK_003: Perfil & Estatísticas -->
+    <div class="glass-overlay" id="profileOverlay">
+        <div class="glass-card">
+            <h2>👤 Perfil do Jogador</h2>
+            <div class="trophy-gallery" id="trophyGallery"></div>
+            <div class="stats-grid" id="statsGrid"></div>
+            <button id="walletReload" class="secondary">Recarregar Carteira (+$500)</button>
+            <button id="profileClose">Fechar</button>
+        </div>
     </div>
 
     <div class="hand-tracker-panel" id="hand-tracker">
@@ -887,6 +1023,45 @@
                     win: ["EU SOU O REI DISSO AQUI! CHORA!", "HA-HA! FÁCIL DEMAIS!"],
                     lose: ["ISSO É ROUBO!", "Como você pagou isso?! Inacreditável!"]
                 }
+            },
+            // === TASK_003: novas IAs de torneio ===
+            'Diana "The Adaptable"': {
+                avatar: '🦊',
+                color: '#00f0ff', // Ciano brilhante
+                aggressiveness: 0.55,
+                bluffFrequency: 0.30,
+                callingRate: 0.40,
+                adaptive: true, // ajusta estilo conforme o tamanho do pote
+                dialogues: {
+                    preflop: ["Vamos ver o que você tem...", "Adapto-me a qualquer mesa."],
+                    flop: ["Interessante. Estou lendo você."],
+                    raise: ["Subo. Sua reação me dirá tudo.", "Roubando essas blinds. 😏"],
+                    call: ["Pago, por enquanto.", "Vou observar mais."],
+                    bluff: ["Tem certeza de que quer me pagar? 🦊"],
+                    fold: ["Não vale o risco agora.", "Recuo estratégico."],
+                    strongHand: ["A raposa fechou a armadilha!", "Você caiu direitinho."],
+                    win: ["Adaptação é tudo.", "Previsível demais."],
+                    lose: ["Reajustando minha leitura.", "Bem jogado."]
+                }
+            },
+            'Erik "The Legend"': {
+                avatar: '👑',
+                color: '#d4af37', // Ouro metálico
+                aggressiveness: 0.70,
+                bluffFrequency: 0.18,    // só blefa no River
+                callingRate: 0.35,
+                legendary: true,         // nunca blefa no flop/turn; all-in de blefe no river
+                dialogues: {
+                    preflop: ["Sente-se. Observe uma lenda.", "O cálculo é absoluto."],
+                    flop: ["As probabilidades já estão decididas."],
+                    raise: ["Matemática pura.", "A coroa não erra."],
+                    call: ["Concedo este passo.", "Eu pago, friamente."],
+                    bluff: ["ALL-IN. Você sente o peso da coroa?", "Sua hesitação te traiu."],
+                    fold: ["Eu cedo esta mão. Não a guerra.", "Disciplina é tudo."],
+                    strongHand: ["Xeque-mate no feltro.", "A lenda é real."],
+                    win: ["Como esperado.", "Uma lenda não conhece a derrota."],
+                    lose: ["Variância. Apenas variância.", "Aproveite. Foi raro."]
+                }
             }
         };
 
@@ -907,6 +1082,119 @@
             history: [],
             round: 0
         };
+
+        // ===================================================================
+        // === TASK_003 — Torneios, Fichas 3D, Tells, Juiciness e Estatísticas
+        // ===================================================================
+        const TOURNAMENTS_CONFIG = [
+            { id: 'bronze_pub', name: 'Bronze Pub Cup', trophy: '🥉', buyIn: 200, startingChips: 1000, blindEveryHands: 5, ante: 0,
+              opponents: ['Arthur "The Shark"', 'Beatriz "Calling Station"', 'Caio "The Maniac"'] },
+            { id: 'cyber_silver', name: 'Cyber-Silver Trophy', trophy: '🥈', buyIn: 500, startingChips: 2000, blindEveryHands: 4, ante: 10,
+              opponents: ['Arthur "The Shark"', 'Caio "The Maniac"', 'Diana "The Adaptable"'] },
+            { id: 'imperial_gold', name: 'Imperial Gold Crown', trophy: '🏆', buyIn: 1500, startingChips: 3000, blindEveryHands: 3, ante: 25,
+              opponents: ['Arthur "The Shark"', 'Caio "The Maniac"', 'Diana "The Adaptable"', 'Erik "The Legend"'] }
+        ];
+        // Escala de blinds (SB/BB) — minBet do gameState = SB
+        const BLIND_LEVELS = [
+            { sb: 10, bb: 20 }, { sb: 20, bb: 40 }, { sb: 40, bb: 80 },
+            { sb: 80, bb: 160 }, { sb: 150, bb: 300 }, { sb: 250, bb: 500 }
+        ];
+
+        const tournamentState = {
+            active: false, config: null, blindLevel: 0, handsThisLevel: 0
+        };
+
+        const POKER_SAVE_KEY = 'playful_poker_tournament_data';
+        let pokerData = { wallet: 1000, trophies: [], unlockedStages: [1], stats: { handsPlayed: 0, handsWon: 0, biggestPot: 0, successfulBluffs: 0 } };
+
+        function loadPokerData() {
+            try {
+                const d = JSON.parse(localStorage.getItem(POKER_SAVE_KEY));
+                if (d) {
+                    pokerData.wallet = d.wallet ?? 1000;
+                    pokerData.trophies = d.trophies || [];
+                    pokerData.unlockedStages = d.unlockedStages || [1];
+                    pokerData.stats = Object.assign({ handsPlayed: 0, handsWon: 0, biggestPot: 0, successfulBluffs: 0 }, d.stats || {});
+                }
+            } catch (e) { }
+        }
+        function savePokerData() {
+            try { localStorage.setItem(POKER_SAVE_KEY, JSON.stringify(pokerData)); } catch (e) { }
+        }
+
+        // -- Fichas físicas 3D --
+        function calculateChipsForAmount(amount) {
+            const chips = { black: 0, green: 0, blue: 0, red: 0 };
+            let r = Math.max(0, Math.floor(amount));
+            chips.black = Math.min(5, Math.floor(r / 500)); r %= 500;
+            chips.green = Math.min(5, Math.floor(r / 100)); r %= 100;
+            chips.blue = Math.min(5, Math.floor(r / 50)); r %= 50;
+            chips.red = Math.min(5, Math.floor(r / 10));
+            return chips;
+        }
+        function renderChipStacks(containerEl, amount) {
+            if (!containerEl) return;
+            containerEl.innerHTML = '';
+            if (amount <= 0) return;
+            const cfg = calculateChipsForAmount(amount);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chip-stack-wrapper';
+            ['black', 'green', 'blue', 'red'].forEach(color => {
+                const count = cfg[color];
+                if (count === 0) return;
+                const stack = document.createElement('div');
+                stack.className = 'chip-stack';
+                for (let i = 0; i < count; i++) {
+                    const chip = document.createElement('div');
+                    chip.className = `poker-chip chip-${color}`;
+                    chip.style.bottom = `${i * 4}px`;
+                    stack.appendChild(chip);
+                }
+                wrapper.appendChild(stack);
+            });
+            containerEl.appendChild(wrapper);
+        }
+
+        // -- All-in Juiciness (tremor + sirene Web Audio) --
+        let pokerAudioCtx = null;
+        function triggerAllInJuice() {
+            const wrap = document.querySelector('.container') || document.body;
+            wrap.classList.remove('allin-shake'); void wrap.offsetWidth; wrap.classList.add('allin-shake');
+            setTimeout(() => wrap.classList.remove('allin-shake'), 600);
+            try {
+                if (!pokerAudioCtx) pokerAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const ctx = pokerAudioCtx, now = ctx.currentTime;
+                for (let k = 0; k < 2; k++) {
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'sawtooth';
+                    o.frequency.setValueAtTime(440, now + k * 0.25);
+                    o.frequency.linearRampToValueAtTime(880, now + k * 0.25 + 0.12);
+                    o.frequency.linearRampToValueAtTime(440, now + k * 0.25 + 0.24);
+                    g.gain.setValueAtTime(0.0001, now + k * 0.25);
+                    g.gain.linearRampToValueAtTime(0.12, now + k * 0.25 + 0.04);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + k * 0.25 + 0.24);
+                    o.connect(g); g.connect(ctx.destination); o.start(now + k * 0.25); o.stop(now + k * 0.25 + 0.25);
+                }
+            } catch (e) { }
+        }
+
+        // -- Estatísticas --
+        function recordHandPlayed() { pokerData.stats.handsPlayed++; savePokerData(); }
+        function recordHandResult(humanWon, potSize, wasBluff) {
+            if (humanWon) {
+                pokerData.stats.handsWon++;
+                if (potSize > pokerData.stats.biggestPot) pokerData.stats.biggestPot = potSize;
+                if (wasBluff) pokerData.stats.successfulBluffs++;
+            }
+            savePokerData();
+        }
+        function awardTrophy(tournamentId) {
+            if (!pokerData.trophies.includes(tournamentId)) pokerData.trophies.push(tournamentId);
+            // Desbloquear próxima etapa
+            const idx = TOURNAMENTS_CONFIG.findIndex(t => t.id === tournamentId);
+            if (idx >= 0 && idx + 2 > Math.max(...pokerData.unlockedStages)) pokerData.unlockedStages.push(idx + 2);
+            savePokerData();
+        }
 
         // Elementos do DOM
         const modeSelect = document.querySelector('.mode-select');
@@ -1178,17 +1466,32 @@
                     playerEl.appendChild(bubble);
                 }
 
-                // Avatar redondo flutuante para as IAs
+                // Avatar redondo flutuante para as IAs (TASK_003: tell emoji + tensão)
                 if (profile) {
                     const avatarContainer = document.createElement('div');
                     avatarContainer.className = 'player-avatar-container';
                     const avatarIcon = document.createElement('div');
-                    avatarIcon.className = 'player-avatar-icon';
+                    avatarIcon.className = 'player-avatar-icon' + (player._tellEmoji ? ' tell-emoji' : '');
                     avatarIcon.style.borderColor = profile.color;
                     avatarIcon.style.boxShadow = `0 0 10px ${profile.color}`;
-                    avatarIcon.textContent = profile.avatar;
+                    avatarIcon.textContent = player._tellEmoji || profile.avatar;
                     avatarContainer.appendChild(avatarIcon);
+                    // Barra de "Tensão da IA" (Mind Read Indicator)
+                    if (player._tension !== undefined && player._tension > 0) {
+                        const tb = document.createElement('div'); tb.className = 'tension-bar-bg';
+                        const tf = document.createElement('div'); tf.className = 'tension-bar-fill';
+                        tf.style.width = Math.min(100, player._tension) + '%';
+                        tb.appendChild(tf); avatarContainer.appendChild(tb);
+                    }
                     playerEl.appendChild(avatarContainer);
+                }
+
+                // TASK_003: token físico de Dealer/SB/BB
+                if (player._blindRole) {
+                    const tok = document.createElement('div');
+                    tok.className = 'blind-token token-' + player._blindRole;
+                    tok.textContent = player._blindRole;
+                    playerEl.appendChild(tok);
                 }
 
                 const nameEl = document.createElement('div');
@@ -1233,8 +1536,13 @@
                 playerEl.appendChild(nameEl);
                 playerEl.appendChild(chipsEl);
                 playerEl.appendChild(betEl);
+                // TASK_003: pilha física de fichas da aposta atual do jogador
+                const chipStackEl = document.createElement('div');
+                chipStackEl.className = 'player-chip-stack';
+                renderChipStacks(chipStackEl, player.bet);
+                playerEl.appendChild(chipStackEl);
                 playerEl.appendChild(cardsEl);
-                
+
                 playerAreaEl.appendChild(playerEl);
             });
         }
@@ -1259,6 +1567,7 @@
 
         function updatePot() {
             potEl.textContent = `Pot: $${gameState.pot}`;
+            renderChipStacks(document.getElementById('potChips'), gameState.pot); // TASK_003
         }
 
         function updateControls() {
@@ -1418,6 +1727,9 @@
         function startSinglePlayerGame() {
             modeSelect.style.display = 'none';
             gameState.gameMode = 'singleplayer';
+            tournamentState.active = false; // TASK_003: jogo casual não usa torneio
+            gameState.minBet = 10;
+            const bh = document.getElementById('blindsHud'); if (bh) bh.style.display = 'none';
             
             // Criar jogador humano e 3 oponentes de IA com personalidades distintas
             const playerName = playerNameInput.value.trim() || 'Jogador';
@@ -1515,6 +1827,17 @@
             
             // Se todos os oponentes faliram
             if (activeOpponents.length === 0) {
+                // TASK_003: vitória de torneio concede troféu + prêmio na carteira
+                if (tournamentState.active && tournamentState.config) {
+                    awardTrophy(tournamentState.config.id);
+                    const prize = tournamentState.config.buyIn * 5;
+                    pokerData.wallet += prize;
+                    savePokerData();
+                    showGameMessage(`🏆 Você venceu o ${tournamentState.config.name}! Troféu conquistado +$${prize}!`, 0);
+                    tournamentState.active = false;
+                    setTimeout(() => { alert(`🏆 Campeão do ${tournamentState.config.name}! Prêmio: $${prize}`); resetToMainMenu(); }, 3000);
+                    return;
+                }
                 showGameMessage('Você venceu o jogo! Todos os oponentes faliram.', 0);
                 setTimeout(() => {
                     alert('Parabéns! Você venceu o jogo! Todos os oponentes faliram.');
@@ -1535,26 +1858,53 @@
             
             // Incrementar o contador de rodadas
             gameState.round = (gameState.round || 0) + 1;
-            
+            recordHandPlayed(); // TASK_003: estatística de mãos jogadas
+            gameState._humanBluff = false;
+
+            // TASK_003: progressão de blinds por mãos jogadas + nível de blind ativo
+            let ante = 0;
+            if (tournamentState.active) {
+                tournamentState.handsThisLevel++;
+                if (tournamentState.handsThisLevel > tournamentState.config.blindEveryHands &&
+                    tournamentState.blindLevel < BLIND_LEVELS.length - 1) {
+                    tournamentState.blindLevel++;
+                    tournamentState.handsThisLevel = 1;
+                    flashBlindsUp();
+                }
+                gameState.minBet = BLIND_LEVELS[tournamentState.blindLevel].sb;
+                ante = tournamentState.config.ante;
+                updateBlindsHud();
+            }
+
             gameState.phase = 'preflop';
             gameState.pot = 0;
             gameState.currentBet = gameState.minBet * 2; // Big blind
-            
+
             // Deal cards (embaralha, distribui e reseta as apostas/dobras de todos)
             dealCards();
-            
+
+            // TASK_003: Ante — deduz de todos os jogadores ativos e soma ao pote
+            if (ante > 0) {
+                gameState.players.forEach(p => { const a = Math.min(ante, p.chips); p.chips -= a; gameState.pot += a; });
+            }
+
             // Collect blinds
             const smallBlindIdx = 0;
             const bigBlindIdx = 1 % gameState.players.length;
-            
+
             gameState.players[smallBlindIdx].chips -= gameState.minBet;
             gameState.players[smallBlindIdx].bet = gameState.minBet;
-            
+
             gameState.players[bigBlindIdx].chips -= gameState.minBet * 2;
             gameState.players[bigBlindIdx].bet = gameState.minBet * 2;
-            
-            gameState.pot = gameState.minBet * 3;
-            
+
+            gameState.pot += gameState.minBet * 3;
+
+            // Marca os papéis de Dealer/SB/BB para os tokens (TASK_003)
+            gameState.players.forEach((p, i) => { p._blindRole = i === smallBlindIdx ? 'SB' : (i === bigBlindIdx ? 'BB' : null); });
+            const dealerIdx = (smallBlindIdx - 1 + gameState.players.length) % gameState.players.length;
+            if (gameState.players[dealerIdx]) gameState.players[dealerIdx]._blindRole = gameState.players[dealerIdx]._blindRole || 'D';
+
             // Dealer is after big blind
             gameState.currentPlayerIndex = (bigBlindIdx + 1) % gameState.players.length;
             
@@ -1649,7 +1999,8 @@
                 const winner = activePlayers[0];
                 const winAmount = gameState.pot;
                 winner.chips += winAmount;
-                
+                recordHandResult(winner.isHuman, winAmount, winner.isHuman && !!gameState._humanBluff); // TASK_003
+
                 // Animar a vitória
                 animateWinner(winner, winAmount);
                 
@@ -1746,6 +2097,7 @@
             if (tiedPlayers.length === 1) {
                 // Vencedor único no Showdown
                 winner.chips += totalPot;
+                recordHandResult(winner.isHuman, totalPot, winner.isHuman && winner.handRank < 1); // TASK_003: blefe = venceu showdown sem par
                 animateWinner(winner, totalPot);
                 
                 addToHistory({
@@ -1902,13 +2254,20 @@
             // Update current bet
             gameState.currentBet = betAmount;
             player.bet = betAmount;
-            
+
+            // TASK_003: marca blefe do humano (aposta agressiva no river com mão fraca)
+            if (player.isHuman && (gameState.phase === 'river' || gameState.phase === 'turn')) {
+                const handRank = evaluateHand([...player.cards, ...gameState.communityCards.filter(Boolean)]).rank;
+                if (handRank < 1) gameState._humanBluff = true;
+            }
+            if (player.chips === 0) triggerAllInJuice(); // TASK_003: all-in do humano
+
             if (gameState.currentBet === 0) {
                 showGameMessage(`${player.name} bets $${betAmount}`, 2000);
             } else {
                 showGameMessage(`${player.name} raises to $${betAmount}`, 2000);
             }
-            
+
             nextPlayerTurn();
         }
 
@@ -1922,13 +2281,14 @@
             if (activePlayers.length === 1) {
                 const winner = activePlayers[0];
                 const winAmount = gameState.pot;
-                
+
                 // Award pot to last player
                 winner.chips += winAmount;
-                
+                recordHandResult(winner.isHuman, winAmount, winner.isHuman && !!gameState._humanBluff); // TASK_003
+
                 // Animar a vitória
                 animateWinner(winner, winAmount);
-                
+
                 // Adicionar ao histórico
                 addToHistory({
                     winners: [winner],
@@ -1936,17 +2296,17 @@
                     hand: "todos desistiram",
                     type: 'fold'
                 });
-                
+
                 showGameMessage(`${winner.name} vence $${winAmount} (todos os outros jogadores desistiram)!`);
                 gameState.pot = 0;
-                
+
                 // Start new hand after delay
                 setTimeout(() => {
                     startNewHand();
                 }, 3000);
                 return;
             }
-            
+
             nextPlayerTurn();
         }
 
@@ -2036,6 +2396,22 @@
                 isBluffing = bluffFactor > 0.4;
             }
 
+            // TASK_003: Diana "The Adaptable" — ajusta blefe pelo tamanho do pote
+            if (profile.adaptive) {
+                const isPotSmall = gameState.pot < aiPlayer.chips * 0.3;
+                const bf = isPotSmall ? 0.45 : 0.08; // pote pequeno: rouba blinds; grande: cautela
+                isBluffing = Math.random() < bf;
+                bluffFactor = isBluffing ? (0.5 + Math.random() * 0.3) : (isPotSmall ? bluffFactor : 0);
+            }
+            // TASK_003: Erik "The Legend" — nunca blefa antes do river; all-in de blefe no river vendo fraqueza
+            if (profile.legendary) {
+                if (gameState.phase === 'river' && handStrength < 0.4 && gameState.currentBet === 0) {
+                    isBluffing = true; bluffFactor = 0.9; // sente fraqueza (checks) -> blefa pesado
+                } else if (gameState.phase !== 'river') {
+                    isBluffing = false; bluffFactor = 0;
+                }
+            }
+
             // 4. Score de decisão final (combina força real + fator de blefe)
             const decisionScore = (handStrength * 0.6) + (bluffFactor * 0.4);
 
@@ -2083,8 +2459,30 @@
             }
             showAIDialogue(aiPlayer, pickDialogue(profile, dialogueCategory));
 
-            // Executar a ação após exibir o balão de fala
-            setTimeout(() => handleAIAction(action, betAmount), 800);
+            // === TASK_003: Tells psicológicos — emoji + atraso + barra de tensão ===
+            let delay = 800;
+            let tell = null;
+            aiPlayer._tension = 0;
+            if (action === 'raise' && isBluffing) {
+                delay = 2000 + Math.random() * 1000;              // hesitação longa = blefe tenso
+                tell = Math.random() > 0.5 ? '😰' : '🤫';
+                aiPlayer._tension = 70 + Math.random() * 30;
+            } else if (handStrength > 0.66 && (action === 'call' || action === 'raise')) {
+                delay = 350;                                      // decisão instantânea = força (armadilha)
+                tell = '😈';
+            } else if (profile.adaptive && action === 'raise' && isBluffing) {
+                tell = '😏';                                      // Diana roubando blinds
+            }
+            // Cartas de perigo no board + hesitação => enche a barra de tensão (pista p/ o humano)
+            if (tableBluffPotential > 0 && isBluffing) aiPlayer._tension = Math.max(aiPlayer._tension, 85);
+
+            if (tell || aiPlayer._tension > 0) { aiPlayer._tellEmoji = tell; updatePlayers(); }
+
+            setTimeout(() => {
+                aiPlayer._tellEmoji = null;
+                aiPlayer._tension = 0;
+                handleAIAction(action, betAmount);
+            }, delay);
         }
 
         function handleAIAction(action, amount = 0) {
@@ -2115,6 +2513,7 @@
                     
                     if (aiPlayer.chips === 0) {
                         showGameMessage(`${aiPlayer.name} goes all-in $${raiseAmount}!`, 2000);
+                        triggerAllInJuice(); // TASK_003
                     } else if (gameState.currentBet === raiseAmount) {
                         showGameMessage(`${aiPlayer.name} bets $${raiseAmount}`, 2000);
                     } else {
@@ -2288,6 +2687,8 @@
             gameState.pot = 0;
             gameState.currentBet = 0;
             gameState.phase = 'waiting';
+            tournamentState.active = false; // TASK_003
+            const bh = document.getElementById('blindsHud'); if (bh) bh.style.display = 'none';
             updateUI();
             init();
         }
@@ -2304,6 +2705,93 @@
             gameState.history = [];
             gameState.round = 0;
         }
+
+        // ===================================================================
+        // === TASK_003 — UI de torneios, perfil/estatísticas e HUD de blinds
+        // ===================================================================
+        function flashBlindsUp() {
+            const el = document.getElementById('blindsUpFlash');
+            if (!el) return;
+            el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+        }
+        function updateBlindsHud() {
+            const hud = document.getElementById('blindsHud');
+            if (!hud || !tournamentState.active) { if (hud) hud.style.display = 'none'; return; }
+            const lvl = BLIND_LEVELS[tournamentState.blindLevel];
+            hud.style.display = 'block';
+            document.getElementById('bhBlinds').textContent = `${lvl.sb} / ${lvl.bb}`;
+            document.getElementById('bhAnte').textContent = tournamentState.config.ante > 0 ? `Ante: $${tournamentState.config.ante}` : '';
+            const left = Math.max(0, tournamentState.config.blindEveryHands - tournamentState.handsThisLevel + 1);
+            document.getElementById('bhNext').textContent = `Sobe em ${left} mão(s)`;
+        }
+
+        function startTournament(config) {
+            if (pokerData.wallet < config.buyIn) { alert(`Carteira insuficiente! Buy-in: $${config.buyIn}.`); return; }
+            pokerData.wallet -= config.buyIn; savePokerData();
+            document.getElementById('tournamentOverlay').classList.remove('show');
+            modeSelect.style.display = 'none';
+            gameState.gameMode = 'singleplayer';
+            gameState.minBet = BLIND_LEVELS[0].sb;
+            tournamentState.active = true;
+            tournamentState.config = config;
+            tournamentState.blindLevel = 0;
+            tournamentState.handsThisLevel = 0;
+            const playerName = (playerNameInput.value || '').trim() || 'Jogador';
+            gameState.players = [{ name: playerName, chips: config.startingChips, bet: 0, cards: [], folded: false, isHuman: true }];
+            config.opponents.forEach(op => gameState.players.push({ name: op, chips: config.startingChips, bet: 0, cards: [], folded: false, isAI: true, profileKey: op }));
+            updateBlindsHud();
+            startNewHand();
+        }
+
+        function renderTournamentCards() {
+            const grid = document.getElementById('tournamentGrid');
+            grid.innerHTML = '';
+            document.getElementById('walletDisplay').textContent = `$${pokerData.wallet}`;
+            TOURNAMENTS_CONFIG.forEach((t, i) => {
+                const unlocked = pokerData.unlockedStages.includes(i + 1);
+                const won = pokerData.trophies.includes(t.id);
+                const card = document.createElement('div');
+                card.className = 'tournament-card' + (unlocked ? '' : ' locked');
+                card.innerHTML = `<div class="t-trophy">${unlocked ? t.trophy : '🔒'}</div>
+                    <div class="t-name">${t.name} ${won ? '✅' : ''}</div>
+                    <div class="t-detail">Buy-in: $${t.buyIn}<br>Fichas: $${t.startingChips}<br>Blinds: a cada ${t.blindEveryHands} mãos${t.ante ? `<br>Ante: $${t.ante}` : ''}<br>${t.opponents.length} oponentes</div>`;
+                if (unlocked) card.addEventListener('click', () => startTournament(t));
+                grid.appendChild(card);
+            });
+        }
+
+        function renderProfile() {
+            const gallery = document.getElementById('trophyGallery');
+            gallery.innerHTML = '';
+            TOURNAMENTS_CONFIG.forEach(t => {
+                const slot = document.createElement('div');
+                slot.className = 'trophy-slot' + (pokerData.trophies.includes(t.id) ? ' earned' : '');
+                slot.textContent = t.trophy;
+                slot.title = t.name;
+                gallery.appendChild(slot);
+            });
+            const s = pokerData.stats;
+            const winRate = s.handsPlayed > 0 ? Math.round((s.handsWon / s.handsPlayed) * 100) : 0;
+            document.getElementById('statsGrid').innerHTML =
+                `<div class="stat-row">Mãos Jogadas<strong>${s.handsPlayed}</strong></div>
+                 <div class="stat-row">Win Rate<strong>${winRate}%</strong></div>
+                 <div class="stat-row">Maior Pote<strong>$${s.biggestPot}</strong></div>
+                 <div class="stat-row">Blefes Vencedores<strong>${s.successfulBluffs}</strong></div>`;
+        }
+
+        // Wiring dos novos botões
+        loadPokerData();
+        document.getElementById('tournament-mode').addEventListener('click', () => { renderTournamentCards(); document.getElementById('tournamentOverlay').classList.add('show'); });
+        document.getElementById('tournamentClose').addEventListener('click', () => document.getElementById('tournamentOverlay').classList.remove('show'));
+        document.getElementById('openProfileBtn').addEventListener('click', () => { renderProfile(); document.getElementById('profileOverlay').classList.add('show'); });
+        document.getElementById('profileClose').addEventListener('click', () => document.getElementById('profileOverlay').classList.remove('show'));
+        document.getElementById('walletReload').addEventListener('click', () => { if (pokerData.wallet < 100) { pokerData.wallet += 500; savePokerData(); renderProfile(); renderTournamentCards(); } });
+
+        // Hook de teste (TASK_003)
+        window.__poker = {
+            gameState, tournamentState, pokerData, TOURNAMENTS_CONFIG, BLIND_LEVELS, AI_PROFILES,
+            calculateChipsForAmount, startTournament, recordHandResult, awardTrophy, loadPokerData, savePokerData
+        };
 
         // Iniciar o jogo
         init();

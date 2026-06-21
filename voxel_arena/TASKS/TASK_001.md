@@ -502,3 +502,48 @@ Todo e qualquer mesh ou luz temporária injetada na cena de jogo durante o Spin,
 *   **Destino**: O arquivo `TASK_001.md` está agora oficialmente pronto para codificação de alta fidelidade visual.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev Complete)
+
+**Arquivo alterado**: `voxel_arena/index.html` (Three.js r160, ES module, loop `requestAnimationFrame`).
+Todas as adições marcadas com `=== TASK_001 ===` / comentários `TASK_001:` para rastreabilidade.
+
+### 1. Atmosfera Sombria & Luzes Dinâmicas
+*   Névoa `THREE.Fog` linear → **`THREE.FogExp2(0x0a0c16, 0.03)`**; `scene.background` laranja-pôr-do-sol → catacumba `#0a0c16`.
+*   Luz direcional do pôr-do-sol → **luar frio `#7ec0ee`, intensidade `2.0`** (ângulo alto), `shadow.mapSize` 2048². Ambiente quente → ambiente frio dim (`0x3a4a6a`, 0.45).
+*   **Glow de habilidades**: `spawnDynamicSkillVFX()` injeta um `THREE.PointLight` por conjuração (Spin dourado 3.0 / Heal verde 4.0 / Ult magenta 6.0) cuja intensidade decai senoidalmente (`cos(age·π/2)`) e é descartado com `dispose()`.
+
+### 2. Modelos Low-Poly & VFX 3D Procedurais
+*   **Voxel Beasts**: `Enemy.createMesh()` reescrito de um `BoxGeometry` estático para um **`THREE.Group` de 8 voxels** (tronco, cabeça, 2 olhos rubis emissivos `emissiveIntensity 2.0`, 2 garras, 2 pernas). `takeDamage()` adaptado para piscar o array `flashMats` (o grupo não tem `.material` único). *Olhos posicionados em `-Z`* porque `lookAt()` aponta o `-Z` do grupo para o jogador — assim o brilho rubi encara o herói.
+*   **Chão de Basalto**: `createFloorTexture()` gera uma `CanvasTexture` procedural 512² (ruído de rocha + grade dourada sutil, `repeat 8×8`) sobre material `#141923`. `GridHelper` recolorido para runas ciano escuras semitransparentes (`opacity 0.35`).
+*   **VFX por habilidade**: Spin = **cilindro toroidal duplo contra-rotativo** + faíscas aditivas; Dash = **3 silhuetas-fantasma** do herói (`opacity 0.3`, additive) ao longo do trajeto, fade em 150 ms; Heal = **12 esferas verdes** em espiral helicoidal ascendente (0.6 s); Ult = **domo wireframe** expandindo de raio 1→25 com fade quadrático.
+*   Ambiente (árvores/rochas/paredes) escurecido para coerência de catacumba.
+
+### 3. HUD Glassmorphism & Runas SVG
+*   Barras de HP/Stamina/XP com `backdrop-filter: blur`, borda dourada metálica e brilho interno; slots de skill em vidro fosco.
+*   Números dos slots → **runas SVG inline** geométricas, coloridas por tema (`data-skill`: ouro/ciano/verde/magenta) com `drop-shadow` neon.
+*   Cooldown `conic-gradient` + **flash `@keyframes flashGlow`** (brilho + escala 1.1×) disparado no instante em que o cooldown zera (detecção de transição `em-recarga → pronto` com `void offsetWidth` para re-disparo limpo).
+*   Modais (Start/Game Over) glassmorphic, tipografia `Cinzel`/`Outfit` (com fallback gracioso caso a CDN de fontes seja bloqueada).
+
+### Extra aprovado pelo TL (Dúvida #3): Áudio sintetizado das habilidades
+*   `playSkillSound()` via **Web Audio API** (AudioContext criado no gesto "Enter Arena"): Dash = ruído filtrado bandpass; Heal = arpejo senoidal ascendente; Ult = dente-de-serra grave com LFO; Spin = sweep triangular.
+
+### 🧹 Segurança de Memória (Garbage Collector — exigência do TL)
+`updateVFX()` percorre `activeVFX`, decai vida/luz, e ao expirar remove da cena e executa `geometry.dispose()` + `material.dispose()` (incl. arrays e clones de fantasma). **Verificado sem vazamento** (ver abaixo).
+
+### ✅ Verificação local (preview headless via hook `window.__arena`)
+*   **Cena**: Three.js (CDN unpkg) carrega; 60 objetos; `FogExp2 density 0.03`; bg `#0a0c16`.
+*   **Inimigo**: `isGroup=true`, 8 partes, olhos rubis emissivos (`#ff0000`, intensidade 2.0), 2 flashMats.
+*   **Luar**: `#7ec0ee`, intensidade 2.0, shadow map 2048.
+*   **VFX**: 3 conjurações ⇒ 3 PointLights; após decaimento forçado (3 s) ⇒ `activeVFX.length === 0` (**descarte limpo, sem leak**). Dash ⇒ exatamente **3 fantasmas**.
+*   **HUD**: 4 slots, 4 runas SVG, `data-skill` = [spin, dash, heal, ult].
+*   **Chão**: `#141923` com `CanvasTexture` aplicada.
+*   **Áudio**: 4 sons sem exceção; `AudioContext` disponível.
+*   **Pipeline real**: `game.start()` + `player.useSkill()` define cooldowns e instancia VFX; `renderer.render()` sem erro. **Zero erros no console.**
+
+> Nota: `preview_screenshot` expira neste ambiente headless (jogos com `requestAnimationFrame` contínuo) — limitação do harness, não do código. Verificação feita por inspeção de estado/funcional via debug hook.
+
+*Status: 🚀 Dev complete — pronto para Code Review (TL).*
+*Responsável: Programador Sênior (Agente Dev)*

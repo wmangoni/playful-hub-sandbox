@@ -54,7 +54,7 @@ arquiteturas de desenvolvimento.
 * Se não tiver tarefas, não faça nada.
 
 ### 2. Desenvolvimento e Codificação (Programador)
-*   **Ação**: O programador busca a primeira tarefa disponível com o status `✅ Refined`. Mas primeiro veja se tem alguma task em `Requested changes` para arrumar alguma coisa antes de pegar uma tarefa nova.
+*   **Ação**: O programador busca a primeira tarefa disponível com o status `✅ Refined`. Mas primeiro veja se tem alguma task em `Requested changes` para arrumar alguma coisa antes de pegar uma tarefa nova. Também veja o arquivo PO_DUVIDAS.md pra ver se tem alguma coisa importante a ser considerada na sua tarefa.
 *   **Transição de Status**:
     *   Ao iniciar o desenvolvimento: muda para `In Progress`.
     *   Ao finalizar o código e garantir o funcionamento local: muda para `Dev complete`.
@@ -72,7 +72,7 @@ arquiteturas de desenvolvimento.
 * Se não tiver tarefas, não faça nada.
 
 ### 4. Garantia de Qualidade (QA)
-*   **Ação**: O analista de QA busca a primeira tarefa com o status `Ready for QA` para testar os critérios de aceitação estabelecidos.
+*   **Ação**: O analista de QA busca a primeira tarefa com o status `Ready for QA` para testar os critérios de aceitação estabelecidos. Também veja o arquivo PO_DUVIDAS.md pra ver se tem alguma coisa importante a ser considerada na sua tarefa.
 *   **Transição de Status**:
     *   **Opção A (Falha nos testes)**: Se o QA encontrar bugs ou discrepâncias em relação aos critérios de aceitação originais, o status muda para `Requested changes`.
         *   *Ação Obrigatória*: O QA deve adicionar uma seção no arquivo de task correspondente chamada `## 🧪 Resultado dos testes`, detalhando as observações, bugs encontrados e passos para reproduzi-los.

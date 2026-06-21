@@ -375,6 +375,17 @@
         let lastScoreDeductionTime = 0;
         let badgeCountdownInterval = null;
 
+        // === TASK_003: Portais, Cobra Rival, Partículas e Screen Shake ===
+        let portalsActive = false;
+        const portalA = { x: 2, y: 10, color: '#00d2ff', glowColor: 'rgba(0, 210, 255, 0.8)' };
+        const portalB = { x: 17, y: 10, color: '#ff9f43', glowColor: 'rgba(255, 159, 67, 0.8)' };
+        let rivalSnake = null;            // null até score >= 20
+        let rivalDirection = 'left';
+        let rivalRespawnTime = 0;         // timestamp para respawn (cooldown)
+        let goldenApples = [];            // {x,y,value,spawnTime}
+        const particles = [];             // rastro neon
+        let shakeDuration = 0;            // ms restantes de tremor
+
         let snake = [{x: 10, y: 10}];
         let direction = 'right';
         let requestedDirection = 'right';
@@ -526,6 +537,10 @@
                 }
             }
 
+            // TASK_003: ativar portais (>=10 pts) e spawnar a cobra rival (>=20 pts)
+            portalsActive = score >= 10;
+            if (score >= 20 && !rivalSnake && Date.now() >= rivalRespawnTime) spawnRival();
+
             direction = requestedDirection;
             let head = { ...snake[0] };
             switch (direction) {
@@ -533,6 +548,14 @@
                 case 'down': head.y++; break;
                 case 'left': head.x--; break;
                 case 'right': head.x++; break;
+            }
+
+            // TASK_003: teletransporte por portais (mantém a direção)
+            if (portalsActive) {
+                let teleported = false;
+                if (head.x === portalA.x && head.y === portalA.y) { head.x = portalB.x; head.y = portalB.y; teleported = true; }
+                else if (head.x === portalB.x && head.y === portalB.y) { head.x = portalA.x; head.y = portalA.y; teleported = true; }
+                if (teleported) { triggerScreenShake(150); createPortalBurst(head.x, head.y); }
             }
 
             // Bordas: sempre atravessam para o lado oposto (screen wrap).
@@ -555,13 +578,30 @@
                 triggerGameOver(); return;
             }
 
+            // TASK_003: colisão com a cobra rival = Game Over (ignorada no modo fantasma)
+            if (!isGhostMode && rivalSnake && rivalSnake.some(seg => seg.x === head.x && seg.y === head.y)) {
+                triggerScreenShake(200);
+                triggerGameOver(); return;
+            }
+
             snake.unshift(head);
 
-            if (head.x === food.x && head.y === food.y) {
+            // TASK_003: comer Maçã Dourada (3 pts; cresce e não dá pop)
+            const gaIdx = goldenApples.findIndex(a => a.x === head.x && a.y === head.y);
+            if (gaIdx !== -1) {
+                score += goldenApples[gaIdx].value * (isSpeedBoostActive ? 2 : 1);
+                goldenApples.splice(gaIdx, 1);
+                scoreElement.textContent = `Score: ${score}`;
+                triggerScreenShake(150);
+                createExplosionParticles(head.x, head.y, '#f1c40f');
+                scoreElement.style.transform = 'scale(1.1)';
+                setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
+            } else if (head.x === food.x && head.y === food.y) {
                 const pointsAwarded = isSpeedBoostActive ? 2 : 1;
 
                 if (food.isSpecial) {
                     applySpecialFood(food);
+                    triggerScreenShake(200); // juice ao pegar fruta especial
                 } else {
                     normalFoodEaten++;
                 }
@@ -574,6 +614,12 @@
             } else {
                 snake.pop();
             }
+
+            // TASK_003: IA rival, maçãs douradas e rastro de partículas
+            updateRivalAI();
+            updateGoldenApples();
+            const tail = snake[snake.length - 1];
+            if (tail) spawnParticle(tail.x, tail.y, snakeBodyColorEnd);
         }
 
         // Aplica o efeito de uma fruta especial consumida
@@ -639,6 +685,144 @@
             hideStatusBadge();
         }
 
+        // ===================== TASK_003 =====================
+        function triggerScreenShake(ms) { shakeDuration = Math.max(shakeDuration, ms); }
+
+        // --- Partículas neon ---
+        function spawnParticle(gx, gy, color) {
+            particles.push({
+                x: gx * gridSize + gridSize / 2, y: gy * gridSize + gridSize / 2,
+                vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                size: Math.random() * 3 + 2, color, alpha: 1.0, decay: Math.random() * 0.05 + 0.02
+            });
+        }
+        function createPortalBurst(gx, gy) {
+            for (let i = 0; i < 14; i++) spawnParticle(gx, gy, i % 2 ? '#00d2ff' : '#ff9f43');
+        }
+        function createExplosionParticles(gx, gy, color) {
+            for (let i = 0; i < 10; i++) spawnParticle(gx, gy, color);
+        }
+        function updateAndDrawParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+                if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.shadowBlur = 5; ctx.shadowColor = p.color;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        // --- Portais dimensionais ---
+        function drawPortals() {
+            if (!portalsActive) return;
+            [portalA, portalB].forEach(portal => {
+                const px = (portal.x + 0.5) * gridSize;
+                const py = (portal.y + 0.5) * gridSize;
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(Date.now() / 200);
+                ctx.shadowBlur = 15; ctx.shadowColor = portal.glowColor;
+                ctx.strokeStyle = portal.color; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.ellipse(0, 0, gridSize * 0.4, gridSize * 0.6, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.beginPath(); ctx.ellipse(0, 0, gridSize * 0.4 - 2, gridSize * 0.6 - 2, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        // --- Cobra Rival (IA) ---
+        function spawnRival() {
+            const maze = getCurrentMaze();
+            let rx, ry, tries = 0;
+            do {
+                rx = Math.floor(Math.random() * tileCount);
+                ry = Math.floor(Math.random() * tileCount);
+                tries++;
+            } while (tries < 80 && (
+                maze.some(w => w.x === rx && w.y === ry) ||
+                snake.some(s => s.x === rx && s.y === ry) ||
+                (Math.abs(rx - snake[0].x) + Math.abs(ry - snake[0].y) < 6)
+            ));
+            rivalSnake = [{ x: rx, y: ry }];
+            rivalDirection = 'left';
+        }
+        function updateRivalAI() {
+            if (!rivalSnake || rivalSnake.length === 0) return;
+            const head = rivalSnake[0];
+            const maze = getCurrentMaze();
+            const moves = [
+                { dir: 'up', x: head.x, y: head.y - 1 },
+                { dir: 'down', x: head.x, y: head.y + 1 },
+                { dir: 'left', x: head.x - 1, y: head.y },
+                { dir: 'right', x: head.x + 1, y: head.y }
+            ];
+            const valid = moves.filter(m => {
+                if (m.x < 0 || m.x >= tileCount || m.y < 0 || m.y >= tileCount) return false;
+                if (maze.some(w => w.x === m.x && w.y === m.y)) return false;
+                if (rivalSnake.some(s => s.x === m.x && s.y === m.y)) return false;
+                if (snake.some(s => s.x === m.x && s.y === m.y)) return false;
+                return true;
+            });
+            if (valid.length === 0) { triggerRivalDeath(); return; }
+            let best = valid[0], minDist = Infinity;
+            valid.forEach(m => {
+                const d = Math.abs(m.x - food.x) + Math.abs(m.y - food.y);
+                if (d < minDist) { minDist = d; best = m; }
+            });
+            rivalDirection = best.dir;
+            const newHead = { x: best.x, y: best.y };
+            rivalSnake.unshift(newHead);
+            if (newHead.x === food.x && newHead.y === food.y) {
+                food = generateFood();
+                createPortalBurst(newHead.x, newHead.y);
+                // rival cresce (sem pop)
+            } else {
+                rivalSnake.pop();
+            }
+        }
+        function triggerRivalDeath() {
+            if (!rivalSnake) return;
+            triggerScreenShake(300);
+            rivalSnake.forEach(seg => {
+                goldenApples.push({ x: seg.x, y: seg.y, value: 3, spawnTime: Date.now() });
+                createExplosionParticles(seg.x, seg.y, '#f1c40f');
+            });
+            rivalSnake = null;
+            rivalRespawnTime = Date.now() + 15000;
+        }
+        function drawRival() {
+            if (!rivalSnake) return;
+            const cr = gridSize * 0.3;
+            rivalSnake.forEach((seg, i) => {
+                ctx.fillStyle = i === 0 ? '#e74c3c' : '#c0392b';
+                ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(231, 76, 60, 0.6)';
+                drawRoundedRect(ctx, seg.x * gridSize + 1, seg.y * gridSize + 1, gridSize - 2, gridSize - 2, cr);
+            });
+            ctx.shadowBlur = 0;
+        }
+        function drawGoldenApples() {
+            goldenApples.forEach(a => {
+                const ax = (a.x + 0.5) * gridSize, ay = (a.y + 0.5) * gridSize;
+                const pulse = 0.15 * Math.sin(Date.now() / 120);
+                ctx.fillStyle = '#f1c40f';
+                ctx.shadowBlur = 14; ctx.shadowColor = 'rgba(241, 196, 15, 0.9)';
+                ctx.beginPath(); ctx.arc(ax, ay, (gridSize / 2.6) * (1 + pulse), 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+        }
+        function updateGoldenApples() {
+            const now = Date.now();
+            for (let i = goldenApples.length - 1; i >= 0; i--) {
+                if (now - goldenApples[i].spawnTime > 8000) goldenApples.splice(i, 1);
+            }
+        }
+
         function drawRoundedRect(ctx, x, y, width, height, radius) { /* ... Same as before ... */
              ctx.beginPath();
              ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
@@ -664,9 +848,16 @@
          }
 
         function draw() {
-            // Clear canvas
+            // Clear canvas (sem tremor, para limpar a tela inteira)
             ctx.fillStyle = canvasBgColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // TASK_003: Screen shake — desloca o contexto durante o impacto
+            ctx.save();
+            if (shakeDuration > 0) {
+                ctx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+                shakeDuration -= 16.66;
+            }
 
             // Draw subtle grid
             ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
@@ -677,6 +868,10 @@
 
             // Draw maze walls (neon magenta)
             drawMaze();
+
+            // TASK_003: portais e maçãs douradas (atrás da cobra)
+            drawPortals();
+            drawGoldenApples();
 
             // Draw food with glow and gradient (special foods use unique colors)
             const foodX = (food.x + 0.5) * gridSize; const foodY = (food.y + 0.5) * gridSize;
@@ -729,6 +924,11 @@
                 }
             });
             ctx.globalAlpha = 1.0; // Garantir reset após o modo fantasma
+
+            // TASK_003: cobra rival, partículas e fim do screen shake
+            drawRival();
+            updateAndDrawParticles();
+            ctx.restore();
         }
 
         // Desenha as paredes do labirinto ativo com visual neon magenta
@@ -793,6 +993,14 @@
 
              // Reset power-ups e cronômetros pendentes
              resetPowerUps();
+
+             // TASK_003: reset de portais, rival, maçãs, partículas e tremor
+             portalsActive = false;
+             rivalSnake = null;
+             rivalRespawnTime = 0;
+             goldenApples = [];
+             particles.length = 0;
+             shakeDuration = 0;
 
              // Reset game state
              snake = [{x: 10, y: 10}];
@@ -869,6 +1077,23 @@
          displayHighScores(); // Load and display scores on page load
          direction = requestedDirection = pickSafeStartDirection();
          gameLoop(); // Start the game
+
+         // Hook de depuração/teste (TASK_003)
+         window.__snake3 = {
+             getState: () => ({ score, portalsActive, hasRival: !!rivalSnake, rivalLen: rivalSnake ? rivalSnake.length : 0, goldenApples: goldenApples.length, particles: particles.length, shake: shakeDuration }),
+             portalA, portalB,
+             setScore: (s) => { score = s; },
+             setSnake: (s) => { snake = s; },
+             getSnake: () => snake,
+             setFood: (f) => { food = f; },
+             getFood: () => food,
+             getRival: () => rivalSnake,
+             setRival: (r) => { rivalSnake = r; },
+             getGolden: () => goldenApples,
+             spawnRival, updateRivalAI, triggerRivalDeath, update,
+             setMaze: (m) => { document.getElementById('mazeSelect').value = m; },
+             tileCount
+         };
 
     </script>
 </body>

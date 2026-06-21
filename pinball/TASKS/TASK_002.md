@@ -256,3 +256,49 @@ Como **Tech Lead** do projeto **Playful Hub**, fiz a revisão de arquitetura par
 
 > [!NOTE]
 > **Próximos Passos**: Com a especificação técnica perfeitamente refinada, a modelagem vetorial de colisão elástica estruturada e as dúvidas resolvidas sob rigorosos padrões de Clean Code, a tarefa está oficialmente aprovada pelo Tech Lead e movida de `📋 Backlog` para `✅ Refined` no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md).
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev Complete)
+
+**Arquivo alterado**: `pinball/index.html` (Canvas 2D, loop `requestAnimationFrame`). Construído sobre a TASK_001 (`Dev complete`). Adições marcadas com `TASK_002:`.
+
+### Arquitetura de refatoração (baixo risco)
+Para suportar multibola sem reescrever todas as funções de colisão, adotei o padrão de **ponteiro global `ball`**: `const ball` → `let ball`; `update()`/`draw()` iteram `activeBalls` e fazem `ball = activeBalls[i]` antes de chamar as funções de colisão existentes (que continuam referenciando `ball`). Cada bola é criada por `createBall(x,y,launched)` e carrega `trail` e `stuckTimer` próprios.
+
+### 1. Missões Ciber-Sintéticas
+*   **HACK THE GRID**: `registerBumperHitForMissions()` registra bumpers 0/1/2 numa janela de **15 s** (`hackGridTimer`); ao completar 3/3 ⇒ **+500 pts** e `spawnMultiball()`.
+*   **SYSTEM OVERCLOCK**: `checkMultiplierZoneCollisions(dt)` acumula tempo nas zonas centrais (2,3); ≥ **3 s** ⇒ `globalScoreMultiplier = 2` por **20 s** (`overclockTimer`).
+*   **FIREWALL CRACK**: 3 alvos retangulares laterais (`firewallTargets`) que acendem em sequência; `checkFirewallTargets()` valida a ordem ⇒ **+1000 pts** e **+1 vida** (se < 3).
+*   **HUD glassmorphic** desenhado no canvas (`drawMissionsHUD`) com título, detalhe e barra neon de progresso/tempo, priorizando a missão em andamento.
+
+### 2. Multibola
+*   `activeBalls` gerencia N bolas; `spawnMultiball()` adiciona 2 bolas de portais neon superiores (com faíscas). 
+*   **Colisão elástica 2D bola-bola** (`checkBallToBallCollisions`): resolução de penetração + troca das componentes de velocidade normais (massas iguais), faíscas no ponto de contato.
+*   **Multiplicador de sobrevivência**: `addScore(base)` = `base × currentMultiplier × activeBalls.length × globalScoreMultiplier`.
+*   **Dreno por bola** (`handleDrainCheck`): remove a bola caída; só perde vida quando a **última** cai (senão, flash vermelho de moldura `frameFlashTimer`).
+
+### 3. Modos de Gravidade Mutáveis
+*   `setPhysicsMode('low_gravity', 12)` ⇒ `currentGravity = GRAVITY×0.5`, `currentFriction = 1.0` (disparado pela zona central inferior `multiplierZones[3]`).
+*   `setPhysicsMode('overdrive', 8)` ⇒ `currentGravity = GRAVITY×1.35`, `bounceBoost = 1.4` (rebote de bumpers/flippers +40%), disparado por **3 hits sucessivos** nos bumpers inferiores.
+*   `drawTableGrid()` desenha grade CRT neon ciano (low gravity) ou magenta (overdrive), pulsando por `performance.now()`.
+
+### Dúvidas do TL implementadas
+*   **#1 Stuck individual**: cada bola tem `stuckTimer`; no multibola, uma bola travada >6 s é teletransportada só ela para o topo (`200,50`) com faíscas, sem afetar as demais.
+*   **#2 Momentum por distância do pivô**: o impulso do flipper escala por `r/flipper.width` (`v = ω·r`) — a ponta transmite mais força que a base.
+
+### ✅ Verificação local (preview headless — funções globais)
+*   **Colisão bola-bola**: separação 8→16 px; velocidades trocadas (v0x 3→-1, v1x -1→3). ✓
+*   **HACK THE GRID**: 3 bumpers ⇒ `hackGridDone`, `activeBalls.length === 3`, +500. ✓
+*   **OVERDRIVE**: 3 hits inferiores ⇒ modo overdrive, gravidade 0.27, bounceBoost 1.4. ✓
+*   **LOW GRAVITY**: zona[3] ⇒ gravidade 0.10, fricção 1.0. ✓
+*   **OVERCLOCK**: 3.5 s na zona central ⇒ timer 20, multiplicador global 2. ✓
+*   **Survival score**: base 10 × 2 bolas × 2 overclock = **40**. ✓
+*   **FIREWALL**: 3 alvos em sequência ⇒ +1000 e vida 2→3. ✓
+*   **Dreno**: cair 1 de 2 ⇒ 1 bola, vida mantida; cair a última ⇒ vida 3→2 + nova bola na lane. ✓
+*   `draw()` completo (grid + alvos + HUD + multibola) **sem exceção**. **Zero erros no console.**
+
+> Nota: `preview_screenshot` expira neste ambiente headless (loop `requestAnimationFrame`) — limitação do harness; verificação feita dirigindo as funções globais e inspecionando estado.
+
+*Status: 🚀 Dev complete — pronto para Code Review (TL).*
+*Responsável: Programador Sênior (Agente Dev)*

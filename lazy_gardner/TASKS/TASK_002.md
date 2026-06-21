@@ -220,3 +220,22 @@ Implementado em `lazy_gardner/index.html` (Three.js r160). Todos os critérios a
 *   **Iluminação por clima**: mantive o ciclo dia/noite existente como driver principal da luz direcional; a Seca/Chuva alteram céu e solo (`updateSkyColor`) mas não sobrescrevem a intensidade por frame, para não brigar com o `updateTimeOfDay`. Posso aprofundar a iluminação por clima se o PO desejar.
 *   **Hook de teste** `window.__garden`: deixei um objeto de depuração exposto (estado + funções) que foi usado para validar as mecânicas e é útil para o QA. Pode ser removido no cleanup de produção, se preferir (permite "cheats" via console).
 
+---
+
+## 🔍 Code Review (Tech Lead)
+
+### 📋 Checklist de Revisão Técnica
+- [x] **Clima Dinâmico**: O sistema de clima de 45 segundos alterna perfeitamente entre Ensolarado, Chuvoso e Seca com sorteio ponderado (60/25/15). Efeitos visuais (partículas de chuva `THREE.Points` e ajustes de iluminação/céu via `updateSkyColor`) integrados sem bugs de colisão de loops.
+- [x] **Umidade do Solo e Rega**: Lógica de umidade linear implementada de forma dinâmica. A mudança de cor do solo (`soilMesh` RingGeometry) de marrom úmido (`#3D2314`) para bege seco (`#9A8A78`) funciona corretamente e a velocidade de crescimento cai para 0.1x quando seca.
+- [x] **Pragas (Lagartas)**: Lagarta procedural (3 esferas e olhos vermelhos) com barra de vida/tempo funcional de 12 segundos e remoção/destruição física apropriada por Raycast. Mudança do canteiro para tronco seco cinza quando devorado e limpeza de canteiro funcionando sem vazamentos de memória (rebuild de mesh).
+- [x] **Robô Colhedor**: Movimentação passiva e colheita automática a cada 3s com laser indicador azul (`THREE.Line`) e floaters de ouro na tela funcionando de forma fluida.
+- [x] **Persistência e Offline Gains**: `localStorage` salva dados corretamente e o cálculo de ganhos offline está bem estruturado com base no tempo longe e nos robôs ativos.
+- [x] **Segurança e Estabilidade**: Estrutura geral limpa, sem duplicações de loops de animação ou vazamentos de referências 3D no Three.js.
+
+### 💬 Considerações do Tech Lead
+O refatoramento do crescimento para um acumulador de tempo (`growTimer`) resolveu elegantemente o problema de transição de clima no meio do ciclo de crescimento das espécies. A iluminação de clima está muito bem balanceada e não briga com o ciclo dia/noite do driver principal. O hook de depuração exposto em `window.__garden` é excelente para a esteira de QA validar os multiplicadores e spawns.
+
+**STATUS**: APROVADO PARA QA (Ready for QA)
+*Assinado: Tech Lead veterano*
+
+

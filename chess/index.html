@@ -3,136 +3,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jogo de Xadrez com IA</title>
+    <title>Jogo de Xadrez com IA e Análise</title>
     <!-- Incluir CSS do chessboardjs -->
-    <link rel="stylesheet"
-          href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
 
     <style>
+        :root {
+            --primary-bg: #b3aa88;
+            --container-bg: #f8fafc;
+            --text-color: #0f172a;
+            --accent-color: #3b82f6;
+        }
+
         body {
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-top: 20px;
-            background-color: #b3aa88;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+            background-color: var(--primary-bg);
+            transition: background 0.5s ease, color 0.5s ease;
         }
+
         .game-container {
             display: flex;
             flex-direction: column;
             align-items: center;
+            padding: 25px;
+            border-radius: 12px;
+            background-color: var(--container-bg);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            color: var(--text-color);
         }
-        /* Container para o tabuleiro e o overlay */
+
+        .board-flex-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .advantage-bar-container {
+            position: relative;
+            width: 25px;
+            height: 400px;
+            border: 2px solid #2d2d2d;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-color: #111;
+        }
+
+        .bar-fill {
+            width: 100%;
+            transition: height 0.3s ease-in-out;
+        }
+
+        .white-fill {
+            background-color: #ffffff;
+            height: 50%;
+        }
+
+        .black-fill {
+            background-color: #222222;
+            height: 50%;
+        }
+
+        #advantageBarLabel {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            bottom: 50%;
+            transform: translateY(50%);
+            color: #888;
+            mix-blend-mode: difference;
+            pointer-events: none;
+        }
+
         .board-container {
-            position: relative; /* Necessário para posicionar o overlay absoluto */
-            width: 400px; /* Mesma largura do tabuleiro */
-            margin-bottom: 15px;
+            position: relative;
+            width: 400px;
+            margin-bottom: 0;
         }
+
         #myBoard {
-            width: 400px; /* Ou ajuste conforme necessário */
-            margin-bottom: 15px;
+            width: 400px;
         }
+
         .controls {
             margin-top: 15px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
         }
+
         #status, #turn {
             margin: 5px 0;
             font-weight: bold;
-            min-height: 1.2em; /* Evita saltos de layout */
+            min-height: 1.2em;
         }
+
         select, button {
             padding: 8px 12px;
-            font-size: 1em;
+            font-size: 0.95em;
             cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            transition: all 0.2s ease;
         }
+
+        button:hover {
+            filter: brightness(0.9);
+        }
+
         .highlight-check {
-            box-shadow: inset 0 0 15px 5px rgba(255, 0, 0, 0.5); /* Destaque visual para rei em xeque */
+            box-shadow: inset 0 0 15px 5px rgba(255, 0, 0, 0.7) !important;
         }
-        /* --- Estilo do Overlay de Loading --- */
+
         #loadingOverlay {
-            position: absolute; /* Posiciona sobre o tabuleiro */
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(255, 255, 255, 0.7); /* Fundo branco semi-transparente */
+            background-color: rgba(255, 255, 255, 0.7);
             color: #333;
             font-size: 1.8em;
             font-weight: bold;
-            display: flex; /* Para centralizar o texto */
+            display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 100; /* Garante que fique por cima das peças */
-            cursor: wait; /* Muda o cursor */
-            border-radius: 3px; /* Opcional: arredondar bordas */
-            /* Escondido por padrão */
+            z-index: 100;
+            cursor: wait;
+            border-radius: 3px;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out; /* Transição suave */
+            transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
         }
-        /* Classe para mostrar o overlay */
+
         #loadingOverlay.active {
             opacity: 1;
             visibility: visible;
         }
+
         .captured-pieces {
             display: flex;
             flex-wrap: wrap;
-            min-height: 50px;
-            padding: 10px;
+            min-height: 44px;
+            padding: 8px;
             margin: 10px 0;
             background: #e8e0d3;
-            border-radius: 4px;
-            width: 400px; /* Mesma largura do tabuleiro */
+            border-radius: 6px;
+            width: 400px;
+            box-sizing: border-box;
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: background 0.3s ease;
         }
+
         .captured-piece {
-            width: 30px;
-            height: 30px;
+            width: 26px;
+            height: 26px;
             margin: 2px;
         }
+
         /* Estilos para destacar a última jogada */
         .highlight-white {
-            box-shadow: inset 0 0 3px 3px yellow;
+            box-shadow: inset 0 0 3px 3px rgba(255, 235, 59, 0.85);
         }
+
         .highlight-black {
-            box-shadow: inset 0 0 3px 3px yellow;
+            box-shadow: inset 0 0 3px 3px rgba(255, 235, 59, 0.85);
         }
-        /* Estilo para os movimentos possíveis */
+
         .highlight-legal-move {
-            background-color: rgba(0, 255, 0, 0.3) !important;
+            background-color: rgba(76, 175, 80, 0.35) !important;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -12;
+            }
+        }
+
+        /* --- Temas Gráficos --- */
+        
+        /* 1. Classic Wood (Mesa Tradicional) */
+        body.theme-wood {
+            background: linear-gradient(135deg, #2b1f17 0%, #150f0b 100%);
+            color: #f5eedc;
+        }
+        .theme-wood .game-container {
+            background: #3a2a1f;
+            border: 2px solid #5c381e;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.6);
+            color: #f5eedc;
+        }
+        .theme-wood .board-b72b1 {
+            border: 10px solid #5c381e;
+            border-radius: 4px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .theme-wood .white-1e1d7 {
+            background-color: #f0d9b5;
+        }
+        .theme-wood .black-3c85d {
+            background-color: #b58863;
+        }
+        .theme-wood .captured-pieces {
+            background: #2b1f17;
+            border: 1px solid #5c381e;
+        }
+        .theme-wood button, .theme-wood select {
+            background-color: #5c381e;
+            color: #ebd0a7;
+            border: 1px solid #7c4c2a;
+        }
+        
+        /* 2. Glassmorphism (Translúcido Futurista) */
+        body.theme-glass {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+        }
+        .theme-glass .game-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            color: #f8fafc;
+        }
+        .theme-glass .board-b72b1 {
+            background: rgba(255, 255, 255, 0.03);
+            border: 6px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+        .theme-glass .white-1e1d7 {
+            background-color: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-sizing: border-box;
+        }
+        .theme-glass .black-3c85d {
+            background-color: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            box-sizing: border-box;
+        }
+        .theme-glass img.piece-4a2a4 {
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+            transition: transform 0.2s ease;
+        }
+        .theme-glass img.piece-4a2a4:hover {
+            transform: scale(1.08);
+        }
+        .theme-glass .captured-pieces {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .theme-glass button, .theme-glass select {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* 3. Neon Cyber (Brilho Synthwave) */
+        body.theme-cyber {
+            background: linear-gradient(135deg, #05010a 0%, #120424 100%);
+            color: #00f5d4;
+        }
+        .theme-cyber .game-container {
+            background: rgba(5, 1, 10, 0.95);
+            border: 2px solid #00f5d4;
+            box-shadow: 0 0 25px rgba(0, 245, 212, 0.2), inset 0 0 15px rgba(123, 44, 191, 0.15);
+            color: #00f5d4;
+        }
+        .theme-cyber .board-b72b1 {
+            background: #020205;
+            border: 6px solid #00f5d4;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 245, 212, 0.3), inset 0 0 15px rgba(123, 44, 191, 0.2);
+        }
+        .theme-cyber .white-1e1d7 {
+            background-color: #1a0826;
+            border: 1px solid rgba(123, 44, 191, 0.3);
+            box-sizing: border-box;
+        }
+        .theme-cyber .black-3c85d {
+            background-color: #0c0812;
+            border: 1px solid rgba(0, 245, 212, 0.2);
+            box-sizing: border-box;
+        }
+        .theme-cyber img.piece-4a2a4 {
+            filter: drop-shadow(0 0 4px #00f5d4) drop-shadow(0 0 8px #7b2cbf);
+        }
+        .theme-cyber .square-55d63.highlight-white,
+        .theme-cyber .square-55d63.highlight-black {
+            box-shadow: inset 0 0 15px #00f5d4, 0 0 10px #00f5d4 !important;
+        }
+        .theme-cyber .captured-pieces {
+            background: #0c0812;
+            border: 1px solid rgba(0, 245, 212, 0.2);
+        }
+        .theme-cyber button, .theme-cyber select {
+            background-color: #7b2cbf;
+            color: #00f5d4;
+            border: 1px solid #00f5d4;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(123, 44, 191, 0.4);
+        }
+        .theme-cyber button:hover, .theme-cyber select:hover {
+            background-color: #9d4edd;
+            box-shadow: 0 0 15px rgba(0, 245, 212, 0.6);
         }
     </style>
 </head>
-<body>
+<body class="theme-wood">
 
     <div class="game-container">
-        <h2>Xadrez com IA (Minimax Alpha-Beta)</h2>
+        <h2 style="margin-top: 0; font-weight: 800; letter-spacing: 1px;">Xadrez com IA & Análise</h2>
+        
         <div class="captured-pieces" id="blackCaptured">
             <!-- Peças pretas capturadas -->
         </div>
-        <div class="board-container">
-            <div id="myBoard"></div>
-            <!-- Elemento do Overlay -->
-            <div id="loadingOverlay">Pensando...</div>
+
+        <div class="board-flex-wrapper">
+            <!-- Barra de Vantagem Tática -->
+            <div class="advantage-bar-container">
+                <div id="advantageBarWhite" class="bar-fill white-fill"></div>
+                <div id="advantageBarBlack" class="bar-fill black-fill"></div>
+                <span id="advantageBarLabel">0.0</span>
+            </div>
+
+            <!-- Tabuleiro de Xadrez com SVG Overlay -->
+            <div class="board-container">
+                <div id="myBoard"></div>
+                <svg id="boardOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255, 152, 0, 0.8)"></polygon>
+                        </marker>
+                    </defs>
+                    <line id="bestMoveLine" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255, 152, 0, 0.8)" stroke-width="6" marker-end="url(#arrowhead)" style="display: none; stroke-dasharray: 8 4; animation: dash 1s linear infinite;" />
+                </svg>
+                <div id="loadingOverlay">Pensando...</div>
+            </div>
         </div>
+
         <div class="captured-pieces" id="whiteCaptured">
             <!-- Peças brancas capturadas -->
         </div>
+
         <div id="status">Status: Novo Jogo</div>
         <div id="turn">Turno: Brancas</div>
 
         <div class="controls">
-            <label for="difficulty">Dificuldade:</label>
+            <label for="difficulty" style="font-weight: 600;">Dificuldade:</label>
             <select id="difficulty">
                 <option value="2">Muito Fácil</option>
                 <option value="3" selected>Fácil</option>
                 <option value="4">Médio</option>
                 <option value="5">Difícil</option>
             </select>
-            <button id="newGameButton">Novo Jogo</button>
+
+            <label for="themeSelect" style="font-weight: 600; margin-left: 5px;">Tema:</label>
+            <select id="themeSelect">
+                <option value="wood" selected>Classic Wood</option>
+                <option value="glass">Glassmorphism</option>
+                <option value="cyber">Neon Cyber</option>
+            </select>
+
+            <button id="toggleHintsBtn" style="font-weight: bold;">💡 Dicas: Ligadas</button>
+            <button id="newGameButton" style="font-weight: bold;">Novo Jogo</button>
+        </div>
+
+        <!-- Painel de Notação PGN/FEN e Replay -->
+        <div class="notation-panel" style="background-color: rgba(0, 0, 0, 0.15); padding: 15px; border-radius: 8px; width: 400px; margin-top: 20px; border: 1px solid rgba(255, 255, 255, 0.08); box-sizing: border-box;">
+            <h3 style="margin-top: 0; font-size: 1.05em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 6px; font-weight: 700; letter-spacing: 0.5px;">Partida e Histórico (PGN/FEN)</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px; margin-top: 10px;">
+                <button id="copyFenBtn" style="flex: 1; font-size: 0.85em; font-weight: 600;">Copiar FEN</button>
+                <button id="exportPgnBtn" style="flex: 1; font-size: 0.85em; font-weight: 600;">Exportar PGN</button>
+            </div>
+            
+            <div style="margin-top: 10px;">
+                <textarea id="importInput" placeholder="Cole aqui seu código FEN ou PGN para análise..." style="width: 100%; height: 50px; background: rgba(0, 0, 0, 0.25); color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px; font-family: monospace; font-size: 11px; resize: none; box-sizing: border-box; outline: none;"></textarea>
+                <button id="loadPartidaBtn" style="width: 100%; margin-top: 6px; background-color: #2e7d32; color: white; border: none; font-weight: bold;">Carregar Partida</button>
+            </div>
+
+            <!-- Controles de Replay de Histórico PGN -->
+            <div id="replayControls" style="display: none; align-items: center; justify-content: center; gap: 15px; margin-top: 12px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                <button id="prevMoveBtn" style="padding: 4px 8px; font-size: 0.85em; font-weight: bold;">◀ Anterior</button>
+                <span id="replayStatus" style="font-weight: bold; color: #fbc02d; font-size: 12px;">Lance 0/0</span>
+                <button id="nextMoveBtn" style="padding: 4px 8px; font-size: 0.85em; font-weight: bold;">Próximo ▶</button>
+            </div>
         </div>
     </div>
 
@@ -161,41 +430,31 @@
         const victorySound = new Audio('../assets/sounds/powerup3.mp3');
         const defeatSound = new Audio('../assets/sounds/game_over_bgm.mp3');
 
-        // --- CONSTANTES DE AVALIAÇÃO (Ajustáveis) ---
+        // --- Stockfish.js Setup ---
+        const STOCKFISH_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js';
+        let stockfishWorker = null;
+        let bestMoveRecommended = null;
+        var showComputerHints = true;
+
+        // --- CONSTANTES DE AVALIAÇÃO MINIMAX ---
         const PAWN_VALUE = 100;
         const KNIGHT_VALUE = 320;
         const BISHOP_VALUE = 330;
         const ROOK_VALUE = 500;
         const QUEEN_VALUE = 900;
-        const KING_VALUE = 20000; // Valor altíssimo para evitar mate
+        const KING_VALUE = 20000;
 
         const DOUBLED_PAWN_PENALTY = -10;
         const ISOLATED_PAWN_PENALTY = -15;
-        const PASSED_PAWN_BONUS_BASE = 20; // Bônus aumenta com o avanço
+        const PASSED_PAWN_BONUS_BASE = 20;
         const CASTLING_BONUS = 50;
-        const PAWN_SHIELD_BONUS = 10; // Por peão na frente do rei roqueado
+        const PAWN_SHIELD_BONUS = 10;
         const KING_EXPOSED_PENALTY = -30;
-        const DEVELOPMENT_BONUS = 10; // Por peça menor desenvolvida
-        const CENTER_PAWN_BONUS = 15; // Peões em d4/e4/d5/e5
-        const ATTACK_CENTER_BONUS = 5; // Peças atacando o centro
+        const DEVELOPMENT_BONUS = 10;
+        const CENTER_PAWN_BONUS = 15;
+        const ATTACK_CENTER_BONUS = 5;
 
         // --- Tabelas Posição-Peça (Piece-Square Tables) ---
-        // Valores adaptados/simplificados. Positivo é bom para a peça naquela casa.
-        // Definidos da perspectiva das Brancas (linha 0 é a 8ª fileira, linha 7 é a 1ª)
-
-        /*
-        var pawnTable = [
-            [ 0,   0,   0,   0,   0,   0,   0,   0],
-            [50,  50,  50,  50,  50,  50,  50,  50], // Peões avançados valem mais
-            [10,  10,  20,  30,  30,  20,  10,  10],
-            [ 0,   0,   0,  20,  20,   0,   0,   0],
-            [ 0,   0,   0,  20,  20,   0,   0,   0], // Centro inicial
-            [ 0, -10, -10,   0,   0, -10, -10,   0], // Penalidade pequena para peões bloqueados iniciais
-            [ 0,   0,   0, -20, -20,   0,   0,   0], // Penalidade maior para peões muito recuados
-            [ 0,   0,   0,   0,   0,   0,   0,   0]
-        ];
-        */
-
         var pawnTable = [
             [ 0,   0,   0,   0,   0,   0,   0,   0],
             [ 5,  10,  10, -20, -20,  10,  10,   5],
@@ -211,18 +470,18 @@
             [-50, -40, -30, -30, -30, -30, -40, -50],
             [-40, -20,   0,   0,   0,   0, -20, -40],
             [-30,   0,  10,  10,  10,  10,   0, -30],
-            [-30,   0,  10,  20,  20,  10,   0, -30], // Cavalos centralizados são bons
+            [-30,   0,  10,  20,  20,  10,   0, -30],
             [-30,   0,  10,  20,  20,  10,   0, -30],
             [-30,   0,  10,  10,  10,  10,   0, -30],
             [-40, -20,   0,   0,   0,   0, -20, -40],
-            [-50, -40, -30, -30, -30, -30, -40, -50] // Cavalos nos cantos são ruins
+            [-50, -40, -30, -30, -30, -30, -40, -50]
         ];
 
         var bishopTable = [
             [-20, -10, -10, -10, -10, -10, -10, -20],
             [-10,   0,   0,   0,   0,   0,   0, -10],
             [-10,   0,   0,  10,  10,   0,   0, -10],
-            [-10,   0,  10,  10,  10,  10,   0, -10], // Bispos em diagonais longas e centro
+            [-10,   0,  10,  10,  10,  10,   0, -10],
             [-10,   0,  10,  10,  10,  10,   0, -10],
             [-10,   0,   0,  10,  10,   0,   0, -10],
             [-10,   0,   0,   0,   0,   0,   0, -10],
@@ -231,16 +490,15 @@
 
         var rookTable = [
             [  0,   0,   0,   0,   0,   0,   0,   0],
-            [  0,  10,  10,  10,  10,  10,  10,   0], // Torres na 7ª (ou 2ª para pretas)
-            [-10,   0,   0,   0,   0,   0,   0, -10], // Ligeiramente pior nas casas iniciais
+            [  0,  10,  10,  10,  10,  10,  10,   0],
             [-10,   0,   0,   0,   0,   0,   0, -10],
             [-10,   0,   0,   0,   0,   0,   0, -10],
             [-10,   0,   0,   0,   0,   0,   0, -10],
             [-10,   0,   0,   0,   0,   0,   0, -10],
-            [  0,   0,   0,  10,  10,   0,   0,   0] // Bom em colunas abertas/semi-abertas (simplificado)
+            [-10,   0,   0,   0,   0,   0,   0, -10],
+            [  0,   0,   0,  10,  10,   0,   0,   0]
         ];
 
-        // Rainha: Combinação de Torre e Bispo (simplificado aqui como bônus central)
          var queenTable = [
             [-20, -10, -10,   0,   0, -10, -10, -20],
             [-10,   0,   0,   0,   0,   0,   0, -10],
@@ -252,46 +510,165 @@
             [-20, -10, -10,   0,   0, -10, -10, -20]
         ];
 
-        // Rei: Segurança é chave (simplificado para evitar bordas/centro no início)
         var kingTable = [
-            [ 20,  30,  10,   0,   0,  10,  30,  20], // Bom estar perto do canto após roque
+            [ 20,  30,  10,   0,   0,  10,  30,  20],
             [ 20,  20,   0,   0,   0,   0,  20,  20],
             [-10, -20, -20, -20, -20, -20, -20, -10],
-            [-20, -30, -30, -40, -40, -30, -30, -20], // Ruim no centro exposto
+            [-20, -30, -30, -40, -40, -30, -30, -20],
             [-30, -40, -40, -50, -50, -40, -40, -30],
             [-30, -40, -40, -50, -50, -40, -40, -30],
             [-30, -40, -40, -50, -50, -40, -40, -30],
             [-30, -40, -40, -50, -50, -40, -40, -30]
         ];
 
-        //Tabela de rei para final de jogo
         var kingTableEndGame = [
             [-50,-40,-30,-20,-20,-30,-40,-50],
             [-30,-20,-10,  0,  0,-10,-20,-30],
             [-30,-10, 20, 30, 30, 20,-10,-30],
-            [-30,-10, 30, 40, 40, 30,-10,-30], // Rei ativo no centro no final
+            [-30,-10, 30, 40, 40, 30,-10,-30],
             [-30,-10, 30, 40, 40, 30,-10,-30],
             [-30,-10, 20, 30, 30, 20,-10,-30],
             [-30,-20,-10,  0,  0,-10,-20,-30],
             [-50,-40,-30,-20,-20,-30,-40,-50]
         ];
 
-        // Função de debug centralizada
+        // --- Lógica de Análise Stockfish.js ---
+        function initStockfish() {
+            try {
+                const blobCode = `importScripts('${STOCKFISH_CDN}');`;
+                const blob = new Blob([blobCode], { type: 'application/javascript' });
+                const blobURL = URL.createObjectURL(blob);
+                stockfishWorker = new Worker(blobURL);
+
+                stockfishWorker.onmessage = function(event) {
+                    handleStockfishMessage(event.data);
+                };
+
+                stockfishWorker.postMessage('uci');
+                stockfishWorker.postMessage('ucinewgame');
+                stockfishWorker.postMessage('isready');
+            } catch (e) {
+                console.error("Erro ao inicializar o Stockfish.js:", e);
+            }
+        }
+
+        function requestAnalysis() {
+            clearArrow();
+            if (!stockfishWorker) return;
+            const currentFen = game.fen();
+            stockfishWorker.postMessage(`position fen ${currentFen}`);
+            stockfishWorker.postMessage('go depth 10');
+        }
+
+        function handleStockfishMessage(line) {
+            if (line.startsWith('info') && line.includes('score')) {
+                const scoreMatch = line.match(/score (cp|mate) (-?\d+)/);
+                if (scoreMatch) {
+                    const scoreType = scoreMatch[1];
+                    let scoreVal = parseInt(scoreMatch[2], 10);
+                    
+                    if (game.turn() === 'b') {
+                        scoreVal = -scoreVal;
+                    }
+                    
+                    updateAdvantageBar(scoreType, scoreVal);
+                }
+            }
+            
+            if (line.startsWith('bestmove')) {
+                const moveMatch = line.match(/^bestmove ([a-h][1-8])([a-h][1-8])(?:[qrbn])?/);
+                if (moveMatch) {
+                    const from = moveMatch[1];
+                    const to = moveMatch[2];
+                    bestMoveRecommended = { from, to };
+                    
+                    if (game.turn() === playerColor && !game.game_over()) {
+                        drawBestMoveArrow(from, to);
+                    } else {
+                        clearArrow();
+                    }
+                }
+            }
+        }
+
+        function updateAdvantageBar(type, scoreVal) {
+            const label = document.getElementById('advantageBarLabel');
+            const whiteBar = document.getElementById('advantageBarWhite');
+            const blackBar = document.getElementById('advantageBarBlack');
+            
+            let labelText = '';
+            let whiteHeight = 50;
+            
+            if (type === 'mate') {
+                const absMate = Math.abs(scoreVal);
+                labelText = `#M${absMate}`;
+                whiteHeight = scoreVal > 0 ? 100 : 0;
+            } else {
+                const pawns = (scoreVal / 100).toFixed(1);
+                labelText = scoreVal > 0 ? `+${pawns}` : pawns;
+                
+                let clampedPawns = scoreVal / 100;
+                if (clampedPawns > 10) clampedPawns = 10;
+                if (clampedPawns < -10) clampedPawns = -10;
+                
+                whiteHeight = 50 + (clampedPawns / 10) * 45;
+            }
+            
+            label.textContent = labelText;
+            whiteBar.style.height = `${whiteHeight}%`;
+            blackBar.style.height = `${100 - whiteHeight}%`;
+        }
+
+        function drawBestMoveArrow(fromSquare, toSquare) {
+            if (!showComputerHints) {
+                clearArrow();
+                return;
+            }
+            const fromPos = getSquareCenter(fromSquare);
+            const toPos = getSquareCenter(toSquare);
+            if (!fromPos || !toPos) return;
+
+            const line = document.getElementById('bestMoveLine');
+            line.setAttribute('x1', fromPos.x);
+            line.setAttribute('y1', fromPos.y);
+            line.setAttribute('x2', toPos.x);
+            line.setAttribute('y2', toPos.y);
+            line.style.display = 'block';
+        }
+
+        function getSquareCenter(squareName) {
+            const squareEl = document.querySelector(`#myBoard .square-${squareName}`);
+            if (!squareEl) return null;
+            
+            const boardEl = document.getElementById('myBoard');
+            const boardRect = boardEl.getBoundingClientRect();
+            const sqRect = squareEl.getBoundingClientRect();
+            
+            return {
+                x: (sqRect.left + sqRect.width / 2) - boardRect.left,
+                y: (sqRect.top + sqRect.height / 2) - boardRect.top
+            };
+        }
+
+        function clearArrow() {
+            const line = document.getElementById('bestMoveLine');
+            if (line) line.style.display = 'none';
+        }
+
+        // --- Funções Auxiliares de Avaliação e Debug ---
         function debug(...args) {
             if (DEBUG_MODE) {
                 console.log(...args);
             }
         }
 
-        // Função para tocar o som do movimento
         function playMoveSound() {
-            moveSound.currentTime = 0; // Reseta o áudio para o início
+            moveSound.currentTime = 0;
             moveSound.play().catch(error => {
-                debug("Erro ao tocar som:", error);
+                debug("Erro ao jogar som do movimento:", error);
             });
         }
 
-        // Função auxiliar para determinar a fase do jogo (simplificado)
         function determineIsEndGame(currentBoard) {
             let whiteMaterial = 0;
             let blackMaterial = 0;
@@ -301,7 +678,7 @@
                 for (let j = 0; j < 8; j++) {
                     const piece = currentBoard[i][j];
                     if (piece && piece.type !== 'k' && piece.type !== 'p') {
-                        const value = getPieceValue(piece); // Usa a função existente
+                        const value = getPieceValue(piece);
                         if (piece.color === 'w') {
                             whiteMaterial += value;
                         } else {
@@ -313,53 +690,43 @@
                     }
                 }
             }
-            // Critério: Sem damas OU material total (sem peões/reis) abaixo de um limiar
-            const lowMaterialThreshold = KNIGHT_VALUE + BISHOP_VALUE + ROOK_VALUE; // Exemplo de limiar
+            const lowMaterialThreshold = KNIGHT_VALUE + BISHOP_VALUE + ROOK_VALUE;
             return queens === 0 || (whiteMaterial < lowMaterialThreshold && blackMaterial < lowMaterialThreshold);
         }
             
-        // --- NOVA FUNÇÃO evaluateBoard ---
         function evaluateBoard(currentBoard, turn) {
             let totalEvaluation = 0;
             
-            // Verificação de empate por repetição (adicionar no início da função)
             if (game.in_threefold_repetition()) {
-                // Se for a vez das pretas (IA), penalizar fortemente o empate
-                // pois queremos que a IA evite repetições
                 return turn === 'b' ? -5000 : 5000;
             }
             
-            // Verificação de outros tipos de empate
             if (game.in_draw() || game.in_stalemate() || game.insufficient_material()) {
-                // Penalizar empates em geral, mas menos que o mate
                 return turn === 'b' ? -3000 : 3000;
             }
 
             let materialScore = 0;
             let positionalScore = 0;
             let structureAndSafetyScore = 0;
-            let tacticalBonus = 0; // Bônus para xeque, mate, ataques
+            let tacticalBonus = 0;
             let whiteKingSquare = null;
             let blackKingSquare = null;
             let whiteMinorPiecesDeveloped = 0;
             let blackMinorPiecesDeveloped = 0;
-            let whitePawns = []; // Armazena { square: 'e2', col: 4, row: 6 }
+            let whitePawns = [];
             let blackPawns = [];
 
             const isEndGame = determineIsEndGame(currentBoard);
 
-            // --- FASE 1: Calcular Material e Posição Base (Tabelas) ---
-            for (let i = 0; i < 8; i++) { // Linhas (0-7) -> Fileiras (8-1)
-                for (let j = 0; j < 8; j++) { // Colunas (0-7) -> Colunas (a-h)
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
                     const piece = currentBoard[i][j];
                     const square = String.fromCharCode('a'.charCodeAt(0) + j) + (8 - i);
 
                     if (piece) {
-                        // 1.1 Calcular Score Material
                         const pieceValue = getPieceValue(piece);
                         materialScore += (piece.color === 'w' ? pieceValue : -pieceValue);
 
-                        // 1.2 Calcular Score Posicional (usando tabelas)
                         let table = null;
                         switch (piece.type) {
                             case 'p':
@@ -369,13 +736,11 @@
                                 break;
                             case 'n':
                                 table = knightTable;
-                                // Conta desenvolvimento se não estiver na casa inicial
                                 if (piece.color === 'w' && !(i === 7 && (j === 1 || j === 6))) whiteMinorPiecesDeveloped += 10;
                                 if (piece.color === 'b' && !(i === 0 && (j === 1 || j === 6))) blackMinorPiecesDeveloped += 10;
                                 break;
                             case 'b':
                                 table = bishopTable;
-                                // Conta desenvolvimento se não estiver na casa inicial
                                 if (piece.color === 'w' && !(i === 7 && (j === 2 || j === 5))) whiteMinorPiecesDeveloped += 10;
                                 if (piece.color === 'b' && !(i === 0 && (j === 2 || j === 5))) blackMinorPiecesDeveloped += 10;
                                 break;
@@ -389,7 +754,7 @@
                         }
 
                         if (table) {
-                            const tableRow = piece.color === 'w' ? i : 7 - i; // Ajusta linha para tabela (espelha para pretas)
+                            const tableRow = piece.color === 'w' ? i : 7 - i;
                             const tableCol = j;
                             const tableValue = table[tableRow][tableCol];
                             positionalScore += (piece.color === 'w' ? tableValue : -tableValue);
@@ -398,26 +763,23 @@
                 }
             }
 
-            // --- FASE 2: Calcular Bônus/Penalidades Estruturais e de Segurança ---
-
-            // 2.1 Estrutura de Peões
+            // Estrutura de Peões
             let whitePawnStructureScore = 0;
             let blackPawnStructureScore = 0;
             const whitePawnCols = whitePawns.map(p => p.col);
             const blackPawnCols = blackPawns.map(p => p.col);
 
-            // Penalidades/Bônus para Brancas
             whitePawns.forEach(pawn => {
                 const col = pawn.col;
-                const rank = 8 - pawn.row; // Rank (1-8)
+                const rank = 8 - pawn.row;
                 if (whitePawnCols.filter(c => c === col).length > 1) whitePawnStructureScore += DOUBLED_PAWN_PENALTY;
                 if (!whitePawnCols.includes(col - 1) && !whitePawnCols.includes(col + 1)) whitePawnStructureScore += ISOLATED_PAWN_PENALTY;
-                // Passados: Checar se não há peões pretos na frente ou adjacentes
+                
                 let isPassed = true;
                 for (let bpCol = col - 1; bpCol <= col + 1; bpCol++) {
                     if (bpCol >= 0 && bpCol <= 7) {
                         blackPawns.forEach(blackPawn => {
-                            if (blackPawn.col === bpCol && blackPawn.row < pawn.row) { // Peão preto está à frente
+                            if (blackPawn.col === bpCol && blackPawn.row < pawn.row) {
                                 isPassed = false;
                             }
                         });
@@ -425,135 +787,104 @@
                     if (!isPassed) break;
                 }
                 if (isPassed) whitePawnStructureScore += PASSED_PAWN_BONUS_BASE + (rank - 2) * 5;
-                // Bônus centro peão (pode ser redundante se já estiver na tabela, mas explícito aqui)
                 if (pawn.square === 'd4' || pawn.square === 'e4') whitePawnStructureScore += CENTER_PAWN_BONUS;
             });
 
-            // Penalidades/Bônus para Pretas
             blackPawns.forEach(pawn => {
                 const col = pawn.col;
-                const rank = 8 - pawn.row; // Rank (1-8)
+                const rank = 8 - pawn.row;
                 if (blackPawnCols.filter(c => c === col).length > 1) blackPawnStructureScore += DOUBLED_PAWN_PENALTY;
                 if (!blackPawnCols.includes(col - 1) && !blackPawnCols.includes(col + 1)) blackPawnStructureScore += ISOLATED_PAWN_PENALTY;
-                // Passados: Checar se não há peões brancos na frente ou adjacentes
+                
                 let isPassed = true;
                 for (let wpCol = col - 1; wpCol <= col + 1; wpCol++) {
                     if (wpCol >= 0 && wpCol <= 7) {
                         whitePawns.forEach(whitePawn => {
-                            if (whitePawn.col === wpCol && whitePawn.row > pawn.row) { // Peão branco está à frente
+                            if (whitePawn.col === wpCol && whitePawn.row > pawn.row) {
                                 isPassed = false;
                             }
                         });
                     }
                      if (!isPassed) break;
                 }
-                if (isPassed) blackPawnStructureScore += PASSED_PAWN_BONUS_BASE + (7 - rank) * 5; // Bonus aumenta com avanço (para pretas)
-                // Bônus centro peão
+                if (isPassed) blackPawnStructureScore += PASSED_PAWN_BONUS_BASE + (7 - rank) * 5;
                 if (pawn.square === 'd5' || pawn.square === 'e5') blackPawnStructureScore += CENTER_PAWN_BONUS;
             });
 
-            structureAndSafetyScore += whitePawnStructureScore; // Adiciona score branco
-            structureAndSafetyScore -= blackPawnStructureScore; // Subtrai score preto
+            structureAndSafetyScore += whitePawnStructureScore;
+            structureAndSafetyScore -= blackPawnStructureScore;
 
-            // 2.2 Segurança do Rei e Roque
+            // Segurança do Rei e Roque
             let whiteKingSafetyScore = 0;
             let blackKingSafetyScore = 0;
-            // Verifica roque branco (simplificado)
             let whiteCastled = false;
             if (whiteKingSquare) {
-                if (whiteKingSquare.square === 'g1' && currentBoard[7][5]?.type === 'r' && currentBoard[7][5]?.color === 'w') { // Roque curto O-O
+                if (whiteKingSquare.square === 'g1' && currentBoard[7][5]?.type === 'r' && currentBoard[7][5]?.color === 'w') {
                     whiteCastled = true;
-                    if (currentBoard[6][5]?.type === 'p' && currentBoard[6][5]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // f2
-                    if (currentBoard[6][6]?.type === 'p' && currentBoard[6][6]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // g2
-                    if (currentBoard[6][7]?.type === 'p' && currentBoard[6][7]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // h2
-                } else if (whiteKingSquare.square === 'c1' && currentBoard[7][3]?.type === 'r' && currentBoard[7][3]?.color === 'w') { // Roque longo O-O-O
+                    if (currentBoard[6][5]?.type === 'p' && currentBoard[6][5]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[6][6]?.type === 'p' && currentBoard[6][6]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[6][7]?.type === 'p' && currentBoard[6][7]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS;
+                } else if (whiteKingSquare.square === 'c1' && currentBoard[7][3]?.type === 'r' && currentBoard[7][3]?.color === 'w') {
                     whiteCastled = true;
-                    if (currentBoard[6][0]?.type === 'p' && currentBoard[6][0]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // a2
-                    if (currentBoard[6][1]?.type === 'p' && currentBoard[6][1]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // b2
-                    if (currentBoard[6][2]?.type === 'p' && currentBoard[6][2]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS; // c2
+                    if (currentBoard[6][0]?.type === 'p' && currentBoard[6][0]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[6][1]?.type === 'p' && currentBoard[6][1]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[6][2]?.type === 'p' && currentBoard[6][2]?.color === 'w') whiteKingSafetyScore += PAWN_SHIELD_BONUS;
                 }
                 if (whiteCastled) whiteKingSafetyScore += CASTLING_BONUS;
-                // else if (!isEndGame && (whiteKingSquare.col > 2 && whiteKingSquare.col < 5)) { // Penalidade se rei estiver no centro no meio-jogo sem rocar?
-                //     whiteKingSafetyScore += KING_EXPOSED_PENALTY;
-                // }
             }
-             // Verifica roque preto (simplificado)
             let blackCastled = false;
              if (blackKingSquare) {
-                if (blackKingSquare.square === 'g8' && currentBoard[0][5]?.type === 'r' && currentBoard[0][5]?.color === 'b') { // Roque curto O-O
+                if (blackKingSquare.square === 'g8' && currentBoard[0][5]?.type === 'r' && currentBoard[0][5]?.color === 'b') {
                     blackCastled = true;
-                    if (currentBoard[1][5]?.type === 'p' && currentBoard[1][5]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // f7
-                    if (currentBoard[1][6]?.type === 'p' && currentBoard[1][6]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // g7
-                    if (currentBoard[1][7]?.type === 'p' && currentBoard[1][7]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // h7
-                } else if (blackKingSquare.square === 'c8' && currentBoard[0][3]?.type === 'r' && currentBoard[0][3]?.color === 'b') { // Roque longo O-O-O
+                    if (currentBoard[1][5]?.type === 'p' && currentBoard[1][5]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[1][6]?.type === 'p' && currentBoard[1][6]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[1][7]?.type === 'p' && currentBoard[1][7]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS;
+                } else if (blackKingSquare.square === 'c8' && currentBoard[0][3]?.type === 'r' && currentBoard[0][3]?.color === 'b') {
                     blackCastled = true;
-                    if (currentBoard[1][0]?.type === 'p' && currentBoard[1][0]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // a7
-                    if (currentBoard[1][1]?.type === 'p' && currentBoard[1][1]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // b7
-                    if (currentBoard[1][2]?.type === 'p' && currentBoard[1][2]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS; // c7
+                    if (currentBoard[1][0]?.type === 'p' && currentBoard[1][0]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[1][1]?.type === 'p' && currentBoard[1][1]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS;
+                    if (currentBoard[1][2]?.type === 'p' && currentBoard[1][2]?.color === 'b') blackKingSafetyScore += PAWN_SHIELD_BONUS;
                 }
                 if (blackCastled) blackKingSafetyScore += CASTLING_BONUS;
-                // else if (!isEndGame && (blackKingSquare.col > 2 && blackKingSquare.col < 5)) {
-                //     blackKingSafetyScore += KING_EXPOSED_PENALTY;
-                // }
             }
             structureAndSafetyScore += whiteKingSafetyScore;
             structureAndSafetyScore -= blackKingSafetyScore;
 
-            // 2.3 Desenvolvimento de Peças Menores
+            // Desenvolvimento de Peças
             structureAndSafetyScore += whiteMinorPiecesDeveloped * DEVELOPMENT_BONUS;
             structureAndSafetyScore -= blackMinorPiecesDeveloped * DEVELOPMENT_BONUS;
 
-            // --- FASE 3: Bônus Táticos (Xeque, Mate, Ataque) ---
-            // Usamos a instância global 'game' para verificar estados como xeque/mate
-            // A avaliação é da *posição atual*. game.turn() indica quem jogaria *depois*.
+            // Bônus Táticos
             const turnAfterPosition = game.turn();
 
             if (game.in_checkmate()) {
-                // Se é a vez das Brancas jogarem e estão em mate, Pretas venceram (ruim para Brancas -> grande negativo)
-                // Se é a vez das Pretas jogarem e estão em mate, Brancas venceram (bom para Brancas -> grande positivo)
                 tacticalBonus += (turnAfterPosition === 'w' ? -KING_VALUE * 2 : KING_VALUE * 2);
-            } else if (game.in_stalemate() || game.in_draw() || game.insufficient_material() || game.in_threefold_repetition()) {
-                // Empates devem ter score próximo de 0, ajustando a partir do material/posição
-                // Se um lado tem vantagem material mas força empate, isso é ruim para ele.
-                // Vamos retornar 0 diretamente para simplificar, assumindo que empate é neutro.
-                // return 0; // Ou ajustar baseado na avaliação atual? Por ora, deixamos somar.
             } else if (game.in_check()) {
-                // Se é a vez das Brancas jogarem e estão em xeque, é ruim para Brancas (negativo).
-                // Se é a vez das Pretas jogarem e estão em xeque, é bom para Brancas (positivo).
                 tacticalBonus += (turnAfterPosition === 'w' ? -50 : 50);
             }
 
-            // 3.2 Bônus de Ataque ao Rei (Proximidade - lógica anterior mantida)
+            // Bônus de Ataque ao Rei
             const enemyColor = turn === 'w' ? 'b' : 'w';
             const enemyKingSquare = enemyColor === 'w' ? whiteKingSquare : blackKingSquare;
             let attackBonus = 0;
-            if (enemyKingSquare && !isEndGame) { // Bônus de ataque mais relevante no meio-jogo
+            if (enemyKingSquare && !isEndGame) {
                 const kingRow = enemyKingSquare.row;
                 const kingCol = enemyKingSquare.col;
                 for (let i = 0; i < 8; i++) {
                     for (let j = 0; j < 8; j++) {
                         const piece = currentBoard[i][j];
-                        // Se a peça é da cor que está avaliando (cor de 'turn')
                         if (piece && piece.color === turn) {
                             const distance = Math.abs(i - kingRow) + Math.abs(j - kingCol);
-                            // Bônus maior para peças mais próximas (inversamente proporcional à distância)
-                            // Ajuste o multiplicador conforme necessário
-                            attackBonus += Math.max(0, (14 - distance)) * 2; // Ex: 14 - dist, max 0, mult 2
+                            attackBonus += Math.max(0, (14 - distance)) * 2;
                         }
                     }
                 }
             }
-            // O bônus de ataque é bom para quem está atacando (turn)
             tacticalBonus += (turn === 'w' ? attackBonus : -attackBonus);
 
-
-            // --- FASE 4: Retornar Avaliação Final ---
-            // Soma todas as componentes. A avaliação é sempre do ponto de vista das Brancas.
             totalEvaluation = materialScore + positionalScore + structureAndSafetyScore + tacticalBonus;
+            debug(`Eval: Mat=${materialScore}, Pos=${positionalScore}, Struct=${structureAndSafetyScore}, Tact=${tacticalBonus} => Tot=${totalEvaluation}`);
 
-            debug(`Eval (White's Pov): Material=${materialScore}, Positional=${positionalScore}, Struct/Safe=${structureAndSafetyScore}, Tactical=${tacticalBonus} => Total=${totalEvaluation}`);
-
-            // A função minimax lida com maximizar/minimizar, então retornamos sempre a perspectiva das Brancas.
             return totalEvaluation;
         }
 
@@ -570,34 +901,27 @@
             }
         }
 
-        // Função auxiliar para encontrar a posição do rei
         function findKing(color) {
             var boardState = game.board();
             for (var i = 0; i < 8; i++) {
                 for (var j = 0; j < 8; j++) {
                     var piece = boardState[i][j];
                     if (piece && piece.type === 'k' && piece.color === color) {
-                        // Converte coordenadas (linha, coluna) para notação de casa (ex: e4)
                         return String.fromCharCode('a'.charCodeAt(0) + j) + (8 - i);
                     }
                 }
             }
-            return null; // Não deveria acontecer em um jogo normal
+            return null;
         }
 
-        // Implementar uma função de busca seletiva que avalia apenas os movimentos mais promissores
+        // --- Motor de Minimax AI Local ---
         function minimaxRoot(depth, isMaximizingPlayer) {
             const moves = game.moves({ verbose: true });
-            
-            // Número de melhores movimentos para explorar em cada nível
             const BEAM_WIDTH = 10;
-            
-            // Fase 1: Avaliar todos os movimentos possíveis na primeira camada
             const evaluatedMoves = [];
             
             for (const move of moves) {
                 game.move(move.san);
-                // Avaliação superficial (profundidade 1)
                 const score = evaluateBoard(game.board(), game.turn());
                 game.undo();
                 
@@ -607,27 +931,20 @@
                 });
             }
             
-            // Ordenar os movimentos
-            // Para o jogador maximizador (brancas), ordenamos do maior para o menor
-            // Para o jogador minimizador (pretas), ordenamos do menor para o maior
             evaluatedMoves.sort((a, b) => {
                 return isMaximizingPlayer ? b.score - a.score : a.score - b.score;
             });
             
-            // Selecionar apenas os N melhores movimentos
             const bestMoves = evaluatedMoves.slice(0, Math.min(BEAM_WIDTH, evaluatedMoves.length));
             
-            // Fase 2: Explorar com profundidade total apenas os melhores movimentos
             let bestMoveFound = null;
             let bestScore = isMaximizingPlayer ? -Infinity : Infinity;
             
             for (const moveObj of bestMoves) {
                 game.move(moveObj.move.san);
-                // Agora explorar com profundidade total usando seletividade em cada nível
                 const value = selectiveSearch(depth - 1, -Infinity, Infinity, !isMaximizingPlayer, BEAM_WIDTH);
                 game.undo();
                 
-                // Atualizar o melhor movimento
                 if (isMaximizingPlayer) {
                     if (value > bestScore) {
                         bestScore = value;
@@ -641,7 +958,6 @@
                 }
             }
             
-            // Se por algum motivo não encontrarmos o melhor movimento
             if (bestMoveFound === null && moves.length > 0) {
                 return moves[0];
             }
@@ -649,21 +965,17 @@
             return bestMoveFound;
         }
 
-        // Modificar a função selectiveSearch para considerar capturas como movimentos prioritários
         function selectiveSearch(depth, alpha, beta, isMaximizingPlayer, beamWidth) {
-            // Caso base: fim da recursão
             if (depth === 0 || game.game_over()) {
                 return evaluateBoard(game.board(), game.turn());
             }
             
             const moves = game.moves({ verbose: true });
             
-            // Se estivermos no último nível ou houver poucos movimentos, avaliar todos
             if (depth === 1 || moves.length <= beamWidth) {
                 return minimax(depth, alpha, beta, isMaximizingPlayer);
             }
             
-            // Separar movimentos de captura e não-captura
             const captureMoves = [];
             const nonCaptureMoves = [];
             
@@ -675,37 +987,23 @@
                 }
             }
             
-            // Avaliar superficialmente todos os movimentos neste nível
             const evaluatedCaptures = [];
             const evaluatedNonCaptures = [];
             
-            // Avaliar capturas
             for (const move of captureMoves) {
                 game.move(move);
-                // Avaliação superficial
                 const score = evaluateBoard(game.board(), game.turn());
                 game.undo();
-                
-                evaluatedCaptures.push({
-                    move: move,
-                    score: score
-                });
+                evaluatedCaptures.push({ move, score });
             }
             
-            // Avaliar não-capturas
             for (const move of nonCaptureMoves) {
                 game.move(move);
-                // Avaliação superficial
                 const score = evaluateBoard(game.board(), game.turn());
                 game.undo();
-                
-                evaluatedNonCaptures.push({
-                    move: move,
-                    score: score
-                });
+                evaluatedNonCaptures.push({ move, score });
             }
             
-            // Ordenar os movimentos
             evaluatedCaptures.sort((a, b) => {
                 return isMaximizingPlayer ? b.score - a.score : a.score - b.score;
             });
@@ -714,58 +1012,39 @@
                 return isMaximizingPlayer ? b.score - a.score : a.score - b.score;
             });
             
-            // Selecionar os melhores movimentos, priorizando capturas
-            let bestMoves = [];
+            let bestMoves = [].concat(evaluatedCaptures.slice(0, beamWidth));
             
-            // Adicionar todas as capturas (ou até o limite de beam width)
-            bestMoves = bestMoves.concat(evaluatedCaptures.slice(0, beamWidth));
-            
-            // Adicionar os melhores movimentos não-captura até completar o beam width
             if (bestMoves.length < beamWidth) {
                 bestMoves = bestMoves.concat(
                     evaluatedNonCaptures.slice(0, beamWidth - bestMoves.length)
                 );
             }
             
-            // Agora que temos os melhores movimentos, aplicamos o minimax tradicional
             if (isMaximizingPlayer) {
                 let bestScore = -Infinity;
-                
                 for (const moveObj of bestMoves) {
                     game.move(moveObj.move);
                     const score = selectiveSearch(depth - 1, alpha, beta, false, beamWidth);
                     game.undo();
-                    
                     bestScore = Math.max(bestScore, score);
                     alpha = Math.max(alpha, bestScore);
-                    
-                    if (beta <= alpha) {
-                        break; // Poda alpha-beta
-                    }
+                    if (beta <= alpha) break;
                 }
-                
                 return bestScore;
             } else {
                 let bestScore = Infinity;
-                
                 for (const moveObj of bestMoves) {
                     game.move(moveObj.move);
                     const score = selectiveSearch(depth - 1, alpha, beta, true, beamWidth);
                     game.undo();
-                    
                     bestScore = Math.min(bestScore, score);
                     beta = Math.min(beta, bestScore);
-                    
-                    if (beta <= alpha) {
-                        break; // Poda alpha-beta
-                    }
+                    if (beta <= alpha) break;
                 }
-                
                 return bestScore;
             }
         }
 
-        // Manter a função minimax original para os níveis mais profundos
         function minimax(depth, alpha, beta, isMaximizingPlayer) {
             if (depth === 0 || game.game_over()) {
                 return evaluateBoard(game.board(), game.turn());
@@ -775,161 +1054,107 @@
             
             if (isMaximizingPlayer) {
                 let bestScore = -Infinity;
-                
                 for (const move of moves) {
                     game.move(move);
                     const score = minimax(depth - 1, alpha, beta, false);
                     game.undo();
-                    
                     bestScore = Math.max(bestScore, score);
                     alpha = Math.max(alpha, bestScore);
-                    
-                    if (beta <= alpha) {
-                        break; // Poda alpha-beta
-                    }
+                    if (beta <= alpha) break;
                 }
-                
                 return bestScore;
             } else {
                 let bestScore = Infinity;
-                
                 for (const move of moves) {
                     game.move(move);
                     const score = minimax(depth - 1, alpha, beta, true);
                     game.undo();
-                    
                     bestScore = Math.min(bestScore, score);
                     beta = Math.min(beta, bestScore);
-                    
-                    if (beta <= alpha) {
-                        break; // Poda alpha-beta
-                    }
+                    if (beta <= alpha) break;
                 }
-                
                 return bestScore;
             }
         }
 
-        // --- Funções de Controle do Jogo ---
-
+        // --- Controles de IA ---
         function makeAIMove() {
             if (game.game_over()) return;
 
-            const ply = game.history().length; // Número de meios-movimentos jogados
-            const isOpeningPhase = ply < 6; // Aplicar livro nos 3 primeiros lances das pretas (ply 1 e 3 e 5)
+            const ply = game.history().length;
+            const isOpeningPhase = ply < 6;
             let openingMoveSAN = null;
             let captureAvailable = false;
             let bookMoveMade = false;
 
-            // 1. Verificar se estamos na fase de abertura e é a vez da IA
             if (game.turn() === aiColor && isOpeningPhase) {
-                // 2. Verificar se há alguma captura disponível
                 const possibleMoves = game.moves({ verbose: true });
                 for (const move of possibleMoves) {
                     if (move.flags.includes('c')) {
                         captureAvailable = true;
-                        //console.log("AI: Captura disponível, ignorando livro de abertura.");
                         break;
                     }
                 }
 
-                // 3. Se não houver captura, determinar o movimento do livro
                 if (!captureAvailable) {
-                    if (ply === 1) { // Primeiro movimento das Pretas
+                    if (ply === 1) {
                         openingMoveSAN = 'e6';
-                    } else if (ply === 3) { // Segundo movimento das Pretas
-                        // Verificar se e6 foi jogado (histórico deve ter 3 lances, o segundo sendo e6)
+                    } else if (ply === 3) {
                          if (game.history().length === 3 && game.history({verbose:true})[1].san === 'e6') {
                               openingMoveSAN = 'd5';
-                         } else {
-                              console.log("AI: Condição para d5 (após e6) não atendida, usando Minimax.");
                          }
                     }
                 }
             }
 
-            // 4. Tentar executar o movimento do livro, se aplicável
             if (openingMoveSAN) {
                  const moveResult = game.move(openingMoveSAN);
                  if (moveResult) {
-                     //console.log("AI: Jogando movimento da abertura (Defesa Francesa):", openingMoveSAN);
                      board.position(game.fen());
                      updateStatus();
                      bookMoveMade = true;
-                     // Não precisa de setTimeout aqui, é instantâneo
-                 } else {
-                     // Isso não deveria acontecer para e6/d5 no início, mas por segurança:
-                     console.warn("AI: Movimento da abertura", openingMoveSAN, "foi ilegal? Usando Minimax.");
                  }
             }
 
-            // 5. Se nenhum movimento do livro foi feito, usar Minimax
             if (!bookMoveMade) {
-                // //console.log("AI: Usando Minimax para encontrar o movimento.");
                 var depth = parseInt(document.getElementById('difficulty').value);
-                // ---> MOSTRAR LOADING <---
-                //loadingOverlay.classList.add('active');
-                // Opcional: remover a atualização do #status para "Pensando..." se o overlay for suficiente
                 setThinkingStatus(true);
-                // Usar setTimeout para não bloquear a UI e dar sensação de "pensamento"
                 window.setTimeout(function() {
-                    var move = minimaxRoot(depth, false); // Preto é minimizador
-
-                    // ---> ESCONDER LOADING (SEMPRE, mesmo se move for null) <---
-                    //loadingOverlay.classList.remove('active');
+                    var move = minimaxRoot(depth, false);
                     setThinkingStatus(false);
 
                     if (move) {
                         const capturedPiece = game.get(move.to);
-                        
                         game.move(move.san);
-                        
-                        // Tocar som do movimento
                         playMoveSound();
-                        
-                        // Destacar o movimento da IA
                         highlightMove(move.from, move.to);
                         
-                        if (capturedPiece) {
-                            const color = capturedPiece.color;
-                            const type = capturedPiece.type;
-                            debug("IA capturou:", color, type);
-                            capturedPieces[color].push(type);
-                            updateCapturedPieces();
-                        }
-
                         board.position(game.fen());
                         updateStatus();
                     } else {
-                        console.error("AI Minimax falhou em encontrar um movimento! Estado:", game.fen(), game.game_over());
+                        console.error("AI falhou em encontrar um movimento!");
                     }
-                    setThinkingStatus(false);
-                }, 400); // Delay pequeno
+                }, 400);
             }
         }
 
-        // Função setThinkingStatus (sem alterações)
         function setThinkingStatus(isThinking) {
             const statusElement = document.getElementById('status');
             if (isThinking) {
                 statusElement.textContent = "IA está pensando...";
             } else {
-                 updateStatus(); // Restaura o status normal
+                 updateStatus();
             }
         }
 
-        // Função auxiliar para obter o nome correto da peça para a URL da imagem
         function getPieceName(pieceName) {
             return pieceName.toUpperCase().slice(-1);
         }
 
-        // Função atualizada para exibir as peças capturadas
         function updateCapturedPieces() {
             const blackCaptured = document.getElementById('blackCaptured');
             const whiteCaptured = document.getElementById('whiteCaptured');
 
-            debug("Estado atual das peças capturadas:", JSON.stringify(capturedPieces, undefined, 4));
-            
             blackCaptured.innerHTML = '';
             whiteCaptured.innerHTML = '';
             
@@ -948,56 +1173,85 @@
             });
         }
 
-        // Função para remover highlights anteriores
+        function recalculateCapturedPieces() {
+            capturedPieces.w = [];
+            capturedPieces.b = [];
+            
+            const startingCounts = {
+                p: 8, n: 2, b: 2, r: 2, q: 1
+            };
+            
+            const currentCounts = {
+                w: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+                b: { p: 0, n: 0, b: 0, r: 0, q: 0 }
+            };
+            
+            const boardState = game.board();
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const piece = boardState[i][j];
+                    if (piece && piece.type !== 'k') {
+                        currentCounts[piece.color][piece.type]++;
+                    }
+                }
+            }
+            
+            for (const type in startingCounts) {
+                const missingW = startingCounts[type] - currentCounts.w[type];
+                for (let k = 0; k < missingW; k++) {
+                    capturedPieces.w.push(type);
+                }
+                const missingB = startingCounts[type] - currentCounts.b[type];
+                for (let k = 0; k < missingB; k++) {
+                    capturedPieces.b.push(type);
+                }
+            }
+            
+            updateCapturedPieces();
+        }
+
         function removeHighlights() {
             $('#myBoard .square-55d63').removeClass('highlight-white');
             $('#myBoard .square-55d63').removeClass('highlight-black');
         }
 
-        // Função para destacar um movimento
         function highlightMove(source, target) {
             removeHighlights();
             $('#myBoard .square-' + source).addClass('highlight-white');
             $('#myBoard .square-' + target).addClass('highlight-black');
         }
 
-        // Função para remover highlights de movimentos possíveis
         function removeLegalMoveHighlights() {
             $('#myBoard .square-55d63').removeClass('highlight-legal-move');
         }
 
-        // Função para mostrar movimentos possíveis
         function showLegalMoves(square) {
-            // Obter movimentos possíveis para a peça
             const moves = game.moves({
                 square: square,
                 verbose: true
             });
-
-            // Destacar cada movimento possível
             moves.forEach(move => {
                 $(`#myBoard .square-${move.to}`).addClass('highlight-legal-move');
             });
         }
 
-        // Modificar a função onDragStart para mostrar movimentos possíveis
+        // --- Handlers de Drag and Drop ---
         function onDragStart(source, piece, position, orientation) {
-            // Remover highlights anteriores
             removeLegalMoveHighlights();
             
-            // Não permitir mover se o jogo acabou ou não é a vez do jogador
             if (game.game_over() || game.turn() !== playerColor || piece.search(/^b/) !== -1) {
                 return false;
             }
-
-            // Mostrar movimentos possíveis
             showLegalMoves(source);
         }
 
-        // Modificar a função onDrop para limpar os highlights
         function onDrop(source, target) {
-            // Remover highlights de movimentos possíveis
             removeLegalMoveHighlights();
+
+            // Desativa controles de replay ao fazer jogada manual
+            document.getElementById('replayControls').style.display = 'none';
+            replayMoves = [];
+            replayIndex = -1;
 
             const capturedPiece = game.get(target);
             
@@ -1009,25 +1263,13 @@
 
             if (move === null) return 'snapback';
 
-            // Tocar som do movimento
             playMoveSound();
-
-            // Destacar o movimento do jogador
             highlightMove(source, target);
-
-            if (capturedPiece) {
-                const color = capturedPiece.color;
-                const type = capturedPiece.type;
-                debug("Peça capturada:", color, type);
-                capturedPieces[color].push(type);
-                updateCapturedPieces();
-            }
 
             updateStatus();
             
             if (!game.game_over() && game.turn() === aiColor) {
-                // Adiciona delay consistente para os primeiros movimentos
-                if (game.history().length <= 4) { // Primeiros 2 lances de cada lado
+                if (game.history().length <= 4) {
                     setTimeout(() => {
                         const possibleMoves = game.moves();
                         const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
@@ -1035,7 +1277,6 @@
                         game.move(randomMove);
                         playMoveSound();
                         
-                        // Destacar o movimento aleatório da IA
                         const lastMove = game.history({verbose: true})[game.history().length - 1];
                         highlightMove(lastMove.from, lastMove.to);
                         
@@ -1048,18 +1289,16 @@
             }
         }
 
-        // Atualiza o status do jogo (turno, xeque, etc.)
+        // --- Status Tracker ---
         function updateStatus() {
             let status = '';
             let gameEnded = false;
 
             if (game.in_checkmate()) {
-                // Verifica quem ganhou
                 const winner = game.turn() === 'w' ? 'Pretas' : 'Brancas';
                 status = `Fim de jogo, ${winner} venceram por xeque-mate`;
                 gameEnded = true;
                 
-                // Toca o som apropriado
                 if (winner === 'Brancas') {
                     victorySound.play().catch(error => debug("Erro ao tocar som de vitória:", error));
                 } else {
@@ -1096,13 +1335,120 @@
 
             document.getElementById('turn').textContent = status;
             
-            // Se o jogo acabou, desabilita o tabuleiro
+            // Destaque de rei em xeque
+            $('#myBoard .square-55d63').removeClass('highlight-check');
+            if (game.in_check()) {
+                const kingSquare = findKing(game.turn());
+                if (kingSquare) {
+                    $(`#myBoard .square-${kingSquare}`).addClass('highlight-check');
+                }
+            }
+            
+            recalculateCapturedPieces();
+            
             if (gameEnded) {
                 board.draggable = false;
+                clearArrow();
+            } else {
+                board.draggable = true;
+                requestAnalysis();
             }
         }
 
-        // Configuração inicial do chessboardjs
+        // --- Replay de Histórico PGN/FEN ---
+        let replayMoves = [];
+        let replayIndex = -1;
+
+        function updateReplayStatus() {
+            document.getElementById('replayStatus').textContent = `Lance ${replayIndex + 1}/${replayMoves.length}`;
+        }
+
+        document.getElementById('loadPartidaBtn').addEventListener('click', function() {
+            const input = document.getElementById('importInput').value.trim();
+            if (!input) return;
+
+            const tempGame = new Chess();
+            
+            // 1. Tentar como FEN
+            if (tempGame.load(input)) {
+                game = tempGame;
+                board.position(game.fen());
+                document.getElementById('replayControls').style.display = 'none';
+                updateStatus();
+                return;
+            }
+
+            // 2. Tentar como PGN
+            if (tempGame.load_pgn(input)) {
+                replayMoves = tempGame.history({ verbose: true });
+                replayIndex = -1; // Começa no início do replay
+                
+                game = new Chess();
+                board.position(game.fen());
+                
+                document.getElementById('replayControls').style.display = 'flex';
+                updateReplayStatus();
+                updateStatus();
+                return;
+            }
+
+            alert('Formato posicional (FEN) ou histórico (PGN) inválido!');
+        });
+
+        document.getElementById('prevMoveBtn').addEventListener('click', function() {
+            if (replayIndex >= 0) {
+                game.undo();
+                replayIndex--;
+                board.position(game.fen());
+                updateReplayStatus();
+                updateStatus();
+            }
+        });
+
+        document.getElementById('nextMoveBtn').addEventListener('click', function() {
+            if (replayIndex < replayMoves.length - 1) {
+                replayIndex++;
+                game.move(replayMoves[replayIndex].san);
+                board.position(game.fen());
+                updateReplayStatus();
+                updateStatus();
+            }
+        });
+
+        document.getElementById('copyFenBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText(game.fen());
+            alert('FEN copiada para a área de transferência!');
+        });
+
+        document.getElementById('exportPgnBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText(game.pgn());
+            alert('Histórico PGN copiado para a área de transferência!');
+        });
+
+        // --- Customizador de Temas Visuais (Skins) ---
+        document.getElementById('themeSelect').addEventListener('change', function(e) {
+            const theme = e.target.value;
+            
+            // Remove classes antigas do body
+            document.body.classList.remove('theme-wood', 'theme-glass', 'theme-cyber');
+            document.body.classList.add(`theme-${theme}`);
+            
+            // Atualizar cores da seta baseadas no tema
+            const arrowHead = document.querySelector('#arrowhead polygon');
+            const arrowLine = document.getElementById('bestMoveLine');
+            if (theme === 'cyber') {
+                arrowHead.setAttribute('fill', '#00f5d4');
+                arrowLine.setAttribute('stroke', '#00f5d4');
+            } else if (theme === 'glass') {
+                arrowHead.setAttribute('fill', '#ffffff');
+                arrowLine.setAttribute('stroke', '#ffffff');
+            } else {
+                arrowHead.setAttribute('fill', '#ff9800');
+                arrowLine.setAttribute('stroke', '#ff9800');
+            }
+        });
+
+        // --- Configuração Chessboard.js ---
         var config = {
             draggable: true,
             position: 'start',
@@ -1113,24 +1459,25 @@
             },
             onMouseoutSquare: removeLegalMoveHighlights,
             onMouseoverSquare: function(square, piece) {
-                // Mostrar movimentos possíveis apenas se for uma peça do jogador
                 if (piece && piece.charAt(0) === playerColor) {
                     showLegalMoves(square);
                 }
             },
             pieceTheme: '../assets/images/{piece}.png'
-            //pieceTheme: 'https://chessboardjs.com/img/chesspieces/alpha/{piece}.png'
-            //pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         };
 
-        board = Chessboard('myBoard', config); // Inicializa o tabuleiro
+        board = Chessboard('myBoard', config);
 
-        // --- Event Listeners ---
+        // --- Event Listeners Globais ---
         document.getElementById('newGameButton').addEventListener('click', function() {
             game = new Chess();
             board.position('start');
             board.draggable = true;
-            loadingOverlay.classList.remove('active');
+            document.getElementById('replayControls').style.display = 'none';
+            replayMoves = [];
+            replayIndex = -1;
+            bestMoveRecommended = null;
+            
             capturedPieces.w = [];
             capturedPieces.b = [];
             updateCapturedPieces();
@@ -1143,18 +1490,25 @@
 
         document.getElementById('difficulty').addEventListener('change', function(e) {
             currentDifficultyDepth = parseInt(e.target.value);
-            //console.log("Dificuldade alterada para Profundidade: " + currentDifficultyDepth);
-            // Opcional: Reiniciar o jogo ao mudar a dificuldade?
-            // game = new Chess();
-            // board.position('start');
-            // updateStatus();
+        });
+
+        document.getElementById('toggleHintsBtn').addEventListener('click', function() {
+            showComputerHints = !showComputerHints;
+            if (showComputerHints) {
+                this.textContent = '💡 Dicas: Ligadas';
+                if (bestMoveRecommended && game.turn() === playerColor && !game.game_over()) {
+                    drawBestMoveArrow(bestMoveRecommended.from, bestMoveRecommended.to);
+                }
+            } else {
+                this.textContent = '💡 Dicas: Desligadas';
+                clearArrow();
+            }
         });
 
         // --- Inicialização ---
-        $(window).resize(board.resize); // Torna o tabuleiro responsivo se a janela mudar de tamanho
-        updateStatus(); // Define o status inicial
-
+        $(window).resize(board.resize);
+        initStockfish();
+        updateStatus();
     </script>
-
 </body>
 </html>

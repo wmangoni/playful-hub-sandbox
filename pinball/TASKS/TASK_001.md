@@ -386,3 +386,36 @@ O gerador de partículas atual `createParticles` será refinado para gerar faís
 **Com este nível de detalhamento técnico e modelagem arquitetural, a especificação da TASK-PINBALL está formalmente concluída e perfeitamente estruturada para o início do desenvolvimento.**
 
 *Assinado: Tech Lead do Playful Hub*
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev Complete)
+
+**Arquivo alterado**: `pinball/index.html` (Canvas 2D, game loop `requestAnimationFrame`). Adições marcadas com `TASK_001:`.
+
+### Identidade visual (Synthwave / Cyberpunk Neon)
+*   **Fontes**: `Press Start 2P` + `Orbitron` (Google Fonts, com fallback gracioso se a CDN for bloqueada).
+*   **Moldura do canvas**: borda `#1a1b26` arredondada (16px) com dupla sombra neon (rosa + ciano) e sombra interna.
+*   **HUD Glassmorphism** (`#gameInfo`): fundo translúcido `rgba(18,19,32,0.65)` + `backdrop-filter: blur(12px) saturate(180%)`, borda clara, score em dourado neon e demais valores em ciano (`text-shadow` glow). `<h1>` em Press Start 2P magenta.
+*   **Paleta neon** aplicada a bumpers (`#ff2e97`/`#ffcc00`/`#39ff14`/`#00f0ff`) e zonas multiplicadoras.
+
+### Mecânicas visuais implementadas
+1.  **Rastro da bola (Ghost Trail)**: `ball.trail` (lista circular de 12 posições) alimentada no `update()` e limpa nos resets; `drawBall()` renderiza círculos ciano decrescentes + bola cromada com reflexo radial e glow neon.
+2.  **Bumpers com bloom elástico**: `drawBumpers()` expande o raio (×1.25) e intensifica `shadowBlur` (até 40) no impacto, decaindo por `hitTimer/BUMPER_HIT_DURATION`; gradiente radial branco→cor→sombra + borda branca no hit.
+3.  **Zonas holográficas de laser**: `drawMultiplierZones()` com preenchimento pulsante (senoidal via `performance.now()`), linha pontilhada **rastejante** (`lineDashOffset` animado) com glow, e texto `Orbitron` 900.
+4.  **Partículas neon (velocity stretching)**: `createParticles()`/`drawParticles()` refeitos — faíscas alongadas no vetor de velocidade, `shadowBlur` colorido, gravidade sutil e decaimento por frame.
+5.  **Launcher sci-fi**: plunger/mola com degradê cromado; **Power Meter** como equalizador de **10 LEDs segmentados** (verde→dourado→magenta) que acendem com glow conforme a carga.
+6.  **Score Bump**: `updateScoreDisplay()` aplica `@keyframes scoreBumpAnimation` ao `#score` a cada incremento (escala + flash magenta).
+7.  **Overlays premium**: Game Over em Press Start 2P magenta + placar Orbitron dourado; Instruções com **scanlines CRT**, logo neon pulsante e tipografia retro. Paredes e flippers ganharam borda/glow neon ciano.
+
+### ✅ Verificação local (preview headless — funções globais do script clássico)
+*   Carrega sem erros; `ball.trail` (max 12) presente; bumpers nas cores neon; HUD com `backdrop-filter: blur(12px) saturate(1.8)` e fonte Press Start 2P; canvas `border-radius 16px`.
+*   `createParticles('#ff2e97')` ⇒ 10 partículas com `vx`, `alpha=1`, `decay` por-frame, RGB `[255,46,151]` (hex convertido).
+*   `ball.trail` popula ao rodar `update()` com a bola lançada.
+*   Pipeline completo `draw()` (com bumper em bloom + LEDs do power meter) + `drawGameOver()` + `drawInstructions()` executa **sem lançar exceção**.
+*   `score-bump` aplicado ao `#score` quando a pontuação aumenta. **Zero erros no console.**
+
+> Nota: `preview_screenshot` expira neste ambiente headless (loop `requestAnimationFrame`) — limitação do harness. Verificação feita dirigindo as funções globais de desenho/lógica e inspecionando estado/estilos computados.
+
+*Status: 🚀 Dev complete — pronto para Code Review (TL).*
+*Responsável: Programador Sênior (Agente Dev)*

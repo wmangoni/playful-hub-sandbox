@@ -156,6 +156,74 @@
         }
         .legend span { display: inline-flex; align-items: center; gap: 5px; }
         .legend .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+
+        /* === TASK_003: Modo Desafio, Eventos de Caos e Áudio Generativo === */
+        .panel {
+            margin-top: 16px;
+            background: #0d1426;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #e2e8f0;
+            max-width: 620px;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.12);
+        }
+        .panel h3 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            letter-spacing: 1px;
+            color: #00e5ff;
+            text-align: center;
+        }
+        .panel-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Seletor de modo */
+        .mode-btn { background-color: #334155; }
+        .mode-btn.active { background-color: #00bcd4; box-shadow: 0 0 12px rgba(0, 243, 255, 0.7); }
+        .level-btn { background-color: #475569; min-width: 70px; }
+        .level-btn.active { background-color: #7c3aed; box-shadow: 0 0 12px rgba(124, 58, 237, 0.8); }
+        #challenge-controls { display: none; flex-direction: column; gap: 10px; margin-top: 10px; }
+        #challenge-controls.visible { display: flex; }
+
+        .challenge-hud {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            background: #070d1c;
+            border: 1px solid rgba(124, 58, 237, 0.35);
+            border-radius: 6px;
+            padding: 10px;
+        }
+        .challenge-hud .hud-item { text-align: center; }
+        .challenge-hud .hud-label { font-size: 10px; color: #8fa3c7; text-transform: uppercase; letter-spacing: 0.5px; }
+        .challenge-hud .hud-value { font-size: 16px; font-weight: bold; color: #fff; }
+        .challenge-desc { font-size: 12px; color: #aab6cf; text-align: center; line-height: 1.5; }
+        .challenge-state { font-size: 18px; font-weight: bold; text-align: center; letter-spacing: 1px; }
+        .challenge-state.playing { color: #00e5ff; }
+        .challenge-state.won { color: #34d399; text-shadow: 0 0 12px rgba(52, 211, 153, 0.8); }
+        .challenge-state.lost { color: #f87171; text-shadow: 0 0 12px rgba(248, 113, 113, 0.8); }
+        #retry-challenge-btn { background-color: #7c3aed; }
+        #retry-challenge-btn:hover { background-color: #6d28d9; }
+
+        /* Eventos de caos */
+        .chaos-field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+        .chaos-field input[type="range"] { width: 90px; }
+        #cosmic-ray-btn { background-color: #f59e0b; color: #1a1a1a; }
+        #cosmic-ray-btn:hover { background-color: #d97706; }
+        .switch-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+
+        /* Áudio */
+        #audio-toggle-btn { background-color: #ec4899; }
+        #audio-toggle-btn.muted { background-color: #64748b; }
+        #audio-toggle-btn:hover { background-color: #db2777; }
     </style>
 </head>
 <body>
@@ -223,6 +291,61 @@
         <span><span class="swatch" style="background:rgba(138,43,226,0.5)"></span> Rastro de morte</span>
     </div>
 
+    <!-- === TASK_003: Modo Desafio (Puzzles de Autômatos) === -->
+    <div class="panel" id="challenge-panel">
+        <h3>🎯 Modo de Jogo</h3>
+        <div class="panel-row">
+            <button class="mode-btn active" id="mode-free-btn">🌌 Simulação Livre</button>
+            <button class="mode-btn" id="mode-challenge-btn">🧩 Modo Desafio</button>
+        </div>
+        <div id="challenge-controls">
+            <div class="panel-row">
+                <button class="level-btn" data-level="1">Nível 1</button>
+                <button class="level-btn" data-level="2">Nível 2</button>
+                <button class="level-btn" data-level="3">Nível 3</button>
+                <button id="retry-challenge-btn">↻ Tentar Novamente</button>
+            </div>
+            <p class="challenge-desc" id="challenge-desc">Selecione um nível para começar.</p>
+            <div class="challenge-hud">
+                <div class="hud-item"><div class="hud-label">Células</div><div class="hud-value" id="hud-placements">0 / 0</div></div>
+                <div class="hud-item"><div class="hud-label">Geração</div><div class="hud-value" id="hud-generation">0 / 0</div></div>
+                <div class="hud-item"><div class="hud-label">População</div><div class="hud-value" id="hud-population">0</div></div>
+            </div>
+            <div class="challenge-state playing" id="challenge-state">— selecione um nível —</div>
+        </div>
+    </div>
+
+    <!-- === TASK_003: Eventos Ambientais (Chaos Events) === -->
+    <div class="panel" id="chaos-panel">
+        <h3>🌪️ Eventos Ambientais</h3>
+        <div class="panel-row">
+            <label class="switch-label"><input type="checkbox" id="cosmic-auto-toggle"> ☄️ Raio Cósmico (auto)</label>
+            <button id="cosmic-ray-btn">⚡ Disparar Raio</button>
+            <div class="chaos-field">
+                <label for="cosmic-intensity">Intensidade</label>
+                <input type="range" id="cosmic-intensity" min="0" max="100" value="50">
+                <span id="cosmic-intensity-val">50%</span>
+            </div>
+        </div>
+        <div class="panel-row" style="margin-top:10px;">
+            <label class="switch-label"><input type="checkbox" id="blackhole-toggle"> 🕳️ Buraco Negro (centro)</label>
+        </div>
+    </div>
+
+    <!-- === TASK_003: Música Generativa (Web Audio API) === -->
+    <div class="panel" id="audio-panel">
+        <h3>🎵 Música Generativa</h3>
+        <div class="panel-row">
+            <button id="audio-toggle-btn" class="muted">🔇 Áudio Desligado</button>
+            <div class="chaos-field">
+                <label for="volume-slider">Volume</label>
+                <input type="range" id="volume-slider" min="0" max="100" value="30">
+                <span id="volume-val">30%</span>
+            </div>
+        </div>
+        <p class="challenge-desc" style="margin-top:8px;">As colunas com células vivas tocam notas de uma escala pentatônica · células mais antigas têm prioridade melódica.</p>
+    </div>
+
     <div class="footer">
         <p>Selecione uma estrutura e clique no grid para posicioná-la (pré-visualização fantasma) · <strong>ESC</strong> cancela · clique simples alterna células.</p>
     </div>
@@ -250,6 +373,37 @@
             let selectedPattern = null;          // matriz do padrão em modo de posicionamento
             let hoverRow = -1, hoverCol = -1;    // célula sob o cursor
 
+            // === TASK_003: estado do Modo Desafio ===
+            let isChallengeMode = false;
+            let activeChallengeId = null;
+            let placedCellsCount = 0;
+            let challengeState = 'idle';   // 'idle' | 'playing' | 'won' | 'lost'
+            let prevSnapshot = null;       // grid da geração anterior (detecção still-life)
+            let prevSnapshot2 = null;      // grid de 2 gerações atrás (detecção oscilador período-2)
+
+            // === TASK_003: estado dos Eventos de Caos ===
+            let cosmicAutoEnabled = false;
+            let cosmicRayIntensity = 0.5;  // probabilidade de mutação (0..1)
+            let cosmicRayActive = false;
+            let cosmicRayX = -1;
+            let cosmicRayTimer = 0;        // contador regressivo de gerações p/ disparo automático
+            let isBlackHoleEnabled = false;
+            const blackHolePulledParticles = []; // partículas sugadas (estética)
+
+            // === TASK_003: motor de áudio generativo (Web Audio API) ===
+            let audioCtx = null;
+            let audioEnabled = false;
+            let soundVolume = 0.3;
+            let lastChordTime = 0;         // throttle (performance.now ms)
+            const MIN_CHORD_INTERVAL = 120; // ms mínimos entre acordes (anti-cacofonia)
+            // Escala pentatônica de Dó maior (Hz) — 16 graus em 4 oitavas
+            const PENTATONIC_FREQS = [
+                130.81, 146.83, 164.81, 196.00, 220.00,
+                261.63, 293.66, 329.63, 392.00, 440.00,
+                523.25, 587.33, 659.25, 783.99, 880.00,
+                1046.50
+            ];
+
             // UI elements
             const startBtn = document.getElementById('start-btn');
             const pauseBtn = document.getElementById('pause-btn');
@@ -263,7 +417,27 @@
             const ruleBirthEl = document.getElementById('rule-birth');
             const ruleSurvivalEl = document.getElementById('rule-survival');
             const applyRulesBtn = document.getElementById('apply-rules-btn');
-            
+
+            // === TASK_003: elementos de UI ===
+            const modeFreeBtn = document.getElementById('mode-free-btn');
+            const modeChallengeBtn = document.getElementById('mode-challenge-btn');
+            const challengeControls = document.getElementById('challenge-controls');
+            const levelButtons = document.querySelectorAll('.level-btn');
+            const retryChallengeBtn = document.getElementById('retry-challenge-btn');
+            const challengeDescEl = document.getElementById('challenge-desc');
+            const hudPlacementsEl = document.getElementById('hud-placements');
+            const hudGenerationEl = document.getElementById('hud-generation');
+            const hudPopulationEl = document.getElementById('hud-population');
+            const challengeStateEl = document.getElementById('challenge-state');
+            const cosmicAutoToggle = document.getElementById('cosmic-auto-toggle');
+            const cosmicRayBtn = document.getElementById('cosmic-ray-btn');
+            const cosmicIntensityEl = document.getElementById('cosmic-intensity');
+            const cosmicIntensityValEl = document.getElementById('cosmic-intensity-val');
+            const blackholeToggle = document.getElementById('blackhole-toggle');
+            const audioToggleBtn = document.getElementById('audio-toggle-btn');
+            const volumeSlider = document.getElementById('volume-slider');
+            const volumeValEl = document.getElementById('volume-val');
+
             // Initialize the grid
             function createEmptyGrid() {
                 return Array(rows).fill().map(() => Array(cols).fill(0));
@@ -346,6 +520,12 @@
 
                 // Silhueta do padrão (placement mode)
                 drawPatternPreview();
+
+                // TASK_003: zona alvo do desafio, buraco negro e raio cósmico
+                drawTargetZone();
+                drawBlackHole();
+                drawBlackHoleParticles();
+                drawCosmicRay();
             }
 
             // Count ALIVE neighbors for a cell (age >= 1)
@@ -364,6 +544,26 @@
 
             // Apply rules with aging + decay trail (B/S customizável)
             function nextGeneration() {
+                // TASK_003: snapshots p/ detecção de estabilidade (Modo Desafio nv.2)
+                prevSnapshot2 = prevSnapshot;
+                prevSnapshot = grid.map(row => row.slice());
+
+                // TASK_003: Nível 1 lança um Glider do canto sup-esq a cada 10 gerações
+                if (isChallengeMode && activeChallengeId === 1 &&
+                    CHALLENGES[1].spawnsGlider && generationCount % 10 === 0) {
+                    injectGlider(1, 1);
+                }
+
+                // TASK_003: Raio Cósmico automático (a cada 80-120 gerações)
+                if (cosmicAutoEnabled) {
+                    if (cosmicRayTimer <= 0) {
+                        triggerCosmicRay();
+                        cosmicRayTimer = 80 + Math.floor(Math.random() * 41);
+                    } else {
+                        cosmicRayTimer--;
+                    }
+                }
+
                 const newGrid = createEmptyGrid();
                 let population = 0;
 
@@ -392,9 +592,17 @@
                     }
                 }
 
+                // TASK_003: o Buraco Negro devora células antes de consolidar a grade
+                applyBlackHole(newGrid);
+
                 grid = newGrid;
                 generationCount++;
+                population = countPopulation(); // recontagem (buraco negro pode ter consumido)
                 updateStats(population);
+
+                // TASK_003: música generativa + avaliação do desafio
+                playGenerativeSound();
+                evaluateChallenge();
 
                 return population > 0; // ainda há vida?
             }
@@ -432,6 +640,8 @@
             
             // Start simulation
             function startSimulation() {
+                // TASK_003: no Modo Desafio só inicia se o puzzle estiver em jogo
+                if (isChallengeMode && challengeState !== 'playing') return;
                 if (!isRunning) {
                     isRunning = true;
                     startBtn.disabled = true;
@@ -487,6 +697,21 @@
                 const row = Math.floor(y / cellSize);
 
                 if (row < 0 || row >= rows || col < 0 || col >= cols) return;
+
+                // TASK_003: no Modo Desafio, células são "peças" pré-disparo com limite
+                if (isChallengeMode) {
+                    if (isRunning || challengeState !== 'playing') return; // travado durante a simulação
+                    const ch = CHALLENGES[activeChallengeId];
+                    if (!ch) return;
+                    if (grid[row][col] >= 1) return;                 // não desperdiça clique em célula viva
+                    if (placedCellsCount >= ch.maxPlacements) return; // limite de inserção atingido
+                    grid[row][col] = 1;
+                    placedCellsCount++;
+                    updateChallengeHUD();
+                    drawGrid();
+                    updateStats(countPopulation());
+                    return;
+                }
 
                 if (selectedPattern) {
                     placePatternAt(selectedPattern, row, col);
@@ -597,7 +822,386 @@
                 parseRules(`B${b}/S${s}`);
                 syncRuleInputs();
             }
-            
+
+            // =====================================================================
+            // === TASK_003 — MODO DESAFIO (Automata Puzzles) ======================
+            // =====================================================================
+
+            // Glider canônico (move-se na diagonal para baixo/direita), top-left em (top,left)
+            function injectGlider(top, left) {
+                const g = [[0, 1, 0], [0, 0, 1], [1, 1, 1]];
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 0; c < 3; c++) {
+                        if (g[r][c]) grid[(top + r + rows) % rows][(left + c + cols) % cols] = 1;
+                    }
+                }
+            }
+
+            // Compara apenas o conjunto de células VIVAS (ignora rastro de decay)
+            function gridsEqualLive(a, b) {
+                if (!a || !b) return false;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if ((a[r][c] >= 1 ? 1 : 0) !== (b[r][c] >= 1 ? 1 : 0)) return false;
+                    }
+                }
+                return true;
+            }
+
+            // Catálogo de desafios. NOTA DE ENGENHARIA: os limites de geração foram
+            // calibrados para que cada puzzle seja efetivamente vencível no grid 40x40
+            // (a especificação de referência era internamente inconsistente — ver dev notes).
+            const CHALLENGES = {
+                1: {
+                    name: "O Defletor de Glider",
+                    description: "Um Glider é lançado do canto superior-esquerdo a cada 10 gerações. Coloque até 4 células para guiá-lo até o alvo ciano 3x3 no canto inferior-direito. Inicie a simulação para disparar.",
+                    maxPlacements: 4,
+                    maxGenerations: 150,
+                    targetZone: { startRow: 32, endRow: 34, startCol: 32, endCol: 34 },
+                    spawnsGlider: true,
+                    init() {
+                        grid = createEmptyGrid();
+                        injectGlider(1, 1);
+                    },
+                    check() {
+                        const z = this.targetZone;
+                        for (let r = z.startRow; r <= z.endRow; r++) {
+                            for (let c = z.startCol; c <= z.endCol; c++) {
+                                if (grid[r] && grid[r][c] >= 1) return 'won';
+                            }
+                        }
+                        if (generationCount >= this.maxGenerations) return 'lost';
+                        return 'playing';
+                    }
+                },
+                2: {
+                    name: "O Estabilizador de Centelha",
+                    description: "Um oscilador instável pulsa no centro e nunca para sozinho. Adicione até 3 células para convertê-lo em estruturas estáticas (Still Lifes) — sem nenhuma célula mudando de estado — antes de 35 gerações.",
+                    maxPlacements: 3,
+                    maxGenerations: 35,
+                    targetZone: null,
+                    spawnsGlider: false,
+                    init() {
+                        grid = createEmptyGrid();
+                        const cy = Math.floor(rows / 2);
+                        const cx = Math.floor(cols / 2);
+                        // "Traffic-light" / blinkers: oscilam para sempre se não forem tratados.
+                        const seed = [
+                            [0, 1, 0, 0, 0, 1, 0],
+                            [0, 1, 0, 0, 0, 1, 0],
+                            [0, 1, 0, 0, 0, 1, 0]
+                        ];
+                        for (let r = 0; r < seed.length; r++) {
+                            for (let c = 0; c < seed[0].length; c++) {
+                                if (seed[r][c]) grid[cy - 1 + r][cx - 3 + c] = 1;
+                            }
+                        }
+                    },
+                    check() {
+                        const pop = countPopulation();
+                        // Vitória: padrão vivo idêntico ao da geração anterior (Still Life puro) e com vida.
+                        if (pop > 0 && gridsEqualLive(grid, prevSnapshot)) return 'won';
+                        if (generationCount >= this.maxGenerations) return 'lost';
+                        return 'playing';
+                    }
+                },
+                3: {
+                    name: "A Fábrica de Vida",
+                    description: "Desenhe uma semente fértil adicionando até 6 células. O objetivo é atingir uma população de pelo menos 50 células vivas simultâneas na geração 40. (Dica: padrões caóticos como o R-pentomino explodem em população.)",
+                    maxPlacements: 6,
+                    maxGenerations: 40,
+                    targetZone: null,
+                    spawnsGlider: false,
+                    targetPopulation: 50,
+                    init() {
+                        grid = createEmptyGrid();
+                    },
+                    check() {
+                        if (generationCount >= this.maxGenerations) {
+                            return countPopulation() >= this.targetPopulation ? 'won' : 'lost';
+                        }
+                        return 'playing';
+                    }
+                }
+            };
+
+            function setChallengeState(state) {
+                challengeState = state;
+                challengeStateEl.className = 'challenge-state ' + state;
+                const labels = {
+                    idle: '— selecione um nível —',
+                    playing: '▶ Jogando',
+                    won: '🏆 VITÓRIA!',
+                    lost: '💀 Derrota — tente novamente'
+                };
+                challengeStateEl.textContent = labels[state] || state;
+            }
+
+            function updateChallengeHUD() {
+                const ch = activeChallengeId ? CHALLENGES[activeChallengeId] : null;
+                if (!ch) {
+                    hudPlacementsEl.textContent = '0 / 0';
+                    hudGenerationEl.textContent = '0 / 0';
+                    hudPopulationEl.textContent = '0';
+                    return;
+                }
+                hudPlacementsEl.textContent = `${placedCellsCount} / ${ch.maxPlacements}`;
+                hudGenerationEl.textContent = `${generationCount} / ${ch.maxGenerations}`;
+                hudPopulationEl.textContent = countPopulation();
+            }
+
+            function startChallenge(id) {
+                stopSimulation();
+                activeChallengeId = id;
+                placedCellsCount = 0;
+                generationCount = 0;
+                prevSnapshot = null;
+                prevSnapshot2 = null;
+                const ch = CHALLENGES[id];
+                ch.init();
+                challengeDescEl.textContent = ch.description;
+                setChallengeState('playing');
+                levelButtons.forEach(b => b.classList.toggle('active', +b.dataset.level === id));
+                updateStats(countPopulation());
+                updateChallengeHUD();
+                drawGrid();
+            }
+
+            function resetChallenge() {
+                if (activeChallengeId) startChallenge(activeChallengeId);
+            }
+
+            // Avalia condição de vitória/derrota após cada geração no modo desafio
+            function evaluateChallenge() {
+                if (!isChallengeMode || !activeChallengeId || challengeState !== 'playing') return;
+                const result = CHALLENGES[activeChallengeId].check();
+                updateChallengeHUD();
+                if (result === 'won' || result === 'lost') {
+                    setChallengeState(result);
+                    stopSimulation();
+                }
+            }
+
+            function setGameMode(challenge) {
+                isChallengeMode = challenge;
+                stopSimulation();
+                modeFreeBtn.classList.toggle('active', !challenge);
+                modeChallengeBtn.classList.toggle('active', challenge);
+                challengeControls.classList.toggle('visible', challenge);
+                // Sair do posicionamento de padrões ao entrar no desafio
+                selectedPattern = null;
+                patternButtons.forEach(b => b.classList.remove('active-preview'));
+                if (challenge) {
+                    startChallenge(activeChallengeId || 1);
+                } else {
+                    activeChallengeId = null;
+                    setChallengeState('idle');
+                    clearGrid();
+                }
+            }
+
+            // =====================================================================
+            // === TASK_003 — EVENTOS DE CAOS (Chaos Physics Engine) ===============
+            // =====================================================================
+
+            function triggerCosmicRay() {
+                cosmicRayX = Math.floor(Math.random() * cols);
+                cosmicRayActive = true;
+                const strikeRow = Math.floor(Math.random() * (rows - 6)) + 3;
+                for (let r = strikeRow - 1; r <= strikeRow + 1; r++) {
+                    for (let c = cosmicRayX - 1; c <= cosmicRayX + 1; c++) {
+                        const row = (r + rows) % rows;
+                        const col = (c + cols) % cols;
+                        if (Math.random() < cosmicRayIntensity) {
+                            grid[row][col] = Math.random() > 0.5 ? 1 : 0;
+                        }
+                    }
+                }
+                drawGrid(); // feedback visual imediato (mesmo pausado)
+                setTimeout(() => { cosmicRayActive = false; if (!isRunning) drawGrid(); }, 200);
+            }
+
+            // Buraco negro: núcleo 2x2 no centro que devora células num raio de atração
+            function applyBlackHole(targetGrid) {
+                if (!isBlackHoleEnabled) return;
+                const bhRow = Math.floor(rows / 2);
+                const bhCol = Math.floor(cols / 2);
+                const pullRadius = 3;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const dist = Math.hypot(r - bhRow, c - bhCol);
+                        if (dist <= 1.5) {
+                            targetGrid[r][c] = 0; // núcleo: devora instantaneamente
+                        } else if (dist <= pullRadius && targetGrid[r][c] >= 1) {
+                            if (Math.random() < 0.40) {
+                                // partícula sugada em direção ao centro (estética)
+                                blackHolePulledParticles.push({
+                                    x: c * cellSize + cellSize / 2,
+                                    y: r * cellSize + cellSize / 2,
+                                    tx: bhCol * cellSize, ty: bhRow * cellSize, life: 1
+                                });
+                                targetGrid[r][c] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            function drawBlackHole() {
+                if (!isBlackHoleEnabled) return;
+                const cx = Math.floor(cols / 2) * cellSize + cellSize;
+                const cy = Math.floor(rows / 2) * cellSize + cellSize;
+                const t = performance.now() / 400;
+                ctx.save();
+                // Halo gravitacional
+                const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, cellSize * 4);
+                grad.addColorStop(0, 'rgba(168, 85, 247, 0.9)');
+                grad.addColorStop(0.4, 'rgba(124, 58, 237, 0.45)');
+                grad.addColorStop(1, 'rgba(124, 58, 237, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(cx - cellSize * 4, cy - cellSize * 4, cellSize * 8, cellSize * 8);
+                // Espiral neon
+                ctx.strokeStyle = 'rgba(216, 180, 254, 0.8)';
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#a855f7';
+                ctx.beginPath();
+                for (let a = 0; a < Math.PI * 6; a += 0.2) {
+                    const rad = a * 1.4;
+                    const x = cx + Math.cos(a + t) * rad;
+                    const y = cy + Math.sin(a + t) * rad;
+                    if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                // Núcleo
+                ctx.fillStyle = '#1a032e';
+                ctx.beginPath();
+                ctx.arc(cx, cy, cellSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            function drawBlackHoleParticles() {
+                for (let i = blackHolePulledParticles.length - 1; i >= 0; i--) {
+                    const p = blackHolePulledParticles[i];
+                    p.x += (p.tx - p.x) * 0.25;
+                    p.y += (p.ty - p.y) * 0.25;
+                    p.life -= 0.12;
+                    if (p.life <= 0) { blackHolePulledParticles.splice(i, 1); continue; }
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, p.life);
+                    ctx.fillStyle = '#e9d5ff';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = '#a855f7';
+                    ctx.fillRect(p.x, p.y, 3, 3);
+                    ctx.restore();
+                }
+            }
+
+            function drawCosmicRay() {
+                if (!cosmicRayActive || cosmicRayX < 0) return;
+                const x = cosmicRayX * cellSize + cellSize / 2;
+                ctx.save();
+                const grad = ctx.createLinearGradient(x - cellSize, 0, x + cellSize, 0);
+                grad.addColorStop(0, 'rgba(255, 255, 0, 0)');
+                grad.addColorStop(0.5, 'rgba(255, 255, 120, 0.85)');
+                grad.addColorStop(1, 'rgba(255, 255, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = '#fde047';
+                ctx.fillRect(x - cellSize, 0, cellSize * 2, canvas.height);
+                ctx.restore();
+            }
+
+            function drawTargetZone() {
+                if (!isChallengeMode || !activeChallengeId) return;
+                const zone = CHALLENGES[activeChallengeId].targetZone;
+                if (!zone) return;
+                ctx.save();
+                ctx.strokeStyle = '#00f3ff';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([4, 4]);
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(0, 243, 255, 0.8)';
+                const x = zone.startCol * cellSize;
+                const y = zone.startRow * cellSize;
+                const w = (zone.endCol - zone.startCol + 1) * cellSize;
+                const h = (zone.endRow - zone.startRow + 1) * cellSize;
+                ctx.strokeRect(x, y, w, h);
+                ctx.restore();
+            }
+
+            // =====================================================================
+            // === TASK_003 — MÚSICA GENERATIVA (Web Audio Synth Engine) ===========
+            // =====================================================================
+
+            function initAudio() {
+                if (audioCtx) return;
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) { audioCtx = null; }
+            }
+
+            function playGenerativeSound() {
+                if (!audioEnabled || soundVolume <= 0) return;
+                initAudio();
+                if (!audioCtx) return;
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const nowMs = performance.now();
+                if (nowMs - lastChordTime < MIN_CHORD_INTERVAL) return; // anti-cacofonia
+                lastChordTime = nowMs;
+
+                // Colunas ativas + idade máxima de cada uma
+                const activeCols = [];
+                for (let j = 0; j < cols; j++) {
+                    let maxAge = 0, hasAlive = false;
+                    for (let i = 0; i < rows; i++) {
+                        if (grid[i][j] >= 1) { hasAlive = true; if (grid[i][j] > maxAge) maxAge = grid[i][j]; }
+                    }
+                    if (hasAlive) activeCols.push({ colIndex: j, maxAge });
+                }
+                if (activeCols.length === 0) return;
+
+                activeCols.sort((a, b) => b.maxAge - a.maxAge); // ancestrais primeiro
+                const playLimit = Math.min(4, activeCols.length); // máx. 4 vozes
+                const now = audioCtx.currentTime;
+
+                for (let k = 0; k < playLimit; k++) {
+                    const freq = PENTATONIC_FREQS[activeCols[k].colIndex % PENTATONIC_FREQS.length];
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    const attack = 0.05, decay = 0.1, sustain = 0.2, release = 0.3;
+                    const noteVolume = soundVolume * 0.15; // atenua p/ evitar clipping
+                    gainNode.gain.setValueAtTime(0.0001, now);
+                    gainNode.gain.linearRampToValueAtTime(noteVolume, now + attack);
+                    gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, noteVolume * sustain), now + attack + decay);
+                    gainNode.gain.setValueAtTime(Math.max(0.0001, noteVolume * sustain), now + attack + decay + 0.1);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + attack + decay + 0.1 + release);
+
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + attack + decay + 0.1 + release + 0.05);
+                }
+            }
+
+            function toggleAudio() {
+                audioEnabled = !audioEnabled;
+                if (audioEnabled) {
+                    initAudio();
+                    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                    audioToggleBtn.textContent = '🔊 Áudio Ligado';
+                    audioToggleBtn.classList.remove('muted');
+                } else {
+                    audioToggleBtn.textContent = '🔇 Áudio Desligado';
+                    audioToggleBtn.classList.add('muted');
+                }
+            }
+
             // Event listeners
             startBtn.addEventListener('click', startSimulation);
             pauseBtn.addEventListener('click', stopSimulation);
@@ -662,6 +1266,34 @@
             ruleBirthEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyRulesFromInputs(); });
             ruleSurvivalEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyRulesFromInputs(); });
 
+            // === TASK_003: listeners de Modo Desafio ===
+            modeFreeBtn.addEventListener('click', () => setGameMode(false));
+            modeChallengeBtn.addEventListener('click', () => setGameMode(true));
+            levelButtons.forEach(btn => btn.addEventListener('click', () => startChallenge(+btn.dataset.level)));
+            retryChallengeBtn.addEventListener('click', resetChallenge);
+
+            // === TASK_003: listeners de Eventos de Caos ===
+            cosmicAutoToggle.addEventListener('change', function() {
+                cosmicAutoEnabled = this.checked;
+                cosmicRayTimer = 80 + Math.floor(Math.random() * 41);
+            });
+            cosmicRayBtn.addEventListener('click', () => { initAudio(); triggerCosmicRay(); });
+            cosmicIntensityEl.addEventListener('input', function() {
+                cosmicRayIntensity = parseInt(this.value) / 100;
+                cosmicIntensityValEl.textContent = this.value + '%';
+            });
+            blackholeToggle.addEventListener('change', function() {
+                isBlackHoleEnabled = this.checked;
+                drawGrid();
+            });
+
+            // === TASK_003: listeners de Áudio Generativo ===
+            audioToggleBtn.addEventListener('click', toggleAudio);
+            volumeSlider.addEventListener('input', function() {
+                soundVolume = parseInt(this.value) / 100;
+                volumeValEl.textContent = this.value + '%';
+            });
+
             // Hook de depuração/teste (TASK_002)
             window.__gol = {
                 getGrid: () => grid,
@@ -669,7 +1301,20 @@
                 nextGeneration, countNeighbors, getCellColor, parseRules, placePatternAt,
                 getRules: () => ({ birth: [...birthRules], survival: [...survivalRules] }),
                 patterns, createEmptyGrid,
-                rows, cols
+                rows, cols,
+                // === TASK_003: superfície de teste ===
+                CHALLENGES, setGameMode, startChallenge, resetChallenge, evaluateChallenge,
+                injectGlider, gridsEqualLive, triggerCosmicRay, applyBlackHole,
+                playGenerativeSound, toggleAudio, countPopulation,
+                setBlackHole: (v) => { isBlackHoleEnabled = v; },
+                setCosmicIntensity: (v) => { cosmicRayIntensity = v; },
+                setAudioEnabled: (v) => { audioEnabled = v; },
+                setVolume: (v) => { soundVolume = v; },
+                getChallengeInfo: () => ({
+                    isChallengeMode, activeChallengeId, placedCellsCount,
+                    challengeState, generationCount, population: countPopulation()
+                }),
+                getState: () => ({ generationCount, cosmicRayActive, isBlackHoleEnabled, audioEnabled })
             };
 
             // Initial draw

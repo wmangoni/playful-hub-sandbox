@@ -535,7 +535,6 @@
         let lives = 3;
         let level = 1;
         let notes = [];
-        let obstacles = [];
         let captureZones = [];
 
         // === TASK_002: estado do modo de música customizada / notas time-driven ===
@@ -580,7 +579,6 @@
             // Adicionar elementos do jogo se estiver ativo
             if (gameActive) {
                 updateNotes();
-                updateObstacles();
                 drawCaptureZones();
             }
 
@@ -764,88 +762,7 @@
         createStrings();
         animate();
 
-        // Função para gerar obstáculos
-        function startObstacleGenerator() {
-            const obstacleInterval = setInterval(() => {
-                if (!gameActive) {
-                    clearInterval(obstacleInterval);
-                    return;
-                }
-                
-                // Lógica para gerar obstáculos...
-                if (Math.random() < 0.1 + (level * 0.02)) {
-                    createObstacle();
-                }
-            }, 2000 - (level * 100));
-        }
-        
-        // Função para atualizar obstáculos
-        function updateObstacles() {
-            obstacles.forEach(obstacle => {
-                if (!obstacle.active) return;
-                
-                // Mover obstáculo
-                obstacle.x += obstacle.speed;
-                
-                // Verificar se passou da tela
-                if (obstacle.x > canvas.width) {
-                    obstacle.active = false;
-                }
-                
-                // Desenhar obstáculo
-                ctx.beginPath();
-                ctx.arc(obstacle.x, strings[obstacle.stringIndex].points[0].y, obstacle.radius, 0, Math.PI * 2);
-                ctx.fillStyle = 'red';
-                ctx.fill();
-                ctx.strokeStyle = 'darkred';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            });
-            
-            // Remover obstáculos inativos
-            obstacles = obstacles.filter(obstacle => obstacle.active);
-        }
-        
-        // Função para criar obstáculo
-        function createObstacle() {
-            const stringIndex = Math.floor(Math.random() * strings.length);
-            
-            obstacles.push({
-                stringIndex,
-                x: 0,
-                speed: 3 + (level * 0.3),
-                radius: 12,
-                active: true
-            });
-        }
 
-        // Função para quando um obstáculo é atingido (seja por clique ou por passar)
-        function hitObstacle(obstacle, clicked = false) {
-            // Tocar som de acerto de obstáculo
-            obstacleHitSound.currentTime = 0;
-            obstacleHitSound.play().catch(error => console.error("Erro ao tocar som de obstáculo:", error));
-
-            // Reduzir vida
-            lives--;
-
-            // Resetar combo
-            combo = 0;
-
-            // Mostrar feedback visual
-            const stringY = strings[obstacle.stringIndex].points[0].y;
-            showFeedback("HIT!", obstacle.x, stringY, "red");
-
-            // Desativar obstáculo
-            obstacle.active = false;
-
-            // Atualizar UI
-            updateScoreDisplay();
-
-            // Verificar game over
-            if (lives <= 0) {
-                gameOver();
-            }
-        }
 
         // Nota Mina atingida: -150 pts, zera combo, NÃO perde vida
         function hitMine(note) {
@@ -912,25 +829,6 @@
                         captureNote(note, Math.max(0, precisionFactor)); // Garante que precisão não seja negativa
                         return; // Sai após capturar uma nota
                     }
-                }
-            }
-
-            // Verificar cliques em obstáculos
-            for (let i = 0; i < obstacles.length; i++) {
-                const obstacle = obstacles[i];
-                if (!obstacle.active) continue;
-
-                // Obter a posição Y da corda
-                const stringY = strings[obstacle.stringIndex].points[0].y;
-
-                // Calcular a distância entre o clique e o obstáculo
-                const distance = Math.sqrt(Math.pow(x - obstacle.x, 2) + Math.pow(y - stringY, 2));
-
-                // Verificar se o clique foi próximo o suficiente do obstáculo
-                if (distance <= obstacle.radius * 1.5) { // Área de clique um pouco maior que o raio visual
-                    // Atingiu obstáculo com clique
-                    hitObstacle(obstacle, true); // Passa true para indicar que foi clicado
-                    return; // Sai após atingir um obstáculo
                 }
             }
 
@@ -1273,7 +1171,6 @@
             lives = 3;
             level = 1;
             notes = [];
-            obstacles = [];
             sparkles = [];
 
             if (customMode) {

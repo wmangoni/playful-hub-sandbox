@@ -429,3 +429,32 @@ Abaixo estão as definições oficiais de arquitetura homologadas para o desenvo
     * Criar um método utilitário `SoundSynth.playAlertTick(frequency)` acoplado à classe de áudio.
     * O tick de aviso de pressão deve tocar estritamente quando a parte inteira do segundo mudar de `4` para `3`, `3` para `2` e `2` para `1`.
     * Usar uma onda quadrada (`square`) de frequência `880Hz` suavizada por um envelope de ganho muito rápido (decay de `40ms`) a um volume extremamente contido (`0.03` de ganho) para simular um bip de radar tático sutil e estiloso.
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `tetris/index.html` sobre a base da TASK_002 (ghost piece, time attack, SoundSynth). Todos os critérios e decisões do TL atendidos e validados localmente (preview + testes da lógica via console). Nenhum erro de runtime.
+
+### O que foi entregue
+1.  **Curva de gravidade + Level Up**: `calculateDropInterval(lvl)` (fórmula exponencial clássica, cap de 50ms); nível sobe a cada 10 linhas; banner CSS `.level-up-banner` animado (`triggerLevelUpEffects`).
+2.  **T-Spin + Combo + Floating Texts**: `detectTSpin()` pela Regra dos 3 Cantos — robusta à matriz 4x4 e à rotação (acha o centro do T dinamicamente via `findTCenter` e checa os 4 cantos diagonais; bordas contam como apoio). Pontuação T-Spin (400/800/1200/1600 × nível), combo (`50·combo·nível`) e popups flutuantes (`spawnFloatingText`/`drawFloatingTexts`, desenhados em espaço de pixels com `setTransform` para não herdar a escala do canvas).
+3.  **Modo Sobrevivência**: opção no seletor; pré-popula 4–6 linhas de lixo (1 buraco aleatório cada); cronômetro de 12s no `update()`; ao zerar, `insertGarbageRow()` empurra tudo para cima e adiciona lixo na base (Game Over se transbordar o topo); bips de alerta nos segundos 3/2/1.
+
+### Decisões do TL implementadas
+*   **Wall Kicks** em `rotatePiece()`: tenta esquerda (−1), direita (+1) e floor kick (−1 em Y) antes de reverter.
+*   **Lixo cinza chumbo** `#424242` no índice `8` de `COLORS`.
+*   **`SoundSynth.playAlertTick(880)`**: onda quadrada, ganho 0.03, decay ~40ms. Adicionei também `playTSpin` (acorde ascendente).
+
+### Validações executadas (console, via hook `window.__tetris`)
+*   Gravidade: nível 1→1000ms, 2→793ms, 10→64ms, 20→50ms (cap).
+*   T-Spin: detectado em slot real de 3 cantos; ignora se último ato foi `move` ou se a peça não é T.
+*   Scoring: T-Spin Double = 1200×nível; combo encadeado soma `50·combo·nível`; combo zera ao não limpar linha; floating text criado.
+*   Lixo: pré-população de 5–6 linhas com 1 buraco cada; `insertGarbageRow` desloca o tabuleiro e adiciona lixo na base.
+*   Banner de Level Up injetado no DOM ao subir de nível.
+
+### Decisão de implementação (atenção do TL)
+*   **Detecção de T-Spin adaptada**: o exemplo do refinamento assumia matriz 3×3 com cantos fixos em (0,0)/(2,0)/(0,2)/(2,2). Como as `SHAPES` aqui são matrizes 4×4 com o T deslocado, implementei a detecção encontrando o **centro do T dinamicamente** e checando os 4 cantos diagonais ao redor dele — equivalente e robusto a rotações.
+*   **Bug latente corrigido**: o `update()` era chamado com `time=0` na 1ª frame, gerando `deltaTime` enorme/negativo (`0 - performance.now()`). Inofensivo para o `dropCounter`, mas corrompia o cronômetro de sobrevivência. Adicionei um clamp de `deltaTime` (descarta valores <0 ou >1000ms → 16ms), o que também previne saltos ao retomar a aba.
+*   **T-Spin pós-rotação**: hard drop e gravidade preservam o `lastAction='rotate'` (movimentos horizontais e a próxima peça o resetam), tornando os T-Spins viáveis e recompensadores.
+*   Hook `window.__tetris` deixado exposto (debug/QA), removível no cleanup.

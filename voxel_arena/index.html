@@ -6,11 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voxel Arena</title>
     <style>
+        /* TASK_001: tipografia ciber-medieval (fallback gracioso se a CDN bloquear) */
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Outfit:wght@400;700&display=swap');
+
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #111;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #05070a;
+            font-family: 'Outfit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             user-select: none;
         }
 
@@ -175,6 +178,237 @@
         .hidden {
             display: none !important;
         }
+
+        /* =====================================================================
+           === TASK_001 — HUD de Luxo Glassmorphism, Runas SVG & Modais Premium
+           ===================================================================== */
+
+        #hud-top { color: #e5c158; }
+        #timer {
+            font-family: 'Cinzel', serif;
+            letter-spacing: 4px;
+            text-shadow: 0 0 18px rgba(229, 193, 88, 0.5), 0 0 4px #000;
+        }
+        #wave-info { font-family: 'Outfit', sans-serif; letter-spacing: 2px; }
+
+        /* Barras com acabamento de vidro fosco + contorno dourado metálico */
+        .bar-container {
+            width: 320px;
+            height: 18px;
+            background: rgba(10, 14, 22, 0.6);
+            border: 1.5px solid rgba(211, 175, 55, 0.45);
+            border-radius: 4px;
+            transform: none;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.8), inset 0 0 6px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            overflow: hidden;
+        }
+        .bar-fill { box-shadow: 0 0 8px currentColor; }
+        #health-fill  { background: linear-gradient(90deg, #962626, #e74c3c); color: #e74c3c; }
+        #stamina-fill { background: linear-gradient(90deg, #1b5b82, #3498db); color: #3498db; }
+        #xp-fill      { background: linear-gradient(90deg, #c59b27, #f39c12); color: #f39c12; }
+
+        /* Slots de habilidade glassmorphism */
+        .skill-slot {
+            width: 65px;
+            height: 65px;
+            background: rgba(12, 17, 28, 0.85);
+            border: 2px solid rgba(211, 175, 55, 0.3);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: border-color 0.3s, transform 0.2s, box-shadow 0.3s;
+            overflow: visible;
+        }
+        .skill-slot:hover {
+            border-color: rgba(211, 175, 55, 0.8);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(211, 175, 55, 0.3);
+        }
+        .skill-slot svg {
+            width: 32px;
+            height: 32px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            filter: drop-shadow(0 0 6px currentColor);
+            transition: transform 0.3s;
+        }
+        .skill-slot:hover svg { transform: scale(1.15) rotate(5deg); }
+
+        /* Temas de cor por habilidade */
+        .skill-slot[data-skill="spin"] { color: #ffd700; }
+        .skill-slot[data-skill="dash"] { color: #00ffff; }
+        .skill-slot[data-skill="heal"] { color: #00ff88; }
+        .skill-slot[data-skill="ult"]  { color: #ff00ff; }
+
+        .key-hint {
+            top: auto;
+            bottom: -18px;
+            color: rgba(229, 193, 88, 0.7);
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            text-shadow: 0 0 4px #000;
+        }
+
+        /* Cooldown cônico sobre o ícone */
+        .skill-cooldown {
+            border-radius: 8px;
+            background: conic-gradient(rgba(5, 7, 10, 0.78) 0%, transparent 0%);
+        }
+
+        /* Flash luminoso ao zerar o cooldown */
+        .skill-slot.ready-pulse {
+            animation: flashGlow 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+        }
+        @keyframes flashGlow {
+            0%   { box-shadow: 0 0 0px currentColor; filter: brightness(1.0); transform: scale(1.0); }
+            30%  { box-shadow: 0 0 30px currentColor; filter: brightness(2.0); transform: scale(1.1); }
+            100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); filter: brightness(1.0); transform: scale(1.0); }
+        }
+
+        /* Modais glassmorphic */
+        .screen {
+            background: radial-gradient(circle, rgba(12, 17, 28, 0.95) 0%, rgba(5, 7, 10, 0.98) 100%);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+        h1 {
+            font-family: 'Cinzel', serif;
+            color: #e5c158;
+            text-shadow: 0 0 20px rgba(229, 193, 88, 0.4);
+            letter-spacing: 6px;
+        }
+        button {
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(135deg, #1b2234 0%, #0d121f 100%);
+            border: 1.5px solid rgba(229, 193, 88, 0.5);
+            border-radius: 6px;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        button:hover {
+            border-color: #e5c158;
+            background: linear-gradient(135deg, #242f49 0%, #131b2e 100%);
+            box-shadow: 0 0 20px rgba(229, 193, 88, 0.6);
+            transform: scale(1.05);
+        }
+
+        /* =====================================================================
+           === TASK_002 — Waves, Stamina Pulse & Draft Roguelite Modal
+           ===================================================================== */
+
+        /* Banner flutuante de onda */
+        #wave-banner {
+            position: absolute;
+            top: 28%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.6);
+            font-family: 'Cinzel', serif;
+            font-size: 72px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            color: #e5c158;
+            text-shadow: 0 0 30px rgba(229, 193, 88, 0.8), 0 0 8px #000;
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #wave-banner.show { animation: waveBannerAnim 2.2s ease-out forwards; }
+        @keyframes waveBannerAnim {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); filter: brightness(2); }
+            20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            35%  { transform: translate(-50%, -50%) scale(1.0); }
+            80%  { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.0); }
+        }
+        #wave-banner .wave-sub {
+            display: block;
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            letter-spacing: 4px;
+            color: #c0392b;
+            text-shadow: 0 0 12px rgba(231, 76, 60, 0.7);
+            margin-top: 6px;
+        }
+
+        /* Pulso vermelho de exaustão na barra de stamina */
+        .bar-container.exhausted { animation: staminaPulse 0.4s ease-in-out; }
+        @keyframes staminaPulse {
+            0%, 100% { border-color: rgba(211, 175, 55, 0.45); box-shadow: 0 0 10px rgba(0,0,0,0.8); }
+            50%      { border-color: #ff2a2a; box-shadow: 0 0 18px rgba(255, 42, 42, 0.9); }
+        }
+
+        /* Modal de Draft de Upgrades */
+        #upgrade-modal {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(6, 9, 15, 0.96) 0%, rgba(2, 3, 5, 0.99) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+        }
+        #upgrade-title-container { text-align: center; margin-bottom: 40px; }
+        #upgrade-title-container h1 { font-size: 44px; margin: 0; }
+        .level-badge {
+            background: linear-gradient(135deg, #ffd700, #b8860b);
+            color: #000; font-weight: bold;
+            padding: 6px 16px; border-radius: 20px; font-size: 16px;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+            display: inline-block; margin-bottom: 10px;
+            font-family: 'Outfit', sans-serif;
+        }
+        #cards-wrapper { display: flex; gap: 30px; perspective: 1000px; }
+        .upgrade-card {
+            width: 240px; height: 340px;
+            background: rgba(15, 20, 32, 0.75);
+            border: 2px solid rgba(211, 175, 55, 0.3);
+            border-radius: 12px; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            text-align: center; cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.02);
+            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), border-color 0.4s, box-shadow 0.4s;
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+        }
+        .upgrade-card:hover {
+            transform: translateY(-15px) rotateY(5deg);
+            border-color: rgba(229, 193, 88, 0.9);
+            box-shadow: 0 20px 40px rgba(229, 193, 88, 0.25), 0 0 30px rgba(229, 193, 88, 0.15);
+        }
+        .upgrade-card .icon-placeholder {
+            width: 60px; height: 60px; border-radius: 50%;
+            background: rgba(229, 193, 88, 0.1);
+            border: 1px solid rgba(229, 193, 88, 0.3);
+            display: flex; justify-content: center; align-items: center;
+            color: #e5c158; font-size: 28px; margin-top: 15px;
+            transition: background 0.3s;
+        }
+        .upgrade-card:hover .icon-placeholder {
+            background: rgba(229, 193, 88, 0.25);
+            box-shadow: 0 0 15px rgba(229, 193, 88, 0.4);
+        }
+        .upgrade-card h3 {
+            font-family: 'Cinzel', serif; color: #e5c158;
+            font-size: 20px; margin: 15px 0 10px 0; text-transform: uppercase;
+        }
+        .upgrade-card p {
+            font-family: 'Outfit', sans-serif; color: #bdc3c7;
+            font-size: 14px; line-height: 1.5; flex-grow: 1;
+        }
+        .upgrade-rarity {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+            font-weight: bold; color: #95a5a6; margin-bottom: 10px;
+        }
     </style>
     <script type="importmap">
         {
@@ -207,17 +441,27 @@
             </div>
         </div>
 
+        <div id="wave-banner"></div>
+
         <div id="skills-container">
-            <div class="skill-slot"><span class="key-hint">1</span>
+            <div class="skill-slot" data-skill="spin"><span class="key-hint">1</span>
+                <!-- Runa de redemoinho (Spin) -->
+                <svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-7.6 5.5" stroke-linecap="round"/><path d="M12 4l-3 1.5M12 4l1.5 3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.5"/></svg>
                 <div class="skill-cooldown"></div>
             </div>
-            <div class="skill-slot"><span class="key-hint">2</span>
+            <div class="skill-slot" data-skill="dash"><span class="key-hint">2</span>
+                <!-- Runa de impulso (Dash) -->
+                <svg viewBox="0 0 24 24"><path d="M4 7l6 5-6 5M11 7l6 5-6 5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <div class="skill-cooldown"></div>
             </div>
-            <div class="skill-slot"><span class="key-hint">3</span>
+            <div class="skill-slot" data-skill="heal"><span class="key-hint">3</span>
+                <!-- Runa de cura (Heal) -->
+                <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" stroke-linecap="round"/><circle cx="12" cy="12" r="9"/></svg>
                 <div class="skill-cooldown"></div>
             </div>
-            <div class="skill-slot"><span class="key-hint">4</span>
+            <div class="skill-slot" data-skill="ult"><span class="key-hint">4</span>
+                <!-- Runa de cataclisma (Ultimate) -->
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.2L21 9l-5 4.4L17.6 21 12 17.3 6.4 21 8 13.4 3 9l6.6-.8z" stroke-linejoin="round"/></svg>
                 <div class="skill-cooldown"></div>
             </div>
         </div>
@@ -234,6 +478,15 @@
         <button id="start-btn">Enter Arena</button>
     </div>
 
+    <!-- TASK_002: Modal de Draft Roguelite -->
+    <div id="upgrade-modal" class="hidden">
+        <div id="upgrade-title-container">
+            <div class="level-badge" id="level-badge">LEVEL UP</div>
+            <h1>Escolha seu Poder</h1>
+        </div>
+        <div id="cards-wrapper"></div>
+    </div>
+
     <div id="game-over-screen" class="screen hidden">
         <h1 id="go-title">Defeated</h1>
         <div id="bonus-selection" style="display: flex; gap: 20px;">
@@ -247,6 +500,216 @@
 
         // --- Game Constants ---
         const ARENA_SIZE = 100;
+
+        // =====================================================================
+        // === TASK_001 — Gerenciador de VFX dinâmicos (luzes + meshes temporários)
+        // === Descarte centralizado de geometria/material p/ evitar memory leaks.
+        // =====================================================================
+        const activeVFX = [];
+
+        function spawnDynamicSkillVFX(scene, playerPos, type) {
+            const vfxGroup = new THREE.Group();
+            vfxGroup.position.copy(playerPos);
+
+            let lightColor, lightIntensity, lightDistance, duration = 500;
+
+            if (type === 'spin') {
+                lightColor = 0xffd700; lightIntensity = 3.0; lightDistance = 18; duration = 300;
+                // Cilindro toroidal duplo girando em direções opostas
+                const mk = (r) => new THREE.Mesh(
+                    new THREE.TorusGeometry(r, 0.35, 8, 32),
+                    new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending })
+                );
+                const ringA = mk(5), ringB = mk(3.4);
+                ringA.rotation.x = -Math.PI / 2; ringB.rotation.x = -Math.PI / 2;
+                vfxGroup.add(ringA); vfxGroup.add(ringB);
+                vfxGroup.customUpdate = (dt, age) => {
+                    ringA.rotation.z += dt * 16; ringB.rotation.z -= dt * 22;
+                    ringA.scale.setScalar(1 + age * 1.6); ringB.scale.setScalar(1 + age * 1.2);
+                    ringA.material.opacity = 0.85 * (1 - age); ringB.material.opacity = 0.85 * (1 - age);
+                };
+            } else if (type === 'heal') {
+                lightColor = 0x00ff88; lightIntensity = 4.0; lightDistance = 14; duration = 600;
+                const partMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true });
+                const partGeo = new THREE.SphereGeometry(0.2, 6, 6);
+                const particles = [];
+                for (let i = 0; i < 12; i++) {
+                    const p = new THREE.Mesh(partGeo, partMat);
+                    const a = (i / 12) * Math.PI * 2;
+                    p.position.set(Math.cos(a) * 1.5, 0.2 * i, Math.sin(a) * 1.5);
+                    vfxGroup.add(p); particles.push(p);
+                }
+                vfxGroup.customUpdate = (dt, age) => {
+                    particles.forEach((p, idx) => {
+                        const a = (idx / 12) * Math.PI * 2 + age * Math.PI * 4;
+                        const rad = 1.5 - age * 0.5;
+                        p.position.x = Math.cos(a) * rad;
+                        p.position.z = Math.sin(a) * rad;
+                        p.position.y += dt * 4;
+                    });
+                    partMat.opacity = 1 - age;
+                };
+            } else if (type === 'ult') {
+                lightColor = 0xff00ff; lightIntensity = 6.0; lightDistance = 45; duration = 800;
+                const domeGeo = new THREE.SphereGeometry(1, 18, 18, 0, Math.PI * 2, 0, Math.PI / 2);
+                const domeMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+                const dome = new THREE.Mesh(domeGeo, domeMat);
+                vfxGroup.add(dome);
+                vfxGroup.customUpdate = (dt, age) => {
+                    dome.scale.setScalar(1 + age * 24);
+                    domeMat.opacity = 0.9 * (1 - Math.pow(age, 2));
+                };
+            } else { return null; }
+
+            const pLight = new THREE.PointLight(lightColor, lightIntensity, lightDistance, 1.5);
+            pLight.position.set(0, 1.5, 0);
+            vfxGroup.add(pLight);
+            scene.add(vfxGroup);
+
+            const entry = { group: vfxGroup, light: pLight, initialIntensity: lightIntensity, maxLife: duration, life: duration };
+            activeVFX.push(entry);
+            return entry;
+        }
+
+        // Rastro de "fantasmas" do Dash: 3 silhuetas semitransparentes que somem em ~150ms
+        function spawnDashGhosts(scene, playerMesh, fromPos, toPos) {
+            for (let i = 1; i <= 3; i++) {
+                const t = i / 4;
+                const ghost = playerMesh.clone(true);
+                ghost.position.lerpVectors(fromPos, toPos, t);
+                ghost.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = false; child.receiveShadow = false;
+                        child.material = new THREE.MeshBasicMaterial({
+                            color: 0x00ffff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending
+                        });
+                    }
+                });
+                scene.add(ghost);
+                activeVFX.push({ group: ghost, light: null, initialIntensity: 0, maxLife: 150, life: 150, isGhost: true });
+            }
+        }
+
+        function updateVFX(scene, dt) {
+            for (let i = activeVFX.length - 1; i >= 0; i--) {
+                const vfx = activeVFX[i];
+                vfx.life -= dt * 1000;
+                const age = Math.min(1, 1.0 - (vfx.life / vfx.maxLife));
+
+                if (vfx.group.customUpdate) vfx.group.customUpdate(dt, age);
+                if (vfx.isGhost) {
+                    vfx.group.traverse(c => { if (c.isMesh && c.material) c.material.opacity = 0.3 * (1 - age); });
+                }
+                if (vfx.light) vfx.light.intensity = vfx.initialIntensity * Math.cos(age * Math.PI / 2);
+
+                if (vfx.life <= 0) {
+                    scene.remove(vfx.group);
+                    vfx.group.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                            else child.material.dispose();
+                        }
+                    });
+                    activeVFX.splice(i, 1);
+                }
+            }
+        }
+
+        // =====================================================================
+        // === TASK_001 — Áudio sintetizado das habilidades (Web Audio API)
+        // === (TL aprovou na Dúvida #3). Criado sob gesto do usuário (Enter Arena).
+        // =====================================================================
+        let audioCtx = null;
+        function initSkillAudio() {
+            if (audioCtx) return;
+            try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+        }
+        function playSkillSound(type) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0.0001, now);
+            master.connect(audioCtx.destination);
+
+            if (type === 'dash') {
+                // ruído filtrado (whoosh)
+                const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.25, audioCtx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+                const src = audioCtx.createBufferSource(); src.buffer = buf;
+                const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 0.8;
+                src.connect(bp); bp.connect(master);
+                master.gain.linearRampToValueAtTime(0.25, now + 0.02);
+                master.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+                src.start(now); src.stop(now + 0.25);
+            } else if (type === 'heal') {
+                // arpejo harmônico ascendente senoidal
+                const notes = [392.0, 523.25, 659.25, 783.99];
+                notes.forEach((f, idx) => {
+                    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                    o.type = 'sine'; o.frequency.value = f;
+                    const t0 = now + idx * 0.08;
+                    g.gain.setValueAtTime(0.0001, t0);
+                    g.gain.linearRampToValueAtTime(0.18, t0 + 0.03);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+                    o.connect(g); g.connect(master); master.gain.setValueAtTime(1, now);
+                    o.start(t0); o.stop(t0 + 0.32);
+                });
+                master.gain.setValueAtTime(0.8, now);
+            } else if (type === 'ult') {
+                // dente-de-serra grave modulada
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                o.type = 'sawtooth'; o.frequency.setValueAtTime(70, now);
+                o.frequency.exponentialRampToValueAtTime(180, now + 0.4);
+                const lfo = audioCtx.createOscillator(); const lfoG = audioCtx.createGain();
+                lfo.frequency.value = 18; lfoG.gain.value = 25; lfo.connect(lfoG); lfoG.connect(o.frequency);
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.linearRampToValueAtTime(0.3, now + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+                o.connect(g); g.connect(master); master.gain.setValueAtTime(1, now);
+                o.start(now); lfo.start(now); o.stop(now + 0.85); lfo.stop(now + 0.85);
+            } else { // spin
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                o.type = 'triangle'; o.frequency.setValueAtTime(880, now);
+                o.frequency.exponentialRampToValueAtTime(1760, now + 0.18);
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.linearRampToValueAtTime(0.2, now + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+                o.connect(g); g.connect(master); master.gain.setValueAtTime(1, now);
+                o.start(now); o.stop(now + 0.27);
+            }
+        }
+
+        // =====================================================================
+        // === TASK_002 — Configuração de Inimigos, Ondas e Upgrades Roguelite
+        // =====================================================================
+        const ENEMY_CONFIG = {
+            basic:   { hp: 30,  speed: 6, damage: 5,  attackCd: 1.5, scale: 1.0, armor: 0x1f0d3d, flesh: 0x2d1b4e, eye: 0xff0000, xp: 15 },
+            brute:   { hp: 120, speed: 3, damage: 15, attackCd: 1.5, scale: 1.8, armor: 0x4a0a0a, flesh: 0x2a0606, eye: 0xffcc00, xp: 40 },
+            stalker: { hp: 25,  speed: 9, damage: 6,  attackCd: 0.8, scale: 0.7, armor: 0x052410, flesh: 0x031a0a, eye: 0x00ffff, xp: 20 }
+        };
+
+        const WAVE_CONFIG = {
+            1: { duration: 60, spawnInterval: 3.0, maxEnemies: 8,  ratios: { basic: 1.0, brute: 0.0, stalker: 0.0 }, elite: false },
+            2: { duration: 60, spawnInterval: 2.5, maxEnemies: 12, ratios: { basic: 0.8, brute: 0.2, stalker: 0.0 }, elite: true  },
+            3: { duration: 60, spawnInterval: 2.0, maxEnemies: 15, ratios: { basic: 0.6, brute: 0.2, stalker: 0.2 }, elite: true  },
+            4: { duration: 60, spawnInterval: 1.5, maxEnemies: 18, ratios: { basic: 0.4, brute: 0.3, stalker: 0.3 }, elite: true  },
+            5: { duration: 60, spawnInterval: 1.0, maxEnemies: 25, ratios: { basic: 0.3, brute: 0.35, stalker: 0.35 }, elite: true }
+        };
+        const MAX_ORBS = 40;
+
+        const UPGRADE_POOL = [
+            { id: 'blade',  name: 'Lâmina do Caçador', icon: '⚔️', rarity: 'Comum',   desc: 'Dano de ataque básico +15%.',                  apply: p => { p.damageMultiplier *= 1.15; } },
+            { id: 'armor',  name: 'Armadura do Gigante', icon: '🛡️', rarity: 'Raro',  desc: 'HP Máximo +20 e cura instantânea de +40 HP.',  apply: p => { p.stats.maxHp += 20; p.stats.hp = Math.min(p.stats.maxHp, p.stats.hp + 40); } },
+            { id: 'wind',   name: 'Manto do Vento',  icon: '🌬️', rarity: 'Comum',     desc: 'Velocidade de movimento +12%.',                 apply: p => { p.speedMultiplier *= 1.12; } },
+            { id: 'focus',  name: 'Foco Rúnico',     icon: '🔮', rarity: 'Comum',     desc: 'Regeneração de Stamina +25%.',                  apply: p => { p.staminaRegenBonus *= 1.25; } },
+            { id: 'spin',   name: 'Fúria Giratória', icon: '🌀', rarity: 'Raro',      desc: 'Cooldown do Spin Attack -20%.',                 apply: p => { p.skills[0].cdMult *= 0.80; } },
+            { id: 'dash',   name: 'Estela Relâmpago', icon: '⚡', rarity: 'Raro',     desc: 'Alcance do Dash +25% e cooldown -15%.',         apply: p => { p.dashRangeMult *= 1.25; p.skills[1].cdMult *= 0.85; } },
+            { id: 'heal',   name: 'Cálice Divino',   icon: '✨', rarity: 'Épico',     desc: 'Eficácia da cura do Heal +30%.',                apply: p => { p.healMult *= 1.30; } },
+            { id: 'ult',    name: 'Cúpula Solar',    icon: '☀️', rarity: 'Épico',     desc: 'Raio e dano da Ultimate +25%.',                 apply: p => { p.ultMult *= 1.25; } }
+        ];
 
         // --- Classes ---
 
@@ -293,16 +756,48 @@
                 this.createEnvironment();
             }
 
+            // TASK_001: textura procedural de basalto vulcânico (canvas dinâmico, sem assets externos)
+            createFloorTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                const c = canvas.getContext('2d');
+                c.fillStyle = '#0f131a';
+                c.fillRect(0, 0, 512, 512);
+                for (let i = 0; i < 8000; i++) {
+                    const x = Math.random() * 512, y = Math.random() * 512;
+                    const size = 1 + Math.random() * 3;
+                    const b = Math.random() * 12;
+                    c.fillStyle = `rgba(${b + 10}, ${b + 15}, ${b + 22}, ${0.1 + Math.random() * 0.15})`;
+                    c.fillRect(x, y, size, size);
+                }
+                c.strokeStyle = 'rgba(211, 175, 55, 0.08)';
+                c.lineWidth = 2;
+                for (let i = 0; i <= 512; i += 64) {
+                    c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 512); c.stroke();
+                    c.beginPath(); c.moveTo(0, i); c.lineTo(512, i); c.stroke();
+                }
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(8, 8);
+                return tex;
+            }
+
             createFloor() {
                 const geo = new THREE.PlaneGeometry(ARENA_SIZE, ARENA_SIZE);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x3a5f0b, roughness: 0.8 }); // Darker green
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x141923, roughness: 0.95, metalness: 0.1,
+                    map: this.createFloorTexture()
+                });
                 this.mesh = new THREE.Mesh(geo, mat);
                 this.mesh.rotation.x = -Math.PI / 2;
                 this.mesh.receiveShadow = true;
                 this.scene.add(this.mesh);
 
-                // Grid helper for style
-                const grid = new THREE.GridHelper(ARENA_SIZE, 20, 0x444444, 0x333333);
+                // Grade de runas de confinamento em ciano escuro semitransparente
+                const grid = new THREE.GridHelper(ARENA_SIZE, 20, 0x0e7a8c, 0x0a3a44);
+                grid.material.transparent = true;
+                grid.material.opacity = 0.35;
+                grid.position.y = 0.02;
                 this.scene.add(grid);
             }
 
@@ -310,7 +805,7 @@
                 const wallHeight = 10;
                 const halfSize = ARENA_SIZE / 2;
                 const wallGeo = new THREE.BoxGeometry(ARENA_SIZE, wallHeight, 2);
-                const wallMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f1320, roughness: 0.9, metalness: 0.15 });
 
                 const walls = [
                     { pos: [0, wallHeight / 2, -halfSize], rot: 0 },
@@ -331,9 +826,9 @@
             createEnvironment() {
                 // Trees
                 const treeGeo = new THREE.BoxGeometry(1, 4, 1);
-                const treeMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const treeMat = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 0.95 }); // dead bark
                 const leafGeo = new THREE.BoxGeometry(3, 3, 3);
-                const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                const leafMat = new THREE.MeshStandardMaterial({ color: 0x13241b, roughness: 1.0 }); // dark canopy
 
                 for (let i = 0; i < 20; i++) {
                     const x = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
@@ -355,7 +850,7 @@
 
                 // Rocks
                 const rockGeo = new THREE.DodecahedronGeometry(1);
-                const rockMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.9 });
 
                 for (let i = 0; i < 15; i++) {
                     const x = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
@@ -398,11 +893,46 @@
                 this.enemyManager = null; // Set by Game
 
                 this.skills = [
-                    { name: 'Spin', cooldown: 0, maxCooldown: 5 },
-                    { name: 'Dash', cooldown: 0, maxCooldown: 3 },
-                    { name: 'Heal', cooldown: 0, maxCooldown: 10 },
-                    { name: 'Ult', cooldown: 0, maxCooldown: 30 }
+                    { name: 'Spin', cooldown: 0, maxCooldown: 5,  cdMult: 1.0 },
+                    { name: 'Dash', cooldown: 0, maxCooldown: 3,  cdMult: 1.0 },
+                    { name: 'Heal', cooldown: 0, maxCooldown: 10, cdMult: 1.0 },
+                    { name: 'Ult', cooldown: 0, maxCooldown: 30, cdMult: 1.0 }
                 ];
+
+                // === TASK_002: progressão roguelite + modificadores ===
+                this.xp = 0;
+                this.level = 1;
+                this.damageMultiplier = 1.0;
+                this.speedMultiplier = 1.0;
+                this.staminaRegenBonus = 1.0;
+                this.dashRangeMult = 1.0;
+                this.healMult = 1.0;
+                this.ultMult = 1.0;
+                this.idleTimer = 0; // tempo parado (acelera regen de stamina)
+            }
+
+            // TASK_002: tenta gastar stamina; se insuficiente, bloqueia e sinaliza exaustão
+            trySpendStamina(cost) {
+                if (this.stats.stamina < cost) {
+                    if (this.scene.game) this.scene.game.flashStamina();
+                    return false;
+                }
+                this.stats.stamina -= cost;
+                return true;
+            }
+
+            gainXP(amount) {
+                this.xp += amount;
+                const xpNeeded = this.level * 120;
+                if (this.xp >= xpNeeded) {
+                    this.xp -= xpNeeded;
+                    this.levelUp();
+                }
+            }
+
+            levelUp() {
+                this.level++;
+                if (this.scene.game) this.scene.game.triggerUpgradeDraft();
             }
 
             createMesh() {
@@ -491,7 +1021,11 @@
                 if (input.mouseDown && this.attackCooldown <= 0 && !this.isAttacking) {
                     this.attack();
                 }
-                this.isDefending = input.mouseRightDown;
+                // TASK_002: defesa ativa drena stamina continuamente (15/s)
+                this.isDefending = input.mouseRightDown && this.stats.stamina > 0;
+                if (this.isDefending) {
+                    this.stats.stamina = Math.max(0, this.stats.stamina - 15 * dt);
+                }
 
                 // Skills
                 if (input.keys['Digit1']) this.useSkill(0);
@@ -517,9 +1051,9 @@
                     this.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.pitch));
                 }
 
-                // Movement
-                let speed = 10;
-                if (this.isDefending) speed = 5;
+                // Movement (TASK_002: escala pelo speedMultiplier do draft roguelite)
+                let speed = 10 * this.speedMultiplier;
+                if (this.isDefending) speed *= 0.5;
 
                 const moveDir = new THREE.Vector3();
                 if (input.keys['KeyW']) moveDir.z -= 1;
@@ -544,6 +1078,14 @@
                     this.mesh.rotation.y = angle + Math.PI;
                 }
 
+                // TASK_002: regeneração de stamina (45/s parado >1s, senão 25/s)
+                const movingNow = !!(input.keys['KeyW'] || input.keys['KeyS'] || input.keys['KeyA'] || input.keys['KeyD']);
+                if (movingNow || this.isDefending) this.idleTimer = 0; else this.idleTimer += dt;
+                if (!this.isDefending) {
+                    const regenRate = (this.idleTimer > 1.0 ? 45 : 25) * this.staminaRegenBonus;
+                    this.stats.stamina = Math.min(this.stats.maxStamina, this.stats.stamina + regenRate * dt);
+                }
+
                 // Camera Follow
                 const camX = this.mesh.position.x + this.zoom * Math.sin(this.yaw) * Math.cos(this.pitch);
                 const camY = this.mesh.position.y + this.zoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
@@ -554,6 +1096,7 @@
             }
 
             attack() {
+                if (!this.trySpendStamina(8)) return; // TASK_002: custo de stamina
                 this.isAttacking = true;
                 this.attackCooldown = 0.5;
 
@@ -578,7 +1121,7 @@
                 if (this.enemyManager) {
                     const playerFwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw).normalize();
                     // Pass player forward vector to checkHit for angle check
-                    this.enemyManager.checkHit(this.mesh.position, 4, 10, playerFwd);
+                    this.enemyManager.checkHit(this.mesh.position, 4, 10 * this.damageMultiplier, playerFwd);
                 }
             }
 
@@ -612,33 +1155,36 @@
                 const skill = this.skills[index];
                 if (skill.cooldown > 0) return;
 
-                skill.cooldown = skill.maxCooldown;
+                // TASK_002: custos de stamina por habilidade (bloqueia se insuficiente)
+                const STAMINA_COST = [20, 15, 30, 50];
+                if (!this.trySpendStamina(STAMINA_COST[index])) return;
+
+                // Cooldown escalado pelos modificadores do draft
+                skill.cooldown = skill.maxCooldown * skill.cdMult;
 
                 if (index === 0) { // Spin
-                    this.enemyManager.checkHit(this.mesh.position, 8, 20);
-                    // Visual
-                    const ringGeo = new THREE.RingGeometry(6, 7, 32);
-                    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide });
-                    const ring = new THREE.Mesh(ringGeo, ringMat);
-                    ring.rotation.x = -Math.PI / 2;
-                    ring.position.copy(this.mesh.position);
-                    this.scene.add(ring);
-                    setTimeout(() => this.scene.remove(ring), 200);
+                    this.enemyManager.checkHit(this.mesh.position, 8, 20 * this.damageMultiplier);
+                    spawnDynamicSkillVFX(this.scene, this.mesh.position, 'spin');
+                    playSkillSound('spin');
                 } else if (index === 1) { // Dash
+                    const fromPos = this.mesh.position.clone();
+                    const dist = 10 * this.dashRangeMult; // base fixa, escala só pelo upgrade do Dash
                     const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
-                    this.mesh.position.add(fwd.multiplyScalar(10));
-                    this.enemyManager.checkHit(this.mesh.position, 5, 15);
+                    this.mesh.position.add(fwd.multiplyScalar(dist));
+                    const half = ARENA_SIZE / 2 - 2;
+                    this.mesh.position.x = Math.max(-half, Math.min(half, this.mesh.position.x));
+                    this.mesh.position.z = Math.max(-half, Math.min(half, this.mesh.position.z));
+                    spawnDashGhosts(this.scene, this.mesh, fromPos, this.mesh.position.clone());
+                    this.enemyManager.checkHit(this.mesh.position, 5, 15 * this.damageMultiplier);
+                    playSkillSound('dash');
                 } else if (index === 2) { // Heal
-                    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 30);
+                    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 30 * this.healMult);
+                    spawnDynamicSkillVFX(this.scene, this.mesh.position, 'heal');
+                    playSkillSound('heal');
                 } else if (index === 3) { // Ult
-                    this.enemyManager.checkHit(this.mesh.position, 25, 100);
-                    // Visual
-                    const sphereGeo = new THREE.SphereGeometry(20, 32, 32);
-                    const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
-                    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-                    sphere.position.copy(this.mesh.position);
-                    this.scene.add(sphere);
-                    setTimeout(() => this.scene.remove(sphere), 500);
+                    this.enemyManager.checkHit(this.mesh.position, 25 * this.ultMult, 100 * this.ultMult);
+                    spawnDynamicSkillVFX(this.scene, this.mesh.position, 'ult');
+                    playSkillSound('ult');
                 }
             }
         }
@@ -647,25 +1193,82 @@
             constructor(scene, position, type = 'basic') {
                 this.scene = scene;
                 this.type = type;
+                this.cfg = ENEMY_CONFIG[type] || ENEMY_CONFIG.basic;
                 this.mesh = this.createMesh();
                 this.mesh.position.copy(position);
                 this.scene.add(this.mesh);
 
-                this.hp = type === 'basic' ? 30 : 60;
-                this.speed = type === 'basic' ? 6 : 4;
-                this.damage = 5; // Nerfed from 10
+                this.hp = this.cfg.hp;
+                this.speed = this.cfg.speed;
+                this.damage = this.cfg.damage;
+                this.attackCdMax = this.cfg.attackCd;
+                this.xpValue = this.cfg.xp;
                 this.isDead = false;
                 this.attackCooldown = 0;
             }
 
+            // TASK_001/002: Voxel Beast das sombras (grupo composto, cores/olhos/escala por tipo)
             createMesh() {
-                const color = this.type === 'basic' ? 0xff0000 : 0x880000;
-                const geo = new THREE.BoxGeometry(1.2, 2.2, 1.2);
-                const mat = new THREE.MeshStandardMaterial({ color: color });
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.y = 1.1;
-                mesh.castShadow = true;
-                return mesh;
+                const enemyGroup = new THREE.Group();
+                const cfg = this.cfg;
+
+                const darkArmorMat = new THREE.MeshStandardMaterial({
+                    color: cfg.armor, roughness: 0.9, metalness: 0.2
+                });
+                const fleshMat = new THREE.MeshStandardMaterial({
+                    color: cfg.flesh, roughness: 0.9
+                });
+                // olhos emissivos neon (rubi p/ basic, âmbar p/ brute, ciano p/ stalker)
+                const eyeIntensity = this.type === 'basic' ? 2.0 : 3.5;
+                const rubyGlowMat = new THREE.MeshStandardMaterial({
+                    color: cfg.eye, emissive: cfg.eye, emissiveIntensity: eyeIntensity
+                });
+
+                // Tronco
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.9), darkArmorMat);
+                torso.position.y = 1.1; torso.castShadow = true; torso.receiveShadow = true;
+                enemyGroup.add(torso);
+
+                // Cabeça
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), fleshMat);
+                head.position.set(0, 2.0, 0); head.castShadow = true;
+                enemyGroup.add(head);
+
+                // Olhos rubis emissivos — em -Z, pois lookAt() aponta o -Z do grupo para o jogador
+                const eyeGeo = new THREE.BoxGeometry(0.12, 0.08, 0.08);
+                const leftEye = new THREE.Mesh(eyeGeo, rubyGlowMat);
+                leftEye.position.set(-0.18, 2.05, -0.28);
+                enemyGroup.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeo, rubyGlowMat);
+                rightEye.position.set(0.18, 2.05, -0.28);
+                enemyGroup.add(rightEye);
+
+                // Garras longas
+                const armGeo = new THREE.BoxGeometry(0.3, 1.1, 0.3);
+                const leftArm = new THREE.Mesh(armGeo, darkArmorMat);
+                leftArm.position.set(-0.75, 1.2, 0.1); leftArm.rotation.x = 0.2; leftArm.castShadow = true;
+                enemyGroup.add(leftArm);
+                const rightArm = new THREE.Mesh(armGeo, darkArmorMat);
+                rightArm.position.set(0.75, 1.2, 0.1); rightArm.rotation.x = 0.2; rightArm.castShadow = true;
+                enemyGroup.add(rightArm);
+
+                // Pernas de bloco
+                const legGeo = new THREE.BoxGeometry(0.4, 0.8, 0.4);
+                const leftLeg = new THREE.Mesh(legGeo, darkArmorMat);
+                leftLeg.position.set(-0.35, 0.4, 0); leftLeg.castShadow = true;
+                enemyGroup.add(leftLeg);
+                const rightLeg = new THREE.Mesh(legGeo, darkArmorMat);
+                rightLeg.position.set(0.35, 0.4, 0); rightLeg.castShadow = true;
+                enemyGroup.add(rightLeg);
+
+                // Materiais para o flash de dano (tronco/cabeça/membros)
+                this.flashMats = [darkArmorMat, fleshMat];
+                this.baseColors = this.flashMats.map(m => m.color.getHex());
+
+                // TASK_002: escala por tipo (Brute 1.8x grande / Stalker 0.7x esguio)
+                enemyGroup.scale.setScalar(cfg.scale);
+
+                return enemyGroup;
             }
 
             update(dt, playerPos) {
@@ -687,7 +1290,7 @@
             }
 
             attack() {
-                this.attackCooldown = 1.5; // Nerfed from 0.5
+                this.attackCooldown = this.attackCdMax; // por tipo (Stalker ataca mais rápido)
                 // Simple attack animation (bump forward)
                 const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
                 this.mesh.position.add(fwd.multiplyScalar(0.5));
@@ -700,10 +1303,15 @@
 
             takeDamage(amount) {
                 this.hp -= amount;
-                this.mesh.material.color.setHex(0xffffff);
-                setTimeout(() => {
-                    if (!this.isDead) this.mesh.material.color.setHex(this.type === 'basic' ? 0xff0000 : 0x880000);
-                }, 100);
+                // Flash branco em todos os materiais do corpo do voxel beast
+                if (this.flashMats) {
+                    this.flashMats.forEach(m => m.color.setHex(0xffffff));
+                    setTimeout(() => {
+                        if (!this.isDead && this.flashMats) {
+                            this.flashMats.forEach((m, i) => m.color.setHex(this.baseColors[i]));
+                        }
+                    }, 100);
+                }
 
                 if (this.hp <= 0) {
                     this.die();
@@ -712,11 +1320,16 @@
 
             die() {
                 this.isDead = true;
+                const deathPos = this.mesh.position.clone();
                 this.scene.remove(this.mesh);
+                // Dispose dos materiais do voxel beast (evita leak GPU)
+                this.mesh.traverse(c => { if (c.isMesh && c.geometry) c.geometry.dispose(); });
+                if (this.flashMats) this.flashMats.forEach(m => m.dispose());
 
-                // Drop Item (30% chance)
-                if (Math.random() < 0.3 && this.scene.game && this.scene.game.itemManager) {
-                    this.scene.game.itemManager.spawnItem(this.mesh.position);
+                // TASK_002: dropa um XP Orb no local da morte (valor por tipo)
+                const game = this.scene.game;
+                if (game && game.xpOrbManager) {
+                    game.xpOrbManager.spawnOrb(deathPos, this.xpValue);
                 }
             }
         }
@@ -729,18 +1342,31 @@
                 this.spawnTimer = 0;
             }
 
-            update(dt) {
+            // TASK_002: spawn orquestrado pela configuração da onda atual
+            update(dt, waveNum) {
+                const config = WAVE_CONFIG[waveNum] || WAVE_CONFIG[1];
                 this.spawnTimer += dt;
-                if (this.spawnTimer > 3) {
+                if (this.spawnTimer >= config.spawnInterval && this.enemies.length < config.maxEnemies) {
                     this.spawnTimer = 0;
-                    this.spawnEnemy();
+                    this.spawnEnemy(this.selectEnemyType(waveNum));
                 }
 
                 this.enemies.forEach(e => e.update(dt, this.player.mesh.position));
                 this.enemies = this.enemies.filter(e => !e.isDead);
             }
 
-            spawnEnemy() {
+            // Seleção ponderada de tipo conforme os ratios da onda
+            selectEnemyType(waveNum) {
+                const config = WAVE_CONFIG[waveNum];
+                if (!config) return 'basic';
+                const r = config.ratios;
+                const rand = Math.random();
+                if (rand < r.basic) return 'basic';
+                if (rand < r.basic + r.brute) return 'brute';
+                return 'stalker';
+            }
+
+            spawnEnemy(type = 'basic') {
                 const angle = Math.random() * Math.PI * 2;
                 const dist = 30 + Math.random() * 10;
                 const x = Math.cos(angle) * dist;
@@ -751,7 +1377,7 @@
                 pos.x = Math.max(-half, Math.min(half, pos.x));
                 pos.z = Math.max(-half, Math.min(half, pos.z));
 
-                this.enemies.push(new Enemy(this.scene, pos));
+                this.enemies.push(new Enemy(this.scene, pos, type));
             }
 
             checkHit(origin, range, damage, direction = null) {
@@ -834,12 +1460,90 @@
             }
         }
 
+        // TASK_002: Esfera de XP com atração magnética e descarte limpo
+        class XpOrb {
+            constructor(scene, position, xpValue) {
+                this.scene = scene;
+                this.xpValue = xpValue;
+                this.active = true;
+                this.time = Math.random() * 100;
+                this.magneticSpeed = 0;
+                this.mesh = this.createMesh(position);
+                this.scene.add(this.mesh);
+            }
+
+            createMesh(position) {
+                const geo = new THREE.OctahedronGeometry(0.3);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0xffd700, emissive: 0xcc9900, emissiveIntensity: 1.5,
+                    roughness: 0.2, metalness: 0.8
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.copy(position);
+                mesh.position.y = 0.6;
+                mesh.castShadow = true;
+                return mesh;
+            }
+
+            update(dt, playerPosition) {
+                if (!this.active) return;
+                this.mesh.rotation.y += dt * 2.5;
+                this.mesh.rotation.x += dt * 1.2;
+                this.time += dt * 3.0;
+                this.mesh.position.y = 0.6 + Math.sin(this.time) * 0.15;
+
+                const toPlayer = playerPosition.clone().sub(this.mesh.position);
+                const distance = toPlayer.length();
+                if (distance < 8.0) { // raio magnético
+                    this.magneticSpeed += dt * 30.0; // aceleração progressiva (sucção)
+                    toPlayer.normalize();
+                    this.mesh.position.addScaledVector(toPlayer, this.magneticSpeed * dt);
+                }
+            }
+
+            destroy() {
+                this.active = false;
+                this.scene.remove(this.mesh);
+                if (this.mesh.geometry) this.mesh.geometry.dispose();
+                if (this.mesh.material) this.mesh.material.dispose();
+            }
+        }
+
+        class XpOrbManager {
+            constructor(scene, player) {
+                this.scene = scene;
+                this.player = player;
+                this.orbs = [];
+            }
+
+            spawnOrb(position, xpValue) {
+                // Limite de orbs ativos: remove o mais antigo se exceder (decisão do TL)
+                if (this.orbs.length >= MAX_ORBS) {
+                    const oldest = this.orbs.shift();
+                    if (oldest) oldest.destroy();
+                }
+                this.orbs.push(new XpOrb(this.scene, position, xpValue));
+            }
+
+            update(dt) {
+                this.orbs.forEach(orb => {
+                    orb.update(dt, this.player.mesh.position);
+                    if (orb.mesh.position.distanceTo(this.player.mesh.position) < 1.2) {
+                        this.player.gainXP(orb.xpValue);
+                        orb.destroy();
+                    }
+                });
+                this.orbs = this.orbs.filter(o => o.active);
+            }
+        }
+
         class Game {
             constructor() {
                 this.container = document.getElementById('game-container');
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x201005); // Dark orange/brown sky
-                this.scene.fog = new THREE.Fog(0x201005, 20, 60);
+                // TASK_001: céu de catacumba + névoa volumétrica exponencial densa
+                this.scene.background = new THREE.Color(0x0a0c16);
+                this.scene.fog = new THREE.FogExp2(0x0a0c16, 0.03);
 
                 this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.camera.position.set(0, 15, 15);
@@ -850,12 +1554,12 @@
                 this.renderer.shadowMap.enabled = true;
                 this.container.appendChild(this.renderer.domElement);
 
-                // Lights
-                const ambient = new THREE.AmbientLight(0xffccaa, 0.6); // Warm ambient
+                // Lights — TASK_001: ambiente frio e luz lunar azulada/ciano
+                const ambient = new THREE.AmbientLight(0x3a4a6a, 0.45); // cool dim ambient
                 this.scene.add(ambient);
 
-                const dirLight = new THREE.DirectionalLight(0xffaa00, 1.5); // Sunset orange
-                dirLight.position.set(-20, 10, -20); // Lower angle
+                const dirLight = new THREE.DirectionalLight(0x7ec0ee, 2.0); // moonlight
+                dirLight.position.set(-20, 30, -20); // high cold angle
                 dirLight.castShadow = true;
                 dirLight.shadow.camera.left = -50;
                 dirLight.shadow.camera.right = 50;
@@ -873,6 +1577,12 @@
                 this.scene.game = this; // Allow access from Enemy
                 this.enemyManager = new EnemyManager(this.scene, this.player);
                 this.player.enemyManager = this.enemyManager;
+
+                // TASK_002: gerenciador de XP Orbs + estado de ondas
+                this.xpOrbManager = new XpOrbManager(this.scene, this.player);
+                this.currentWave = 1;
+                this.baseFogColor = new THREE.Color(0x0a0c16);
+                this.fogFlashTimer = 0;
 
                 this.clock = new THREE.Clock();
                 this.isRunning = false;
@@ -894,6 +1604,73 @@
             start() {
                 document.getElementById('start-screen').classList.add('hidden');
                 this.isRunning = true;
+                initSkillAudio(); // gesto do usuário libera o AudioContext (autoplay policy)
+                this.showWaveBanner(1);
+            }
+
+            // TASK_002: banner flutuante de onda
+            showWaveBanner(n) {
+                const labels = {
+                    1: 'Incursão Inicial', 2: 'Elites Despertam', 3: 'Caçadores nas Sombras',
+                    4: 'Ritmo Frenético', 5: 'Sobrevivência Final'
+                };
+                const banner = document.getElementById('wave-banner');
+                banner.innerHTML = `WAVE ${n}<span class="wave-sub">${labels[n] || ''}</span>`;
+                banner.classList.remove('show');
+                void banner.offsetWidth; // reinicia a animação
+                banner.classList.add('show');
+            }
+
+            // TASK_002: flash vermelho de stamina exausta (Dúvida do PO: feedback de exaustão)
+            flashStamina() {
+                const bar = document.getElementById('stamina-fill').parentElement;
+                bar.classList.remove('exhausted');
+                void bar.offsetWidth;
+                bar.classList.add('exhausted');
+            }
+
+            // TASK_002: flash de névoa na entrada de ondas com elites (Dúvida #2 — aprovado pelo TL)
+            flashFog(hex) {
+                if (this.scene.fog) this.scene.fog.color.setHex(hex);
+                this.fogFlashTimer = 0.5;
+            }
+
+            // TASK_002: Draft roguelite — pausa o jogo e oferece 3 upgrades aleatórios
+            triggerUpgradeDraft() {
+                this.isRunning = false;
+                document.exitPointerLock();
+                const modal = document.getElementById('upgrade-modal');
+                const wrapper = document.getElementById('cards-wrapper');
+                document.getElementById('level-badge').textContent = `LEVEL ${this.player.level}`;
+                wrapper.innerHTML = '';
+
+                // 3 upgrades distintos aleatórios
+                const pool = [...UPGRADE_POOL];
+                const picks = [];
+                for (let i = 0; i < 3 && pool.length; i++) {
+                    picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+                }
+
+                picks.forEach(up => {
+                    const card = document.createElement('div');
+                    card.className = 'upgrade-card';
+                    card.innerHTML = `
+                        <div class="upgrade-rarity">${up.rarity}</div>
+                        <div class="icon-placeholder">${up.icon}</div>
+                        <h3>${up.name}</h3>
+                        <p>${up.desc}</p>`;
+                    card.addEventListener('click', () => {
+                        up.apply(this.player);
+                        modal.classList.add('hidden');
+                        this.isRunning = true;
+                        if (this.renderer && this.renderer.domElement) {
+                            this.renderer.domElement.requestPointerLock();
+                        }
+                    });
+                    wrapper.appendChild(card);
+                });
+
+                modal.classList.remove('hidden');
             }
 
             onResize() {
@@ -907,14 +1684,34 @@
 
                 const dt = this.clock.getDelta();
 
+                // TASK_001: atualiza/descarta VFX dinâmicos sempre (decai mesmo após game over)
+                updateVFX(this.scene, dt);
+
+                // TASK_002: restaura a cor da névoa após o flash de entrada de onda
+                if (this.fogFlashTimer > 0) {
+                    this.fogFlashTimer -= dt;
+                    if (this.fogFlashTimer <= 0 && this.scene.fog) this.scene.fog.color.copy(this.baseFogColor);
+                }
+
                 if (this.isRunning && !this.gameOver) {
                     this.timeLeft -= dt;
                     if (this.timeLeft <= 0) {
                         this.endGame(true);
                     }
 
+                    // TASK_002: progressão de 5 ondas (60s cada); vitória ao fim da onda 5
+                    const elapsed = 300 - this.timeLeft;
+                    const wave = Math.min(5, Math.floor(elapsed / 60) + 1);
+                    if (wave !== this.currentWave) {
+                        this.currentWave = wave;
+                        document.getElementById('wave-info').innerText = `Wave ${wave}`;
+                        this.showWaveBanner(wave);
+                        if (WAVE_CONFIG[wave] && WAVE_CONFIG[wave].elite) this.flashFog(0x3a0000);
+                    }
+
                     this.player.update(dt, this.input);
-                    this.enemyManager.update(dt);
+                    this.enemyManager.update(dt, this.currentWave);
+                    this.xpOrbManager.update(dt);
                     this.itemManager.update(dt);
                     this.input.resetFrame();
 
@@ -929,12 +1726,27 @@
                     const stamPct = (this.player.stats.stamina / this.player.stats.maxStamina) * 100;
                     document.getElementById('stamina-fill').style.width = `${stamPct}%`;
 
-                    // Update Skill Cooldowns
+                    // TASK_002: barra de XP (preenche até o próximo nível)
+                    const xpPct = (this.player.xp / (this.player.level * 120)) * 100;
+                    document.getElementById('xp-fill').style.width = `${Math.min(100, xpPct)}%`;
+
+                    // Update Skill Cooldowns + flash de "pronto" (TASK_001)
+                    const slots = document.querySelectorAll('.skill-slot');
                     this.player.skills.forEach((s, i) => {
                         const el = document.querySelectorAll('.skill-cooldown')[i];
-                        const pct = (s.cooldown / s.maxCooldown) * 100;
-                        // Use a more visible color (white/red overlay)
-                        el.style.background = `conic-gradient(rgba(255, 255, 255, 0.5) ${pct}%, transparent ${pct}%)`;
+                        const pct = Math.max(0, (s.cooldown / s.maxCooldown) * 100);
+                        el.style.background = `conic-gradient(rgba(5, 7, 10, 0.78) ${pct}%, transparent ${pct}%)`;
+
+                        // Detecta a transição "em recarga" -> "pronto" e dispara o flash luminoso
+                        if (this._cdReady === undefined) this._cdReady = [true, true, true, true];
+                        const ready = s.cooldown <= 0;
+                        if (ready && !this._cdReady[i]) {
+                            const slot = slots[i];
+                            slot.classList.remove('ready-pulse');
+                            void slot.offsetWidth; // força recálculo p/ re-disparar a animação
+                            slot.classList.add('ready-pulse');
+                        }
+                        this._cdReady[i] = ready;
                     });
 
                     // Collision Player vs Enemy
@@ -968,7 +1780,34 @@
         }
 
         window.onload = () => {
-            new Game();
+            const game = new Game();
+            // === TASK_001: superfície de teste ===
+            window.__arena = {
+                game,
+                activeVFX,
+                spawnDynamicSkillVFX, spawnDashGhosts, updateVFX,
+                initSkillAudio, playSkillSound,
+                THREE,
+                makeEnemy: (type) => new Enemy(game.scene, new THREE.Vector3(5, 0, 5), type),
+                vfxCount: () => activeVFX.length,
+                // === TASK_002: superfície de teste ===
+                ENEMY_CONFIG, WAVE_CONFIG, UPGRADE_POOL, Enemy, XpOrb,
+                orbCount: () => game.xpOrbManager.orbs.length,
+                enemyCount: () => game.enemyManager.enemies.length,
+                getPlayerState: () => ({
+                    xp: game.player.xp, level: game.player.level,
+                    hp: game.player.stats.hp, maxHp: game.player.stats.maxHp,
+                    stamina: game.player.stats.stamina,
+                    damageMultiplier: game.player.damageMultiplier,
+                    speedMultiplier: game.player.speedMultiplier,
+                    staminaRegenBonus: game.player.staminaRegenBonus,
+                    dashRangeMult: game.player.dashRangeMult,
+                    healMult: game.player.healMult, ultMult: game.player.ultMult,
+                    skillCdMult: game.player.skills.map(s => s.cdMult),
+                    currentWave: game.currentWave
+                }),
+                selectType: (w) => game.enemyManager.selectEnemyType(w)
+            };
         };
     </script>
 </body>
