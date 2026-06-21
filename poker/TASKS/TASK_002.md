@@ -404,3 +404,21 @@ Para garantir um visual moderno e estimulante para o usuário:
 2.  **Entradas Suaves para Balões**: Utilizar animações CSS `@keyframes popIn` que escalam o balão de `scale(0)` para `scale(1)` com efeito de "bounce" suave de forma rápida ao disparar diálogos.
 3.  **Responsividade**: O painel do `Hand Tracker` deve ficar convenientemente posicionado de forma fixa ou lateral no desktop, e se ajustar de forma flexível logo abaixo das cartas do jogador em dispositivos móveis, sem obstruir a visão da mesa principal de feltro do Poker.
 
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `poker/index.html`. Todos os critérios de aceitação atendidos e validados localmente via navegador (preview + testes unitários do avaliador via console).
+
+### O que foi entregue
+1.  **3 oponentes de IA com personalidade** (`AI_PROFILES`): Arthur "The Shark" 🦈 (agressivo-seletivo), Beatriz "Calling Station" 🐢 (passiva), Caio "The Maniac" 🤪 (agressivo/blefador). Cada perfil tem cor, avatar e pesos de `aggressiveness`/`bluffFrequency`/`callingRate`. Avatares exibidos com borda neon na cor do perfil (WOW factor).
+2.  **Decisão da IA com blefe** (`playAITurn` reescrita): score de decisão = força real da mão (`evaluateHand`) + fator de blefe ponderado pela personalidade e pelo potencial de flush draw visível na mesa.
+3.  **Balões de fala** (`showAIDialogue`): renderizados a partir do **estado** (`player._dialogue`) e não por append direto ao DOM — assim sobrevivem aos re-renders de `updatePlayers()`. Diálogos contextuais (raise / bluff / strongHand / call / fold), animação `bubblePopIn` (scale 0→1 com bounce).
+4.  **Hand Tracker** (`updateHandTracker`): painel fixo (lateral no desktop, em fluxo no mobile via media query) mostrando combinação atual (PT-BR), draws (Flush/Straight Draw) e barra de força colorida por faixa.
+
+### ⚠️ Bugs PRÉ-EXISTENTES corrigidos / encontrados
+*   **Corrigido (necessário p/ Critério 3)**: o `evaluateHand` antigo usava `parseInt('A'|'K'|'Q'|'J')` → `NaN` e comparava `card.value` (string) como número. Resultado: **straights com figuras nunca eram detectados** (ex.: 10‑J‑Q‑K‑A virava "High Card"), **trinca de figuras virava "Full House"** e **Royal Flush virava "Flush"**. Reescrevi o avaliador para usar valores numéricos consistentes (2..14 via `getCardValue`), mantendo o contrato `{name, rank, primaryValue, secondaryValue, kickers}`. Validei as 10 categorias + roda (A‑2‑3‑4‑5) + melhor‑de‑7. Isso também corrige o **showdown** do jogo.
+*   **NÃO corrigido (fora do escopo — para o TL avaliar)**:
+    1.  `dealCards()` é chamado **depois** de postar os blinds em `startNewHand()` e reseta `player.bet = 0` para todos, apagando o registro de aposta dos blinds (o big blind acaba "pagando" novamente para igualar a aposta). Não toquei na ordem deal/blind para não desestabilizar o fluxo de apostas.
+    2.  Em `determineWinner()`, o ramo de **showdown real** (não-fold) usa a mensagem/histórico hardcoded "todos desistiram". O pagamento está correto, mas o texto exibido fica errado num showdown verdadeiro.
+

@@ -191,3 +191,28 @@ if (analyser) {
     *   Adicionar a inicialização do `AudioContext`, o mapeamento do analisador e os filtros de frequência para modular a renderização do Canvas.
 
 Com este refinamento técnico, a tarefa está pronta para desenvolvimento com sincronia estrita de áudio, alta fidelidade reativa e mecânicas completas para os minijogos rítmicos.
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `visual_effects/index.html`. Todos os critérios atendidos e validados localmente (preview + testes unitários das mecânicas via console). Nenhum erro de runtime.
+
+### O que foi entregue
+1.  **Upload de música customizada**: botão ciano "🎵 Carregar Música Customizada" no menu inicial → modal com input de áudio (.mp3/.ogg) + input de mapa (.json), validação do JSON via `FileReader`, e link de download do `template.json` (data URI). O áudio customizado é carregado no mesmo elemento `backgroundMusic` (necessário porque `createMediaElementSource` é único por elemento).
+2.  **Engine time-driven**: em modo customizado as notas são spawnadas pela fila `noteQueue` com base em `backgroundMusic.currentTime` (antecedência `T_VIEW = 2.0s`), posição `x = X_capture * (1 - (t_note - t)/T_VIEW)` — sincronia independente do FPS. Modo default segue procedural (`createNote`), agora gerando também holds e minas.
+3.  **Nota Sustentada (Hold - amarela)**: cabeça com glow neon + cauda translúcida; mecânica de segurar via `mousedown`/`mouseup` (+5 pts por frame); soltar cedo → "BREAK!" e zera combo; completar → "HOLD!" e mantém combo. Suporte a toque.
+4.  **Nota Mina (vermelha piscante)**: pisca via `Math.sin(Date.now()*0.02)`; clicar → −150 pts (clampado em 0), zera combo, som de impacto, **sem** perda de vida. Minas não capturadas passam sem penalidade.
+5.  **Web Audio API reativa**: `AnalyserNode` (fftSize 256) extrai graves (`bins 0–10`) e agudos (`bins 80–120`). Fundo pulsa em direção a roxo escuro nos graves (`blendColors`), cordas ganham `shadowBlur` + vibração extra nos graves, e sparkles de poeira estelar sobem reagindo aos agudos.
+
+### Validações executadas (console)
+*   Distribuição de tipos em 500 notas: ~73% normal / ~15% hold / ~12% mina.
+*   Captura normal com timing perfeito: +15 (10 base + 5 PERFECT).
+*   Mina com score 500 → 350 (−150 exato) e combo zerado; com score baixo, clamp em 0.
+*   Hold: sustentação acumula +5/frame, completa e mantém combo; soltar no meio gera BREAK e zera combo.
+*   Modo customizado: JSON (incl. `type: "obstacle"` → mina) vira fila ordenada e spawna dentro da janela de 2s.
+
+### Observações para o TL
+*   Mantive o sistema antigo de `obstacles`/`startObstacleGenerator`/`hitObstacle` no arquivo, porém **não é mais acionado** (os perigos agora são as Minas, conforme o Critério 2, que exige −150 pts e nenhuma perda de vida — comportamento incompatível com o `hitObstacle` legado que tirava vida). Pode ser removido em um cleanup futuro.
+*   Corrigi de passagem um comportamento do replay: o "Jogar Novamente" original não retomava a música após o game over; agora ele restaura e toca a trilha default.
+

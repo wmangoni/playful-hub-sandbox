@@ -48,25 +48,137 @@
             display: none;
             /* Começa escondido */
         }
+
+        /* === TASK_002: Loja incremental (glassmorphism) === */
+        #ui {
+            background: rgba(20, 30, 25, 0.55);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+            color: #eafff0;
+            width: 230px;
+            max-height: 94vh;
+            overflow-y: auto;
+        }
+        #goldDisplay {
+            font-size: 1.25em;
+            font-weight: bold;
+            color: #ffd54a;
+            text-align: center;
+            margin-bottom: 8px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            transition: transform 0.15s ease;
+        }
+        #goldDisplay.bump { transform: scale(1.18); }
+        .shop-section-title {
+            font-size: 0.78em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #9fe6b8;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 3px;
+            margin: 10px 0 6px;
+        }
+        #ui button.shop-btn {
+            display: block;
+            width: 100%;
+            margin: 3px 0;
+            padding: 6px 8px;
+            text-align: left;
+            background: rgba(76, 175, 80, 0.25);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 6px;
+            color: #eafff0;
+            cursor: pointer;
+            font-size: 0.82em;
+            transition: background 0.2s, opacity 0.2s;
+        }
+        #ui button.shop-btn:hover:not(:disabled) { background: rgba(76, 175, 80, 0.45); }
+        #ui button.shop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        #ui button.shop-btn.selected { outline: 2px solid #ffd54a; background: rgba(76, 175, 80, 0.5); }
+        #ui button.shop-btn.owned { background: rgba(41, 128, 185, 0.4); cursor: default; }
+        .shop-cost { float: right; color: #ffd54a; font-weight: bold; }
+        #statusBadges { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+        .status-badge {
+            font-size: 0.7em; padding: 3px 6px; border-radius: 10px;
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.25);
+        }
+
+        /* Texto flutuante de colheita automática */
+        .float-text {
+            position: absolute;
+            color: #ffd54a;
+            font-family: sans-serif;
+            font-weight: bold;
+            font-size: 1.1em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+            pointer-events: none;
+            z-index: 50;
+            transition: transform 1.2s ease-out, opacity 1.2s ease-out;
+        }
+
+        /* Modal Glassmorphic de boas-vindas (ganhos offline) */
+        #welcomeModal {
+            position: fixed; inset: 0; display: none;
+            justify-content: center; align-items: center; z-index: 2000;
+            background: rgba(0,0,0,0.55);
+        }
+        #welcomeModal .card {
+            background: rgba(20, 30, 25, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 16px;
+            padding: 28px 32px;
+            text-align: center;
+            color: #eafff0;
+            font-family: sans-serif;
+            max-width: 360px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+        }
+        #welcomeModal h2 { color: #ffd54a; margin: 0 0 12px; }
+        #welcomeModal button {
+            margin-top: 18px; padding: 10px 22px; border: none; border-radius: 8px;
+            background: #4caf50; color: white; cursor: pointer; font-size: 1em;
+        }
     </style>
 </head>
 
 <body>
     <div id="ui">
-        <span>Plantar:</span>
-        <button id="plantFlower">Flor (30s)</button>
-        <button id="plantTree">Árvore (60s)</button>
-        <button id="plantPineTree">Pinheiro (120s)</button>
-        <button id="plantMushroom">Cogumelo (20s)</button>
-        <button id="plantBamboo">Bambu (40s)</button>
-        <button id="plantBerryBush">Arbusto de Bagas (80s)</button>
-        <button id="plantLotus">Lótus Flutuante (150s)</button>
-        <br>
-        <span id="weatherStatus">Clima: Ensolarado</span> |
-        <span id="timeStatus">Hora: Dia</span>
+        <div id="goldDisplay">🪙 100</div>
+        <div id="statusBadges"></div>
+
+        <div class="shop-section-title">🛒 Sementes</div>
+        <button id="plantFlower" class="shop-btn" data-seed="flower">🌸 Flor <span class="shop-cost">10</span></button>
+        <button id="plantMushroom" class="shop-btn" data-seed="mushroom">🍄 Cogumelo <span class="shop-cost">20</span></button>
+        <button id="plantBamboo" class="shop-btn" data-seed="bamboo">🎋 Bambu <span class="shop-cost">45</span></button>
+        <button id="plantBerryBush" class="shop-btn" data-seed="berrybush">🫐 Arbusto <span class="shop-cost">90</span></button>
+        <button id="plantTree" class="shop-btn" data-seed="tree">🌳 Árvore <span class="shop-cost">180</span></button>
+        <button id="plantPineTree" class="shop-btn" data-seed="pinetree">🌲 Pinheiro <span class="shop-cost">350</span></button>
+        <button id="plantLotus" class="shop-btn" data-seed="lotus">🪷 Lótus <span class="shop-cost">700</span></button>
+
+        <div class="shop-section-title">🚀 Automações</div>
+        <button id="buySprinkler" class="shop-btn">💧 Regador Auto <span class="shop-cost">300</span></button>
+        <button id="buyScarecrow" class="shop-btn">🦅 Espantalho <span class="shop-cost">500</span></button>
+        <button id="buyHarvester" class="shop-btn">🚜 Robô Colhedor <span class="shop-cost">800</span></button>
+
+        <div class="shop-section-title">🌦️ Estado</div>
+        <div id="weatherStatus">Clima: Ensolarado</div>
+        <div id="timeStatus">Hora: Dia</div>
+        <div style="font-size:0.72em; color:#9fe6b8; margin-top:6px;">Clique numa planta madura para colher · na terra para regar · na praga para eliminá-la.</div>
     </div>
 
     <div id="notifications" role="alert"></div>
+
+    <div id="welcomeModal">
+        <div class="card">
+            <h2>🌱 Bem-vindo de volta!</h2>
+            <p id="welcomeText">Seu jardim ocioso rendeu ouro enquanto você descansava.</p>
+            <button id="welcomeClose">Coletar 🪙</button>
+        </div>
+    </div>
 
     <canvas id="gameCanvas"></canvas>
 
@@ -117,8 +229,39 @@
             lotus: { spore: 0, pad: 40, bud: 100, bloom: 150 }
         };
 
-        const weatherChangeInterval = 30; // Mudar clima a cada 30 segundos
+        const weatherChangeInterval = 45; // TASK_002: Mudar clima a cada 45 segundos
         let timeSinceLastWeatherChange = 0;
+        let weatherGrowthMultiplier = 1.0; // sunny 1.0 / rainy 2.0 / drought 0.5
+        let goldMultiplier = 1.0;          // drought => 1.5x ouro
+
+        // === TASK_002: Economia incremental ===
+        const SEED_INFO = {
+            flower:    { cost: 10,  harvest: 25 },
+            mushroom:  { cost: 20,  harvest: 45 },
+            bamboo:    { cost: 45,  harvest: 95 },
+            berrybush: { cost: 90,  harvest: 210 },
+            tree:      { cost: 180, harvest: 450 },
+            pinetree:  { cost: 350, harvest: 950 },
+            lotus:     { cost: 700, harvest: 2100 }
+        };
+        const UPGRADE_COSTS = { sprinkler: 300, scarecrow: 500, harvester: 800 };
+        const SAVE_KEY = 'lazyGardenerState';
+
+        const gardenState = {
+            gold: 100,
+            sprinklerActive: false,
+            harvesterRobots: 0,
+            ultrasonicScarecrow: false,
+            lastActiveTimestamp: Date.now()
+        };
+
+        // Pragas e robôs
+        const pests = [];
+        let timeSinceLastPest = 0;
+        let nextPestInterval = 60 + Math.random() * 60; // 60..120s
+        let harvesterTimer = 0;
+        const HARVEST_INTERVAL = 3; // segundos
+        let harvesterRobotMesh = null;
 
         const flowerBloomColors = [
             0xFF69B4, // HotPink (original)
@@ -134,6 +277,90 @@
         const notificationElement = document.getElementById('notifications');
         const weatherStatusElement = document.getElementById('weatherStatus');
         const timeStatusElement = document.getElementById('timeStatus');
+        const goldDisplayElement = document.getElementById('goldDisplay');
+        const statusBadgesElement = document.getElementById('statusBadges');
+
+        // === TASK_002: Helpers de economia ===
+        function getSeedCost(type) { return SEED_INFO[type] ? SEED_INFO[type].cost : 0; }
+        function getHarvestValue(type) { return SEED_INFO[type] ? SEED_INFO[type].harvest : 0; }
+
+        function addGold(amount) {
+            gardenState.gold += amount;
+            if (gardenState.gold < 0) gardenState.gold = 0;
+            updateGoldUI();
+            saveGame();
+        }
+        function spendGold(amount) {
+            if (gardenState.gold < amount) return false;
+            gardenState.gold -= amount;
+            updateGoldUI();
+            saveGame();
+            return true;
+        }
+        function updateGoldUI() {
+            if (!goldDisplayElement) return;
+            goldDisplayElement.textContent = `🪙 ${Math.floor(gardenState.gold)}`;
+            goldDisplayElement.classList.add('bump');
+            setTimeout(() => goldDisplayElement.classList.remove('bump'), 150);
+            refreshShopAffordability();
+            updateStatusBadges();
+        }
+
+        function updateStatusBadges() {
+            if (!statusBadgesElement) return;
+            const badges = [];
+            if (gardenState.sprinklerActive) badges.push('💧 Regador');
+            if (gardenState.ultrasonicScarecrow) badges.push('🦅 Espantalho');
+            if (gardenState.harvesterRobots > 0) badges.push(`🚜 x${gardenState.harvesterRobots}`);
+            statusBadgesElement.innerHTML = badges.map(b => `<span class="status-badge">${b}</span>`).join('');
+        }
+
+        function refreshShopAffordability() {
+            // Sementes
+            Object.keys(SEED_INFO).forEach(type => {
+                const btn = document.querySelector(`.shop-btn[data-seed="${type}"]`);
+                if (!btn) return;
+                btn.disabled = gardenState.gold < getSeedCost(type);
+                btn.classList.toggle('selected', currentSeedType === type);
+            });
+            // Automações
+            const sprBtn = document.getElementById('buySprinkler');
+            const scrBtn = document.getElementById('buyScarecrow');
+            const harBtn = document.getElementById('buyHarvester');
+            if (sprBtn) {
+                sprBtn.classList.toggle('owned', gardenState.sprinklerActive);
+                sprBtn.disabled = gardenState.sprinklerActive || gardenState.gold < UPGRADE_COSTS.sprinkler;
+                if (gardenState.sprinklerActive) sprBtn.innerHTML = '💧 Regador Auto <span class="shop-cost">✔</span>';
+            }
+            if (scrBtn) {
+                scrBtn.classList.toggle('owned', gardenState.ultrasonicScarecrow);
+                scrBtn.disabled = gardenState.ultrasonicScarecrow || gardenState.gold < UPGRADE_COSTS.scarecrow;
+                if (gardenState.ultrasonicScarecrow) scrBtn.innerHTML = '🦅 Espantalho <span class="shop-cost">✔</span>';
+            }
+            if (harBtn) {
+                harBtn.disabled = gardenState.gold < UPGRADE_COSTS.harvester;
+                harBtn.innerHTML = `🚜 Robô Colhedor (${gardenState.harvesterRobots}) <span class="shop-cost">800</span>`;
+            }
+        }
+
+        // Texto flutuante na tela (HTML sobre o canvas) numa posição 3D
+        function showFloatingText(text, worldPos, color = '#ffd54a') {
+            const v = worldPos.clone().project(camera);
+            const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-v.y * 0.5 + 0.5) * window.innerHeight;
+            const el = document.createElement('div');
+            el.className = 'float-text';
+            el.textContent = text;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.color = color;
+            document.body.appendChild(el);
+            requestAnimationFrame(() => {
+                el.style.transform = 'translateY(-50px)';
+                el.style.opacity = '0';
+            });
+            setTimeout(() => el.remove(), 1200);
+        }
 
         // Elementos de Áudio
         const ambientSoundDay = document.getElementById('ambientSoundDay');
@@ -210,6 +437,9 @@
                 addCloud();
             }
 
+            // TASK_002: sistema de chuva
+            createRain();
+
             // --- Event Listeners ---
             window.addEventListener('resize', onWindowResize);
             window.addEventListener('pointerdown', onPointerDown); // Usar pointerdown para mouse e toque
@@ -222,19 +452,48 @@
             document.getElementById('plantBerryBush').addEventListener('click', () => setSeedType('berrybush'));
             document.getElementById('plantLotus').addEventListener('click', () => setSeedType('lotus'));
 
+            // TASK_002: botões de automação + modal de boas-vindas
+            document.getElementById('buySprinkler').addEventListener('click', buySprinkler);
+            document.getElementById('buyScarecrow').addEventListener('click', buyScarecrow);
+            document.getElementById('buyHarvester').addEventListener('click', buyHarvester);
+            document.getElementById('welcomeClose').addEventListener('click', () => {
+                document.getElementById('welcomeModal').style.display = 'none';
+            });
+
+            // TASK_002: carregar progresso salvo e processar ganhos offline
+            loadGame();
+            applyWeatherEffects();
+            updateGoldUI();
+            processOfflineEarnings();
+
+            // Salvar ao sair / trocar de aba (idle state)
+            window.addEventListener('beforeunload', saveGame);
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) saveGame();
+            });
+
             // Iniciar loop de animação
             animate();
             updateWeather(); // Define o clima inicial
             updateAudio(); // Tenta iniciar o áudio
 
-            // Carregar o modelo do urso
-            // loadBearModel();
+            // Hook de depuração/teste (TASK_002)
+            window.__garden = {
+                THREE, gardenState, plants, pests, SEED_INFO, UPGRADE_COSTS,
+                getWeather: () => simulatedWeather,
+                getMultipliers: () => ({ growth: weatherGrowthMultiplier, gold: goldMultiplier }),
+                setWeather: (w) => { simulatedWeather = w; applyWeatherEffects(); updateSkyColor(); },
+                plantAt: (x, z, type) => plantSeed(new THREE.Vector3(x, 0, z), type),
+                plantSeed, harvestPlant, spawnPest, killPest, buySprinkler, buyScarecrow, buyHarvester,
+                isPlantMature, updatePests, updateHarvesterRobots, updatePlantGrowth
+            };
         }
 
         function setSeedType(type) {
             currentSeedType = type;
-            showNotification(`Semente de ${type} selecionada. Toque no chão para plantar.`, 3000);
-            console.log(`Selected seed: ${type}`);
+            const cost = getSeedCost(type);
+            showNotification(`Semente selecionada (${cost} 🪙). Toque no chão para plantar.`, 3000);
+            refreshShopAffordability();
         }
 
         function onWindowResize() {
@@ -243,53 +502,78 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        function findPlantFromObject(obj) {
+            let o = obj;
+            while (o) {
+                if (o.userData && o.userData.plantData) return o.userData.plantData;
+                o = o.parent;
+            }
+            return null;
+        }
+        function findPestFromObject(obj) {
+            let o = obj;
+            while (o) {
+                if (o.userData && o.userData.pestRef) return o.userData.pestRef;
+                o = o.parent;
+            }
+            return null;
+        }
+
         function onPointerDown(event) {
             // Calcular posição do ponteiro em coordenadas normalizadas (-1 a +1)
             pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
             pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            // Atualizar o raycaster com a câmera e a posição do ponteiro
             raycaster.setFromCamera(pointer, camera);
 
-            // Calcular objetos intersectando o raio
-            const intersects = raycaster.intersectObject(ground); // Intersectar apenas com o chão
+            // 1. Pragas têm prioridade (clicar elimina e dá bônus)
+            if (pests.length > 0) {
+                const pestHits = raycaster.intersectObjects(pests.map(p => p.mesh).filter(Boolean), true);
+                if (pestHits.length > 0) {
+                    const pest = findPestFromObject(pestHits[0].object);
+                    if (pest) { killPest(pest); return; }
+                }
+            }
 
-            if (intersects.length > 0 && currentSeedType) {
-                const intersectPoint = intersects[0].point;
-                plantSeed(intersectPoint, currentSeedType);
-                //currentSeedType = null; // Desselecionar após plantar
-                console.log(`Planted ${currentSeedType} at`, intersectPoint);
-            } else if (intersects.length === 0) {
-                // Tentar tocar nas plantas (opcional - colher melodia)
-                const plantIntersects = raycaster.intersectObjects(plants.map(p => p.mesh).filter(m => m)); // Pega os meshes das plantas
-                if (plantIntersects.length > 0) {
-                    const plant = plantIntersects[0].object.userData.plantData;
-                    console.log(`Tocou na planta: ${plant.type}`);
-                    // Aqui poderia tocar um som aleatório (Web Audio API seria melhor)
-                    try { notificationSound.play(); } catch (e) { console.warn("Audio play failed", e); }
+            // 2. Plantas: morta = limpar canteiro; madura = colher; senão = regar
+            const plantMeshes = plants.map(p => p.mesh).filter(Boolean);
+            const plantHits = raycaster.intersectObjects(plantMeshes, true);
+            if (plantHits.length > 0) {
+                const plant = findPlantFromObject(plantHits[0].object);
+                if (plant) {
+                    if (plant.isDead) { cleanDeadPlant(plant); return; }
+                    if (isPlantMature(plant)) { harvestPlant(plant); return; }
+                    waterPlant(plant); return;
+                }
+            }
 
-                    if (plant.type === 'berrybush' && plant.growthStage === 3) {
-                        plant.growthStage = 2; // Voltar para 'foliage'
-                        scene.remove(plant.mesh);
-                        plant.mesh = createPlantMesh(plant);
-                        plant.mesh.position.copy(plant.position);
-                        if (plant.mesh.type === 'Group') {
-                            plant.mesh.position.y = plant.position.y;
-                        } else {
-                            plant.mesh.position.y = plant.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
-                        }
-                        plant.mesh.castShadow = true;
-                        plant.mesh.userData.plantData = plant;
-                        scene.add(plant.mesh);
-                        showNotification("Colheu bagas! A vida é doce. 🍒", 3000);
-                    } else {
-                        showNotification(`🎶 Melodia suave da ${plant.type} 🎶`, 1500);
-                    }
+            // 3. Chão: plantar a semente selecionada
+            const groundHits = raycaster.intersectObject(ground);
+            if (groundHits.length > 0) {
+                if (currentSeedType) {
+                    plantSeed(groundHits[0].point, currentSeedType);
+                } else {
+                    showNotification('Selecione uma semente na loja para plantar. 🌱', 2000);
                 }
             }
         }
 
+        function cleanDeadPlant(plant) {
+            if (plant.mesh) scene.remove(plant.mesh);
+            if (plant.soilMesh) scene.remove(plant.soilMesh);
+            const idx = plants.indexOf(plant);
+            if (idx >= 0) plants.splice(idx, 1);
+            showNotification('Canteiro limpo. Plante de novo! 🌱', 2500);
+            saveGame();
+        }
+
         function plantSeed(position, type) {
+            // TASK_002: cobra o custo da semente
+            const cost = getSeedCost(type);
+            if (!spendGold(cost)) {
+                showNotification(`Ouro insuficiente! ${type} custa ${cost} 🪙.`, 2500);
+                return;
+            }
+
             // Adicionar variabilidade de tamanho para cada planta individual
             const sizeVariation = 0.85 + Math.random() * 0.3; // Variação de 85% a 115% do tamanho normal
 
@@ -302,7 +586,11 @@
                 mesh: null,
                 notifiedStages: {},
                 sizeVariation: sizeVariation, // Armazenar o fator de escala para esta planta
-                bloomColor: type === 'flower' ? flowerBloomColors[Math.floor(Math.random() * flowerBloomColors.length)] : null
+                bloomColor: type === 'flower' ? flowerBloomColors[Math.floor(Math.random() * flowerBloomColors.length)] : null,
+                moisture: 100,   // TASK_002: umidade do solo
+                growTimer: 0,    // segundos efetivos de crescimento
+                isDead: false,
+                hasPest: false
             };
 
             plantData.mesh = createPlantMesh(plantData);
@@ -312,7 +600,21 @@
 
             plantData.mesh.userData.plantData = plantData;
             scene.add(plantData.mesh);
+
+            // Anel de terra (indicador de umidade)
+            const soilGeo = new THREE.RingGeometry(0.35, 0.6, 24);
+            const soilMat = new THREE.MeshStandardMaterial({ color: 0x3D2314, side: THREE.DoubleSide });
+            const soilMesh = new THREE.Mesh(soilGeo, soilMat);
+            soilMesh.rotation.x = -Math.PI / 2;
+            soilMesh.position.copy(position);
+            soilMesh.position.y = 0.02;
+            soilMesh.receiveShadow = true;
+            scene.add(soilMesh);
+            plantData.soilMesh = soilMesh;
+
             plants.push(plantData);
+            showFloatingText(`-${cost} 🪙`, position, '#ff8a80');
+            saveGame();
         }
 
         function getPlantStages(type) {
@@ -328,17 +630,11 @@
             }
         }
 
+        // TASK_002: retorna a duração BASE do estágio. O efeito do clima agora é
+        // aplicado globalmente via weatherGrowthMultiplier + umidade do solo no loop de crescimento.
         function getGrowthDuration(type, stageName) {
             if (growthTimes[type] && growthTimes[type][stageName] !== undefined) {
-                let duration = growthTimes[type][stageName];
-                // Modificador de clima
-                if (simulatedWeather === 'sunny' && type !== 'mushroom') duration *= 0.8; // Cresce 20% mais rápido no sol
-                if (simulatedWeather === 'rainy' && type === 'mushroom') duration *= 0.7; // Cogumelos 30% mais rápidos na chuva
-                if (simulatedWeather === 'rainy' && type === 'bamboo') duration *= 0.8; // Bambu 20% mais rápido na chuva
-                if (timeOfDay === 'day' && type === 'berrybush') duration *= 0.9; // Arbusto 10% mais rápido de dia
-                if (simulatedWeather === 'rainy' && type === 'lotus') duration *= 0.75; // Lótus 25% mais rápido na chuva
-                if (simulatedWeather === 'rainy' && type !== 'mushroom' && type !== 'bamboo' && type !== 'lotus') duration *= 1.2; // Outras plantas 20% mais lentas na chuva
-                return duration;
+                return growthTimes[type][stageName];
             }
             return Infinity;
         }
@@ -677,66 +973,124 @@
             return mesh;
         }
 
+        function isPlantMature(plant) {
+            const stages = getPlantStages(plant.type);
+            return plant.growthStage >= stages.length - 1;
+        }
+
+        function rebuildPlantMesh(plant) {
+            if (plant.mesh) scene.remove(plant.mesh);
+            plant.mesh = createPlantMesh(plant);
+            if (plant.mesh) {
+                plant.mesh.position.copy(plant.position);
+                if (plant.mesh.type === 'Group') {
+                    plant.mesh.position.y = plant.position.y;
+                } else {
+                    plant.mesh.position.y = plant.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
+                }
+                plant.mesh.castShadow = true;
+                plant.mesh.userData.plantData = plant;
+                scene.add(plant.mesh);
+            }
+        }
+
+        function updateSoilColor(plant) {
+            if (!plant.soilMesh) return;
+            const wet = (plant.moisture ?? 100) >= 30;
+            plant.soilMesh.material.color.set(wet ? 0x3D2314 : 0x9A8A78);
+        }
+
+        function notifyMaturity(plant, newStageName) {
+            const isMatureStage =
+                (plant.type === 'flower' && newStageName === 'bloom') ||
+                (plant.type === 'tree' && newStageName === 'mature') ||
+                (plant.type === 'pinetree' && (newStageName === 'mature' || newStageName === 'ancient')) ||
+                (plant.type === 'mushroom' && newStageName === 'grown') ||
+                (plant.type === 'bamboo' && newStageName === 'dense') ||
+                (plant.type === 'berrybush' && newStageName === 'berry') ||
+                (plant.type === 'lotus' && newStageName === 'bloom');
+            if (!isMatureStage || plant.notifiedStages[newStageName]) return;
+            const messages = {
+                'flower': `Sua flor desabrochou! 🌸 Clique para colher.`,
+                'tree': `Sua árvore está madura! 🌳 Clique para colher.`,
+                'pinetree': `Seu pinheiro está pronto! 🌲 Clique para colher.`,
+                'mushroom': `Seu cogumelo cresceu! 🍄 Clique para colher.`,
+                'bamboo': `Seu bambuzal está denso! 🎋 Clique para colher.`,
+                'berrybush': `Seu arbusto deu frutos! 🍒 Clique para colher.`,
+                'lotus': `Sua lótus desabrochou! 🪷 Clique para colher.`
+            };
+            showNotification(messages[plant.type] || 'Planta pronta para colheita!', 4000);
+            try { notificationSound.play(); } catch (e) { }
+            plant.notifiedStages[newStageName] = true;
+        }
+
         function updatePlantGrowth(deltaTime) {
-            const currentTime = clock.getElapsedTime();
             plants.forEach(plant => {
                 if (!plant.mesh) return;
+
+                // Umidade do solo: chuva ou regador mantêm em 100%; senão decai
+                if (simulatedWeather === 'rainy' || gardenState.sprinklerActive) {
+                    plant.moisture = 100;
+                } else {
+                    const decay = simulatedWeather === 'drought' ? 2 : 1; // %/s
+                    plant.moisture = Math.max(0, (plant.moisture ?? 100) - decay * deltaTime);
+                }
+                updateSoilColor(plant);
+
+                if (plant.isDead) return;            // planta morta não cresce
+                if (isPlantMature(plant)) return;    // já madura
+
+                // Velocidade de crescimento efetiva = clima * solo
+                const soilMult = (plant.moisture > 0) ? 1.0 : 0.1;
+                plant.growTimer = (plant.growTimer || 0) + deltaTime * weatherGrowthMultiplier * soilMult;
+
                 const stages = getPlantStages(plant.type);
-                const currentStageName = stages[plant.growthStage];
-                const timeElapsed = currentTime - plant.plantedTime;
+                let cumulativeTime = 0;
+                for (let i = 1; i <= plant.growthStage + 1; i++) {
+                    cumulativeTime += getGrowthDuration(plant.type, stages[i]);
+                }
 
-                if (plant.growthStage < stages.length - 1) {
-                    const nextStageName = stages[plant.growthStage + 1];
-                    let cumulativeTime = 0;
-                    for (let i = 1; i <= plant.growthStage + 1; i++) {
-                        cumulativeTime += getGrowthDuration(plant.type, stages[i]);
-                    }
-
-                    if (timeElapsed >= cumulativeTime) {
-                        plant.growthStage++;
-                        const newStageName = stages[plant.growthStage];
-                        console.log(`${plant.type} ${plant.id.substring(0, 4)} advanced to ${newStageName}`);
-
-                        scene.remove(plant.mesh);
-                        plant.mesh = createPlantMesh(plant);
-                        if (plant.mesh) {
-                            plant.mesh.position.copy(plant.position);
-                            if (plant.mesh.type === 'Group') {
-                                plant.mesh.position.y = plant.position.y;
-                            } else {
-                                plant.mesh.position.y = plant.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
-                            }
-                            plant.mesh.castShadow = true;
-                            plant.mesh.userData.plantData = plant;
-                            scene.add(plant.mesh);
-
-                            if ((plant.type === 'flower' && newStageName === 'bloom') ||
-                                (plant.type === 'tree' && newStageName === 'mature') ||
-                                (plant.type === 'pinetree' && (newStageName === 'mature' || newStageName === 'ancient')) ||
-                                (plant.type === 'mushroom' && newStageName === 'grown') ||
-                                (plant.type === 'bamboo' && newStageName === 'dense') ||
-                                (plant.type === 'berrybush' && newStageName === 'berry') ||
-                                (plant.type === 'lotus' && newStageName === 'bloom')) {
-                                if (!plant.notifiedStages[newStageName]) {
-                                    const messages = {
-                                        'flower': `Sua ${plant.type} desabrochou! 🌸`,
-                                        'tree': `Sua ${plant.type} está madura! 🌳`,
-                                        'pinetree': newStageName === 'ancient' ? `Seu pinheiro se tornou uma árvore ancestral! 🌲` : `Seu pinheiro atingiu o tamanho máximo! 🌲`,
-                                        'mushroom': `Seu ${plant.type} cresceu! 🍄`,
-                                        'bamboo': `Seu bambuzal está denso! 🎋`,
-                                        'berrybush': `Seu arbusto deu frutos! 🍒`,
-                                        'lotus': `Sua lótus desabrochou e brilha! 🪷`
-                                    };
-                                    const message = plant.type === 'pinetree' ? messages['pinetree'] : messages[plant.type];
-                                    showNotification(message, 5000);
-                                    try { notificationSound.play(); } catch (e) { console.warn("Audio play failed", e); }
-                                    plant.notifiedStages[newStageName] = true;
-                                }
-                            }
-                        }
-                    }
+                if (plant.growTimer >= cumulativeTime) {
+                    plant.growthStage++;
+                    rebuildPlantMesh(plant);
+                    notifyMaturity(plant, stages[plant.growthStage]);
                 }
             });
+        }
+
+        // Colhe uma planta madura: paga ouro (x1.5 na seca) e reinicia o ciclo
+        function harvestPlant(plant, auto = false) {
+            if (!plant || plant.isDead || !isPlantMature(plant)) return false;
+            const value = Math.round(getHarvestValue(plant.type) * goldMultiplier);
+            addGold(value);
+            showFloatingText(`+${value} 🪙${auto ? ' (Auto)' : ''}`, plant.position, '#ffd54a');
+            try { notificationSound.play(); } catch (e) { }
+            // Reinicia o ciclo de crescimento (volta para semente)
+            plant.growthStage = 0;
+            plant.growTimer = 0;
+            plant.plantedTime = clock.getElapsedTime();
+            plant.notifiedStages = {};
+            rebuildPlantMesh(plant);
+            return true;
+        }
+
+        function waterPlant(plant) {
+            plant.moisture = 100;
+            updateSoilColor(plant);
+            showFloatingText('💧', plant.position, '#4fc3f7');
+        }
+
+        function weatherLabel() {
+            return simulatedWeather === 'sunny' ? 'Ensolarado ☀️'
+                 : simulatedWeather === 'rainy' ? 'Chuvoso 🌧️'
+                 : 'Seca 🏜️';
+        }
+
+        function applyWeatherEffects() {
+            if (simulatedWeather === 'rainy') { weatherGrowthMultiplier = 2.0; goldMultiplier = 1.0; }
+            else if (simulatedWeather === 'drought') { weatherGrowthMultiplier = 0.5; goldMultiplier = 1.5; }
+            else { weatherGrowthMultiplier = 1.0; goldMultiplier = 1.0; }
+            setRainVisible(simulatedWeather === 'rainy');
         }
 
         function updateWeather(deltaTime = 0) {
@@ -744,14 +1098,46 @@
             if (timeSinceLastWeatherChange > weatherChangeInterval) {
                 timeSinceLastWeatherChange = 0;
                 const prevState = simulatedWeather;
-                simulatedWeather = Math.random() < 0.7 ? 'sunny' : 'rainy';
-                console.log(`Weather changed to: ${simulatedWeather}`);
+                // Sorteio ponderado: 60% sol / 25% chuva / 15% seca
+                const r = Math.random();
+                simulatedWeather = r < 0.60 ? 'sunny' : (r < 0.85 ? 'rainy' : 'drought');
                 if (prevState !== simulatedWeather) {
+                    applyWeatherEffects();
                     updateAudio();
                     updateSkyColor();
+                    showNotification(`O clima mudou: ${weatherLabel()}`, 3000);
                 }
             }
-            weatherStatusElement.textContent = `Clima: ${simulatedWeather === 'sunny' ? 'Ensolarado ☀️' : 'Chuva Leve 🌧️'}`;
+            weatherStatusElement.textContent = `Clima: ${weatherLabel()}`;
+        }
+
+        // === TASK_002: Sistema de partículas de chuva ===
+        let rainPoints = null;
+        function createRain() {
+            const count = 1500;
+            const positions = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 60;
+                positions[i * 3 + 1] = Math.random() * 40;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 60;
+            }
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({ color: 0x99bbff, size: 0.15, transparent: true, opacity: 0.6 });
+            rainPoints = new THREE.Points(geo, mat);
+            rainPoints.visible = false;
+            scene.add(rainPoints);
+        }
+        function setRainVisible(v) { if (rainPoints) rainPoints.visible = v; }
+        function updateRain(deltaTime) {
+            if (!rainPoints || !rainPoints.visible) return;
+            const pos = rainPoints.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                let y = pos.getY(i) - deltaTime * 25;
+                if (y < 0) y = 40;
+                pos.setY(i, y);
+            }
+            pos.needsUpdate = true;
         }
 
         function updateTimeOfDay(deltaTime) {
@@ -824,10 +1210,13 @@
                 groundCol.set(0x1A4D2E); // Verde bem escuro
             }
 
-            // Modificador de chuva
+            // Modificador de clima
             if (simulatedWeather === 'rainy') {
                 skyCol.lerp(new THREE.Color(0x778899), 0.6); // Cinza
                 groundCol.lerp(new THREE.Color(0x1E5631), 0.4); // Verde mais escuro/molhado
+            } else if (simulatedWeather === 'drought') {
+                skyCol.lerp(new THREE.Color(0xE08B5E), 0.5); // Entardecer desértico quente
+                groundCol.lerp(new THREE.Color(0x9A8A78), 0.45); // Terra seca/bege
             }
 
             // scene.background = skyCol; // Muda o fundo da cena
@@ -907,6 +1296,299 @@
             }
         }
 
+        // === TASK_002: Pragas (lagartas) ===
+        function createCaterpillarMesh() {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4CAF50, roughness: 0.6 });
+            for (let i = 0; i < 3; i++) {
+                const seg = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), bodyMat);
+                seg.position.x = (i - 1) * 0.2;
+                seg.castShadow = true;
+                group.add(seg);
+            }
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            [-0.07, 0.07].forEach(dz => {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), eyeMat);
+                eye.position.set(0.32, 0.06, dz);
+                group.add(eye);
+            });
+            return group;
+        }
+
+        function spawnPest() {
+            if (gardenState.ultrasonicScarecrow) return;
+            const candidates = plants.filter(p => !p.isDead && !p.hasPest && p.growthStage >= 1 && p.mesh);
+            if (candidates.length === 0) return;
+            const target = candidates[Math.floor(Math.random() * candidates.length)];
+            target.hasPest = true;
+
+            const mesh = createCaterpillarMesh();
+            mesh.position.copy(target.position);
+            mesh.position.y = target.position.y + 0.6;
+
+            // Barra de tempo vermelha
+            const bar = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.6, 0.08),
+                new THREE.MeshBasicMaterial({ color: 0xff3333, side: THREE.DoubleSide })
+            );
+            bar.position.set(0, 0.45, 0);
+            mesh.add(bar);
+
+            const pest = { plant: target, mesh, bar, timeLeft: 12, maxTime: 12 };
+            mesh.userData.pestRef = pest;
+            scene.add(mesh);
+            pests.push(pest);
+            showNotification('🐛 Uma praga apareceu! Clique nela para eliminá-la!', 4000);
+            try { notificationSound.play(); } catch (e) { }
+        }
+
+        function updatePests(deltaTime) {
+            if (!gardenState.ultrasonicScarecrow) {
+                timeSinceLastPest += deltaTime;
+                if (timeSinceLastPest >= nextPestInterval) {
+                    timeSinceLastPest = 0;
+                    nextPestInterval = 60 + Math.random() * 60; // 60..120s
+                    spawnPest();
+                }
+            }
+            for (let i = pests.length - 1; i >= 0; i--) {
+                const pest = pests[i];
+                pest.timeLeft -= deltaTime;
+                pest.mesh.rotation.y += deltaTime * 2; // wiggle
+                pest.bar.scale.x = Math.max(0.001, pest.timeLeft / pest.maxTime);
+                pest.bar.lookAt(camera.position);
+                if (pest.timeLeft <= 0) pestDevoursPlant(pest);
+            }
+        }
+
+        function killPest(pest) {
+            addGold(15);
+            showFloatingText('+15 🪙', pest.plant.position, '#8bc34a');
+            spawnPestParticles(pest.mesh.position.clone());
+            removePest(pest);
+            showNotification('Praga eliminada! +15 🪙 de controle biológico. 🐛💥', 2500);
+        }
+
+        function removePest(pest) {
+            if (pest.mesh) scene.remove(pest.mesh);
+            if (pest.plant) pest.plant.hasPest = false;
+            const idx = pests.indexOf(pest);
+            if (idx >= 0) pests.splice(idx, 1);
+        }
+
+        function pestDevoursPlant(pest) {
+            const plant = pest.plant;
+            removePest(pest);
+            if (!plant || plant.isDead) return;
+            plant.isDead = true;
+            if (plant.mesh) scene.remove(plant.mesh);
+            const stump = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08, 0.13, 0.45, 6),
+                new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 1.0 })
+            );
+            stump.position.copy(plant.position);
+            stump.position.y = plant.position.y + 0.22;
+            stump.rotation.z = 0.3;
+            stump.castShadow = true;
+            stump.userData.plantData = plant;
+            plant.mesh = stump;
+            scene.add(stump);
+            showNotification('😢 Uma praga devorou sua planta! Clique no tronco seco para limpar.', 4500);
+            saveGame();
+        }
+
+        function spawnPestParticles(pos) {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshBasicMaterial({ color: 0x8bc34a });
+            const parts = [];
+            for (let i = 0; i < 12; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), mat);
+                p.position.copy(pos);
+                parts.push({ mesh: p, vel: new THREE.Vector3((Math.random() - 0.5), Math.random(), (Math.random() - 0.5)).multiplyScalar(2.5) });
+                group.add(p);
+            }
+            scene.add(group);
+            let life = 0.6;
+            (function anim() {
+                const dt = 0.016;
+                life -= dt;
+                parts.forEach(pp => { pp.mesh.position.addScaledVector(pp.vel, dt); pp.vel.y -= 5 * dt; });
+                if (life > 0) requestAnimationFrame(anim); else scene.remove(group);
+            })();
+        }
+
+        // === TASK_002: Robô colheitadeiro (idle) ===
+        function createHarvesterRobot() {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.7, roughness: 0.3 });
+            const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd54a, metalness: 0.8, roughness: 0.2 });
+            const neonMat = new THREE.MeshStandardMaterial({ color: 0x2196f3, emissive: 0x2196f3, emissiveIntensity: 1.0 });
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 1.0), bodyMat);
+            body.position.y = 0.35; body.castShadow = true; group.add(body);
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), goldMat);
+            cabin.position.set(0, 0.65, -0.1); group.add(cabin);
+            [-0.4, 0.4].forEach(x => [-0.45, 0.45].forEach(z => {
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.15, 12), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                wheel.rotation.z = Math.PI / 2; wheel.position.set(x, 0.18, z); group.add(wheel);
+            }));
+            const light = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), neonMat);
+            light.position.set(0, 0.85, -0.1); group.add(light);
+            group.position.set(-8, 0, -8);
+            return group;
+        }
+
+        function ensureHarvesterRobot() {
+            if (!harvesterRobotMesh && gardenState.harvesterRobots > 0) {
+                harvesterRobotMesh = createHarvesterRobot();
+                scene.add(harvesterRobotMesh);
+            }
+        }
+
+        function fireHarvestLaser(fromPos, toPos) {
+            const geo = new THREE.BufferGeometry().setFromPoints([fromPos, toPos]);
+            const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x2196f3, transparent: true, opacity: 0.9 }));
+            scene.add(line);
+            setTimeout(() => scene.remove(line), 200);
+        }
+
+        function updateHarvesterRobots(deltaTime) {
+            if (gardenState.harvesterRobots <= 0) return;
+            ensureHarvesterRobot();
+            harvesterTimer += deltaTime;
+            if (harvesterTimer < HARVEST_INTERVAL) return;
+            harvesterTimer = 0;
+            const mature = plants.filter(p => !p.isDead && isPlantMature(p));
+            mature.slice(0, gardenState.harvesterRobots).forEach(plant => {
+                if (harvesterRobotMesh) {
+                    const from = harvesterRobotMesh.position.clone(); from.y = 0.7;
+                    const to = plant.position.clone(); to.y += 0.3;
+                    fireHarvestLaser(from, to);
+                }
+                harvestPlant(plant, true);
+            });
+        }
+
+        // === TASK_002: Persistência + ganhos offline (idle) ===
+        function saveGame() {
+            try {
+                gardenState.lastActiveTimestamp = Date.now();
+                const data = {
+                    gold: gardenState.gold,
+                    sprinklerActive: gardenState.sprinklerActive,
+                    harvesterRobots: gardenState.harvesterRobots,
+                    ultrasonicScarecrow: gardenState.ultrasonicScarecrow,
+                    lastActiveTimestamp: gardenState.lastActiveTimestamp,
+                    plants: plants.map(p => ({
+                        type: p.type, x: p.position.x, y: p.position.y, z: p.position.z,
+                        growthStage: p.growthStage, growTimer: p.growTimer, moisture: p.moisture,
+                        isDead: p.isDead, bloomColor: p.bloomColor, sizeVariation: p.sizeVariation
+                    }))
+                };
+                localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+            } catch (e) { console.warn('Falha ao salvar:', e); }
+        }
+
+        function loadGame() {
+            let data;
+            try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { data = null; }
+            if (!data) return;
+            gardenState.gold = data.gold ?? 100;
+            gardenState.sprinklerActive = !!data.sprinklerActive;
+            gardenState.harvesterRobots = data.harvesterRobots || 0;
+            gardenState.ultrasonicScarecrow = !!data.ultrasonicScarecrow;
+            gardenState.lastActiveTimestamp = data.lastActiveTimestamp || Date.now();
+
+            (data.plants || []).forEach(pd => {
+                const pos = new THREE.Vector3(pd.x, pd.y, pd.z);
+                const plantData = {
+                    id: THREE.MathUtils.generateUUID(), type: pd.type, position: pos,
+                    plantedTime: clock.getElapsedTime(), growthStage: pd.growthStage || 0,
+                    mesh: null, notifiedStages: {}, sizeVariation: pd.sizeVariation || 1,
+                    bloomColor: pd.bloomColor || (pd.type === 'flower' ? flowerBloomColors[0] : null),
+                    moisture: pd.moisture ?? 100, growTimer: pd.growTimer || 0, isDead: !!pd.isDead, hasPest: false
+                };
+                if (plantData.isDead) {
+                    const stump = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.08, 0.13, 0.45, 6),
+                        new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 1.0 }));
+                    stump.position.copy(pos); stump.position.y = pos.y + 0.22; stump.rotation.z = 0.3;
+                    stump.castShadow = true; stump.userData.plantData = plantData; plantData.mesh = stump;
+                    scene.add(stump);
+                } else {
+                    plantData.mesh = createPlantMesh(plantData);
+                    if (plantData.mesh) {
+                        plantData.mesh.position.copy(pos);
+                        plantData.mesh.position.y += 0.1;
+                        plantData.mesh.castShadow = true;
+                        plantData.mesh.userData.plantData = plantData;
+                        scene.add(plantData.mesh);
+                    }
+                }
+                const soilMesh = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.6, 24),
+                    new THREE.MeshStandardMaterial({ color: 0x3D2314, side: THREE.DoubleSide }));
+                soilMesh.rotation.x = -Math.PI / 2; soilMesh.position.copy(pos); soilMesh.position.y = 0.02;
+                scene.add(soilMesh); plantData.soilMesh = soilMesh;
+                plants.push(plantData);
+            });
+            ensureHarvesterRobot();
+        }
+
+        function processOfflineEarnings() {
+            const timeAway = (Date.now() - gardenState.lastActiveTimestamp) / 1000;
+            if (timeAway < 10 || gardenState.harvesterRobots <= 0) return;
+            let offlineGold = 0;
+            plants.filter(p => !p.isDead).forEach(plant => {
+                const stages = getPlantStages(plant.type);
+                let cycle = 0;
+                for (let i = 1; i < stages.length; i++) cycle += getGrowthDuration(plant.type, stages[i]);
+                cycle += HARVEST_INTERVAL;
+                if (cycle <= 0) return;
+                const cycles = Math.floor(timeAway / cycle);
+                if (cycles > 0) offlineGold += cycles * getHarvestValue(plant.type);
+            });
+            offlineGold = Math.floor(offlineGold);
+            if (offlineGold > 0) {
+                gardenState.gold += offlineGold;
+                updateGoldUI();
+                showWelcomeModal(offlineGold);
+                saveGame();
+            }
+        }
+
+        function showWelcomeModal(gold) {
+            const modal = document.getElementById('welcomeModal');
+            const text = document.getElementById('welcomeText');
+            if (!modal) return;
+            text.innerHTML = `Seu jardim ocioso rendeu <strong>+${gold} 🪙</strong> enquanto você descansava! 🌟`;
+            modal.style.display = 'flex';
+        }
+
+        // === TASK_002: Compras da loja ===
+        function buySprinkler() {
+            if (gardenState.sprinklerActive) return;
+            if (!spendGold(UPGRADE_COSTS.sprinkler)) { showNotification('Ouro insuficiente! 🪙', 2000); return; }
+            gardenState.sprinklerActive = true;
+            updateGoldUI();
+            showNotification('💧 Regador Automático instalado! O solo fica sempre úmido.', 3000);
+            saveGame();
+        }
+        function buyScarecrow() {
+            if (gardenState.ultrasonicScarecrow) return;
+            if (!spendGold(UPGRADE_COSTS.scarecrow)) { showNotification('Ouro insuficiente! 🪙', 2000); return; }
+            gardenState.ultrasonicScarecrow = true;
+            updateGoldUI();
+            showNotification('🦅 Espantalho Ultrassônico ativo! Sem mais pragas.', 3000);
+            saveGame();
+        }
+        function buyHarvester() {
+            if (!spendGold(UPGRADE_COSTS.harvester)) { showNotification('Ouro insuficiente! 🪙', 2000); return; }
+            gardenState.harvesterRobots++;
+            updateGoldUI();
+            ensureHarvesterRobot();
+            showNotification(`🚜 Robô Colhedor comprado! Frota: ${gardenState.harvesterRobots}.`, 3000);
+            saveGame();
+        }
+
         function animate() {
             requestAnimationFrame(animate);
 
@@ -917,6 +1599,9 @@
             updateTimeOfDay(deltaTime);
             updateButterflies(deltaTime);
             updateClouds(deltaTime);
+            updateRain(deltaTime);
+            updatePests(deltaTime);
+            updateHarvesterRobots(deltaTime);
 
             renderer.render(scene, camera);
         }

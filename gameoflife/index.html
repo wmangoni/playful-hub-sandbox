@@ -64,9 +64,10 @@
         }
 
         #game-canvas {
-            border: 1px solid #999;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #1b2440;
+            background-color: #070913;
+            box-shadow: 0 0 18px rgba(0, 243, 255, 0.25);
+            cursor: crosshair;
         }
 
         .patterns {
@@ -98,6 +99,63 @@
             color: #888;
             text-align: center;
         }
+
+        /* === TASK_002: padrão selecionado + editor de regras === */
+        .pattern-btn.active-preview {
+            background-color: #00bcd4;
+            box-shadow: 0 0 12px rgba(0, 243, 255, 0.7);
+            outline: 2px solid #fff;
+        }
+
+        .rules-panel {
+            margin-top: 18px;
+            background: #0d1426;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 8px;
+            padding: 14px 18px;
+            color: #e2e8f0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            justify-content: center;
+            max-width: 620px;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.15);
+        }
+        .rules-panel h3 {
+            width: 100%;
+            margin: 0 0 4px;
+            font-size: 14px;
+            letter-spacing: 1px;
+            color: #00e5ff;
+            text-align: center;
+        }
+        .rules-field { display: flex; flex-direction: column; gap: 4px; }
+        .rules-field label { font-size: 11px; color: #8fa3c7; text-transform: uppercase; letter-spacing: 0.5px; }
+        .rules-field input, .rules-field select {
+            padding: 6px 8px;
+            background: #16213e;
+            color: #fff;
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+        .rules-field input.rule-text { width: 70px; text-align: center; font-family: monospace; }
+        #apply-rules-btn { background-color: #7c3aed; }
+        #apply-rules-btn:hover { background-color: #6d28d9; }
+
+        .legend {
+            margin-top: 12px;
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+            font-size: 12px;
+            color: #aab;
+        }
+        .legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .legend .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
     </style>
 </head>
 <body>
@@ -127,16 +185,46 @@
     </div>
 
     <div class="patterns">
-        <button class="pattern-btn" data-pattern="glider">Glider</button>
+        <button class="pattern-btn" data-pattern="glider">📐 Glider</button>
+        <button class="pattern-btn" data-pattern="pulsar">🌀 Pulsar</button>
+        <button class="pattern-btn" data-pattern="gosper">🔫 Gosper Glider Gun</button>
         <button class="pattern-btn" data-pattern="blinker">Blinker</button>
         <button class="pattern-btn" data-pattern="toad">Toad</button>
         <button class="pattern-btn" data-pattern="beacon">Beacon</button>
-        <button class="pattern-btn" data-pattern="pulsar">Pulsar</button>
-        <button class="pattern-btn" data-pattern="gosper">Gosper Glider Gun</button>
+    </div>
+
+    <div class="rules-panel">
+        <h3>🔬 Regras Lógicas (B/S) &nbsp;·&nbsp; Estruturas Prontas</h3>
+        <div class="rules-field">
+            <label for="rules-presets">Preset</label>
+            <select id="rules-presets">
+                <option value="B3/S23">Conway Clássico (B3/S23)</option>
+                <option value="B36/S23">HighLife (B36/S23)</option>
+                <option value="B2/S">Seeds (B2/S)</option>
+                <option value="B3678/S34678">Day &amp; Night (B3678/S34678)</option>
+                <option value="B3/S012345678">Life Without Death</option>
+            </select>
+        </div>
+        <div class="rules-field">
+            <label for="rule-birth">Birth (B)</label>
+            <input type="text" id="rule-birth" value="3" class="rule-text">
+        </div>
+        <div class="rules-field">
+            <label for="rule-survival">Survival (S)</label>
+            <input type="text" id="rule-survival" value="23" class="rule-text">
+        </div>
+        <button id="apply-rules-btn">Aplicar</button>
+    </div>
+
+    <div class="legend">
+        <span><span class="swatch" style="background:hsl(190,100%,50%)"></span> Recém-nascida</span>
+        <span><span class="swatch" style="background:hsl(300,100%,55%)"></span> Adulta</span>
+        <span><span class="swatch" style="background:hsl(45,100%,50%)"></span> Ancestral (10+)</span>
+        <span><span class="swatch" style="background:rgba(138,43,226,0.5)"></span> Rastro de morte</span>
     </div>
 
     <div class="footer">
-        <p>Rules: A live cell survives with 2 or 3 neighbors. A dead cell becomes alive with exactly 3 neighbors.</p>
+        <p>Selecione uma estrutura e clique no grid para posicioná-la (pré-visualização fantasma) · <strong>ESC</strong> cancela · clique simples alterna células.</p>
     </div>
 
     <script>
@@ -154,7 +242,14 @@
             let generationCount = 0;
             let animationId = null;
             let speed = 10; // Default speed (frames per second)
-            
+
+            // === TASK_002: regras B/S, envelhecimento e posicionamento fantasma ===
+            const MAX_DECAY = 6;                 // persistência do rastro de morte
+            let birthRules = new Set([3]);       // B3 (Conway clássico)
+            let survivalRules = new Set([2, 3]); // S23
+            let selectedPattern = null;          // matriz do padrão em modo de posicionamento
+            let hoverRow = -1, hoverCol = -1;    // célula sob o cursor
+
             // UI elements
             const startBtn = document.getElementById('start-btn');
             const pauseBtn = document.getElementById('pause-btn');
@@ -164,98 +259,144 @@
             const generationCountEl = document.getElementById('generation-count');
             const populationCountEl = document.getElementById('population-count');
             const patternButtons = document.querySelectorAll('.pattern-btn');
+            const rulesPresets = document.getElementById('rules-presets');
+            const ruleBirthEl = document.getElementById('rule-birth');
+            const ruleSurvivalEl = document.getElementById('rule-survival');
+            const applyRulesBtn = document.getElementById('apply-rules-btn');
             
             // Initialize the grid
             function createEmptyGrid() {
                 return Array(rows).fill().map(() => Array(cols).fill(0));
             }
             
-            // Draw the grid
-            function drawGrid() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw cells
-                for (let i = 0; i < rows; i++) {
-                    for (let j = 0; j < cols; j++) {
-                        if (grid[i][j] === 1) {
-                            ctx.fillStyle = '#333';
-                            ctx.fillRect(j * cellSize, i * cellSize, cellSize - 1, cellSize - 1);
+            // Cor neon da célula conforme a idade (TASK_002)
+            function getCellColor(age) {
+                if (age === 1) {
+                    return 'hsl(190, 100%, 50%)';          // recém-nascida: ciano
+                } else if (age >= 10) {
+                    return 'hsl(45, 100%, 50%)';           // ancestral: dourado
+                } else if (age > 1) {
+                    const hue = 190 + (300 - 190) * ((age - 1) / 8);
+                    return `hsl(${hue}, 100%, 55%)`;       // adulta: ciano -> magenta
+                } else if (age < 0) {
+                    const opacity = 1 - (Math.abs(age) / (MAX_DECAY + 1));
+                    return `rgba(138, 43, 226, ${opacity * 0.35})`; // rastro violeta
+                }
+                return null;
+            }
+
+            // Silhueta do padrão selecionado sob o cursor (modo posicionamento)
+            function drawPatternPreview() {
+                if (!selectedPattern || hoverRow === -1 || hoverCol === -1 || isRunning) return;
+                const patternRows = selectedPattern.length;
+                const patternCols = selectedPattern[0].length;
+                const startRow = hoverRow - Math.floor(patternRows / 2);
+                const startCol = hoverCol - Math.floor(patternCols / 2);
+
+                ctx.fillStyle = 'rgba(0, 243, 255, 0.35)';
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
+                ctx.lineWidth = 1.5;
+                for (let r = 0; r < patternRows; r++) {
+                    for (let c = 0; c < patternCols; c++) {
+                        if (selectedPattern[r][c] === 1) {
+                            const gridRow = (startRow + r + rows) % rows;
+                            const gridCol = (startCol + c + cols) % cols;
+                            ctx.fillRect(gridCol * cellSize, gridRow * cellSize, cellSize - 1, cellSize - 1);
+                            ctx.strokeRect(gridCol * cellSize, gridRow * cellSize, cellSize - 1, cellSize - 1);
                         }
                     }
                 }
-                
-                // Draw grid lines (optional)
-                ctx.strokeStyle = '#ddd';
+            }
+
+            // Draw the grid
+            function drawGrid() {
+                // Fundo escuro espacial para o neon brilhar
+                ctx.fillStyle = '#070913';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw cells (vivas + rastro de morte)
+                for (let i = 0; i < rows; i++) {
+                    for (let j = 0; j < cols; j++) {
+                        const v = grid[i][j];
+                        if (v !== 0) {
+                            const color = getCellColor(v);
+                            if (color) {
+                                ctx.fillStyle = color;
+                                ctx.fillRect(j * cellSize, i * cellSize, cellSize - 1, cellSize - 1);
+                            }
+                        }
+                    }
+                }
+
+                // Linhas de grade sutis
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
                 ctx.lineWidth = 0.5;
-                
-                // Vertical lines
                 for (let i = 0; i <= cols; i++) {
                     ctx.beginPath();
                     ctx.moveTo(i * cellSize, 0);
                     ctx.lineTo(i * cellSize, canvas.height);
                     ctx.stroke();
                 }
-                
-                // Horizontal lines
                 for (let i = 0; i <= rows; i++) {
                     ctx.beginPath();
                     ctx.moveTo(0, i * cellSize);
                     ctx.lineTo(canvas.width, i * cellSize);
                     ctx.stroke();
                 }
+
+                // Silhueta do padrão (placement mode)
+                drawPatternPreview();
             }
-            
-            // Count neighbors for a cell
+
+            // Count ALIVE neighbors for a cell (age >= 1)
             function countNeighbors(grid, row, col) {
                 let count = 0;
                 for (let i = -1; i <= 1; i++) {
                     for (let j = -1; j <= 1; j++) {
                         if (i === 0 && j === 0) continue;
-                        
                         const r = (row + i + rows) % rows; // Wrap around
                         const c = (col + j + cols) % cols; // Wrap around
-                        
-                        count += grid[r][c];
+                        if (grid[r][c] >= 1) count++;
                     }
                 }
                 return count;
             }
-            
-            // Apply Game of Life rules
+
+            // Apply rules with aging + decay trail (B/S customizável)
             function nextGeneration() {
                 const newGrid = createEmptyGrid();
                 let population = 0;
-                
+
                 for (let i = 0; i < rows; i++) {
                     for (let j = 0; j < cols; j++) {
                         const neighbors = countNeighbors(grid, i, j);
-                        
-                        // Apply Conway's Game of Life rules
-                        if (grid[i][j] === 1) {
-                            // Live cell
-                            if (neighbors < 2 || neighbors > 3) {
-                                newGrid[i][j] = 0; // Dies
-                            } else {
-                                newGrid[i][j] = 1; // Survives
+                        const isAlive = grid[i][j] >= 1;
+
+                        if (isAlive) {
+                            if (survivalRules.has(neighbors)) {
+                                newGrid[i][j] = grid[i][j] + 1; // incrementa idade
                                 population++;
+                            } else {
+                                newGrid[i][j] = -1; // morre -> inicia rastro
                             }
                         } else {
-                            // Dead cell
-                            if (neighbors === 3) {
-                                newGrid[i][j] = 1; // Becomes alive
+                            if (birthRules.has(neighbors)) {
+                                newGrid[i][j] = 1; // nasce
                                 population++;
+                            } else if (grid[i][j] < 0) {
+                                newGrid[i][j] = Math.max(-MAX_DECAY, grid[i][j] - 1); // esfria
                             } else {
-                                newGrid[i][j] = 0; // Stays dead
+                                newGrid[i][j] = 0;
                             }
                         }
                     }
                 }
-                
+
                 grid = newGrid;
                 generationCount++;
                 updateStats(population);
-                
-                return population > 0; // Return true if there's still life
+
+                return population > 0; // ainda há vida?
             }
             
             // Update statistics display
@@ -264,12 +405,12 @@
                 populationCountEl.textContent = population;
             }
             
-            // Count current population
+            // Count current population (cells alive, age >= 1)
             function countPopulation() {
                 let count = 0;
                 for (let i = 0; i < rows; i++) {
                     for (let j = 0; j < cols; j++) {
-                        count += grid[i][j];
+                        if (grid[i][j] >= 1) count++;
                     }
                 }
                 return count;
@@ -336,17 +477,21 @@
                 drawGrid();
             }
             
-            // Handle canvas click to toggle cells
+            // Handle canvas click: posicionar padrão selecionado, ou alternar célula
             function handleCanvasClick(event) {
                 const rect = canvas.getBoundingClientRect();
                 const x = event.clientX - rect.left;
                 const y = event.clientY - rect.top;
-                
+
                 const col = Math.floor(x / cellSize);
                 const row = Math.floor(y / cellSize);
-                
-                if (row >= 0 && row < rows && col >= 0 && col < cols) {
-                    grid[row][col] = grid[row][col] ? 0 : 1;
+
+                if (row < 0 || row >= rows || col < 0 || col >= cols) return;
+
+                if (selectedPattern) {
+                    placePatternAt(selectedPattern, row, col);
+                } else {
+                    grid[row][col] = (grid[row][col] >= 1) ? 0 : 1; // alterna viva/morta
                     drawGrid();
                     updateStats(countPopulation());
                 }
@@ -404,32 +549,53 @@
                 ]
             };
             
-            // Place a pattern on the grid
-            function placePattern(pattern, centerRow, centerCol) {
-                clearGrid();
-                
+            // Posiciona um padrão centrado em (centerRow, centerCol), de forma aditiva e com wrap toroidal
+            function placePatternAt(pattern, centerRow, centerCol) {
                 const patternRows = pattern.length;
                 const patternCols = pattern[0].length;
-                
-                const startRow = Math.max(0, centerRow - Math.floor(patternRows / 2));
-                const startCol = Math.max(0, centerCol - Math.floor(patternCols / 2));
-                
-                let population = 0;
-                
+                const startRow = centerRow - Math.floor(patternRows / 2);
+                const startCol = centerCol - Math.floor(patternCols / 2);
+
                 for (let i = 0; i < patternRows; i++) {
                     for (let j = 0; j < patternCols; j++) {
-                        const gridRow = startRow + i;
-                        const gridCol = startCol + j;
-                        
-                        if (gridRow < rows && gridCol < cols) {
-                            grid[gridRow][gridCol] = pattern[i][j];
-                            population += pattern[i][j];
+                        if (pattern[i][j] === 1) {
+                            const gridRow = (startRow + i + rows) % rows;
+                            const gridCol = (startCol + j + cols) % cols;
+                            grid[gridRow][gridCol] = 1; // nasce com idade 1
                         }
                     }
                 }
-                
-                updateStats(population);
+
                 drawGrid();
+                updateStats(countPopulation());
+            }
+
+            // Parser de regras B/S (ex.: "B36/S23")
+            function parseRules(ruleString) {
+                const parts = ruleString.toUpperCase().split('/');
+                const newBirth = new Set();
+                const newSurvival = new Set();
+                parts.forEach(part => {
+                    if (part.startsWith('B')) {
+                        for (let i = 1; i < part.length; i++) { const v = parseInt(part[i]); if (!isNaN(v)) newBirth.add(v); }
+                    } else if (part.startsWith('S')) {
+                        for (let i = 1; i < part.length; i++) { const v = parseInt(part[i]); if (!isNaN(v)) newSurvival.add(v); }
+                    }
+                });
+                birthRules = newBirth;
+                survivalRules = newSurvival;
+            }
+
+            function syncRuleInputs() {
+                ruleBirthEl.value = [...birthRules].sort((a, b) => a - b).join('');
+                ruleSurvivalEl.value = [...survivalRules].sort((a, b) => a - b).join('');
+            }
+
+            function applyRulesFromInputs() {
+                const b = (ruleBirthEl.value || '').replace(/[^0-8]/g, '');
+                const s = (ruleSurvivalEl.value || '').replace(/[^0-8]/g, '');
+                parseRules(`B${b}/S${s}`);
+                syncRuleInputs();
             }
             
             // Event listeners
@@ -449,18 +615,63 @@
                 }
             });
             
+            // Seleção de padrão = modo de posicionamento fantasma (toggle)
             patternButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    const patternName = this.getAttribute('data-pattern');
-                    const pattern = patterns[patternName];
-                    
-                    if (pattern) {
-                        // Place pattern in the center of the grid
-                        placePattern(pattern, Math.floor(rows / 2), Math.floor(cols / 2));
+                    const pattern = patterns[this.getAttribute('data-pattern')];
+                    if (!pattern) return;
+                    const wasActive = this.classList.contains('active-preview');
+                    patternButtons.forEach(b => b.classList.remove('active-preview'));
+                    if (wasActive) {
+                        selectedPattern = null;
+                    } else {
+                        selectedPattern = pattern;
+                        this.classList.add('active-preview');
                     }
+                    drawGrid();
                 });
             });
-            
+
+            // Hover para a silhueta do padrão
+            canvas.addEventListener('mousemove', function(event) {
+                const rect = canvas.getBoundingClientRect();
+                hoverCol = Math.floor((event.clientX - rect.left) / cellSize);
+                hoverRow = Math.floor((event.clientY - rect.top) / cellSize);
+                if (selectedPattern && !isRunning) drawGrid();
+            });
+            canvas.addEventListener('mouseleave', function() {
+                hoverRow = -1; hoverCol = -1;
+                if (selectedPattern && !isRunning) drawGrid();
+            });
+
+            // ESC cancela o posicionamento
+            window.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    selectedPattern = null;
+                    patternButtons.forEach(b => b.classList.remove('active-preview'));
+                    drawGrid();
+                }
+            });
+
+            // Editor de regras B/S
+            rulesPresets.addEventListener('change', function() {
+                parseRules(this.value);
+                syncRuleInputs();
+            });
+            applyRulesBtn.addEventListener('click', applyRulesFromInputs);
+            ruleBirthEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyRulesFromInputs(); });
+            ruleSurvivalEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyRulesFromInputs(); });
+
+            // Hook de depuração/teste (TASK_002)
+            window.__gol = {
+                getGrid: () => grid,
+                setGrid: (g) => { grid = g; },
+                nextGeneration, countNeighbors, getCellColor, parseRules, placePatternAt,
+                getRules: () => ({ birth: [...birthRules], survival: [...survivalRules] }),
+                patterns, createEmptyGrid,
+                rows, cols
+            };
+
             // Initial draw
             drawGrid();
         });
