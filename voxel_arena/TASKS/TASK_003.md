@@ -244,6 +244,90 @@ Adicionar as seguintes regras CSS para animação e visual dos números flutuant
 }
 ```
 
+### 4. Estratégias de Pooling de Objetos (Object Pooling) e Otimização de Memória
+
+Como a batalha contra o Colosso Voxel gera um grande volume de elementos dinâmicos (partículas de lava, esferas de energia, servos voxels e números de dano flutuantes), o desenvolvedor deve implementar um sistema de **Object Pooling** reutilizando instâncias de meshes e elementos DOM para prevenir gargalos de Garbage Collection (GC) e manter a taxa de quadros estável em 60 FPS:
+
+```javascript
+class ObjectPool {
+    constructor(createFn, resetFn, initialSize = 20) {
+        this.createFn = createFn;
+        this.resetFn = resetFn;
+        this.pool = [];
+        
+        for (let i = 0; i < initialSize; i++) {
+            this.pool.push(this.createFn());
+        }
+    }
+    
+    acquire(...args) {
+        let obj = this.pool.length > 0 ? this.pool.pop() : this.createFn();
+        this.resetFn(obj, ...args);
+        return obj;
+    }
+    
+    release(obj) {
+        this.pool.push(obj);
+    }
+}
+
+// Exemplo de uso para Projéteis / Partículas em Three.js:
+const particlePool = new ObjectPool(
+    () => {
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.visible = false;
+        return mesh;
+    },
+    (mesh, position, color) => {
+        mesh.position.copy(position);
+        mesh.material.color.setHex(color);
+        mesh.material.opacity = 1.0;
+        mesh.visible = true;
+    },
+    50
+);
+```
+
+Para os elementos do DOM (Popups de Dano), para evitar `document.createElement` a cada acerto, use um pool de elementos DOM ocultos pre-alocados no `#popup-container`:
+
+```javascript
+class DOMElementPool {
+    constructor(containerId, className, initialSize = 15) {
+        this.container = document.getElementById(containerId);
+        this.className = className;
+        this.pool = [];
+        
+        for (let i = 0; i < initialSize; i++) {
+            const el = document.createElement('div');
+            el.className = this.className;
+            el.style.display = 'none';
+            this.container.appendChild(el);
+            this.pool.push(el);
+        }
+    }
+    
+    acquire(text, color, isCritical) {
+        let el = this.pool.length > 0 ? this.pool.pop() : document.createElement('div');
+        if (!el.parentNode) {
+            this.container.appendChild(el);
+        }
+        el.className = `${this.className} ${isCritical ? 'critical' : ''}`;
+        el.textContent = text;
+        el.style.color = color;
+        el.style.display = 'block';
+        return el;
+    }
+    
+    release(el) {
+        el.style.display = 'none';
+        el.textContent = '';
+        this.pool.push(el);
+    }
+}
+```
+
 ---
 
 ## ❓ Dúvidas para o TL ou o PO
@@ -271,7 +355,7 @@ Abaixo estão homologadas as resoluções técnicas para execução direta:
 
 * **Identificação do Jogo**: `voxel_arena` (Voxel Arena)
 * **Ação**: Nova tarefa de level design e arquitetura adicionada ao backlog global.
-* **Status do Backlog**: Transicionado para `📋 Backlog` no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md).
-* **Destino**: Pronto para ser refinado ou diretamente desenvolvido pelas equipes.
+* **Status do Backlog**: Transicionado para `✅ Refined` no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md).
+* **Destino**: Pronto para desenvolvimento (Ready for Dev).
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*

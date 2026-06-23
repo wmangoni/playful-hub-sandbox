@@ -443,7 +443,7 @@ Como PO experiente em level design e priorizando a experiência do jogador, elab
 
 ---
 
-## ⚔️ 26. Elaboração e Criação de Nova Tarefa: Voxel Arena (TASK_003)
+## ⚔️ 26. Elaboração e Criação de Nova Tarefa: Voxel Arena (TASK_003) - ✅ LIDA
 
 Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **Voxel Arena (voxel_arena)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_arena/TASKS/TASK_003.md):
 
@@ -455,6 +455,44 @@ Como PO experiente em level design e priorizando a experiência do jogador, elab
 *   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🧬 27. Elaboração e Criação de Nova Tarefa: Rede Neural Evolutiva (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na experiência interativa do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o simulador **Rede Neural Evolutiva (rede_neural_evolutiva)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/rede_neural_evolutiva/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Painel de Hiperparâmetros da Evolução (Tempo Real)**: Projetei um painel glassmorphism elegante com sliders dinâmicos para taxa de mutação ($0.0 \to 1.0$), intensidade de mutação ($0.05 \to 2.0$), elitismo ($0.05 \to 0.5$) e fator de aceleração da simulação ($1\text{x} \to 5\text{x}$). Adicionei um seletor para trocar dinamicamente a função de ativação da camada oculta entre `ReLU`, `Sigmoid` e `Tanh` com aplicação instantânea na propagação direta (`feedForward`).
+    *   **Modo Sandbox (Editor de Nível e Obstáculos)**: Criei uma mecânica interativa que suspende o spawn automático de obstáculos e permite ao usuário clicar no `#gameCanvas` para adicionar obstáculos personalizados (definindo largura, altura e velocidade física).
+    *   **Motor de Eventos e Extinção em Massa**: Desenhei um mecanismo (manual por botão, ou automático após 5 gerações sem superação do recorde) que elimina 80% dos piores indivíduos da população, dobra temporariamente a intensidade de mutação dos 20% sobreviventes para escapar de vales de fitness, treme o canvas (`screen-shake`), exibe banners de alerta e gera tons de sirene cibernética dinâmicos.
+    *   **Sintetizador de Áudio via Web Audio API**: Projetei osciladores nativos para reproduzir efeitos de pulo (varredura ascendente curta), colisão/morte (impacto combinando onda dente de serra descendente com ruído branco), novo recorde (arpejo triangular ascendente) e alarme de extinção.
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Retrocompatibilidade de Genomas*: Se no futuro decidirmos mudar as dimensões de entrada/saída do cérebro (por exemplo, adicionar saídas para abaixar/desviar de drones), a rotina de validação e importação JSON definida na TASK_002 precisará ser atualizada de forma correspondente, fornecendo fallbacks automáticos (como preenchimento de pesos vazios com zeros) para manter a retrocompatibilidade com cérebros exportados anteriormente.
+    2.  *Estabilidade Física no Modo Turbo*: O multiplicador de velocidade da simulação ($1\text{x} \to 5\text{x}$) pode causar "teletransporte" ou tunelamento de colisão se os passos de integração física não forem divididos corretamente (substepping) no loop do canvas. O desenvolvedor deve rodar múltiplas atualizações lógicas por frame em vez de multiplicar a velocidade linear dos vetores, garantindo a integridade física em alta velocidade.
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined` devido à riqueza matemática e detalhamento técnico fornecido.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🏢 28. Elaboração e Criação de Nova Tarefa: Company Simulator (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design, focado na imersão estratégica e na experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **Company Simulator (it_simulator)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/it_simulator/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Sistema de Licitação e Projetos Ativos (Quadro de Contratos)**: Substituí a ação genérica "Develop Product" por um quadro de 3 contratos rotativos (com prazos, esforço em pontos, recompensas e multas por atraso) e suporte para aceleração (Rushing) com o dobro de entrega em troca de 15% de estresse para os devs e acúmulo de Dívida Técnica.
+    *   **Mecânica de Dívida Técnica (Tech Debt)**: Adicionei o indicador de Tech Debt (0% a 100%) que se acumula ao usar freelancers ou apressar entregas, resultando em aumento de custos mensais operacionais (Expenses), redução na velocidade de entrega e aumento de risco de vazamento de dados. Desenhei a nova ação de "Refactor Systems ($15.000)" para reduzir a dívida em 25%.
+    *   **Áudio Procedural via Web Audio API**: Desenhei a arquitetura de síntese sonora pura nativa (sem arquivos MP3 externos) contendo uma trilha sonora de fundo lo-fi relaxante em loop e efeitos sonoros para cliques, assinatura de contratos, sucesso de entrega, falhas por prazo e burnout de desenvolvedores.
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Divisão de Esforço*: O desenvolvedor deve programar uma distribuição de pontos justa caso haja múltiplos projetos ativos. A implementação sugere a divisão igualitária da força de entrega final entre todos os contratos ativos no turno.
+    2.  *Validação de Requisitos de Skills*: Ao assinar um contrato, o sistema deve validar se o cargo atual do jogador ou suas skills técnicas atendem ao nível mínimo exigido pelo cliente, gerando logs explicativos em caso de impedimento.
+    3.  *Mitigação de Autoplay de Áudio*: A inicialização do `AudioContext` do sintetizador deve ser executada apenas após o primeiro clique do usuário na tela (ao iniciar a empresa ou ao alternar o controle de som) para evitar bloqueios de segurança dos navegadores.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined` devido à riqueza do detalhamento técnico, mockups e lógica fornecida.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
 
 
 
