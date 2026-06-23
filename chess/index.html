@@ -248,12 +248,12 @@
         }
         .theme-glass .white-1e1d7 {
             background-color: rgba(255, 255, 255, 0.18);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
             box-sizing: border-box;
         }
         .theme-glass .black-3c85d {
             background-color: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.02);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
             box-sizing: border-box;
         }
         .theme-glass img.piece-4a2a4 {
@@ -292,12 +292,12 @@
         }
         .theme-cyber .white-1e1d7 {
             background-color: #1a0826;
-            border: 1px solid rgba(123, 44, 191, 0.3);
+            box-shadow: inset 0 0 0 1px rgba(123, 44, 191, 0.3);
             box-sizing: border-box;
         }
         .theme-cyber .black-3c85d {
             background-color: #0c0812;
-            border: 1px solid rgba(0, 245, 212, 0.2);
+            box-shadow: inset 0 0 0 1px rgba(0, 245, 212, 0.2);
             box-sizing: border-box;
         }
         .theme-cyber img.piece-4a2a4 {
@@ -322,6 +322,40 @@
             background-color: #9d4edd;
             box-shadow: 0 0 15px rgba(0, 245, 212, 0.6);
         }
+
+        /* === TASK_003: Relógio, Puzzles, Juiciness === */
+        .chess-clock-panel { display: flex; gap: 15px; width: 400px; margin: 0 auto 12px; }
+        .clock-display {
+            flex: 1; background: rgba(255, 255, 255, 0.03); border: 2px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px; padding: 8px 12px; text-align: center; backdrop-filter: blur(10px); transition: all 0.3s ease;
+        }
+        .clock-display.active { border-color: #00f5d4; box-shadow: 0 0 15px rgba(0, 245, 212, 0.25); background: rgba(0, 245, 212, 0.03); }
+        .clock-label { font-size: 0.7rem; color: #aaa; letter-spacing: 1px; margin-bottom: 4px; }
+        .clock-time { font-family: 'Courier New', monospace; font-size: 1.6rem; font-weight: bold; color: #fff; }
+        .clock-display.critical-time { border-color: #ff3b30; animation: critical-pulse 0.5s infinite alternate; background: rgba(255, 59, 48, 0.05); }
+        .clock-display.critical-time .clock-time { color: #ff3b30; text-shadow: 0 0 8px rgba(255, 59, 48, 0.6); }
+        @keyframes critical-pulse { from { box-shadow: 0 0 4px rgba(255, 59, 48, 0.2); } to { box-shadow: 0 0 16px rgba(255, 59, 48, 0.65); } }
+
+        .board-container.shake { animation: screen-shake 0.18s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes screen-shake {
+            10%, 90% { transform: translate3d(-3px, 0, 0); } 20%, 80% { transform: translate3d(5px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } 40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+        .highlight-from-neon { box-shadow: inset 0 0 10px #ff007f, 0 0 8px #ff007f !important; }
+        .highlight-to-neon { box-shadow: inset 0 0 10px #00f5d4, 0 0 8px #00f5d4 !important; }
+
+        /* Painel de Desafios Táticos */
+        #puzzlePanel {
+            width: 400px; margin: 12px auto 0; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px; padding: 14px; box-sizing: border-box;
+        }
+        #puzzlePanel h3 { margin: 0 0 8px; font-size: 1.05em; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; }
+        .puzzle-buttons { display: flex; flex-direction: column; gap: 6px; }
+        .puzzle-buttons button { text-align: left; font-size: 0.85em; font-weight: 600; }
+        #puzzleStatus { margin-top: 8px; font-size: 0.85em; min-height: 18px; color: #fbc02d; }
+        #puzzleRatingRow { font-size: 0.8em; color: #9fe6b8; margin-top: 6px; }
+        .puzzle-success { animation: puzzleWin 1.2s ease; }
+        @keyframes puzzleWin { 0% { color: #4ade80; transform: scale(1); } 30% { transform: scale(1.08); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body class="theme-wood">
@@ -331,6 +365,18 @@
         
         <div class="captured-pieces" id="blackCaptured">
             <!-- Peças pretas capturadas -->
+        </div>
+
+        <!-- TASK_003: Relógio de Xadrez Duplo -->
+        <div class="chess-clock-panel">
+            <div class="clock-display" id="clock-black">
+                <div class="clock-label">PRETAS</div>
+                <div class="clock-time" id="time-black">∞</div>
+            </div>
+            <div class="clock-display" id="clock-white">
+                <div class="clock-label">BRANCAS</div>
+                <div class="clock-time" id="time-white">∞</div>
+            </div>
         </div>
 
         <div class="board-flex-wrapper">
@@ -379,8 +425,29 @@
                 <option value="cyber">Neon Cyber</option>
             </select>
 
+            <label for="timeControlSelect" style="font-weight: 600; margin-left: 5px;">⏱ Tempo:</label>
+            <select id="timeControlSelect">
+                <option value="zen" selected>Zen (Sem tempo)</option>
+                <option value="1+0">Bullet 1+0</option>
+                <option value="3+2">Blitz 3+2</option>
+                <option value="5+0">Blitz 5+0</option>
+                <option value="10+0">Rápida 10+0</option>
+            </select>
+
             <button id="toggleHintsBtn" style="font-weight: bold;">💡 Dicas: Ligadas</button>
             <button id="newGameButton" style="font-weight: bold;">Novo Jogo</button>
+        </div>
+
+        <!-- TASK_003: Desafios Táticos -->
+        <div id="puzzlePanel">
+            <h3>♟️ Desafios Táticos (Treinador)</h3>
+            <div class="puzzle-buttons">
+                <button class="puzzle-btn" data-puzzle="0">1 · Xeque-Mate do Pastor (Mate em 1)</button>
+                <button class="puzzle-btn" data-puzzle="1">2 · Mate do Corredor (Mate em 1)</button>
+                <button class="puzzle-btn" data-puzzle="2">3 · Garfo de Cavalo (Ganho de Peça)</button>
+            </div>
+            <div id="puzzleStatus"></div>
+            <div id="puzzleRatingRow">Rating Tático: <strong id="puzzle-rating-val">1200</strong> · <button id="exitPuzzleBtn" style="font-size:0.85em; padding:2px 8px;">Sair do Modo Puzzle</button></div>
         </div>
 
         <!-- Painel de Notação PGN/FEN e Replay -->
@@ -1110,6 +1177,8 @@
             if (openingMoveSAN) {
                  const moveResult = game.move(openingMoveSAN);
                  if (moveResult) {
+                     playMoveSound();
+                     afterMove(moveResult); // TASK_003
                      board.position(game.fen());
                      updateStatus();
                      bookMoveMade = true;
@@ -1128,7 +1197,8 @@
                         game.move(move.san);
                         playMoveSound();
                         highlightMove(move.from, move.to);
-                        
+                        afterMove(game.history({ verbose: true }).slice(-1)[0]); // TASK_003
+
                         board.position(game.fen());
                         updateStatus();
                     } else {
@@ -1238,7 +1308,14 @@
         // --- Handlers de Drag and Drop ---
         function onDragStart(source, piece, position, orientation) {
             removeLegalMoveHighlights();
-            
+
+            // TASK_003: no Modo Puzzle, permite arrastar a peça do lado que deve jogar
+            if (currentActivePuzzle) {
+                if (game.game_over() || piece.charAt(0) !== game.turn()) return false;
+                showLegalMoves(source);
+                return;
+            }
+
             if (game.game_over() || game.turn() !== playerColor || piece.search(/^b/) !== -1) {
                 return false;
             }
@@ -1248,16 +1325,24 @@
         function onDrop(source, target) {
             removeLegalMoveHighlights();
 
+            // TASK_003: interceptação do Modo Puzzle (não envolve a IA)
+            if (currentActivePuzzle) {
+                const ok = handlePuzzleMove(source, target);
+                if (!ok) return 'snapback';
+                updateStatus();
+                return;
+            }
+
             // Desativa controles de replay ao fazer jogada manual
             document.getElementById('replayControls').style.display = 'none';
             replayMoves = [];
             replayIndex = -1;
 
             const capturedPiece = game.get(target);
-            
-            var move = game.move({ 
-                from: source, 
-                to: target, 
+
+            var move = game.move({
+                from: source,
+                to: target,
                 promotion: 'q'
             });
 
@@ -1265,6 +1350,7 @@
 
             playMoveSound();
             highlightMove(source, target);
+            afterMove(move); // TASK_003: relógio + áudio de captura/xeque + juiciness
 
             updateStatus();
             
@@ -1276,10 +1362,11 @@
                         
                         game.move(randomMove);
                         playMoveSound();
-                        
+
                         const lastMove = game.history({verbose: true})[game.history().length - 1];
                         highlightMove(lastMove.from, lastMove.to);
-                        
+                        afterMove(lastMove); // TASK_003
+
                         board.position(game.fen());
                         updateStatus();
                     }, 400);
@@ -1447,6 +1534,225 @@
                 arrowLine.setAttribute('stroke', '#ff9800');
             }
         });
+
+        // ============================================================
+        // === TASK_003 — Relógio, Puzzles Táticos, Áudio Synth, Juiciness
+        // ============================================================
+
+        // --- Web Audio API Synth (lazy, resiliente) ---
+        let chessAudioCtx = null;
+        function getAudioContext() {
+            if (!chessAudioCtx) { try { chessAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+            if (chessAudioCtx && chessAudioCtx.state === 'suspended') chessAudioCtx.resume();
+            return chessAudioCtx;
+        }
+        function synthBeep(frequency, duration, type = 'sine', volume = 0.2) {
+            try {
+                const ctx = getAudioContext(); if (!ctx) return;
+                const osc = ctx.createOscillator(), g = ctx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+                g.gain.setValueAtTime(volume, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+                osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + duration);
+            } catch (e) { }
+        }
+        const ChessSFX = {
+            playMove() {
+                try { const ctx = getAudioContext(); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'triangle'; o.frequency.setValueAtTime(800, ctx.currentTime); o.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.04);
+                    g.gain.setValueAtTime(0.22, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.05);
+                    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.05); } catch (e) { }
+            },
+            playCapture() {
+                try { const ctx = getAudioContext(); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'sawtooth'; o.frequency.setValueAtTime(250, ctx.currentTime); o.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.08);
+                    g.gain.setValueAtTime(0.3, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+                    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.08); } catch (e) { }
+            },
+            playCheck() { synthBeep(1100, 0.06, 'sine', 0.25); setTimeout(() => synthBeep(1300, 0.08, 'sine', 0.25), 80); },
+            playVictory() { [261.63, 329.63, 392.00, 523.25].forEach((f, i) => setTimeout(() => synthBeep(f, 0.35, 'sine', 0.2), i * 120)); }
+        };
+
+        // --- Relógio de Xadrez ---
+        let clockTimer = null, clockEnabled = false;
+        const clockState = { white: 0, black: 0, increment: 0, active: false, lastTick: 0, mode: 'zen' };
+        function selectTimePreset(mode) {
+            clearInterval(clockTimer); clockTimer = null;
+            clockState.active = false; clockState.mode = mode;
+            document.getElementById('clock-white').classList.remove('active', 'critical-time');
+            document.getElementById('clock-black').classList.remove('active', 'critical-time');
+            if (mode === 'zen') {
+                clockEnabled = false;
+                document.getElementById('time-white').textContent = '∞';
+                document.getElementById('time-black').textContent = '∞';
+                return;
+            }
+            clockEnabled = true;
+            const [m, inc] = mode.split('+').map(Number);
+            clockState.white = m * 60 * 1000;
+            clockState.black = m * 60 * 1000;
+            clockState.increment = (inc || 0) * 1000;
+            updateClockDisplay();
+        }
+        function startTimer() {
+            if (clockState.active || !clockEnabled) return;
+            clockState.active = true; clockState.lastTick = performance.now();
+            document.getElementById('clock-' + (game.turn() === 'w' ? 'white' : 'black')).classList.add('active');
+            clockTimer = setInterval(() => {
+                const now = performance.now(), delta = now - clockState.lastTick; clockState.lastTick = now;
+                const c = game.turn();
+                if (c === 'w') { clockState.white = Math.max(0, clockState.white - delta); if (clockState.white === 0) handleTimeOut('w'); }
+                else { clockState.black = Math.max(0, clockState.black - delta); if (clockState.black === 0) handleTimeOut('b'); }
+                updateClockDisplay();
+            }, 50);
+        }
+        function switchTurnsTimer() {
+            if (!clockEnabled) return;
+            if (!clockState.active) { startTimer(); return; }
+            const justPlayed = game.turn() === 'b' ? 'w' : 'b'; // se agora é a vez das pretas, brancas jogaram
+            if (justPlayed === 'w') { clockState.white += clockState.increment; document.getElementById('clock-white').classList.remove('active'); document.getElementById('clock-black').classList.add('active'); }
+            else { clockState.black += clockState.increment; document.getElementById('clock-black').classList.remove('active'); document.getElementById('clock-white').classList.add('active'); }
+            updateClockDisplay();
+        }
+        function formatClock(ms) {
+            const totalSecs = Math.floor(ms / 1000), minutes = Math.floor(totalSecs / 60), seconds = totalSecs % 60, cs = Math.floor((ms % 1000) / 10);
+            if (minutes < 1) return `${String(seconds).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        let lastTickTime = 0;
+        function maybeTick(ms) {
+            if (ms < 10000 && ms > 0) { const now = performance.now(); if (now - lastTickTime > 1000) { synthBeep(440, 0.05, 'triangle', 0.15); lastTickTime = now; } }
+        }
+        function updateClockDisplay() {
+            if (!clockEnabled) return;
+            document.getElementById('time-white').textContent = formatClock(clockState.white);
+            document.getElementById('time-black').textContent = formatClock(clockState.black);
+            const wc = document.getElementById('clock-white'), bc = document.getElementById('clock-black');
+            if (clockState.white < 10000 && clockState.white > 0) { wc.classList.add('critical-time'); if (game.turn() === 'w') maybeTick(clockState.white); } else wc.classList.remove('critical-time');
+            if (clockState.black < 10000 && clockState.black > 0) { bc.classList.add('critical-time'); if (game.turn() === 'b') maybeTick(clockState.black); } else bc.classList.remove('critical-time');
+        }
+        function handleTimeOut(color) {
+            clearInterval(clockTimer); clockTimer = null; clockState.active = false;
+            const winner = color === 'w' ? 'Pretas' : 'Brancas';
+            document.getElementById('status').innerHTML = `🚨 Fim de Tempo! Vitória das <strong>${winner}</strong>.`;
+            document.getElementById('turn').textContent = `Tempo esgotado — ${winner} vencem`;
+            board.draggable = false;
+            ChessSFX.playVictory();
+        }
+
+        // --- Desafios Táticos (Puzzles) ---
+        const CHESS_PUZZLES = [
+            { id: 1, title: "Xeque-Mate do Pastor (Mate em 1)", fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 1", solution: { from: 'h5', to: 'f7' }, feedback: "A Dama apoiada pelo Bispo esmaga a defesa do Rei." },
+            { id: 2, title: "Mate do Corredor (Mate em 1)", fen: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1", solution: { from: 'd1', to: 'd8' }, feedback: "O mate na fila do fundo — clássico de torneios." },
+            { id: 3, title: "Garfo de Cavalo (Ganho de Peça)", fen: "r3k2r/ppp2ppp/8/8/1n1q4/8/PP3PPP/R3K2R b KQkq - 0 1", solution: { from: 'b4', to: 'c2' }, feedback: "O garfo de Cavalo ataca Rei e Torre simultaneamente!" }
+        ];
+        let currentActivePuzzle = null, puzzleRating = 1200;
+        function startPuzzle(idx) {
+            const p = CHESS_PUZZLES[idx]; if (!p) return;
+            getAudioContext();
+            selectTimePreset('zen'); // pausa o relógio durante o puzzle
+            document.getElementById('timeControlSelect').value = 'zen';
+            game.load(p.fen);
+            board.position(p.fen);
+            currentActivePuzzle = p;
+            removeNeon();
+            document.getElementById('status').innerHTML = `🧩 <strong>${p.title}</strong> — encontre o melhor lance!`;
+            document.getElementById('turn').textContent = game.turn() === 'w' ? 'Vez das Brancas' : 'Vez das Pretas';
+            document.getElementById('puzzleStatus').textContent = 'Resolva o desafio tático.';
+            document.getElementById('replayControls').style.display = 'none';
+        }
+        function handlePuzzleMove(source, target) {
+            const sol = currentActivePuzzle.solution;
+            if (source === sol.from && target === sol.to) {
+                game.move({ from: source, to: target, promotion: 'q' });
+                board.position(game.fen());
+                afterMove(game.history({ verbose: true }).slice(-1)[0]);
+                puzzleRating += 15; document.getElementById('puzzle-rating-val').textContent = puzzleRating;
+                const ps = document.getElementById('puzzleStatus');
+                ps.textContent = '🏆 SUCESSO TÁTICO! ' + currentActivePuzzle.feedback;
+                ps.className = 'puzzle-success'; setTimeout(() => ps.className = '', 1200);
+                ChessSFX.playVictory();
+                currentActivePuzzle = null;
+                return true;
+            } else {
+                synthBeep(150, 0.3, 'sawtooth', 0.3);
+                puzzleRating = Math.max(800, puzzleRating - 10); document.getElementById('puzzle-rating-val').textContent = puzzleRating;
+                document.getElementById('puzzleStatus').textContent = '❌ Lance incorreto! O puzzle foi reiniciado.';
+                board.position(currentActivePuzzle.fen); game.load(currentActivePuzzle.fen);
+                return false;
+            }
+        }
+        function exitPuzzleMode() {
+            currentActivePuzzle = null;
+            document.getElementById('puzzleStatus').textContent = 'Modo puzzle encerrado. Clique em "Novo Jogo".';
+        }
+
+        // --- Juiciness ---
+        function triggerScreenShake() {
+            const el = document.querySelector('.board-container'); if (!el) return;
+            el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 200);
+        }
+        function removeNeon() { $('#myBoard .square-55d63').removeClass('highlight-from-neon highlight-to-neon'); }
+        function neonHighlight(from, to) {
+            removeNeon();
+            $(`#myBoard .square-${from}`).addClass('highlight-from-neon');
+            $(`#myBoard .square-${to}`).addClass('highlight-to-neon');
+        }
+        function spawnCaptureParticles(squareName) {
+            const squareEl = document.querySelector(`#myBoard .square-${squareName}`);
+            const overlay = document.getElementById('boardOverlay');
+            if (!squareEl || !overlay) return;
+            const rect = squareEl.getBoundingClientRect(), boardRect = document.getElementById('myBoard').getBoundingClientRect();
+            const startX = (rect.left + rect.width / 2) - boardRect.left, startY = (rect.top + rect.height / 2) - boardRect.top;
+            for (let i = 0; i < 12; i++) {
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', startX); circle.setAttribute('cy', startY);
+                circle.setAttribute('r', Math.random() * 3 + 2);
+                circle.setAttribute('fill', i % 2 === 0 ? '#ff007f' : '#00f5d4');
+                overlay.appendChild(circle);
+                const angle = Math.random() * Math.PI * 2, speed = Math.random() * 4 + 2;
+                let vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed - 2, posX = startX, posY = startY, opacity = 1.0;
+                (function animateParticle() {
+                    vy += 0.2; posX += vx; posY += vy; opacity -= 0.035;
+                    circle.setAttribute('cx', posX); circle.setAttribute('cy', posY); circle.setAttribute('opacity', opacity);
+                    if (opacity > 0) requestAnimationFrame(animateParticle); else circle.remove();
+                })();
+            }
+        }
+
+        // --- Efeitos pós-lance: sons + relógio + juiciness ---
+        function afterMove(move) {
+            if (!move) return;
+            neonHighlight(move.from, move.to);
+            const isCapture = !!move.captured || (move.flags && (move.flags.includes('c') || move.flags.includes('e')));
+            if (isCapture) {
+                ChessSFX.playCapture(); // síntese metálica (o "pop" mp3 base já toca em playMoveSound)
+                spawnCaptureParticles(move.to);
+                if (move.captured === 'q' || move.captured === 'r') triggerScreenShake();
+            }
+            if (game.in_checkmate()) { ChessSFX.playVictory(); }
+            else if (game.in_check()) { ChessSFX.playCheck(); triggerScreenShake(); }
+            if (clockEnabled) switchTurnsTimer();
+        }
+
+        // --- Wiring TASK_003 ---
+        document.getElementById('timeControlSelect').addEventListener('change', function () { getAudioContext(); selectTimePreset(this.value); });
+        document.querySelectorAll('.puzzle-btn').forEach(b => b.addEventListener('click', () => startPuzzle(parseInt(b.dataset.puzzle))));
+        document.getElementById('exitPuzzleBtn').addEventListener('click', exitPuzzleMode);
+        document.getElementById('newGameButton').addEventListener('click', function () {
+            currentActivePuzzle = null;
+            document.getElementById('puzzleStatus').textContent = '';
+            removeNeon();
+            selectTimePreset(document.getElementById('timeControlSelect').value); // reinicia o relógio
+        });
+
+        // Hook de teste (TASK_003)
+        window.__chess = {
+            getClockState: () => clockState, selectTimePreset, switchTurnsTimer, formatClock, handleTimeOut,
+            CHESS_PUZZLES, startPuzzle, handlePuzzleMove, exitPuzzleMode,
+            getPuzzle: () => currentActivePuzzle, getRating: () => puzzleRating,
+            ChessSFX, afterMove, triggerScreenShake, gameRef: () => game
+        };
 
         // --- Configuração Chessboard.js ---
         var config = {

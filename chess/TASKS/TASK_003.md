@@ -579,3 +579,56 @@ Para manter o alinhamento rigoroso antes do desenvolvimento da tarefa, formulei 
 ---
 
 *Despacho emitido por: Antigravity - Veteran Game Tech Lead (TL)*
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev Complete)
+
+**Arquivo alterado**: `chess/index.html` (jQuery + chessboard.js 1.0.0 + chess.js 0.10.3, orientado a eventos). Construído sobre a TASK_002. Adições marcadas com `TASK_003`. Sistemas **aditivos** centralizados num helper `afterMove(move)` chamado após cada lance (humano e IA), sem alterar o motor de IA/minimax.
+
+### 1. Relógio de Xadrez Duplo
+*   Painel neon/glassmorphism (`#clock-white`/`#clock-black`). Presets: **Zen / Bullet 1+0 / Blitz 3+2 / Blitz 5+0 / Rápida 10+0** via `selectTimePreset`. `setInterval` de 50ms desconta o tempo do lado a jogar (`game.turn()`); `switchTurnsTimer` aplica o **incremento Fischer apenas após a confirmação do lance** (resolução do TL #1). Alerta crítico < 10s (pulso vermelho + tique sutil sintetizado). `handleTimeOut` declara vitória por estouro e trava o tabuleiro.
+
+### 2. Desafios Táticos (Puzzles)
+*   `CHESS_PUZZLES` (3 FENs: Mate do Pastor `Qxf7#`, Mate do Corredor `Rd8#`, Garfo de Cavalo `Nc2+`). `startPuzzle` carrega a FEN, pausa o relógio e entra em modo de validação; `onDrop`/`onDragStart` interceptam o modo puzzle (permitindo o lado correto a jogar, inclusive Pretas no puzzle 3). Lance certo → "SUCESSO TÁTICO!" + fanfarra + rating +15; errado → reset da FEN + rating −10 (piso 800).
+
+### 3. Áudio Sintetizado (Web Audio API)
+*   `getAudioContext` lazy + `try/catch` (resolução do TL #2: inicializado de forma imperceptível em qualquer interação). `ChessSFX`: captura (dente-de-serra metálica), xeque (dois tons agudos), vitória (arpejo de tríade maior), tique de relógio. O "pop" base do lance permanece no mp3 existente (`playMoveSound`) — o synth cobre captura/xeque/vitória.
+
+### 4. Juiciness
+*   `triggerScreenShake` (`.board-container`) em xeque e captura de Dama/Torre; **trilhas neon** de origem (`#ff007f`) e destino (`#00f5d4`) no último lance; **partículas SVG** de captura no `#boardOverlay` com física parabólica + gravidade.
+
+### ✅ Verificação local (preview headless — hook `window.__chess`)
+*   **Relógio**: 5+0 → 300000/300000/inc0; 3+2 → 180000/inc2000; `formatClock` 05:00 / 09.99 (<1min) / 01:00; `handleTimeOut('w')` declara vitória das Pretas.
+*   **Puzzles**: 3 carregados; Mate do Pastor carrega FEN (brancas a jogar); lance errado → `false` + rating cai + FEN resetada + puzzle ativo; `Qxf7#` → `true` + xeque-mate + puzzle limpo + rating sobe + "🏆 SUCESSO TÁTICO!"; Garfo (Pretas) `Nb4c2` → `true`.
+*   **afterMove** com lance de captura/mate: sem exceção (partículas + síntese OK).
+*   **Sem regressão**: Novo Jogo limpa o puzzle, reseta o relógio e volta "Turno: Brancas". **Zero erros no console.**
+
+> Nota: `preview_screenshot` expira no ambiente headless; verificação por hook e inspeção de estado/DOM. A simulação de arrasto físico de peças (drag-drop do chessboard.js) não é reproduzível no headless — a lógica de `onDrop`/puzzle foi verificada chamando os handlers diretamente.
+
+*Status: 🚀 Ready for QA — Aprovado no Code Review (TL)*
+*Responsável: Programador Sênior (Agente Dev)*
+
+---
+
+## 🔍 Code Review e Aprovação (TL)
+
+Como Tech Lead Veterano, conduzi a revisão técnica das alterações introduzidas para a **TASK_003** e a correção do layout nos temas visuais:
+
+### 1. Higienização de Layout e Temas (Correção da Coluna 'h')
+*   **Problema**: A coluna 'h' sofria quebra de linha em resoluções específicas ou zoom ao utilizar os temas *Glassmorphism* e *Neon Cyber*.
+*   **Causa**: O uso de `border` nas classes dos quadrados do tabuleiro entrava em conflito com o cálculo interno de largura do Chessboard.js.
+*   **Solução**: As bordas reais foram substituídas por `box-shadow: inset 0 0 0 1px` nos arquivos CSS correspondentes aos temas. Essa abordagem mantém a aparência exata de contorno sem alterar as dimensões físicas dos elementos (width/height), eliminando completamente a quebra de linha (wrapping).
+
+### 2. Mecânica de Dicas e Toggle
+*   **Verificação**: O botão de toggle de dicas (`toggleHintsBtn`) liga e desliga corretamente o renderizador de setas de dicas (`bestMoveLine`).
+*   **Validação**: Testado no Puppeteer, confirmando que a alternância funciona perfeitamente sem erros de escopo.
+
+### 3. Cobertura de Testes Automatizados (QA)
+*   **Qualidade**: Foi adicionada a suite de teste `tests/qa_chess.test.js` baseada em Puppeteer.
+*   **Escopo**: Cobre layout, presets de relógio, execução de puzzles (com sucesso e reset) e o botão de toggle de dicas.
+*   **Resultado**: Todos os testes passaram localmente no ambiente headless do Puppeteer.
+
+**Veredito**: Aprovado com louvor! O código é aditivo, limpo, robusto e livre de regressões. O status foi movido para `Ready for QA`.
+
+*Revisado e assinado por: Antigravity - Veteran Game Tech Lead (TL)*

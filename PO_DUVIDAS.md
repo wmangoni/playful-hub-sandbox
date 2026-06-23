@@ -89,7 +89,7 @@ Durante a análise exploratória da raiz do repositório para a criação da nov
 
 ---
 
-## 🧩 5. Elaboração e Criação de Nova Tarefa: Tetris (TASK_003)
+## 🧩 5. Elaboração e Criação de Nova Tarefa: Tetris (TASK_003) - ✅ LIDA
 
 Para dar continuidade à evolução de qualidade da plataforma **Playful Hub**, elaborei e criei formalmente a tarefa **TASK_003** para o jogo **Tetris**, focando em mecânicas clássicas e de alto impacto de Game Design e Retenção do Jogador:
 
@@ -104,7 +104,7 @@ Para dar continuidade à evolução de qualidade da plataforma **Playful Hub**, 
 
 ---
 
-## 🏎️ 6. Elaboração e Criação de Nova Tarefa: Driving Simulator (TASK_003)
+## 🏎️ 6. Elaboração e Criação de Nova Tarefa: Driving Simulator (TASK_003) - ✅ LIDA
 
 Para expandir as possibilidades de jogabilidade e refinar o level design do **Driving Simulator**, criei e elaborei formalmente a especificação técnica de **TASK_003** focada na retenção do jogador e interações premium em Three.js 3D:
 
@@ -119,7 +119,7 @@ Para expandir as possibilidades de jogabilidade e refinar o level design do **Dr
 
 ---
 
-## 🐍 7. Elaboração e Criação de Nova Tarefa: Snake Game (TASK_003)
+## 🐍 7. Elaboração e Criação de Nova Tarefa: Snake Game (TASK_003) - ✅ LIDA
 
 Como PO experiente em level design e focado na experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o **Snake Game** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/snake/TASKS/TASK_003.md):
 
@@ -135,7 +135,7 @@ Não encontrei nenhum percalço ou inconsistência ao criar a tarefa; a base do 
 
 ---
 
-## ⚔️ 8. Elaboração e Criação de Nova Tarefa: Voxel Arena (TASK_002)
+## ⚔️ 8. Elaboração e Criação de Nova Tarefa: Voxel Arena (TASK_002) - ✅ LIDA
 
 Como PO experiente em jogos e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_002** para o **Voxel Arena** no arquivo [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_arena/TASKS/TASK_002.md):
 
@@ -153,7 +153,7 @@ Não encontrei nenhum percalço técnico na base de código do Voxel Arena; o pr
 
 ---
 
-## 🚀 9. Elaboração e Criação de Nova Tarefa: Space Shooter (TASK_003)
+## 🚀 9. Elaboração e Criação de Nova Tarefa: Space Shooter (TASK_003) - ✅ LIDA
 
 Como PO sênior especializado em jogos e game feel, elaborei e criei com sucesso a especificação de **TASK_003** para o jogo **Space Shooter** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_003.md):
 
@@ -170,7 +170,7 @@ Não foram detectados percalços durante o refinamento; a base do Space Shooter 
 
 ---
 
-## 👑 10. Elaboração e Criação de Nova Tarefa: Chess (TASK_003)
+## 👑 10. Elaboração e Criação de Nova Tarefa: Chess (TASK_003) - ✅ LIDA
 
 Como PO sênior de jogos focado em game feel, mecânicas competitivas e retenção de jogadores, elaborei e criei com sucesso a especificação de **TASK_003** para o jogo **Chess** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/chess/TASKS/TASK_003.md):
 
@@ -208,7 +208,7 @@ Como PO experiente e sênior em jogos, analisei detalhadamente a base de código
 
 ---
 
-## 🦠 12. Elaboração e Criação de Nova Tarefa: Conway's Game of Life (TASK_003)
+## 🦠 12. Elaboração e Criação de Nova Tarefa: Conway's Game of Life (TASK_003) - ✅ LIDA
 
 Como PO experiente em level design e focado na experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o **Conway's Game of Life** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/gameoflife/TASKS/TASK_003.md):
 
@@ -224,7 +224,7 @@ Não foram identificadas inconsistências ou percalços na base de código do Co
 
 ---
 
-## 🏹 13. Elaboração e Criação de Nova Tarefa: The Archer (TASK_003)
+## 🏹 13. Elaboração e Criação de Nova Tarefa: The Archer (TASK_003) - ✅ LIDA
 
 Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **The Archer** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/archer/TASKS/TASK_003.md):
 
@@ -241,7 +241,7 @@ Não foram encontrados novos percalços técnicos ou inconsistências estruturai
 
 ---
 
-## 🌿 14. Elaboração e Criação de Nova Tarefa: Lazy Gardener (TASK_003)
+## 🌿 14. Elaboração e Criação de Nova Tarefa: Lazy Gardener (TASK_003) - ✅ LIDA
 
 Como PO experiente em jogos e focado na experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **Lazy Gardener** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/lazy_gardner/TASKS/TASK_003.md):
 
@@ -258,7 +258,7 @@ Não foram encontrados percalços ou inconsistências na base de código do Lazy
 
 ---
 
-## 🃏 15. Elaboração e Criação de Nova Tarefa: Poker Texas Hold'em (TASK_003)
+## 🃏 15. Elaboração e Criação de Nova Tarefa: Poker Texas Hold'em (TASK_003) - ✅ LIDA
 
 Como PO experiente em jogos, focado em game feel, mecânicas competitivas e na jornada do jogador, elaborei e criei a especificação técnica da **TASK_003** para o jogo **Poker Texas Hold'em** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/poker/TASKS/TASK_003.md):
 
@@ -276,7 +276,7 @@ Não foram detectados percalços que impeçam a implementação da tarefa; a bas
 
 ---
 
-## 🧩 16. Limitação Técnica Identificada e Criação de Nova Tarefa: Rubik's Cube (TASK_003)
+## 🧩 16. Limitação Técnica Identificada e Criação de Nova Tarefa: Rubik's Cube (TASK_003) - ✅ LIDA E CONFIRMADA
 
 Como PO focado na experiência do usuário e no fluxo do jogo, elaborei a **TASK_003** do **Rubik's Cube** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/rubiks_cube/TASKS/TASK_003.md) e a registrei no backlog global como `✅ Refined`.
 
@@ -288,11 +288,173 @@ No entanto, durante a análise da base de código e da entrega da **TASK_002**, 
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
 
+---
 
+## ⚔️ 17. Elaboração e Criação de Nova Tarefa: RPG Adventure Quest (TASK_003) - ✅ LIDA
 
+Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **RPG Adventure Quest (ded)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_003.md):
 
+*   **O que foi feito**:
+    *   **Combate Interativo por Turnos (Combat Screen)**: Substituição do loop `do-while` síncrono por uma tela dedicada de combate por turnos com barra de HP interativa do inimigo e seleção ativa de habilidades baseadas na classe (ex: *Golpe Heroico* com vantagem para Guerreiro, *Míssil Mágico* de acerto garantido para Mago e *Ataque Furtivo* para Ladino).
+    *   **Minimapa de Exploração Dinâmico**: Projetei um mapa visual em SVG/Canvas exibindo nós de salas (Combates ⚔️, Mercador 🪙, Mistérios ❓, Chefes 💀) com névoa de guerra progressiva baseada no estado global (`visitedNodes`).
+    *   **Web Audio API & Juiciness**: Especificação de receitas de síntese analógica pura para reproduzir efeitos de corte de espada, feitiço arcano, arpejo de cura, fuga e fanfarra de vitória/derrota sem carregar arquivos MP3 externos.
+*   **Decisões Importantes Resolvidas**:
+    *   *Inserção de Sabedoria (WIS)*: Atributo ausente nos arquétipos originais mas essencial para feitiços de cura. Decidido sua inclusão com valores iniciais correspondentes (Warrior: 10, Wizard: 14, Rogue: 12) e cálculo dinâmico de modificadores.
+    *   *Uso de Consumíveis*: Devido ao fluxo síncrono original da engine de diálogo, poções só podem ser usadas fora de combate. Durante lutas ou rolagens, os slots de inventário passam a ser exibidos como desabilitados (opacidade reduzida e cursor proibitivo) com log de feedback apropriado.
+    *   *Ficha de Personagem*: Decidida a exibição completa de todos os 6 atributos clássicos de D&D e Sorte (LUCK) no painel compacto lateral para transparência com o jogador.
+*   **Transição de Status**: A nova especificação foi inserida com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
 
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
 
+---
+
+## 🔮 18. Elaboração e Criação de Nova Tarefa: Galton Board (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o simulador **Galton Board (tabuleiro_galton)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tabuleiro_galton/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Modo Desafio (Target Fitting)**: Transformei o simulador passivo em um jogo interativo com 3 desafios de distribuição estatística (Curva Inclinada à Direita com checagem de MSE, Divisão Bimodal "Twin Peaks" com preenchimento tático de colunas, e Grade Uniforme Perfeita com tolerância rígida de dispersão). O progresso do desafio e a porcentagem de Match são exibidos em tempo real.
+    *   **Pinos Especiais (Interactive Peg Modifiers)**: Projetei pinos com comportamentos dinâmicos adicionais no Canvas: Pinos de Teletransporte (Azul Neon/Laranja Neon), Pino Multiplicador (Roxo Neon, dividindo a bolinha em duas verdes) e Pino Gravitacional (Vortex Ciano Neon que atrai bolinhas adjacentes).
+    *   **Sintetizador Web Audio API**: Desenhei a modelagem de síntese sonora procedural nativa para reproduzir notas musicais baseadas na escala pentatônica a cada colisão de bolinha com os pinos (altura da nota baseada no eixo X da colisão), além de efeitos sonoros dedicados para teletransporte, multiplicação e vitória.
+*   **Transição de Status**: A nova especificação foi inserida com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+## 🔫 19. Elaboração e Criação de Nova Tarefa: 3D Shooter (TASK_003) - ✅ LIDA E CONFIRMADA
+
+Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **3D Shooter (3d_shooter)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/3d_shooter/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Arsenal de Armas Avançado**: Desenhei as especificações para o *Rifle de Plasma* (alta cadência, projéteis ciano neon lentos baseados em física, consumo de munição específica) e o *Lançador de Mísseis* (baixa cadência, projéteis explosivos físicos com *Splash Damage* radial, tremor de tela dinâmico e partículas incandescentes).
+    *   **Cyber-Imp (Inimigo à Distância)**: Projetei a IA de comportamento tático que recua/strafa para manter uma distância ideal de 5 unidades e conjura esferas mágicas roxas desviáveis em direção ao jogador a cada 2.5–3.5s.
+    *   **Minimapa Tático Neon**: Projetei um mini-radar HUD glassmorphic para exibir o layout do mapa 2D centralizado no jogador (modo compacto) ou o mapa inteiro (modo expandido/estático) usando as cores de contorno neon ciano, exibindo posições de projéteis, pickups e inimigos ativos.
+    *   **Áudio Procedural com Web Audio API**: Desenhei a síntese de tom pura (laser peew-peew, estrondo de explosão por ruído branco e carregamento mágico) para que os efeitos de combate funcionem sem dependências externas.
+*   **Percalços Técnicos Identificados (Direcionamento)**:
+    1.  *Transição de Hitscan para Projéteis Físicos*: O motor de combate nativo do jogo foi inteiramente construído com base em detecção instantânea (*Hitscan*) via Raycasting. A introdução de projéteis físicos (plasma e mísseis) exigirá que a função `shoot()` seja interceptada para spawnar objetos dinâmicos e que o loop principal implemente uma rotina de translação e colisão baseada na grade de mapa.
+    2.  *Ausência de Estrutura de Projéteis Inimigos*: Atualmente, os inimigos atacam exclusivamente corpo a corpo infligindo dano direto na hitbox. A adição de projéteis do Cyber-Imp requer a inicialização de projéteis de autoria hostil (`owner: 'enemy'`) com verificação contra a hitbox do jogador.
+    3.  *Dualidade de Áudio (Placeholder vs Synth)*: O sistema de som existente no *3D Shooter* depende de carregamento e reprodução de buffers MP3 estáticos para disparos das armas. A especificação sugere que os novos efeitos utilizem a síntese procedural via osciladores, o que exige que o desenvolvedor organize e harmonize o mixer de ganho (`masterGain`) para aceitar ambos os fluxos (analógico e reprodução de arquivo).
+*   **Transição de Status**: A nova especificação foi inserida com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🌍 20. Elaboração e Criação de Nova Tarefa: Three.js Earth (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o simulador **Three.js Earth (threejs-earth-main)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/threejs-earth-main/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Seleção Interativa de Alvos e HUD de Telemetria**: Planejei o posicionamento de 3 estações de observação famosas (Cabo Canaveral, Baikonur e Kourou) convertidas em 3D, suporte a clique (`THREE.Raycaster`) em satélites/estações/pinos, e animação suave de aproximação de câmera (LERP) com exibição de telemetria glassmorphism detalhada.
+    *   **Vento Solar, Auroras Polares e Tempestade Geomagnética**: Desenhei efeitos de partículas para vento solar e torus tridimensionais semitransparentes com glow verde/ciano para as auroras boreais/austrais. Adicionei um slider de intensidade de tempestade solar que afeta a velocidade das partículas, brilho das auroras e injeta um efeito glitch analógico na HUD.
+    *   **Lixo Espacial e Alerta de Proximidade com Sintetizador**: Projetei órbitas caóticas para 30-50 detritos de lixo espacial. Caso entrem na zona de risco de um satélite ($d < 0.15$), acionam um indicador de alerta, anel vermelho piscante e alarme sonoro Web Audio API sintetizado.
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Poluição Visual no Canvas*: A inserção de 30 a 50 partículas de lixo espacial, órbitas, satélites e anéis de aurora pode poluir visualmente a cena e reduzir a performance. É recomendável adicionar toggles específicos na HUD lateral para que o usuário possa ativar/desativar a renderização dos detritos espaciais e das auroras separadamente.
+    2.  *Comportamento de Câmera Travada (Focus Lock)*: Ao centralizar o foco da câmera em um satélite em translação rápida, os OrbitControls podem dificultar o controle do usuário. O desenvolvedor deve garantir que o botão "Liberar Foco" retorne as coordenadas suavemente para a Terra (0,0,0) de forma limpa e restaure a liberdade total da câmera.
+    3.  *Mitigação de Autoplay de Áudio*: Devido a restrições modernas de navegadores contra autoplay de som, o sintetizador do alarme sonoro não deve ser instanciado até que haja o primeiro clique de interação na página.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## ☄️ 21. Elaboração e Criação de Nova Tarefa: Pinball (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o minijogo **Pinball (pinball)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/pinball/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Batalha contra o Chefe (Rogue AI Core)**: Projetei um chefe centralizado no topo (`x: 200, y: 80`) com 300 HP e 3 escudos orbitais giratórios de 50 HP cada. O chefe possui mecânicas de ataque ativas, como o *Glitch Pulse* (área de retardo temporal que reduz a velocidade linear da bola em 30% e deforma visualmente o canvas), *EMP Shockwave* (que desabilita um dos flippers por 2.0 segundos, sinalizando com luz amarela) e *Firewall Barriers* (bricks destrutíveis que surgem na mesa).
+    *   **Skill Shot de Precisão**: Adicionei um indicador linear de precisão ao plunger. Se o jogador lançar a bola exatamente na zona verde de 75% a 85% de força da mola e cruzar o sensor da calha superior em até 1.5s, ganha o *Critical Skill Shot* (+3.000 pts e incremento de multiplicador).
+    *   **Sintetizador Web Audio API Procedural**: Projetei a síntese sonora em tempo real sem arquivos estáticos (flipper, bumper hits sintonizados por notas, glitch sweep de dano do chefe e trilha sonora harmônica com oscilador triangular que modula de acordo com a velocidade das bolas ativas).
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Ausência de Áudio Nativo (UX Limitation)*: Identifiquei que a base do jogo é silenciosa e depende inteiramente de placeholders vazios. A implementação de síntese de oscilador via Web Audio API elimina a necessidade de assets externos e contorna políticas rígidas de reprodução em navegadores modernos.
+    2.  *Comportamento de EMP no Flipper*: Em caso de desativação por pulso elétrico, o flipper afetado deve obrigatoriamente regressar para a posição de descanso (`restAngle`) com opacidade de 50%. Se ele travar ativo (levantado), a bola pode rolar sob ele e drenar injustamente, gerando frustração extrema.
+    3.  *Sobrecarga de Áudio no Multiball*: A alta frequência de colisões com múltiplas bolas na mesa exige uma lógica de limitador de taxa (throttling de 60ms) para as chamadas de som, evitando saturação de ganho (clipping) ou degradação na performance de processamento de sinais de áudio.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🧩 22. Elaboração e Criação de Nova Tarefa: Puzzle (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **Puzzle (Mind Labyrinth)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/puzzle/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Enigma de Conexão Estelar (Celestial Constellations Connect)**: Criei um novo enigma tátil e lógico onde o jogador liga estrelas brilhantes piscantes desenhadas em canvas seguindo regras astrológicas (por temperatura de espectro, ordem rúnica ou diâmetro/brilho), com feedbacks visuais de linhas de neon e explosões de partículas estelares.
+    *   **Grimório de Relíquias Místicas**: Desenhei um painel overlay glassmorphic com 6 relíquias colecionáveis desbloqueadas por feitos nos modos de jogo (Astrolábio Quebrado, Lente do Foco Celestial, Cálice do Infinito, Filtro de Éter, Pena de Fênix, Tábula de Esmeralda), oferecendo bônus passivos limitados a **2 slots equipáveis simultaneamente** (conforme regras do TL) para adicionar decisões estratégicas antes do gameplay.
+    *   **Notificação de Conquistas (Achievements)**: Implementei toasts na HUD com bordas douradas neon para celebrar instantaneamente os desbloqueios das relíquias com textos de lore mística e fanfarras procedurais.
+    *   **Síntese de Áudio no Web Audio API**: Projetei notas e acordes estelares de harpa pura e o som de fogo ascendente (ruído branco varrendo frequências com BiquadFilter passa-banda) da Pena de Fênix em conformidade com as regras do TL.
+*   **Transição de Status**: A tarefa foi devidamente adicionada ao backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`, pronta para desenvolvimento.
+
+Não encontrei nenhum percalço ou inconsistência ao desenhar a tarefa.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🏛️ 23. Elaboração e Criação de Nova Tarefa: Strategy Empire (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o minijogo **Strategy Empire (strategy_game)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/strategy_game/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Recrutamento e Comando de Unidades Militares**: Projetei um sistema de treinamento para 3 tipos de unidades a partir do quartel (*Barracks*): Batedores (🕵️), Soldados (⚔️) e Catapultas (🎯). Cada uma com atributos táticos bem balanceados (custo, movimento por turno, raio de visão e força de ataque) e comportamento de seleção (borda neon ciano) e movimentação tátil no grid.
+    *   **Acampamentos Bárbaros e Saqueadores**: Criei uma mecânica de ameaças ativas em tempo real. Acampamentos bárbaros (⛺) escondidos sob a névoa de guerra cinza spawnam Saqueadores (🪓) que se movem de forma inteligente usando distância Chebyshev para interceptar e destruir construções do jogador ou das IAs, roubando recursos.
+    *   **Captura e Depósito de Relíquias Sagradas**: A destruição de acampamentos bárbaros revela uma Relíquia (🏆) que pode ser carregada por unidades até um Templo (🏛️). O depósito abre uma interface de seleção de Bênçãos Permanentes que concedem buffs estratégicos à economia ou poder militar.
+    *   **Combate Tático e Juiciness**: Implementei lógica de combate baseada em poder e bônus de terreno (como muralhas). Vitória/derrota ou saques ativam partículas vermelhas neon no Canvas de sobreposição e tremores de tela reativos de 200ms.
+    *   **Áudio Procedural via Web Audio API**: Desenhei a síntese pura para disparo de catapultas, choques de espada em combate e arpejos pentatônicos ao depositar relíquias.
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Preservação do Terreno no Grid DOM*: O grid é modelado por atributos no DOM (`tile.dataset.type`). O desenvolvedor deve evitar alterar o tipo do tile para representar as unidades militares em movimento (ex: mudar de `'grass'` para `'soldier'`). As unidades **devem** ser injetadas como filhos absolutos dentro do tile correspondente para preservar o terreno subjacente e estruturas físicas.
+    2.  *Escalonamento do Recurso Madeira na Inicialização*: A madeira (introduzida na TASK_002) precisa ser corretamente balanceada em `initGame()` com escalonamento por nível de dificuldade, assim como o Ouro e Comida, para garantir a consistência das mecânicas econômicas da TASK_003.
+    3.  *Mitigação de Políticas de Autoplay de Áudio*: O mixer de som procedural do AudioContext só deve ser instanciado ou ativado após a primeira interação real do usuário (clique) na página do jogo.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🎸 24. Elaboração e Criação de Nova Tarefa: String Catcher (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o minijogo **String Catcher (visual_effects)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/visual_effects/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Menu de Temas Visuais Dinâmicos (Estilos Gráficos)**: Desenhei 3 novos estilos gráficos de fundo em tempo real: *Retro Cyberpunk* (grade 3D convergente pulsando verticalmente com os graves), *Vaporwave Sunset* (sol aramado e gradientes suaves com bolhas translúcidas) e *Cosmic Nebula* (nebulosa interestelar fluida com estrelas cadentes reativas).
+    *   **Novas Notas Especiais e Modo Frenesi**: Projetei a *Frenzy Note* (arco-íris cintilante com 5% de chance) que ativa 8 segundos de dobro de pontos, cordas em gradiente e banner animado; e a *Shield Note* (coração esmeralda com 8% de chance) que concede um escudo neon protetor capaz de absorver a perda de uma nota ou o clique em uma mina.
+    *   **Sintetizador de Áudio Procedural Integrado**: Especifiquei a síntese sonora em tempo real via Web Audio API (`OscillatorNode`) tocando notas harmônicas baseadas na escala pentatônica menor (Lá Menor) mapeada proporcionalmente às cordas (lanes), permitindo escolher entre ondas *Sine*, *Triangle* e *Sawtooth*.
+    *   **Game Feel Avançado (Juiciness)**: Planejei a *Distorção Física da Corda (Ripple Effect)* (perturbação física ondulatória propagada de forma senoidal atenuada para as cordas adjacentes) e *Screen Shake* de 250ms reativo a eventos de alta tensão (modo frenesi, escudo quebrado ou colisão com mina).
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🏎️ 25. Elaboração e Criação de Nova Tarefa: Voxel City (TASK_003) - ✅ LIDA
+
+Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **Voxel City (voxel_city)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_city/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Rampas de Acrobacias (Stunt Jumps) & Efeito Bullet-Time**: Projetei a inclusão de 4 rampas neon 3D espalhadas pela malha urbana. Ao passar pelas rampas em alta velocidade ($>18\text{ u/s}$), o carro entra em órbita aérea e ativa o efeito slow-motion (Bullet-Time, Time Dilation de 0.3x) e órbita dinâmica de câmera cinematográfica. Ao aterrissar com sucesso, o jogador recebe bônus de \$150 e faíscas neon na suspensão.
+    *   **Obstáculos Físicos Destrutíveis (Cones e Hidrantes Reativos)**: Desenhei grupos de cones destrutíveis tridimensionais voxel que são arremessados elasticamente e rotacionam nos eixos, e hidrantes vermelhos de voxel que explodem gerando um jato de água volumétrico e translúcido composto de partículas ascendentes/descendentes. O asfalto molhado ao redor do hidrante reduz a aderência dos pneus do carro em 50% (hidroplanagem), auxiliando na derrapagem.
+    *   **Mecânica de Drift e Nitro Boost**: Implementei derrapagem ativa segurando `Space` ao curvar em velocidade, gerando marcas de pneu (skidmarks) no asfalto e partículas de fumaça, acumulando uma barra de Nitro. Quando cheia, apertar `Shift` aciona o Nitro Boost, duplicando a aceleração por 3 segundos, adicionando luzes azuis nos faróis/escapamento e aplicando distorção de FOV na câmera.
+    *   **Sintetizador de Áudio Procedural via Web Audio API**: Projetei sintetizadores dinâmicos para marcha e aceleração do motor do carro, sirenes de polícia FM espaciais reativas com efeito Doppler, barulho de spray de água pressurizada do hidrante quebrado, e chiados de drift e nitro boost.
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## ⚔️ 26. Elaboração e Criação de Nova Tarefa: Voxel Arena (TASK_003)
+
+Como PO experiente em level design e priorizando a experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_003** para o jogo **Voxel Arena (voxel_arena)** no arquivo [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_arena/TASKS/TASK_003.md):
+
+*   **O que foi feito**:
+    *   **Encontro Épico com Chefe Multi-Fase (Colosso Voxel)**: Projetei a batalha final que se inicia após as 5 ondas padrão. Ao zerar o tempo, o cronômetro é substituído pelo aviso "BOSS ENCOUNTER", transicionando a atmosfera para violeta/carmesim. O Colosso possui 3 fases de combate com mecânicas próprias: escudos orbitais de cristal destruíveis, feixe de energia Hyperbeam giratório cilíndrico, e modo sobrecarga de alta velocidade invocando servos voxels.
+    *   **Armadilhas Ambientais Ativas**: Inseri dois perigos dinâmicos no campo de batalha: Poças de Lava Volcânica (com colunas de fogo ativas que causam dano a jogadores e monstros, permitindo uso estratégico) e Fendas Gravitacionais (que exercem força física de atração baseada na distância).
+    *   **Feedback de Impacto Visual e Físico (Juiciness)**: Planejei a injeção de Hitstop (tempo de congelamento de 80ms em acertos críticos ou danos pesados para conferir peso ao combate), Screen Shake Direcional de câmera e números de dano flutuantes (Cyan para dano normal, Ouro para críticos e Vermelho para dano no jogador) projetados de 3D para o plano 2D da tela.
+    *   **Sintetizador de Áudio via Web Audio API**: Projetei a síntese sonora em tempo real para os rugidos de spawn do Colosso, varreduras de carga do hyperbeam e quebra de cristais orbitais.
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
 
 
 
