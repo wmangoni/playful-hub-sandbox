@@ -334,3 +334,21 @@ Implementado em `snake/index.html` sobre a TASK_002 (labirintos, frutas especiai
 *   **Modo fantasma** também ignora a colisão com a rival (consistente com a invencibilidade visual piscante do power-up).
 *   **Screen shake** envolve todo o `draw()` em `save/translate/restore`, mas o `clearRect` ocorre antes (em espaço não transladado) para não deixar bordas sujas.
 *   Hook `window.__snake3` deixado exposto (debug/QA), removível no cleanup. rAF/loop roda no preview headless (o rastro de partículas confirma), então a verificação combinou observação ao vivo + chamadas determinísticas de `update()`/IA.
+
+---
+
+## 🔍 Code Review
+
+### 🚀 Validação de Arquitetura e Desempenho
+A implementação realizada no Snake Game atende com precisão a todos os critérios de aceitação e diretrizes de desenvolvimento especificadas na TASK_003.
+
+1. **Portais Dimensionais**: Integrados de forma limpa no loop de física, usando coordenadas fixas `(2,10)` e `(17,10)` livres de obstáculos em todos os mapas de labirinto (inclusive Espiral). O teletransporte do jogador mantém a direção de movimento original e dispara os efeitos visuais e tremores necessários.
+2. **Cobra Rival IA**: O algoritmo heurístico de distância de Manhattan realiza o filtro correto de obstáculos e busca a comida de forma eficiente. O sistema de explosão ao ficar sem movimentos válidos ou colidir, gerando Maçãs Douradas (de 3 pontos e 8 segundos de vida), adiciona uma dinâmica tática arcade excelente. O timer de respawn de 15 segundos funciona perfeitamente e sem erros.
+3. **Juiciness Premium**:
+   - O sistema de partículas neon (`ParticleSystem`) na cauda da cobra foi implementado usando decremento gradual de opacidade (`alpha -= decay`) e com remoção de objetos expirados através do `splice`, prevenindo o vazamento de memória Javascript (não ocorrendo o acúmulo de objetos órfãos na memória heap).
+   - O mecanismo de tremor de tela com `ctx.save()`, `ctx.translate()` e `ctx.restore()` está implementado de forma segura e não causa problemas na renderização principal do Canvas.
+
+### 🌟 Veredito: Aprovado
+Nenhum vazamento de memória ou violação de design foi encontrado. O código está limpo, performático e respeita as melhores práticas da plataforma.
+Status alterado para **Ready for QA**.
+

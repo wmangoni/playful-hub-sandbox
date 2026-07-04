@@ -313,6 +313,30 @@
         let lapStartZ = -50, lapArmed = false; // detecção de volta (cruzar a linha de partida)
 
 
+        // === TASK_003: Memory Management & Object Pooling ===
+        const sharedCoinGeometry = new THREE.CylinderGeometry(1, 1, 0.3, 16);
+        const sharedCoinMaterial = new THREE.MeshLambertMaterial({ color: COIN_COLOR });
+        const sharedSparkGeometry = new THREE.SphereGeometry(0.08, 4, 4);
+        const sharedSmokeGeometry = new THREE.SphereGeometry(0.2, 4, 4);
+        const sharedHealingRingGeometry = new THREE.RingGeometry(0.8, 1.0, 24);
+        const sharedSkidMarkGeometry = new THREE.PlaneGeometry(0.3, 1.2);
+
+        function disposeMesh(obj) {
+            if (!obj) return;
+            obj.traverse(child => {
+                if (child.isMesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => m.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                }
+            });
+        }
+
         // Configuração inicial
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
@@ -538,9 +562,7 @@
         // Moedas
         const coins = [];
         function createCoin() {
-            const coinGeometry = new THREE.CylinderGeometry(1, 1, 0.3, 16);
-            const coinMaterial = new THREE.MeshLambertMaterial({ color: COIN_COLOR });
-            const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+            const coin = new THREE.Mesh(sharedCoinGeometry, sharedCoinMaterial);
             
             let x, z;
             do {
@@ -600,8 +622,20 @@
             isSpunOut = false; spinTimer = 0; isAirborne = false; verticalVelocity = 0;
             timeScale = 1.0; shakeIntensity = 0;
             activeLapTime = 0; activeLapFrames = []; lapArmed = false; ghostFrameIdx = 0;
-            smokeParticles.forEach(p => scene.remove(p)); smokeParticles.length = 0;
-            healingRings.forEach(r => scene.remove(r)); healingRings.length = 0;
+            
+            smokeParticles.forEach(p => {
+                scene.remove(p);
+                if (p.material) p.material.dispose();
+            });
+            smokeParticles.length = 0;
+
+            healingRings.forEach(r => {
+                scene.remove(r);
+                if (r.material) r.material.dispose();
+            });
+            healingRings.length = 0;
+
+            activeCones.forEach(c => placeCone(c)); // (TL) Reset / Pooling de cones
 
             // Modo de corrida
             coins.forEach(coin => scene.remove(coin));
@@ -610,11 +644,15 @@
             if (raceMode === 'time_trial') {
                 aiCar.visible = false;
                 if (lapHud) lapHud.style.display = 'block';
-                if (ghostMesh) ghostMesh.visible = true;
+                if (ghostMesh) {
+                    ghostMesh.visible = true;
+                    ghostFrameIdx = 0;
+                }
             } else {
                 aiCar.visible = true;
                 for (let i = 0; i < COIN_COUNT; i++) createCoin();
                 if (lapHud) lapHud.style.display = 'none';
+                if (ghostMesh) ghostMesh.visible = false;
             }
 
             // TASK_002: reset de tráfego, ciclo de tempo e faróis
@@ -622,7 +660,10 @@
             headlightsAuto = true;
             setHeadlights(false);
             initTraffic();
-            skidMarks.forEach(s => scene.remove(s.mesh));
+            skidMarks.forEach(s => {
+                scene.remove(s.mesh);
+                if (s.mesh.material) s.mesh.material.dispose();
+            });
             skidMarks.length = 0;
 
             updateUI();
@@ -760,7 +801,10 @@
             t.mesh.rotation.y = t.direction === 1 ? 0 : Math.PI;
         }
         function initTraffic() {
-            traffic.forEach(t => scene.remove(t.mesh));
+            traffic.forEach(t => {
+                scene.remove(t.mesh);
+                disposeMesh(t.mesh);
+            });
             traffic.length = 0;
             for (let i = 0; i < TRAFFIC_POOL; i++) {
                 const t = createTrafficCar();
@@ -854,7 +898,7 @@
         // === TASK_002: Marcas de derrapagem (Apex drift) ===
         function addSkidMark() {
             const mark = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.3, 1.2),
+                sharedSkidMarkGeometry,
                 new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.5, depthWrite: false })
             );
             mark.rotation.x = -Math.PI / 2;
@@ -865,14 +909,22 @@
             );
             scene.add(mark);
             skidMarks.push({ mesh: mark, life: 3 });
-            if (skidMarks.length > 120) { const old = skidMarks.shift(); scene.remove(old.mesh); }
+            if (skidMarks.length > 120) {
+                const old = skidMarks.shift();
+                scene.remove(old.mesh);
+                if (old.mesh.material) old.mesh.material.dispose();
+            }
         }
         function updateSkidMarks(dt) {
             for (let i = skidMarks.length - 1; i >= 0; i--) {
                 const s = skidMarks[i];
                 s.life -= dt;
                 s.mesh.material.opacity = Math.max(0, 0.5 * (s.life / 3));
-                if (s.life <= 0) { scene.remove(s.mesh); skidMarks.splice(i, 1); }
+                if (s.life <= 0) {
+                    scene.remove(s.mesh);
+                    skidMarks.splice(i, 1);
+                    if (s.mesh.material) s.mesh.material.dispose();
+                }
             }
         }
 
@@ -935,9 +987,11 @@
             for (let i = 0; i < count; i++) {
                 const color = (gameState.playerHealth < 25 && Math.random() > 0.5) ? 0xFF3300 : 0x777777;
                 const p = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 4, 4),
+                    sharedSmokeGeometry,
                     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 })
                 );
+                const size = 0.75 + Math.random() * 0.5;
+                p.scale.set(size, size, size);
                 const forward = new THREE.Vector3(0, 0.8, 1.5).applyQuaternion(playerCar.quaternion);
                 p.position.copy(playerCar.position).add(forward);
                 p.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.05, 0.05 + Math.random() * 0.05, (Math.random() - 0.5) * 0.05);
@@ -953,7 +1007,11 @@
                 p.scale.multiplyScalar(1.02);
                 p.life -= 0.03;
                 p.material.opacity = Math.max(0, p.life);
-                if (p.life <= 0) { scene.remove(p); smokeParticles.splice(i, 1); }
+                if (p.life <= 0) {
+                    scene.remove(p);
+                    smokeParticles.splice(i, 1);
+                    if (p.material) p.material.dispose();
+                }
             }
         }
 
@@ -968,8 +1026,12 @@
         }
         function placeCone(cone, nearZ) {
             cone.position.set(Math.random() * 16 - 8, 0.6, (nearZ !== undefined ? nearZ : (Math.random() * 200 - 100)));
-            cone.physics.isHit = false; cone.physics.opacity = 1.0;
-            cone.material.opacity = 1.0; cone.material.transparent = false;
+            cone.physics.isHit = false;
+            cone.physics.opacity = 1.0;
+            cone.physics.velocity.set(0, 0, 0);
+            cone.physics.angularVelocity.set(0, 0, 0);
+            cone.material.opacity = 1.0;
+            cone.material.transparent = false;
             cone.rotation.set(0, 0, 0);
         }
         function spawnCones() {
@@ -999,8 +1061,7 @@
                     cone.material.transparent = true;
                     cone.material.opacity = cone.physics.opacity;
                     if (cone.physics.opacity <= 0) {
-                        scene.remove(cone); activeCones.splice(idx, 1);
-                        const nc = makeCone(); placeCone(nc, playerCar.position.z + 120); scene.add(nc); activeCones.push(nc);
+                        placeCone(cone, playerCar.position.z + 120);
                     }
                 }
             }
@@ -1094,7 +1155,7 @@
         function createLandingParticles() {
             for (let i = 0; i < 12; i++) {
                 const spark = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.08, 4, 4),
+                    sharedSparkGeometry,
                     new THREE.MeshBasicMaterial({ color: 0xffee33, transparent: true, opacity: 1 })
                 );
                 spark.position.copy(playerCar.position).add(new THREE.Vector3(0, 0.3, -1.2));
@@ -1130,7 +1191,7 @@
         }
         function spawnHealingRing() {
             const ring = new THREE.Mesh(
-                new THREE.RingGeometry(0.8, 1.0, 24),
+                sharedHealingRingGeometry,
                 new THREE.MeshBasicMaterial({ color: 0x00E676, side: THREE.DoubleSide, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending })
             );
             ring.rotation.x = -Math.PI / 2;
@@ -1146,16 +1207,25 @@
                 r.scale.multiplyScalar(1.03);
                 r.life -= 0.03;
                 r.material.opacity = Math.max(0, r.life * 0.8);
-                if (r.life <= 0) { scene.remove(r); healingRings.splice(i, 1); }
+                if (r.life <= 0) {
+                    scene.remove(r);
+                    healingRings.splice(i, 1);
+                    if (r.material) r.material.dispose();
+                }
             }
         }
 
         // --- Time Trial + Carro Fantasma ---
         function createGhostMesh() {
-            if (ghostMesh) scene.remove(ghostMesh);
+            if (ghostMesh) {
+                disposeMesh(ghostMesh);
+                scene.remove(ghostMesh);
+                ghostMesh = null;
+            }
             ghostMesh = createCar(0x00FFFF);
             ghostMesh.traverse(child => {
                 if (child.isMesh) {
+                    if (child.material) child.material.dispose();
                     child.material = new THREE.MeshBasicMaterial({ color: 0x00FFFF, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending });
                 }
             });

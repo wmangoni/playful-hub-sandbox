@@ -1322,9 +1322,19 @@
                 this.isDead = true;
                 const deathPos = this.mesh.position.clone();
                 this.scene.remove(this.mesh);
-                // Dispose dos materiais do voxel beast (evita leak GPU)
-                this.mesh.traverse(c => { if (c.isMesh && c.geometry) c.geometry.dispose(); });
-                if (this.flashMats) this.flashMats.forEach(m => m.dispose());
+                // Dispose de todas as geometrias e materiais do voxel beast (evita leak GPU)
+                this.mesh.traverse(c => {
+                    if (c.isMesh) {
+                        if (c.geometry) c.geometry.dispose();
+                        if (c.material) {
+                            if (Array.isArray(c.material)) {
+                                c.material.forEach(m => m.dispose());
+                            } else {
+                                c.material.dispose();
+                            }
+                        }
+                    }
+                });
 
                 // TASK_002: dropa um XP Orb no local da morte (valor por tipo)
                 const game = this.scene.game;
@@ -1434,6 +1444,14 @@
             pickup() {
                 this.active = false;
                 this.scene.remove(this.mesh);
+                if (this.mesh.geometry) this.mesh.geometry.dispose();
+                if (this.mesh.material) {
+                    if (Array.isArray(this.mesh.material)) {
+                        this.mesh.material.forEach(m => m.dispose());
+                    } else {
+                        this.mesh.material.dispose();
+                    }
+                }
             }
         }
 

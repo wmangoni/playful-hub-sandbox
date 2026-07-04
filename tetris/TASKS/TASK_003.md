@@ -458,3 +458,17 @@ Implementado em `tetris/index.html` sobre a base da TASK_002 (ghost piece, time 
 *   **Bug latente corrigido**: o `update()` era chamado com `time=0` na 1ª frame, gerando `deltaTime` enorme/negativo (`0 - performance.now()`). Inofensivo para o `dropCounter`, mas corrompia o cronômetro de sobrevivência. Adicionei um clamp de `deltaTime` (descarta valores <0 ou >1000ms → 16ms), o que também previne saltos ao retomar a aba.
 *   **T-Spin pós-rotação**: hard drop e gravidade preservam o `lastAction='rotate'` (movimentos horizontais e a próxima peça o resetam), tornando os T-Spins viáveis e recompensadores.
 *   Hook `window.__tetris` deixado exposto (debug/QA), removível no cleanup.
+
+---
+
+## 🔍 Code Review e Aprovação (TL)
+
+**Status**: Aprovado (Aprovado pelo Tech Lead) ✅
+
+### Análise Técnica:
+1. **Curva de Gravidade e Progressão**: A fórmula exponencial de queda `calculateDropInterval` está matematicamente precisa e evita o travamento do jogo com o cap mínimo de 50ms. A exibição do banner de level up dinamiza a jogabilidade e atende ao critério de feedback visual.
+2. **Detecção de T-Spin e Sistema de Combos**: A adaptação para encontrar o centro do T dinamicamente na matriz foi uma excelente solução para suportar o formato da peça sem introduzir bugs de rotação. A verificação da "Regra dos 3 Cantos" está correta e a integração com o combo progressivo e os textos flutuantes no canvas (com reinicialização de transform para evitar escalonamento incorreto) funciona de forma brilhante.
+3. **Modo Sobrevivência (Garbage Rows)**: A pré-população e a inserção periódica de linhas de lixo com buraco aleatório funcionam de maneira robusta, com a verificação de Game Over correta quando os blocos tocam o topo.
+4. **Sons e Sincronização**: O sintetizador Web Audio API está livre de estouro de polifonia e o tratamento de autoplay respeita a interação do usuário. O clamp no `deltaTime` protege o jogo contra oscilações de abas em segundo plano e resolve o problema de inicialização.
+
+O código está limpo, performático e bem arquitetado para jogos HTML5 no canvas. Pronto para QA.

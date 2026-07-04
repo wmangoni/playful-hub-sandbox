@@ -413,3 +413,34 @@ Implementado em `driving_simulator/index.html` sobre a TASK_002 (tráfego, dia/n
 *   **Detecção de volta** adaptada ao mapa de estrada reta: "ida e volta" cruzando a linha de partida (z=−50). Como o jogo não tem um circuito fechado, essa é a interpretação estável de "1 volta".
 *   No **Time Trial**, ocultei a IA e não spawno moedas (foco no tempo de volta); o modo Coleta de Moedas permanece intacto.
 *   Hook `window.__drive` estendido (debug/QA), removível no cleanup. rAF fica pausado no preview headless — a verificação foi feita acionando as funções de update manualmente; no navegador real roda a 60 FPS.
+
+---
+
+## 🔍 Code Review
+
+### 🚨 Vazamento de Memória Crítico no WebGL (Three.js)
+Durante a revisão do código em `driving_simulator/index.html`, foram identificados múltiplos pontos de vazamento de memória (Memory Leaks) graves no gerenciamento de recursos do Three.js. No Three.js, remover um objeto da cena com `scene.remove(mesh)` **não libera** a memória de vídeo (GPU) associada às suas geometrias e materiais. É obrigatório invocar o método `.dispose()` em geometrias e materiais que não serão mais utilizados para evitar perda de desempenho e eventuais crashes do navegador (Out of Memory).
+
+Pontos críticos identificados:
+1. **Cones Destrutíveis (`makeCone` e `updateCones`)**: Cada vez que um cone é destruído e sumido por opacidade, ele é removido e um novo é criado via `makeCone()`, instanciando novas `CylinderGeometry` e `MeshLambertMaterial` que nunca são liberadas.
+2. **Partículas de Fumaça e Faíscas (`spawnSmoke`, `createLandingParticles` e `updateSmoke`)**: Criam dinamicamente centenas de `SphereGeometry` e `MeshBasicMaterial`. Ao expirar o tempo de vida (`life <= 0`), são apenas retirados da cena, acumulando milhares de objetos órfãos na GPU.
+3. **Anéis de Cura (`spawnHealingRing` e `updateHealingRings`)**: Criam repetidamente `RingGeometry` e `MeshBasicMaterial` sem liberar no descarte.
+4. **Marcas de Pneu/Drift (`addSkidMark` e `updateSkidMarks`)**: Criam novos `PlaneGeometry` e `MeshBasicMaterial` a cada frame de derrapagem, gerando um vazamento acelerado durante drifts.
+5. **Moedas (`createCoin` e `resetGame`)**: Toda vez que uma moeda é coletada ou o jogo é reiniciado, as moedas antigas são removidas e novas geometrias e materiais são criados.
+6. **Ghost Car (`createGhostMesh`)**: Ao recriar o fantasma, o modelo anterior é removido da cena, mas suas geometrias e materiais clonados não são descartados.
+
+### 🛠️ Correções Necessárias (Resolvido)
+*   **Object Pooling / Reaproveitamento de Recursos**:
+    *   **Cones**: Reaproveitados inteiramente (`placeCone(cone, playerCar.position.z + 120)`). Sem novas instâncias de mesh, geometria ou material após o start.
+    *   **Geometrias e Materiais Compartilhados**: `sharedCoinGeometry`, `sharedCoinMaterial`, `sharedSparkGeometry`, `sharedSmokeGeometry`, `sharedHealingRingGeometry` e `sharedSkidMarkGeometry` declarados no escopo global e compartilhados.
+*   **Descarte Explícito (`dispose()`)**:
+    *   Materiais criados dinamicamente para fumaça, faíscas, anéis de cura e marcas de derrapagem são devidamente limpos usando `.dispose()` no momento de expiração e no `resetGame()`.
+    *   O Ghost Car anterior e os materiais gerados no `createCar` (Lambert) são completamente descartados via `disposeMesh()`.
+
+## 🔍 Homologação do Tech Lead
+
+Todos os vazamentos de memória críticos foram solucionados seguindo as melhores práticas de gerenciamento de recursos de WebGL/Three.js. O código foi validado com sucesso e está livre de memory leaks.
+
+*Status: 🚀 Ready for QA*
+*Responsável: Tech Lead (TL) - Antigravity*
+

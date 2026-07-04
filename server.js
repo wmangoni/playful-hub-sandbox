@@ -19,6 +19,9 @@ app.use(cors({
   origin: function (origin, callback) {
     // Permite requisições sem origin (como Postman, apps mobile, ou same-origin)
     if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV === 'test' && (origin.startsWith('http://127.0.0.1') || origin.startsWith('http://localhost'))) {
+      return callback(null, true);
+    }
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'A política de CORS para este site não permite acesso da Origem especificada.';
       return callback(new Error(msg), false);
@@ -34,7 +37,14 @@ app.use(express.json());
 app.use(express.static('./', {
     maxAge: '1h', // Cache de 1 hora para assets estáticos
     etag: true,
-    lastModified: true
+    lastModified: true,
+    // HTML não pode ser cacheado de forma agressiva: senão o navegador segura
+    // uma versão antiga da página por até 1h (ex.: rodapé quebrado já corrigido).
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    }
 }));
 
 // Cache headers para páginas HTML

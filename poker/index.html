@@ -741,12 +741,22 @@
         }
 
         /* Cartas 3D (flip + deal-in) */
-        .card-container { perspective: 1000px; }
+        .card-container {
+            perspective: 1000px;
+            width: 45px;
+            height: 68px;
+            position: relative;
+            display: inline-block;
+        }
+        .community-cards .card-container {
+            width: 50px;
+            height: 75px;
+        }
         .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s cubic-bezier(0.4,0,0.2,1); transform-style: preserve-3d; }
         .card-inner.is-flipped { transform: rotateY(180deg); }
-        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; }
+        .card-front, .card-back { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 6px; }
         .card-back { background: repeating-linear-gradient(45deg, #1a365d, #1a365d 6px, #24477a 6px, #24477a 12px); transform: rotateY(180deg); }
-        .card.dealing { animation: dealIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both; }
+        .card-container.dealing { animation: dealIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both; }
         @keyframes dealIn { 0% { transform: translate(140px,-120px) rotate(360deg) scale(0.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
 
         /* HUD de blinds (torneio) */
@@ -1400,8 +1410,7 @@
             if (gameState.phase === 'waiting' || gameState.phase === 'preflop') {
                 // No flop phase, placeholders for cards
                 for (let i = 0; i < 5; i++) {
-                    const cardEl = document.createElement('div');
-                    cardEl.className = 'card facedown';
+                    const cardEl = createCardElement(null, true);
                     communityCardsEl.appendChild(cardEl);
                 }
             } else {
@@ -1414,15 +1423,20 @@
                 for (let i = 0; i < visibleCards; i++) {
                     if (i < gameState.communityCards.length) {
                         const card = gameState.communityCards[i];
-                        const cardEl = createCardElement(card);
+                        const cardEl = createCardElement(card, true, true);
                         communityCardsEl.appendChild(cardEl);
+                        
+                        // Staggered flip animation
+                        setTimeout(() => {
+                            const inner = cardEl.querySelector('.card-inner');
+                            if (inner) inner.classList.remove('is-flipped');
+                        }, 50 + i * 150);
                     }
                 }
                 
                 // Add face down placeholders for remaining cards
                 for (let i = visibleCards; i < 5; i++) {
-                    const cardEl = document.createElement('div');
-                    cardEl.className = 'card facedown';
+                    const cardEl = createCardElement(null, true);
                     communityCardsEl.appendChild(cardEl);
                 }
             }
@@ -1511,15 +1525,22 @@
                 
                 // Mostrar as cartas do jogador
                 if (player.cards) {
-                    player.cards.forEach(card => {
+                    player.cards.forEach((card, cardIdx) => {
                         // Show cards for human player or during showdown for all players
                         if (!player.isAI || gameState.phase === 'showdown' || player.isHuman) {
-                            const cardEl = createCardElement(card);
+                            const isHumanPreflopFlip = player.isHuman && gameState.phase === 'preflop';
+                            const cardEl = createCardElement(card, isHumanPreflopFlip, true);
                             cardsEl.appendChild(cardEl);
+                            
+                            if (isHumanPreflopFlip) {
+                                setTimeout(() => {
+                                    const inner = cardEl.querySelector('.card-inner');
+                                    if (inner) inner.classList.remove('is-flipped');
+                                }, 300 + cardIdx * 200);
+                            }
                         } else {
                             // Face down cards for AI
-                            const cardEl = document.createElement('div');
-                            cardEl.className = 'card facedown';
+                            const cardEl = createCardElement(card, true, true);
                             cardsEl.appendChild(cardEl);
                         }
                     });
@@ -1547,22 +1568,45 @@
             });
         }
 
-        function createCardElement(card) {
-            const cardEl = document.createElement('div');
-            cardEl.className = `card ${RED_SUITS.includes(card.suit) ? 'red' : 'black'}`;
+        function createCardElement(card, isFaceDown = false, isDealing = false) {
+            const containerEl = document.createElement('div');
+            containerEl.className = 'card-container';
+            if (isDealing) {
+                containerEl.classList.add('dealing');
+            }
             
-            const valueEl = document.createElement('div');
-            valueEl.className = 'card-value';
-            valueEl.textContent = card.value;
+            const innerEl = document.createElement('div');
+            innerEl.className = 'card-inner';
+            if (isFaceDown) {
+                innerEl.classList.add('is-flipped');
+            }
             
-            const suitEl = document.createElement('div');
-            suitEl.className = 'card-suit';
-            suitEl.textContent = card.suit;
+            const frontEl = document.createElement('div');
+            if (card) {
+                frontEl.className = `card card-front ${RED_SUITS.includes(card.suit) ? 'red' : 'black'}`;
+                
+                const valueEl = document.createElement('div');
+                valueEl.className = 'card-value';
+                valueEl.textContent = card.value;
+                
+                const suitEl = document.createElement('div');
+                suitEl.className = 'card-suit';
+                suitEl.textContent = card.suit;
+                
+                frontEl.appendChild(valueEl);
+                frontEl.appendChild(suitEl);
+            } else {
+                frontEl.className = 'card card-front facedown';
+            }
             
-            cardEl.appendChild(valueEl);
-            cardEl.appendChild(suitEl);
+            const backEl = document.createElement('div');
+            backEl.className = 'card card-back facedown';
             
-            return cardEl;
+            innerEl.appendChild(frontEl);
+            innerEl.appendChild(backEl);
+            containerEl.appendChild(innerEl);
+            
+            return containerEl;
         }
 
         function updatePot() {
