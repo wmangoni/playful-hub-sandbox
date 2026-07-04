@@ -11,49 +11,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pimbal - Enhanced Pinball</title>
+    <!-- TASK_001: fontes retro-gamer (fallback gracioso se a CDN bloquear) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
+        /* === TASK_001: Estética Retro-Futurista Synthwave / Cyberpunk === */
         body {
-            background-color: #1a1a1a; /* Darker background */
-            color: #e0e0e0; /* Lighter text */
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Cleaner font */
+            background-color: #0d0e15;
+            background-image: radial-gradient(circle at 50% 0%, #1a1030 0%, #0d0e15 55%, #05060a 100%);
+            color: #e0e0e0;
+            font-family: 'Orbitron', 'Segoe UI', Tahoma, sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             flex-direction: column;
         }
 
         #gameCanvas {
-            background: linear-gradient(to bottom, #101015, #000000); /* Subtle gradient */
-            border: 4px solid #555; /* Thicker border */
-            border-radius: 15px; /* More rounded */
-            box-shadow: 0 0 25px rgba(255, 255, 255, 0.1); /* Outer glow */
+            background: linear-gradient(to bottom, #09090e, #020204);
+            border: 5px solid #1a1b26;
+            border-radius: 16px;
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.05),
+                0 0 20px rgba(255, 0, 127, 0.25),
+                0 0 40px rgba(0, 240, 255, 0.15),
+                inset 0 0 15px rgba(0, 0, 0, 0.8);
+            transition: box-shadow 0.3s ease;
         }
 
         #gameInfo {
-            margin-top: 15px;
-            font-size: 20px;
+            margin-top: 20px;
+            background: rgba(18, 19, 32, 0.65);
+            backdrop-filter: blur(12px) saturate(180%);
+            -webkit-backdrop-filter: blur(12px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            padding: 15px 30px;
             display: flex;
-            gap: 30px; /* Increased gap */
-            color: #ccc;
-            text-shadow: 1px 1px 2px #000;
+            gap: 40px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #aab;
         }
         #gameInfo span {
-            color: #fff;
-            font-weight: bold;
+            display: inline-block;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 18px;
+            color: #00f0ff;
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+            margin-left: 5px;
+        }
+        #gameInfo #score { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+
+        /* Animação de feedback de pontos */
+        .score-bump { animation: scoreBumpAnimation 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes scoreBumpAnimation {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.25); color: #ff007f !important; text-shadow: 0 0 12px #ff007f !important; }
+            100% { transform: scale(1); }
         }
 
         h1 {
-            margin-bottom: 15px;
-            color: #FFD700; /* Gold */
-            font-size: 2.5em;
-            text-shadow: 0 0 8px #FF8C00, 0 0 15px #FF5733; /* Enhanced glow */
-            letter-spacing: 2px;
+            margin-bottom: 18px;
+            font-family: 'Press Start 2P', monospace;
+            color: #ff2e97;
+            font-size: 2em;
+            text-shadow: 0 0 10px #ff007f, 0 0 22px rgba(0, 240, 255, 0.5);
+            letter-spacing: 4px;
         }
-
-        /* Define color classes if needed for specific zone text, but often drawn on canvas */
     </style>
 </head>
 <body>
@@ -103,16 +135,48 @@
         const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + Math.PI / 4; // Mirror active angle
 
         // Ball properties
-        const ball = {
-            xInitial: canvasWidth - 24,
-            yInitial: canvasHeight - 89,
-            x: canvasWidth - 24, // Start in launcher lane
-            y: canvasHeight - 89,
-            radius: BALL_RADIUS,
-            speedX: 0,
-            speedY: 0,
-            isLaunched: false
-        };
+        // TASK_002: fábrica de bolas (cada uma carrega o próprio rastro e stuckTimer)
+        function createBall(x, y, launched = false) {
+            return {
+                xInitial: canvasWidth - 24,
+                yInitial: canvasHeight - 89,
+                x: x, y: y,
+                radius: BALL_RADIUS,
+                speedX: 0, speedY: 0,
+                isLaunched: launched,
+                trail: [],
+                maxTrailLength: 12,
+                stuckTimer: 0 // TASK_002: stuck individual por bola (decisão do TL)
+            };
+        }
+        let ball = createBall(canvasWidth - 24, canvasHeight - 89, false); // bola "corrente" (ponteiro)
+
+        // === TASK_002: Multibola, gravidade mutável e missões ciber-sintéticas ===
+        let activeBalls = [ball];
+        let currentGravity = GRAVITY;
+        let currentFriction = FRICTION;
+        let activePhysicsMode = 'normal'; // 'normal' | 'low_gravity' | 'overdrive'
+        let physicsModeTimer = 0;
+        let bounceBoost = 1;              // amplifica rebotes no overdrive
+        let globalScoreMultiplier = 1;   // 2x durante o OVERCLOCK
+        let frameFlashTimer = 0;         // flash vermelho da moldura ao perder uma bola no multiball
+
+        // Estado das missões
+        const missionsState = { label: '', detail: '', barRatio: 0, accent: '#00f0ff' };
+        let hackGridHits = new Set();    // índices 0,1,2 atingidos
+        let hackGridTimer = 0;           // janela de 15s
+        let hackGridDone = false;
+        let overclockZoneTime = 0;       // tempo cumulativo em zona central
+        let overclockTimer = 0;          // duração do bônus 2x
+        let lowerBumperStreak = 0;       // hits sucessivos nos bumpers inferiores
+        let firewallProgress = 0;        // 0..3 alvos em sequência
+
+        // Alvos físicos da missão FIREWALL CRACK (laterais inferiores)
+        const firewallTargets = [
+            { x: 14,               y: 360, width: 22, height: 12, color: '#ff2e97' },
+            { x: canvasWidth - 60, y: 400, width: 22, height: 12, color: '#00f0ff' },
+            { x: 14,               y: 440, width: 22, height: 12, color: '#39ff14' }
+        ];
 
         // Launcher properties
         const launcher = {
@@ -163,21 +227,22 @@
 
         // Obstacles - Bumpers
         const bumpers = [
-            // Add hit state and cooldown for visual effects
-            { x: 100, y: 150, radius: 18, points: 10, color: '#FF5733', hitColor: '#FFC300', isHit: false, hitTimer: 0 },
-            { x: 200, y: 200, radius: 22, points: 15, color: '#FF5733', hitColor: '#FFC300', isHit: false, hitTimer: 0 },
-            { x: 300, y: 150, radius: 18, points: 10, color: '#FF5733', hitColor: '#FFC300', isHit: false, hitTimer: 0 },
-            { x: 150, y: 300, radius: 15, points: 5, color: '#33FF57', hitColor: '#90EE90', isHit: false, hitTimer: 0 },
-            { x: 250, y: 300, radius: 15, points: 5, color: '#33FF57', hitColor: '#90EE90', isHit: false, hitTimer: 0 }
+            // TASK_001: paleta neon synthwave (pink / gold / cyan / green)
+            { x: 100, y: 150, radius: 18, points: 10, color: '#ff2e97', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
+            { x: 200, y: 200, radius: 22, points: 15, color: '#ffcc00', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
+            { x: 300, y: 150, radius: 18, points: 10, color: '#ff2e97', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
+            { x: 150, y: 300, radius: 15, points: 5, color: '#39ff14', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
+            { x: 250, y: 300, radius: 15, points: 5, color: '#00f0ff', hitColor: '#ffffff', isHit: false, hitTimer: 0 }
         ];
         const BUMPER_HIT_DURATION = 8; // Frames the hit color shows
 
         // Multiplier zones
         const multiplierZones = [
-            { x: 50, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 87, 51, 0.2)', borderColor: 'rgba(255, 87, 51, 0.8)' },
-            { x: 290, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 87, 51, 0.2)', borderColor: 'rgba(255, 87, 51, 0.8)' },
-            { x: 170, y: 100, width: 60, height: 60, multiplier: 3, color: 'rgba(51, 255, 87, 0.2)', borderColor: 'rgba(51, 255, 87, 0.8)' },
-            { x: 170, y: 250, width: 60, height: 60, multiplier: 5, color: 'rgba(51, 87, 255, 0.2)', borderColor: 'rgba(51, 87, 255, 0.8)' }
+            // TASK_001: barreiras holográficas neon
+            { x: 50, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 46, 151, 0.2)', borderColor: 'rgba(255, 46, 151, 0.8)' },
+            { x: 290, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 46, 151, 0.2)', borderColor: 'rgba(255, 46, 151, 0.8)' },
+            { x: 170, y: 100, width: 60, height: 60, multiplier: 3, color: 'rgba(57, 255, 20, 0.2)', borderColor: 'rgba(57, 255, 20, 0.8)' },
+            { x: 170, y: 250, width: 60, height: 60, multiplier: 5, color: 'rgba(0, 240, 255, 0.2)', borderColor: 'rgba(0, 240, 255, 0.8)' }
         ];
 
         // Walls and boundaries - Defined as line segments for better collision
@@ -218,7 +283,7 @@
 
         document.addEventListener('keyup', function(e) {
             if (e.key === ' ' || e.key === 'Spacebar') {
-                if (launcher.charging && !ball.isLaunched) {
+                if (launcher.charging && activeBalls.some(b => !b.isLaunched)) {
                     launchBall();
                 }
                 launcher.charging = false;
@@ -241,7 +306,13 @@
             gameStarted = false; // Needs to be started again by launching
             particles = [];
 
-            resetBall(); // Reset ball position and state
+            resetBallToLauncher(); // TASK_002: nova bola única na lane
+            // Reset de missões e modos de gravidade
+            setPhysicsMode('normal', 0);
+            hackGridHits.clear(); hackGridTimer = 0; hackGridDone = false;
+            overclockZoneTime = 0; overclockTimer = 0; globalScoreMultiplier = 1;
+            lowerBumperStreak = 0; firewallProgress = 0; frameFlashTimer = 0;
+
             leftFlipper.currentAngle = leftFlipper.restAngle;
             rightFlipper.currentAngle = rightFlipper.restAngle;
             leftFlipper.isActivating = false;
@@ -257,30 +328,40 @@
             ball.speedX = 0;
             ball.speedY = 0;
             ball.isLaunched = false; // Precisa ser lançada novamente
+            ball.trail = []; // TASK_001: limpa o rastro
             launcher.pullDistance = 0; // Reseta o lançador também
-            ballStuckTimer = 0; // Reseta o timer de parada
+            ball.stuckTimer = 0; // Reseta o timer de parada desta bola
             // NÃO mexe em lives ou currentMultiplier
              createParticles(ball.x, ball.y, 5, '#8888FF'); // Efeito visual de reset
         }
 
         function checkBallStuckOrOutOfBounds(deltaTime) {
             if (!ball.isLaunched || !gameActive) {
-                ballStuckTimer = 0; // Reseta timer se não lançada ou jogo inativo
-                return; // Só valida após lançar e enquanto o jogo está ativo
+                ball.stuckTimer = 0;
+                return;
             }
 
-            // --- Verificar se está parada ---
+            // --- Verificar se está parada (timer individual por bola) ---
             const currentSpeedSq = ball.speedX * ball.speedX + ball.speedY * ball.speedY;
             if (currentSpeedSq < STUCK_VELOCITY_THRESHOLD * STUCK_VELOCITY_THRESHOLD) {
-                ballStuckTimer += deltaTime; // Incrementa usando delta time
+                ball.stuckTimer += deltaTime;
             } else {
-                ballStuckTimer = 0; // Reseta o timer se a bola está se movendo
+                ball.stuckTimer = 0;
             }
 
-            if (ballStuckTimer > MAX_STUCK_TIME_SECONDS) {
-                console.warn(`Ball stuck for ${ballStuckTimer.toFixed(1)}s, resetting.`);
-                resetBallPosition();
-                return; // Sai da função após resetar
+            if (ball.stuckTimer > MAX_STUCK_TIME_SECONDS) {
+                // TASK_002: no multibola, teletransporta SÓ esta bola para o topo (decisão do TL)
+                if (activeBalls.length > 1) {
+                    createParticles(ball.x, ball.y, 10, '#00f0ff');
+                    ball.x = 200; ball.y = 50;
+                    ball.speedX = (Math.random() - 0.5) * 2; ball.speedY = 2;
+                    ball.trail = [];
+                    ball.stuckTimer = 0;
+                    createParticles(ball.x, ball.y, 10, '#00f0ff');
+                } else {
+                    resetBallPosition();
+                }
+                return;
             }
 
             // --- Verificar se está fora dos limites seguros (antes de cair no dreno) ---
@@ -312,52 +393,244 @@
             ball.speedX = 0;
             ball.speedY = 0;
             ball.isLaunched = false;
+            ball.trail = []; // TASK_001: limpa o rastro
             launcher.pullDistance = 0;
             currentMultiplier = 1; // Reset multiplier on losing a ball
         }
 
         function launchBall() {
-            if (!ball.isLaunched && launcher.pullDistance > 5) { // Require some pull
-                ball.isLaunched = true;
-                // Calculate launch speed based on pull distance
-                ball.speedY = -(launcher.pullDistance * launcher.springStiffness * 1.4);
-                ball.speedX = -1 - Math.random(); // Slight random angle leftwards
+            // TASK_002: lança a bola que estiver na lane do lançador (não lançada)
+            const b = activeBalls.find(x => !x.isLaunched);
+            if (b && launcher.pullDistance > 5) { // Require some pull
+                b.isLaunched = true;
+                b.speedY = -(launcher.pullDistance * launcher.springStiffness * 1.4);
+                b.speedX = -1 - Math.random(); // Slight random angle leftwards
                 launcher.pullDistance = 0;
-                if (!gameStarted) gameStarted = true; // Mark game as started
-                createParticles(ball.x, ball.y + 10, 10, '#FFFF88'); // Launch sparks
+                if (!gameStarted) gameStarted = true;
+                createParticles(b.x, b.y + 10, 10, '#FFFF88'); // Launch sparks
             }
-            launcher.charging = false; // Stop charging after launch/release
+            launcher.charging = false;
         }
 
+        // === TASK_002: pontuação com multiplicador de sobrevivência (× nº de bolas) + overclock ===
+        function addScore(base) {
+            score += Math.round(base * currentMultiplier * activeBalls.length * globalScoreMultiplier);
+        }
+
+        // Dreno por bola — só perde vida quando a ÚLTIMA bola cai
+        function handleDrainCheck(b, index) {
+            if (b.y > canvasHeight + b.radius * 2) {
+                activeBalls.splice(index, 1);
+                if (activeBalls.length === 0) {
+                    if (lives > 1) {
+                        lives--;
+                        resetBallToLauncher();
+                    } else {
+                        lives = 0;
+                        gameActive = false;
+                    }
+                    updateScoreDisplay();
+                } else {
+                    frameFlashTimer = 0.25; // ainda há bolas: flash vermelho de aviso
+                }
+            }
+        }
+
+        function resetBallToLauncher() {
+            const nb = createBall(canvasWidth - 24, canvasHeight - 89, false);
+            activeBalls = [nb];
+            ball = nb;
+            launcher.pullDistance = 0;
+            currentMultiplier = 1;
+        }
+
+        // Spawna 2 bolas adicionais (Multiball) a partir de portais neon superiores
+        function spawnMultiball() {
+            const spawns = [{ x: 150, y: 60 }, { x: 250, y: 60 }];
+            spawns.forEach(s => {
+                const nb = createBall(s.x, s.y, true);
+                nb.speedX = (Math.random() - 0.5) * 4;
+                nb.speedY = 2 + Math.random() * 2;
+                activeBalls.push(nb);
+                createParticles(s.x, s.y, 14, '#00f0ff'); // faíscas elétricas do portal
+            });
+        }
+
+        // Colisão elástica 2D bola-bola (massas iguais) — troca de velocidades normais
+        function checkBallToBallCollisions() {
+            for (let i = 0; i < activeBalls.length; i++) {
+                for (let j = i + 1; j < activeBalls.length; j++) {
+                    const b1 = activeBalls[i], b2 = activeBalls[j];
+                    const dx = b2.x - b1.x, dy = b2.y - b1.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = b1.radius + b2.radius;
+                    if (dist < minDist && dist > 0) {
+                        const overlap = minDist - dist;
+                        const nX = dx / dist, nY = dy / dist;
+                        // resolve penetração igualmente
+                        b1.x -= nX * (overlap / 2); b1.y -= nY * (overlap / 2);
+                        b2.x += nX * (overlap / 2); b2.y += nY * (overlap / 2);
+                        // tangente
+                        const tX = -nY, tY = nX;
+                        const v1n = b1.speedX * nX + b1.speedY * nY;
+                        const v1t = b1.speedX * tX + b1.speedY * tY;
+                        const v2n = b2.speedX * nX + b2.speedY * nY;
+                        const v2t = b2.speedX * tX + b2.speedY * tY;
+                        // troca das componentes normais (massas iguais)
+                        b1.speedX = v2n * nX + v1t * tX; b1.speedY = v2n * nY + v1t * tY;
+                        b2.speedX = v1n * nX + v2t * tX; b2.speedY = v1n * nY + v2t * tY;
+                        createParticles(b1.x + nX * b1.radius, b1.y + nY * b1.radius, 8, '#ffffff');
+                    }
+                }
+            }
+        }
+
+        // === TASK_002: modos de gravidade mutáveis ===
+        function setPhysicsMode(mode, duration) {
+            activePhysicsMode = mode;
+            physicsModeTimer = duration;
+            if (mode === 'low_gravity') {
+                currentGravity = GRAVITY * 0.5; currentFriction = 1.0; bounceBoost = 1;
+            } else if (mode === 'overdrive') {
+                currentGravity = GRAVITY * 1.35; currentFriction = FRICTION; bounceBoost = 1.4;
+            } else {
+                currentGravity = GRAVITY; currentFriction = FRICTION; bounceBoost = 1;
+            }
+        }
+
+        function updatePhysicsMode(dt) {
+            if (physicsModeTimer > 0) {
+                physicsModeTimer -= dt;
+                if (physicsModeTimer <= 0) setPhysicsMode('normal', 0);
+            }
+        }
+
+        // === TASK_002: temporizadores e HUD das missões ===
+        function updateMissions(dt) {
+            // HACK THE GRID — janela de 15s
+            if (hackGridTimer > 0 && !hackGridDone) {
+                hackGridTimer -= dt;
+                if (hackGridTimer <= 0) { hackGridHits.clear(); }
+            }
+            // OVERCLOCK — bônus 2x temporário
+            if (overclockTimer > 0) {
+                overclockTimer -= dt;
+                if (overclockTimer <= 0) { globalScoreMultiplier = 1; }
+            }
+
+            // Descritor de HUD: prioriza missão em andamento
+            if (overclockTimer > 0) {
+                missionsState.label = 'SYSTEM OVERCLOCK · 2x';
+                missionsState.detail = `TIME LEFT: ${overclockTimer.toFixed(1)}s`;
+                missionsState.barRatio = overclockTimer / 20;
+                missionsState.accent = '#ff2e97';
+            } else if (hackGridTimer > 0 && !hackGridDone) {
+                missionsState.label = 'HACK THE GRID';
+                missionsState.detail = `BUMPERS: ${hackGridHits.size}/3 · ${hackGridTimer.toFixed(1)}s`;
+                missionsState.barRatio = hackGridTimer / 15;
+                missionsState.accent = '#ff2e97';
+            } else {
+                missionsState.label = 'FIREWALL CRACK';
+                missionsState.detail = `TARGETS: ${firewallProgress}/3`;
+                missionsState.barRatio = firewallProgress / 3;
+                missionsState.accent = '#39ff14';
+            }
+        }
+
+        // Registra hit de bumper nas missões (chamado de checkBumperCollisions)
+        function registerBumperHitForMissions(index) {
+            // HACK THE GRID: bumpers superiores 0,1,2
+            if (index <= 2) {
+                if (hackGridHits.size === 0) { hackGridTimer = 15; hackGridDone = false; }
+                if (hackGridTimer > 0) {
+                    hackGridHits.add(index);
+                    if (hackGridHits.size >= 3 && !hackGridDone) {
+                        hackGridDone = true;
+                        score += 500;
+                        spawnMultiball();
+                        createParticles(200, 60, 20, '#ff2e97');
+                        hackGridHits.clear();
+                        hackGridTimer = 0;
+                    }
+                }
+            } else {
+                // OVERDRIVE: bumpers inferiores (3,4) sucessivos
+                lowerBumperStreak++;
+                if (lowerBumperStreak >= 3) {
+                    lowerBumperStreak = 0;
+                    setPhysicsMode('overdrive', 8);
+                }
+            }
+        }
+
+        // Alvos físicos da FIREWALL CRACK (chamado por bola no update loop)
+        function checkFirewallTargets() {
+            const target = firewallTargets[firewallProgress];
+            if (!target) return;
+            if (ball.x + ball.radius > target.x && ball.x - ball.radius < target.x + target.width &&
+                ball.y + ball.radius > target.y && ball.y - ball.radius < target.y + target.height) {
+                firewallProgress++;
+                createParticles(target.x + target.width / 2, target.y + target.height / 2, 12, target.color);
+                if (firewallProgress >= 3) {
+                    score += 1000;
+                    if (lives < 3) { lives++; }
+                    firewallProgress = 0;
+                    updateScoreDisplay();
+                }
+            }
+        }
+
+        let lastDisplayedScore = 0;
         function updateScoreDisplay() {
-            document.getElementById('score').textContent = score;
+            const scoreEl = document.getElementById('score');
+            scoreEl.textContent = score;
             document.getElementById('lives').textContent = lives;
             document.getElementById('multiplier').textContent = currentMultiplier + 'x';
+
+            // TASK_001: pulso de feedback ao somar pontos
+            if (score > lastDisplayedScore) {
+                scoreEl.classList.remove('score-bump');
+                void scoreEl.offsetWidth; // re-dispara a animação
+                scoreEl.classList.add('score-bump');
+            }
+            lastDisplayedScore = score;
         }
 
         // --- Drawing Functions ---
         function drawBall() {
-            // Add gradient for 3D look
-            const gradient = ctx.createRadialGradient(ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, ball.radius * 0.1, ball.x, ball.y, ball.radius);
-            gradient.addColorStop(0, '#FFFFFF'); // Highlight
-            gradient.addColorStop(0.8, '#E0E0E0'); // Main color
-            gradient.addColorStop(1, '#AAAAAA'); // Shadow edge
+            if (!gameActive) return;
 
+            // 1. TASK_001: Rastro neon cyberpunk (círculos decrescentes)
+            for (let i = 0; i < ball.trail.length; i++) {
+                const pos = ball.trail[i];
+                const ratio = i / ball.trail.length;
+                const radius = ball.radius * (0.3 + 0.7 * ratio);
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 240, 255, ${0.18 * ratio})`;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            // 2. Bola de aço cromado com reflexo de estúdio neon
+            const grad = ctx.createRadialGradient(
+                ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, ball.radius * 0.1,
+                ball.x, ball.y, ball.radius
+            );
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.3, '#dcdcdc');
+            grad.addColorStop(0.75, '#4a4a5a');
+            grad.addColorStop(1, '#1e1e24');
+
+            ctx.save();
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-            ctx.fillStyle = gradient;
-            // Add a subtle shadow beneath the ball
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 5;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 2;
+            ctx.fillStyle = grad;
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 8;
             ctx.fill();
             ctx.closePath();
-            // Reset shadow for other elements
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
+            ctx.restore();
         }
 
         function drawLauncher() {
@@ -371,16 +644,20 @@
             const currentHeight = launcher.height - launcher.pullDistance;
             const springBaseY = launcher.y + launcher.height; // Bottom of spring path
 
-            // Draw the visible plunger part
-            ctx.fillStyle = '#999';
+            // Draw the visible plunger part (cromado degradê)
+            const plungerGrad = ctx.createLinearGradient(launcher.x - launcher.width / 2, 0, launcher.x + launcher.width / 2, 0);
+            plungerGrad.addColorStop(0, '#3a3a48');
+            plungerGrad.addColorStop(0.5, '#d8d8e0');
+            plungerGrad.addColorStop(1, '#3a3a48');
+            ctx.fillStyle = plungerGrad;
             ctx.fillRect(launcher.x - launcher.width / 2, springBaseY - currentHeight, launcher.width, currentHeight);
             // Draw plunger top cap
-            ctx.fillStyle = '#CCC';
+            ctx.fillStyle = '#eef';
             ctx.fillRect(launcher.x - launcher.width / 2 - 2, springBaseY - currentHeight - 5, launcher.width + 4, 5);
 
 
-            // Draw Spring visualization (compressed part)
-            ctx.strokeStyle = '#AAA';
+            // Draw Spring visualization (compressed part) — cromo neon
+            ctx.strokeStyle = '#8fa0c0';
             ctx.lineWidth = 3;
             ctx.beginPath();
             const startY = springBaseY - currentHeight; // Top of visible plunger
@@ -399,23 +676,36 @@
             ctx.stroke();
 
 
-            // Draw Power Meter next to launcher (visual only)
+            // TASK_001: Power Meter como equalizador de LEDs segmentados sci-fi
             const meterX = canvasWidth - 60;
             const meterY = canvasHeight - launcher.height - 10;
-            const meterWidth = 8;
+            const meterWidth = 9;
             const meterHeight = launcher.height;
-            ctx.fillStyle = '#444';
-            ctx.fillRect(meterX, meterY, meterWidth, meterHeight);
-            const powerHeight = (launcher.pullDistance / launcher.maxPull) * meterHeight;
-            // Gradient for power fill
-            const powerGrad = ctx.createLinearGradient(meterX, meterY + meterHeight, meterX, meterY);
-            powerGrad.addColorStop(0, '#00FF00'); // Green at bottom
-            powerGrad.addColorStop(0.5, '#FFFF00'); // Yellow middle
-            powerGrad.addColorStop(1, '#FF0000'); // Red at top
-            ctx.fillStyle = powerGrad;
-            ctx.fillRect(meterX, meterY + meterHeight - powerHeight, meterWidth, powerHeight);
-            ctx.strokeStyle = '#888';
-            ctx.strokeRect(meterX, meterY, meterWidth, meterHeight);
+            // moldura
+            ctx.fillStyle = 'rgba(8,10,18,0.9)';
+            ctx.fillRect(meterX - 1, meterY - 1, meterWidth + 2, meterHeight + 2);
+
+            const SEGMENTS = 10;
+            const gap = 2;
+            const segH = (meterHeight - gap * (SEGMENTS - 1)) / SEGMENTS;
+            const powerRatio = Math.min(1, launcher.pullDistance / launcher.maxPull);
+            const litCount = Math.round(powerRatio * SEGMENTS);
+            for (let i = 0; i < SEGMENTS; i++) {
+                const t = i / (SEGMENTS - 1); // 0 base -> 1 topo
+                // cor LED: verde -> amarelo -> vermelho conforme sobe
+                const ledColor = t < 0.5 ? '#39ff14' : (t < 0.8 ? '#ffd700' : '#ff2e97');
+                const segY = meterY + meterHeight - (i + 1) * segH - i * gap;
+                if (i < litCount) {
+                    ctx.fillStyle = ledColor;
+                    ctx.shadowColor = ledColor;
+                    ctx.shadowBlur = 8;
+                } else {
+                    ctx.fillStyle = 'rgba(40,44,56,0.7)';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fillRect(meterX, segY, meterWidth, segH);
+            }
+            ctx.shadowBlur = 0;
 
             ctx.restore();
         }
@@ -433,17 +723,17 @@
 
              // Add gradient and shadow for better look
              const gradient = ctx.createLinearGradient(drawX, -flipper.height / 2, drawX, flipper.height / 2);
-             gradient.addColorStop(0, '#FFFFFF');
-             gradient.addColorStop(0.5, '#E0E0E0');
-             gradient.addColorStop(1, '#C0C0C0');
+             gradient.addColorStop(0, '#ffffff');
+             gradient.addColorStop(0.5, '#d8d8e6');
+             gradient.addColorStop(1, '#9aa0b8');
              ctx.fillStyle = gradient;
-             ctx.strokeStyle = '#555'; // Outline
-             ctx.lineWidth = 1;
+             ctx.strokeStyle = '#00f0ff'; // borda neon ciano (TASK_001)
+             ctx.lineWidth = 1.5;
 
-             ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-             ctx.shadowBlur = 4;
-             ctx.shadowOffsetX = 1;
-             ctx.shadowOffsetY = 2;
+             ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
+             ctx.shadowBlur = 8;
+             ctx.shadowOffsetX = 0;
+             ctx.shadowOffsetY = 0;
 
              ctx.beginPath();
              ctx.rect(drawX, -flipper.height / 2, flipper.width, flipper.height);
@@ -466,109 +756,124 @@
 
         function drawBumpers() {
             bumpers.forEach(bumper => {
-                const displayColor = bumper.isHit ? bumper.hitColor : bumper.color;
+                // TASK_001: cor base sempre neon; o "hit" expande e intensifica o bloom
+                const displayColor = bumper.color;
+                let currentRadius = bumper.radius;
+                let glowIntensity = 10;
 
-                // Add gradient for 3D effect
-                const gradient = ctx.createRadialGradient(
-                    bumper.x - bumper.radius * 0.4, bumper.y - bumper.radius * 0.4, bumper.radius * 0.1, // Inner lighter spot
-                    bumper.x, bumper.y, bumper.radius
-                );
-                gradient.addColorStop(0, shadeColor(displayColor, 40)); // Lighter highlight
-                gradient.addColorStop(0.7, displayColor);
-                gradient.addColorStop(1, shadeColor(displayColor, -40)); // Darker edge
-
-                ctx.beginPath();
-                ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
-                ctx.fillStyle = gradient;
-
-                // Add glow effect when hit
                 if (bumper.isHit) {
-                    ctx.shadowColor = bumper.hitColor;
-                    ctx.shadowBlur = 15 + Math.random() * 10; // Pulsing glow
-                } else {
-                    ctx.shadowColor = displayColor;
-                    ctx.shadowBlur = 8;
+                    const factor = bumper.hitTimer / BUMPER_HIT_DURATION; // 1 -> 0
+                    currentRadius = bumper.radius * (1 + factor * 0.25); // pulso elástico
+                    glowIntensity = 25 + factor * 15;
                 }
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
 
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(bumper.x, bumper.y, currentRadius, 0, Math.PI * 2);
+
+                const grad = ctx.createRadialGradient(
+                    bumper.x - currentRadius * 0.25, bumper.y - currentRadius * 0.25, currentRadius * 0.05,
+                    bumper.x, bumper.y, currentRadius
+                );
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.4, displayColor);
+                grad.addColorStop(1, shadeColor(displayColor, -55));
+
+                ctx.fillStyle = grad;
+                ctx.shadowColor = displayColor;
+                ctx.shadowBlur = glowIntensity;
                 ctx.fill();
 
-                 // Reset shadow
-                 ctx.shadowColor = 'transparent';
-                 ctx.shadowBlur = 0;
-
-
-                 // Outline (optional)
-                 ctx.strokeStyle = shadeColor(displayColor, -60); // Darker outline
-                 ctx.lineWidth = 2;
-                 ctx.stroke();
-                 ctx.closePath();
+                // Borda neon (mais grossa e branca no impacto)
+                ctx.strokeStyle = bumper.isHit ? '#ffffff' : shadeColor(displayColor, 30);
+                ctx.lineWidth = bumper.isHit ? 3 : 1.5;
+                ctx.stroke();
+                ctx.closePath();
+                ctx.restore();
             });
         }
 
         function drawMultiplierZones() {
+            // TASK_001: barreiras holográficas de laser reativas (crawling dashes + pulsação)
+            const time = performance.now();
             multiplierZones.forEach(zone => {
+                ctx.save();
                 ctx.beginPath();
                 ctx.rect(zone.x, zone.y, zone.width, zone.height);
-                // Fill with semi-transparent color
-                ctx.fillStyle = zone.color;
-                ctx.fill();
-                // Draw a more prominent border
-                ctx.strokeStyle = zone.borderColor;
-                ctx.lineWidth = 2;
-                // Dashed line effect for border
-                 ctx.setLineDash([5, 5]); // Pattern: 5 pixels drawn, 5 pixels gap
-                ctx.stroke();
-                ctx.setLineDash([]); // Reset to solid line for other drawings
-                ctx.closePath();
 
-                // Draw multiplier text (make it stand out more)
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = 'bold 20px Arial'; // Larger, bolder font
+                // Preenchimento holográfico com pulsação senoidal
+                const pulse = 0.08 + Math.sin(time / 250) * 0.04;
+                const grad = ctx.createLinearGradient(zone.x, zone.y, zone.x + zone.width, zone.y + zone.height);
+                grad.addColorStop(0, zone.borderColor.replace('0.8', pulse.toFixed(3)));
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // Linha laser pontilhada rastejante (crawling)
+                ctx.strokeStyle = zone.borderColor;
+                ctx.lineWidth = 2.5;
+                ctx.shadowColor = zone.borderColor;
+                ctx.shadowBlur = 10;
+                ctx.setLineDash([8, 4]);
+                ctx.lineDashOffset = -(time / 30) % 12;
+                ctx.stroke();
+                ctx.closePath();
+                ctx.setLineDash([]);
+
+                // Texto multiplicador retro
+                ctx.font = '900 16px "Orbitron", sans-serif';
+                ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                ctx.shadowColor = '#000000';
                 ctx.shadowBlur = 4;
-                ctx.shadowOffsetX = 1;
-                ctx.shadowOffsetY = 1;
-                ctx.fillText(`${zone.multiplier}x`, zone.x + zone.width / 2, zone.y + zone.height / 2 + 8); // Adjust Y offset for font size
-                 // Reset shadow
-                 ctx.shadowColor = 'transparent';
+                ctx.fillText(`${zone.multiplier}x`, zone.x + zone.width / 2, zone.y + zone.height / 2 + 6);
+                ctx.restore();
             });
         }
 
         function drawWalls() {
-            ctx.strokeStyle = '#777'; // Grey color for walls
-            ctx.lineWidth = 5; // Make walls thicker
-             ctx.lineCap = 'round'; // Rounded ends
-
+            // TASK_001: paredes com LED neon ciano
+            ctx.save();
+            ctx.strokeStyle = '#1f6f8f';
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.shadowColor = 'rgba(0, 240, 255, 0.7)';
+            ctx.shadowBlur = 8;
             walls.forEach(wall => {
                 ctx.beginPath();
                 ctx.moveTo(wall.x1, wall.y1);
                 ctx.lineTo(wall.x2, wall.y2);
                 ctx.stroke();
             });
-             ctx.lineCap = 'butt'; // Reset line cap
+            ctx.restore();
         }
 
         function drawParticles() {
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
+            // TASK_001: faíscas neon alongadas pelo vetor de velocidade (velocity stretching)
+            particles.forEach(p => {
+                ctx.save();
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${p.alpha})`;
-                ctx.fill();
+                const lengthFactor = 2;
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x - p.vx * lengthFactor, p.y - p.vy * lengthFactor);
+                ctx.strokeStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${p.alpha})`;
+                ctx.lineWidth = p.size;
+                ctx.lineCap = 'round';
+                ctx.shadowColor = `rgb(${p.r}, ${p.g}, ${p.b})`;
+                ctx.shadowBlur = 6;
+                ctx.stroke();
+                ctx.closePath();
+                ctx.restore();
 
-                // Update particle
+                // Física das partículas
                 p.x += p.vx;
                 p.y += p.vy;
-                p.alpha -= p.decay;
-                p.size *= 0.98; // Shrink slightly
-
-                if (p.alpha <= 0 || p.size < 0.5) {
-                    particles.splice(i, 1); // Remove dead particles
-                }
-            }
+                p.vy += 0.05; // gravidade sutil
+                p.alpha = Math.max(0, p.alpha - p.decay);
+                p.size *= 0.97;
+            });
+            // Limpa partículas mortas
+            particles = particles.filter(p => p.alpha > 0 && p.size > 0.4);
         }
 
 
@@ -664,22 +969,11 @@
                       createParticles(closestX, closestY, 3, '#AAAAAA'); // Wall sparks
                  }
             });
-
-             // Drain check (moved out of wall loop for clarity)
-             if (ball.y > canvasHeight + ball.radius * 2) { // Check slightly below canvas bottom
-                if (lives > 1) {
-                    lives--;
-                    resetBall(); // Use reset function
-                 } else {
-                    lives = 0;
-                    gameActive = false;
-                 }
-                 updateScoreDisplay();
-             }
+            // TASK_002: o dreno é tratado por bola em handleDrainCheck (suporte a multibola)
         }
 
         function checkBumperCollisions() {
-            bumpers.forEach(bumper => {
+            bumpers.forEach((bumper, index) => {
                  if (bumper.hitTimer > 0) bumper.hitTimer--; // Decrement hit timer
                  else bumper.isHit = false;
 
@@ -704,7 +998,7 @@
 
                      // Apply bounce factor and ensure minimum speed away from bumper
                      const currentSpeed = Math.sqrt(ball.speedX**2 + ball.speedY**2);
-                     const minBounceSpeed = 5; // Minimum speed after hit
+                     const minBounceSpeed = 5 * bounceBoost; // TASK_002: +40% no overdrive
                      const bounceSpeed = Math.max(minBounceSpeed, currentSpeed * BUMPER_BOUNCE);
 
                      const speedFactor = bounceSpeed / Math.sqrt(reflected.x**2 + reflected.y**2);
@@ -715,27 +1009,40 @@
 
                     // Score and visual feedback
                     if (!bumper.isHit) { // Prevent scoring multiple times on one hit
-                         score += bumper.points * currentMultiplier;
+                         addScore(bumper.points); // TASK_002: × multiplicador × nº bolas × overclock
                          updateScoreDisplay();
                          bumper.isHit = true;
                          bumper.hitTimer = BUMPER_HIT_DURATION;
                           createParticles(ball.x, ball.y, 15, bumper.hitColor); // Bumper hit sparks
-                           // Optional: Play bumper sound
+                          registerBumperHitForMissions(index); // TASK_002: missões/overdrive
                      }
                 }
             });
         }
 
-        function checkMultiplierZoneCollisions() {
-             multiplierZones.forEach(zone => {
-                 if (ball.x + ball.radius > zone.x && ball.x - ball.radius < zone.x + zone.width &&
-                     ball.y + ball.radius > zone.y && ball.y - ball.radius < zone.y + zone.height) {
-                     // Ball is inside the zone, update multiplier if it's higher
-                      if(zone.multiplier > currentMultiplier) {
+        function checkMultiplierZoneCollisions(dt) {
+             multiplierZones.forEach((zone, index) => {
+                 const inside = ball.x + ball.radius > zone.x && ball.x - ball.radius < zone.x + zone.width &&
+                                ball.y + ball.radius > zone.y && ball.y - ball.radius < zone.y + zone.height;
+                 if (inside) {
+                      if (zone.multiplier > currentMultiplier) {
                            currentMultiplier = zone.multiplier;
                            updateScoreDisplay();
-                           // Optional: Visual/Sound effect for entering zone
-                       }
+                      }
+                      // TASK_002: zonas centrais (índices 2,3) alimentam o OVERCLOCK
+                      if (index === 2 || index === 3) {
+                           overclockZoneTime += (dt || 0);
+                           if (overclockZoneTime >= 3.0 && overclockTimer <= 0) {
+                                overclockTimer = 20; globalScoreMultiplier = 2;
+                                overclockZoneTime = 0;
+                                createParticles(ball.x, ball.y, 18, '#ff2e97');
+                           }
+                      }
+                      // TASK_002: zona central inferior (índice 3) dispara LOW GRAVITY
+                      if (index === 3 && activePhysicsMode !== 'low_gravity') {
+                           setPhysicsMode('low_gravity', 12);
+                           createParticles(ball.x, ball.y, 16, '#00f0ff');
+                      }
                  }
             });
          }
@@ -805,26 +1112,23 @@
 
                      // Reflect velocity
                      const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
-                      // Add flipper impulse/angular velocity effect
+                      // Add flipper impulse/angular velocity effect (× overdrive boost)
                       let impulseX = 0;
-                      let impulseY = -FLIPPER_STRENGTH; // Base upward impulse
-                      // Add sideways push based on flipper
-                      impulseX += flipper.isLeft ? FLIPPER_SIDE_STRENGTH : -FLIPPER_SIDE_STRENGTH;
-                      // Add angular velocity contribution (simplified)
-                      // If flipper is moving up (positive angular velocity for left, negative for right)
+                      let impulseY = -FLIPPER_STRENGTH * bounceBoost; // Base upward impulse
+                      impulseX += (flipper.isLeft ? FLIPPER_SIDE_STRENGTH : -FLIPPER_SIDE_STRENGTH) * bounceBoost;
+                      // TASK_002 (decisão TL #2): momentum proporcional à distância do pivô (v = ω·r)
                       if (flipper.angularVelocity !== 0) {
-                           // This needs more sophisticated physics involving point of contact
-                           // Simple boost: increase vertical impulse based on flipper speed
-                           impulseY -= Math.abs(flipper.angularVelocity) * 40; // Factor based on rotation speed
+                           const r = Math.hypot(closestX - flipper.pivotX, closestY - flipper.pivotY);
+                           const rFactor = Math.min(1.4, r / flipper.width); // ponta transmite mais força
+                           impulseY -= Math.abs(flipper.angularVelocity) * 40 * rFactor * bounceBoost;
                        }
 
                      // Apply combined reflection and impulse
-                      // Weighting reflection vs impulse can be tricky. Let's add impulse to reflected velocity.
-                     ball.speedX = reflected.x * 0.5 + impulseX; // Blend reflected velocity with impulse
+                     ball.speedX = reflected.x * 0.5 + impulseX;
                      ball.speedY = reflected.y * 0.5 + impulseY;
 
-                     // Add score, visual effect
-                     score += 1 * currentMultiplier;
+                     // Add score, visual effect (× sobrevivência/overclock)
+                     addScore(1);
                      updateScoreDisplay();
                      createParticles(closestX, closestY, 8, '#FFFFFF'); // Flipper hit sparks
                       // Optional: Play flipper sound
@@ -872,42 +1176,44 @@
             const deltaTime = Math.min(0.1, (timestamp - lastTimestamp) / 1000); // Delta em segundos, com limite
             lastTimestamp = timestamp;
 
-            // Update launcher pull distance
-            if (launcher.charging && !ball.isLaunched) {
-                launcher.pullDistance += 90 * deltaTime; // Carregamento baseado em tempo (ex: 90 pixels/seg)
-                if (launcher.pullDistance > launcher.maxPull) {
-                    launcher.pullDistance = launcher.maxPull;
-                }
+            // Update launcher pull distance (atua na bola ainda não lançada)
+            const launchReady = activeBalls.find(b => !b.isLaunched);
+            if (launcher.charging && launchReady) {
+                launcher.pullDistance += 90 * deltaTime;
+                if (launcher.pullDistance > launcher.maxPull) launcher.pullDistance = launcher.maxPull;
             }
 
-            // Update flippers
-            updateFlippers(); // Update flipper angles smoothly
+            // Update flippers + TASK_002 timers
+            updateFlippers();
+            updatePhysicsMode(deltaTime);
+            updateMissions(deltaTime);
+            if (frameFlashTimer > 0) frameFlashTimer -= deltaTime;
 
-            // Update ball position
-            if (ball.isLaunched) {
-                ball.speedY += GRAVITY; // Apply Gravity
-                ball.x += ball.speedX;
-                ball.y += ball.speedY;
-
-                // Apply friction/air resistance
-                ball.speedX *= FRICTION;
-                ball.speedY *= FRICTION;
-
-                // Check all collisions
-                checkBallStuckOrOutOfBounds(deltaTime);
-                checkWallCollisions();
-                checkBumperCollisions();
-                checkMultiplierZoneCollisions();
-                checkFlipperCollisions(); // Check new flipper collision logic
-
-                // Verifica colisões apenas se a bola ainda estiver ativa (não foi resetada acima)
+            // TASK_002: itera todas as bolas ativas (ponteiro global `ball`)
+            for (let i = activeBalls.length - 1; i >= 0; i--) {
+                ball = activeBalls[i];
                 if (ball.isLaunched) {
-                    checkWallCollisions();      // Inclui o check de dreno que PERDE vida
+                    ball.speedY += currentGravity;
+                    ball.x += ball.speedX;
+                    ball.y += ball.speedY;
+                    ball.speedX *= currentFriction;
+                    ball.speedY *= currentFriction;
+
+                    ball.trail.push({ x: ball.x, y: ball.y });
+                    if (ball.trail.length > ball.maxTrailLength) ball.trail.shift();
+
+                    checkBallStuckOrOutOfBounds(deltaTime);
+                    checkWallCollisions();
                     checkBumperCollisions();
-                    checkMultiplierZoneCollisions();
+                    checkMultiplierZoneCollisions(deltaTime);
                     checkFlipperCollisions();
+                    checkFirewallTargets();
                 }
+                handleDrainCheck(ball, i);
             }
+
+            // TASK_002: colisão elástica entre bolas (multiball)
+            checkBallToBallCollisions();
 
             // Update bumper hit state timers
             bumpers.forEach(bumper => {
@@ -920,56 +1226,82 @@
 
         // --- Main Draw Function ---
         function drawGameOver() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; // More opaque
+            ctx.save();
+            ctx.fillStyle = 'rgba(5, 6, 12, 0.88)';
             ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-            ctx.fillStyle = '#FF4500'; // Orange-Red
-            ctx.font = 'bold 48px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
             ctx.textAlign = 'center';
-            ctx.shadowColor = '#000';
-            ctx.shadowBlur = 5;
-            ctx.fillText('GAME OVER', canvasWidth / 2, canvasHeight / 2 - 60);
+            // GAME OVER em Press Start 2P magenta com glow neon
+            ctx.fillStyle = '#ff2e97';
+            ctx.font = '24px "Press Start 2P", monospace';
+            ctx.shadowColor = '#ff007f';
+            ctx.shadowBlur = 18;
+            ctx.fillText('GAME', canvasWidth / 2, canvasHeight / 2 - 80);
+            ctx.fillText('OVER', canvasWidth / 2, canvasHeight / 2 - 40);
 
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '28px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
-            ctx.fillText(`Final Score: ${score}`, canvasWidth / 2, canvasHeight / 2 + 0);
+            // Placar final em Orbitron dourado
+            ctx.fillStyle = '#ffd700';
+            ctx.shadowColor = '#ffaa00';
+            ctx.shadowBlur = 14;
+            ctx.font = '900 28px "Orbitron", sans-serif';
+            ctx.fillText(`${score}`, canvasWidth / 2, canvasHeight / 2 + 20);
+            ctx.fillStyle = '#00f0ff';
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 8;
+            ctx.font = '700 12px "Orbitron", sans-serif';
+            ctx.fillText('FINAL SCORE', canvasWidth / 2, canvasHeight / 2 - 4);
 
-            ctx.font = '20px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
-            ctx.fillStyle = '#DDDDDD';
-            ctx.fillText('Press ENTER to play again', canvasWidth / 2, canvasHeight / 2 + 50);
-
-             ctx.shadowColor = 'transparent'; // Reset shadow
+            ctx.fillStyle = '#cdd6f4';
+            ctx.shadowBlur = 0;
+            ctx.font = '10px "Press Start 2P", monospace';
+            ctx.fillText('PRESS ENTER', canvasWidth / 2, canvasHeight / 2 + 70);
+            ctx.restore();
         }
 
         function drawInstructions() {
             if (!gameStarted && gameActive) { // Show only if game not started AND not game over
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.save();
+                ctx.fillStyle = 'rgba(5, 6, 12, 0.9)';
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-                ctx.fillStyle = '#FFD700';
-                ctx.font = 'bold 36px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
+                // TASK_001: scanlines estilo CRT
+                ctx.fillStyle = 'rgba(0, 240, 255, 0.04)';
+                for (let y = 0; y < canvasHeight; y += 4) ctx.fillRect(0, y, canvasWidth, 2);
+
                 ctx.textAlign = 'center';
-                ctx.shadowColor = '#FF8C00';
-                ctx.shadowBlur = 10;
-                ctx.fillText('PIMBAL', canvasWidth / 2, canvasHeight / 2 - 140);
-                ctx.shadowColor = 'transparent';
+                // Logo neon piscante (pulsa com o tempo)
+                const t = performance.now();
+                const glow = 12 + Math.sin(t / 200) * 8;
+                ctx.fillStyle = '#ff2e97';
+                ctx.font = '30px "Press Start 2P", monospace';
+                ctx.shadowColor = '#ff007f';
+                ctx.shadowBlur = glow;
+                ctx.fillText('PIMBAL', canvasWidth / 2, canvasHeight / 2 - 150);
 
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = '#00f0ff';
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = '11px "Press Start 2P", monospace';
+                ctx.fillText('CONTROLS', canvasWidth / 2, canvasHeight / 2 - 80);
 
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = '20px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
-                ctx.fillText('Controls:', canvasWidth / 2, canvasHeight / 2 - 70);
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#cdd6f4';
+                ctx.font = '13px "Orbitron", sans-serif';
+                ctx.fillText('SPACE  ·  Charge & Launch', canvasWidth / 2, canvasHeight / 2 - 40);
+                ctx.fillText('< / Z  ·  Left Flipper', canvasWidth / 2, canvasHeight / 2 - 14);
+                ctx.fillText('> / /  ·  Right Flipper', canvasWidth / 2, canvasHeight / 2 + 12);
 
-                ctx.font = '18px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
-                ctx.fillText('SPACE - Charge & Launch Ball', canvasWidth / 2, canvasHeight / 2 - 30);
-                ctx.fillText('LEFT ARROW / Z - Left Flipper', canvasWidth / 2, canvasHeight / 2 + 0);
-                ctx.fillText('RIGHT ARROW / Slash (/) - Right Flipper', canvasWidth / 2, canvasHeight / 2 + 30);
+                ctx.fillStyle = '#39ff14';
+                ctx.shadowColor = '#39ff14';
+                ctx.shadowBlur = 8;
+                ctx.font = '700 14px "Orbitron", sans-serif';
+                ctx.fillText('Hit Bumpers & Zones for Points!', canvasWidth / 2, canvasHeight / 2 + 60);
 
-                ctx.fillStyle = '#66FF66'; // Bright Green
-                ctx.fillText('Hit Bumpers and Zones for Points!', canvasWidth / 2, canvasHeight / 2 + 80);
-
-                ctx.fillStyle = '#FFAA66'; // Light Orange
-                ctx.font = 'bold 20px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
-                ctx.fillText('Hold SPACE to charge, Release to launch!', canvasWidth / 2, canvasHeight / 2 + 140);
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowColor = '#ffaa00';
+                ctx.font = '900 15px "Orbitron", sans-serif';
+                ctx.fillText('HOLD SPACE → RELEASE TO LAUNCH', canvasWidth / 2, canvasHeight / 2 + 120);
+                ctx.restore();
             }
         }
 
@@ -978,14 +1310,20 @@
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
             // Draw game elements (order matters for layering)
+            drawTableGrid();            // TASK_002: grade CRT reativa ao modo de gravidade
             drawMultiplierZones();
-            drawWalls(); // Walls behind other elements
+            drawFirewallTargets();      // TASK_002: alvos da missão Firewall
+            drawWalls();
             drawBumpers();
             drawLauncher();
-            drawParticles(); // Draw particles behind flippers/ball? Or adjust Z
-            drawFlipper(leftFlipper); // Draw flippers using pivot logic
+            drawParticles();
+            drawFlipper(leftFlipper);
             drawFlipper(rightFlipper);
-            drawBall(); // Draw ball on top
+            // TASK_002: desenha todas as bolas ativas (ponteiro global `ball`)
+            activeBalls.forEach(b => { ball = b; drawBall(); });
+
+            drawMissionsHUD();          // TASK_002: HUD glassmorphic de missões
+            if (frameFlashTimer > 0) drawFrameFlash();
 
             // If game over, show message overlay
             if (!gameActive) {
@@ -996,25 +1334,102 @@
             drawInstructions();
         }
 
+        // === TASK_002: grade CRT eletrostática reativa ao modo de gravidade ===
+        function drawTableGrid() {
+            ctx.save();
+            ctx.lineWidth = 1;
+            let gridColor = 'rgba(255, 255, 255, 0.03)';
+            const time = performance.now();
+            if (activePhysicsMode === 'low_gravity') {
+                const pulse = 0.05 + Math.sin(time / 200) * 0.03;
+                gridColor = `rgba(0, 240, 255, ${pulse})`;
+            } else if (activePhysicsMode === 'overdrive') {
+                const pulse = 0.08 + Math.sin(time / 80) * 0.05;
+                gridColor = `rgba(255, 0, 127, ${pulse})`;
+            }
+            ctx.strokeStyle = gridColor;
+            const spacing = 40;
+            for (let x = 0; x < canvasWidth; x += spacing) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvasHeight); ctx.stroke(); }
+            for (let y = 0; y < canvasHeight; y += spacing) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvasWidth, y); ctx.stroke(); }
+            ctx.restore();
+        }
+
+        // === TASK_002: alvos físicos da FIREWALL CRACK (o próximo acende) ===
+        function drawFirewallTargets() {
+            const time = performance.now();
+            firewallTargets.forEach((t, i) => {
+                ctx.save();
+                const isNext = (i === firewallProgress);
+                const done = (i < firewallProgress);
+                ctx.fillStyle = done ? 'rgba(80,80,90,0.5)' : t.color;
+                ctx.shadowColor = t.color;
+                ctx.shadowBlur = isNext ? (10 + Math.sin(time / 120) * 8) : (done ? 0 : 4);
+                ctx.fillRect(t.x, t.y, t.width, t.height);
+                if (isNext) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.strokeRect(t.x, t.y, t.width, t.height); }
+                ctx.restore();
+            });
+        }
+
+        // === TASK_002: HUD glassmorphic de missões (canvas, topo-esquerdo) ===
+        function drawMissionsHUD() {
+            if (!gameStarted || !gameActive) return;
+            const x = 12, y = 12, w = 168, h = 46;
+            ctx.save();
+            ctx.fillStyle = 'rgba(18, 19, 32, 0.6)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(x, y, w, h, 8); else ctx.rect(x, y, w, h);
+            ctx.fill(); ctx.stroke();
+            // título da missão
+            ctx.fillStyle = missionsState.accent;
+            ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 6;
+            ctx.font = '700 11px "Orbitron", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(missionsState.label, x + 10, y + 18);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#cdd6f4';
+            ctx.font = '10px "Orbitron", sans-serif';
+            ctx.fillText(missionsState.detail, x + 10, y + 32);
+            // barra de progresso/tempo
+            const barX = x + 10, barY = y + 37, barW = w - 20, barH = 4;
+            ctx.fillStyle = 'rgba(255,255,255,0.12)';
+            ctx.fillRect(barX, barY, barW, barH);
+            ctx.fillStyle = missionsState.accent;
+            ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 6;
+            ctx.fillRect(barX, barY, barW * Math.max(0, Math.min(1, missionsState.barRatio)), barH);
+            ctx.restore();
+        }
+
+        // === TASK_002: flash vermelho da moldura ao perder bola no multiball ===
+        function drawFrameFlash() {
+            ctx.save();
+            ctx.strokeStyle = `rgba(255, 30, 60, ${Math.min(0.8, frameFlashTimer * 3)})`;
+            ctx.lineWidth = 6;
+            ctx.strokeRect(3, 3, canvasWidth - 6, canvasHeight - 6);
+            ctx.restore();
+        }
+
 
         // --- Utility Functions ---
          function createParticles(x, y, count, color) {
+             // TASK_001: faíscas de curto-circuito com física de amortecimento
+             const rgb = hexToRgb(color) || { r: 255, g: 0, b: 128 };
              for (let i = 0; i < count; i++) {
                  const angle = Math.random() * Math.PI * 2;
-                 const speed = 1 + Math.random() * 3;
-                 const life = 0.4 + Math.random() * 0.4;
-                 const rgb = hexToRgb(color); // Use helper to convert hex
+                 const speed = 1.5 + Math.random() * 4.5;
+                 const life = 0.5 + Math.random() * 0.6;
                  particles.push({
                     x: x,
                     y: y,
                     vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - Math.random() * 1, // Slight upward bias
-                    r: rgb ? rgb.r : 255,
-                    g: rgb ? rgb.g : 255,
-                    b: rgb ? rgb.b : 255,
-                    alpha: 0.9,
-                    decay: 1.5 / life, // Faster decay looks more 'sparky'
-                    size: 1 + Math.random() * 2.5
+                    vy: Math.sin(angle) * speed - 0.8, // viés térmico/gravitacional para cima
+                    r: rgb.r,
+                    g: rgb.g,
+                    b: rgb.b,
+                    alpha: 1,
+                    decay: 1 / (life * 60), // decaimento por frame (~60 FPS)
+                    size: 1.5 + Math.random() * 2
                 });
             }
         }

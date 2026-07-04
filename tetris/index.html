@@ -132,6 +132,36 @@
             font-size: 24px;
             margin-bottom: 15px;
         }
+
+        /* === TASK_003: Banner de Level Up === */
+        .level-up-banner {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            background: linear-gradient(135deg, rgba(156, 90, 255, 0.9), rgba(255, 82, 170, 0.9));
+            border: 2px solid #fff;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(156, 90, 255, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: 900;
+            font-size: 28px;
+            padding: 15px 40px;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 100;
+            animation: levelUpPop 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes levelUpPop {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(-5deg); }
+            15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(2deg); }
+            30%  { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); }
+            80%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0) translateY(-10px); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) translateY(-40px); }
+        }
     </style>
 </head>
 <body>
@@ -151,6 +181,25 @@
                 <canvas id="nextPiece" width="100" height="100"></canvas>
             </div>
             
+            <div class="mode-selection" style="background-color: #2d2d2d; border-radius: 5px; padding: 10px;">
+                <h2>MODO DE JOGO</h2>
+                <select id="gameModeSelect" style="width: 100%; padding: 8px; background: #1e1e1e; color: white; border: 1px solid #444; border-radius: 5px; font-family: inherit; font-size: 14px; outline: none; cursor: pointer;">
+                    <option value="endless">Infinito Clássico</option>
+                    <option value="timeattack">Contra o Tempo (2 min)</option>
+                    <option value="survival">Sobrevivência sob Pressão</option>
+                </select>
+            </div>
+
+            <div id="timerBox" class="lines-box" style="display: none; background-color: #d32f2f;">
+                <h2>TEMPO RESTANTE</h2>
+                <div id="timer" class="value">120s</div>
+            </div>
+
+            <div id="survivalBox" class="lines-box" style="display: none; background-color: #d32f2f; box-shadow: 0 0 15px rgba(211, 47, 47, 0.4);">
+                <h2>SUBIDA DE LIXO</h2>
+                <div id="survivalTimer" class="value">12.0s</div>
+            </div>
+
             <div class="score-box">
                 <h2>PONTUAÇÃO</h2>
                 <div id="score" class="value">0</div>
@@ -172,7 +221,7 @@
     
     <div class="controls">
         <p>Use <span class="key">←</span> <span class="key">→</span> para mover, <span class="key">↑</span> para girar, <span class="key">↓</span> para acelerar</p>
-        <p><span class="key">Espaço</span> para rotacionar a peça, <span class="key">P</span> para pausar</p>
+        <p><span class="key">Espaço</span> para queda instantânea (Hard Drop), <span class="key">P</span> para pausar</p>
     </div>
     
     <div id="gameOver" class="game-over">
@@ -208,7 +257,8 @@
             '#66FF66', // S (Verde)
             '#4C9CFF', // I (Azul claro)
             '#9C5AFF', // T (Roxo)
-            '#FF52AA'  // J (Rosa)
+            '#FF52AA', // J (Rosa)
+            '#424242'  // 8 = Lixo (cinza chumbo - TASK_003)
         ];
 
         // Formas das peças
@@ -240,6 +290,152 @@
         ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
         nextCtx.scale(BLOCK_SIZE, BLOCK_SIZE);
 
+        // Sintetizador Web Audio API Retro
+        const SoundSynth = {
+            ctx: null,
+            
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            
+            playRotate() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sine'; // Onda senoidal para um som mais suave
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.08);
+                    
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de rotação:", e);
+                }
+            },
+            
+            playDrop() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sawtooth'; // Onda dente de serra para som seco/impactante
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.12);
+                    
+                    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.12);
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de encaixe:", e);
+                }
+            },
+            
+            playLine() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const notes = [261.63, 329.63, 392.00, 523.25]; // Acorde C Maior Arpejado (C4, E4, G4, C5)
+                    
+                    notes.forEach((freq, index) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        
+                        osc.type = 'triangle'; // Som de flauta retrô 8-bit nostálgico
+                        osc.frequency.setValueAtTime(freq, now + index * 0.08);
+                        
+                        gain.gain.setValueAtTime(0.08, now + index * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.12);
+                        
+                        osc.start(now + index * 0.08);
+                        osc.stop(now + index * 0.08 + 0.12);
+                    });
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de linhas:", e);
+                }
+            },
+
+            playGameOver() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sawtooth'; // Onda dente de serra grave descendente
+                    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.6);
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.6);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.6);
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de game over:", e);
+                }
+            },
+
+            // TASK_003: T-Spin (acorde brilhante ascendente)
+            playTSpin() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const notes = [392.00, 523.25, 659.25, 783.99]; // G4, C5, E5, G5
+                    notes.forEach((freq, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.connect(gain); gain.connect(this.ctx.destination);
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(freq, now + i * 0.05);
+                        gain.gain.setValueAtTime(0.06, now + i * 0.05);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.14);
+                        osc.start(now + i * 0.05);
+                        osc.stop(now + i * 0.05 + 0.14);
+                    });
+                } catch (e) { console.error("Falha ao tocar áudio de T-Spin:", e); }
+            },
+
+            // TASK_003: bip de alerta tático (subida de lixo) - onda quadrada 880Hz contida
+            playAlertTick(frequency = 880) {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(frequency, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.05);
+                } catch (e) { console.error("Falha ao tocar bip de alerta:", e); }
+            }
+        };
+
         // Variáveis do jogo
         let board = createBoard(COLS, ROWS);
         let score = 0;
@@ -255,9 +451,59 @@
         let piece = null;
         let nextPiece = null;
 
+        // Variáveis do Modo Contra o Tempo (Time Attack)
+        let gameMode = 'endless';
+        let timeLeft = 120;
+        let timerInterval = null;
+
+        // === TASK_003: T-Spin, Combo, Floating Texts e Sobrevivência ===
+        let lastAction = 'spawn';   // 'spawn' | 'move' | 'rotate'
+        let comboCount = -1;
+        let floatingTexts = [];
+        let survivalTimer = 12.0;
+        const GARBAGE_COLOR_INDEX = 8;
+
+        function calculateDropInterval(lvl) {
+            const speedFactor = 0.8 - ((lvl - 1) * 0.007);
+            const interval = Math.round(1000 * Math.pow(speedFactor, lvl - 1));
+            return Math.max(50, interval); // limite mínimo de 50ms
+        }
+
         // Função para criar o board
         function createBoard(cols, rows) {
             return Array.from({ length: rows }, () => Array(cols).fill(0));
+        }
+
+        // Funções da Peça Fantasma (Ghost Piece)
+        function getGhostPositionY() {
+            if (!piece) return 0;
+            const originalY = piece.pos.y;
+            while (!checkCollision()) {
+                piece.pos.y++;
+            }
+            const ghostY = piece.pos.y - 1;
+            piece.pos.y = originalY;
+            return ghostY;
+        }
+
+        function drawGhostPiece() {
+            if (!piece) return;
+            const ghostY = getGhostPositionY();
+            
+            piece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        // Cor com baixa opacidade (20% alpha)
+                        ctx.fillStyle = COLORS[piece.type] + "33"; // Hex com alpha 0x33 ~ 20%
+                        ctx.fillRect(x + piece.pos.x, y + ghostY, 1, 1);
+                        
+                        // Contorno tracejado ou sutil
+                        ctx.strokeStyle = COLORS[piece.type] + "88"; // Hex com alpha 0x88 ~ 50%
+                        ctx.lineWidth = 0.05;
+                        ctx.strokeRect(x + piece.pos.x, y + ghostY, 1, 1);
+                    }
+                });
+            });
         }
 
         // Funções para desenhar
@@ -268,12 +514,18 @@
             
             // Desenhar o board
             drawBoard();
+
+            // Desenhar a peça fantasma (sombra) antes da peça real
+            drawGhostPiece();
             
             // Desenhar a peça atual
             if (piece) {
                 drawPiece(piece, ctx);
             }
-            
+
+            // TASK_003: textos flutuantes (pontuação/T-Spin/combo)
+            drawFloatingTexts();
+
             // Desenhar a próxima peça
             nextCtx.fillStyle = '#2d2d2d';
             nextCtx.fillRect(0, 0, nextPieceCanvas.width / BLOCK_SIZE, nextPieceCanvas.height / BLOCK_SIZE);
@@ -386,6 +638,7 @@
                 piece.pos.x -= dir;
                 return false;
             }
+            lastAction = 'move'; // TASK_003: invalida T-Spin se o último ato foi mover
             return true;
         }
 
@@ -404,39 +657,33 @@
                 }
             }
             
+            const origX = piece.pos.x;
+            const origY = piece.pos.y;
             piece.shape = rotated;
-            
-            // Se houver colisão, reverter a rotação
-            if (checkCollision()) {
-                piece.shape = originalShape;
-            }
+
+            // Sem colisão: rotação direta
+            if (!checkCollision()) { lastAction = 'rotate'; SoundSynth.playRotate(); return; }
+            // TASK_003: Wall Kicks simplificados (esquerda, direita, floor kick)
+            piece.pos.x = origX - 1; if (!checkCollision()) { lastAction = 'rotate'; SoundSynth.playRotate(); return; }
+            piece.pos.x = origX + 1; if (!checkCollision()) { lastAction = 'rotate'; SoundSynth.playRotate(); return; }
+            piece.pos.x = origX; piece.pos.y = origY - 1; if (!checkCollision()) { lastAction = 'rotate'; SoundSynth.playRotate(); return; }
+            // Falhou: reverter tudo
+            piece.pos.x = origX; piece.pos.y = origY; piece.shape = originalShape;
+        }
+
+        function hardDrop() {
+            if (gameOver || paused || !piece) return;
+            piece.pos.y = getGhostPositionY(); // hard drop preserva lastAction (permite T-Spin pós-rotação)
+            lockPiece();
+            dropCounter = 0;
         }
 
         function dropPiece() {
             piece.pos.y++;
-            
             if (checkCollision()) {
                 piece.pos.y--;
-                mergePiece();
-                
-                // Verificar linhas completas
-                let linesCleared = clearLines();
-                if (linesCleared > 0) {
-                    updateScore(linesCleared);
-                }
-                
-                // Continuar o jogo
-                resetPiece();
-                
-                // Verificar game over
-                if (checkCollision()) {
-                    gameOver = true;
-                    cancelAnimationFrame(requestId);
-                    requestId = null;
-                    showGameOver();
-                }
+                lockPiece(); // gravidade preserva lastAction
             }
-            
             dropCounter = 0;
         }
 
@@ -474,11 +721,13 @@
                     }
                 });
             });
+            SoundSynth.playDrop();
         }
 
         function resetPiece() {
             piece = nextPiece || getRandomPiece();
             nextPiece = getRandomPiece();
+            lastAction = 'spawn'; // TASK_003: nova peça não herda T-Spin da anterior
         }
 
         function clearLines() {
@@ -497,7 +746,7 @@
                 y++;
                 linesCleared++;
             }
-            
+            // Som da limpeza é tocado em applyScoring (centralizado p/ diferenciar T-Spin)
             return linesCleared;
         }
 
@@ -518,33 +767,251 @@
             linesElement.textContent = lines;
         }
 
-        function showGameOver() {
+        // === TASK_003: Detecção de T-Spin (Regra dos 3 Cantos, robusta a matriz 4x4 + rotação) ===
+        function findTCenter() {
+            const s = piece.shape;
+            for (let y = 0; y < s.length; y++) {
+                for (let x = 0; x < s[y].length; x++) {
+                    if (s[y][x] !== 0) {
+                        let n = 0;
+                        if (s[y - 1] && s[y - 1][x]) n++;
+                        if (s[y + 1] && s[y + 1][x]) n++;
+                        if (s[y][x - 1]) n++;
+                        if (s[y][x + 1]) n++;
+                        if (n === 3) return { x, y }; // o centro do T tem exatamente 3 vizinhos
+                    }
+                }
+            }
+            return null;
+        }
+
+        function detectTSpin() {
+            if (!piece || piece.type !== 6 || lastAction !== 'rotate') return false;
+            const c = findTCenter();
+            if (!c) return false;
+            const cx = piece.pos.x + c.x;
+            const cy = piece.pos.y + c.y;
+            const corners = [[cx - 1, cy - 1], [cx + 1, cy - 1], [cx - 1, cy + 1], [cx + 1, cy + 1]];
+            let occupied = 0;
+            corners.forEach(([bx, by]) => {
+                if (bx < 0 || bx >= COLS || by >= ROWS) occupied++;           // bordas contam como apoio
+                else if (by >= 0 && board[by][bx] !== 0) occupied++;          // bloco consolidado
+            });
+            return occupied >= 3;
+        }
+
+        // === TASK_003: Floating score popups (desenhados em espaço de pixels) ===
+        function spawnFloatingText(text, gridX, gridY, color) {
+            floatingTexts.push({
+                text, x: gridX * BLOCK_SIZE, y: gridY * BLOCK_SIZE,
+                vy: -1.2, alpha: 1.0, life: 70, color
+            });
+        }
+        function updateFloatingTexts() {
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy;
+                ft.life--;
+                if (ft.life < 35) ft.alpha = Math.max(0, ft.life / 35);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+        function drawFloatingTexts() {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // desenhar em pixels (o ctx do jogo está escalado por BLOCK_SIZE)
+            floatingTexts.forEach(ft => {
+                ctx.globalAlpha = ft.alpha;
+                ctx.font = "bold 13px 'Segoe UI', Arial, sans-serif";
+                ctx.textAlign = 'center';
+                ctx.shadowColor = ft.color;
+                ctx.shadowBlur = 10;
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillStyle = ft.color;
+                ctx.fillText(ft.text, ft.x, ft.y);
+            });
+            ctx.restore();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // === TASK_003: Banner de Level Up ===
+        function triggerLevelUpEffects(newLevel) {
+            if (SoundSynth.playLine) SoundSynth.playLine();
+            const banner = document.createElement('div');
+            banner.className = 'level-up-banner';
+            banner.innerHTML = `<span style="font-size: 14px; text-transform: uppercase; letter-spacing: 2px; display: block; opacity: 0.8;">Excelente!</span>NÍVEL ${newLevel}`;
+            document.body.appendChild(banner);
+            setTimeout(() => banner.remove(), 1600);
+        }
+
+        // === TASK_003: Pontuação com T-Spin + Combo ===
+        function applyScoring(linesCleared, isTSpin) {
+            let baseScore = 0, textFeedback = '';
+
+            if (isTSpin) {
+                if (linesCleared === 0) { baseScore = 400; textFeedback = 'T-SPIN'; }
+                else if (linesCleared === 1) { baseScore = 800; textFeedback = 'T-SPIN SINGLE'; }
+                else if (linesCleared === 2) { baseScore = 1200; textFeedback = 'T-SPIN DOUBLE'; }
+                else if (linesCleared === 3) { baseScore = 1600; textFeedback = 'T-SPIN TRIPLE!'; }
+                if (SoundSynth.playTSpin) SoundSynth.playTSpin();
+            } else {
+                const linePoints = [0, 100, 300, 500, 800];
+                baseScore = linePoints[linesCleared] || 0;
+                if (linesCleared === 4) textFeedback = 'TETRIS!';
+                if (linesCleared > 0 && SoundSynth.playLine) SoundSynth.playLine();
+            }
+
+            // Combo
+            if (linesCleared > 0) {
+                comboCount++;
+                if (comboCount > 0) {
+                    const comboBonus = 50 * comboCount * level;
+                    score += comboBonus;
+                    if (comboCount >= 2) {
+                        spawnFloatingText(`COMBO x${comboCount}! +${comboBonus}`, piece.pos.x + 1, piece.pos.y, '#4C9CFF');
+                    }
+                }
+            } else {
+                comboCount = -1;
+            }
+
+            if (baseScore > 0) {
+                score += baseScore * level;
+                if (textFeedback) {
+                    spawnFloatingText(`${textFeedback} +${baseScore * level}`, piece.pos.x + 1, piece.pos.y, isTSpin ? '#9C5AFF' : '#FFEA2E');
+                }
+            }
+
+            // Linhas, nível e velocidade
+            lines += linesCleared;
+            const newLevel = Math.floor(lines / 10) + 1;
+            if (newLevel > level) { level = newLevel; triggerLevelUpEffects(level); }
+            dropInterval = calculateDropInterval(level);
+
+            scoreElement.textContent = score;
+            levelElement.textContent = level;
+            linesElement.textContent = lines;
+        }
+
+        // Consolida a peça: detecta T-Spin (antes do merge), pontua, e spawna a próxima
+        function lockPiece() {
+            const isTSpin = detectTSpin();
+            mergePiece();
+            const linesCleared = clearLines();
+            applyScoring(linesCleared, isTSpin);
+            resetPiece();
+            if (checkCollision()) {
+                gameOver = true;
+                cancelAnimationFrame(requestId);
+                requestId = null;
+                showGameOver();
+            }
+        }
+
+        // === TASK_003: Modo Sobrevivência - linhas de lixo ===
+        function prepopulateGarbage(numRows) {
+            for (let i = 0; i < numRows; i++) {
+                const row = Array(COLS).fill(GARBAGE_COLOR_INDEX);
+                row[Math.floor(Math.random() * COLS)] = 0; // 1 buraco aleatório
+                board[ROWS - 1 - i] = row;
+            }
+        }
+
+        function insertGarbageRow() {
+            // Se houver bloco na linha do topo, empurrar causa Game Over
+            for (let x = 0; x < COLS; x++) {
+                if (board[0][x] !== 0) {
+                    gameOver = true;
+                    cancelAnimationFrame(requestId);
+                    requestId = null;
+                    showGameOver("SOTERRADO!");
+                    return;
+                }
+            }
+            board.shift(); // remove a linha do topo e desliza tudo para cima
+            const newRow = Array(COLS).fill(GARBAGE_COLOR_INDEX);
+            newRow[Math.floor(Math.random() * COLS)] = 0;
+            board.push(newRow);
+            if (SoundSynth.playDrop) SoundSynth.playDrop();
+
+            // Evitar colisão imediata da peça ativa após o empurrão
+            if (piece && checkCollision()) {
+                piece.pos.y--;
+                if (checkCollision()) {
+                    gameOver = true;
+                    cancelAnimationFrame(requestId);
+                    requestId = null;
+                    showGameOver("SOTERRADO!");
+                }
+            }
+        }
+
+        function showGameOver(customMessage) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            SoundSynth.playGameOver();
+
             gameOverElement.style.display = 'block';
             finalScoreElement.textContent = score;
+            const title = gameOverElement.querySelector('h2');
+            if (customMessage) {
+                title.textContent = customMessage;
+            } else {
+                title.textContent = "GAME OVER";
+            }
         }
 
         function hideGameOver() {
             gameOverElement.style.display = 'none';
+            const title = gameOverElement.querySelector('h2');
+            title.textContent = "GAME OVER";
         }
 
         // Loop principal do jogo
         function update(time = 0) {
             if (gameOver || paused) return;
             
-            const deltaTime = time - lastTime;
+            let deltaTime = time - lastTime;
             lastTime = time;
-            
+            // TASK_003: clamp para a 1ª frame (time=0) e retomada de aba inativa,
+            // evitando saltos no dropCounter e no cronômetro de sobrevivência
+            if (deltaTime < 0 || deltaTime > 1000) deltaTime = 16;
+
             dropCounter += deltaTime;
             if (dropCounter > dropInterval) {
                 dropPiece();
             }
-            
+
+            // TASK_003: Modo Sobrevivência - cronômetro de subida de lixo
+            if (gameMode === 'survival' && !gameOver) {
+                const prevCeil = Math.ceil(survivalTimer);
+                survivalTimer -= deltaTime / 1000;
+                const curCeil = Math.ceil(survivalTimer);
+                // Bip de alerta ao cruzar 3, 2, 1
+                if (curCeil < prevCeil && curCeil >= 1 && curCeil <= 3 && SoundSynth.playAlertTick) {
+                    SoundSynth.playAlertTick(880);
+                }
+                if (survivalTimer <= 0) {
+                    insertGarbageRow();
+                    survivalTimer += 12.0;
+                }
+                const stEl = document.getElementById('survivalTimer');
+                if (stEl) stEl.textContent = Math.max(0, survivalTimer).toFixed(1) + 's';
+            }
+
+            updateFloatingTexts();
             draw();
             requestId = requestAnimationFrame(update);
         }
 
         // Eventos de teclado
         document.addEventListener('keydown', event => {
+            // Inicializar áudio com segurança na interação
+            SoundSynth.init();
+
             if (gameOver) return;
             
             switch (event.key) {
@@ -561,7 +1028,7 @@
                     rotatePiece();
                     break;
                 case ' ':
-                    rotatePiece();
+                    hardDrop();
                     break;
                 case 'p':
                 case 'P':
@@ -580,8 +1047,31 @@
             }
         }
 
+        // Iniciar timer
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!paused && !gameOver) {
+                    timeLeft--;
+                    document.getElementById('timer').textContent = `${timeLeft}s`;
+                    
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        gameOver = true;
+                        cancelAnimationFrame(requestId);
+                        requestId = null;
+                        showGameOver("TEMPO ESGOTADO!");
+                    }
+                }
+            }, 1000);
+        }
+
         // Iniciar/Reiniciar jogo
         function startGame() {
+            // Inicializar contexto de áudio
+            SoundSynth.init();
+
             // Resetar variáveis
             board = createBoard(COLS, ROWS);
             score = 0;
@@ -590,14 +1080,47 @@
             gameOver = false;
             paused = false;
             dropCounter = 0;
-            dropInterval = 1000;
-            
-            // Resetar UI
+            dropInterval = calculateDropInterval(1);
+
+            // TASK_003: resets
+            comboCount = -1;
+            lastAction = 'spawn';
+            floatingTexts = [];
+            survivalTimer = 12.0;
+
+            // Atualizar UI
             scoreElement.textContent = score;
             levelElement.textContent = level;
             linesElement.textContent = lines;
             hideGameOver();
             
+            // Configurar modo de jogo
+            const modeSelect = document.getElementById('gameModeSelect');
+            gameMode = modeSelect.value;
+            const timerBox = document.getElementById('timerBox');
+            const survivalBox = document.getElementById('survivalBox');
+
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            timerBox.style.display = 'none';
+            if (survivalBox) survivalBox.style.display = 'none';
+
+            if (gameMode === 'timeattack') {
+                timeLeft = 120;
+                document.getElementById('timer').textContent = '120s';
+                timerBox.style.display = 'block';
+                startTimer();
+            } else if (gameMode === 'survival') {
+                // Pré-popular 4 a 6 linhas de lixo na base
+                const garbageRows = 4 + Math.floor(Math.random() * 3);
+                prepopulateGarbage(garbageRows);
+                if (survivalBox) survivalBox.style.display = 'block';
+                document.getElementById('survivalTimer').textContent = '12.0s';
+            }
+
             // Criar primeira peça
             piece = getRandomPiece();
             nextPiece = getRandomPiece();
@@ -613,8 +1136,29 @@
         }
 
         // Eventos de botões
-        startBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('click', () => {
+            SoundSynth.init();
+            startGame();
+        });
+        restartBtn.addEventListener('click', () => {
+            SoundSynth.init();
+            startGame();
+        });
+
+        // Hook de depuração/teste (TASK_003)
+        window.__tetris = {
+            calculateDropInterval, detectTSpin, prepopulateGarbage, insertGarbageRow,
+            spawnFloatingText, applyScoring,
+            getState: () => ({ score, level, lines, comboCount, lastAction, gameMode, survivalTimer, floatingTexts: floatingTexts.length, gameOver }),
+            setPiece: (p) => { piece = p; },
+            getPiece: () => piece,
+            getBoard: () => board,
+            setBoard: (b) => { board = b; },
+            setLastAction: (a) => { lastAction = a; },
+            COLS, ROWS,
+            forceLevel: (l) => { level = l; },
+            createPiece, createBoard
+        };
     </script>
 </body>
-</html> 
+</html>
