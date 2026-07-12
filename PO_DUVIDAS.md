@@ -493,6 +493,169 @@ Como PO experiente em level design, focado na imersão estratégica e na experi�
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
 
+---
+
+## 🧩 29. Elaboração e Criação de Nova Tarefa: Tetris (TASK_004) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Tetris (tetris)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tetris/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Interface de Duelo em Tela Dividida (Split Screen Dual HUD)**: Projetei o layout dual-screen responsivo em CSS Flexbox/Grid para comportar o tabuleiro do jogador (esquerda) e da CPU (direita) em tempo real a 60 FPS, contendo mini-painéis individuais de status, filas de ataque neon e avisos visuais.
+    *   **Inteligência Artificial (Heurística baseada em Pierre Dellacherie)**: Estruturei a IA da CPU baseada em 4 pesos heurísticos (Alturas Acumuladas, Linhas Limpas, Buracos e Irregularidade). Estabeleci a simulação de movimentos intervalados (UX Rule de 80ms-120ms por ação) para evitar teletransporte imediato e dar verossimilhança ao comportamento do bot.
+    *   **Sistema de Envio e Cancelamento de Linhas de Lixo (Garbage Attack & Counter)**: Desenhei a lógica clássica competitiva onde combos, T-Spins e eliminações de múltiplas linhas enviam linhas cinzas de lixo ao oponente. Planejei a mecânica tática de defesa ativa (Garbage Cancellation 1:1) baseada em uma fila de lixo pendente que pode ser cancelada antes de entrar no tabuleiro.
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Otimização e Garbage Collection (GC)*: Avaliar exaustivamente todas as posições ($x$) e rotações ($r$) para cada peça que surge pode gerar milhares de alocações temporárias de matrizes na memória, causando engasgos do Garbage Collector. Recomenda-se reutilizar arrays e matrizes de teste (Object Pooling/Pre-allocation) e rodar a rotina de avaliação da IA somente no frame exato em que uma nova peça entra em jogo.
+    2.  *Priorização Sonora e Prevenção de Clippings*: Dois motores de jogo executando consolidations e eliminando linhas ao mesmo tempo podem dobrar a ocorrência de sons, gerando distorções sonoras. O desenvolvedor deve manter os sons de rotação e queda da CPU desligados ou atenuá-los drasticamente (ex: -12dB com filtro passa-baixa) para focar a experiência auditiva nas ações diretas do jogador.
+    3.  *Paridade Esportiva (Sincronismo de Seeds)*: Para garantir um duelo justo, as peças de ambos os lados devem seguir a mesma ordem. A implementação deve instanciar um gerador compartilhado ou alimentá-los com uma semente de número pseudo-aleatório (seed) idêntica a cada início de partida.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🐍 23. Elaboração e Criação de Nova Tarefa: Snake Game (TASK_004) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Snake Game** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/snake/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Estrutura de Campanha com Fases Progressivas (4 Sectores)**: Projetei o arco de fases com metas incrementais de pontuação e introdução progressiva de mecânicas (Fase 1: Grid Limpo, Fase 2: Barreiras móveis que oscilam no tabuleiro, Fase 3: Invasão da IA Rival e Portais, Fase 4: Boss Fight).
+    *   **Batalha de Chefe (Medusa Grid Core)**: Desenhei uma mecânica inovadora de combate para o gênero Snake clássico. A Medusa Grid Core ocupa uma área física 2x2 no Canvas e ataca com feixes de Eye Laser temporariamente intransitáveis e orbes corrompidos que ricocheteiam nas bordas do grid. O jogador deve manobrar para coletar Frutas Detonadoras (D-Fruits) que geram cargas elétricas explosivas em sua cauda para descarregar no núcleo do chefe.
+    *   **Cyber-Shop & Economia Integrada (Upgrades e Skins)**: Desenvolvi o ecossistema com Ciber-Moedas (C-Coins) persistidas localmente no browser (`localStorage`), permitindo a compra de skins premium (RGB Pulsante e Transparência Ghost) e consumíveis de partida ativos (Escudo de Colisão, Ímã de Frutas e Time Warp).
+    *   **Web Audio API Synth Adaptativa**: Modelei a estrutura sonora procedural adaptativa que transiciona dinamicamente de arpejos minimalistas nas fases normais para uma trilha Cyberpunk tensa baseada em osciladores dente-de-serra modulados durante o combate de chefe.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Gerenciamento e Destruição de Estado de Fase*: Cada mudança de fase exige o reset limpo de entidades concorrentes (IA rival, Golden Apples, orbes, lasers, timers de carregamento, partículas). O desenvolvedor deve implementar uma rotina centralizada de inicialização de fase para evitar sobreposição ou vazamentos de referências e loops órfãos.
+    2.  *Colisão Complexa de Entidades 2x2*: O Medusa Grid Core ocupa um bloco 2x2, rompendo o modelo tradicional de verificação de coordenadas unitárias do grid. Recomenda-se realizar verificações por intervalos de bounding box (e.g. `head.x >= boss.x && head.x < boss.x + 2`) para todas as colisões do jogador e detonações de D-Fruta.
+    3.  *Inicialização do AudioContext por Ação do Jogador*: Browsers modernos barram a inicialização de áudio sem interações prévias. O AudioContext da Web Audio API deve ser criado ou resumido (`resume()`) estritamente em eventos de toque/clique nas opções do menu principal de seleção de modo de jogo.
+
+*   **Transição de Status**: A nova especificação foi devidamente registrada na planilha central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🃏 24. Elaboração e Criação de Nova Tarefa: Poker Texas Hold'em (TASK_004) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Poker Texas Hold'em (poker)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/poker/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Clube de Customização VIP (Environment & Skins Shop)**: Desenhei uma modal glassmorphic de loja que permite comprar feltros temáticos (Verde Clássico, Ciber-Glow roxo/ciano neon, e Casino Gold Royale preto/ouro) e versos de cartas estilizados (Classic Navy, Vector Matrix ciano, e Imperial Gold com gradiente dourado metálico) usando o saldo acumulado da carteira do jogador, persistindo no `localStorage`.
+    *   **Dealer Virtual Ativo (Croupier Proativo)**: Projetei um Dealer animado por emoji no topo central da mesa, com balões de diálogo que narram os principais momentos da partida (distribuição, abertura do bordo, jogadas e showdown) e oferecem dicas de jogo úteis no turno do jogador.
+    *   **Analisador Visual de Replay (Hand Replay Analyzer)**: Especifiquei um reprodutor de replays da rodada recém-concluída, permitindo avançar e retroceder passo a passo por cada rodada de aposta com as cartas das IAs exibidas semitransparentes para fins didáticos.
+    *   **Síntese de Áudio no Web Audio API**: Projetei a geração procedural de áudio para o embaralhamento de cartas (com ruído rosa filtrado e oscilação rápida de amplitude), distribuição (sweep senoidal de decay rápido) e impacto de fichas (tons agudos em frequências próximas e decays rápidos), além de fanfarra de vitória.
+    *   **Juiciness Premium**: Projetei ondas de brilho neon no feltro ao ocorrer All-In ou potes grandes e um confete de pequenas fichas e estrelas caindo na mesa em vitória do jogador.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Limitação da Estrutura de Histórico*: A base de código atual de Poker registra apenas resumos estáticos textuais de fim de rodada em `addToHistory()`. Para viabilizar a funcionalidade de Replay Visual detalhado passo a passo, o motor de jogo precisará registrar um objeto estruturado de log (`gameState.lastHandLog`) contendo o log sequencial completo de apostas, cartas comunitárias, cartas fechadas dos oponentes e saldos iniciais/finais a cada rodada de jogo.
+    2.  *Redefinição de Variáveis de Cores*: Para que a customização do feltro se sinta verdadeiramente "VIP", a classe de tema injetada no `<body>` deve alterar não apenas o feltro, mas a paleta de cores secundárias dos painéis e dos botões secundários para manter harmonia visual.
+    3.  *Mitigação de Bloqueio de AudioContext*: Em conformidade com navegadores modernos, a inicialização ou restauração do `AudioContext` da Web Audio API deve ser vinculada à primeira ação física de clique do usuário (como fechar o Clube VIP ou iniciar a partida).
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+## 🌍 25. Elaboração e Criação de Nova Tarefa: Three.js Earth (TASK_004) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Three.js Earth (threejs-earth-main)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/threejs-earth-main/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Ameaça de Asteroides (Procedural Asteroid Spawning)**: Projetei a geração dinâmica de asteroides no espaço profundo ($d \ge 5.0$), com deformações geométricas aleatórias para criar silhuetas rochosas e atrito simulado com rastro de partículas neon.
+    *   **Escudo Defletor Energético Global (Forcefield Shield)**: Especifiquei um escudo esférico aramado ciano ($d = 1.15$) que pulsa e aumenta de opacidade sob colisão (ripple effect), associado a um medidor de integridade (0-100%) que, se zerado, faz com que asteroides atinjam a superfície e criem crateras térmicas vermelhas neon.
+    *   **Canhão Interceptor Laser**: Desenhei a mecânica de intercepção ativa. Ao selecionar satélites ou estações e disparar o laser, um feixe neon conecta o emissor ao asteroide por 150ms, culminando em uma explosão de partículas douradas radiais e destruição do alvo.
+    *   **Sintetizador de Áudio via Web Audio API**: Projetei osciladores dedicados para carregamento do laser (pitch sweep ascendente), disparo (sweep dente-de-serra + ruído), impacto no escudo (ressonância senoidal de baixas frequências) e explosão (ruído branco filtrado com passa-baixas).
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Otimização de GPU e Memória (GC)*: A renderização de múltiplos fragmentos de asteroides e as partículas de explosão simultâneas podem degradar a performance em dispositivos de baixo custo. Recomenda-se pré-alocar buffers e geometrias (`THREE.BufferGeometry`), reutilizando instâncias de material para evitar vazamentos de memória (Memory Leaks).
+    2.  *Controle de Colisão e Limpeza*: Se o asteroide ultrapassar o planeta sem colidir devido a desvios cartesianos ou saltos de frame, o loop de animação deve destruí-lo automaticamente assim que a distância começar a aumentar novamente e passar de 2.0 unidades.
+    3.  *Bloqueio de AudioContext*: Para evitar erros de segurança dos navegadores, a inicialização do `AudioContext` deve ser ativada sob a primeira interação do mouse ou toque na página (evento `click` global).
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🚀 26. Elaboração e Criação de Nova Tarefa: Space Shooter (TASK_004) - ✅ LIDA
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Space Shooter (space_shooter)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Anomalias Gravitacionais (Buracos Negros)**: Projetei vórtices gravitacionais periódicos que exercem atração física centrípeta em todas as entidades móveis (naves do jogador e inimigas, meteoros e detritos) inversamente proporcional à distância, além de distorcer de forma curvilínea os feixes de laser. Se sugadas para o núcleo de morte central (<20px), as entidades sofrem danos extremos.
+    *   **Customização de Arsenal no Hangar (Weapon Loadouts)**: Especifiquei a introdução de uma aba de ajuste de armamentos na interface do Hangar, permitindo aos jogadores desbloquear e selecionar novas armas táticas: *Vulcan Blaster* (tiro padrão rápido), *Plasma Cannon* (orbes lentos e pesados com Splash Damage em área de 60px) e *Tesla Lightning* (relâmpagos elétricos instantâneos que encadeiam e ricocheteiam por até 3 alvos vizinhos).
+    *   **Modo Escolta de Comboio (Escort Mission)**: Criei uma mecânica alternativa para as fases ímpares (a partir da Fase 3), onde o jogador deve defender uma nave de carga aliada passiva e de movimentação lenta (Goliath Transport) com barra de vida exclusiva. A IA hostil foca estrategicamente em emboscar a Goliath, exigindo comportamento defensivo ativo por parte do jogador.
+    *   **Síntese de Áudio no Web Audio API**: Projetei a geração sonora procedural em tempo real para os disparos e explosões de plasma, descargas estáticas elétricas da Tesla e modulação dinâmica sub-grave do vórtice gravitacional, além de BGM adaptativo que acelera e eleva o pitch em situações de vida crítica do comboio ou do jogador.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Refatoração de Trajetória Linear para Vetorial*: O motor de jogo atual processa disparos de lasers de forma linear e estritamente vertical (`y -= speed`). Para viabilizar a atração curvilínea do Buraco Negro, a estrutura de projéteis deve ser refatorada para operar com componentes vetoriais reais (`speedX` e `speedY`), que sofrem incrementos de aceleração a cada frame no loop físico.
+    2.  *Integração de UI no Hangar*: A inclusão da aba de armas no Hangar de seleção de naves deve ser feita de forma limpa, compartilhando a economia centralizada na chave `spaceShooterCoins` do `localStorage`. Deve-se evitar colisões na escrita e leitura do storage garantindo serialização JSON robusta para as chaves `spaceShooterUnlockedWeapons` e `spaceShooterActiveWeapon`.
+    3.  *Exclusão de Fogo Amigo (Splash Damage)*: O motor de colisões deve garantir estritamente que os danos em área gerados pela explosão do Canhão de Plasma verifiquem apenas elementos com a classe `.enemy`. Caso contrário, a proximidade com o jogador ou a Goliath geraria mortes acidentais extremamente frustrantes para o usuário.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 👑 27. Elaboração e Criação de Nova Tarefa: Chess (TASK_004)
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Chess (chess)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/chess/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Modo Duelo Pass-and-Play com Rotação 3D do Tabuleiro**: Projetei um modo local face-a-face de dois jogadores onde o tabuleiro `#myBoard` rotaciona suavemente 180° no final de cada lance. Especifiquei a contra-rotação das peças e da notação lateral para manter a orientação de leitura correta.
+    *   **Análise Pós-Jogo e Classificação de Lances (Game Review)**: Projetei a integração com o Stockfish.js Web Worker para analisar cada lance da partida após o término e classificá-lo nos padrões oficiais FIDE adaptados (Brilhante, Excelente, Bom, Imprecisão, Erro, Erro Crítico/Blunder) com badges e efeitos visuais neon no replay.
+    *   **Mural de Conquistas e Desafios (Achievements Panel)**: Criei a lógica para persistência e desbloqueio de 5 conquistas de xadrez (ex: "Relâmpago Neon", "Resiliência do Rei", etc.) no `localStorage`, acompanhados de toasts na HUD e fanfarra sintetizada na Web Audio API.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Distorção de Proporção nas Coordenadas*: A rotação 3D inverte as anotações textuais nas bordas. Recomendei aplicar uma classe CSS de contra-rotação para manter a leitura vertical transparente.
+    2.  *Limite de Lances Analisáveis*: Partidas longas podem congelar a interface. Recomendei usar uma fila de promessas de análise em lote e expor uma barra de progresso com botão de cancelamento.
+    3.  *Paridade de Estilo de Áudio*: O som de conquista deve reaproveitar os osciladores sintetizados do AudioContext na Web Audio API criado em Task 3, sem dependência de assets.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🔫 28. Elaboração e Criação de Nova Tarefa: 3D Shooter (TASK_004)
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **3D Shooter (3d_shooter)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/3d_shooter/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Portas de Correr Deslizantes (Sliding Doors)**: Desenhei uma mecânica clássica de portas (Comuns, Vermelha e Azul) que abrem ao pressionar a tecla `E`. A renderização de raycasting projeta o progresso de abertura fazendo a textura da parede deslizar lateralmente.
+    *   **Cartões de Acesso (Keycards & Inventory)**: Adicionei chaves vermelha e azul como pickups no cenário e criei um design de inventário com glassmorphism neon para a HUD. Portas coloridas requerem seus respectivos cartões para abrir, tocando sons de acesso negado proceduralmente em caso de falta.
+    *   **Paredes Secretas Camufladas (Pushwalls)**: Introduzi a mecânica clássica de paredes falsas ocultas no cenário que começam a dissolver (reduzindo o canal alfa gradualmente no raycaster) quando o jogador interage ('E') próximo a elas, tocando um chime de segredo e revelando salas escondidas de suprimentos.
+    *   **Barris Explosivos Toxicos (Hazards)**: Criei entidades de barris verdes neon com pontos de vida próprios. Ao serem destruídos, causam uma explosão verde com física de splash damage radial reativa, podendo gerar reações em cadeia e deixando uma poça tóxica ácida temporária que causa dano periódico a entidades que passarem por ela.
+    *   **Áudio Procedural com Web Audio API**: Projetei as receitas sonoras detalhadas de osciladores e envelopes para sintetizar os efeitos de abertura de porta, acesso negado, segredo revelado e explosão ácida.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Mapeamento da Tecla de Interação*: A tecla `E` / `KeyE` precisa ser registrada no input listener do arquivo index.html. O desenvolvedor deve integrá-la ao objeto `keys` para processamento correto.
+    2.  *Raycasting DDA Adaptável para Portas*: Para simular o deslizamento suave, o raycaster precisará verificar o valor da coordenada horizontal de colisão do raio com a face da porta (`wallX`). Se a colisão ocorrer antes do limite de progresso de abertura, o DDA deve ignorar a colisão e prosseguir.
+    3.  *Mitigação de Esmagamento de Entidades*: Ao fechar uma porta automaticamente, deve-se implementar uma validação contínua na célula correspondente para impedir que inimigos ou o jogador fiquem presos fisicamente no bloco do mapa. Se houver entidade, a porta deve reverter imediatamente para o estado de abertura.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## ⚔️ 29. Elaboração e Criação de Nova Tarefa: RPG Adventure Quest (TASK_004)
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **RPG Adventure Quest (ded)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Especialização de Classes (Prestige Classes)**: Projetei a transição de personagens para subclasses temáticas (Paladino/Berserker, Arcanista/Necromante, Assassino/Dançarino das Sombras) ao atingirem o nível 3 (XP >= 150), adicionando novas habilidades passivas e ativas com dinâmicas de cooldown e buffs temporários na AC e HP.
+    *   **Quadro de Missões Secundárias (Quest System & Journal)**: Criei um diário de missões retrátil na HUD e projetei 3 missões iniciais dinâmicas ligadas ao level design (encontrar o amuleto do mercador nos sarcófagos, purificar a cripta derrotando monstros e decifrar runas ancestrais nas paredes).
+    *   **Level Design Tático com Portas e Alavancas (Locked Gates & Levers)**: Especifiquei barreiras mágicas neon bloqueando passagens-chave que exigem a ativação física de 2 alavancas ocultas em outras áreas da masmorra, integradas dinamicamente ao grafo do minimapa em SVG com chaves de estado visual.
+    *   **Áudio Procedural via Web Audio API**: Projetei as receitas sonoras detalhadas de osciladores, filtros passa-altas/passa-baixas e envelopes para as novas habilidades de especialização (Fúria, Escudos, Drenagem de vida) e fanfarra triunfal de conclusão de missões.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Abuso de Input e Estado Compartilhado*: Ao abrir a modal de seleção de especialização, o loop principal de exploração deve ser temporariamente travado para impedir que cliques paralelos mudem o nó de cena ou abram o inventário concorrentemente.
+    2.  *Descarte Limpo de Nós de Áudio*: Devido às múltiplas novas habilidades de prestígio gerando áudio procedural, é vital chamar explicitamente `disconnect()` em todos os osciladores e gainNodes no callback `onended` para mitigar vazamentos de memória (Memory Leaks) e uso excessivo de recursos no AudioContext.
+    3.  *Persistência de Objetos de Quests*: Para manter o salvamento/carregamento robusto via `localStorage`, o estado de progresso de cada missão deve ser serializado de forma limpa, evitando referências circulares ou perdas de dados no objeto `gameState.quests`.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
 
 
 

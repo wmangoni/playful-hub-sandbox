@@ -294,3 +294,17 @@ function playCombatSound() {
 **Refinamento Aprovado e Homologado para Desenvolvimento.**
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Custo da Catapulta (Madeira vs. Outros Recursos)**: **Decisão:** Siga com a **Opção A**. Mude o custo para `60 Comida` e simplifique a implementação mantendo a UI inalterada por ora, já que gerenciar três recursos requererá maior design de balanceamento econômico que foge do escopo desta tarefa.
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `strategy_game`
+* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
+

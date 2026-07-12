@@ -751,6 +751,21 @@
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.7); animation: runeGlow 1.2s infinite alternate;
         }
         #gameover-banner.hidden { display: none; }
+
+        /* Custom styles for Grimoire and Achievement Toast */
+        #grimoire-grid::-webkit-scrollbar { width: 6px; }
+        #grimoire-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        #grimoire-grid::-webkit-scrollbar-thumb { background: rgba(138, 127, 176, 0.4); border-radius: 4px; }
+        #grimoire-grid::-webkit-scrollbar-thumb:hover { background: rgba(212, 175, 55, 0.5); }
+
+        @keyframes slideInRight {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -770,6 +785,40 @@
         <div class="game-container" id="game-container">
             <!-- TASK_002: canvas de partículas rúnicas -->
             <canvas id="particle-canvas"></canvas>
+
+            <!-- Grimório button -->
+            <div style="display: flex; justify-content: flex-end; position: relative; z-index: 10; margin-bottom: 10px;">
+                <button class="btn" id="grimoire-btn" style="margin: 0; padding: 0.4rem 0.8rem; font-size: 0.82rem; font-family: var(--font-display); border-color: rgba(212,175,55,0.4); background: rgba(8,5,15,0.6);">📜 Grimório de Relíquias</button>
+            </div>
+
+            <!-- Grimório Overlay -->
+            <div id="grimoire-overlay" style="display:none; position:absolute; inset:0; z-index:100; background:rgba(8,5,15,0.96); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-radius:16px; padding:2rem; flex-direction:column; justify-content:space-between; border: 1px solid rgba(212, 175, 55, 0.45); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.95);">
+                <div style="display:flex; flex-direction:column; height:100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid rgba(212,175,55,0.2); padding-bottom:0.5rem;">
+                        <h2 style="font-family:var(--font-display); color:var(--gold-color); margin:0; font-size:1.4rem; text-shadow:0 0 10px rgba(212,175,55,0.4);">Grimório de Relíquias</h2>
+                        <button class="btn" id="close-grimoire-btn" style="margin:0; padding:0.4rem 0.8rem; font-size:0.85rem;">✕ Fechar</button>
+                    </div>
+                    <div style="text-align:center; font-family:var(--font-serif); color:var(--accent-color); font-size:0.85rem; margin-bottom:1rem;" id="grimoire-slots-info">
+                        Sintonize até 2 relíquias para obter bônus passivos nas suas partidas.
+                    </div>
+                    <div id="grimoire-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; flex:1; overflow-y:auto; padding-right:5px; align-content: start;">
+                        <!-- 6 slot items will be injected here -->
+                    </div>
+                    <div style="margin-top:1rem; padding-top:0.8rem; border-top:1px solid rgba(212,175,55,0.2); display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; color:#9a90b8;">
+                        <span id="grimoire-equipped-count">Sintonizadas: 0 / 2</span>
+                        <span id="grimoire-warning" style="color:#ff3b3b; font-weight:bold; opacity:0; transition:opacity 0.3s; font-size:0.8rem;">Máximo de 2 relíquias ativas!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Achievement Toast inside game-container -->
+            <div id="achievement-toast" style="display:none; position:absolute; top:20px; right:20px; z-index:1000; width:280px; padding:12px; border-radius:10px; background:rgba(18,12,32,0.95); border:1.5px solid #ffd700; box-shadow:0 0 15px rgba(255,215,0,0.4), inset 0 0 8px rgba(138,127,176,0.3); backdrop-filter:blur(8px); color:#f3effa; font-family:var(--font-sans);">
+                <div style="font-family:var(--font-display); color:#ffd700; font-size:0.85rem; font-weight:bold; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                    <span>✨ CONQUISTA DESBLOQUEADA!</span>
+                </div>
+                <div id="toast-title" style="font-weight:600; font-size:0.8rem; margin-bottom:3px;">Relíquia Ativada</div>
+                <div id="toast-lore" style="font-family:var(--font-serif); font-size:0.75rem; color:#9a90b8; font-style:italic;">Lore text</div>
+            </div>
 
             <div class="game-ui">
                 <div class="level-indicator">Level: <span id="level">1</span></div>
@@ -940,6 +989,84 @@
                 this.heartbeatInterval = setInterval(beat, 1200); beat();
             }
             stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } }
+            playHarp() {
+                if (!this.ctx) return;
+                const ctx = this.ctx, now = ctx.currentTime;
+                const freqs = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                freqs.forEach((freq, idx) => {
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, now + idx * 0.05);
+                    g.gain.setValueAtTime(0, now);
+                    g.gain.linearRampToValueAtTime(0.08, now + idx * 0.05 + 0.01);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.25);
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.start(now + idx * 0.05);
+                    o.stop(now + idx * 0.05 + 0.3);
+                });
+            }
+            playRelicFanfare() {
+                if (!this.ctx) return;
+                const ctx = this.ctx, now = ctx.currentTime;
+                const freqs = [349.23, 440.00, 523.25, 493.88, 698.46];
+                freqs.forEach((freq, idx) => {
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'triangle';
+                    o.frequency.setValueAtTime(freq, now + idx * 0.12);
+                    g.gain.setValueAtTime(0, now);
+                    g.gain.linearRampToValueAtTime(0.12, now + idx * 0.12 + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.5);
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.start(now + idx * 0.12);
+                    o.stop(now + idx * 0.12 + 0.6);
+                });
+            }
+            playPhoenixReviveSFX() {
+                if (!this.ctx) return;
+                const ctx = this.ctx, now = ctx.currentTime;
+                try {
+                    const bufferSize = ctx.sampleRate * 1.5;
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.Q.setValueAtTime(8.0, now);
+                    filter.frequency.setValueAtTime(100, now);
+                    filter.frequency.exponentialRampToValueAtTime(1800, now + 1.2);
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0.3, now);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+                    noise.connect(filter);
+                    filter.connect(g);
+                    g.connect(ctx.destination);
+                    noise.start(now);
+                    noise.stop(now + 1.5);
+                } catch(e) {}
+                
+                const osc = ctx.createOscillator();
+                const oscGain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 1.2);
+                const oscFilter = ctx.createBiquadFilter();
+                oscFilter.type = 'lowpass';
+                oscFilter.frequency.setValueAtTime(300, now);
+                oscFilter.frequency.exponentialRampToValueAtTime(1000, now + 1.2);
+                oscGain.gain.setValueAtTime(0.1, now);
+                oscGain.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
+                osc.connect(oscFilter);
+                oscFilter.connect(oscGain);
+                oscGain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 1.4);
+            }
         }
         const audio = new AudioManager();
 
@@ -1123,6 +1250,308 @@
                         wrap.appendChild(cube); wrap.appendChild(controls); return wrap;
                     }
                 };
+            },
+
+            gen_constellation(level) {
+                const starCount = 5 + Math.floor(Math.random() * 4); // 5 a 8 estrelas
+                const riddleType = Math.floor(Math.random() * 3);
+                
+                const SPECTRA = [
+                    { name: 'Azul', color: '#00f0ff', temp: 6, radius: 10 },
+                    { name: 'Branco-Azul', color: '#aae5ff', temp: 5, radius: 9 },
+                    { name: 'Branco', color: '#ffffff', temp: 4, radius: 8 },
+                    { name: 'Amarelo', color: '#ffd700', temp: 3, radius: 7 },
+                    { name: 'Laranja', color: '#ff9000', temp: 2, radius: 6 },
+                    { name: 'Vermelho', color: '#ff3b3b', temp: 1, radius: 5 }
+                ];
+                
+                const runesList = [
+                    { char: 'ᚨ', val: 'A' },
+                    { char: 'ᛒ', val: 'B' },
+                    { char: 'ᚲ', val: 'C' },
+                    { char: 'ᛞ', val: 'D' },
+                    { char: 'ᛟ', val: 'E' },
+                    { char: 'ᚠ', val: 'F' },
+                    { char: 'ᚷ', val: 'G' },
+                    { char: 'ᚻ', val: 'H' }
+                ];
+                
+                const stars = [];
+                const width = 400;
+                const height = 300;
+                
+                let chosenSpectra = shuffle([...SPECTRA]);
+                let chosenRunes = shuffle([...runesList]);
+                let chosenRadii = [5, 6, 7, 8, 9, 10, 11, 12];
+                chosenRadii = shuffle(chosenRadii);
+                
+                for (let i = 0; i < starCount; i++) {
+                    let x, y, tooClose;
+                    let guard = 0;
+                    do {
+                        x = 45 + Math.random() * (width - 90);
+                        y = 45 + Math.random() * (height - 90);
+                        tooClose = false;
+                        for (let j = 0; j < stars.length; j++) {
+                            const dist = Math.sqrt((x - stars[j].x) ** 2 + (y - stars[j].y) ** 2);
+                            if (dist < 65) {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        guard++;
+                    } while (tooClose && guard < 100);
+                    
+                    const spec = chosenSpectra[i % chosenSpectra.length];
+                    const rune = chosenRunes[i % chosenRunes.length];
+                    const rad = chosenRadii[i % chosenRadii.length];
+                    
+                    stars.push({
+                        id: i,
+                        x,
+                        y,
+                        color: spec.color,
+                        colorName: spec.name,
+                        temp: spec.temp,
+                        label: rune.char,
+                        runeVal: rune.val,
+                        radius: riddleType === 2 ? rad : spec.radius,
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+                
+                let correctOrder = [];
+                let riddleText = "";
+                let hintText = "";
+                
+                if (riddleType === 0) {
+                    correctOrder = [...stars].sort((a, b) => b.temp - a.temp);
+                    riddleText = "Conecte as estrelas do espectro mais quente ao mais frio (Azul ➔ Branco-Azul ➔ Branco ➔ Amarelo ➔ Laranja ➔ Vermelho)";
+                    hintText = "Ordem dos espectros: Azul, Branco-Azul, Branco, Amarelo, Laranja, Vermelho.";
+                } else if (riddleType === 1) {
+                    correctOrder = [...stars].sort((a, b) => a.runeVal.localeCompare(b.runeVal));
+                    riddleText = "Desenhe a constelação ordenando os símbolos rúnicos em ordem alfabética arcana (ᚨ ➔ ᛒ ➔ ᚲ ➔ ᛞ ➔ ᛟ ➔ ᚠ ➔ ᚷ ➔ ᚻ)";
+                    hintText = "Siga a ordem alfabética rúnica: ᚨ(A), ᛒ(B), ᚲ(C), ᛞ(D), ᛟ(E), ᚠ(F), ᚷ(G), ᚻ(H).";
+                } else {
+                    correctOrder = [...stars].sort((a, b) => a.radius - b.radius);
+                    riddleText = "Ligue os nós celestes em ordem crescente de brilho e magnitude (do menor ao maior diâmetro)";
+                    hintText = "Conecte primeiro as menores estrelas e termine nas maiores.";
+                }
+                
+                return {
+                    type: 'constellation',
+                    title: "Conexão Estelar Celestial",
+                    description: riddleText,
+                    hint: hintText,
+                    render(onAnswer) {
+                        const wrap = el('div');
+                        wrap.style.display = 'flex';
+                        wrap.style.flexDirection = 'column';
+                        wrap.style.alignItems = 'center';
+                        wrap.style.width = '100%';
+                        wrap.style.margin = '10px 0';
+                        
+                        const canvas = el('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        canvas.style.background = 'radial-gradient(circle, #0c081d 0%, #05030a 100%)';
+                        canvas.style.borderRadius = '12px';
+                        canvas.style.border = '1px solid rgba(138, 127, 176, 0.4)';
+                        canvas.style.boxShadow = 'inset 0 0 20px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.6)';
+                        canvas.style.cursor = 'crosshair';
+                        canvas.style.maxWidth = '100%';
+                        
+                        const ctx = canvas.getContext('2d');
+                        
+                        let selectedStars = [];
+                        let isDragging = false;
+                        let currentMousePos = null;
+                        let animationFrameId = null;
+                        let isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                        const collisionRadius = isTouch ? 40 : 30;
+                        let lineFlashRed = false;
+                        
+                        function draw() {
+                            ctx.fillStyle = '#06030d';
+                            ctx.fillRect(0, 0, width, height);
+                            
+                            // Desenha o fundo espacial
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                            for (let i = 0; i < 30; i++) {
+                                const sx = (Math.sin(i * 123.45) * 0.5 + 0.5) * width;
+                                const sy = (Math.cos(i * 543.21) * 0.5 + 0.5) * height;
+                                ctx.fillRect(sx, sy, 1.5, 1.5);
+                            }
+                            
+                            // Linhas conectadas
+                            if (selectedStars.length > 0) {
+                                ctx.save();
+                                ctx.lineWidth = 4;
+                                ctx.strokeStyle = lineFlashRed ? '#ff3b3b' : '#ffd700';
+                                ctx.shadowColor = lineFlashRed ? '#ff3b3b' : '#ffd700';
+                                ctx.shadowBlur = 15;
+                                ctx.beginPath();
+                                
+                                selectedStars.forEach((starIdx, i) => {
+                                    const s = stars[starIdx];
+                                    if (i === 0) ctx.moveTo(s.x, s.y);
+                                    else ctx.lineTo(s.x, s.y);
+                                });
+                                
+                                ctx.stroke();
+                                ctx.restore();
+                            }
+                            
+                            // Linha de arraste ativa
+                            if (isDragging && currentMousePos && selectedStars.length > 0) {
+                                ctx.save();
+                                const start = stars[selectedStars[selectedStars.length - 1]];
+                                ctx.lineWidth = 2;
+                                ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+                                ctx.setLineDash([4, 4]);
+                                ctx.beginPath();
+                                ctx.moveTo(start.x, start.y);
+                                ctx.lineTo(currentMousePos.x, currentMousePos.y);
+                                ctx.stroke();
+                                ctx.restore();
+                            }
+                            
+                            // Desenha as estrelas
+                            const t = performance.now() * 0.003;
+                            stars.forEach((star, idx) => {
+                                const isSelected = selectedStars.includes(idx);
+                                const pulse = 1 + Math.sin(t + star.phase) * 0.15;
+                                const radius = star.radius * pulse;
+                                
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.arc(star.x, star.y, radius, 0, Math.PI * 2);
+                                
+                                ctx.fillStyle = star.color;
+                                ctx.shadowColor = star.color;
+                                ctx.shadowBlur = (isSelected ? 18 : 10) + Math.sin(t + star.phase) * 4;
+                                ctx.fill();
+                                
+                                if (isSelected) {
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, radius + 5, 0, Math.PI * 2);
+                                    ctx.strokeStyle = '#ffd700';
+                                    ctx.lineWidth = 1.5;
+                                    ctx.stroke();
+                                }
+                                
+                                ctx.fillStyle = '#ffffff';
+                                ctx.font = 'bold 12px serif';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(star.label, star.x, star.y + radius + 15);
+                                
+                                if (riddleType === 0) {
+                                    ctx.font = 'italic 8px sans-serif';
+                                    ctx.fillStyle = '#9a90b8';
+                                    ctx.fillText(star.colorName, star.x, star.y + radius + 27);
+                                }
+                                
+                                ctx.restore();
+                            });
+                            
+                            animationFrameId = requestAnimationFrame(draw);
+                        }
+                        
+                        draw();
+                        
+                        function getCoords(e) {
+                            const rect = canvas.getBoundingClientRect();
+                            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                            const x = (clientX - rect.left) * (width / rect.width);
+                            const y = (clientY - rect.top) * (height / rect.height);
+                            return { x, y };
+                        }
+                        
+                        function findNearStar(pos) {
+                            for (let i = 0; i < stars.length; i++) {
+                                const s = stars[i];
+                                const dist = Math.sqrt((pos.x - s.x) ** 2 + (pos.y - s.y) ** 2);
+                                if (dist < collisionRadius) {
+                                    return i;
+                                }
+                            }
+                            return -1;
+                        }
+                        
+                        function handleStart(e) {
+                            if (lineFlashRed) return;
+                            const pos = getCoords(e);
+                            const starIdx = findNearStar(pos);
+                            if (starIdx !== -1) {
+                                if (stars[starIdx].id === correctOrder[0].id) {
+                                    isDragging = true;
+                                    selectedStars = [starIdx];
+                                    currentMousePos = pos;
+                                    audio.playClick();
+                                }
+                            }
+                        }
+                        
+                        function handleMove(e) {
+                            if (!isDragging) return;
+                            const pos = getCoords(e);
+                            currentMousePos = pos;
+                            
+                            const starIdx = findNearStar(pos);
+                            if (starIdx !== -1 && !selectedStars.includes(starIdx)) {
+                                const nextReqIndex = selectedStars.length;
+                                if (stars[starIdx].id === correctOrder[nextReqIndex].id) {
+                                    selectedStars.push(starIdx);
+                                    audio.playHarp();
+                                    
+                                    if (selectedStars.length === stars.length) {
+                                        isDragging = false;
+                                        cancelAnimationFrame(animationFrameId);
+                                        onAnswer(true);
+                                    }
+                                } else {
+                                    isDragging = false;
+                                    lineFlashRed = true;
+                                    audio.playIncorrect();
+                                    triggerShake();
+                                    
+                                    setTimeout(() => {
+                                        selectedStars = [];
+                                        lineFlashRed = false;
+                                        onAnswer(false);
+                                    }, 600);
+                                }
+                            }
+                        }
+                        
+                        function handleEnd() {
+                            if (isDragging) {
+                                isDragging = false;
+                                selectedStars = [];
+                            }
+                        }
+                        
+                        canvas.addEventListener('mousedown', handleStart);
+                        canvas.addEventListener('mousemove', handleMove);
+                        window.addEventListener('mouseup', handleEnd);
+                        
+                        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); });
+                        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); });
+                        canvas.addEventListener('touchend', handleEnd);
+                        
+                        wrap.cleanup = () => {
+                            cancelAnimationFrame(animationFrameId);
+                            canvas.removeEventListener('mousedown', handleStart);
+                            canvas.removeEventListener('mousemove', handleMove);
+                            window.removeEventListener('mouseup', handleEnd);
+                        };
+                        
+                        wrap.appendChild(canvas);
+                        return wrap;
+                    }
+                };
             }
         };
 
@@ -1153,9 +1582,260 @@
         function startParticleLoop() { if (!particleRAF) particleLoop(); }
         
         // ===================================================================
-        // === TASK_002 — Motor de jogo (modos, sanidade, juiciness) ==========
+        // === TASK_003 — Grimório de Relíquias & Conquistas ================
         // ===================================================================
-        const PUZZLE_TYPES = ['sequence', 'pattern', 'memory', 'logic', 'perspective'];
+        const RELICS_DATA = [
+            {
+                name: "Astrolábio Quebrado",
+                icon: "🧭",
+                desc: "O custo de Foco de qualquer dica é reduzido de 10% para 5%.",
+                lore: "Suas engrenagens rachadas ainda apontam para verdades esquecidas nos céus.",
+                req: "Resolva 5 sequências arcanas consecutivas no modo Labirinto Sem Fim."
+            },
+            {
+                name: "Lente do Foco Celestial",
+                icon: "🔍",
+                desc: "Regenera +2% extras de Foco Mental a cada acerto (total de +7% de regeneração).",
+                lore: "Um cristal lapidado sob o alinhamento dos solstícios, ampliando a clareza mental.",
+                req: "Alcance o Nível 5 no modo Campanha."
+            },
+            {
+                name: "Cálice do Infinito",
+                icon: "🏆",
+                desc: "Reduz as penalidades de Foco por resposta incorreta em 3%.",
+                lore: "Uma taça que transborda com a essência do éter, amortecendo o cansaço da mente.",
+                req: "Alcance 4.000 pontos no modo Labirinto Sem Fim."
+            },
+            {
+                name: "Filtro de Éter",
+                icon: "🧪",
+                desc: "No modo Contra o Tempo, cada enigma correto concede +12 segundos em vez de +10.",
+                lore: "Uma poção volátil que desacelera a percepção do tempo ao redor do conjurador.",
+                req: "Resolva um enigma no modo Contra o Tempo com mais de 25 segundos restantes."
+            },
+            {
+                name: "Pena de Fênix",
+                icon: "🪶",
+                desc: "Salva da derrota uma vez por partida! Ao zerar o Foco, restaura 25% do Foco e quebra.",
+                lore: "Um filamento incandescente que arde com o calor do renascimento espiritual.",
+                req: "Acerte 8 enigmas consecutivos sem errar em qualquer modo."
+            },
+            {
+                name: "Tábula de Esmeralda",
+                icon: "📜",
+                desc: "A cada 5 enigmas resolvidos, concede 1 dica grátis (sem custo de foco ou tempo).",
+                lore: "Gravações antigas contendo a lei hermética: 'O que está embaixo é como o que está no topo'.",
+                req: "Resolva todos os 5 tipos de enigmas clássicos no modo Campanha."
+            }
+        ];
+
+        let freeHintCount = 0;
+        let sequenceCorrectStreak = 0;
+
+        function getUnlockedRelics() {
+            return JSON.parse(localStorage.getItem('mind_labyrinth_relics') || '[]');
+        }
+
+        function getActiveRelics() {
+            return JSON.parse(localStorage.getItem('mind_labyrinth_active_relics') || '[]');
+        }
+
+        function unlockRelic(name, lore) {
+            let unlocked = getUnlockedRelics();
+            if (!unlocked.includes(name)) {
+                unlocked.push(name);
+                localStorage.setItem('mind_labyrinth_relics', JSON.stringify(unlocked));
+                triggerAchievementToast(name, lore);
+                renderGrimoire();
+            }
+        }
+
+        function triggerAchievementToast(name, lore) {
+            const toast = $('achievement-toast');
+            $('toast-title').textContent = `Relíquia Desbloqueada: ${name}`;
+            $('toast-lore').textContent = lore;
+            toast.style.display = 'block';
+            toast.style.animation = 'slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            audio.playRelicFanfare();
+            
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.5s forwards';
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                }, 500);
+            }, 3500);
+        }
+
+        function renderGrimoire() {
+            const unlocked = getUnlockedRelics();
+            const active = getActiveRelics();
+            const grid = $('grimoire-grid');
+            grid.innerHTML = '';
+            
+            RELICS_DATA.forEach(relic => {
+                const card = el('div');
+                const isUnlocked = unlocked.includes(relic.name);
+                const isActive = active.includes(relic.name);
+                
+                card.style.background = isUnlocked ? 'rgba(35, 26, 62, 0.5)' : 'rgba(8, 5, 15, 0.8)';
+                card.style.border = isUnlocked ? (isActive ? '1px solid var(--gold-color)' : '1px solid rgba(138, 127, 176, 0.4)') : '1px solid rgba(255, 255, 255, 0.05)';
+                card.style.borderRadius = '8px';
+                card.style.padding = '10px';
+                card.style.display = 'flex';
+                card.style.flexDirection = 'column';
+                card.style.justifyContent = 'space-between';
+                card.style.minHeight = '110px';
+                card.style.boxShadow = isActive ? '0 0 10px rgba(212, 175, 55, 0.2)' : 'none';
+                
+                const infoDiv = el('div');
+                
+                const headerDiv = el('div');
+                headerDiv.style.display = 'flex';
+                headerDiv.style.alignItems = 'center';
+                headerDiv.style.gap = '8px';
+                headerDiv.style.marginBottom = '4px';
+                
+                const iconSpan = el('span');
+                iconSpan.textContent = isUnlocked ? relic.icon : '🔒';
+                iconSpan.style.fontSize = '1.2rem';
+                headerDiv.appendChild(iconSpan);
+                
+                const nameSpan = el('span');
+                nameSpan.textContent = relic.name;
+                nameSpan.style.fontFamily = 'var(--font-display)';
+                nameSpan.style.fontSize = '0.85rem';
+                nameSpan.style.color = isUnlocked ? 'var(--light-color)' : '#666';
+                headerDiv.appendChild(nameSpan);
+                
+                infoDiv.appendChild(headerDiv);
+                
+                const descP = el('p');
+                descP.textContent = isUnlocked ? relic.desc : `Bloqueado. ${relic.req}`;
+                descP.style.margin = '4px 0';
+                descP.style.fontSize = '0.75rem';
+                descP.style.color = isUnlocked ? '#bfaee3' : '#777';
+                infoDiv.appendChild(descP);
+                
+                if (isUnlocked) {
+                    const loreP = el('p');
+                    loreP.textContent = `"${relic.lore}"`;
+                    loreP.style.margin = '4px 0';
+                    loreP.style.fontSize = '0.7rem';
+                    loreP.style.fontStyle = 'italic';
+                    loreP.style.color = '#7f6f9c';
+                    infoDiv.appendChild(loreP);
+                }
+                
+                card.appendChild(infoDiv);
+                
+                const actBtn = el('button', 'btn');
+                actBtn.style.margin = '8px 0 0 0';
+                actBtn.style.padding = '0.2rem 0.5rem';
+                actBtn.style.fontSize = '0.75rem';
+                actBtn.style.width = '100%';
+                
+                if (!isUnlocked) {
+                    actBtn.textContent = 'Trancado';
+                    actBtn.disabled = true;
+                    actBtn.style.background = '#151020';
+                    actBtn.style.borderColor = '#333';
+                    actBtn.style.color = '#555';
+                } else if (isActive) {
+                    actBtn.textContent = 'Desativar';
+                    actBtn.style.background = 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(184,134,11,0.4) 100%)';
+                    actBtn.style.borderColor = 'var(--gold-color)';
+                    actBtn.style.color = 'var(--gold-color)';
+                    actBtn.addEventListener('click', () => {
+                        const idx = active.indexOf(relic.name);
+                        if (idx !== -1) {
+                            active.splice(idx, 1);
+                            localStorage.setItem('mind_labyrinth_active_relics', JSON.stringify(active));
+                            renderGrimoire();
+                            updateGameUI();
+                        }
+                    });
+                } else {
+                    actBtn.textContent = 'Ativar';
+                    actBtn.addEventListener('click', () => {
+                        if (active.length >= 2) {
+                            const warn = $('grimoire-warning');
+                            warn.style.opacity = '1';
+                            setTimeout(() => { warn.style.opacity = '0'; }, 2000);
+                        } else {
+                            active.push(relic.name);
+                            localStorage.setItem('mind_labyrinth_active_relics', JSON.stringify(active));
+                            renderGrimoire();
+                            updateGameUI();
+                        }
+                    });
+                }
+                card.appendChild(actBtn);
+                
+                grid.appendChild(card);
+            });
+            
+            $('grimoire-equipped-count').textContent = `Sintonizadas: ${active.length} / 2`;
+        }
+
+        function checkRelicUnlocks(isCorrect) {
+            if (isCorrect) {
+                if (gameState.mode === 'endless') {
+                    if (gameState.currentPuzzle && gameState.currentPuzzle.type === 'sequence') {
+                        sequenceCorrectStreak++;
+                        if (sequenceCorrectStreak >= 5) {
+                            unlockRelic('Astrolábio Quebrado', 'Suas engrenagens rachadas ainda apontam para verdades esquecidas nos céus.');
+                        }
+                    }
+                }
+                
+                if (gameState.mode === 'campaign' && gameState.level >= 5) {
+                    unlockRelic('Lente do Foco Celestial', 'Um cristal lapidado sob o alinhamento dos solstícios, ampliando a clareza mental.');
+                }
+                
+                if (gameState.mode === 'endless' && gameState.score >= 4000) {
+                    unlockRelic('Cálice do Infinito', 'Uma taça que transborda com a essência do éter, amortecendo o cansaço da mente.');
+                }
+                
+                if (gameState.mode === 'timeattack' && gameState.timeLeft > 25) {
+                    unlockRelic('Filtro de Éter', 'Uma poção volátil que desacelera a percepção do tempo ao redor do conjurador.');
+                }
+                
+                if (gameState.combo >= 8) {
+                    unlockRelic('Pena de Fênix', 'Um filamento incandescente que arde com o calor do renascimento espiritual.');
+                }
+                
+                if (gameState.mode === 'campaign' && gameState.currentPuzzle) {
+                    let campaignSolved = JSON.parse(localStorage.getItem('mind_labyrinth_campaign_solved') || '{}');
+                    campaignSolved[gameState.currentPuzzle.type] = true;
+                    localStorage.setItem('mind_labyrinth_campaign_solved', JSON.stringify(campaignSolved));
+                    
+                    const types = ['sequence', 'pattern', 'memory', 'logic', 'perspective'];
+                    const allSolved = types.every(t => campaignSolved[t]);
+                    if (allSolved) {
+                        unlockRelic('Tábula de Esmeralda', 'Gravações antigas contendo a lei hermética: "O que está embaixo é como o que está no topo".');
+                    }
+                }
+            } else {
+                if (gameState.currentPuzzle && gameState.currentPuzzle.type === 'sequence') {
+                    sequenceCorrectStreak = 0;
+                }
+            }
+        }
+
+        $('grimoire-btn').addEventListener('click', () => {
+            audio.init();
+            $('grimoire-overlay').style.display = 'flex';
+            renderGrimoire();
+        });
+
+        $('close-grimoire-btn').addEventListener('click', () => {
+            $('grimoire-overlay').style.display = 'none';
+        });
+
+        // ===================================================================
+        // === MOTOR DE JOGO (modos, sanidade, juiciness) =====================
+        // ===================================================================
+        const PUZZLE_TYPES = ['sequence', 'pattern', 'memory', 'logic', 'perspective', 'constellation'];
         let timeAttackTimer = null;
 
         function showHighscoreNote() { highscoreNote.textContent = highScore > 0 ? `🏆 Recorde (Endless): ${highScore}` : ''; }
@@ -1166,10 +1846,19 @@
         showHighscoreNote();
 
         function difficulty() { return gameState.level <= 3 ? 'easy' : (gameState.level <= 6 ? 'medium' : 'hard'); }
-        function focusPenalty() { const d = difficulty(); return d === 'easy' ? 15 : (d === 'medium' ? 20 : 25); }
+        function focusPenalty() {
+            const d = difficulty();
+            const base = d === 'easy' ? 15 : (d === 'medium' ? 20 : 25);
+            const hasChalice = getActiveRelics().includes('Cálice do Infinito');
+            return hasChalice ? base - 3 : base;
+        }
 
         function startGame(mode) {
             audio.init();
+            sessionStorage.removeItem('relic_phoenix_used');
+            freeHintCount = 0;
+            sequenceCorrectStreak = 0;
+
             Object.assign(gameState, { mode, level: 1, score: 0, focus: 100, combo: 0, puzzlesSolved: 0, puzzleCount: 0, narrativeProgress: 0, timeLeft: 60, running: true, hintUsed: false });
             modeSelect.style.display = 'none';
             gameoverScreen.classList.add('hidden');
@@ -1207,6 +1896,12 @@
         function loadNextPuzzle() {
             feedbackElement.style.display = 'none';
             gameState.hintUsed = false;
+            
+            const oldWrap = puzzleContainer.firstElementChild;
+            if (oldWrap && oldWrap.cleanup) {
+                oldWrap.cleanup();
+            }
+
             // Campanha: dificuldade escala com a sala (1..7); tipos em rotação
             if (gameState.mode === 'campaign') gameState.level = gameState.puzzleCount + 1;
             const type = (gameState.mode === 'campaign')
@@ -1225,14 +1920,30 @@
 
         function onAnswer(isCorrect) {
             if (!gameState.running) return;
+            
+            // Verifica desbloqueio de relíquias primeiro
+            checkRelicUnlocks(isCorrect);
+            
             if (isCorrect) {
                 audio.playCorrect();
                 gameState.combo++;
                 const comboMult = 1 + Math.floor(gameState.combo / 3);
                 gameState.score += 100 * comboMult;
-                gameState.focus = Math.min(100, gameState.focus + 5); // regen por acerto
+                
+                // Lente do Foco Celestial check
+                const hasLens = getActiveRelics().includes('Lente do Foco Celestial');
+                const regen = hasLens ? 7 : 5;
+                gameState.focus = Math.min(100, gameState.focus + regen);
+                
                 gameState.puzzlesSolved++;
                 gameState.puzzleCount++;
+                
+                // Tábula de Esmeralda check
+                if (gameState.puzzlesSolved % 5 === 0 && getActiveRelics().includes('Tábula de Esmeralda')) {
+                    freeHintCount++;
+                    triggerAchievementToast('Dica Grátis!', 'A Tábula de Esmeralda concedeu-lhe uma revelação direta.');
+                }
+                
                 spawnRuneParticles(particleCanvas.width / 2, particleCanvas.height * 0.42);
                 showFeedback(true, 'Correto! O caminho se revela...');
                 if (gameState.mode === 'campaign') {
@@ -1241,7 +1952,10 @@
                 } else if (gameState.mode === 'endless') {
                     if (gameState.puzzleCount % 3 === 0) gameState.level++;
                 } else if (gameState.mode === 'timeattack') {
-                    gameState.timeLeft += 10;
+                    // Filtro de Éter check
+                    const hasFilter = getActiveRelics().includes('Filtro de Éter');
+                    const timeBonus = hasFilter ? 12 : 10;
+                    gameState.timeLeft += timeBonus;
                 }
             } else {
                 audio.playIncorrect();
@@ -1251,9 +1965,25 @@
                 showFeedback(false, 'Incorreto. As paredes se movem ao seu redor...');
                 if (gameState.mode === 'timeattack') gameState.timeLeft = Math.max(0, gameState.timeLeft - 15);
             }
+            
             updateFocusBar();
             updateGameUI();
-            if (gameState.focus <= 0) return gameOver('Sua mente se perdeu nas sombras do labirinto...');
+            
+            if (gameState.focus <= 0) {
+                // Pena de Fênix check
+                if (getActiveRelics().includes('Pena de Fênix') && !sessionStorage.getItem('relic_phoenix_used')) {
+                    sessionStorage.setItem('relic_phoenix_used', 'true');
+                    gameState.focus = 25;
+                    updateFocusBar();
+                    updateGameUI();
+                    triggerAchievementToast('Pena de Fênix Ativada!', 'A relíquia da fênix se dissolveu, restaurando 25% de seu Foco Mental.');
+                    audio.playPhoenixReviveSFX();
+                    setTimeout(() => { if (gameState.running) loadNextPuzzle(); }, 1100);
+                    return;
+                } else {
+                    return gameOver('Sua mente se perdeu nas sombras do labirinto...');
+                }
+            }
             if (gameState.mode === 'timeattack' && gameState.timeLeft <= 0) return gameOver('O tempo se esgotou no labirinto...');
             setTimeout(() => { if (gameState.running) loadNextPuzzle(); }, isCorrect ? 1100 : 850);
         }
@@ -1265,13 +1995,34 @@
             feedbackElement.style.display = 'block';
             feedbackElement.className = 'feedback-message';
             feedbackElement.style.background = 'rgba(212,175,55,0.12)';
-            feedbackElement.textContent = '💡 ' + gameState.currentPuzzle.hint;
-            if (gameState.mode === 'timeattack') {
-                gameState.timeLeft = Math.max(0, gameState.timeLeft - 8); // TL: -8s, sem custo de foco
+            
+            const hasTable = getActiveRelics().includes('Tábula de Esmeralda');
+            if (hasTable && freeHintCount > 0) {
+                freeHintCount--;
+                feedbackElement.textContent = '💡 ' + gameState.currentPuzzle.hint + ' (Dica Grátis!)';
             } else {
-                gameState.focus = Math.max(0, gameState.focus - 10); // custo cognitivo
-                updateFocusBar();
-                if (gameState.focus <= 0) return gameOver('Sua mente se perdeu nas sombras do labirinto...');
+                feedbackElement.textContent = '💡 ' + gameState.currentPuzzle.hint;
+                if (gameState.mode === 'timeattack') {
+                    gameState.timeLeft = Math.max(0, gameState.timeLeft - 8);
+                } else {
+                    // Astrolábio Quebrado check
+                    const hasAstrolabe = getActiveRelics().includes('Astrolábio Quebrado');
+                    const cost = hasAstrolabe ? 5 : 10;
+                    gameState.focus = Math.max(0, gameState.focus - cost);
+                    updateFocusBar();
+                    if (gameState.focus <= 0) {
+                        if (getActiveRelics().includes('Pena de Fênix') && !sessionStorage.getItem('relic_phoenix_used')) {
+                            sessionStorage.setItem('relic_phoenix_used', 'true');
+                            gameState.focus = 25;
+                            updateFocusBar();
+                            updateGameUI();
+                            triggerAchievementToast('Pena de Fênix Ativada!', 'A relíquia da fênix se dissolveu, restaurando 25% de seu Foco Mental.');
+                            audio.playPhoenixReviveSFX();
+                        } else {
+                            return gameOver('Sua mente se perdeu nas sombras do labirinto...');
+                        }
+                    }
+                }
             }
             updateGameUI();
         }
@@ -1302,6 +2053,13 @@
             scoreElement.textContent = gameState.score;
             comboElement.textContent = 'x' + (1 + Math.floor(gameState.combo / 3));
             timerDisplay.textContent = Math.ceil(gameState.timeLeft);
+            
+            const hasTable = getActiveRelics().includes('Tábula de Esmeralda');
+            if (hasTable && freeHintCount > 0) {
+                hintButton.textContent = `💡 Dica (Grátis: ${freeHintCount})`;
+            } else {
+                hintButton.textContent = `💡 Dica`;
+            }
         }
 
         function updateNarrative() {

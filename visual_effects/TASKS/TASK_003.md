@@ -527,6 +527,22 @@ Para garantir que a performance permaneça ideal sob múltiplas notas e holds at
 2. **Estabilidade de FPS com Ripple**: Propagar ripple para 5 cordas ao mesmo tempo faz com que 500 pontos recalculem velocidades de forma sutil. A física simples `velocity *= 0.95` e `y = originalY + velocity` é extremamente otimizada e não causará lentidão.
 3. **Limitação de Teclas**: O jogo possui apenas jogabilidade por clique. Na inclusão de novas notas especiais, preservaremos a interação padrão de clique e mousedown por zona.
 
+### ❓ Dúvidas do Desenvolvedor (Dev) para o TL ou o PO
+
+Abaixo estão os pontos que necessitam de alinhamento antes do início do desenvolvimento:
+
+1. **Interação entre Sintetizador Procedural e Áudio Customizado**: O sintetizador deve reproduzir as notas harmônicas pentatônicas *por cima* da música carregada pelo usuário (modo customizado) ou essa síntese de cliques deve ser opcional/silenciada para evitar poluição sonora?
+2. **Layout e Posicionamento do Menu de Temas**: O painel de temas visuais (Retro Cyberpunk, Vaporwave, Cosmic Nebula) deve ser integrado dentro do menu de parâmetros lateral existente (`.controls`) ou deve ser criada uma nova interface/dropdown glassmorphic flutuante e independente na tela?
+3. **Ripple Effect com Movimento do Mouse**: Quando o mouse passa por cima das cordas vibrando-as (movimento padrão), esse movimento também deve propagar o ripple para as cordas vizinhas, ou o ripple é ativado exclusivamente pela captura perfeita de notas de jogo?
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Interação entre Sintetizador e Áudio Customizado**: **Decisão:** O som de sintetizador de clicks deve ser sutil e opcional. Ao carregar a própria música, a opção deve continuar gerando o som procedural leve sobre a trilha para o "game feel", mas inclua o controle (toggle) para mutá-lo se a poluição ficar muito grande.
+2. **Layout do Menu de Temas**: **Decisão:** Um novo dropdown elegante e integrado no painel esquerdo atual (controls) é preferível para manter a UI concentrada e o canvas limpo.
+3. **Ripple Effect com Movimento do Mouse**: **Decisão:** O movimento passivo do mouse sobre a corda deve propagar um ripple em menor escala (força = 15-20%) enquanto o clique exato numa nota propaga a força máxima (100%).
+
 ---
 
 ## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)

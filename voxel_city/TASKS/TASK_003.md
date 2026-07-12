@@ -164,3 +164,18 @@ Durante a subida e decolagem de uma rampa:
 - [ ] **Obstáculos Físicos Destrutíveis**: Spawn de cones e hidrantes voxel reativos, física de colisão secundária (lançamento elástico e rotação livre dos cones), efeito volumétrico de jato de água para hidrantes destruídos e mecânica de hidroplanagem (perda de tração temporária do carro na área molhada).
 - [ ] **Derrapagem (Drift) & Nitro Boost**: Detecção de derrapagem sob pressão de freio de mão (`Space`), marcas de pneu (skidmarks) no asfalto e emissores de fumaça cinza, carregamento de barra de Nitro na HUD e ativação de Boost supersônico com Shift (aceleração duplicada, luzes de escape azuis e distorção dinâmica de FOV).
 - [ ] **Áudio Procedural via Web Audio API**: Gerador e oscilador procedural de rotações por minuto do motor do carro, sirenes policiais FM com efeito Doppler espacial reativo, ruído de spray de água pressurizada para hidrantes quebrados e chiados sintetizados para canto de pneu (drift) e queima de Nitro.
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Simulação Física Vertical**: **Decisão:** Implemente um vetor simples `vy` na classe do veículo. Quando o veículo entra num "stunt jump", adicione um `vy` positivo baseado na velocidade de subida e diminua usando o valor da gravidade a cada frame até bater no chão.
+2. **Critério de Pouso**: **Decisão:** O critério de alinhamento do vetor up do veículo vs vetor `(0,1,0)` é correto. Se o vetor Up do carro tiver inclinação (tilt) considerável em Roll/Pitch no momento em que a coordenada $Y \le 0$, considere como acidente/dano.
+3. **Inicialização do Autoplay**: **Decisão:** Associe no primeiro input de controle ou botão de "Start" na tela principal para criar/resumir o `audioCtx`. 
+4. **Rotação das Rampas**: **Decisão:** Paralelamente aos eixos X/Z nas extremidades de quarteirões para encaixar de forma limpa na malha urbana existente de Voxel City, com rotação discreta (`0, 90, 180, 270`).
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `voxel_city`
+* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
+

@@ -649,3 +649,18 @@ Abaixo estão detalhadas as inclusões visuais para exibir os Contratos Ativos e
 Este escopo eleva a complexidade do **Company Simulator** para um padrão de excelência de simulador de estúdio, garantindo diversão e imersão total!
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Dependência Crítica da TASK_002**: **Decisão:** Você pode começar o front-end visual e a estrutura paralela (Quadro de Contratos e Audio engine), mockando as variáveis de freelancer até que a TASK_002 seja mesclada. Evite refatoração de arrays da `this.developers` até o merge.
+2. **Valores da Dívida Técnica**: **Decisão:** Siga o detalhamento técnico: `+4%` para Rushing e `+2%` por Freelancer ativo. A diferença será retificada na história de usuário no próximo refinamento de regras.
+3. **Custo Operacional Adicional**: **Decisão:** Adote a fórmula contínua (`this.techDebt * 30`). É melhor computacionalmente e distribui a penalidade suavemente para o jogador em vez de solavancos agressivos de custo.
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `it_simulator`
+* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.

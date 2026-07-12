@@ -238,3 +238,19 @@ function playBounceSound() {
 1.  **Refill de Flechas Especiais**: **Aprovado o cenário de Opção A**. Sempre que o jogador estourar o Balão da Fortuna ou atingir múltiplos de 5 no combo (5, 10, 15, etc.), ele receberá +1 de carga em uma das flechas especiais aleatoriamente.
 2.  **Duração de Bullet-Time**: **Aprovado**. Limitar a câmera lenta a **3 segundos** ou até que todas as flechas ativas caiam/desapareçam da tela. Isso mantém o dinamismo clássico do arcade intacto.
 3.  **Mixagem e Segurança de Som**: A ativação do `AudioContext` deve ser atrelada estritamente ao evento de interação do usuário (`mousedown` ou `touchstart` de puxada do arco) para contornar restrições de reprodução automática dos navegadores modernos.
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Refatoração de Código Duplicado em `index.html`**: **Decisão:** Sim, a refatoração deve ser feita antes. Unifique as funções duplicadas e os event listeners redundantes. Um código limpo e modular é pré-requisito para as novas features (flechas múltiplas, etc.).
+2. **Estrutura de Atributos/Variáveis para Flechas Especiais**: **Decisão:** Sim. Elimine completamente o uso de variáveis escalares (como `arrowFired`, `arrowVelocityX`) e consolide o loop físico para iterar apenas sobre `activeArrows`.
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `archer` (The Archer)
+* **Ação**: Resolução de dúvidas técnicas do desenvolvedor.
+* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
+

@@ -317,4 +317,80 @@ O código foi rigorosamente estruturado sob práticas recomendadas de Clean Code
 
 *Relatório de progresso concluído por: Antigravity - Software Engineer*
 
+---
+
+## Evidencias de Testes
+
+A tarefa foi validada e testada com sucesso via automação baseada em Puppeteer.
+
+### 📋 Resultados da execução da suíte de testes E2E (`tests/qa_tetris.test.js`)
+```
+--- STARTING QA TEST SUITE FOR TETRIS (TASK_002) ---
+Loading puppeteer (ESM)...
+Servidor rodando em http://localhost:3000
+Jogo acessível em http://localhost:3000/jogo
+Test server running on http://127.0.0.1:3099
+
+--- Test 1: Verifying layout, select option, and instruction elements ---
+Mode select dropdown exists: true
+Start button exists: true
+Controls text: "Use ← → para mover, ↑ para girar, ↓ para acelerar
+        Espaço para queda instantânea (Hard Drop), P para pausar"
+✅ PASS: Controls instructions updated correctly.
+
+--- Test 2: Testing Ghost Piece (Shadow) logic ---
+Clicking "NOVO JOGO" to initialize game...
+__tetris debug hook exists: true
+Initial state: {
+  score: 0,
+  level: 1,
+  lines: 0,
+  comboCount: -1,
+  lastAction: 'spawn',
+  gameMode: 'endless',
+  survivalTimer: 12,
+  floatingTexts: 0,
+  gameOver: false
+}
+Current piece Y: 0, Ghost Y: 17
+✅ PASS: Ghost Y position is calculated correctly.
+
+--- Test 3: Testing Hard Drop (Space key) ---
+Initial piece type: 2
+Pressing Space key...
+State after Hard Drop: { pieceType: 6, gameOver: false }
+✅ PASS: Hard Drop locks and spawns next piece correctly.
+
+--- Test 4: Testing Time Attack Mode selection and timer ---
+Selecting Time Attack Mode from select dropdown...
+Clicking "NOVO JOGO" to start Time Attack...
+Timer box visible: true
+Initial time displayed: "120s"
+Waiting 2 seconds to check if countdown runs...
+Time after 2 seconds: "118s"
+Pausing game by pressing "P" key...
+Time at pause: "118s"
+Waiting 2 seconds during pause...
+Time after 2 seconds of pause: "118s"
+Resuming game by pressing "P" key...
+Waiting 2 seconds after resuming...
+Time after 2 seconds of resume: "116s"
+✅ PASS: Time Attack mode countdown and pause/resume logic are correct.
+
+--- Test 5: Testing Time Expired Game Over ---
+Set timeLeft = 1. Waiting for expiration...
+Is game over: true, Game over message: "TEMPO ESGOTADO!"
+✅ PASS: Time expiration triggers Game Over screen with TEMPO ESGOTADO! message.
+
+--- Test 6: Testing Web Audio API SoundSynth existence ---
+SoundSynth object exists: true
+SoundSynth sound methods exist: true
+AudioContext is initialized: true
+✅ PASS: SoundSynth retro wave synth exists and AudioContext initialized correctly.
+
+=============================================
+🎉 ALL TETRIS TASK_002 TESTS PASSED SUCCESSFULLY!
+=============================================
+```
+
 

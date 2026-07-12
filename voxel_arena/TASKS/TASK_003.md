@@ -341,6 +341,14 @@ class DOMElementPool {
 
 ---
 
+## 💻 Dúvidas do Desenvolvedor (Software Engineer)
+
+1. **Remoção de Obstáculos Procedurais no Spawn do Colosso**: Como o Colosso Voxel é spawnado no centro exato da arena (`0, 0, 0`), e as árvores e rochas da arena são geradas de forma aleatória/procedural, há o risco de o chefe nascer colidindo com algum desses objetos indestrutíveis. Devemos limpar todos os obstáculos da arena ao iniciar a batalha ou apenas aqueles situados em um raio próximo ao centro?
+2. **Dano Direto na Fenda Singular (Gravity Nexus)**: O Gravity Nexus puxa entidades fisicamente para o centro (`0, 0.5, 0`). Além da força de atração física, o contato direto com a fenda singular deve causar dano contínuo (ex: 5 de dano por segundo) ou atuar estritamente como um elemento de posicionamento e atração?
+3. **Conflito de Arquitetura no Pooling de Popups DOM**: O item 2 da seção do Tech Lead orienta a exclusão ativa com `.remove()` na finalização do callback de animação. No entanto, a seção 4 detalha um `DOMElementPool` para reaproveitar elementos DOM alternando `.style.display`. Para melhor performance e controle de Garbage Collection, devemos adotar a estratégia de Object Pooling puro (reutilizando e apenas ocultando os elementos no pool) ou realizar a deleção/recriação via `.remove()` e `document.createElement()`?
+
+---
+
 ## 💡 Decisões e Resoluções do Tech Lead (TL)
 
 Abaixo estão homologadas as resoluções técnicas para execução direta:
@@ -348,14 +356,17 @@ Abaixo estão homologadas as resoluções técnicas para execução direta:
 1. **Design de Partição dos Voxels do Colosso (Aprovado)**: A malha tridimensional do Colosso será uma composição hierárquica em `THREE.Group()`, contendo sub-meshes geométricas representando torso, braços gigantescos articulados e núcleo de energia. No início da Fase 3, as peças externas da armadura devem ser desmembradas definindo matrizes de velocidade independentes com força de gravidade no eixo Y para efeito cênico de "Armadura Quebrada", seguido de remoção em 2.5 segundos.
 2. **Gerenciamento de Frequência do Popups DOM (Garbage Collector)**: Para evitar lentidão de layout (reflows) com muitos popups simultâneos de dano, o contêiner DOM deve ser limpo de forma síncrona. Elementos DOM de popups expirados **devem** ser excluídos ativamente com `.remove()` na finalização do callback de animação.
 3. **Volume e Conexões de Áudio Procedurais**: O AudioContext deve passar por um nó de ganho mestre regulado em `0.45` para evitar saturação harmônica (clipping) ao misturar o rugido pesado do chefe com explosões de habilidades do jogador.
+4. **Remoção de Obstáculos Procedurais**: **Decisão:** Devemos limpar completamente a arena no raio central de 10 unidades (deletando árvores e pedras indestrutíveis) usando uma animação de poeira ou afundamento quando o boss spawnar. Isso garantirá espaço justo para a batalha.
+5. **Dano Direto na Fenda Singular**: **Decisão:** A fenda não deve causar dano direto. Ela serve apenas como perigo ambiental de atração tática. Deixe os inimigos e a poça de lava serem as fontes ativas de dano.
+6. **Conflito de Arquitetura no Pooling de Popups DOM**: **Decisão:** Adote a abordagem de **Object Pooling puro** (ocultando os elementos com `display: none` e reutilizando). A menção a `.remove()` era antiga e deve ser desconsiderada em favor do pool pré-alocado.
 
 ---
 
 ## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
 
 * **Identificação do Jogo**: `voxel_arena` (Voxel Arena)
-* **Ação**: Nova tarefa de level design e arquitetura adicionada ao backlog global.
-* **Status do Backlog**: Transicionado para `✅ Refined` no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md).
+* **Ação**: Nova tarefa de level design e arquitetura adicionada ao backlog global e dúvidas do desenvolvedor resolvidas.
+* **Status do Backlog**: Transicionado para `✅ Refined` no `BACKLOG.md`.
 * **Destino**: Pronto para desenvolvimento (Ready for Dev).
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*

@@ -366,3 +366,44 @@ A cada frame:
 **Resultado da Avaliação**: APROVADO. A interatividade e estética do console de monitoramento planetário ficaram impecáveis.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidencias de Testes (QA Test Evidence)
+
+A tarefa foi validada e testada com sucesso via automação baseada em Puppeteer.
+
+### 📋 Resultados da execução da suíte de testes E2E (`tests/qa_threejs_earth.test.js`)
+```
+--- STARTING QA TEST SUITE FOR THREE.JS EARTH (TASK_003) ---
+Loading puppeteer (ESM)...
+Test server running on http://127.0.0.1:3093
+
+--- Test 1: Verifying HUD layout & controls ---
+Control panel exists: true
+Toggles exist: Satellites=true, SolarWind=true, Auroras=true, Debris=true, Alarm=true
+Solar Storm Slider exists: true
+
+--- Test 2: Verifying WebGL data structures & hooks ---
+WebGL and task data structs valid: true
+
+--- Test 3: Testing raycast selection & telemetry sidebar ---
+Sidebar initially visible: false
+Simulating target click on Station Cabo Canaveral...
+Sidebar visible after click: true, Target Name: "Cabo Canaveral (EUA)"
+Clicking "Liberar Foco" button...
+Sidebar visible after release: false
+
+--- Test 4: Testing solar storm slider & geomagnetic glitch effects ---
+Scanlines active initially: false
+Setting solar storm to 90% (Extreme storm)...
+Scanlines active after storm: true, Panels glitching: true
+
+--- Test 5: Testing show/hide toggles ---
+Toggling off satellites...
+Satellites group visible: false
+
+=============================================
+🎉 ALL THREEJS-EARTH TASK_003 TESTS PASSED SUCCESSFULLY!
+=============================================
+```
