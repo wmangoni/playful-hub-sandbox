@@ -416,6 +416,22 @@
     <div id="interaction-prompt">Press SPACE to Enter/Exit Car</div>
     <div id="garage-prompt">Press G to enter Tuning Garage</div>
 
+    <!-- Nitro HUD -->
+    <div id="nitro-hud" style="position: absolute; bottom: 20px; left: 20px; width: 220px; background: rgba(0, 0, 0, 0.75); border: 2px solid #00f0ff; border-radius: 8px; padding: 10px; color: white; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); backdrop-filter: blur(8px); pointer-events: none; z-index: 5;">
+        <div style="font-size: 14px; font-weight: bold; letter-spacing: 1px; color: #00f0ff; text-shadow: 0 0 5px #00f0ff; display: flex; justify-content: space-between; align-items: center;">
+            <span>NITRO BOOST</span>
+            <span id="nitro-text-prompt" style="font-size: 11px; color: #ffcc00; display: none; animation: blinkRed 0.5s infinite alternate;">PRESS SHIFT!</span>
+        </div>
+        <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; border: 1px solid rgba(0, 240, 255, 0.3);">
+            <div id="nitro-bar-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0077ff, #00f0ff); box-shadow: 0 0 8px #00f0ff; transition: width 0.1s ease;"></div>
+        </div>
+    </div>
+
+    <!-- Stunt Jump Notification Banner -->
+    <div id="stunt-notice" style="position: absolute; top: 25%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; font-weight: bold; color: #00f0ff; text-shadow: 0 0 15px #00f0ff, 0 0 30px #0077ff; display: none; pointer-events: none; z-index: 20;">
+        STUNT JUMP LANDED! +$150
+    </div>
+
     <div id="wanted-level-hud">
         <span class="star">★</span>
         <span class="star">★</span>
@@ -549,8 +565,430 @@
             inGarage: false,
             policeCars: [],
             bribes: [],
-            timeSinceLastIncident: 0
+            timeSinceLastIncident: 0,
+
+            // TASK_003: Ramp, Drift, Nitro & Props state
+            timeScale: 1.0,
+            stuntJumpActive: false,
+            stuntJumpTime: 0,
+            stuntCarVy: 0,
+            nitroCharge: 0,
+            nitroActive: false,
+            nitroTimeLeft: 0,
+            driftActive: false,
+            destructibleProps: [],
+            waterParticles: [],
+            smokeParticles: [],
+            skidmarks: [],
+            sparkParticles: [],
+            ramps: []
         };
+
+        // --- TASK_003: Procedural Audio Engine ---
+        class ProceduralAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.engineOsc = null;
+                this.engineGain = null;
+                this.engineFilter = null;
+                this.sirenOsc = null;
+                this.sirenGain = null;
+                this.driftNoiseNode = null;
+                this.driftGain = null;
+                this.driftFilter = null;
+                this.waterNoiseNode = null;
+                this.waterGain = null;
+                this.waterFilter = null;
+                this.nitroNoiseNode = null;
+                this.nitroGain = null;
+                this.nitroFilter = null;
+                this.initialized = false;
+            }
+
+            init() {
+                if (this.initialized) return;
+                try {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+
+                    // Engine sound setup (Sawtooth wave with lowpass filter)
+                    this.engineOsc = this.ctx.createOscillator();
+                    this.engineOsc.type = 'sawtooth';
+                    this.engineFilter = this.ctx.createBiquadFilter();
+                    this.engineFilter.type = 'lowpass';
+                    this.engineFilter.frequency.value = 200;
+
+                    this.engineGain = this.ctx.createGain();
+                    this.engineGain.gain.value = 0;
+
+                    this.engineOsc.connect(this.engineFilter);
+                    this.engineFilter.connect(this.engineGain);
+                    this.engineGain.connect(this.ctx.destination);
+                    this.engineOsc.start();
+
+                    // Siren setup (FM synthesis)
+                    this.sirenOsc = this.ctx.createOscillator();
+                    this.sirenOsc.type = 'sine';
+                    this.sirenGain = this.ctx.createGain();
+                    this.sirenGain.gain.value = 0;
+                    this.sirenOsc.connect(this.sirenGain);
+                    this.sirenGain.connect(this.ctx.destination);
+                    this.sirenOsc.start();
+
+                    // Buffer for procedural noise
+                    const bufferSize = this.ctx.sampleRate * 2;
+                    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const output = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        output[i] = Math.random() * 2 - 1;
+                    }
+
+                    // Drift screech (filtered noise)
+                    this.driftNoiseNode = this.ctx.createBufferSource();
+                    this.driftNoiseNode.buffer = noiseBuffer;
+                    this.driftNoiseNode.loop = true;
+                    this.driftFilter = this.ctx.createBiquadFilter();
+                    this.driftFilter.type = 'bandpass';
+                    this.driftFilter.frequency.value = 2200;
+                    this.driftFilter.Q.value = 3.0;
+                    this.driftGain = this.ctx.createGain();
+                    this.driftGain.gain.value = 0;
+                    this.driftNoiseNode.connect(this.driftFilter);
+                    this.driftFilter.connect(this.driftGain);
+                    this.driftGain.connect(this.ctx.destination);
+                    this.driftNoiseNode.start();
+
+                    // Water fountain sound
+                    this.waterNoiseNode = this.ctx.createBufferSource();
+                    this.waterNoiseNode.buffer = noiseBuffer;
+                    this.waterNoiseNode.loop = true;
+                    this.waterFilter = this.ctx.createBiquadFilter();
+                    this.waterFilter.type = 'lowpass';
+                    this.waterFilter.frequency.value = 850;
+                    this.waterGain = this.ctx.createGain();
+                    this.waterGain.gain.value = 0;
+                    this.waterNoiseNode.connect(this.waterFilter);
+                    this.waterFilter.connect(this.waterGain);
+                    this.waterGain.connect(this.ctx.destination);
+                    this.waterNoiseNode.start();
+
+                    // Nitro boost roar
+                    this.nitroNoiseNode = this.ctx.createBufferSource();
+                    this.nitroNoiseNode.buffer = noiseBuffer;
+                    this.nitroNoiseNode.loop = true;
+                    this.nitroFilter = this.ctx.createBiquadFilter();
+                    this.nitroFilter.type = 'lowpass';
+                    this.nitroFilter.frequency.value = 500;
+                    this.nitroGain = this.ctx.createGain();
+                    this.nitroGain.gain.value = 0;
+                    this.nitroNoiseNode.connect(this.nitroFilter);
+                    this.nitroFilter.connect(this.nitroGain);
+                    this.nitroGain.connect(this.ctx.destination);
+                    this.nitroNoiseNode.start();
+
+                    this.initialized = true;
+                } catch (e) {
+                    console.error("Audio init error:", e);
+                }
+            }
+
+            update(dt, state, carSpeed, maxSpeed, nearestPoliceDist) {
+                if (!this.initialized || !this.ctx) return;
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+
+                const now = this.ctx.currentTime;
+
+                // Engine sound modulation (80Hz to 450Hz sawtooth)
+                if (state.inCar && state.currentCar) {
+                    const speedRatio = Math.abs(carSpeed) / (maxSpeed || 35);
+                    const targetFreq = 80 + speedRatio * 370;
+                    const targetCutoff = 200 + speedRatio * 750;
+                    this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.05);
+                    this.engineFilter.frequency.setTargetAtTime(targetCutoff, now, 0.05);
+                    this.engineGain.gain.setTargetAtTime(0.12, now, 0.05);
+                } else {
+                    this.engineGain.gain.setTargetAtTime(0, now, 0.1);
+                }
+
+                // Police Siren (600Hz to 1200Hz sweep with Doppler distance attenuation)
+                if (state.wantedLevel > 0 && nearestPoliceDist !== null && nearestPoliceDist < 120) {
+                    const sirenFreq = 600 + Math.sin(now * 8) * 600;
+                    const distFactor = Math.max(0, 1 - nearestPoliceDist / 120);
+                    this.sirenOsc.frequency.setTargetAtTime(sirenFreq, now, 0.02);
+                    this.sirenGain.gain.setTargetAtTime(0.18 * distFactor, now, 0.05);
+                } else {
+                    this.sirenGain.gain.setTargetAtTime(0, now, 0.1);
+                }
+
+                // Drift screech sound
+                if (state.inCar && state.driftActive) {
+                    this.driftGain.gain.setTargetAtTime(0.22, now, 0.03);
+                } else {
+                    this.driftGain.gain.setTargetAtTime(0, now, 0.05);
+                }
+
+                // Water jet sound
+                const hasActiveHydrant = state.destructibleProps.some(p => p.type === 'hydrant' && p.isDestroyed);
+                if (hasActiveHydrant) {
+                    this.waterGain.gain.setTargetAtTime(0.18, now, 0.1);
+                } else {
+                    this.waterGain.gain.setTargetAtTime(0, now, 0.1);
+                }
+
+                // Nitro roar sound
+                if (state.inCar && state.nitroActive) {
+                    this.nitroGain.gain.setTargetAtTime(0.3, now, 0.03);
+                    this.nitroFilter.frequency.setTargetAtTime(700 + Math.random() * 300, now, 0.02);
+                } else {
+                    this.nitroGain.gain.setTargetAtTime(0, now, 0.05);
+                }
+            }
+        }
+
+        window.audioEngine = new ProceduralAudioEngine();
+
+        // --- TASK_003: Destructible Props ---
+        class DestructibleProp {
+            constructor(type, mesh, position) {
+                this.type = type; // 'cone' or 'hydrant'
+                this.mesh = mesh;
+                this.position = position.clone();
+                this.mesh.position.copy(position);
+                this.velocity = new THREE.Vector3(0, 0, 0);
+                this.angularVelocity = new THREE.Vector3(0, 0, 0);
+                this.isHit = false;
+                this.isDestroyed = false;
+                this.box = new THREE.Box3().setFromObject(mesh);
+            }
+
+            update(dt, world) {
+                if (this.type === 'cone' && this.isHit) {
+                    this.velocity.y -= 18 * dt; // Gravity
+                    this.mesh.position.addScaledVector(this.velocity, dt);
+
+                    this.mesh.rotation.x += this.angularVelocity.x * dt;
+                    this.mesh.rotation.y += this.angularVelocity.y * dt;
+                    this.mesh.rotation.z += this.angularVelocity.z * dt;
+
+                    if (this.mesh.position.y <= 0.3) {
+                        this.mesh.position.y = 0.3;
+                        this.velocity.y = -this.velocity.y * 0.4; // Elastic bounce
+                        this.velocity.x *= 0.82; // Ground friction
+                        this.velocity.z *= 0.82;
+                        this.angularVelocity.multiplyScalar(0.82);
+                    }
+                    this.box.setFromObject(this.mesh);
+                }
+            }
+        }
+
+        // --- TASK_003: Water Particle Pool ---
+        class WaterParticlePool {
+            constructor(scene, count = 200) {
+                this.scene = scene;
+                this.pool = [];
+                const geo = new THREE.SphereGeometry(0.12, 6, 6);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x00f0ff,
+                    transparent: true,
+                    opacity: 0.7,
+                    roughness: 0.1,
+                    emissive: 0x00aaff,
+                    emissiveIntensity: 0.4
+                });
+
+                for (let i = 0; i < count; i++) {
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.visible = false;
+                    this.scene.add(mesh);
+                    this.pool.push({
+                        mesh: mesh,
+                        active: false,
+                        velocity: new THREE.Vector3(),
+                        life: 0
+                    });
+                }
+            }
+
+            spawn(pos) {
+                const p = this.pool.find(item => !item.active);
+                if (!p) return;
+                p.mesh.position.copy(pos);
+                p.mesh.position.x += (Math.random() - 0.5) * 0.4;
+                p.mesh.position.z += (Math.random() - 0.5) * 0.4;
+                p.velocity.set(
+                    (Math.random() - 0.5) * 2.5,
+                    7 + Math.random() * 4,
+                    (Math.random() - 0.5) * 2.5
+                );
+                p.life = 1.2 + Math.random() * 0.6;
+                p.active = true;
+                p.mesh.visible = true;
+            }
+
+            update(dt) {
+                for (const p of this.pool) {
+                    if (!p.active) continue;
+                    p.velocity.y -= 16 * dt;
+                    p.mesh.position.addScaledVector(p.velocity, dt);
+                    p.life -= dt;
+
+                    if (p.mesh.position.y <= 0.05 || p.life <= 0) {
+                        p.active = false;
+                        p.mesh.visible = false;
+                    }
+                }
+            }
+        }
+
+        // --- TASK_003: Smoke Particle Pool ---
+        class SmokeParticlePool {
+            constructor(scene, count = 120) {
+                this.scene = scene;
+                this.pool = [];
+                const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+
+                for (let i = 0; i < count; i++) {
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: 0xcccccc,
+                        transparent: true,
+                        opacity: 0.6,
+                        roughness: 0.9
+                    });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.visible = false;
+                    this.scene.add(mesh);
+                    this.pool.push({
+                        mesh: mesh,
+                        active: false,
+                        velocity: new THREE.Vector3(),
+                        life: 0,
+                        maxLife: 1.0,
+                        material: mat
+                    });
+                }
+            }
+
+            spawn(pos) {
+                const p = this.pool.find(item => !item.active);
+                if (!p) return;
+                p.mesh.position.copy(pos);
+                p.mesh.scale.set(1, 1, 1);
+                p.velocity.set(
+                    (Math.random() - 0.5) * 0.8,
+                    0.8 + Math.random() * 0.8,
+                    (Math.random() - 0.5) * 0.8
+                );
+                p.life = 0.6 + Math.random() * 0.4;
+                p.maxLife = p.life;
+                p.material.opacity = 0.6;
+                p.active = true;
+                p.mesh.visible = true;
+            }
+
+            update(dt) {
+                for (const p of this.pool) {
+                    if (!p.active) continue;
+                    p.mesh.position.addScaledVector(p.velocity, dt);
+                    p.mesh.scale.addScalar(1.8 * dt);
+                    p.life -= dt;
+                    p.material.opacity = Math.max(0, (p.life / p.maxLife) * 0.6);
+
+                    if (p.life <= 0) {
+                        p.active = false;
+                        p.mesh.visible = false;
+                    }
+                }
+            }
+        }
+
+        // --- TASK_003: Spark Particle Pool ---
+        class SparkParticlePool {
+            constructor(scene, count = 50) {
+                this.scene = scene;
+                this.pool = [];
+                const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+                const mat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+
+                for (let i = 0; i < count; i++) {
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.visible = false;
+                    this.scene.add(mesh);
+                    this.pool.push({
+                        mesh: mesh,
+                        active: false,
+                        velocity: new THREE.Vector3(),
+                        life: 0
+                    });
+                }
+            }
+
+            spawn(pos) {
+                for (let i = 0; i < 15; i++) {
+                    const p = this.pool.find(item => !item.active);
+                    if (!p) break;
+                    p.mesh.position.copy(pos);
+                    p.velocity.set(
+                        (Math.random() - 0.5) * 10,
+                        3 + Math.random() * 6,
+                        (Math.random() - 0.5) * 10
+                    );
+                    p.life = 0.4 + Math.random() * 0.3;
+                    p.active = true;
+                    p.mesh.visible = true;
+                }
+            }
+
+            update(dt) {
+                for (const p of this.pool) {
+                    if (!p.active) continue;
+                    p.velocity.y -= 12 * dt;
+                    p.mesh.position.addScaledVector(p.velocity, dt);
+                    p.life -= dt;
+
+                    if (p.life <= 0) {
+                        p.active = false;
+                        p.mesh.visible = false;
+                    }
+                }
+            }
+        }
+
+        // --- TASK_003: Skidmark Manager ---
+        class SkidmarkManager {
+            constructor(scene, count = 200) {
+                this.scene = scene;
+                this.pool = [];
+                this.index = 0;
+                const geo = new THREE.PlaneGeometry(0.4, 0.8);
+                geo.rotateX(-Math.PI / 2);
+                const mat = new THREE.MeshBasicMaterial({
+                    color: 0x111111,
+                    transparent: true,
+                    opacity: 0.6,
+                    depthWrite: false
+                });
+
+                for (let i = 0; i < count; i++) {
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(0, -100, 0);
+                    this.scene.add(mesh);
+                    this.pool.push(mesh);
+                }
+            }
+
+            addMark(pos, rotationY) {
+                const mesh = this.pool[this.index];
+                mesh.position.copy(pos);
+                mesh.position.y = 0.03; // Just above ground
+                mesh.rotation.y = rotationY;
+                this.index = (this.index + 1) % this.pool.length;
+            }
+        }
 
         // --- Input Handling ---
         class Input {
@@ -608,6 +1046,172 @@
                 this.createRoadNetwork();
                 this.createStreetLights();
                 this.createGarageZone();
+                this.createRamps();
+                this.createDestructibleProps();
+            }
+
+            createRamps() {
+                state.ramps = [];
+
+                const createRampMesh = () => {
+                    const group = new THREE.Group();
+
+                    const shape = new THREE.Shape();
+                    shape.moveTo(-3, 0);
+                    shape.lineTo(3, 0);
+                    shape.lineTo(3, 1.6);
+                    shape.lineTo(-3, 0.2);
+                    shape.closePath();
+
+                    const extrudeSettings = { depth: 4, bevelEnabled: false };
+                    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                    geo.center();
+
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: 0x151525,
+                        roughness: 0.3,
+                        metalness: 0.7
+                    });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    group.add(mesh);
+
+                    const borderGeo = new THREE.BoxGeometry(6.2, 0.15, 0.2);
+                    const borderMat = new THREE.MeshStandardMaterial({
+                        color: 0x00f0ff,
+                        emissive: 0x00f0ff,
+                        emissiveIntensity: 1.8
+                    });
+
+                    const leftBorder = new THREE.Mesh(borderGeo, borderMat);
+                    leftBorder.position.set(0, 0.9, -2.05);
+                    leftBorder.rotation.z = Math.atan2(1.4, 6);
+                    group.add(leftBorder);
+
+                    const rightBorder = new THREE.Mesh(borderGeo, borderMat);
+                    rightBorder.position.set(0, 0.9, 2.05);
+                    rightBorder.rotation.z = Math.atan2(1.4, 6);
+                    group.add(rightBorder);
+
+                    const arrowMat = new THREE.MeshStandardMaterial({
+                        color: 0xff00ff,
+                        emissive: 0xff00ff,
+                        emissiveIntensity: 1.5
+                    });
+                    const arrowGeo = new THREE.BoxGeometry(1.2, 0.05, 0.6);
+                    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+                    arrow.position.set(0, 0.85, 0);
+                    group.add(arrow);
+
+                    group.castShadow = true;
+                    group.receiveShadow = true;
+                    return group;
+                };
+
+                const rampConfigs = [
+                    { pos: new THREE.Vector3(40, 0.8, 0), rotY: 0 },
+                    { pos: new THREE.Vector3(-40, 0.8, 0), rotY: Math.PI },
+                    { pos: new THREE.Vector3(0, 0.8, 40), rotY: Math.PI / 2 },
+                    { pos: new THREE.Vector3(0, 0.8, -40), rotY: -Math.PI / 2 }
+                ];
+
+                rampConfigs.forEach(cfg => {
+                    const mesh = createRampMesh();
+                    mesh.position.copy(cfg.pos);
+                    mesh.rotation.y = cfg.rotY;
+                    this.scene.add(mesh);
+
+                    const box = new THREE.Box3().setFromObject(mesh);
+                    state.ramps.push({
+                        mesh: mesh,
+                        position: cfg.pos,
+                        rotationY: cfg.rotY,
+                        box: box
+                    });
+                });
+            }
+
+            createDestructibleProps() {
+                state.destructibleProps = [];
+
+                const createConeMesh = () => {
+                    const group = new THREE.Group();
+                    const baseGeo = new THREE.BoxGeometry(0.8, 0.1, 0.8);
+                    const baseMat = new THREE.MeshStandardMaterial({ color: 0xff5500 });
+                    const base = new THREE.Mesh(baseGeo, baseMat);
+                    base.position.y = 0.05;
+                    group.add(base);
+
+                    const coneGeo = new THREE.CylinderGeometry(0.1, 0.35, 0.9, 8);
+                    const coneMat = new THREE.MeshStandardMaterial({ color: 0xff5500 });
+                    const cone = new THREE.Mesh(coneGeo, coneMat);
+                    cone.position.y = 0.5;
+                    group.add(cone);
+
+                    const stripeGeo = new THREE.CylinderGeometry(0.18, 0.26, 0.25, 8);
+                    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+                    stripe.position.y = 0.5;
+                    group.add(stripe);
+
+                    group.castShadow = true;
+                    return group;
+                };
+
+                const createHydrantMesh = () => {
+                    const group = new THREE.Group();
+                    const bodyGeo = new THREE.CylinderGeometry(0.35, 0.35, 1.0, 10);
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.3 });
+                    const body = new THREE.Mesh(bodyGeo, bodyMat);
+                    body.position.y = 0.5;
+                    group.add(body);
+
+                    const capGeo = new THREE.SphereGeometry(0.36, 10, 10);
+                    const capMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.8 });
+                    const cap = new THREE.Mesh(capGeo, capMat);
+                    cap.position.y = 1.0;
+                    group.add(cap);
+
+                    const sideGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+                    const side = new THREE.Mesh(sideGeo, capMat);
+                    side.rotation.z = Math.PI / 2;
+                    side.position.y = 0.6;
+                    group.add(side);
+
+                    group.castShadow = true;
+                    return group;
+                };
+
+                const conePositions = [
+                    new THREE.Vector3(14, 0.1, 14),
+                    new THREE.Vector3(15.2, 0.1, 14),
+                    new THREE.Vector3(14, 0.1, 15.2),
+                    new THREE.Vector3(-24, 0.1, 24),
+                    new THREE.Vector3(-25.2, 0.1, 24),
+                    new THREE.Vector3(24, 0.1, -24),
+                    new THREE.Vector3(25.2, 0.1, -24),
+                    new THREE.Vector3(-34, 0.1, -34)
+                ];
+
+                conePositions.forEach(pos => {
+                    const mesh = createConeMesh();
+                    this.scene.add(mesh);
+                    state.destructibleProps.push(new DestructibleProp('cone', mesh, pos));
+                });
+
+                const hydrantPositions = [
+                    new THREE.Vector3(11, 0, 9),
+                    new THREE.Vector3(-11, 0, 29),
+                    new THREE.Vector3(29, 0, -11),
+                    new THREE.Vector3(-29, 0, -29),
+                    new THREE.Vector3(49, 0, 11),
+                    new THREE.Vector3(-49, 0, -11)
+                ];
+
+                hydrantPositions.forEach(pos => {
+                    const mesh = createHydrantMesh();
+                    this.scene.add(mesh);
+                    state.destructibleProps.push(new DestructibleProp('hydrant', mesh, pos));
+                });
             }
 
             createGarageZone() {
@@ -1153,6 +1757,16 @@
             }
         }
 
+        window.showStuntNotice = function(text) {
+            const el = document.getElementById('stunt-notice');
+            if (!el) return;
+            el.innerText = text;
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 2500);
+        };
+
         // --- Player Controller ---
         class Player {
             constructor(scene, camera, input, trafficSystem, world) {
@@ -1236,10 +1850,13 @@
 
             tryInteract() {
                 if (state.inCar) {
-                    state.inCar = false;
-                    state.currentCar = null;
-                    this.mesh.visible = true;
-                    this.mesh.position.add(new THREE.Vector3(3, 0, 0));
+                    // Only exit if vehicle speed is slow
+                    if (state.currentCar && Math.abs(state.currentCar.currentSpeed || 0) < 4.0) {
+                        state.inCar = false;
+                        state.currentCar = null;
+                        this.mesh.visible = true;
+                        this.mesh.position.add(new THREE.Vector3(3, 0, 0));
+                    }
                 } else {
                     let closestCar = null;
                     let minDst = 8;
@@ -1256,7 +1873,6 @@
                         state.currentCar = closestCar;
                         this.mesh.visible = false;
 
-                        // Apply custom color to the entered car
                         closestCar.mesh.traverse(child => {
                             if (child.isMesh && child.name === 'car-body') {
                                 child.material.color.setHex(state.playerCarStats.color);
@@ -1267,6 +1883,18 @@
             }
 
             update(dt) {
+                // Initialize audio on input interaction
+                if (this.input.mouseDown || Object.keys(this.input.keys).some(k => this.input.keys[k])) {
+                    if (window.audioEngine && !window.audioEngine.initialized) {
+                        window.audioEngine.init();
+                    }
+                }
+
+                // Smooth time scaling (Bullet-time slow motion for Stunt Jumps)
+                const targetScale = state.stuntJumpActive ? 0.3 : 1.0;
+                state.timeScale = THREE.MathUtils.lerp(state.timeScale, targetScale, 6 * dt);
+                const effectiveDt = dt * state.timeScale;
+
                 if (state.inCar) {
                     const car = state.currentCar;
 
@@ -1284,11 +1912,36 @@
 
                     this.mesh.position.copy(car.mesh.position);
 
-                    const baseMaxSpeed = 35;
-                    const maxSpeed = baseMaxSpeed * (1 + (state.playerCarStats.speedLevel - 1) * 0.20);
+                    // Base stats & Nitro modifiers
+                    let baseMaxSpeed = 35;
+                    let maxSpeed = baseMaxSpeed * (1 + (state.playerCarStats.speedLevel - 1) * 0.20);
+                    let baseAccel = 15;
+                    let accel = baseAccel * (1 + (state.playerCarStats.accelLevel - 1) * 0.30);
 
-                    const baseAccel = 15;
-                    const accel = baseAccel * (1 + (state.playerCarStats.accelLevel - 1) * 0.30);
+                    // Nitro Boost input check (Shift key)
+                    const shiftPressed = this.input.keys['ShiftLeft'] || this.input.keys['ShiftRight'] || this.input.keys['KeyShift'];
+                    if (shiftPressed && state.nitroCharge >= 100 && !state.nitroActive) {
+                        state.nitroActive = true;
+                        state.nitroTimeLeft = 3.0;
+                        state.nitroCharge = 0;
+                        playSound('upgrade');
+                    }
+
+                    if (state.nitroActive) {
+                        state.nitroTimeLeft -= effectiveDt;
+                        accel *= 2.2;
+                        maxSpeed *= 1.35;
+                        if (state.nitroTimeLeft <= 0) {
+                            state.nitroActive = false;
+                        }
+                    }
+
+                    // Camera FOV transition (Nitro zoom / Stunt Jump)
+                    const targetFOV = state.nitroActive ? 88 : (state.stuntJumpActive ? 68 : 75);
+                    if (Math.abs(this.camera.fov - targetFOV) > 0.1) {
+                        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, 5 * dt);
+                        this.camera.updateProjectionMatrix();
+                    }
 
                     if (car.currentSpeed === undefined) {
                         car.currentSpeed = 0;
@@ -1299,21 +1952,109 @@
                     if (this.input.keys['KeyS']) inputDir = -1;
 
                     if (inputDir !== 0) {
-                        car.currentSpeed += inputDir * accel * dt;
+                        car.currentSpeed += inputDir * accel * effectiveDt;
                         car.currentSpeed = THREE.MathUtils.clamp(car.currentSpeed, -maxSpeed * 0.5, maxSpeed);
                     } else {
-                        car.currentSpeed = THREE.MathUtils.lerp(car.currentSpeed, 0, 4 * dt);
+                        car.currentSpeed = THREE.MathUtils.lerp(car.currentSpeed, 0, 4 * effectiveDt);
                     }
 
-                    const steerSpeed = 3.5 * (1 + (state.playerCarStats.steerLevel - 1) * 0.25);
+                    // Hydroplaning check (50% steering grip reduction near destroyed hydrants)
+                    let gripFactor = 1.0;
+                    for (const prop of state.destructibleProps) {
+                        if (prop.type === 'hydrant' && prop.isDestroyed) {
+                            if (car.mesh.position.distanceTo(prop.mesh.position) < 8.0) {
+                                gripFactor = 0.5;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Steering & Drift
+                    const spacePressed = this.input.keys['Space'];
+                    if (spacePressed && Math.abs(car.currentSpeed) > 8.0) {
+                        state.driftActive = true;
+                        state.nitroCharge = Math.min(100, state.nitroCharge + 35 * effectiveDt);
+                        if (window.smokePool && window.skidmarkMgr) {
+                            const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
+                            const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
+                            const rearLeft = car.mesh.position.clone().add(forward.clone().multiplyScalar(1.6)).add(right.clone().multiplyScalar(-0.8));
+                            const rearRight = car.mesh.position.clone().add(forward.clone().multiplyScalar(1.6)).add(right.clone().multiplyScalar(0.8));
+                            window.smokePool.spawn(rearLeft);
+                            window.smokePool.spawn(rearRight);
+                            window.skidmarkMgr.addMark(rearLeft, car.mesh.rotation.y);
+                            window.skidmarkMgr.addMark(rearRight, car.mesh.rotation.y);
+                        }
+                    } else {
+                        state.driftActive = false;
+                    }
+
+                    const steerSpeed = 3.5 * (1 + (state.playerCarStats.steerLevel - 1) * 0.25) * (state.driftActive ? 1.4 : 1.0) * gripFactor;
                     let angleDiff = this.yaw - car.mesh.rotation.y;
                     angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
-                    car.mesh.rotation.y += angleDiff * steerSpeed * dt;
+                    car.mesh.rotation.y += angleDiff * steerSpeed * effectiveDt;
 
                     const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
                     const oldPos = car.mesh.position.clone();
-                    car.mesh.position.addScaledVector(forward, car.currentSpeed * dt);
+                    car.mesh.position.addScaledVector(forward, car.currentSpeed * effectiveDt);
 
+                    // --- Stunt Jump & Ramp Physics ---
+                    if (!state.stuntJumpActive && Math.abs(car.currentSpeed) > 18.0) {
+                        for (const ramp of state.ramps) {
+                            if (ramp.box.containsPoint(car.mesh.position)) {
+                                state.stuntJumpActive = true;
+                                state.stuntCarVy = 8.0 + (Math.abs(car.currentSpeed) - 18.0) * 0.25;
+                                playSound('upgrade');
+                                break;
+                            }
+                        }
+                    }
+
+                    if (state.stuntJumpActive) {
+                        car.mesh.position.y += state.stuntCarVy * effectiveDt;
+                        state.stuntCarVy -= 18.0 * effectiveDt; // Gravity
+
+                        if (car.mesh.position.y <= 0) {
+                            car.mesh.position.y = 0;
+                            state.stuntJumpActive = false;
+                            state.stuntCarVy = 0;
+
+                            const carUp = new THREE.Vector3(0, 1, 0).applyQuaternion(car.mesh.quaternion);
+                            if (carUp.dot(new THREE.Vector3(0, 1, 0)) > 0.65) {
+                                state.money += 150;
+                                updateMoneyHUD();
+                                playSound('upgrade');
+                                showStuntNotice("STUNT JUMP LANDED! +$150");
+                                if (window.sparkPool) window.sparkPool.spawn(car.mesh.position);
+                            } else {
+                                playSound('collision');
+                                if (state.hasPackage && state.cargoType === 'fragile') {
+                                    state.cargoHealth = Math.max(0, state.cargoHealth - 25);
+                                    if (state.cargoHealth <= 0) window.failMission("Cargo Destroyed in Stunt Crash!");
+                                }
+                            }
+                        }
+                    }
+
+                    // --- Destructible Prop Collisions ---
+                    for (const prop of state.destructibleProps) {
+                        if (prop.type === 'cone' && !prop.isHit) {
+                            if (car.mesh.position.distanceTo(prop.mesh.position) < 2.0) {
+                                prop.isHit = true;
+                                const hitDir = forward.clone().multiplyScalar(Math.max(12, Math.abs(car.currentSpeed) * 1.5));
+                                prop.velocity.copy(hitDir).add(new THREE.Vector3(0, 4 + Math.abs(car.currentSpeed) * 0.3, 0));
+                                prop.angularVelocity.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+                                playSound('collision');
+                            }
+                        } else if (prop.type === 'hydrant' && !prop.isDestroyed) {
+                            if (car.mesh.position.distanceTo(prop.mesh.position) < 2.2) {
+                                prop.isDestroyed = true;
+                                prop.mesh.rotation.z = Math.PI / 2;
+                                playSound('collision');
+                            }
+                        }
+                    }
+
+                    // Building Collision Check
                     if (this.world.checkCollision(car.mesh.position)) {
                         if (Math.abs(car.currentSpeed) > 10) {
                             playSound('collision');
@@ -1322,7 +2063,7 @@
                                 damage = Math.round(damage / state.playerCarStats.armorLevel);
                                 state.cargoHealth = Math.max(0, state.cargoHealth - damage);
                                 if (state.cargoHealth <= 0) {
-                                    failMission("Cargo Destroyed!");
+                                    window.failMission("Cargo Destroyed!");
                                 }
                             }
                             state.wantedLevel = Math.min(5, state.wantedLevel + 1);
@@ -1333,6 +2074,7 @@
                         car.currentSpeed = -car.currentSpeed * 0.3;
                     }
 
+                    // Traffic Collisions
                     for (const other of this.trafficSystem.cars) {
                         if (other === car) continue;
                         const dist = car.mesh.position.distanceTo(other.mesh.position);
@@ -1350,7 +2092,7 @@
                                         damage = Math.round(damage / state.playerCarStats.armorLevel);
                                         state.cargoHealth = Math.max(0, state.cargoHealth - damage);
                                         if (state.cargoHealth <= 0) {
-                                            failMission("Cargo Destroyed!");
+                                            window.failMission("Cargo Destroyed!");
                                         }
                                     }
                                 }
@@ -1363,16 +2105,24 @@
 
                     this.mesh.position.copy(car.mesh.position);
 
-                    const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
-                    const camY = car.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
-                    const camZ = car.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
-                    this.camera.position.set(camX, camY, camZ);
-                    this.camera.lookAt(car.mesh.position);
+                    // Camera position (Side orbital during Stunt Jump or standard chase)
+                    if (state.stuntJumpActive) {
+                        const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
+                        const sideCamPos = car.mesh.position.clone().add(right.multiplyScalar(14)).add(new THREE.Vector3(0, 4, -4));
+                        this.camera.position.lerp(sideCamPos, 5 * dt);
+                        this.camera.lookAt(car.mesh.position);
+                    } else {
+                        const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
+                        const camY = car.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
+                        const camZ = car.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
+                        this.camera.position.set(camX, camY, camZ);
+                        this.camera.lookAt(car.mesh.position);
+                    }
                     return;
                 }
 
+                // On Foot Movement
                 this.mesh.visible = true;
-
                 const moveDir = new THREE.Vector3();
                 if (this.input.keys['KeyW']) moveDir.z -= 1;
                 if (this.input.keys['KeyS']) moveDir.z += 1;
@@ -1383,7 +2133,7 @@
                     moveDir.normalize();
                     moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
 
-                    const nextPos = this.mesh.position.clone().add(moveDir.multiplyScalar(this.speed * dt));
+                    const nextPos = this.mesh.position.clone().add(moveDir.multiplyScalar(this.speed * effectiveDt));
 
                     if (!this.world.checkCollision(nextPos)) {
                         this.mesh.position.copy(nextPos);
@@ -2038,6 +2788,13 @@
                 this.trafficSystem = new TrafficSystem(this.scene, this.world);
                 this.player = new Player(this.scene, this.camera, this.input, this.trafficSystem, this.world);
 
+                // Initialize TASK_003 Particle Pools & Audio Engine
+                window.waterPool = new WaterParticlePool(this.scene);
+                window.smokePool = new SmokeParticlePool(this.scene);
+                window.sparkPool = new SparkParticlePool(this.scene);
+                window.skidmarkMgr = new SkidmarkManager(this.scene);
+                window.audioEngine = new ProceduralAudioEngine();
+
                 this.pedestrians = [];
                 for (let i = 0; i < 40; i++) {
                     this.pedestrians.push(new Pedestrian(this.scene, this.world));
@@ -2069,7 +2826,6 @@
             update(dt) {
                 if (state.gameOver) return;
                 if (state.isBusted) {
-                    // Update camera and rendering but freeze gameplay
                     return;
                 }
 
@@ -2079,6 +2835,60 @@
                     document.getElementById('game-over').style.display = 'flex';
                     document.getElementById('final-score').innerText = state.score;
                     document.exitPointerLock();
+                }
+
+                // Particle systems update
+                if (window.waterPool) window.waterPool.update(dt);
+                if (window.smokePool) window.smokePool.update(dt);
+                if (window.sparkPool) window.sparkPool.update(dt);
+
+                // Destructible props update
+                state.destructibleProps.forEach(prop => {
+                    prop.update(dt);
+                    if (prop.type === 'hydrant' && prop.isDestroyed && window.waterPool) {
+                        window.waterPool.spawn(prop.mesh.position);
+                    }
+                });
+
+                // Nitro HUD Update
+                const bar = document.getElementById('nitro-bar-fill');
+                const badge = document.getElementById('nitro-text-prompt');
+                if (bar) bar.style.width = `${Math.min(100, Math.max(0, state.nitroCharge))}%`;
+                if (badge) {
+                    if (state.nitroActive) {
+                        badge.style.display = 'block';
+                        badge.innerText = 'BOOSTING!';
+                        badge.style.color = '#00f0ff';
+                    } else if (state.nitroCharge >= 100) {
+                        badge.style.display = 'block';
+                        badge.innerText = 'READY (SHIFT)';
+                        badge.style.color = '#00ff00';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+
+                // Procedural Audio Engine Update
+                if (window.audioEngine) {
+                    if (state.inCar && state.currentCar) {
+                        let nearestPoliceDist = 999;
+                        state.policeCars.forEach(pc => {
+                            if (pc.active) {
+                                const d = pc.mesh.position.distanceTo(state.currentCar.mesh.position);
+                                if (d < nearestPoliceDist) nearestPoliceDist = d;
+                            }
+                        });
+                        const maxSpd = 35 * (1 + (state.playerCarStats.speedLevel - 1) * 0.20);
+                        window.audioEngine.update(
+                            dt,
+                            state,
+                            state.currentCar.currentSpeed || 0,
+                            maxSpd,
+                            nearestPoliceDist
+                        );
+                    } else {
+                        window.audioEngine.update(dt, state, 0, 35, 999);
+                    }
                 }
 
                 this.player.update(dt);

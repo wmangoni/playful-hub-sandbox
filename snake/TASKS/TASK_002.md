@@ -435,3 +435,45 @@ Implementado em `snake/index.html`. Todos os critérios atendidos e validados lo
 *   **Causa**: o `update()` só fazia *screen wrap* no modo Fantasma; nos demais casos, a borda disparava Game Over (comportamento herdado do jogo original).
 *   **Correção**: a borda agora **sempre** faz wrap para o lado oposto. O mapa **Caixa Fechada** continua matando na borda porque suas paredes de perímetro são tratadas pela colisão de labirinto (a cobra morre na parede em x/y=19, um passo antes do wrap). Validado: Clássico atravessa as 4 bordas; Caixa Fechada continua morrendo na parede.
 
+---
+
+## 🧪 Resultado dos testes
+
+### ⚙️ Metodologia e Execução dos Testes:
+Os testes foram realizados via **automação end-to-end em navegador headless (Puppeteer/Node.js)** no arquivo `tests/qa_snake.test.js` em conjunto com validações visuais no navegador.
+
+### 📷 Evidencias de Testes:
+
+1. **Teste 1 - Validação do Modo Labirinto e Interface (Maze Mode)**:
+   - **Verificação**: Presença e funcionamento do elemento `<select id="mazeSelect">` com as 4 opções: *Clássico (Sem Paredes)*, *Caixa Fechada*, *Quatro Cantos* e *Grande Espiral*.
+   - **Evidência**: O elemento foi detectado no DOM e validado com os 4 mapas carregando corretamente suas respectivas estruturas de coordenadas no objeto `MAZES` (`classic`: 0 blocos, `box`: 76 blocos, `corners`: 20 blocos, `spiral`: 51 blocos).
+   - **Resultado**: ✅ **Passou**
+
+2. **Teste 2 - Colisão com Obstáculos do Labirinto**:
+   - **Verificação**: Colidir a cabeça da cobra com qualquer bloco de labirinto (como a parede perimetral em `box` nas coordenadas `(0,0)`) dispara Game Over instantâneo.
+   - **Evidência**: Ao simular o movimento da cabeça da cobra para a coordenada `(0,0)` no mapa `box`, a função `triggerGameOver()` foi acionada com sucesso (`isGameOver === true`).
+   - **Resultado**: ✅ **Passou**
+
+3. **Teste 3 - Spawn e Ciclo de Frutas Especiais (Power Food)**:
+   - **Verificação**: A cada 5 frutas normais consumidas, a próxima fruta gerada deve obrigatoriamente ser especial (`isSpecial: true`) com um tipo aleatório entre `ghost`, `speed` ou `shrink`.
+   - **Evidência**: Com `normalFoodEaten = 4`, `generateFood()` gerou fruta normal. Com `normalFoodEaten = 5`, a função retornou `isSpecial: true` e atribuiu o tipo especial com propriedades visuais neon e badges correspondentes.
+   - **Resultado**: ✅ **Passou**
+
+4. **Teste 4 - Efeitos Visuais e Mecânicos das Frutas Especiais**:
+   - **Fruta Fantasma (Roxa)**: Permite transposição de bordas (*screen-wrap*) e imunidade contra colisões de paredes/corpo por 5 segundos com efeito de opacidade piscante (`ctx.globalAlpha = 0.3`). Validado que a cabeça em `x=-1` reapareceu em `x=19` sem Game Over.
+   - **Fruta Aceleração (Azul)**: Dobra a velocidade de movimento (intervalo do game loop reduzido pela metade, `speedMultiplier = 0.5`) e dobra a pontuação obtida (+2 pontos por fruta) por 8 segundos. Validado retorno do calculador de velocidade `finalSpeed: 75ms` e incremento de pontuação.
+   - **Fruta Cortadora (Verde)**: Remove instantaneamente 3 segmentos da cauda da cobra quando o tamanho atual for maior que 6. Validado que uma cobra de tamanho 8 encolheu para 5 segmentos, e cobras de tamanho <= 6 mantiveram seu tamanho mínimo.
+   - **Resultado**: ✅ **Passou**
+
+5. **Teste 5 - Speed Boost Manual com Barra de Espaço**:
+   - **Verificação**: Manter a barra de espaço pressionada dobra a velocidade de movimentação da cobra e consome 1 ponto da pontuação a cada 1,5 segundos.
+   - **Evidência**: Ao simular o evento da tecla `Space`, a taxa de atualização do game loop aplicou o multiplicador `0.5`, e a rotina de temporização deduziu 1 ponto do score após 1.500ms decorridos (`score: 10` ➔ `score: 9`).
+   - **Resultado**: ✅ **Passou**
+
+### 🎯 Conclusão de QA:
+A tarefa é totalmente testável e **todos os 5 cenários de testes automatizados e manuais passaram com 100% de sucesso**. Nenhuma regressão ou discrepância encontrada em relação aos critérios de aceitação.
+
+**Status dos Testes:** ✅ **APROVADO (Ready for Deploy)**
+*Assinado: Analista de QA (Antigravity) - 2026-08-02*
+
+

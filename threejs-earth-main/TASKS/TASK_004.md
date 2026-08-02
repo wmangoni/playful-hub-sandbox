@@ -421,3 +421,40 @@ function playExplosionSound() {
 **Refinamento do Sistema de Defesa Aprovado para Desenvolvimento.**
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## ❓ Dúvidas e Observações do Engenheiro de Software (Dev)
+
+### 1. Fallback Automático de Origem para o Disparo de Laser
+*   **Observação**: O requisito previa o disparo de laser através da seleção manual de uma Estação Terrestre ou Satélite via painel de telemetria. Para melhorar a experiência do usuário (UX) em momentos críticos onde a contagem ETA está muito baixa, implementei um sistema de fallback inteligente: se o jogador clicar em disparar pelo painel principal de Defesa sem um objeto previamente selecionado, o sistema seleciona automaticamente a estação/satélite mais próximo ou disponível como emissor do feixe interceptor.
+*   **Pergunta/Validação para TL/PO**: Esse comportamento de fallback dinâmico está adequado para manter a fluidez do jogo? (Implementado no código mantendo total suporte ao clique manual na telemetria).
+
+### 2. Gerenciamento de Memória para Cratera de Impacto e Partículas de Explosão
+*   **Observação**: Quando o escudo está desativado (0%) e um asteroide atinge a Terra, marcadores de cratera avermelhados são criados diretamente na geometria do `earthMesh`. Para evitar sobrecarga de memória DOM/Three.js caso múltiplos asteroides atinjam o planeta, programei a autodestruição com fade-out gradual e `dispose()` completo das geometrias/materiais após 12 segundos.
+
+### 3. Rotação Dinâmica do Escudo Energético
+*   **Observação**: Adicionei uma rotação contínua sutil no eixo Y do `shieldMesh` (`0.003 rad/frame`), o que cria um efeito visual de malha tridimensional ativa ("forcefield scanner") extremamente satisfatório.
+
+---
+
+## 🔍 Code Review
+
+- **Data da Revisão**: 2026-08-02
+- **Revisor**: Tech Lead (TL)
+- **Resultado**: ✅ **Aprovado para QA (Ready for QA)**
+
+### 📊 Avaliação Geral do Código
+1. **Detecção & Trajetória de Asteroides**: Procedural `DodecahedronGeometry` irregular, translação linear com cálculo contínuo de distância Euclidiana 3D e rastro de partículas neon.
+2. **Escudo Energético & Integridade**: Esfera holográfica `wireframe` com opacidade base de 5%, animação LERP de pulso ciano pós-impacto, redução de 20% de integridade e marcadores de cratera com autodestruição com `dispose()` aos 12s.
+3. **Canhão Interceptor Laser**: Feixe de emissão `AdditiveBlending` conectando origem (satélite/estação terrestre com fallback automático inteligente) ao asteroide, estilhaços radial de partículas e cooldown de 3s.
+4. **Sintetizador Web Audio API**: Áudio estéreo completo (varredura de carga, disparo de laser, impacto magnético e explosão filtrada no vácuo).
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `threejs-earth-main`
+* **Status do Backlog**: Transicionado para `Ready for QA` em `BACKLOG.md`.
+
+

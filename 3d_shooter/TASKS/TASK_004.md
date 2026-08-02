@@ -309,7 +309,24 @@ Para garantir que o fluxo de desenvolvimento e a experiência do jogador estejam
 ---
 
 ## 💡 Decisões e Resoluções do Tech Lead (TL)
-*(Seção a ser preenchida pelo Tech Lead durante o refinamento)*
+
+1. **Layout e Gating do Mapa (Aprovado)**:
+   * **Decisão**: Aprovada a reorganização da área sudeste do mapa com a inclusão de uma sala com recompensas valiosas guardadas pela Porta Vermelha, e o Cartão Vermelho alocado na área noroeste (em sala secreta).
+   * **Diretriz Técnica**: O desenvolvedor deve manter a matriz `mapData` limpa e modular. Recomenda-se exportar constantes legíveis para os tipos de blocos (ex: `TILE_DOOR_COMMON = 9`, `TILE_DOOR_RED = 10`, `TILE_DOOR_BLUE = 11`, `TILE_SECRET_WALL = 12`) para evitar "magic numbers" soltos na lógica de renderização e raycasting.
+
+2. **Tempo de Resposta para Obstrução de Portas (Aprovado)**:
+   * **Decisão**: Definido o tempo de retenção em **2.0 segundos** caso a porta seja forçada a reabrir devido à presença de entidades (jogador ou inimigos).
+   * **Diretriz Técnica**: A verificação de entidades deve utilizar uma checagem de AABB (Axis-Aligned Bounding Box) ou distância euclidiana simples $d < 0.8$ contra o centro da célula da porta (`door.x + 0.5`, `door.y + 0.5`). Se houver colisão, redefinir `openTimer = 2.0` e manter `status = 'open'` sem recalcular o progresso até que a célula esteja livre.
+
+3. **Gerenciamento e Descarte de Poças Tóxicas (Aprovado)**:
+   * **Decisão**: Poças tóxicas devem expirar rigorosamente em **4.0 segundos** com interpolação de transparência (`fade out` de alfa nos últimos 1.0s).
+   * **Diretriz Técnica**: Para mitigar gargalos de memória e acúmulo desnecessário de objetos na lista global de sprites, as poças devem ser limpas e removidas do array `puddles` via `.filter(p => p.active)` assim que a opacidade atingir `0`.
+
+4. **Diretrizes Arquiteturais para o Raycasting DDA e Performance**:
+   * **Sliding Progress DDA**: Certificar que o cálculo de `wallX` respeite as boundaries de UV mapping $[0.0, 1.0]$. A intersecção com a porta deve ajustar as coordenadas de textura sem gerar fendas pretas (texture bleeding).
+   * **AudioContext Cleanup**: As receitas sintetizadas na Web Audio API (buzzer, chime, explosão) devem fechar os nós de osciladores e ganho através do callback `onended` (`osc.onended = () => { osc.disconnect(); gain.disconnect(); }`) garantindo zero vazamento de memória.
+
+*Status da Especificação*: ✅ **Aprovado pelo Tech Lead** - Pronta para ser assumida pelo time de desenvolvimento.
 
 ---
 

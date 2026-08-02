@@ -120,21 +120,23 @@
 ---
 
 ## 🚀 Status da Implementação (Implementation Status)
-*   **Status**: `📋 Backlog`
-*   **Refinado por**: PO (Product Owner)
-*   **Data de Criação**: 2026-07-04
+*   **Status**: `✅ Refined`
+*   **Refinado por**: Tech Lead (TL) - Antigravity
+*   **Data do Refinamento**: 2026-08-02
 
 ---
 
 ## 🛡️ Diretrizes de Arquitetura e Segurança do Tech Lead (TL)
 
-### 1. Prevenção de Abuso de Loops de Seleção
-*   Ao abrir a modal de Especialização, o estado global do jogo deve ser pausado temporariamente, impedindo teclas de atalho de exploração de mapas, movimentação de nós ou abertura de outras telas (como compras na loja) até que a seleção seja confirmada.
+### 1. Prevenção de Abuso de Loops de Seleção e Modal Lock
+*   Ao abrir a modal de Especialização (`#specialization-modal`), o estado global do jogo deve ser pausado temporariamente (`gameState.isPaused = true`), impedindo teclas de atalho de exploração de mapas, movimentação de nós ou abertura de outras telas (como compras na loja) até que a escolha da subclasse seja confirmada pelo jogador.
+*   Uma vez escolhida a subclasse, desativar a pausa e persistir a especialização no `gameState.player.specialization`.
 
-### 2. Persistência de Dados e Serialização Limpa
-*   Todos os estados de missões (`quests`) e alavancas (`levers`) adicionados ao `gameState` devem ser serializados de forma limpa pelo método `saveGame()` e desserializados corretamente em `loadGame()`.
+### 2. Persistência de Dados e Serialização Limpa (LocalStorage)
+*   Todos os estados de missões (`quests`), alavancas (`levers`) e especializações de prestígio adicionados ao `gameState` devem ser serializados de forma limpa pelo método `saveGame()` e desserializados corretamente em `loadGame()`.
 *   A inclusão das subclasses e suas modificações de atributos não deve sobrescrever os atributos originais básicos do jogador, permitindo rollback ou checagem limpa em caso de efeitos negativos temporários.
 
-### 3. Isolamento e Throttling na Síntese de Efeitos Sonoros
-*   Habilidades passivas (como veneno agindo a cada tick) ou invocações de lacaios não devem saturar o barramento de áudio com múltiplos osciladores simultâneos. Deve-se estabelecer uma restrição de polifonia máxima de 2 vozes para habilidades especiais de prestígio.
+### 3. Isolamento e Throttling na Síntese de Efeitos Sonoros (Web Audio API)
+*   Habilidades passivas (como veneno agindo a cada tick) ou invocações de lacaios não devem saturar o barramento de áudio com múltiplos osciladores simultâneos. Estabelece-se uma restrição de polifonia máxima de 2 vozes para habilidades especiais de prestígio.
 *   Implementar a destruição explícita dos nós de áudio (`osc.disconnect()`, `gain.disconnect()`) no callback `onended` de cada sintetizador procedural para prevenir vazamentos de recursos de memória de áudio do browser.
+

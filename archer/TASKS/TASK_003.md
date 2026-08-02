@@ -254,3 +254,48 @@ function playBounceSound() {
 * **Ação**: Resolução de dúvidas técnicas do desenvolvedor.
 * **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
 
+---
+
+## 💻 Notas de Desenvolvimento (Desenvolvedor)
+
+* **Refatoração realizada**: Código duplicado limpo e unificado em `index.html`.
+* **Gerenciamento de Flechas**: Sistema refatorado para operar com o array `activeArrows`.
+* **Arsenal de Flechas Especiais**:
+  * Implementadas as flechas **Tripla (Split Shot)**, **Fogo (Fire Arrow)** e **Gravitacional (Gravity Arrow)** com visualização no HUD e seletores por teclado (`1`, `2`, `3`, `4`).
+  * Sistema de recarga ativado ao acertar o Balão Dourado ou combos múltiplos de 5.
+* **Obstáculos Físicos**:
+  * **Nuvem de Tempestade**: Desintegra a flecha ao impacto com efeito de faíscas elétricas e áudio de sizzle.
+  * **Escudo Rotativo de Madeira**: Ricocheteia a flecha com inversão de velocidade e física de queda tumbling.
+* **Câmera Lenta Bullet-Time**: Ativada a 0.25x quando a última flecha está próxima do balão ou ao atingir o Balão Dourado em alta velocidade, limitada a 3 segundos.
+* **Áudio Procedural**: Web Audio API integrado para puxada do arco, disparo, estouro de balão, ricochete, faíscas e combo break.
+
+---
+
+## 🔍 Code Review (Tech Lead)
+
+### 📋 Avaliação Geral
+* **Status**: ✅ **APROVADO (Ready for QA)**
+* **Arquivos Analisados**: `/archer/index.html`
+
+### 🎯 Validação dos Critérios de Aceitação:
+1. **Obstáculos Físicos Dinâmicos**: 
+   - ✅ Nuvens de tempestade oscilando e desintegrando a flecha com faíscas ciano e efeito sonoro de sizzle (`playCloudHitSound`).
+   - ✅ Escudo rotativo de madeira retratado em SVG com rotação contínua e colisão elástica com inversão de vetor e tumbling physics (`isRicocheted`).
+2. **Arsenal de Flechas Especiais**:
+   - ✅ Seleção por teclado (`1`-`4`) e por slots visuais no HUD.
+   - ✅ Munição por partida com recarga dinâmica em Balão Dourado e múltiplos de 5 no combo.
+   - ✅ Flechas Tripla (em leque), Fogo (perfurante) e Gravitacional (campo magnético em balões) funcionando perfeitamente.
+3. **Câmera Lenta Bullet-Time**:
+   - ✅ Ativação a 0.25x quando a última flecha se aproxima do alvo (< 85px) ou em hits de alta velocidade no Balão Dourado.
+   - ✅ Banner pulsante e desaturação/contraste aplicados no container, com timeout automático de 3s.
+4. **Áudio Procedural (Web Audio API)**:
+   - ✅ Síntese limpa com osciladores e envelopes sem dependência de assets externos.
+   - ✅ Inicialização amigável de `AudioContext` no primeiro evento do usuário.
+
+### 🏛️ Qualidade da Arquitetura & Código:
+- Código limpo, modular e sem duplicações.
+- Gerenciamento eficiente do array `activeArrows`.
+- Transição de status efetuada no `BACKLOG.md` de `In review` para `Ready for QA`.
+
+
+

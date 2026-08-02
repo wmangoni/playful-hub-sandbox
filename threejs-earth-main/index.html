@@ -203,6 +203,118 @@
         transform: scale(1.25);
       }
 
+      /* Planetary Defense Section */
+      .defense-section {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .defense-status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+      }
+
+      .shield-bar-container {
+        width: 100%;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 5px;
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      .shield-bar-fill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #00ffff, #0088ff);
+        box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+        transition: width 0.3s ease, background 0.3s ease;
+      }
+
+      .shield-bar-fill.critical {
+        background: linear-gradient(90deg, #ff0055, #990022);
+        box-shadow: 0 0 10px rgba(255, 0, 85, 0.8);
+      }
+
+      .btn-defense-action {
+        background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2));
+        border: 1px solid #00f2fe;
+        border-radius: 8px;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.8rem;
+        font-weight: bold;
+        padding: 10px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.2s ease;
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .btn-defense-action:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(0, 242, 254, 0.4), rgba(79, 172, 254, 0.4));
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
+      }
+
+      .btn-defense-action:disabled {
+        opacity: 0.35;
+        border-color: #666;
+        color: #999;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .btn-fire-laser {
+        background: linear-gradient(135deg, rgba(255, 0, 85, 0.25), rgba(153, 0, 34, 0.25));
+        border: 1px solid #ff0055;
+        color: #ff0055;
+        box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
+        margin-top: 10px;
+      }
+
+      .btn-fire-laser:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(255, 0, 85, 0.5), rgba(255, 0, 85, 0.3));
+        color: #ffffff;
+        box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+      }
+
+      .threat-tracker {
+        background: rgba(255, 0, 85, 0.08);
+        border: 1px dashed rgba(255, 0, 85, 0.3);
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.8rem;
+      }
+
+      .cooldown-bar-container {
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 4px;
+      }
+
+      .cooldown-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: #ff0055;
+        transition: width 0.1s linear;
+      }
+
       /* Telemetry Panel (Right) */
       .telemetry-panel {
         width: 320px;
@@ -425,6 +537,46 @@
           </div>
           <input type="range" id="solarStormSlider" class="solar-slider" min="0" max="100" value="0">
         </div>
+
+        <!-- Section: Planetary Defense Shield (TASK_004) -->
+        <div class="defense-section">
+          <h2>🛡️ Defesa Planetária</h2>
+          
+          <div class="defense-status-row">
+            <span style="font-size: 0.85rem; color: #94a3b8;">Escudo Energético:</span>
+            <span id="shieldStatusText" style="font-family: 'Orbitron', monospace; font-weight: bold; color: #00ffff;">100% [ATIVO]</span>
+          </div>
+          <div class="shield-bar-container">
+            <div id="shieldBarFill" class="shield-bar-fill"></div>
+          </div>
+
+          <button id="spawnAsteroidBtn" class="btn-defense-action" style="margin-top: 4px;">
+            <span>☄️</span> Simular Ameaça de Asteroide
+          </button>
+
+          <!-- Threat Tracker Widget (Active when asteroid is incoming) -->
+          <div id="threatTracker" class="threat-tracker" style="display: none;">
+            <div style="font-weight: bold; color: #ff0055; font-family: 'Orbitron', sans-serif; display: flex; justify-content: space-between;">
+              <span>🚨 AMEAÇA DETECTADA</span>
+              <span id="threatEta">ETA: 00s</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; color: #cbd5e1;">
+              <span>Distância Orbital:</span>
+              <span id="threatDistance" style="font-family: monospace;">5.50u</span>
+            </div>
+          </div>
+
+          <!-- Laser Cooldown Status -->
+          <div id="laserCooldownContainer" style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748b;">
+              <span>CANHÃO INTERCEPTOR LASER:</span>
+              <span id="cooldownText" style="color: #00ffaa;">PRONTO</span>
+            </div>
+            <div class="cooldown-bar-container">
+              <div id="cooldownBarFill" class="cooldown-bar-fill"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Right Panel: Telemetry -->
@@ -446,6 +598,11 @@
         <div id="telDetails">
           <!-- Dynamic rows added here -->
         </div>
+
+        <!-- Laser Fire Button (Visible when Satellite or Station selected) -->
+        <button id="fireLaserBtn" class="btn-defense-action btn-fire-laser" style="display: none;">
+          <span>🎯</span> Disparar Interceptor Laser
+        </button>
 
         <button id="releaseFocusBtn" class="btn-release">
           <span>🔓</span> Liberar Foco

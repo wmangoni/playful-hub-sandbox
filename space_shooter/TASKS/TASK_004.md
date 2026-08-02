@@ -411,7 +411,36 @@ Abaixo estão as especificações arquiteturais finais para a implementação:
 
 * **Identificação do Jogo**: `space_shooter` (Space Shooter)
 * **Ação**: Nova tarefa estruturada para adição no topo de backlog.
-* **Status do Backlog**: Cadastrado e enviado para `📋 Backlog`.
+* **Status do Backlog**: 🟢 Ready for QA.
 * **Destino**: A especificação está documentada de forma robusta e limpa, em total conformidade estética e técnica com o Playful Hub.
 
+---
+
+## 🔍 Registro de Revisão de Código & Validação Arquitetural (Tech Lead)
+
+### 1. Funcionalidades Implementadas
+- **Hangar UI & Armas (Weapon Tuning Modal)**:
+  - Adicionada modal com visual glassmorphic para compra/seleção de armas (`vulcan`, `plasma`, `tesla`).
+  - Integrado sistema de economia com moedas (`coins`), ganhos ao destruir inimigos e persistência via `localStorage`.
+- **Anomalias Gravitacionais (Buracos Negros)**:
+  - Surgimento estocástico a partir da Fase 3.
+  - Implementada atração vetorial centrípeta $F_g \propto 1/d$ puxando jogador, inimigos e defletindo projéteis.
+  - Animação SVG com rotação contínua e raio de colisão central que causa dano massivo/destruição.
+- **Modo Escolta de Carga (Goliath Transport)**:
+  - Inicialização automática em fases ímpares a partir da Fase 3.
+  - Barra de vida dedicada (200 HP).
+  - Movimentação senoidal passiva com prioridade de ataque inimigo contra o transporte aliada.
+  - Recompensa de +40 moedas ao concluir a fase de escolta com sucesso.
+- **Áudio Procedural Web Audio API**:
+  - `playPlasmaBurstSound()`: Varredura senoidal descendente pesada e ruído.
+  - `playTeslaDischargeSound()`: Disparo elétrico com cliques de alta frequência e modulação.
+  - `updateVortexSound()`: Oscilador sub-grave senoidal controlado por proximidade.
+
+### 2. Validação dos Critérios de Aceitação
+- **Buracos Negros**: ✅ Implementado e integrado no game loop.
+- **Weapon Loadout System**: ✅ Unificado com a economia de moedas do Hangar.
+- **Escort Mission (Goliath)**: ✅ Totalmente operacional com UI dedicada.
+- **Trilha Sonora Adaptativa / Web Audio API**: ✅ Modulação baseada no HP e efeitos proceduralmente sintetizados.
+
 *Assinado: Tech Lead (TL) - Antigravity*
+

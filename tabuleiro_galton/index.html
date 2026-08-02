@@ -181,6 +181,49 @@
             color: #00ffcc;
             text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
         }
+        .challenge-card {
+            background: rgba(255, 235, 59, 0.04);
+            border: 1px solid rgba(255, 235, 59, 0.2);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .challenge-title {
+            color: #ffeb3b;
+            text-shadow: 0 0 10px rgba(255, 235, 59, 0.3);
+        }
+        .challenge-info {
+            font-size: 0.8rem;
+            color: #d1d5db;
+            line-height: 1.3;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px dashed rgba(255, 235, 59, 0.3);
+        }
+        .challenge-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .match-badge {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+        .challenge-btn {
+            background: rgba(255, 235, 59, 0.15);
+            border-color: #ffeb3b;
+            color: #ffeb3b;
+        }
+        .challenge-btn:hover {
+            background: rgba(255, 235, 59, 0.3);
+            border-color: #fff176;
+            box-shadow: 0 0 12px rgba(255, 235, 59, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -194,6 +237,30 @@
                 <span id="totalBalls">Total: 0</span>
             </div>
             
+            <div class="challenge-card">
+                <div class="section-title challenge-title">🎯 Modo Desafio (Target Fitting)</div>
+                <div class="control-row">
+                    <label for="challengeSelector" style="font-size:0.8rem; color:#b0b3b8;">Selecionar Desafio</label>
+                    <select id="challengeSelector">
+                        <option value="none">Livre (Sem Desafio)</option>
+                        <option value="skewed">Desafio 1: Curva Inclinada (Skewed Right)</option>
+                        <option value="bimodal">Desafio 2: Twin Peaks (Bimodal)</option>
+                        <option value="uniform">Desafio 3: Grade Uniforme</option>
+                    </select>
+                </div>
+                <div id="challengeInfoBox" class="challenge-info" style="display:none;">
+                    Selecione um desafio para começar.
+                </div>
+                <div id="challengeStatusBox" class="challenge-status" style="display:none;">
+                    <span>Aderência (Match):</span>
+                    <span id="matchPercentDisplay" class="match-badge">0%</span>
+                </div>
+                <div class="button-group" style="grid-template-columns: 1fr 1fr;">
+                    <button id="startChallengeBtn" class="challenge-btn">Iniciar Desafio</button>
+                    <button id="cancelChallengeBtn" style="background:rgba(255,255,255,0.05); color:#aaa;">Cancelar</button>
+                </div>
+            </div>
+
             <div class="control-card">
                 <div class="section-title">Controles Principais</div>
                 <div class="button-group">
@@ -295,6 +362,14 @@
         const ballCollisionCheck = document.getElementById('ballCollisionCheck');
         const totalBallsSpan = document.getElementById('totalBalls');
 
+        // Modo Desafio UI
+        const challengeSelector = document.getElementById('challengeSelector');
+        const challengeInfoBox = document.getElementById('challengeInfoBox');
+        const challengeStatusBox = document.getElementById('challengeStatusBox');
+        const matchPercentDisplay = document.getElementById('matchPercentDisplay');
+        const startChallengeBtn = document.getElementById('startChallengeBtn');
+        const cancelChallengeBtn = document.getElementById('cancelChallengeBtn');
+
         // --- Configurações & Parâmetros Físicos ---
         let canvasWidth = 600;
         let canvasHeight = 600;
@@ -328,20 +403,225 @@
         let showGauss = true;
         let ballCollisionEnabled = false;
 
-        // --- Funções ---
+        // --- Sintetizador Web Audio API ---
+        let audioCtx = null;
+        const PENTATONIC_SCALE = [130.81, 146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playCollisionTone(xPos) {
+            if (!audioCtx) return;
+            const xRatio = Math.max(0, Math.min(1, xPos / canvasWidth));
+            const scaleIndex = Math.floor(xRatio * PENTATONIC_SCALE.length);
+            const frequency = PENTATONIC_SCALE[scaleIndex] || 261.63;
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.12);
+        }
+
+        function playAudio(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            if (type === 'teleport') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'split') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+            } else if (type === 'victory') {
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, index) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.1);
+                    g.gain.setValueAtTime(0.1, audioCtx.currentTime + index * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + index * 0.1 + 0.25);
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.start(audioCtx.currentTime + index * 0.1);
+                    o.stop(audioCtx.currentTime + index * 0.1 + 0.25);
+                });
+            }
+        }
+
+        // --- Modo Desafio Data ---
+        let activeChallengeKey = 'none';
+        let challengeCompleted = false;
+
+        const CHALLENGES = {
+            skewed: {
+                id: 'skewed',
+                name: 'Desafio 1: Curva Inclinada',
+                description: 'Dispare esferas com viés de 70% à direita e alcance MSE < 0.015 em relação à curva teórica após 100 bolinhas.',
+                setup: () => {
+                    probabilityRight = 0.7;
+                    probSlider.value = 0.7;
+                    layoutSelector.value = 'triangle';
+                    probVal.textContent = '70%';
+                    setup();
+                },
+                check: () => {
+                    const collected = bins.reduce((sum, b) => sum + b.count, 0);
+                    if (collected < 100) return { success: false, match: Math.min(100, Math.round((collected / 100) * 100)), msg: `Colete 100 bolinhas (${collected}/100)` };
+
+                    const M = bins.length;
+                    const p = 0.7;
+                    const mean = (M - 1) * p;
+                    const sigma = Math.sqrt((M - 1) * p * (1 - p));
+                    let sumSqError = 0;
+
+                    for (let i = 0; i < M; i++) {
+                        const xStat = i;
+                        const exponent = -Math.pow(xStat - mean, 2) / (2 * Math.pow(sigma, 2));
+                        const targetPdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+                        const realProp = bins[i].count / collected;
+                        sumSqError += Math.pow(realProp - targetPdf, 2);
+                    }
+                    const mse = sumSqError / M;
+                    const matchPercent = Math.max(0, Math.min(100, Math.round((1 - mse / 0.03) * 100)));
+
+                    return {
+                        success: mse < 0.015,
+                        match: matchPercent,
+                        msg: `MSE: ${mse.toFixed(4)} (${matchPercent}% Match) | Bolinhas: ${collected}/100`
+                    };
+                }
+            },
+            bimodal: {
+                id: 'bimodal',
+                name: 'Desafio 2: Twin Peaks',
+                description: 'Acumule pelo menos 25 bolinhas nas colunas 3 e 12, com no máximo 10 nas colunas centrais (6 a 9).',
+                setup: () => {
+                    layoutSelector.value = 'bimodal';
+                    setup();
+                },
+                check: () => {
+                    const col3 = bins[3]?.count || 0;
+                    const col12 = bins[12]?.count || 0;
+                    const centralSum = (bins[6]?.count || 0) + (bins[7]?.count || 0) + (bins[8]?.count || 0) + (bins[9]?.count || 0);
+
+                    const success = col3 >= 25 && col12 >= 25 && centralSum <= 10;
+                    const matchPercent = Math.round(Math.min(100, ((Math.min(col3, 25) + Math.min(col12, 25)) / 50) * 100 * (centralSum > 10 ? 0.3 : 1.0)));
+
+                    return {
+                        success: success,
+                        match: matchPercent,
+                        msg: `Col 3: ${col3}/25 | Col 12: ${col12}/25 | Centro: ${centralSum}/10`
+                    };
+                }
+            },
+            uniform: {
+                id: 'uniform',
+                name: 'Desafio 3: Grade Uniforme',
+                description: 'Dispare exatamente 120 esferas. A diferença máxima entre a maior e a menor coluna deve ser <= 15.',
+                setup: () => {
+                    layoutSelector.value = 'uniform';
+                    setup();
+                },
+                check: () => {
+                    const collected = bins.reduce((sum, b) => sum + b.count, 0);
+                    if (collected < 120) return { success: false, match: Math.min(100, Math.round((collected / 120) * 100)), msg: `Dispare 120 bolinhas (${collected}/120)` };
+
+                    const counts = bins.map(b => b.count);
+                    const maxVal = Math.max(...counts);
+                    const minVal = Math.min(...counts);
+                    const diff = maxVal - minVal;
+
+                    const success = diff <= 15;
+                    const matchPercent = Math.max(0, Math.min(100, Math.round((1 - Math.max(0, diff - 15) / 30) * 100)));
+
+                    return {
+                        success: success,
+                        match: matchPercent,
+                        msg: `Diferença Máxima: ${diff} (Meta <= 15) | Bolinhas: ${collected}/120`
+                    };
+                }
+            }
+        };
+
+        // --- Funções Principais ---
+
+        function assignSpecialPegs() {
+            pegs.forEach(p => { p.type = 'normal'; p.color = pegColor; });
+            if (pegs.length < 15) return;
+
+            // Teleport Portal In & Out
+            const inIdx = Math.floor(pegs.length * 0.35);
+            const outIdx = Math.floor(pegs.length * 0.65);
+            if (pegs[inIdx]) {
+                pegs[inIdx].type = 'portal-in';
+                pegs[inIdx].color = '#00d2ff';
+            }
+            if (pegs[outIdx]) {
+                pegs[outIdx].type = 'portal-out';
+                pegs[outIdx].color = '#ff9f43';
+            }
+
+            // Splitter Peg
+            const splitIdx = Math.floor(pegs.length * 0.15);
+            if (pegs[splitIdx]) {
+                pegs[splitIdx].type = 'splitter';
+                pegs[splitIdx].color = '#b833ff';
+            }
+
+            // Vortex Peg
+            const vortexIdx = Math.floor(pegs.length * 0.8);
+            if (pegs[vortexIdx]) {
+                pegs[vortexIdx].type = 'vortex';
+                pegs[vortexIdx].color = '#00ffcc';
+            }
+        }
 
         function setup() {
             balls = [];
-            pegs = []; // Limpa os pinos existentes
+            pegs = [];
             bins = [];
             totalBallCount = 0;
+            challengeCompleted = false;
             updateTotalBallsDisplay();
 
             const selectedLayout = layoutSelector.value;
-            const availableHeight = canvasHeight - binHeight - topOffset - 30; // Altura disponível para pinos
+            const availableHeight = canvasHeight - binHeight - topOffset - 30;
 
             if (selectedLayout === 'triangle') {
-                // Layout Triangular (normal)
                 const numRows = numRowsTriangle;
                 const rowSpacing = availableHeight / (numRows + 1);
 
@@ -363,7 +643,6 @@
                     }
                 }
             } else if (selectedLayout === 'bimodal') {
-                // Dois triângulos menores lado a lado
                 const numRows = 11;
                 const rowSpacing = availableHeight / (numRows + 1);
                 
@@ -374,7 +653,6 @@
                     let spacing = Math.max(pegRadius * 2.5, (canvasWidth * 0.38) / Math.max(1, numPegsInRow));
                     const totalWidth = (numPegsInRow - 1) * spacing;
                     
-                    // Triângulo da esquerda (centro em 26% da largura)
                     const startX1 = (canvasWidth * 0.26) - totalWidth / 2;
                     for (let j = 0; j < numPegsInRow; j++) {
                         const x = startX1 + j * spacing;
@@ -383,7 +661,6 @@
                         }
                     }
                     
-                    // Triângulo da direita (centro em 74% da largura)
                     const startX2 = (canvasWidth * 0.74) - totalWidth / 2;
                     for (let j = 0; j < numPegsInRow; j++) {
                         const x = startX2 + j * spacing;
@@ -393,7 +670,6 @@
                     }
                 }
                 
-                // Divisor central no topo: V invertido para separar a queda central para os funis laterais
                 const divRows = 6;
                 const divSpacingY = rowSpacing;
                 for (let i = 0; i < divRows; i++) {
@@ -405,7 +681,6 @@
                     }
                 }
             } else if (selectedLayout === 'uniform') {
-                // Layout Uniforme: Grade regular (sem deslocamento de linhas)
                 const gridRows = 11;
                 const gridCols = 13;
                 const rowSpacing = availableHeight / (gridRows + 1);
@@ -419,6 +694,9 @@
                     }
                 }
             }
+
+            // Atribuir Pinos Especiais aos pinos gerados
+            assignSpecialPegs();
 
             // Inicializar colunas receptoras (bins)
             const numBins = numRowsTriangle + 1; // 16 bins
@@ -437,20 +715,22 @@
         }
 
         function createBall() {
+            // Se for Desafio 3 (Uniforme), bloqueia disparo após 120 esferas
+            if (activeChallengeKey === 'uniform' && totalBallCount >= 120) {
+                return;
+            }
+
             totalBallCount++;
             updateTotalBallsDisplay();
 
             const selectedLayout = layoutSelector.value;
             let startX;
             if (selectedLayout === 'uniform') {
-                // Queda aleatória/uniforme ao longo de toda a largura
                 startX = 0.1 * canvasWidth + Math.random() * (0.8 * canvasWidth);
             } else if (selectedLayout === 'bimodal') {
-                // Alterna entre cair sobre o triângulo da esquerda e da direita
                 startX = Math.random() < 0.5 ? (canvasWidth * 0.26) : (canvasWidth * 0.74);
                 startX += (Math.random() - 0.5) * 6;
             } else {
-                // Triangular clássico: cai no centro geométrico
                 startX = canvasWidth / 2 + (Math.random() - 0.5) * 5;
             }
 
@@ -460,7 +740,8 @@
                 vx: (Math.random() - 0.5) * 1,
                 vy: 0,
                 radius: ballRadius,
-                active: true
+                active: true,
+                color: ballColor
             });
         }
 
@@ -468,7 +749,7 @@
             const effectiveDt = dt * simulationSpeed;
             if (effectiveDt <= 0) return;
 
-            // 1. Resolver colisões elásticas círculo-círculo entre as esferas (se ativado)
+            // 1. Colisões círculo-círculo entre esferas (se ativado)
             if (ballCollisionEnabled) {
                 for (let i = 0; i < balls.length; i++) {
                     const b1 = balls[i];
@@ -486,20 +767,17 @@
                             const nx = dx / (dist || 1);
                             const ny = dy / (dist || 1);
 
-                            // Velocidade relativa ao longo da normal
                             const kx = b1.vx - b2.vx;
                             const ky = b1.vy - b2.vy;
                             const vn = kx * nx + ky * ny;
 
                             if (vn > 0) {
-                                // Coeficiente de restituição aplicado à colisão entre bolinhas
                                 const impulse = (1 + restitution) * vn / 2;
                                 b1.vx -= impulse * nx;
                                 b1.vy -= impulse * ny;
                                 b2.vx += impulse * nx;
                                 b2.vy += impulse * ny;
 
-                                // Empurrar para resolver interpenetração
                                 const overlap = minDist - dist;
                                 b1.x -= nx * overlap * 0.51;
                                 b1.y -= ny * overlap * 0.51;
@@ -511,16 +789,35 @@
                 }
             }
 
-            // 2. Integração cinemática e colisões com obstáculos estáticos
+            // Identificar pinos vortex ativos para atração gravitacional
+            const vortexPegs = pegs.filter(p => p.type === 'vortex');
+
+            // 2. Integração cinemática e colisões com obstáculos estáticos e especiais
             balls.forEach((ball) => {
                 if (!ball.active) return;
 
-                // Aplica gravidade parametrizada
+                // Atração radial do Vortex Peg
+                vortexPegs.forEach(vortex => {
+                    const dx = vortex.x - ball.x;
+                    const dy = vortex.y - ball.y;
+                    const distSq = dx * dx + dy * dy;
+                    const dist = Math.sqrt(distSq);
+                    if (dist < 40 && dist > 0) {
+                        // Limitador d_min para evitar estilingada física instável
+                        const dMin = pegRadius + ball.radius + 2;
+                        const clampedDist = Math.max(dist, dMin);
+                        const force = 1500 / (clampedDist * clampedDist * clampedDist);
+                        ball.vx += dx * force * effectiveDt;
+                        ball.vy += dy * force * effectiveDt;
+                    }
+                });
+
+                // Gravidade
                 ball.vy += baseGravity * gravityMultiplier * effectiveDt;
                 ball.x += ball.vx * effectiveDt;
                 ball.y += ball.vy * effectiveDt;
 
-                // Colisão com as paredes laterais
+                // Paredes laterais
                 if (ball.x - ball.radius < 0) {
                     ball.x = ball.radius;
                     ball.vx *= -restitution;
@@ -529,40 +826,77 @@
                     ball.vx *= -restitution;
                 }
 
-                // Colisão com os pinos (obstáculos circulares estáticos)
-                pegs.forEach(peg => {
+                // Colisão com pinos
+                for (let peg of pegs) {
                     const dx = ball.x - peg.x;
                     const dy = ball.y - peg.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     const minDistance = ball.radius + peg.radius;
 
                     if (distance < minDistance) {
+                        // Portal Teletransporte In
+                        if (peg.type === 'portal-in') {
+                            const portalOut = pegs.find(p => p.type === 'portal-out');
+                            if (portalOut) {
+                                ball.x = portalOut.x;
+                                ball.y = portalOut.y + portalOut.radius + ball.radius + 2;
+                                ball.vy = Math.abs(ball.vy) * 1.05;
+                                ball.vx = (Math.random() - 0.5) * 2;
+                                playAudio('teleport');
+                                break;
+                            }
+                        }
+
+                        // Splitter (Multiplicador)
+                        if (peg.type === 'splitter' && balls.length < 150) {
+                            ball.active = false;
+                            const speed = 2.5;
+                            balls.push({
+                                x: peg.x - 8,
+                                y: peg.y + peg.radius + 6,
+                                vx: -1.8,
+                                vy: 1.5,
+                                radius: ballRadius,
+                                color: '#39ff14',
+                                active: true
+                            });
+                            balls.push({
+                                x: peg.x + 8,
+                                y: peg.y + peg.radius + 6,
+                                vx: 1.8,
+                                vy: 1.5,
+                                radius: ballRadius,
+                                color: '#39ff14',
+                                active: true
+                            });
+                            playAudio('split');
+                            break;
+                        }
+
                         const nx = dx / distance;
                         const ny = dy / distance;
                         const relativeVelocity = ball.vx * nx + ball.vy * ny;
 
                         if (relativeVelocity < 0) {
-                            // Viés probabilístico lateral (Binomial Assimétrica)
                             const goRight = Math.random() < probabilityRight;
                             const driftSign = goRight ? 1 : -1;
 
-                            // Atualização de velocidade física com restituição (elasticidade)
                             const impulse = -(1 + restitution) * relativeVelocity;
                             ball.vx += impulse * nx;
                             ball.vy += impulse * ny;
 
-                            // Aplica a força probabilística lateral direcionada
                             ball.vx += driftSign * horizontalRandomness * (0.6 + Math.random() * 0.8);
 
-                            // Resolve interpenetração
                             const overlap = minDistance - distance;
                             ball.x += nx * overlap * 0.51;
                             ball.y += ny * overlap * 0.51;
+
+                            playCollisionTone(peg.x);
                         }
                     }
-                });
+                }
 
-                // Verificar entrada nas colunas receptoras (bins)
+                // Entrada nos coletores (bins)
                 if (ball.y + ball.radius > canvasHeight - binHeight && ball.y < canvasHeight + ball.radius) {
                     let collected = false;
                     for (let i = 0; i < bins.length; i++) {
@@ -595,12 +929,78 @@
                     ball.active = false;
                 }
             });
+
+            // Processar checagem do Modo Desafio
+            if (activeChallengeKey !== 'none' && CHALLENGES[activeChallengeKey]) {
+                const res = CHALLENGES[activeChallengeKey].check();
+                matchPercentDisplay.textContent = `${res.match}%`;
+                challengeInfoBox.textContent = res.msg;
+
+                if (res.success && !challengeCompleted) {
+                    challengeCompleted = true;
+                    playAudio('victory');
+                    challengeInfoBox.innerHTML = `🎉 <strong>DESAFIO CONCLUÍDO COM SUCESSO!</strong><br>${res.msg}`;
+                    challengeInfoBox.style.borderColor = '#00ffcc';
+                    challengeInfoBox.style.color = '#00ffcc';
+                }
+            }
         }
 
-        // Desenhar a curva teórica de Gauss sobre as colunas
+        // Desenhar Curva Teórica de Gauss ou Metas do Desafio
         function drawGaussianCurve() {
             const collectedBalls = bins.reduce((sum, b) => sum + b.count, 0);
-            if (collectedBalls === 0) return;
+
+            // Desenhar linha amarela alvo no modo desafio
+            if (activeChallengeKey === 'skewed') {
+                const M = bins.length;
+                const p = 0.7;
+                const mean = (M - 1) * p;
+                const sigma = Math.sqrt((M - 1) * p * (1 - p));
+
+                ctx.beginPath();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.setLineDash([6, 6]);
+
+                const scaleY = (binHeight - 5) / Math.max(1, ...bins.map(b => b.count), 15);
+                const targetBalls = 100;
+
+                for (let xCanvas = 0; xCanvas <= canvasWidth; xCanvas += 2) {
+                    const xStat = (xCanvas / canvasWidth) * M - 0.5;
+                    const exponent = -Math.pow(xStat - mean, 2) / (2 * Math.pow(sigma, 2));
+                    const pdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+                    const expectedHeight = Math.max(collectedBalls, targetBalls) * pdf * scaleY;
+                    const yCanvas = (canvasHeight - binHeight) + binHeight - expectedHeight;
+
+                    if (xCanvas === 0) ctx.moveTo(xCanvas, yCanvas);
+                    else ctx.lineTo(xCanvas, yCanvas);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (activeChallengeKey === 'bimodal') {
+                ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.setLineDash([4, 4]);
+
+                // Destacar Col 3 e Col 12
+                [3, 12].forEach(colIdx => {
+                    if (bins[colIdx]) {
+                        ctx.strokeRect(bins[colIdx].x + 2, canvasHeight - binHeight, bins[colIdx].width - 4, binHeight);
+                    }
+                });
+                ctx.setLineDash([]);
+            } else if (activeChallengeKey === 'uniform') {
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.setLineDash([4, 4]);
+                const targetY = canvasHeight - (120 / bins.length) * 4;
+                ctx.beginPath();
+                ctx.moveTo(0, targetY);
+                ctx.lineTo(canvasWidth, targetY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            if (!showGauss || collectedBalls === 0) return;
 
             const M = bins.length;
             const p = probabilityRight;
@@ -608,12 +1008,11 @@
             const variance = (M - 1) * p * (1 - p);
             const sigma = Math.sqrt(variance);
 
-            // Prevenção de divisão por zero
             if (sigma < 0.01) return;
 
             ctx.beginPath();
             ctx.lineWidth = 3;
-            ctx.strokeStyle = '#00ffcc'; // Verde Neon brilhante
+            ctx.strokeStyle = '#00ffcc';
             ctx.shadowBlur = 12;
             ctx.shadowColor = 'rgba(0, 255, 204, 0.8)';
 
@@ -621,25 +1020,17 @@
             const scaleY = (binHeight - 5) / maxCount;
 
             for (let xCanvas = 0; xCanvas <= canvasWidth; xCanvas += 2) {
-                // Mapeia coordenada do Canvas para o espaço normal binomial [0, M-1]
                 const xStat = (xCanvas / canvasWidth) * M - 0.5;
-
-                // Densidade de probabilidade normal
                 const exponent = -Math.pow(xStat - mean, 2) / (2 * Math.pow(sigma, 2));
                 const pdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
-
-                // Altura proporcional calculada
                 const expectedHeight = collectedBalls * pdf * scaleY;
                 const yCanvas = (canvasHeight - binHeight) + binHeight - expectedHeight;
 
-                if (xCanvas === 0) {
-                    ctx.moveTo(xCanvas, yCanvas);
-                } else {
-                    ctx.lineTo(xCanvas, yCanvas);
-                }
+                if (xCanvas === 0) ctx.moveTo(xCanvas, yCanvas);
+                else ctx.lineTo(xCanvas, yCanvas);
             }
             ctx.stroke();
-            ctx.shadowBlur = 0; // Reset do glow
+            ctx.shadowBlur = 0;
         }
 
         function draw() {
@@ -647,15 +1038,32 @@
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
 
-            // 1. Desenhar pinos
-            ctx.fillStyle = pegColor;
+            // 1. Desenhar pinos normais e especiais
             pegs.forEach(peg => {
                 ctx.beginPath();
                 ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI * 2);
-                ctx.fill();
+                if (peg.type && peg.type !== 'normal') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = peg.color;
+                    ctx.fillStyle = peg.color;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Anel espiral/pulsante para Vortex
+                    if (peg.type === 'vortex') {
+                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(peg.x, peg.y, peg.radius + 6, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                } else {
+                    ctx.fillStyle = pegColor;
+                    ctx.fill();
+                }
             });
 
-            // 2. Desenhar divisórias dos coletores (bins)
+            // 2. Desenhar divisórias das colunas receptoras (bins)
             ctx.strokeStyle = binColor;
             ctx.lineWidth = 1;
             for (let i = 1; i < bins.length; i++) {
@@ -665,7 +1073,6 @@
                 ctx.lineTo(x, canvasHeight);
                 ctx.stroke();
             }
-            // Bordas laterais
             ctx.beginPath();
             ctx.moveTo(1, canvasHeight - binHeight);
             ctx.lineTo(1, canvasHeight);
@@ -673,10 +1080,9 @@
             ctx.lineTo(canvasWidth - 1, canvasHeight);
             ctx.stroke();
 
-            // 3. Desenhar histograma como bolinhas empilhadas (ilusão analógica)
+            // 3. Desenhar histograma como empilhamento analógico
             const maxCount = Math.max(1, ...bins.map(b => b.count));
             
-            // Fundo sutil para marcar as colunas ativas
             ctx.fillStyle = 'rgba(255, 51, 102, 0.04)';
             bins.forEach(bin => {
                 if (bin.count > 0) {
@@ -685,7 +1091,6 @@
                 }
             });
 
-            // Empilhamento dinâmico de partículas simuladas
             ctx.fillStyle = histogramColor;
             ctx.shadowBlur = 10;
             ctx.shadowColor = histogramShadowColor;
@@ -696,14 +1101,12 @@
                     const ballsPerRow = Math.max(1, Math.floor((bin.width - 2) / diameter));
                     const maxRowCount = Math.max(1, ...bins.map(b => Math.ceil(b.count / ballsPerRow)));
                     
-                    // O espaçamento vertical encolhe dinamicamente se o número de linhas crescer demais
                     const rowSpacing = Math.min(diameter, (binHeight - 6) / maxRowCount);
                     
                     for (let i = 0; i < bin.count; i++) {
                         const row = Math.floor(i / ballsPerRow);
                         const col = i % ballsPerRow;
                         
-                        // Centraliza bolinhas na última linha incompleta
                         const rowCountInThisLine = Math.min(ballsPerRow, bin.count - row * ballsPerRow);
                         const startX = bin.x + (bin.width - rowCountInThisLine * diameter) / 2 + ballRadius;
                         
@@ -717,18 +1120,16 @@
                 }
             });
 
-            // 4. Desenhar curva teórica de Gauss se ativado
-            if (showGauss) {
-                drawGaussianCurve();
-            }
+            // 4. Desenhar curva teórica ou metas
+            drawGaussianCurve();
 
-            // 5. Desenhar bolinhas em queda livre (glowing active spheres)
-            ctx.fillStyle = ballColor;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = ballShadowColor;
-
+            // 5. Desenhar esferas ativas
             balls.forEach(ball => {
                 if (!ball.active) return;
+                ctx.fillStyle = ball.color || ballColor;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = ball.color ? ball.color : ballShadowColor;
+
                 ctx.beginPath();
                 ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
                 ctx.fill();
@@ -761,10 +1162,18 @@
             radiusVal.textContent = `${ballRadius}px`;
         }
 
+        // --- Interceptação do Primeiro Clique para Áudio ---
+        window.addEventListener('pointerdown', initAudio, { once: true });
+        window.addEventListener('keydown', initAudio, { once: true });
+
         // --- Event Listeners ---
-        addBallBtn.addEventListener('click', createBall);
+        addBallBtn.addEventListener('click', () => {
+            initAudio();
+            createBall();
+        });
         
         add10BallsBtn.addEventListener('click', () => {
+            initAudio();
             let count = 0;
             const intervalId = setInterval(() => {
                 if (count < 10) {
@@ -776,8 +1185,15 @@
             }, 60);
         });
 
-        resetBtn.addEventListener('click', setup);
-        layoutSelector.addEventListener('change', setup);
+        resetBtn.addEventListener('click', () => {
+            initAudio();
+            setup();
+        });
+
+        layoutSelector.addEventListener('change', () => {
+            initAudio();
+            setup();
+        });
 
         speedSlider.addEventListener('input', (e) => {
             simulationSpeed = parseFloat(e.target.value);
@@ -810,6 +1226,44 @@
 
         ballCollisionCheck.addEventListener('change', (e) => {
             ballCollisionEnabled = e.target.checked;
+        });
+
+        // Eventos do Modo Desafio
+        challengeSelector.addEventListener('change', (e) => {
+            const key = e.target.value;
+            if (key !== 'none' && CHALLENGES[key]) {
+                challengeInfoBox.style.display = 'block';
+                challengeInfoBox.style.borderColor = 'rgba(255, 235, 59, 0.3)';
+                challengeInfoBox.style.color = '#d1d5db';
+                challengeInfoBox.textContent = CHALLENGES[key].description;
+            } else {
+                challengeInfoBox.style.display = 'none';
+                challengeStatusBox.style.display = 'none';
+            }
+        });
+
+        startChallengeBtn.addEventListener('click', () => {
+            initAudio();
+            const key = challengeSelector.value;
+            if (key !== 'none' && CHALLENGES[key]) {
+                activeChallengeKey = key;
+                challengeCompleted = false;
+                challengeStatusBox.style.display = 'flex';
+                challengeInfoBox.style.display = 'block';
+                challengeInfoBox.style.borderColor = 'rgba(255, 235, 59, 0.3)';
+                challengeInfoBox.style.color = '#d1d5db';
+                matchPercentDisplay.textContent = '0%';
+                CHALLENGES[key].setup();
+            }
+        });
+
+        cancelChallengeBtn.addEventListener('click', () => {
+            activeChallengeKey = 'none';
+            challengeCompleted = false;
+            challengeSelector.value = 'none';
+            challengeInfoBox.style.display = 'none';
+            challengeStatusBox.style.display = 'none';
+            setup();
         });
 
         // --- Inicialização ---

@@ -258,11 +258,26 @@ As resoluções e diretrizes arquiteturais para a implementação segura de Bata
 
 ---
 
-## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+## ❓ Dúvidas e Observações do Desenvolvedor
 
-* **Identificação do Jogo**: `pinball` (Pinball Retro Arcade)
-* **Ação**: Elaboração e refinamento da especificação da Batalha contra o Chefe (Rogue AI Core), Skill Shot e Sintetizador Web Audio API concluída.
-* **Status do Backlog**: Homologado e atualizado no `BACKLOG.md` para o status `✅ Refined`.
-* **Destino**: A especificação `TASK_003.md` está 100% pronta para ser assumida por um desenvolvedor.
+* **Status da Tarefa**: Em Desenvolvimento (In Progress) ➡️ Concluído (Dev complete).
+* **Observações Técnicas de Implementação**:
+  1. **Batalha contra o Chefe (Rogue AI Core)**:
+     - Implementado o objeto `bossState` com trigger ao atingir 15.000 pts ou 3 cruzamentos de rampas/multiplicadores superiores.
+     - 3 Escudos orbitais com 50 HP cada rodando em ângulo a 45px do núcleo. Dano de -15 HP ao colidir a bola com faíscas ciano.
+     - Núcleo invulnerável até a queda dos 3 escudos, após o qual sofre -50 HP por impacto direto da bola.
+     - Ataque *Glitch Pulse* (8s): pulso vermelho que reduz 30% a velocidade da bola e aplica classe CSS `.glitch-effect` no canvas por 0.5s.
+     - Ataque *EMP Shockwave* (12s): flash amarelo e desabilita flipper afetado (alternado/aleatório) por 2.0s retornando ao `restAngle` com opacidade 50%.
+     - Ataque *Firewall Barrier*: tijolo central (`x: 200, y: 300`) ativado com HP < 150 do Boss, destruído com 2 acertos.
+     - Vitória (+15.000 pts, +1 vida se < 3, explosão de 40 partículas douradas, skin dourada na bola por 20s ou até o fim da vida).
+  2. **Skill Shot de Precisão**:
+     - Marcador visual da Green Zone (75%-85% pull) no meter do plunger.
+     - Anel neon indicador do sensor em `x: 350, y: 40`.
+     - Validação dentro de 1.5s após disparo na Green Zone concedendo `CRITICAL SKILL SHOT!`, +3.000 pts e +1 ao multiplicador.
+  3. **Sintetizador Web Audio API (`SoundSynth`)**:
+     - Inicialização lazy no primeiro clique/tecla.
+     - Sons proceduralmente sintetizados para Flipper Flip, Bumper Hit (com throttling de 60ms), Boss Damage (ruído branco + dente de serra), Vitória do Boss, Skill Shot e Cyber Drone de fundo modulado por velocidade da bola (com atenuação no Game Over).
+     - Desconexão automática dos nós de áudio após finalização (`osc.onended`).
 
-*Assinado: Tech Lead - Antigravity*
+*Assinado: Software Engineer - Antigravity*
+

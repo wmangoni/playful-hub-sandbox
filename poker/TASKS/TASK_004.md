@@ -206,6 +206,10 @@ function playChipClinkSound(audioCtx) {
    - *Dúvida*: As dicas dadas pelo Dealer em tempo real sobre força de mãos ou prováveis saídas do bordo (Flops e Draws) violam as regras competitivas ou ajudam a ensinar novos jogadores?
    - *Proposta do PO*: Ajudam novos jogadores e tornam o game feel muito mais atrativo. Como as dicas são de texto estático, não alteram o motor interno de cartas nem dão vantagem injusta (já que o Tracker de mãos da TASK_002 já exibe a força em porcentagem). O Dealer apenas traduz a telemetria do jogo em comentários de voz divertidos.
 
+3. **Gravação de Logs para o Replay Visual (Observação/Dúvida do Desenvolvedor)**:
+   - *Dúvida / Observação*: O motor de jogo registrará `gameState.lastHandLog` com objetos sequenciais enxutos para evitar travamentos de memória. Confirmamos que a retenção deve ser estritamente da última mão concluída para manter leve o consumo do navegador?
+   - *Proposta do Dev*: Manter apenas a última mão recente concluída no buffer `gameState.lastHandLog`, permitindo re-visualização instantânea sem impactar o desempenho.
+
 ---
 
 ## 💡 Decisões e Resoluções do Tech Lead (TL)
@@ -219,7 +223,7 @@ function playChipClinkSound(audioCtx) {
 
 * **Identificação do Jogo**: `poker` (Poker Texas Hold'em)
 * **Ação**: Criação e especificação técnica de customização VIP de feltros e cartas, Dealer interativo de mesa, replay de mão e efeitos sonoros procedurais.
-* **Status do Backlog**: Registrado com sucesso no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
-* **Destino**: A `TASK_004.md` está homologada para desenvolvimento técnico futuro.
+* **Status do Backlog**: Transicionado com sucesso para `In Progress` no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md).
+* **Destino**: A `TASK_004.md` foi assumida pelo desenvolvedor e está em fase de codificação.
 
-*Assinado: Product Owner (PO) - Antigravity*
+*Assinado: Desenvolvedor de Software / Antigravity*
