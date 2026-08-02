@@ -583,14 +583,165 @@
             transform: scale(1.05);
         }
         
-        .achievement-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
+        /* Task 003: Client Contracts & Tech Debt & Sound */
+        .contracts-panel {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .panel-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+
+        .tech-debt-container {
+            text-align: right;
+            min-width: 160px;
+        }
+
+        .tech-debt-progress-bg {
             width: 100%;
+            height: 8px;
+            background: #34495e;
+            border-radius: 4px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .tech-debt-progress-fill {
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            z-index: 9999;
+            background-color: #e74c3c;
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }
+
+        .available-contracts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .contract-card {
+            background: #34495e;
+            border: 1px solid #4a6278;
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+
+        .contract-card:hover {
+            border-color: #3498db;
+            transform: translateY(-2px);
+        }
+
+        .contract-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #f1c40f;
+        }
+
+        .contract-meta {
+            font-size: 0.8rem;
+            color: #bdc3c7;
+            margin-top: 6px;
+            line-height: 1.3;
+        }
+
+        .contract-btn-sm {
+            margin-top: 10px;
+            width: 100%;
+            padding: 6px;
+            font-size: 0.8rem;
+            background: #27ae60;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .contract-btn-sm:hover:not(:disabled) {
+            background: #2ecc71;
+        }
+
+        .contract-btn-sm:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .active-project-card {
+            background: #34495e;
+            border: 1px solid #3498db;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .project-progress-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #ecf0f1;
+        }
+
+        .project-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: #2c3e50;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .project-bar-fill {
+            height: 100%;
+            background-color: #3498db;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+
+        .sound-toggle-btn {
+            background: #34495e;
+            border: 1px solid #3498db;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sound-toggle-btn:hover {
+            background: #2980b9;
+        }
+
+        .rush-btn {
+            background: #e67e22;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .rush-btn.active {
+            background: #e74c3c;
+            box-shadow: 0 0 8px #e74c3c;
         }
     </style>
 </head>
@@ -613,7 +764,10 @@
             <div class="game-layout">
                 <!-- Seção da Empresa (Esquerda) -->
                 <div class="company-section">
-                    <div class="section-title">Empresa: <span id="companyNameDisplay"></span></div>
+                    <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Empresa: <span id="companyNameDisplay"></span></span>
+                        <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSoundUI()">🔊 Sound: OFF</button>
+                    </div>
                     
                     <div class="company-dashboard">
                         <!-- Coluna da esquerda: Stats -->
@@ -665,6 +819,43 @@
                                     <div class="action-description">Reduce risk of security breaches and hacking.</div>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Client Contracts Board & Tech Debt -->
+                    <div class="contracts-panel" id="contractsBoard">
+                        <div class="panel-header-row">
+                            <h3 style="margin: 0; color: #3498db;">💼 Client Contracts Board</h3>
+                            <div class="tech-debt-container">
+                                <span>Tech Debt: <span id="techDebtDisplay">15%</span></span>
+                                <div class="tech-debt-progress-bg">
+                                    <div class="tech-debt-progress-fill" id="techDebtBar" style="width: 15%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Contratos Disponíveis -->
+                        <div style="margin-bottom: 15px;">
+                            <h4 style="margin: 5px 0; color: #f1c40f;">Available Contracts (Select to sign)</h4>
+                            <div class="available-contracts-grid" id="available-contracts-list">
+                                <!-- Populado dinamicamente -->
+                            </div>
+                        </div>
+
+                        <!-- Lista de Projetos Ativos -->
+                        <div style="border-top: 1px solid #34495e; padding-top: 10px;">
+                            <h4 style="margin: 5px 0; color: #2ecc71;">Active Projects (<span id="active-contracts-count">0</span>/2)</h4>
+                            <div class="active-contracts-list" id="active-contracts-list">
+                                <!-- Populado dinamicamente -->
+                            </div>
+                        </div>
+
+                        <!-- Botão de Refatoração -->
+                        <div style="margin-top: 15px; text-align: center;">
+                            <button class="action-button" id="btn-refactor-code" onclick="refactorCodebase()" style="margin: 0 auto; max-width: 320px; text-align: center;">
+                                🛠️ Refactor Codebase ($15,000)
+                                <div class="action-description" style="color: #ecf0f1;">Reduces Tech Debt by 25%</div>
+                            </button>
                         </div>
                     </div>
                     
@@ -927,6 +1118,155 @@
     </div>
 
     <script>
+        // Corporate Audio Engine (Web Audio API Procedural Synthesizer)
+        class CorporateAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.isEnabled = false;
+                this.bgmInterval = null;
+                this.masterGain = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContextClass();
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                this.masterGain.connect(this.ctx.destination);
+                this.isEnabled = true;
+                this.startBGMLoop();
+            }
+
+            toggle(state) {
+                if (!this.ctx) this.init();
+                this.isEnabled = (state !== undefined) ? state : !this.isEnabled;
+                if (this.masterGain) {
+                    this.masterGain.gain.setValueAtTime(this.isEnabled ? 0.15 : 0, this.ctx.currentTime);
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+                return this.isEnabled;
+            }
+
+            playSFX(type) {
+                if (!this.isEnabled || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                if (type === 'click') {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'success') {
+                    const notes = [261.63, 329.63, 392.00, 523.25];
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0, now + idx * 0.08);
+                        gain.gain.linearRampToValueAtTime(0.1, now + idx * 0.08 + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(this.masterGain);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.3);
+                    });
+                } else if (type === 'failure') {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.linearRampToValueAtTime(90, now + 0.4);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.linearRampToValueAtTime(0.001, now + 0.4);
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'burnout') {
+                    const bufferSize = this.ctx.sampleRate * 0.5;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(1200, now);
+                    filter.frequency.exponentialRampToValueAtTime(100, now + 0.5);
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.masterGain);
+                    noise.start(now);
+                    noise.stop(now + 0.5);
+                } else if (type === 'crisis') {
+                    [0, 0.2].forEach(delay => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(delay === 0 ? 440 : 380, now + delay);
+                        gain.gain.setValueAtTime(0.1, now + delay);
+                        gain.gain.linearRampToValueAtTime(0.1, now + delay + 0.15);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.18);
+                        osc.connect(gain);
+                        gain.connect(this.masterGain);
+                        osc.start(now + delay);
+                        osc.stop(now + delay + 0.2);
+                    });
+                }
+            }
+
+            startBGMLoop() {
+                const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+                const progression = [
+                    [0, 2, 4],
+                    [1, 3, 5],
+                    [2, 4, 0],
+                    [3, 5, 2]
+                ];
+                let currentStep = 0;
+
+                if (this.bgmInterval) clearInterval(this.bgmInterval);
+                this.bgmInterval = setInterval(() => {
+                    if (!this.isEnabled || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const chordIdx = Math.floor(currentStep / 4) % progression.length;
+                    const chord = progression[chordIdx];
+                    const note = scale[chord[currentStep % chord.length]];
+
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(note, now);
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(0.04, now + 0.2);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now);
+                    osc.stop(now + 0.9);
+                    currentStep++;
+                }, 1000);
+            }
+        }
+        const audioEngine = new CorporateAudioEngine();
+        window.playSFX = (type) => audioEngine.playSFX(type);
+        window.toggleSound = (state) => audioEngine.toggle(state);
+
         // Tech Company Management Simulation
         // A simple text-based strategy game to run your own tech company
 
@@ -942,6 +1282,13 @@
                 this.expenses = 5000; // Monthly burn rate
                 this.securityLevel = 10; // Security level out of 100
                 
+                // Task 003 attributes
+                this.techDebt = 15;
+                this.activeContracts = [];
+                this.availableContracts = [];
+                this.completedContractsCount = 0;
+                this.contractNextId = 1;
+                
                 // Game state
                 this.month = 1;
                 this.year = 1;
@@ -951,8 +1298,140 @@
                 
                 this.messages.push(`${this.companyName} founded with $${this.money.toLocaleString()} capital!`);
                 this.messages.push(`WARNING: Your security level is low (${this.securityLevel}/100). Consider investing in security.`);
+                
+                this.regenerateAvailableContracts();
             }
-            
+
+            regenerateAvailableContracts() {
+                const contractTemplates = [
+                    { name: "E-Commerce Mobile App", type: "app", baseEffort: 100, baseReward: 35000, penaltyRatio: 0.4, baseDuration: 4 },
+                    { name: "Corporate Portal Revamp", type: "web", baseEffort: 60, baseReward: 20000, penaltyRatio: 0.3, baseDuration: 3 },
+                    { name: "AI Analytics Microservice", type: "ai", baseEffort: 140, baseReward: 55000, penaltyRatio: 0.5, baseDuration: 5 },
+                    { name: "Fintech API Integration", type: "web", baseEffort: 90, baseReward: 30000, penaltyRatio: 0.4, baseDuration: 4 },
+                    { name: "Cloud DB Migration", type: "database", baseEffort: 80, baseReward: 25000, penaltyRatio: 0.35, baseDuration: 3 },
+                    { name: "SaaS Multi-tenant Refactor", type: "database", baseEffort: 120, baseReward: 45000, penaltyRatio: 0.45, baseDuration: 4 }
+                ];
+
+                if (!this.availableContracts) this.availableContracts = [];
+                while (this.availableContracts.length < 3) {
+                    const template = contractTemplates[Math.floor(Math.random() * contractTemplates.length)];
+                    const variance = 0.85 + Math.random() * 0.3;
+                    const effortNeeded = Math.floor(template.baseEffort * variance);
+                    const reward = Math.floor(template.baseReward * variance);
+                    const penalty = Math.floor(reward * template.penaltyRatio);
+                    const duration = Math.max(2, template.baseDuration + Math.floor((Math.random() - 0.5) * 2));
+
+                    this.availableContracts.push({
+                        id: `contract_${this.contractNextId++}`,
+                        name: template.name,
+                        type: template.type,
+                        effortNeeded: effortNeeded,
+                        effortDelivered: 0,
+                        reward: reward,
+                        penalty: penalty,
+                        duration: duration,
+                        initialDuration: duration,
+                        isRushed: false
+                    });
+                }
+            }
+
+            signContract(contractId) {
+                if (this.isGameOver) return;
+                if (this.activeContracts.length >= 2) {
+                    this.messages.push("You already have 2 active contracts! Finish one before taking another.");
+                    return;
+                }
+                const idx = this.availableContracts.findIndex(c => c.id === contractId);
+                if (idx !== -1) {
+                    const contract = this.availableContracts.splice(idx, 1)[0];
+                    this.activeContracts.push(contract);
+                    this.messages.push(`Signed contract: "${contract.name}" (Reward: $${contract.reward.toLocaleString()})`);
+                    if (window.playSFX) window.playSFX('click');
+                    this.regenerateAvailableContracts();
+                }
+            }
+
+            toggleRushContract(contractId) {
+                const contract = this.activeContracts.find(c => c.id === contractId);
+                if (contract) {
+                    contract.isRushed = !contract.isRushed;
+                    const status = contract.isRushed ? "Rushed 🔥 (+Tech Debt)" : "Normal Speed";
+                    this.messages.push(`Contract "${contract.name}" set to: ${status}`);
+                    if (window.playSFX) window.playSFX('click');
+                }
+            }
+
+            refactorCodebase() {
+                if (this.isGameOver) return;
+                const refactorCost = 15000;
+                if (this.money >= refactorCost) {
+                    this.money -= refactorCost;
+                    const oldDebt = this.techDebt;
+                    this.techDebt = Math.max(0, this.techDebt - 25);
+                    const diff = oldDebt - this.techDebt;
+                    this.messages.push(`Refactored codebase! Tech Debt reduced by ${diff}% (Now: ${this.techDebt}%).`);
+                    if (window.playSFX) window.playSFX('click');
+                    this.advanceTime();
+                } else {
+                    this.messages.push(`Not enough money to refactor codebase. Required: $${refactorCost.toLocaleString()}`);
+                }
+            }
+
+            processContractsDelivery() {
+                if (this.activeContracts.length === 0) return;
+
+                // Calcular pontos de força da equipe
+                const baseDevForce = this.employees * 10;
+                let playerBonus = 0;
+                if (typeof player !== 'undefined' && player && player.skills) {
+                    playerBonus = (player.skills.javascript || 0) * 2 + (player.skills.backend || 0) * 2;
+                }
+                const totalForcePoints = baseDevForce + playerBonus;
+
+                // Impacto da Dívida Técnica
+                const debtImpact = Math.max(0.4, 1.0 - (this.techDebt * 0.004));
+                const finalEffort = Math.floor(totalForcePoints * debtImpact);
+
+                // Dividir entre projetos ativos
+                const effortPerProject = Math.floor(finalEffort / this.activeContracts.length);
+
+                this.activeContracts.forEach(contract => {
+                    let projectEffort = effortPerProject;
+                    if (contract.isRushed) {
+                        projectEffort *= 2;
+                        this.techDebt = Math.min(100, this.techDebt + 4);
+                    }
+                    contract.effortDelivered += projectEffort;
+                });
+            }
+
+            updateContractsTimeline() {
+                const remainingContracts = [];
+                this.activeContracts.forEach(contract => {
+                    contract.duration--;
+
+                    if (contract.effortDelivered >= contract.effortNeeded) {
+                        // Sucesso
+                        this.money += contract.reward;
+                        this.reputation = Math.min(100, this.reputation + 8);
+                        this.completedContractsCount++;
+                        this.messages.push(`✅ CONTRACT COMPLETED: "${contract.name}" delivered! Earned $${contract.reward.toLocaleString()} and +8 reputation.`);
+                        if (window.playSFX) window.playSFX('success');
+                        if (typeof addXP === 'function') addXP(25);
+                    } else if (contract.duration <= 0) {
+                        // Falha por prazo
+                        this.money = Math.max(0, this.money - contract.penalty);
+                        this.reputation = Math.max(0, this.reputation - 15);
+                        this.messages.push(`❌ CONTRACT FAILED: "${contract.name}" missed deadline! Penalty: $${contract.penalty.toLocaleString()} and -15 reputation.`);
+                        if (window.playSFX) window.playSFX('failure');
+                    } else {
+                        remainingContracts.push(contract);
+                    }
+                });
+                this.activeContracts = remainingContracts;
+            }
+
             // Main game loop
             playTurn(decision) {
                 if (this.isGameOver) {
@@ -1092,6 +1571,10 @@
                 // Calculate revenue from products
                 this.revenue = this.products.reduce((total, product) => total + product.revenue, 0);
                 
+                // Tech debt increases monthly maintenance expenses
+                const techDebtExpense = Math.floor(this.techDebt * 30);
+                this.expenses = 5000 + (this.employees * 1500) + techDebtExpense;
+
                 // Monthly profit/loss
                 const monthlyChange = this.revenue - this.expenses;
                 this.money += monthlyChange;
@@ -1106,8 +1589,8 @@
             triggerRandomEvent() {
                 const eventChance = Math.random() * 100;
                 
-                // Evento de vazamento de dados (10% de chance base)
-                let dataBreachChance = 10;
+                // Evento de vazamento de dados (aumenta com dívida técnica)
+                let dataBreachChance = 10 * (1 + (this.techDebt / 100));
                 
                 // Reduzir chance de vazamento se tiver certificação DBA
                 if (player && player.certifications && player.certifications.dba) {
@@ -1122,6 +1605,7 @@
                     this.money = Math.max(0, this.money - moneyLoss);
                     
                     this.messages.push(`DATA BREACH! Your company lost ${reputationLoss} reputation points and $${moneyLoss.toLocaleString()} in fines and compensations.`);
+                    if (window.playSFX) window.playSFX('crisis');
                     
                     // Penalidade de XP para o jogador
                     if (player) {
@@ -1174,10 +1658,12 @@
                     this.money -= hackAmount;
                     this.messages.push(`Your company was hacked! You lost $${hackAmount.toLocaleString()}.`);
                     this.securityLevel = Math.max(0, this.securityLevel - 10);
+                    if (window.playSFX) window.playSFX('crisis');
                 } else if (eventChance < 55 && this.employees > 2) {
                     this.employees -= 1;
                     this.expenses -= Math.floor(Math.random()*5000) + 4000;
                     this.messages.push("An employee quit unexpectedly!");
+                    if (window.playSFX) window.playSFX('burnout');
                 }
             }
             
@@ -1200,6 +1686,15 @@
                     this.month = 1;
                     this.year++;
                 }
+
+                // Entregar progresso nos contratos ativos
+                this.processContractsDelivery();
+                
+                // Atualizar prazos e verificar conclusão/falha
+                this.updateContractsTimeline();
+
+                // Manter contratos disponíveis atualizados
+                this.regenerateAvailableContracts();
                 
                 // Calcular receita e despesas mensais
                 this.calculateFinances();
@@ -1729,6 +2224,11 @@
                     month: game.month,
                     year: game.year,
                     securityLevel: game.securityLevel,
+                    techDebt: game.techDebt,
+                    activeContracts: game.activeContracts,
+                    availableContracts: game.availableContracts,
+                    completedContractsCount: game.completedContractsCount,
+                    contractNextId: game.contractNextId,
                     revenue: game.revenue,
                     expenses: game.expenses,
                     isGameOver: game.isGameOver,
@@ -1812,6 +2312,11 @@
                         game.month = parsedData.company.month;
                         game.year = parsedData.company.year;
                         game.securityLevel = parsedData.company.securityLevel;
+                        game.techDebt = parsedData.company.techDebt !== undefined ? parsedData.company.techDebt : 15;
+                        game.activeContracts = parsedData.company.activeContracts || [];
+                        game.availableContracts = parsedData.company.availableContracts || [];
+                        game.completedContractsCount = parsedData.company.completedContractsCount || 0;
+                        game.contractNextId = parsedData.company.contractNextId || 1;
                         game.revenue = parsedData.company.revenue;
                         game.expenses = parsedData.company.expenses;
                         game.isGameOver = parsedData.company.isGameOver;
@@ -1931,6 +2436,27 @@
                 });
             });
 
+            // Configurar botão de Refatoração de Dívida Técnica
+            const refactorBtn = document.getElementById('refactorBtn');
+            if (refactorBtn) {
+                refactorBtn.addEventListener('click', function() {
+                    if (game) {
+                        game.refactorCodebase();
+                        updateGameDisplay();
+                    }
+                });
+            }
+
+            // Configurar botão de Áudio / Som
+            const soundToggleBtn = document.getElementById('soundToggleBtn');
+            if (soundToggleBtn) {
+                soundToggleBtn.addEventListener('click', function() {
+                    const state = window.toggleSound();
+                    soundToggleBtn.textContent = state ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+                    soundToggleBtn.style.background = state ? '#27ae60' : '#7f8c8d';
+                });
+            }
+
             // Adicionar listener para o botão de reiniciar jogo
             const restartGameBtn = document.getElementById('restartGameBtn');
             if (restartGameBtn) {
@@ -1955,6 +2481,71 @@
             // Atualizar barra de segurança
             document.getElementById('securityLevel').textContent = game.securityLevel;
             document.getElementById('securityBar').style.width = `${game.securityLevel}%`;
+
+            // Atualizar Dívida Técnica
+            const techDebtVal = game.techDebt || 0;
+            const techDebtElement = document.getElementById('techDebtLevel');
+            if (techDebtElement) techDebtElement.textContent = `${techDebtVal}%`;
+            const techDebtBar = document.getElementById('techDebtBar');
+            if (techDebtBar) techDebtBar.style.width = `${techDebtVal}%`;
+
+            // Renderizar Contratos Ativos
+            const activeList = document.getElementById('activeContractsList');
+            if (activeList) {
+                activeList.innerHTML = '';
+                if (!game.activeContracts || game.activeContracts.length === 0) {
+                    activeList.innerHTML = '<p class="no-contracts">No active projects running.</p>';
+                } else {
+                    game.activeContracts.forEach(c => {
+                        const pct = Math.min(100, Math.floor((c.effortDelivered / c.effortNeeded) * 100));
+                        const card = document.createElement('div');
+                        card.className = 'contract-card';
+                        card.innerHTML = `
+                            <div class="contract-header">
+                                <strong>${c.name}</strong>
+                                <span class="type-badge ${c.type}">${c.type.toUpperCase()}</span>
+                            </div>
+                            <p style="margin: 5px 0; font-size: 0.85em; color: #7f8c8d;">Reward: $${c.reward.toLocaleString()} | Penalty: $${c.penalty.toLocaleString()}</p>
+                            <p style="margin: 5px 0; font-size: 0.85em;">Time Left: <strong>${c.duration} month(s)</strong></p>
+                            <div class="progress-bar" style="margin: 8px 0;">
+                                <div class="contract-progress-fill" style="width: ${pct}%;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8em; margin-top: 5px;">
+                                <span>Progress: ${c.effortDelivered}/${c.effortNeeded} pts (${pct}%)</span>
+                                <button class="rush-btn ${c.isRushed ? 'active' : ''}" onclick="window.game.toggleRushContract('${c.id}'); updateGameDisplay();">
+                                    ${c.isRushed ? '🔥 Rushed' : '⚡ Rush Delivery'}
+                                </button>
+                            </div>
+                        `;
+                        activeList.appendChild(card);
+                    });
+                }
+            }
+
+            // Renderizar Contratos Disponíveis
+            const availList = document.getElementById('availableContractsList');
+            if (availList) {
+                availList.innerHTML = '';
+                if (game.availableContracts) {
+                    game.availableContracts.forEach(c => {
+                        const card = document.createElement('div');
+                        card.className = 'contract-card';
+                        card.innerHTML = `
+                            <div class="contract-header">
+                                <strong>${c.name}</strong>
+                                <span class="type-badge ${c.type}">${c.type.toUpperCase()}</span>
+                            </div>
+                            <p style="margin: 5px 0; font-size: 0.85em; color: #7f8c8d;">Effort: ${c.effortNeeded} pts | Duration: ${c.duration} months</p>
+                            <p style="margin: 5px 0; font-size: 0.85em; color: #27ae60;">Reward: <strong>$${c.reward.toLocaleString()}</strong></p>
+                            <p style="margin: 5px 0; font-size: 0.85em; color: #e74c3c;">Penalty: $${c.penalty.toLocaleString()}</p>
+                            <button class="sign-contract-btn" ${game.activeContracts && game.activeContracts.length >= 2 || game.isGameOver ? 'disabled' : ''} onclick="window.game.signContract('${c.id}'); updateGameDisplay();">
+                                Sign Contract
+                            </button>
+                        `;
+                        availList.appendChild(card);
+                    });
+                }
+            }
             
             // Atualizar mensagens
             const messagesDiv = document.getElementById('messages');
@@ -1965,10 +2556,10 @@
                 msgElement.textContent = message;
                 
                 // Destacar mensagens importantes
-                if (message.includes("DATA BREACH") || message.includes("SECURITY BREACH")) {
+                if (message.includes("DATA BREACH") || message.includes("SECURITY BREACH") || message.includes("FAILED")) {
                     msgElement.style.color = "#e74c3c";
                     msgElement.style.fontWeight = "bold";
-                } else if (message.includes("STRATEGIC PARTNERSHIP") || message.includes("investor")) {
+                } else if (message.includes("STRATEGIC PARTNERSHIP") || message.includes("investor") || message.includes("COMPLETED")) {
                     msgElement.style.color = "#27ae60";
                     msgElement.style.fontWeight = "bold";
                 }

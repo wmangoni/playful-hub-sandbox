@@ -140,13 +140,14 @@
         <div id="startScreen" class="overlay show">
             <h1>RETRO SHOOTER</h1>
             <h2>Canvas Mayhem</h2>
-            <p>Eliminate all hostile entities. Use WASD/Arrows to move, Mouse to aim/turn, Click/Space to shoot, Keys 1/2 to switch weapons. ESC to Pause.</p>
+            <p>Eliminate all hostile entities. Use WASD/Arrows to move, Mouse to aim/turn, Click/Space to shoot, Keys 1-4 to switch weapons, M for Minimap. ESC to Pause.</p>
              <div class="control-info">
                 <div><span>Move:</span> WASD / ↑↓</div>
                  <div><span>Strafe:</span> A / D</div>
                  <div><span>Turn:</span> ←→ / Mouse</div>
                  <div><span>Shoot:</span> Click / Space</div>
-                 <div><span>Weapon:</span> 1 / 2</div>
+                 <div><span>Weapon:</span> 1 / 2 / 3 / 4</div>
+                 <div><span>Minimap:</span> M</div>
                 <div><span>Pause:</span> ESC</div>
             </div>
             <button id="startButton">BEGIN CARNAGE</button>
@@ -176,12 +177,19 @@
             <button id="restartButton">RESTART</button>
         </div>
 
+        <div id="victoryScreen" class="overlay">
+            <h1>VICTORY!</h1>
+            <h2 id="victoryScore">Final Score: 0</h2>
+            <p>All hostile entities have been eliminated. You survived the carnage!</p>
+            <button id="victoryRestartButton">PLAY AGAIN</button>
+        </div>
+
     </div>
 
     <script>
         const DEBUG = false;
         // --- Add near the top with other constants ---
-        const OPTIMIZE_MODE = 1; // 0 = High Quality (potentially slow), 1 = Optimized, 2 = Max Performance (lower res)
+        let OPTIMIZE_MODE = 1; // 0 = High Quality (potentially slow), 1 = Optimized, 2 = Max Performance (lower res)
 
         // --- Modify Screen Width based on mode (Adjust these values as needed) ---
         const baseScreenWidth = 800;
@@ -208,11 +216,13 @@
         let gameStarted = false;
         let isPaused = false;
         let isGameOver = false;
+        let isVictory = false;
         let player = {}; // Initialize later
         let enemies = []; // Initialize later
         let map = []; // Initialize later
         let pickups = []; // Health / Ammo
-        let particles = []; // For impacts, etc.
+        let particlePool = []; // For impacts, etc.
+        const MAX_PARTICLES = (OPTIMIZE_MODE === 2) ? 50 : 250;
         let zBuffer = new Array(screenWidth).fill(Infinity);
         let lastTimestamp = 0;
         let deltaTime = 0; // Time difference between frames in seconds
@@ -237,21 +247,21 @@
         // Map Data (1-4: Walls, 5: Health Pickup, 6: Ammo Pickup)
         const mapData = [
           [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 6, 0, 0, 1],
+          [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 6, 0, 7, 1],
           [1, 0, 2, 2, 0, 1, 1, 0, 1, 1, 0, 3, 0, 1, 0, 0, 0, 0, 0, 1],
           [1, 0, 2, 0, 0, 0, 0, 0, 0, 1, 0, 3, 0, 1, 1, 1, 1, 0, 1, 1],
-          [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 0, 1, 0, 0, 1],
+          [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 0, 1, 0, 8, 1],
           [1, 1, 1, 0, 1, 1, 1, 4, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
           [1, 0, 0, 0, 0, 0, 1, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
           [1, 0, 3, 3, 0, 0, 1, 4, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
-          [1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1],
+          [1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 7, 0, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1],
           [1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 5, 1],
           [1, 5, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          [1, 0, 4, 4, 4, 4, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+          [1, 0, 4, 4, 4, 4, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 1],
           [1, 0, 4, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 1],
-          [1, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+          [1, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
           [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ];
@@ -317,6 +327,19 @@
             soundHurt: 'demonHurt',
             soundDeath: 'demonDeath',
             soundAlert: 'demonAlert'
+          },
+          cyber_imp: {
+            health: 80,
+            speed: 1.2,
+            damage: 15,
+            size: 0.6,
+            color: '#ff00ff',
+            scoreValue: 200,
+            attackRange: 6.0,
+            sightRange: 12,
+            soundHurt: 'gruntHurt',
+            soundDeath: 'gruntDeath',
+            soundAlert: 'gruntAlert'
           }
         };
 
@@ -333,6 +356,8 @@
             projectiles: 1,
             sound: 'shootPistol',
             automatic: false,
+            muzzleOffsetX: 0,
+            muzzleOffsetY: 5,
             sprite: {
               w: 80,
               h: 100,
@@ -351,6 +376,8 @@
             projectiles: 6,
             sound: 'shootShotgun',
             automatic: false,
+            muzzleOffsetX: 0,
+            muzzleOffsetY: 15,
             sprite: {
               w: 100,
               h: 90,
@@ -358,7 +385,46 @@
               color2: '#2a1a0e'
             }
           },
-          // Add other weapons if any
+          plasma: {
+            name: "Plasma Rifle",
+            damage: 10,
+            fireRate: 0.1,
+            ammo: 50,
+            maxAmmo: 150,
+            reloadTime: 1.2,
+            spread: 0.02,
+            projectiles: 1,
+            sound: 'shootPlasma',
+            automatic: true,
+            muzzleOffsetX: 0,
+            muzzleOffsetY: 5,
+            sprite: {
+              w: 90,
+              h: 95,
+              color1: '#00f3ff',
+              color2: '#00838f'
+            }
+          },
+          rocket: {
+            name: "Rocket Launcher",
+            damage: 100,
+            fireRate: 1.2,
+            ammo: 10,
+            maxAmmo: 30,
+            reloadTime: 2.0,
+            spread: 0.01,
+            projectiles: 1,
+            sound: 'shootRocket',
+            automatic: false,
+            muzzleOffsetX: 0,
+            muzzleOffsetY: 10,
+            sprite: {
+              w: 110,
+              h: 105,
+              color1: '#ff3300',
+              color2: '#bf360c'
+            }
+          }
         };
 
         // Variable to hold the looping proximity sound instance
@@ -390,8 +456,31 @@
             target: 'ammo',
             sound: 'pickupAmmo'
           },
-          // Gives ammo for current weapon
+          ammo_plasma: {
+            type: 7,
+            size: 0.3,
+            color: '#00f3ff',
+            bob: true,
+            amount: 30,
+            target: 'ammo_plasma',
+            sound: 'pickupAmmo'
+          },
+          ammo_rocket: {
+            type: 8,
+            size: 0.3,
+            color: '#ff3300',
+            bob: true,
+            amount: 5,
+            target: 'ammo_rocket',
+            sound: 'pickupAmmo'
+          }
         };
+
+        // Projectile, Minimap, and Screen Shake variables
+        let projectiles = [];
+        let showMinimap = 1; // 0: Hidden, 1: Compact, 2: Expanded
+        let screenShakeTimer = 0;
+        let screenShakeIntensity = 0;
 
         // --- Input Tracking ---
         const keys = {
@@ -406,7 +495,10 @@
           ' ': false,
           Escape: false,
           '1': false,
-          '2': false
+          '2': false,
+          '3': false,
+          '4': false,
+          'm': false
         };
         let mouseX = 0;
         let mouseY = 0;
@@ -433,11 +525,13 @@
             currentWeapon: defaultWeapon,
             weapons: JSON.parse(JSON.stringify(weapons)), // Deep copy weapon stats
             lastShotTimestamp: 0,
+            muzzleFlashTimer: 0,
             isReloading: false,
             reloadTimer: 0,
             score: 0,
             isMoving: false
           };
+          projectiles = []; // Clear projectiles
           enemies = [ // Initial enemy placement
             {
               x: 6.5,
@@ -452,8 +546,8 @@
               id: `enemy_${Date.now()}_1`
             },
             {
-              x: 10.5,
-              y: 10.5,
+              x: 9.5,
+              y: 9.5,
               type: 'grunt',
               id: `enemy_${Date.now()}_2`
             },
@@ -470,10 +564,22 @@
               id: `enemy_${Date.now()}_4`
             },
             {
-              x: 2.5,
+              x: 3.5,
               y: 15.5,
               type: 'grunt',
               id: `enemy_${Date.now()}_5`
+            },
+            {
+              x: 12.5,
+              y: 4.5,
+              type: 'cyber_imp',
+              id: `enemy_${Date.now()}_6`
+            },
+            {
+              x: 8.5,
+              y: 12.5,
+              type: 'cyber_imp',
+              id: `enemy_${Date.now()}_7`
             }
           ].map(e => ({
             ...e,
@@ -488,10 +594,34 @@
             isVisible: true,
           }));
           pickups = []; // Clear previous pickups
-          particles = []; // Clear particles
+          // Initialize particle pool
+          particlePool = [];
+          for (let i = 0; i < MAX_PARTICLES; i++) {
+            particlePool.push({
+              active: false,
+              x: 0,
+              y: 0,
+              z: 0,
+              vx: 0,
+              vy: 0,
+              vz: 0,
+              r: 0,
+              g: 0,
+              b: 0,
+              alpha: 0,
+              life: 0,
+              maxLife: 0,
+              size: 0
+            });
+          }
           scanMapForPickups(); // Populate pickups based on map codes
           isGameOver = false;
           isPaused = false;
+          isVictory = false;
+          const victoryScreen = document.getElementById('victoryScreen');
+          if (victoryScreen) {
+            victoryScreen.classList.remove('show');
+          }
           damageOverlayAlpha = 0;
           finalScoreElement.textContent = 'Score: 0'; // Use a separate score element for HUD later?
           updateHUD(); // Initial HUD update
@@ -694,6 +824,9 @@
             if (e.key >= '1' && e.key <= '9') { // Weapon switch keys
               switchWeapon(parseInt(e.key));
             }
+            if (e.key === 'm' || e.key === 'M') {
+              showMinimap = (showMinimap + 1) % 3;
+            }
             // Init audio on first keydown
             initAudio();
           });
@@ -732,6 +865,18 @@
             lastTimestamp = performance.now(); // Reset timer
             requestAnimationFrame(gameLoop); // Resume loop immediately
           });
+          
+          const victoryRestartButton = document.getElementById('victoryRestartButton');
+          if (victoryRestartButton) {
+            victoryRestartButton.addEventListener('click', () => {
+              initializeGame();
+              const victoryScreen = document.getElementById('victoryScreen');
+              if (victoryScreen) victoryScreen.classList.remove('show');
+              gameStarted = true;
+              lastTimestamp = performance.now();
+              requestAnimationFrame(gameLoop);
+            });
+          }
         }
 
         function processInput(dt) {
@@ -819,15 +964,393 @@
         }
 
 
+        // --- Web Audio API Synthesizers ---
+        function playPlasmaLaserSound() {
+          if (!audioContext || !isAudioInitialized) return;
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(900, audioContext.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.12, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.12);
+          osc.connect(gain).connect(masterGain);
+          osc.start();
+          osc.stop(audioContext.currentTime + 0.12);
+        }
+
+        function playRocketLaunchSound() {
+          if (!audioContext || !isAudioInitialized) return;
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(180, audioContext.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+          osc.connect(gain).connect(masterGain);
+          osc.start();
+          osc.stop(audioContext.currentTime + 0.3);
+        }
+
+        function playExplosionSound() {
+          if (!audioContext || !isAudioInitialized) return;
+          const bufferSize = audioContext.sampleRate * 0.6;
+          const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          const noiseSource = audioContext.createBufferSource();
+          noiseSource.buffer = buffer;
+          const filter = audioContext.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(800, audioContext.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(80, audioContext.currentTime + 0.5);
+          const gain = audioContext.createGain();
+          gain.gain.setValueAtTime(0.4, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.5);
+          noiseSource.connect(filter).connect(gain).connect(masterGain);
+          noiseSource.start();
+          noiseSource.stop(audioContext.currentTime + 0.6);
+        }
+
+        function playImpCastSound() {
+          if (!audioContext || !isAudioInitialized) return;
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(300, audioContext.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.25);
+          gain.gain.setValueAtTime(0.15, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.25);
+          osc.connect(gain).connect(masterGain);
+          osc.start();
+          osc.stop(audioContext.currentTime + 0.25);
+        }
+
+        // --- Projectile System ---
+        function spawnProjectile(owner, type, x, y, angle, speed, damage, color) {
+          projectiles.push({
+            owner: owner,
+            type: type,
+            x: x,
+            y: y,
+            z: 0.5,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            radius: 0.15,
+            damage: damage,
+            color: color,
+            active: true,
+            life: type === 'plasma' ? 3.0 : (type === 'rocket' ? 5.0 : 4.0)
+          });
+        }
+
+        function triggerScreenShake(intensity, duration) {
+          screenShakeIntensity = intensity;
+          screenShakeTimer = duration;
+        }
+
+        function explodeRocket(ex, ey) {
+          const splashRadius = 1.8;
+          const maxDamage = 100;
+
+          playExplosionSound();
+          triggerScreenShake(15, 0.5);
+
+          for (let k = 0; k < 20; k++) {
+            const pAngle = Math.random() * Math.PI * 2;
+            const pSpeed = 1.0 + Math.random() * 4.0;
+            const colorHex = Math.random() > 0.4 ? '#ff5500' : '#888888';
+            const r = colorHex === '#ff5500' ? 255 : 136;
+            const g = colorHex === '#ff5500' ? 85 : 136;
+            const b = colorHex === '#ff5500' ? 0 : 136;
+            const p = particlePool.find(item => !item.active);
+            if (p) {
+              p.active = true;
+              p.x = ex;
+              p.y = ey;
+              p.z = 0.5;
+              p.vx = Math.cos(pAngle) * pSpeed;
+              p.vy = Math.sin(pAngle) * pSpeed;
+              p.vz = (Math.random() - 0.5) * 5;
+              p.r = r; p.g = g; p.b = b;
+              p.alpha = 1.0;
+              p.maxLife = 0.4 + Math.random() * 0.4;
+              p.life = p.maxLife;
+              p.size = 4 + Math.random() * 4;
+            }
+          }
+
+          for (let i = 0; i < enemies.length; i++) {
+            const e = enemies[i];
+            if (e.state === 'dead' || e.state === 'dying') continue;
+            const dx = e.x - ex;
+            const dy = e.y - ey;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist <= splashRadius) {
+              const damageFactor = 1 - (dist / splashRadius);
+              const finalDamage = Math.round(maxDamage * damageFactor);
+              if (finalDamage > 0) {
+                e.currentHealth -= finalDamage;
+                e.lastHitTimestamp = Date.now();
+                e.isHit = true;
+                if (e.currentHealth <= 0 && e.state !== 'dying') {
+                  triggerEnemyDeath(e);
+                }
+              }
+            }
+          }
+
+          const dxPlay = player.x - ex;
+          const dyPlay = player.y - ey;
+          const distPlay = Math.sqrt(dxPlay * dxPlay + dyPlay * dyPlay);
+          if (distPlay <= splashRadius) {
+            const damageFactor = 1 - (distPlay / splashRadius);
+            const finalDamage = Math.round(maxDamage * damageFactor * 0.5);
+            if (finalDamage > 0) {
+              player.health -= finalDamage;
+              triggerDamageOverlay();
+              if (player.health <= 0) {
+                triggerGameOver();
+              }
+              updateHUD();
+            }
+          }
+        }
+
+        function updateProjectiles(dt) {
+          for (let i = projectiles.length - 1; i >= 0; i--) {
+            const p = projectiles[i];
+            if (!p.active) {
+              projectiles.splice(i, 1);
+              continue;
+            }
+
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+
+            const gridX = Math.floor(p.x);
+            const gridY = Math.floor(p.y);
+
+            if (p.life <= 0 || gridX < 0 || gridX >= mapWidth || gridY < 0 || gridY >= mapHeight || map[gridY][gridX] > 0) {
+              if (p.type === 'rocket') {
+                explodeRocket(p.x, p.y);
+              } else {
+                createImpactParticles(p.x, p.y, p.color, Math.atan2(p.vy, p.vx));
+              }
+              p.active = false;
+              projectiles.splice(i, 1);
+              continue;
+            }
+
+            if (p.owner === 'player') {
+              for (let j = 0; j < enemies.length; j++) {
+                const e = enemies[j];
+                if (e.state === 'dead' || e.state === 'dying') continue;
+                const dx = p.x - e.x;
+                const dy = p.y - e.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < (e.size || 0.5) + p.radius) {
+                  e.currentHealth -= p.damage;
+                  e.lastHitTimestamp = Date.now();
+                  e.isHit = true;
+                  if (e.currentHealth <= 0 && e.state !== 'dying') {
+                    triggerEnemyDeath(e);
+                  }
+                  if (p.type === 'rocket') {
+                    explodeRocket(p.x, p.y);
+                  } else {
+                    createImpactParticles(p.x, p.y, p.color, Math.atan2(p.vy, p.vx));
+                  }
+                  p.active = false;
+                  break;
+                }
+              }
+            } else if (p.owner === 'enemy') {
+              const dx = p.x - player.x;
+              const dy = p.y - player.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 0.3 + p.radius) {
+                player.health -= p.damage;
+                triggerDamageOverlay();
+                createImpactParticles(p.x, p.y, p.color, Math.atan2(p.vy, p.vx));
+                p.active = false;
+                if (player.health <= 0) {
+                  triggerGameOver();
+                }
+                updateHUD();
+              }
+            }
+
+            if (!p.active) {
+              projectiles.splice(i, 1);
+            }
+          }
+        }
+
+        // --- Cyber-Imp AI ---
+        function updateCyberImpAI(e, dt) {
+          const dx = player.x - e.x;
+          const dy = player.y - e.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          const hasSight = castRayEnemy(e.x, e.y, Math.atan2(dy, dx)).distance >= dist - 0.1;
+          if (!hasSight) {
+            moveEnemy(e, Math.atan2(dy, dx), e.speed * dt);
+            return;
+          }
+
+          e.angle = Math.atan2(dy, dx);
+
+          const optimalDist = 5.0;
+          const tolerance = 1.0;
+
+          if (dist > optimalDist + tolerance) {
+            moveEnemy(e, e.angle, e.speed * dt);
+          } else if (dist < optimalDist - tolerance) {
+            const retreatX = e.x - Math.cos(e.angle) * e.speed * dt;
+            const retreatY = e.y - Math.sin(e.angle) * e.speed * dt;
+            if (!isWall(Math.floor(retreatX), Math.floor(retreatY))) {
+              e.x = retreatX;
+              e.y = retreatY;
+            } else {
+              const strafeAngle = e.angle + Math.PI / 2;
+              const strafeX = e.x + Math.cos(strafeAngle) * e.speed * dt;
+              const strafeY = e.y + Math.sin(strafeAngle) * e.speed * dt;
+              if (!isWall(Math.floor(strafeX), Math.floor(strafeY))) {
+                e.x = strafeX;
+                e.y = strafeY;
+              }
+            }
+          }
+
+          const now = Date.now();
+          if (!e.lastAttackTimestamp) e.lastAttackTimestamp = now;
+          if (now - e.lastAttackTimestamp > 2500 + Math.random() * 1000) {
+            e.lastAttackTimestamp = now;
+            spawnProjectile('enemy', 'imp-ball', e.x, e.y, e.angle, 5.0, 15, '#ff00ff');
+            playImpCastSound();
+          }
+        }
+
+        // --- Minimap Renderer ---
+        function renderMinimap() {
+          if (showMinimap === 0) return;
+
+          const size = showMinimap === 2 ? 200 : 120;
+          const padding = 15;
+          const mx = screenWidth - size - padding;
+          const my = padding;
+
+          ctx.save();
+          ctx.fillStyle = 'rgba(10, 15, 20, 0.75)';
+          ctx.strokeStyle = '#00f3ff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(mx, my, size, size, 8);
+          } else {
+            ctx.rect(mx, my, size, size);
+          }
+          ctx.fill();
+          ctx.stroke();
+          ctx.clip();
+
+          const scale = size / (showMinimap === 2 ? mapWidth : 8);
+          const centerX = player.x;
+          const centerY = player.y;
+
+          if (showMinimap === 1) {
+            const startGridX = Math.floor(player.x - 4);
+            const startGridY = Math.floor(player.y - 4);
+
+            for (let y = startGridY; y <= startGridY + 8; y++) {
+              for (let x = startGridX; x <= startGridX + 8; x++) {
+                if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight && map[y][x] > 0) {
+                  const rx = mx + size / 2 + (x - centerX) * scale;
+                  const ry = my + size / 2 + (y - centerY) * scale;
+                  ctx.fillStyle = 'rgba(0, 243, 255, 0.2)';
+                  ctx.strokeStyle = 'rgba(0, 243, 255, 0.6)';
+                  ctx.lineWidth = 1;
+                  ctx.fillRect(rx, ry, scale, scale);
+                  ctx.strokeRect(rx, ry, scale, scale);
+                }
+              }
+            }
+          } else {
+            const fullScaleX = size / mapWidth;
+            const fullScaleY = size / mapHeight;
+            for (let y = 0; y < mapHeight; y++) {
+              for (let x = 0; x < mapWidth; x++) {
+                if (map[y][x] > 0) {
+                  ctx.fillStyle = 'rgba(0, 243, 255, 0.25)';
+                  ctx.fillRect(mx + x * fullScaleX, my + y * fullScaleY, fullScaleX, fullScaleY);
+                }
+              }
+            }
+          }
+
+          projectiles.forEach(p => {
+            const rx = showMinimap === 1 ? mx + size / 2 + (p.x - centerX) * scale : mx + p.x * (size / mapWidth);
+            const ry = showMinimap === 1 ? my + size / 2 + (p.y - centerY) * scale : my + p.y * (size / mapHeight);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(rx, ry, 2, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          enemies.forEach(e => {
+            if (e.state === 'dead' || e.state === 'dying') return;
+            const rx = showMinimap === 1 ? mx + size / 2 + (e.x - centerX) * scale : mx + e.x * (size / mapWidth);
+            const ry = showMinimap === 1 ? my + size / 2 + (e.y - centerY) * scale : my + e.y * (size / mapHeight);
+            
+            ctx.fillStyle = e.type === 'cyber_imp' ? '#ff00ff' : (e.state === 'chase' ? '#ff3333' : '#ffaa00');
+            ctx.beginPath();
+            ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          pickups.forEach(p => {
+            const rx = showMinimap === 1 ? mx + size / 2 + (p.x - centerX) * scale : mx + p.x * (size / mapWidth);
+            const ry = showMinimap === 1 ? my + size / 2 + (p.y - centerY) * scale : my + p.y * (size / mapHeight);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(rx - 2, ry - 2, 4, 4);
+          });
+
+          const px = showMinimap === 1 ? mx + size / 2 : mx + player.x * (size / mapWidth);
+          const py = showMinimap === 1 ? my + size / 2 : my + player.y * (size / mapHeight);
+
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(player.angle);
+          ctx.fillStyle = '#ffeb3b';
+          ctx.beginPath();
+          ctx.moveTo(6, 0);
+          ctx.lineTo(-4, -4);
+          ctx.lineTo(-4, 4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+
+          ctx.restore();
+        }
+
         // --- Update Logic ---
         function update(dt) {
-          if (isPaused || isGameOver) return;
+          if (isPaused || isGameOver || isVictory) return;
           
           processInput(dt);
           updatePlayer(dt);
+          updateProjectiles(dt);
           updateEnemies(dt);
           updatePickups(dt);
           updateParticles(dt);
+          if (player.muzzleFlashTimer > 0) {
+            player.muzzleFlashTimer = Math.max(0, player.muzzleFlashTimer - dt);
+          }
           // updateActiveSounds(); // Update positions for looping sounds
           updateEnemySounds(); // <--- Add this call
         }
@@ -989,6 +1512,7 @@
               if (enemy.dyingTimer <= 0) {
                 enemy.state = 'dead';
                 // playSound(enemy.soundDeath, 1.0, 1.0, enemy); // Play death sound
+                checkVictory();
               }
               return; // No other actions while dying
             }
@@ -996,6 +1520,11 @@
             // Hit flash timer
             if (enemy.isHit && Date.now() - enemy.lastHitTimestamp > 150) {
               enemy.isHit = false;
+            }
+
+            if (enemy.type === 'cyber_imp') {
+              updateCyberImpAI(enemy, dt);
+              return;
             }
             
             const dx = player.x - enemy.x;
@@ -1134,13 +1663,15 @@
                   player.health = Math.min(player.maxHealth, player.health + pickup.amount);
                   pickedUp = true;
                 }
-              } else if (pickup.target === 'ammo') {
-                const weapon = player.weapons[player.currentWeapon];
-                if (weapon.ammo < weapon.maxAmmo) {
+              } else if (pickup.target === 'ammo' || pickup.target === 'ammo_plasma' || pickup.target === 'ammo_rocket') {
+                let targetWeaponKey = player.currentWeapon;
+                if (pickup.target === 'ammo_plasma') targetWeaponKey = 'plasma';
+                if (pickup.target === 'ammo_rocket') targetWeaponKey = 'rocket';
+                const weapon = player.weapons[targetWeaponKey];
+                if (weapon && weapon.ammo < weapon.maxAmmo) {
                   weapon.ammo = Math.min(weapon.maxAmmo, weapon.ammo + pickup.amount);
                   pickedUp = true;
                 }
-                // Alternative: give ammo for all weapons?
               }
               
               if (pickedUp) {
@@ -1154,12 +1685,36 @@
         }
 
         function updateParticles(dt) {
-          particles = particles.filter(p => {
+          const GRAVITY = 12.0;
+          for (let i = 0; i < particlePool.length; i++) {
+            const p = particlePool[i];
+            if (!p.active) continue;
+            
+            // Apply speed on X and Y
             p.x += p.vx * dt;
             p.y += p.vy * dt;
-            p.alpha -= p.decay * dt;
-            return p.alpha > 0;
-          });
+            
+            // Apply gravity and speed on Z
+            p.vz -= GRAVITY * dt;
+            p.z += p.vz * dt;
+            
+            // Floor collision (Z = 0)
+            if (p.z <= 0) {
+              p.z = 0;
+              p.vz = -p.vz * 0.35; // Energy loss bounce
+              p.vx *= 0.7;        // Friction
+              p.vy *= 0.7;
+            }
+            
+            // Decay life
+            p.life -= dt;
+            if (p.life <= 0) {
+              p.active = false;
+            } else {
+              // Fade out
+              p.alpha = Math.max(0, p.life / p.maxLife);
+            }
+          }
         }
 
         // --- Rendering ---
@@ -1167,68 +1722,77 @@
           ctx.clearRect(0, 0, screenWidth, screenHeight);
           zBuffer.fill(Infinity);
           
+          let shaking = false;
+          if (screenShakeTimer > 0) {
+            screenShakeTimer -= deltaTime;
+            shaking = true;
+            const shakeX = (Math.random() - 0.5) * screenShakeIntensity;
+            const shakeY = (Math.random() - 0.5) * screenShakeIntensity;
+            ctx.save();
+            ctx.translate(shakeX, shakeY);
+          }
+
           renderBackgroundAndFloor(); // Optimized version called here
           
           // --- Wall Casting & Rendering ---
           for (let x = 0; x < screenWidth; x++) {
             const rayAngle = player.angle - FOV / 2 + x * angleStep;
-            // Using bitwise OR 0 for faster floor on map coords access? Maybe minor.
             const playerMapX = player.x | 0;
             const playerMapY = player.y | 0;
             const ray = castRay(player.x, player.y, rayAngle);
             
             zBuffer[x] = ray.perpWallDist;
             
-            // Use Math.round once? Check performance vs floor. Use bitwise |0 potentially.
-            const lineHeight = (screenHeight * wallHeightMultiplier / ray.perpWallDist) | 0; // Use bitwise floor
-            const drawStart = Math.max(0, ((screenHeight - lineHeight) / 2) | 0); // Use bitwise floor
-            const drawEnd = Math.min(screenHeight - 1, ((screenHeight + lineHeight) / 2) | 0); // Use bitwise floor
+            const lineHeight = (screenHeight * wallHeightMultiplier / ray.perpWallDist) | 0;
+            const drawStart = Math.max(0, ((screenHeight - lineHeight) / 2) | 0);
+            const drawEnd = Math.min(screenHeight - 1, ((screenHeight + lineHeight) / 2) | 0);
             
             const wallType = map[ray.mapY]?.[ray.mapX];
             
-            if (wallType >= 1 && wallType <= 4) { // Valid wall check
+            if (wallType >= 1 && wallType <= 4) {
               const wallStyle = wallColors[wallType];
               const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
               let shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
               let baseWallColor = shadeColor(wallStyle.base, distanceFade * -80, shadeFactor);
               
-              // OPTIMIZATION: Check if strip is too small before complex calcs / drawing
               if (drawEnd > drawStart) {
                 ctx.fillStyle = baseWallColor;
                 ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
                 
-                // Calculate wallX only if needed for pattern
-                if (OPTIMIZE_MODE < 2) { // Don't calc/apply pattern in max perf mode?
+                if (OPTIMIZE_MODE < 2) {
                   let wallX;
                   if (ray.side === 0) {
                     wallX = player.y + ray.perpWallDist * Math.sin(rayAngle);
                   } else {
                     wallX = player.x + ray.perpWallDist * Math.cos(rayAngle);
                   }
-                  wallX -= Math.floor(wallX); // Fractional part
-                  applyWallPattern(x, drawStart, drawEnd, wallX, wallStyle, baseWallColor); // Optimized version called here
+                  wallX -= Math.floor(wallX);
+                  applyWallPattern(x, drawStart, drawEnd, wallX, wallStyle, baseWallColor);
                 }
               }
-            } else if (drawEnd > drawStart) { // Draw error color only if strip has height
+            } else if (drawEnd > drawStart) {
               ctx.fillStyle = '#FF00FF';
               ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
             }
           }
           
-          // --- Render Sprites, Particles, Weapon, HUD (Assume these functions are relatively less demanding, or optimize separately) ---
-          if (OPTIMIZE_MODE < 2) { // Maybe skip sprites/particles in max performance? Check impact.
+          if (OPTIMIZE_MODE < 2) {
             renderSprites();
             renderParticles();
           } else {
-            // Maybe render simplified sprites (solid color blocks?) or fewer particles
-            renderSpritesSimple(); // Create a simpler version of renderSprites if needed
-            // Skip renderParticles() ?
+            renderSpritesSimple();
+            renderParticles();
           }
           
-          renderWeapon(); // HUD elements are usually less costly
+          renderWeapon();
           renderHUD();
           renderDamageOverlay();
           renderCrosshair();
+          renderMinimap();
+
+          if (shaking) {
+            ctx.restore();
+          }
         }
 
         // IF using renderSpritesSimple, add health bar there too:
@@ -1411,10 +1975,11 @@
         }
 
         function renderSprites() {
-          // Combine enemies and pickups into one list for Z-sorting
+          // Combine enemies, pickups, and projectiles into one list for Z-sorting
           const sprites = [
             ...enemies.filter(e => e.state !== 'dead'),
-            ...pickups
+            ...pickups,
+            ...projectiles
           ];
           
           // Calculate distance and angle for each sprite
@@ -1425,7 +1990,7 @@
             while (angle < -Math.PI) angle += 2 * Math.PI;
             while (angle > Math.PI) angle -= 2 * Math.PI;
             sprite.angle = angle;
-            sprite.isVisible = Math.abs(angle) < FOV / 1.8; // Slightly narrower than FOV to avoid edge issues
+            sprite.isVisible = Math.abs(angle) < FOV / 1.8;
           });
           
           // Sort sprites by distance (far to near)
@@ -1433,11 +1998,11 @@
           
           // Draw sprites
           sprites.forEach(sprite => {
-            if (!sprite.isVisible || sprite.dist < 0.1) return; // Skip if not visible or too close
+            if (!sprite.isVisible || sprite.dist < 0.1) return;
             
-            const perpDist = sprite.dist * Math.cos(sprite.angle); // Correct for fish-eye on sprites
-            const spriteHeight = Math.min(screenHeight * 1.5, screenHeight / perpDist * (sprite.size || 0.5)); // Use sprite specific size
-            const spriteWidth = spriteHeight * 0.8; // Assume width is related to height
+            const perpDist = sprite.dist * Math.cos(sprite.angle);
+            const spriteHeight = Math.min(screenHeight * 1.5, screenHeight / perpDist * (sprite.size || 0.5));
+            const spriteWidth = spriteHeight * 0.8;
             
             const screenX = Math.tan(sprite.angle) * (screenWidth / 2) / Math.tan(FOV / 2) + screenWidth / 2;
             const drawStartY = (screenHeight - spriteHeight) / 2;
@@ -1445,31 +2010,31 @@
             const drawStartX = Math.floor(screenX - spriteWidth / 2);
             const drawEndX = Math.floor(screenX + spriteWidth / 2);
             
-            const intScreenX = Math.floor(screenX); // Center X coordinate (integer)
+            const intScreenX = Math.floor(screenX);
             
-            // Bobbing for pickups
             let bobOffset = 0;
             if (sprite.bob) {
-              // Use timestamp and sprite position for varied bobbing
               const bobTime = Date.now() / (250 / pickupBobSpeed);
               bobOffset = Math.sin(bobTime + sprite.x * 0.5 + sprite.y * 0.3) * spriteHeight * pickupBobAmount;
             }
             const finalDrawStartY = drawStartY + bobOffset;
             const finalDrawEndY = drawEndY + bobOffset;
             
-            let isPickup = Object.values(pickupTypes).find(pt => pt.type === sprite.type);
-            let isEnemy = !isPickup && sprite.currentHealth !== undefined;
+            let isProjectile = sprite.vx !== undefined;
+            let isPickup = !isProjectile && Object.values(pickupTypes).find(pt => pt.type === sprite.type);
+            let isEnemy = !isProjectile && !isPickup && sprite.currentHealth !== undefined;
             
-            // Render the main sprite stripes first (as before)
             for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
               if (stripe >= 0 && stripe < screenWidth && perpDist < zBuffer[stripe]) {
-                // --- Existing stripe rendering logic for pickups OR enemies ---
                 const stripeStartYClamped = Math.max(0, Math.floor(finalDrawStartY));
                 const stripeEndYClamped = Math.min(screenHeight, Math.floor(finalDrawStartY + spriteHeight));
                 const stripeHeight = stripeEndYClamped - stripeStartYClamped;
                 if (stripeHeight <= 0) continue;
                 
-                if (isPickup) {
+                if (isProjectile) {
+                  ctx.fillStyle = sprite.color;
+                  ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
+                } else if (isPickup) {
                   // ... existing pickup stripe rendering ...
                   const basePickupColor = sprite.color; // Already has 'color' property
                   const distanceFade = Math.min(1, perpDist / fogDepth);
@@ -1699,8 +2264,9 @@
         // ==========================================
 
         function renderParticles() {
-          particles.forEach(p => {
-            if (p.alpha <= 0) return;
+          for (let i = 0; i < particlePool.length; i++) {
+            const p = particlePool[i];
+            if (!p.active) continue;
             
             // Convert world particle pos to screen pos (similar to sprites)
             const dx = p.x - player.x;
@@ -1718,24 +2284,25 @@
               // Ensure particle is not behind a wall
               const screenXInt = Math.floor(screenX);
               if (screenXInt >= 0 && screenXInt < screenWidth && perpDist < zBuffer[screenXInt]) {
-                // Determine screen Y based on perspective (simple midpoint for now)
-                // A more accurate Y would require projecting particle height. Let's place near center vertically.
-                const particleBaseHeight = 0.5; // Assumed height of particle source off ground
-                const projectedY = screenHeight / 2 + (particleBaseHeight / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2));
+                const relativeZ = p.z - 0.5; // Player eye height is 0.5
+                const projectedY = (screenHeight / 2) - (relativeZ / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2));
                 
-                const particleSize = Math.max(1, Math.min(5, (3 / perpDist) * p.size)); // Size depends on distance
-                // const screenY = screenHeight / 2; // Simpler: Place around horizon
+                const particleSize = Math.max(1, Math.min(8, (p.size / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2)) * 0.05));
                 
                 ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${p.alpha.toFixed(2)})`;
-                // Draw particle (maybe as a small circle or rotated square?)
-                // ctx.fillRect(screenX - particleSize / 2, projectedY - particleSize / 2, particleSize, particleSize);
-                // Draw circle particle:
-                ctx.beginPath();
-                ctx.arc(screenX, projectedY, particleSize / 2, 0, Math.PI * 2);
-                ctx.fill();
+                
+                if (OPTIMIZE_MODE === 2) {
+                  // Faster square render without path creation
+                  ctx.fillRect(screenX - particleSize / 2, projectedY - particleSize / 2, particleSize, particleSize);
+                } else {
+                  // Beautiful circle render
+                  ctx.beginPath();
+                  ctx.arc(screenX, projectedY, particleSize / 2, 0, Math.PI * 2);
+                  ctx.fill();
+                }
               }
             }
-          });
+          }
         }
 
         function renderWeapon() {
@@ -1792,16 +2359,14 @@
           
           
           // --- Muzzle Flash ---
-          if (Date.now() - player.lastShotTimestamp < 50) { // Flash duration 50ms
+          if (player.muzzleFlashTimer > 0) {
             const flashSizeBase = 35;
             const flashVariation = 15;
             const flashSize = flashSizeBase + Math.random() * flashVariation;
-            // Position flash near where the weapon "muzzle" would be
-            const muzzleOffsetX = 0; // Center X for now
-            const muzzleOffsetY = -scaledH * 0.1; // Slightly above the weapon base position
             
-            const flashX = screenWidth / 2 + muzzleOffsetX + recoilX; // Add recoil shake to flash pos
-            const flashY = finalY + muzzleOffsetY + recoilY * 0.5; // Add some recoil offset to flash Y
+            // Position flash dynamically anchored to active weapon muzzle settings
+            const flashX = finalX + scaledW / 2 + weapon.muzzleOffsetX;
+            const flashY = finalY + weapon.muzzleOffsetY;
             
             // Draw multiple layers for a better flash effect
             // Layer 1: Outer Glow (Yellow/Orange)
@@ -1820,7 +2385,6 @@
             gradient.addColorStop(1, 'rgba(255, 220, 100, 0)');
             ctx.fillStyle = gradient;
             ctx.fillRect(flashX - coreSize, flashY - coreSize, coreSize * 2, coreSize * 2);
-            
           }
         } // End renderWeapon
 
@@ -1965,56 +2529,66 @@
         function shoot() {
           const weapon = player.weapons[player.currentWeapon];
           player.lastShotTimestamp = Date.now();
+          player.muzzleFlashTimer = 0.05; // 50ms
           weapon.ammo--;
-          playSound(weapon.sound, 0.9, 1.0 + (Math.random() - 0.5) * 0.1);
+
+          if (player.currentWeapon === 'plasma') {
+            playPlasmaLaserSound();
+          } else if (player.currentWeapon === 'rocket') {
+            playRocketLaunchSound();
+          } else {
+            playSound(weapon.sound, 0.9, 1.0 + (Math.random() - 0.5) * 0.1);
+          }
           
           currentRecoil = maxRecoil;
           
           for (let i = 0; i < weapon.projectiles; i++) {
             const spreadAngle = (Math.random() - 0.5) * weapon.spread * 2;
             const shotAngle = player.angle + spreadAngle;
-            const ray = castRay(player.x, player.y, shotAngle);
-            
-            let hitEnemy = null;
-            let minDistToEnemy = ray.distance;
-            
-            // Refined hit detection for multiple enemies
-            const potentialHits = enemies
-              .filter(e => e.state !== 'dead' && e.dist < minDistToEnemy && e.isVisible) // Use pre-calculated visibility/dist
-              .sort((a, b) => a.dist - b.dist); // Sort nearby visible enemies by distance
-            
-            for (const enemy of potentialHits) {
-              const angleDiff = Math.abs(enemy.angle - spreadAngle);
-              // Check if angle is within enemy's apparent size at that distance
-              const apparentSizeAngle = Math.atan(enemy.size / enemy.dist); // angle subtended by enemy size
-              if (angleDiff < apparentSizeAngle * 0.8) { // Allow hitting if shot angle is within ~80% of enemy visual angle
-                hitEnemy = enemy;
-                minDistToEnemy = enemy.dist; // Track closest hit
-                break; // Hit the first enemy in the sorted list
-              }
-            }
-            
-            
-            if (hitEnemy) {
-              // Hit Enemy
-              hitEnemy.currentHealth -= weapon.damage;
-              hitEnemy.lastHitTimestamp = Date.now();
-              hitEnemy.isHit = true;
-              playSound(hitEnemy.soundHurt, 0.8, 1.0 + (Math.random() - 0.5) * 0.1, hitEnemy);
-              createImpactParticles(hitEnemy.x, hitEnemy.y, '#C80815'); // More fleshy red color
-              
-              if (hitEnemy.currentHealth <= 0 && hitEnemy.state !== 'dying') { // Prevent multiple death triggers
-                triggerEnemyDeath(hitEnemy);
-              }
+
+            if (player.currentWeapon === 'plasma') {
+              spawnProjectile('player', 'plasma', player.x, player.y, shotAngle, 12.0, weapon.damage, '#00f3ff');
+            } else if (player.currentWeapon === 'rocket') {
+              spawnProjectile('player', 'rocket', player.x, player.y, shotAngle, 8.0, weapon.damage, '#ff3300');
             } else {
-              // Hit Wall - More noticeable sparks
-              const hitX = player.x + Math.cos(shotAngle) * ray.distance * 0.99; // Position slightly before wall
-              const hitY = player.y + Math.sin(shotAngle) * ray.distance * 0.99;
-              createImpactParticles(hitX, hitY, '#FFFF88'); // Brighter yellow/white sparks
-              playSound('impactWall', 0.5, 1.0 + (Math.random() - 0.5) * 0.2, {
-                x: hitX,
-                y: hitY
-              });
+              // Hitscan logic
+              const ray = castRay(player.x, player.y, shotAngle);
+              let hitEnemy = null;
+              let minDistToEnemy = ray.distance;
+              
+              const potentialHits = enemies
+                .filter(e => e.state !== 'dead' && e.dist < minDistToEnemy && e.isVisible)
+                .sort((a, b) => a.dist - b.dist);
+              
+              for (const enemy of potentialHits) {
+                const angleDiff = Math.abs(enemy.angle - spreadAngle);
+                const apparentSizeAngle = Math.atan(enemy.size / enemy.dist);
+                if (angleDiff < apparentSizeAngle * 0.8) {
+                  hitEnemy = enemy;
+                  minDistToEnemy = enemy.dist;
+                  break;
+                }
+              }
+              
+              if (hitEnemy) {
+                hitEnemy.currentHealth -= weapon.damage;
+                hitEnemy.lastHitTimestamp = Date.now();
+                hitEnemy.isHit = true;
+                playSound(hitEnemy.soundHurt, 0.8, 1.0 + (Math.random() - 0.5) * 0.1, hitEnemy);
+                createImpactParticles(hitEnemy.x, hitEnemy.y, '#C80815', shotAngle);
+                
+                if (hitEnemy.currentHealth <= 0 && hitEnemy.state !== 'dying') {
+                  triggerEnemyDeath(hitEnemy);
+                }
+              } else {
+                const hitX = player.x + Math.cos(shotAngle) * ray.distance * 0.99;
+                const hitY = player.y + Math.sin(shotAngle) * ray.distance * 0.99;
+                createImpactParticles(hitX, hitY, '#FFFF88', shotAngle);
+                playSound('impactWall', 0.5, 1.0 + (Math.random() - 0.5) * 0.2, {
+                  x: hitX,
+                  y: hitY
+                });
+              }
             }
           }
           updateHUD();
@@ -2076,6 +2650,32 @@
           finalScoreElement.textContent = `Final Score: ${player.score}`;
           gameOverScreen.classList.add('show');
           adContainer.style.display = 'block'; // Use 'block' or 'flex' depending on desired layout
+          document.exitPointerLock();
+        }
+
+        function checkVictory() {
+          const allDead = enemies.every(e => e.state === 'dead');
+          if (allDead && !isGameOver && !isVictory) {
+            triggerVictory();
+          }
+        }
+
+        function triggerVictory() {
+          if (isVictory) return;
+          console.log("VICTORY");
+          isVictory = true;
+          stopAllSounds();
+          playSound('victory', 1.0);
+          
+          const victoryScoreElement = document.getElementById('victoryScore');
+          if (victoryScoreElement) {
+            victoryScoreElement.textContent = `Final Score: ${player.score}`;
+          }
+          
+          const victoryScreen = document.getElementById('victoryScreen');
+          if (victoryScreen) {
+            victoryScreen.classList.add('show');
+          }
           document.exitPointerLock();
         }
 
@@ -2239,29 +2839,73 @@
         }
 
 
-        function createImpactParticles(x, y, baseColorHex) {
-          const numParticles = 8 + Math.floor(Math.random() * 8); // 8-15 particles
-          const baseSpeed = 2 + Math.random() * 3; // Base speed 2-5
-          const life = 0.3 + Math.random() * 0.5; // Lifespan 0.3-0.8s
-          
-          const baseColor = hexToRgb(baseColorHex);
+        function createImpactParticles(x, y, baseColorHex, shotAngle = null) {
+          const isEnemy = (baseColorHex === '#C80815');
+          let numParticles;
+          if (OPTIMIZE_MODE === 2) {
+            numParticles = 3 + Math.floor(Math.random() * 3); // 3 to 5 particles
+          } else {
+            numParticles = isEnemy ? (10 + Math.floor(Math.random() * 9)) : (8 + Math.floor(Math.random() * 8)); // Enemy: 10-18, Wall: 8-15
+          }
           
           for (let i = 0; i < numParticles; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = baseSpeed * (0.5 + Math.random() * 1.0); // Vary speed
-            const particle = {
-              x: x + (Math.random() - 0.5) * 0.1, // Slightly offset start pos
-              y: y + (Math.random() - 0.5) * 0.1,
-              vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed,
-              r: Math.max(0, Math.min(255, baseColor.r + Math.random() * 60 - 30)), // Color variation
-              g: Math.max(0, Math.min(255, baseColor.g + Math.random() * 60 - 30)),
-              b: Math.max(0, Math.min(255, baseColor.b + Math.random() * 60 - 30)),
-              alpha: 0.8 + Math.random() * 0.2, // Start fairly opaque
-              decay: 1.0 / life, // Calculate decay rate based on desired lifespan
-              size: 1.5 + Math.random() * 1.5, // Particle size 1.5-3
-            };
-            particles.push(particle);
+            // Find first inactive particle in pool
+            const p = particlePool.find(item => !item.active);
+            if (!p) return; // Pool is full
+            
+            p.active = true;
+            p.x = x + (Math.random() - 0.5) * 0.05;
+            p.y = y + (Math.random() - 0.5) * 0.05;
+            
+            let speed, angle, life;
+            if (isEnemy) {
+              // Blood Splatter
+              life = 0.4 + Math.random() * 0.4; // 0.4 to 0.8s
+              speed = 1.5 + Math.random() * 2.0; // Moderate speed
+              if (shotAngle !== null) {
+                // Forward cone of 60 degrees
+                angle = shotAngle + (Math.random() - 0.5) * (Math.PI / 3);
+              } else {
+                angle = Math.random() * Math.PI * 2;
+              }
+              p.z = 0.3 + Math.random() * 0.4; // Initial Z height
+              p.vz = 1.0 + Math.random() * 3.0; // Blood spray upwards
+            } else {
+              // Wall Sparks
+              life = 0.3 + Math.random() * 0.3; // 0.3 to 0.6s
+              speed = 2.5 + Math.random() * 3.5; // Fast speed
+              if (shotAngle !== null) {
+                // Ricochet backwards cone of 90 degrees
+                angle = (shotAngle + Math.PI) + (Math.random() - 0.5) * (Math.PI / 2);
+              } else {
+                angle = Math.random() * Math.PI * 2;
+              }
+              p.z = 0.5; // Direct impact height
+              p.vz = -2.0 + Math.random() * 4.0; // High bounce energy
+            }
+            
+            p.vx = Math.cos(angle) * speed;
+            p.vy = Math.sin(angle) * speed;
+            
+            // High quality color selection
+            if (isEnemy) {
+              const colors = ['#8B0000', '#B22222', '#FF0000'];
+              const chosen = hexToRgb(colors[Math.floor(Math.random() * colors.length)]);
+              p.r = chosen.r;
+              p.g = chosen.g;
+              p.b = chosen.b;
+            } else {
+              const colors = ['#FFFFDD', '#FFA500', '#FF4500'];
+              const chosen = hexToRgb(colors[Math.floor(Math.random() * colors.length)]);
+              p.r = chosen.r;
+              p.g = chosen.g;
+              p.b = chosen.b;
+            }
+            
+            p.alpha = 0.9 + Math.random() * 0.1;
+            p.life = life;
+            p.maxLife = life;
+            p.size = isEnemy ? (1.0 + Math.random() * 2.0) : (1.5 + Math.random() * 1.5);
           }
         }
 

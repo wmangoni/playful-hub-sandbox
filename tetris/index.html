@@ -10,7 +10,7 @@
     <!-- End Google Tag Manager -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tetris Moderno</title>
+    <title>Tetris Moderno - Duelo vs CPU</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -18,23 +18,211 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
             background-color: #121212;
             color: #ffffff;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding: 20px 0;
+            box-sizing: border-box;
         }
 
-        .game-container {
+        h1 {
+            margin: 0 0 10px 0;
+            color: #4caf50;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            font-size: 32px;
+            letter-spacing: 2px;
+        }
+
+        /* Top Bar de Controles Gerais */
+        .top-bar {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background-color: #1e1e1e;
+            padding: 12px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .control-group label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #81c784;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .select-input {
+            padding: 8px 12px;
+            background: #2d2d2d;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .main-start-btn {
+            background: linear-gradient(135deg, #4caf50, #2e7d32);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            transition: transform 0.1s ease, filter 0.2s ease;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .main-start-btn:hover {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+
+        .single-game-container {
             display: flex;
             gap: 20px;
             align-items: flex-start;
         }
 
+        /* === TASK_004: Interface de Duelo em Tela Dividida (Split Screen) === */
+        .duel-arena {
+            display: none;
+            flex-direction: row;
+            gap: 25px;
+            align-items: flex-start;
+            justify-content: center;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .board-wrapper {
+            position: relative;
+            background: rgba(30, 30, 30, 0.8);
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            gap: 15px;
+        }
+
+        .board-wrapper.player-wrapper {
+            border-color: #4C9CFF;
+            box-shadow: 0 0 20px rgba(76, 156, 255, 0.2);
+        }
+
+        .board-wrapper.cpu-wrapper {
+            border-color: #FF3F51;
+            box-shadow: 0 0 20px rgba(255, 63, 81, 0.2);
+        }
+
+        .board-title {
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .player-wrapper .board-title { color: #4C9CFF; }
+        .cpu-wrapper .board-title { color: #FF3F51; }
+
+        /* === TASK_004: Barra Vertical de Fila de Lixo (Garbage Bar) === */
+        .garbage-bar {
+            position: relative;
+            width: 12px;
+            height: 480px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #444;
+            align-self: center;
+        }
+
+        .garbage-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(180deg, #ff1744, #ff5252);
+            box-shadow: 0 0 10px #ff1744;
+            transition: height 0.2s ease;
+        }
+
+        .garbage-warning {
+            animation: garbagePulse 0.5s infinite alternate;
+            border-color: #ff1744 !important;
+        }
+
+        @keyframes garbagePulse {
+            from { box-shadow: 0 0 5px #ff1744; }
+            to { box-shadow: 0 0 20px #ff1744, 0 0 30px #ff5252; }
+        }
+
+        /* Painel Central de Duelo */
+        .duel-center-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            min-width: 160px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        .vs-badge {
+            font-size: 32px;
+            font-weight: 900;
+            font-style: italic;
+            background: linear-gradient(135deg, #4C9CFF, #FF52AA, #FF3F51);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 82, 170, 0.5);
+        }
+
+        .leader-indicator {
+            font-size: 13px;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: #2b2b2b;
+            text-align: center;
+            border: 1px solid #444;
+        }
+
+        .leader-player { color: #4C9CFF; border-color: #4C9CFF; box-shadow: 0 0 10px rgba(76, 156, 255, 0.3); }
+        .leader-cpu { color: #FF3F51; border-color: #FF3F51; box-shadow: 0 0 10px rgba(255, 63, 81, 0.3); }
+        .leader-tie { color: #FFEA2E; border-color: #FFEA2E; }
+
         canvas {
             border: 2px solid #444;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            background-color: #121212;
         }
 
         .side-panel {
@@ -44,7 +232,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             width: 160px;
         }
 
@@ -60,30 +248,25 @@
             padding: 10px;
         }
 
-        h1 {
-            margin-bottom: 20px;
-            color: #4caf50;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
         h2 {
             margin: 0 0 5px 0;
-            font-size: 16px;
+            font-size: 13px;
             color: #81c784;
+            text-transform: uppercase;
         }
 
         .value {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
         }
 
         .controls {
-            margin-top: 30px;
+            margin-top: 20px;
             background-color: #1e1e1e;
             padding: 15px;
             border-radius: 8px;
             text-align: center;
-            max-width: 500px;
+            max-width: 550px;
         }
 
         .controls p {
@@ -109,8 +292,9 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
-            margin-top: 10px;
+            margin-top: 5px;
             transition: background-color 0.2s;
+            width: 100%;
         }
 
         button:hover {
@@ -119,18 +303,102 @@
 
         .game-over {
             position: absolute;
-            background-color: rgba(0, 0, 0, 0.8);
+            background-color: rgba(0, 0, 0, 0.85);
             color: white;
-            border-radius: 10px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 25px;
             text-align: center;
             display: none;
+            z-index: 500;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            border: 1px solid #444;
         }
 
         .game-over h2 {
             color: #ff5252;
-            font-size: 24px;
+            font-size: 26px;
             margin-bottom: 15px;
+        }
+
+        /* Banner de Level Up */
+        .level-up-banner {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            background: linear-gradient(135deg, rgba(156, 90, 255, 0.9), rgba(255, 82, 170, 0.9));
+            border: 2px solid #fff;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(156, 90, 255, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: 900;
+            font-size: 28px;
+            padding: 15px 40px;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 1000;
+            animation: levelUpPop 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes levelUpPop {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(-5deg); }
+            15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(2deg); }
+            30%  { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); }
+            80%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0) translateY(-10px); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) translateY(-40px); }
+        }
+
+        /* Banner K.O. de Duelo */
+        .ko-banner {
+            position: fixed;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            padding: 25px 50px;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 900;
+            font-size: 36px;
+            border-radius: 16px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 2000;
+            opacity: 0;
+            animation: koPop 2.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .ko-win {
+            background: linear-gradient(135deg, rgba(0, 230, 118, 0.95), rgba(0, 229, 255, 0.95));
+            border: 3px solid #fff;
+            box-shadow: 0 0 40px rgba(0, 230, 118, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.6);
+            color: #ffffff;
+            text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+        }
+        .ko-lose {
+            background: linear-gradient(135deg, rgba(255, 23, 68, 0.95), rgba(213, 0, 0, 0.95));
+            border: 3px solid #fff;
+            box-shadow: 0 0 40px rgba(255, 23, 68, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.6);
+            color: #ffffff;
+            text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+        }
+        @keyframes koPop {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); }
+            20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(3deg); }
+            35%  { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); }
+            80%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0) translateY(-10px); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) translateY(-50px); }
+        }
+
+        /* Partículas de Ataque Neon */
+        .attack-particle {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            background: #ff1744;
+            box-shadow: 0 0 10px #ff1744, 0 0 20px #ff5252;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1500;
         }
     </style>
 </head>
@@ -142,7 +410,32 @@
     
     <h1>TETRIS</h1>
     
-    <div class="game-container">
+    <!-- TOP BAR DE CONTROLES PRINCIPAIS -->
+    <div class="top-bar">
+        <div class="control-group">
+            <label for="gameModeSelect">Modo de Jogo</label>
+            <select id="gameModeSelect" class="select-input">
+                <option value="endless">Infinito Clássico</option>
+                <option value="timeattack">Contra o Tempo (2 min)</option>
+                <option value="survival">Sobrevivência sob Pressão</option>
+                <option value="duel">⚔️ Duelo contra CPU</option>
+            </select>
+        </div>
+
+        <div id="cpuDifficultyBox" class="control-group" style="display: none;">
+            <label for="cpuDifficultySelect">Dificuldade da IA</label>
+            <select id="cpuDifficultySelect" class="select-input">
+                <option value="easy">Fácil (180ms)</option>
+                <option value="medium" selected>Médio (100ms)</option>
+                <option value="hard">Impossível (40ms + Lookahead)</option>
+            </select>
+        </div>
+
+        <button id="startBtn" class="main-start-btn">NOVO JOGO</button>
+    </div>
+
+    <!-- MODO SINGLE PLAYER CONTAINER -->
+    <div id="singleGameArea" class="single-game-container">
         <canvas id="tetris" width="240" height="480"></canvas>
         
         <div class="side-panel">
@@ -150,7 +443,17 @@
                 <h2>PRÓXIMA PEÇA</h2>
                 <canvas id="nextPiece" width="100" height="100"></canvas>
             </div>
-            
+
+            <div id="timerBox" class="lines-box" style="display: none; background-color: #d32f2f;">
+                <h2>TEMPO RESTANTE</h2>
+                <div id="timer" class="value">120s</div>
+            </div>
+
+            <div id="survivalBox" class="lines-box" style="display: none; background-color: #d32f2f; box-shadow: 0 0 15px rgba(211, 47, 47, 0.4);">
+                <h2>SUBIDA DE LIXO</h2>
+                <div id="survivalTimer" class="value">12.0s</div>
+            </div>
+
             <div class="score-box">
                 <h2>PONTUAÇÃO</h2>
                 <div id="score" class="value">0</div>
@@ -165,14 +468,80 @@
                 <h2>LINHAS</h2>
                 <div id="lines" class="value">0</div>
             </div>
-            
-            <button id="startBtn">NOVO JOGO</button>
+        </div>
+    </div>
+
+    <!-- MODO DUELO CONTAINER (TASK_004) -->
+    <div id="duelArena" class="duel-arena">
+        <!-- LADO ESQUERDO: JOGADOR -->
+        <div class="board-wrapper player-wrapper">
+            <div class="garbage-bar" id="playerGarbageBar">
+                <div class="garbage-fill" id="playerGarbageFill"></div>
+            </div>
+            <div>
+                <div class="board-title">👤 JOGADOR</div>
+                <canvas id="duelPlayerTetris" width="240" height="480"></canvas>
+            </div>
+            <div class="side-panel">
+                <div class="next-piece">
+                    <h2>PRÓXIMA PEÇA</h2>
+                    <canvas id="duelPlayerNextPiece" width="100" height="100"></canvas>
+                </div>
+                <div class="score-box">
+                    <h2>PONTUAÇÃO</h2>
+                    <div id="duelPlayerScore" class="value">0</div>
+                </div>
+                <div class="level-box">
+                    <h2>NÍVEL</h2>
+                    <div id="duelPlayerLevel" class="value">1</div>
+                </div>
+                <div class="lines-box">
+                    <h2>LINHAS</h2>
+                    <div id="duelPlayerLines" class="value">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAINEL CENTRAL DE STATUS -->
+        <div class="duel-center-panel">
+            <div class="vs-badge">VS</div>
+            <div id="duelLeaderIndicator" class="leader-indicator leader-tie">EMPATADO ⚔️</div>
+            <div id="duelAttackStatus" style="font-size: 12px; color: #aaa; text-align: center;">Limpe linhas ou faça T-Spins para enviar lixo!</div>
+        </div>
+
+        <!-- LADO DIREITO: CPU -->
+        <div class="board-wrapper cpu-wrapper">
+            <div class="garbage-bar" id="cpuGarbageBar">
+                <div class="garbage-fill" id="cpuGarbageFill"></div>
+            </div>
+            <div>
+                <div class="board-title">🤖 IA DE DUELO</div>
+                <canvas id="duelCpuTetris" width="240" height="480"></canvas>
+            </div>
+            <div class="side-panel">
+                <div class="next-piece">
+                    <h2>PRÓXIMA PEÇA</h2>
+                    <canvas id="duelCpuNextPiece" width="100" height="100"></canvas>
+                </div>
+                <div class="score-box">
+                    <h2>PONTUAÇÃO</h2>
+                    <div id="duelCpuScore" class="value">0</div>
+                </div>
+                <div class="level-box">
+                    <h2>NÍVEL</h2>
+                    <div id="duelCpuLevel" class="value">1</div>
+                </div>
+                <div class="lines-box">
+                    <h2>LINHAS</h2>
+                    <div id="duelCpuLines" class="value">0</div>
+                </div>
+            </div>
         </div>
     </div>
     
     <div class="controls">
         <p>Use <span class="key">←</span> <span class="key">→</span> para mover, <span class="key">↑</span> para girar, <span class="key">↓</span> para acelerar</p>
-        <p><span class="key">Espaço</span> para rotacionar a peça, <span class="key">P</span> para pausar</p>
+        <p><span class="key">Espaço</span> para queda instantânea (Hard Drop), <span class="key">P</span> para pausar</p>
     </div>
     
     <div id="gameOver" class="game-over">
@@ -196,7 +565,7 @@
     </div>
 
     <script>
-        // Configurações do jogo
+        // Configurações Globais do Tetris
         const COLS = 10;
         const ROWS = 20;
         const BLOCK_SIZE = 24;
@@ -208,10 +577,11 @@
             '#66FF66', // S (Verde)
             '#4C9CFF', // I (Azul claro)
             '#9C5AFF', // T (Roxo)
-            '#FF52AA'  // J (Rosa)
+            '#FF52AA', // J (Rosa)
+            '#424242'  // 8 = Lixo (cinza chumbo)
         ];
 
-        // Formas das peças
+        // Formas das peças (1-indexed)
         const SHAPES = [
             [],
             [[0, 0, 0, 0], [1, 1, 0, 0], [0, 1, 1, 0], [0, 0, 0, 0]], // Z
@@ -223,150 +593,185 @@
             [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 1, 0], [0, 0, 0, 0]]  // J
         ];
 
-        // Obtendo os elementos do DOM
-        const canvas = document.getElementById('tetris');
-        const nextPieceCanvas = document.getElementById('nextPiece');
-        const ctx = canvas.getContext('2d');
-        const nextCtx = nextPieceCanvas.getContext('2d');
-        const scoreElement = document.getElementById('score');
-        const levelElement = document.getElementById('level');
-        const linesElement = document.getElementById('lines');
-        const startBtn = document.getElementById('startBtn');
-        const restartBtn = document.getElementById('restartBtn');
-        const gameOverElement = document.getElementById('gameOver');
-        const finalScoreElement = document.getElementById('finalScore');
+        // Sintetizador Web Audio API Retro
+        const SoundSynth = {
+            ctx: null,
+            
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            
+            playRotate() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.08);
+                    
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de rotação:", e);
+                }
+            },
+            
+            playDrop() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.12);
+                    
+                    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.12);
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de encaixe:", e);
+                }
+            },
+            
+            playLine() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const notes = [261.63, 329.63, 392.00, 523.25];
+                    
+                    notes.forEach((freq, index) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + index * 0.08);
+                        
+                        gain.gain.setValueAtTime(0.08, now + index * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.12);
+                        
+                        osc.start(now + index * 0.08);
+                        osc.stop(now + index * 0.08 + 0.12);
+                    });
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de linhas:", e);
+                }
+            },
 
-        // Configurando a escala do canvas
-        ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
-        nextCtx.scale(BLOCK_SIZE, BLOCK_SIZE);
+            playGameOver() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.6);
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.6);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.6);
+                } catch (e) {
+                    console.error("Falha ao tocar áudio de game over:", e);
+                }
+            },
 
-        // Variáveis do jogo
-        let board = createBoard(COLS, ROWS);
-        let score = 0;
-        let level = 1;
-        let lines = 0;
-        let gameOver = false;
-        let paused = false;
-        let requestId = null;
-        let dropCounter = 0;
-        let dropInterval = 1000;
-        let lastTime = 0;
-        
-        let piece = null;
-        let nextPiece = null;
+            playTSpin() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const notes = [392.00, 523.25, 659.25, 783.99];
+                    notes.forEach((freq, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.connect(gain); gain.connect(this.ctx.destination);
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(freq, now + i * 0.05);
+                        gain.gain.setValueAtTime(0.06, now + i * 0.05);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.14);
+                        osc.start(now + i * 0.05);
+                        osc.stop(now + i * 0.05 + 0.14);
+                    });
+                } catch (e) { console.error("Falha ao tocar áudio de T-Spin:", e); }
+            },
 
-        // Função para criar o board
+            playAlertTick(frequency = 880) {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(frequency, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.05);
+                } catch (e) { console.error("Falha ao tocar bip de alerta:", e); }
+            }
+        };
+
+        // === TASK_004: Gerador de Peças com Semente Sincronizada (PRNG) ===
+        class SeededBagGenerator {
+            constructor(seed = Math.floor(Math.random() * 1000000)) {
+                this.seed = seed;
+                this.bag = [];
+            }
+
+            random() {
+                this.seed = (this.seed * 9301 + 49297) % 233280;
+                return this.seed / 233280;
+            }
+
+            getNextPieceType() {
+                if (this.bag.length === 0) {
+                    this.bag = [1, 2, 3, 4, 5, 6, 7];
+                    for (let i = this.bag.length - 1; i > 0; i--) {
+                        const j = Math.floor(this.random() * (i + 1));
+                        [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+                    }
+                }
+                return this.bag.pop();
+            }
+        }
+
+        // Funções globais de apoio de grade
         function createBoard(cols, rows) {
             return Array.from({ length: rows }, () => Array(cols).fill(0));
         }
 
-        // Funções para desenhar
-        function draw() {
-            // Limpar o canvas
-            ctx.fillStyle = '#121212';
-            ctx.fillRect(0, 0, canvas.width / BLOCK_SIZE, canvas.height / BLOCK_SIZE);
-            
-            // Desenhar o board
-            drawBoard();
-            
-            // Desenhar a peça atual
-            if (piece) {
-                drawPiece(piece, ctx);
-            }
-            
-            // Desenhar a próxima peça
-            nextCtx.fillStyle = '#2d2d2d';
-            nextCtx.fillRect(0, 0, nextPieceCanvas.width / BLOCK_SIZE, nextPieceCanvas.height / BLOCK_SIZE);
-            if (nextPiece) {
-                drawNextPiece();
-            }
+        function calculateDropInterval(lvl) {
+            const speedFactor = 0.8 - ((lvl - 1) * 0.007);
+            const interval = Math.round(1000 * Math.pow(speedFactor, lvl - 1));
+            return Math.max(50, interval);
         }
 
-        function drawBoard() {
-            board.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value > 0) {
-                        ctx.fillStyle = COLORS[value];
-                        ctx.fillRect(x, y, 1, 1);
-                        
-                        // Bordas mais claras
-                        ctx.fillStyle = lightenColor(COLORS[value], 30);
-                        ctx.fillRect(x, y, 1, 0.1);
-                        ctx.fillRect(x, y, 0.1, 1);
-                        
-                        // Bordas mais escuras
-                        ctx.fillStyle = darkenColor(COLORS[value], 30);
-                        ctx.fillRect(x, y + 0.9, 1, 0.1);
-                        ctx.fillRect(x + 0.9, y, 0.1, 1);
-                    }
-                });
-            });
-        }
-
-        function drawPiece(piece, context) {
-            piece.shape.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        context.fillStyle = COLORS[piece.type];
-                        context.fillRect(x + piece.pos.x, y + piece.pos.y, 1, 1);
-                        
-                        // Bordas mais claras
-                        context.fillStyle = lightenColor(COLORS[piece.type], 30);
-                        context.fillRect(x + piece.pos.x, y + piece.pos.y, 1, 0.1);
-                        context.fillRect(x + piece.pos.x, y + piece.pos.y, 0.1, 1);
-                        
-                        // Bordas mais escuras
-                        context.fillStyle = darkenColor(COLORS[piece.type], 30);
-                        context.fillRect(x + piece.pos.x, y + piece.pos.y + 0.9, 1, 0.1);
-                        context.fillRect(x + piece.pos.x + 0.9, y + piece.pos.y, 0.1, 1);
-                    }
-                });
-            });
-        }
-
-        function drawNextPiece() {
-            nextPiece.shape.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        nextCtx.fillStyle = COLORS[nextPiece.type];
-                        nextCtx.fillRect(x + 1, y + 1, 1, 1);
-                        
-                        // Bordas mais claras
-                        nextCtx.fillStyle = lightenColor(COLORS[nextPiece.type], 30);
-                        nextCtx.fillRect(x + 1, y + 1, 1, 0.1);
-                        nextCtx.fillRect(x + 1, y + 1, 0.1, 1);
-                        
-                        // Bordas mais escuras
-                        nextCtx.fillStyle = darkenColor(COLORS[nextPiece.type], 30);
-                        nextCtx.fillRect(x + 1, y + 1 + 0.9, 1, 0.1);
-                        nextCtx.fillRect(x + 1 + 0.9, y + 1, 0.1, 1);
-                    }
-                });
-            });
-        }
-
-        // Funções utilitárias para cores
-        function lightenColor(hex, amount) {
-            return adjustColor(hex, amount);
-        }
-
-        function darkenColor(hex, amount) {
-            return adjustColor(hex, -amount);
-        }
-
-        function adjustColor(hex, amount) {
-            let r = parseInt(hex.slice(1, 3), 16);
-            let g = parseInt(hex.slice(3, 5), 16);
-            let b = parseInt(hex.slice(5, 7), 16);
-
-            r = Math.max(0, Math.min(255, r + amount));
-            g = Math.max(0, Math.min(255, g + amount));
-            b = Math.max(0, Math.min(255, b + amount));
-
-            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        }
-
-        // Funções de criação e movimento das peças
         function createPiece(type) {
             return {
                 type: type,
@@ -380,188 +785,907 @@
             return createPiece(type);
         }
 
-        function movePiece(dir) {
-            piece.pos.x += dir;
-            if (checkCollision()) {
-                piece.pos.x -= dir;
-                return false;
-            }
-            return true;
+        function lightenColor(hex, amount) { return adjustColor(hex, amount); }
+        function darkenColor(hex, amount) { return adjustColor(hex, -amount); }
+        function adjustColor(hex, amount) {
+            if (!hex) return '#ffffff';
+            let r = parseInt(hex.slice(1, 3), 16);
+            let g = parseInt(hex.slice(3, 5), 16);
+            let b = parseInt(hex.slice(5, 7), 16);
+            r = Math.max(0, Math.min(255, r + amount));
+            g = Math.max(0, Math.min(255, g + amount));
+            b = Math.max(0, Math.min(255, b + amount));
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
         }
 
-        function rotatePiece() {
-            const originalShape = piece.shape;
-            
-            // Clonar e rotacionar a forma da peça
-            const rows = piece.shape.length;
-            const cols = piece.shape[0].length;
-            
+        // === TASK_004: Arquitetura Orientada a Objetos para Instâncias do Jogo ===
+        class TetrisBoardInstance {
+            constructor({ canvas, nextCanvas, scoreEl, levelEl, linesEl, garbageFillEl, isCPU = false, name = "Jogador" }) {
+                this.canvas = canvas;
+                this.nextCanvas = nextCanvas;
+                this.ctx = canvas.getContext('2d');
+                this.nextCtx = nextCanvas ? nextCanvas.getContext('2d') : null;
+                this.scoreElement = scoreEl;
+                this.levelElement = levelEl;
+                this.linesElement = linesEl;
+                this.garbageFillElement = garbageFillEl;
+                this.isCPU = isCPU;
+                this.name = name;
+
+                this.ctx.imageSmoothingEnabled = false;
+                if (this.nextCtx) this.nextCtx.imageSmoothingEnabled = false;
+
+                this.bagGenerator = null;
+                this.reset();
+            }
+
+            reset() {
+                this.board = createBoard(COLS, ROWS);
+                this.score = 0;
+                this.level = 1;
+                this.lines = 0;
+                this.gameOver = false;
+                this.dropCounter = 0;
+                this.dropInterval = calculateDropInterval(1);
+
+                this.piece = null;
+                this.nextPiece = null;
+                this.lastAction = 'spawn';
+                this.comboCount = -1;
+                this.floatingTexts = [];
+                this.incomingGarbage = 0;
+                this.lastGarbageHoleCol = null;
+
+                // Propriedades da IA
+                this.aiStepTimer = 0;
+                this.aiTargetMove = null;
+                this.aiDifficulty = 'medium';
+
+                this.updateUI();
+                this.updateGarbageHUD();
+            }
+
+            updateUI() {
+                if (this.scoreElement) this.scoreElement.textContent = this.score;
+                if (this.levelElement) this.levelElement.textContent = this.level;
+                if (this.linesElement) this.linesElement.textContent = this.lines;
+            }
+
+            updateGarbageHUD() {
+                if (!this.garbageFillElement) return;
+                const percent = Math.min(100, (this.incomingGarbage / 10) * 100);
+                this.garbageFillElement.style.height = percent + '%';
+                
+                const wrapper = this.garbageFillElement.parentElement;
+                if (wrapper) {
+                    if (this.incomingGarbage >= 4) {
+                        wrapper.classList.add('garbage-warning');
+                    } else {
+                        wrapper.classList.remove('garbage-warning');
+                    }
+                }
+            }
+
+            spawnPiece() {
+                if (this.bagGenerator) {
+                    this.piece = this.nextPiece || createPiece(this.bagGenerator.getNextPieceType());
+                    this.nextPiece = createPiece(this.bagGenerator.getNextPieceType());
+                } else {
+                    this.piece = this.nextPiece || getRandomPiece();
+                    this.nextPiece = getRandomPiece();
+                }
+                this.lastAction = 'spawn';
+                this.aiTargetMove = null;
+            }
+
+            getGhostPositionY() {
+                if (!this.piece) return 0;
+                const originalY = this.piece.pos.y;
+                while (!this.checkCollision()) {
+                    this.piece.pos.y++;
+                }
+                const ghostY = this.piece.pos.y - 1;
+                this.piece.pos.y = originalY;
+                return ghostY;
+            }
+
+            checkCollision() {
+                if (!this.piece) return false;
+                for (let y = 0; y < this.piece.shape.length; y++) {
+                    for (let x = 0; x < this.piece.shape[y].length; x++) {
+                        if (this.piece.shape[y][x] !== 0) {
+                            const boardX = x + this.piece.pos.x;
+                            const boardY = y + this.piece.pos.y;
+                            if (
+                                boardX < 0 || 
+                                boardX >= COLS || 
+                                boardY >= ROWS ||
+                                (boardY >= 0 && this.board[boardY][boardX] !== 0)
+                            ) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            movePiece(dir) {
+                if (this.gameOver || !this.piece) return false;
+                this.piece.pos.x += dir;
+                if (this.checkCollision()) {
+                    this.piece.pos.x -= dir;
+                    return false;
+                }
+                this.lastAction = 'move';
+                return true;
+            }
+
+            rotatePiece() {
+                if (this.gameOver || !this.piece) return;
+                const originalShape = this.piece.shape;
+                const rows = this.piece.shape.length;
+                const cols = this.piece.shape[0].length;
+                
+                let rotated = [];
+                for (let y = 0; y < rows; y++) {
+                    rotated.push([]);
+                    for (let x = 0; x < cols; x++) {
+                        rotated[y][x] = this.piece.shape[cols - x - 1][y];
+                    }
+                }
+                
+                const origX = this.piece.pos.x;
+                const origY = this.piece.pos.y;
+                this.piece.shape = rotated;
+
+                if (!this.checkCollision()) {
+                    this.lastAction = 'rotate';
+                    if (!this.isCPU) SoundSynth.playRotate();
+                    return;
+                }
+                // Wall kicks
+                this.piece.pos.x = origX - 1; if (!this.checkCollision()) { this.lastAction = 'rotate'; if (!this.isCPU) SoundSynth.playRotate(); return; }
+                this.piece.pos.x = origX + 1; if (!this.checkCollision()) { this.lastAction = 'rotate'; if (!this.isCPU) SoundSynth.playRotate(); return; }
+                this.piece.pos.x = origX; this.piece.pos.y = origY - 1; if (!this.checkCollision()) { this.lastAction = 'rotate'; if (!this.isCPU) SoundSynth.playRotate(); return; }
+                
+                this.piece.pos.x = origX; this.piece.pos.y = origY; this.piece.shape = originalShape;
+            }
+
+            dropPiece(opponentInstance) {
+                if (this.gameOver || !this.piece) return;
+                this.piece.pos.y++;
+                if (this.checkCollision()) {
+                    this.piece.pos.y--;
+                    this.lockPiece(opponentInstance);
+                }
+                this.dropCounter = 0;
+            }
+
+            hardDrop(opponentInstance) {
+                if (this.gameOver || !this.piece) return;
+                this.piece.pos.y = this.getGhostPositionY();
+                this.lockPiece(opponentInstance);
+                this.dropCounter = 0;
+            }
+
+            findTCenter() {
+                const s = this.piece.shape;
+                for (let y = 0; y < s.length; y++) {
+                    for (let x = 0; x < s[y].length; x++) {
+                        if (s[y][x] !== 0) {
+                            let n = 0;
+                            if (s[y - 1] && s[y - 1][x]) n++;
+                            if (s[y + 1] && s[y + 1][x]) n++;
+                            if (s[y][x - 1]) n++;
+                            if (s[y][x + 1]) n++;
+                            if (n === 3) return { x, y };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            detectTSpin() {
+                if (!this.piece || this.piece.type !== 6 || this.lastAction !== 'rotate') return false;
+                const c = this.findTCenter();
+                if (!c) return false;
+                const cx = this.piece.pos.x + c.x;
+                const cy = this.piece.pos.y + c.y;
+                const corners = [[cx - 1, cy - 1], [cx + 1, cy - 1], [cx - 1, cy + 1], [cx + 1, cy + 1]];
+                let occupied = 0;
+                corners.forEach(([bx, by]) => {
+                    if (bx < 0 || bx >= COLS || by >= ROWS) occupied++;
+                    else if (by >= 0 && this.board[by][bx] !== 0) occupied++;
+                });
+                return occupied >= 3;
+            }
+
+            mergePiece() {
+                this.piece.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value !== 0) {
+                            const boardY = y + this.piece.pos.y;
+                            const boardX = x + this.piece.pos.x;
+                            if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+                                this.board[boardY][boardX] = this.piece.type;
+                            }
+                        }
+                    });
+                });
+                if (!this.isCPU) SoundSynth.playDrop();
+            }
+
+            clearLines() {
+                let linesCleared = 0;
+                outer: for (let y = ROWS - 1; y >= 0; y--) {
+                    for (let x = 0; x < COLS; x++) {
+                        if (this.board[y][x] === 0) continue outer;
+                    }
+                    const row = this.board.splice(y, 1)[0].fill(0);
+                    this.board.unshift(row);
+                    y++;
+                    linesCleared++;
+                }
+                return linesCleared;
+            }
+
+            lockPiece(opponentInstance) {
+                const isTSpin = this.detectTSpin();
+                this.mergePiece();
+                const linesCleared = this.clearLines();
+
+                // === TASK_004: Sistema de Ataque e Cancelamento de Lixo ===
+                if (opponentInstance) {
+                    const linesGenerated = calculateGarbageLines(linesCleared, isTSpin, this.comboCount + 1);
+                    processGarbageCombat(this, opponentInstance, linesGenerated);
+                }
+
+                this.applyScoring(linesCleared, isTSpin);
+
+                if (linesCleared === 0 && this.incomingGarbage > 0) {
+                    this.applyIncomingGarbage();
+                }
+
+                this.spawnPiece();
+                if (this.checkCollision()) {
+                    this.gameOver = true;
+                    if (opponentInstance) {
+                        handleDuelGameOver(this, opponentInstance);
+                    } else {
+                        showGameOver();
+                    }
+                }
+            }
+
+            applyIncomingGarbage() {
+                const linesToInsert = this.incomingGarbage;
+                this.incomingGarbage = 0;
+                this.updateGarbageHUD();
+
+                for (let l = 0; l < linesToInsert; l++) {
+                    for (let x = 0; x < COLS; x++) {
+                        if (this.board[0][x] !== 0) {
+                            this.gameOver = true;
+                            return;
+                        }
+                    }
+                    this.board.shift();
+                    const newRow = Array(COLS).fill(8);
+                    if (!this.lastGarbageHoleCol || l === 0) {
+                        this.lastGarbageHoleCol = Math.floor(Math.random() * COLS);
+                    }
+                    newRow[this.lastGarbageHoleCol] = 0;
+                    this.board.push(newRow);
+                }
+
+                if (SoundSynth.playDrop && !this.isCPU) SoundSynth.playDrop();
+
+                if (this.piece && this.checkCollision()) {
+                    this.piece.pos.y--;
+                    if (this.checkCollision()) {
+                        this.gameOver = true;
+                    }
+                }
+            }
+
+            applyScoring(linesCleared, isTSpin) {
+                let baseScore = 0, textFeedback = '';
+
+                if (isTSpin) {
+                    if (linesCleared === 0) { baseScore = 400; textFeedback = 'T-SPIN'; }
+                    else if (linesCleared === 1) { baseScore = 800; textFeedback = 'T-SPIN SINGLE'; }
+                    else if (linesCleared === 2) { baseScore = 1200; textFeedback = 'T-SPIN DOUBLE'; }
+                    else if (linesCleared === 3) { baseScore = 1600; textFeedback = 'T-SPIN TRIPLE!'; }
+                    if (!this.isCPU) SoundSynth.playTSpin();
+                } else {
+                    const linePoints = [0, 100, 300, 500, 800];
+                    baseScore = linePoints[linesCleared] || 0;
+                    if (linesCleared === 4) textFeedback = 'TETRIS!';
+                    if (linesCleared > 0 && !this.isCPU) SoundSynth.playLine();
+                }
+
+                if (linesCleared > 0) {
+                    this.comboCount++;
+                    if (this.comboCount > 0) {
+                        const comboBonus = 50 * this.comboCount * this.level;
+                        this.score += comboBonus;
+                        if (this.comboCount >= 2) {
+                            this.spawnFloatingText(`COMBO x${this.comboCount}! +${comboBonus}`, this.piece.pos.x + 1, this.piece.pos.y, '#4C9CFF');
+                        }
+                    }
+                } else {
+                    this.comboCount = -1;
+                }
+
+                if (baseScore > 0) {
+                    this.score += baseScore * this.level;
+                    if (textFeedback) {
+                        this.spawnFloatingText(`${textFeedback} +${baseScore * this.level}`, this.piece.pos.x + 1, this.piece.pos.y, isTSpin ? '#9C5AFF' : '#FFEA2E');
+                    }
+                }
+
+                this.lines += linesCleared;
+                const newLevel = Math.floor(this.lines / 10) + 1;
+                if (newLevel > this.level) {
+                    this.level = newLevel;
+                    if (!this.isCPU) triggerLevelUpEffects(this.level);
+                }
+                this.dropInterval = calculateDropInterval(this.level);
+
+                this.updateUI();
+            }
+
+            spawnFloatingText(text, gridX, gridY, color) {
+                this.floatingTexts.push({
+                    text, x: gridX * BLOCK_SIZE, y: gridY * BLOCK_SIZE,
+                    vy: -1.2, alpha: 1.0, life: 70, color
+                });
+            }
+
+            updateFloatingTexts() {
+                for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+                    const ft = this.floatingTexts[i];
+                    ft.y += ft.vy;
+                    ft.life--;
+                    if (ft.life < 35) ft.alpha = Math.max(0, ft.life / 35);
+                    if (ft.life <= 0) this.floatingTexts.splice(i, 1);
+                }
+            }
+
+            draw() {
+                this.ctx.fillStyle = '#121212';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.board.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value > 0) {
+                            this.drawBlock(this.ctx, x, y, COLORS[value]);
+                        }
+                    });
+                });
+
+                if (this.piece) {
+                    const ghostY = this.getGhostPositionY();
+                    this.piece.shape.forEach((row, y) => {
+                        row.forEach((value, x) => {
+                            if (value !== 0) {
+                                this.ctx.fillStyle = COLORS[this.piece.type] + "33";
+                                this.ctx.fillRect((x + this.piece.pos.x) * BLOCK_SIZE, (y + ghostY) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                                this.ctx.strokeStyle = COLORS[this.piece.type] + "88";
+                                this.ctx.lineWidth = 1;
+                                this.ctx.strokeRect((x + this.piece.pos.x) * BLOCK_SIZE, (y + ghostY) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                            }
+                        });
+                    });
+
+                    this.piece.shape.forEach((row, y) => {
+                        row.forEach((value, x) => {
+                            if (value !== 0) {
+                                this.drawBlock(this.ctx, x + this.piece.pos.x, y + this.piece.pos.y, COLORS[this.piece.type]);
+                            }
+                        });
+                    });
+                }
+
+                this.floatingTexts.forEach(ft => {
+                    this.ctx.save();
+                    this.ctx.globalAlpha = ft.alpha;
+                    this.ctx.font = "bold 13px 'Segoe UI', Arial, sans-serif";
+                    this.ctx.textAlign = 'center';
+                    this.ctx.shadowColor = ft.color;
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.strokeStyle = '#000000';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeText(ft.text, ft.x, ft.y);
+                    this.ctx.fillStyle = ft.color;
+                    this.ctx.fillText(ft.text, ft.x, ft.y);
+                    this.ctx.restore();
+                });
+
+                if (this.nextCtx && this.nextPiece) {
+                    this.nextCtx.fillStyle = '#2d2d2d';
+                    this.nextCtx.fillRect(0, 0, this.nextCanvas.width, this.nextCanvas.height);
+                    this.nextPiece.shape.forEach((row, y) => {
+                        row.forEach((value, x) => {
+                            if (value !== 0) {
+                                this.drawBlock(this.nextCtx, x + 1, y + 1, COLORS[this.nextPiece.type]);
+                            }
+                        });
+                    });
+                }
+            }
+
+            drawBlock(context, x, y, color) {
+                const px = x * BLOCK_SIZE;
+                const py = y * BLOCK_SIZE;
+                context.fillStyle = color;
+                context.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+                
+                context.fillStyle = lightenColor(color, 30);
+                context.fillRect(px, py, BLOCK_SIZE, 2);
+                context.fillRect(px, py, 2, BLOCK_SIZE);
+                
+                context.fillStyle = darkenColor(color, 30);
+                context.fillRect(px, py + BLOCK_SIZE - 2, BLOCK_SIZE, 2);
+                context.fillRect(px + BLOCK_SIZE - 2, py, 2, BLOCK_SIZE);
+            }
+        }
+
+        // === TASK_004: Algoritmo Heurístico de Pierre Dellacherie para a CPU ===
+        function evaluateBoardState(board) {
+            const boardClone = board.map(r => [...r]);
+            const linesCleared = clearSimulatedLines(boardClone);
+            const heights = getHeights(boardClone);
+            const aggHeight = heights.reduce((sum, h) => sum + h, 0);
+            const holes = countHoles(boardClone);
+            const bumpiness = calculateBumpiness(heights);
+
+            return (-0.515 * aggHeight) + (0.760 * linesCleared) - (0.360 * holes) - (0.180 * bumpiness);
+        }
+
+        function clearSimulatedLines(board) {
+            let cleared = 0;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                let full = true;
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c] === 0) { full = false; break; }
+                }
+                if (full) {
+                    board.splice(r, 1);
+                    board.unshift(new Array(COLS).fill(0));
+                    cleared++;
+                    r++;
+                }
+            }
+            return cleared;
+        }
+
+        function getHeights(board) {
+            const heights = new Array(COLS).fill(0);
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS; r++) {
+                    if (board[r][c] !== 0) {
+                        heights[c] = ROWS - r;
+                        break;
+                    }
+                }
+            }
+            return heights;
+        }
+
+        function countHoles(board) {
+            let holes = 0;
+            for (let c = 0; c < COLS; c++) {
+                let blockFound = false;
+                for (let r = 0; r < ROWS; r++) {
+                    if (board[r][c] !== 0) blockFound = true;
+                    else if (blockFound && board[r][c] === 0) holes++;
+                }
+            }
+            return holes;
+        }
+
+        function calculateBumpiness(heights) {
+            let bumpiness = 0;
+            for (let i = 0; i < COLS - 1; i++) {
+                bumpiness += Math.abs(heights[i] - heights[i + 1]);
+            }
+            return bumpiness;
+        }
+
+        function rotateMatrix(matrix) {
+            const rows = matrix.length;
+            const cols = matrix[0].length;
             let rotated = [];
             for (let y = 0; y < rows; y++) {
                 rotated.push([]);
                 for (let x = 0; x < cols; x++) {
-                    rotated[y][x] = piece.shape[cols - x - 1][y];
+                    rotated[y][x] = matrix[cols - x - 1][y];
                 }
             }
-            
-            piece.shape = rotated;
-            
-            // Se houver colisão, reverter a rotação
-            if (checkCollision()) {
-                piece.shape = originalShape;
-            }
+            return rotated;
         }
 
-        function dropPiece() {
-            piece.pos.y++;
-            
-            if (checkCollision()) {
-                piece.pos.y--;
-                mergePiece();
-                
-                // Verificar linhas completas
-                let linesCleared = clearLines();
-                if (linesCleared > 0) {
-                    updateScore(linesCleared);
-                }
-                
-                // Continuar o jogo
-                resetPiece();
-                
-                // Verificar game over
-                if (checkCollision()) {
-                    gameOver = true;
-                    cancelAnimationFrame(requestId);
-                    requestId = null;
-                    showGameOver();
-                }
-            }
-            
-            dropCounter = 0;
-        }
+        function findBestMoveForCPU(aiInstance) {
+            if (!aiInstance.piece) return { targetX: 3, targetRot: 0 };
 
-        function checkCollision() {
-            for (let y = 0; y < piece.shape.length; y++) {
-                for (let x = 0; x < piece.shape[y].length; x++) {
-                    if (piece.shape[y][x] !== 0) {
-                        const boardX = x + piece.pos.x;
-                        const boardY = y + piece.pos.y;
-                        
-                        // Verificar limites do board e colisões
-                        if (
-                            boardX < 0 || 
-                            boardX >= COLS || 
-                            boardY >= ROWS ||
-                            (boardY >= 0 && board[boardY][boardX] !== 0)
-                        ) {
-                            return true;
+            let bestScore = -Infinity;
+            let bestX = 0;
+            let bestRot = 0;
+
+            const baseShape = aiInstance.piece.shape;
+
+            for (let rot = 0; rot < 4; rot++) {
+                let currentShape = baseShape;
+                for (let r = 0; r < rot; r++) {
+                    currentShape = rotateMatrix(currentShape);
+                }
+
+                for (let targetX = -3; targetX < COLS; targetX++) {
+                    let tempBoard = aiInstance.board.map(row => [...row]);
+                    let testPiece = { shape: currentShape, pos: { x: targetX, y: 0 } };
+
+                    let collides = false;
+                    for (let y = 0; y < currentShape.length; y++) {
+                        for (let x = 0; x < currentShape[y].length; x++) {
+                            if (currentShape[y][x] !== 0) {
+                                const bx = x + targetX;
+                                const by = y;
+                                if (bx < 0 || bx >= COLS || by >= ROWS || (by >= 0 && tempBoard[by][bx] !== 0)) {
+                                    collides = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (collides) break;
+                    }
+                    if (collides) continue;
+
+                    while (true) {
+                        testPiece.pos.y++;
+                        let hit = false;
+                        for (let y = 0; y < currentShape.length; y++) {
+                            for (let x = 0; x < currentShape[y].length; x++) {
+                                if (currentShape[y][x] !== 0) {
+                                    const bx = x + testPiece.pos.x;
+                                    const by = y + testPiece.pos.y;
+                                    if (bx < 0 || bx >= COLS || by >= ROWS || (by >= 0 && tempBoard[by][bx] !== 0)) {
+                                        hit = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (hit) break;
+                        }
+                        if (hit) {
+                            testPiece.pos.y--;
+                            break;
                         }
                     }
+
+                    currentShape.forEach((row, y) => {
+                        row.forEach((val, x) => {
+                            if (val !== 0) {
+                                const by = y + testPiece.pos.y;
+                                const bx = x + testPiece.pos.x;
+                                if (by >= 0 && by < ROWS && bx >= 0 && bx < COLS) {
+                                    tempBoard[by][bx] = aiInstance.piece.type;
+                                }
+                            }
+                        });
+                    });
+
+                    const currentScore = evaluateBoardState(tempBoard);
+                    if (currentScore > bestScore) {
+                        bestScore = currentScore;
+                        bestX = targetX;
+                        bestRot = rot;
+                    }
                 }
             }
-            return false;
+
+            return { targetX: bestX, targetRot: bestRot };
         }
 
-        function mergePiece() {
-            piece.shape.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        const boardY = y + piece.pos.y;
-                        const boardX = x + piece.pos.x;
-                        if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
-                            board[boardY][boardX] = piece.type;
-                        }
-                    }
-                });
-            });
-        }
+        function updateCPUMovement(aiInstance, opponentInstance, deltaTime) {
+            if (aiInstance.gameOver || !aiInstance.piece) return;
 
-        function resetPiece() {
-            piece = nextPiece || getRandomPiece();
-            nextPiece = getRandomPiece();
-        }
+            if (!aiInstance.aiTargetMove) {
+                aiInstance.aiTargetMove = findBestMoveForCPU(aiInstance);
+                aiInstance.currentRot = 0;
+            }
 
-        function clearLines() {
-            let linesCleared = 0;
-            
-            outer: for (let y = ROWS - 1; y >= 0; y--) {
-                for (let x = 0; x < COLS; x++) {
-                    if (board[y][x] === 0) {
-                        continue outer;
-                    }
+            let baseDelay = 100;
+            if (aiInstance.aiDifficulty === 'easy') baseDelay = 180;
+            else if (aiInstance.aiDifficulty === 'medium') baseDelay = 100;
+            else if (aiInstance.aiDifficulty === 'hard') baseDelay = 40;
+
+            const stepInterval = Math.max(20, baseDelay * Math.pow(0.95, aiInstance.level - 1));
+
+            aiInstance.aiStepTimer += deltaTime;
+            if (aiInstance.aiStepTimer >= stepInterval) {
+                aiInstance.aiStepTimer = 0;
+                const target = aiInstance.aiTargetMove;
+
+                if ((aiInstance.currentRot || 0) < target.targetRot) {
+                    aiInstance.rotatePiece();
+                    aiInstance.currentRot = (aiInstance.currentRot || 0) + 1;
+                } else if (aiInstance.piece.pos.x < target.targetX) {
+                    aiInstance.movePiece(1);
+                } else if (aiInstance.piece.pos.x > target.targetX) {
+                    aiInstance.movePiece(-1);
+                } else {
+                    aiInstance.hardDrop(opponentInstance);
+                    aiInstance.aiTargetMove = null;
                 }
+            }
+        }
+
+        // === TASK_004: Regras de Combate e Disparo de Linhas de Lixo ===
+        function calculateGarbageLines(linesCleared, isTSpin, comboCount) {
+            let linesSent = 0;
+            if (isTSpin) {
+                if (linesCleared === 1) linesSent = 2;
+                else if (linesCleared === 2) linesSent = 4;
+                else if (linesCleared === 3) linesSent = 6;
+            } else {
+                if (linesCleared === 2) linesSent = 1;
+                else if (linesCleared === 3) linesSent = 2;
+                else if (linesCleared === 4) linesSent = 4;
+            }
+            if (linesCleared > 0 && comboCount >= 1) {
+                linesSent += 1;
+            }
+            return linesSent;
+        }
+
+        function processGarbageCombat(attacker, defender, linesGenerated) {
+            if (linesGenerated <= 0) return;
+            
+            if (attacker.incomingGarbage > 0) {
+                const cancelled = Math.min(attacker.incomingGarbage, linesGenerated);
+                attacker.incomingGarbage -= cancelled;
+                linesGenerated -= cancelled;
+                attacker.updateGarbageHUD();
+            }
+            
+            if (linesGenerated > 0 && defender) {
+                defender.incomingGarbage += linesGenerated;
+                defender.updateGarbageHUD();
+                triggerAttackParticles(attacker.canvas, defender.garbageFillElement, linesGenerated);
+                defender.spawnFloatingText(`+${linesGenerated} LIXO!`, 5, 2, '#FF1744');
                 
-                // Remover a linha
-                const row = board.splice(y, 1)[0].fill(0);
-                board.unshift(row);
-                y++;
-                linesCleared++;
+                if (defender.incomingGarbage >= 4 && SoundSynth.playAlertTick) {
+                    SoundSynth.playAlertTick(880);
+                }
+            }
+        }
+
+        function triggerAttackParticles(attackerCanvas, defenderGarbageFill, linesCount) {
+            if (!attackerCanvas || !defenderGarbageFill) return;
+            const rectFrom = attackerCanvas.getBoundingClientRect();
+            const rectTo = defenderGarbageFill.getBoundingClientRect();
+            
+            const count = Math.min(12, linesCount * 3);
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.className = 'attack-particle';
+                const startX = rectFrom.left + rectFrom.width / 2 + (Math.random() * 40 - 20);
+                const startY = rectFrom.top + rectFrom.height / 2 + (Math.random() * 40 - 20);
+                p.style.left = startX + 'px';
+                p.style.top = startY + 'px';
+                document.body.appendChild(p);
+                
+                const targetX = rectTo.left + rectTo.width / 2;
+                const targetY = rectTo.top + rectTo.height / 2;
+                
+                p.animate([
+                    { transform: 'scale(1)', opacity: 1 },
+                    { transform: `translate(${targetX - startX}px, ${targetY - startY}px) scale(0.3)`, opacity: 0.8 }
+                ], {
+                    duration: 600 + Math.random() * 200,
+                    easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+                    fill: 'forwards'
+                }).onfinish = () => p.remove();
+            }
+        }
+
+        // === TASK_004: Fim de Jogo no Modo Duelo (K.O.) ===
+        function handleDuelGameOver(loserInstance, winnerInstance) {
+            SoundSynth.playGameOver();
+            
+            const banner = document.createElement('div');
+            banner.className = 'ko-banner';
+            
+            if (loserInstance.isCPU) {
+                banner.classList.add('ko-win');
+                banner.innerHTML = `NOCAUTE! 🏆<br><span style="font-size:24px;">VOCÊ VENCEU A IA!</span>`;
+                showGameOver("VITÓRIA NO DUELO!");
+            } else {
+                banner.classList.add('ko-lose');
+                banner.innerHTML = `NOCAUTEADO! 💀<br><span style="font-size:24px;">A IA VENCEU A PARTIDA!</span>`;
+                showGameOver("DERROTA NO DUELO!");
             }
             
-            return linesCleared;
+            document.body.appendChild(banner);
+            setTimeout(() => banner.remove(), 2200);
         }
 
-        function updateScore(linesCleared) {
-            const linePoints = [0, 40, 100, 300, 1200];
-            score += linePoints[linesCleared] * level;
-            lines += linesCleared;
-            
-            // Atualizar nível
-            level = Math.floor(lines / 10) + 1;
-            
-            // Atualizar velocidade de queda
-            dropInterval = Math.max(100, 1000 - ((level - 1) * 100));
-            
-            // Atualizar UI
-            scoreElement.textContent = score;
-            levelElement.textContent = level;
-            linesElement.textContent = lines;
+        function triggerLevelUpEffects(newLevel) {
+            if (SoundSynth.playLine) SoundSynth.playLine();
+            const banner = document.createElement('div');
+            banner.className = 'level-up-banner';
+            banner.innerHTML = `<span style="font-size: 14px; text-transform: uppercase; letter-spacing: 2px; display: block; opacity: 0.8;">Excelente!</span>NÍVEL ${newLevel}`;
+            document.body.appendChild(banner);
+            setTimeout(() => banner.remove(), 1600);
         }
 
-        function showGameOver() {
-            gameOverElement.style.display = 'block';
-            finalScoreElement.textContent = score;
-        }
+        // --- Variáveis de Instância Globais ---
+        let playerInstance = null;
+        let cpuInstance = null;
 
-        function hideGameOver() {
-            gameOverElement.style.display = 'none';
+        let gameMode = 'endless';
+        let gameOver = false;
+        let paused = false;
+        let requestId = null;
+        let lastTime = 0;
+        let timeLeft = 120;
+        let timerInterval = null;
+        let survivalTimer = 12.0;
+
+        // Elementos DOM principais
+        const canvas = document.getElementById('tetris');
+        const nextPieceCanvas = document.getElementById('nextPiece');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const linesElement = document.getElementById('lines');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+        const gameModeSelect = document.getElementById('gameModeSelect');
+        const cpuDifficultyBox = document.getElementById('cpuDifficultyBox');
+        const cpuDifficultySelect = document.getElementById('cpuDifficultySelect');
+
+        // Elementos DOM do Duelo
+        const singleGameArea = document.getElementById('singleGameArea');
+        const duelArena = document.getElementById('duelArena');
+        const duelPlayerCanvas = document.getElementById('duelPlayerTetris');
+        const duelPlayerNextCanvas = document.getElementById('duelPlayerNextPiece');
+        const duelPlayerScore = document.getElementById('duelPlayerScore');
+        const duelPlayerLevel = document.getElementById('duelPlayerLevel');
+        const duelPlayerLines = document.getElementById('duelPlayerLines');
+        const playerGarbageFill = document.getElementById('playerGarbageFill');
+
+        const duelCpuCanvas = document.getElementById('duelCpuTetris');
+        const duelCpuNextCanvas = document.getElementById('duelCpuNextPiece');
+        const duelCpuScore = document.getElementById('duelCpuScore');
+        const duelCpuLevel = document.getElementById('duelCpuLevel');
+        const duelCpuLines = document.getElementById('duelCpuLines');
+        const cpuGarbageFill = document.getElementById('cpuGarbageFill');
+        const duelLeaderIndicator = document.getElementById('duelLeaderIndicator');
+
+        // Instanciar o jogador padrão
+        playerInstance = new TetrisBoardInstance({
+            canvas: canvas,
+            nextCanvas: nextPieceCanvas,
+            scoreEl: scoreElement,
+            levelEl: levelElement,
+            linesEl: linesElement,
+            isCPU: false,
+            name: "Jogador"
+        });
+
+        // Alternância de modo de jogo na UI
+        gameModeSelect.addEventListener('change', () => {
+            gameMode = gameModeSelect.value;
+            if (gameMode === 'duel') {
+                cpuDifficultyBox.style.display = 'flex';
+                singleGameArea.style.display = 'none';
+                duelArena.style.display = 'flex';
+            } else {
+                cpuDifficultyBox.style.display = 'none';
+                singleGameArea.style.display = 'flex';
+                duelArena.style.display = 'none';
+            }
+        });
+
+        function updateLeaderIndicator() {
+            if (!duelLeaderIndicator || !playerInstance || !cpuInstance || gameMode !== 'duel') return;
+            if (playerInstance.score > cpuInstance.score) {
+                duelLeaderIndicator.textContent = "JOGADOR NA FRENTE 🔼";
+                duelLeaderIndicator.className = "leader-indicator leader-player";
+            } else if (cpuInstance.score > playerInstance.score) {
+                duelLeaderIndicator.textContent = "CPU NA FRENTE 🔻";
+                duelLeaderIndicator.className = "leader-indicator leader-cpu";
+            } else {
+                duelLeaderIndicator.textContent = "EMPATADO ⚔️";
+                duelLeaderIndicator.className = "leader-indicator leader-tie";
+            }
         }
 
         // Loop principal do jogo
         function update(time = 0) {
             if (gameOver || paused) return;
             
-            const deltaTime = time - lastTime;
+            let deltaTime = time - lastTime;
             lastTime = time;
-            
-            dropCounter += deltaTime;
-            if (dropCounter > dropInterval) {
-                dropPiece();
+            if (deltaTime < 0 || deltaTime > 1000) deltaTime = 16;
+
+            if (gameMode === 'duel') {
+                playerInstance.dropCounter += deltaTime;
+                if (playerInstance.dropCounter > playerInstance.dropInterval) {
+                    playerInstance.dropPiece(cpuInstance);
+                }
+                playerInstance.updateFloatingTexts();
+                playerInstance.draw();
+
+                if (cpuInstance && !cpuInstance.gameOver) {
+                    cpuInstance.dropCounter += deltaTime;
+                    if (cpuInstance.dropCounter > cpuInstance.dropInterval) {
+                        cpuInstance.dropPiece(playerInstance);
+                    }
+                    updateCPUMovement(cpuInstance, playerInstance, deltaTime);
+                    cpuInstance.updateFloatingTexts();
+                    cpuInstance.draw();
+                }
+
+                updateLeaderIndicator();
+                if (playerInstance.gameOver || (cpuInstance && cpuInstance.gameOver)) {
+                    gameOver = true;
+                }
+            } else {
+                playerInstance.dropCounter += deltaTime;
+                if (playerInstance.dropCounter > playerInstance.dropInterval) {
+                    playerInstance.dropPiece(null);
+                }
+
+                if (gameMode === 'survival' && !playerInstance.gameOver) {
+                    const prevCeil = Math.ceil(survivalTimer);
+                    survivalTimer -= deltaTime / 1000;
+                    const curCeil = Math.ceil(survivalTimer);
+                    if (curCeil < prevCeil && curCeil >= 1 && curCeil <= 3 && SoundSynth.playAlertTick) {
+                        SoundSynth.playAlertTick(880);
+                    }
+                    if (survivalTimer <= 0) {
+                        playerInstance.incomingGarbage = 1;
+                        playerInstance.applyIncomingGarbage();
+                        survivalTimer += 12.0;
+                    }
+                    const stEl = document.getElementById('survivalTimer');
+                    if (stEl) stEl.textContent = Math.max(0, survivalTimer).toFixed(1) + 's';
+                }
+
+                playerInstance.updateFloatingTexts();
+                playerInstance.draw();
+                if (playerInstance.gameOver) gameOver = true;
             }
-            
-            draw();
-            requestId = requestAnimationFrame(update);
+
+            if (!gameOver) {
+                requestId = requestAnimationFrame(update);
+            }
         }
 
-        // Eventos de teclado
         document.addEventListener('keydown', event => {
-            if (gameOver) return;
+            SoundSynth.init();
+            if (gameOver || !playerInstance) return;
             
             switch (event.key) {
                 case 'ArrowLeft':
-                    movePiece(-1);
+                    playerInstance.movePiece(-1);
                     break;
                 case 'ArrowRight':
-                    movePiece(1);
+                    playerInstance.movePiece(1);
                     break;
                 case 'ArrowDown':
-                    dropPiece();
+                    playerInstance.dropPiece(gameMode === 'duel' ? cpuInstance : null);
                     break;
                 case 'ArrowUp':
-                    rotatePiece();
+                    playerInstance.rotatePiece();
                     break;
                 case ' ':
-                    rotatePiece();
+                    playerInstance.hardDrop(gameMode === 'duel' ? cpuInstance : null);
                     break;
                 case 'p':
                 case 'P':
@@ -580,41 +1704,182 @@
             }
         }
 
-        // Iniciar/Reiniciar jogo
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!paused && !gameOver) {
+                    timeLeft--;
+                    document.getElementById('timer').textContent = `${timeLeft}s`;
+                    
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        gameOver = true;
+                        cancelAnimationFrame(requestId);
+                        requestId = null;
+                        showGameOver("TEMPO ESGOTADO!");
+                    }
+                }
+            }, 1000);
+        }
+
+        function showGameOver(customMessage) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            SoundSynth.playGameOver();
+
+            gameOverElement.style.display = 'block';
+            finalScoreElement.textContent = playerInstance ? playerInstance.score : 0;
+            const title = gameOverElement.querySelector('h2');
+            if (customMessage) {
+                title.textContent = customMessage;
+            } else {
+                title.textContent = "GAME OVER";
+            }
+        }
+
+        function hideGameOver() {
+            gameOverElement.style.display = 'none';
+            const title = gameOverElement.querySelector('h2');
+            title.textContent = "GAME OVER";
+        }
+
         function startGame() {
-            // Resetar variáveis
-            board = createBoard(COLS, ROWS);
-            score = 0;
-            level = 1;
-            lines = 0;
+            SoundSynth.init();
+
             gameOver = false;
             paused = false;
-            dropCounter = 0;
-            dropInterval = 1000;
-            
-            // Resetar UI
-            scoreElement.textContent = score;
-            levelElement.textContent = level;
-            linesElement.textContent = lines;
+            survivalTimer = 12.0;
+            gameMode = gameModeSelect.value;
+
+            const timerBox = document.getElementById('timerBox');
+            const survivalBox = document.getElementById('survivalBox');
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            timerBox.style.display = 'none';
+            if (survivalBox) survivalBox.style.display = 'none';
+
             hideGameOver();
-            
-            // Criar primeira peça
-            piece = getRandomPiece();
-            nextPiece = getRandomPiece();
-            
-            // Cancelar loop anterior se existir
-            if (requestId) {
-                cancelAnimationFrame(requestId);
+
+            if (gameMode === 'duel') {
+                singleGameArea.style.display = 'none';
+                duelArena.style.display = 'flex';
+
+                const sharedSeed = Math.floor(Math.random() * 1000000);
+                const playerBag = new SeededBagGenerator(sharedSeed);
+                const cpuBag = new SeededBagGenerator(sharedSeed);
+
+                playerInstance = new TetrisBoardInstance({
+                    canvas: duelPlayerCanvas,
+                    nextCanvas: duelPlayerNextCanvas,
+                    scoreEl: duelPlayerScore,
+                    levelEl: duelPlayerLevel,
+                    linesEl: duelPlayerLines,
+                    garbageFillEl: playerGarbageFill,
+                    isCPU: false,
+                    name: "Jogador"
+                });
+                playerInstance.bagGenerator = playerBag;
+                playerInstance.spawnPiece();
+
+                cpuInstance = new TetrisBoardInstance({
+                    canvas: duelCpuCanvas,
+                    nextCanvas: duelCpuNextCanvas,
+                    scoreEl: duelCpuScore,
+                    levelEl: duelCpuLevel,
+                    linesEl: duelCpuLines,
+                    garbageFillEl: cpuGarbageFill,
+                    isCPU: true,
+                    name: "CPU"
+                });
+                cpuInstance.bagGenerator = cpuBag;
+                cpuInstance.aiDifficulty = cpuDifficultySelect.value;
+                cpuInstance.spawnPiece();
+
+                updateLeaderIndicator();
+            } else {
+                singleGameArea.style.display = 'flex';
+                duelArena.style.display = 'none';
+
+                playerInstance = new TetrisBoardInstance({
+                    canvas: canvas,
+                    nextCanvas: nextPieceCanvas,
+                    scoreEl: scoreElement,
+                    levelEl: levelElement,
+                    linesEl: linesElement,
+                    isCPU: false,
+                    name: "Jogador"
+                });
+                playerInstance.spawnPiece();
+
+                if (gameMode === 'timeattack') {
+                    timeLeft = 120;
+                    document.getElementById('timer').textContent = '120s';
+                    timerBox.style.display = 'block';
+                    startTimer();
+                } else if (gameMode === 'survival') {
+                    const garbageRows = 4 + Math.floor(Math.random() * 3);
+                    playerInstance.incomingGarbage = garbageRows;
+                    playerInstance.applyIncomingGarbage();
+                    if (survivalBox) survivalBox.style.display = 'block';
+                    document.getElementById('survivalTimer').textContent = '12.0s';
+                }
             }
-            
-            // Iniciar loop
+
+            if (requestId) cancelAnimationFrame(requestId);
             lastTime = performance.now();
             update();
         }
 
-        // Eventos de botões
-        startBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('click', () => { SoundSynth.init(); startGame(); });
+        restartBtn.addEventListener('click', () => { SoundSynth.init(); startGame(); });
+
+        // === TASK_004: Backward compatibility debug hook para testes QA ===
+        window.getGhostPositionY = () => playerInstance ? playerInstance.getGhostPositionY() : 0;
+        window.__tetris = {
+            calculateDropInterval,
+            detectTSpin: () => playerInstance ? playerInstance.detectTSpin() : false,
+            prepopulateGarbage: (rows) => {
+                if (playerInstance) {
+                    playerInstance.incomingGarbage = rows;
+                    playerInstance.applyIncomingGarbage();
+                }
+            },
+            setIncomingGarbage: (rows) => {
+                if (playerInstance) {
+                    playerInstance.incomingGarbage = rows;
+                    playerInstance.updateGarbageHUD();
+                }
+            },
+            insertGarbageRow: () => {
+                if (playerInstance) {
+                    playerInstance.incomingGarbage = 1;
+                    playerInstance.applyIncomingGarbage();
+                }
+            },
+            spawnFloatingText: (t, x, y, c) => playerInstance && playerInstance.spawnFloatingText(t, x, y, c),
+            applyScoring: (lines, isTS) => playerInstance && playerInstance.applyScoring(lines, isTS),
+            getState: () => ({
+                score: playerInstance ? playerInstance.score : 0,
+                level: playerInstance ? playerInstance.level : 1,
+                lines: playerInstance ? playerInstance.lines : 0,
+                comboCount: playerInstance ? playerInstance.comboCount : -1,
+                lastAction: playerInstance ? playerInstance.lastAction : 'spawn',
+                gameMode,
+                survivalTimer,
+                floatingTexts: playerInstance ? playerInstance.floatingTexts.length : 0,
+                gameOver
+            }),
+            setPiece: (p) => { if (playerInstance) playerInstance.piece = p; },
+            getPiece: () => playerInstance ? playerInstance.piece : null,
+            getBoard: () => playerInstance ? playerInstance.board : [],
+            setBoard: (b) => { if (playerInstance) playerInstance.board = b; },
+            setLastAction: (a) => { if (playerInstance) playerInstance.lastAction = a; },
+            COLS, ROWS,
+            forceLevel: (l) => { if (playerInstance) playerInstance.level = l; },
+            createPiece, createBoard
+        };
     </script>
 </body>
-</html> 
+</html>

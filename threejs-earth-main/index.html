@@ -3,22 +3,617 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Robot Bobby Earth</title>
+    <title>Visualizador Global - Playful Hub Earth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
     <style>
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
+        overflow: hidden;
+        background-color: #050508;
+        font-family: 'Inter', sans-serif;
+        color: #e2e8f0;
+        user-select: none;
+      }
+      
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      /* HUD Base Classes */
+      .hud-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none; /* let clicks pass to canvas */
+        z-index: 10;
+        display: flex;
+        justify-content: space-between;
+        padding: 20px;
+      }
+
+      .hud-panel {
+        background: rgba(10, 10, 18, 0.65);
+        backdrop-filter: blur(12px) saturate(180%);
+        -webkit-backdrop-filter: blur(12px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 20px;
+        pointer-events: auto; /* restore pointer events for panels */
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .hud-panel:hover {
+        border-color: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.7);
+      }
+
+      /* Control Panel (Left) */
+      .control-panel {
+        width: 320px;
+        align-self: flex-start;
+      }
+
+      h1, h2, h3 {
+        font-family: 'Orbitron', sans-serif;
+        margin: 0;
+        letter-spacing: 1px;
+      }
+
+      h1 {
+        font-size: 1.2rem;
+        background: linear-gradient(90deg, #00f2fe, #4facfe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-transform: uppercase;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 10px;
+      }
+
+      h2 {
+        font-size: 1rem;
+        color: #00ffff;
+        text-transform: uppercase;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        padding-bottom: 8px;
+        margin-bottom: 5px;
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        padding: 6px 0;
+      }
+
+      .toggle-label {
+        font-size: 0.9rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Custom Switch */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 22px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.1);
+        transition: .3s;
+        border-radius: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #cbd5e1;
+        transition: .3s;
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: #00f2fe;
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(22px);
+        background-color: #ffffff;
+      }
+
+      /* Solar Storm Slider styling */
+      .slider-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .slider-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .solar-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        outline: none;
+        margin: 10px 0;
+      }
+
+      .solar-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #00f2fe;
+        cursor: pointer;
+        box-shadow: 0 0 10px #00f2fe;
+        transition: all 0.2s ease;
+      }
+
+      .solar-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.25);
+      }
+
+      /* Planetary Defense Section */
+      .defense-section {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .defense-status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+      }
+
+      .shield-bar-container {
+        width: 100%;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 5px;
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      .shield-bar-fill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #00ffff, #0088ff);
+        box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+        transition: width 0.3s ease, background 0.3s ease;
+      }
+
+      .shield-bar-fill.critical {
+        background: linear-gradient(90deg, #ff0055, #990022);
+        box-shadow: 0 0 10px rgba(255, 0, 85, 0.8);
+      }
+
+      .btn-defense-action {
+        background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2));
+        border: 1px solid #00f2fe;
+        border-radius: 8px;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.8rem;
+        font-weight: bold;
+        padding: 10px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.2s ease;
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .btn-defense-action:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(0, 242, 254, 0.4), rgba(79, 172, 254, 0.4));
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
+      }
+
+      .btn-defense-action:disabled {
+        opacity: 0.35;
+        border-color: #666;
+        color: #999;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .btn-fire-laser {
+        background: linear-gradient(135deg, rgba(255, 0, 85, 0.25), rgba(153, 0, 34, 0.25));
+        border: 1px solid #ff0055;
+        color: #ff0055;
+        box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
+        margin-top: 10px;
+      }
+
+      .btn-fire-laser:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(255, 0, 85, 0.5), rgba(255, 0, 85, 0.3));
+        color: #ffffff;
+        box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+      }
+
+      .threat-tracker {
+        background: rgba(255, 0, 85, 0.08);
+        border: 1px dashed rgba(255, 0, 85, 0.3);
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.8rem;
+      }
+
+      .cooldown-bar-container {
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 4px;
+      }
+
+      .cooldown-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: #ff0055;
+        transition: width 0.1s linear;
+      }
+
+      /* Telemetry Panel (Right) */
+      .telemetry-panel {
+        width: 320px;
+        align-self: flex-start;
+        display: none; /* hidden by default, shown on click */
+      }
+
+      .tel-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .tel-row span:first-child {
+        color: #94a3b8;
+      }
+
+      .tel-row span:last-child {
+        font-family: 'Orbitron', monospace;
+        font-weight: 500;
+        color: #ffffff;
+      }
+
+      .btn-release {
+        margin-top: 15px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .btn-release:hover {
+        background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2));
+        border-color: #00f2fe;
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+      }
+
+      /* Instructions Overlay (Top/Bottom Info) */
+      .hud-instructions {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.8rem;
+        background: rgba(10, 10, 18, 0.4);
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: #64748b;
+        letter-spacing: 0.5px;
+        pointer-events: none;
+      }
+
+      /* Collision Warning Banner */
+      .warning-banner {
+        position: absolute;
+        top: 25px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 0, 85, 0.15);
+        border: 2px solid #ff0055;
+        border-radius: 8px;
+        padding: 12px 24px;
+        color: #ff0055;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.95rem;
+        font-weight: bold;
+        display: none; /* dynamic */
+        align-items: center;
+        gap: 12px;
+        z-index: 100;
+        box-shadow: 0 0 20px rgba(255, 0, 85, 0.3);
+        animation: warning-pulse 1s infinite alternate;
+      }
+
+      @keyframes warning-pulse {
+        0% { transform: translateX(-50%) scale(1.0); box-shadow: 0 0 10px rgba(255, 0, 85, 0.3); }
+        100% { transform: translateX(-50%) scale(1.03); box-shadow: 0 0 25px rgba(255, 0, 85, 0.6); }
+      }
+
+      /* Glitch Effect Scanlines */
+      .scanlines {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(
+          rgba(18, 16, 16, 0) 50%, 
+          rgba(0, 0, 0, 0.25) 50%
+        ), linear-gradient(
+          90deg,
+          rgba(255, 0, 0, 0.03),
+          rgba(0, 255, 0, 0.01),
+          rgba(0, 0, 255, 0.03)
+        );
+        background-size: 100% 4px, 6px 100%;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .scanlines.active {
+        opacity: 1;
+      }
+
+      /* HUD Panel Glitch Style */
+      .hud-panel.glitch {
+        animation: hud-flicker 0.15s infinite;
+        border-color: rgba(255, 0, 85, 0.4) !important;
+        box-shadow: 0 0 20px rgba(255, 0, 85, 0.15) !important;
+      }
+
+      h1.glitch, h2.glitch {
+        text-shadow: 2px 0 #ff0055, -2px 0 #00ffaa;
+      }
+
+      @keyframes hud-flicker {
+        0% { opacity: 0.95; transform: translate(1px, -1px); }
+        50% { opacity: 0.85; transform: translate(-1px, 1px); }
+        100% { opacity: 0.95; transform: translate(0); }
       }
     </style>
     <script type="importmap">
-			{
-				"imports": {
-					"three": "https://cdn.jsdelivr.net/npm/three@0.161/build/three.module.js",
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.161/build/three.module.js",
           "jsm/": "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/"
         }
-			}
-		</script>
+      }
+    </script>
   </head>
   <body>
+    <!-- Scanlines overlay for storm glitch -->
+    <div id="scanlines" class="scanlines"></div>
+
+    <!-- Collision warning banner -->
+    <div id="warningBanner" class="warning-banner">
+      <span style="font-size: 1.2rem;">⚠️</span>
+      <span id="warningMessage">AVISO: RISCO DE COLISÃO DE DETRITOS</span>
+    </div>
+
+    <!-- HUD Container overlay -->
+    <div class="hud-container">
+      <!-- Left Panel: Controls -->
+      <div id="controlPanel" class="hud-panel control-panel">
+        <h1>Centro de Comando</h1>
+        
+        <div class="control-group">
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <span>🛰️</span> Satélites e Órbitas
+            </span>
+            <label class="switch">
+              <input type="checkbox" id="satellitesToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <span>✨</span> Vento Solar
+            </span>
+            <label class="switch">
+              <input type="checkbox" id="solarWindToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <span>🌈</span> Auroras Polares
+            </span>
+            <label class="switch">
+              <input type="checkbox" id="aurorasToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <span>🗑️</span> Detritos Espaciais
+            </span>
+            <label class="switch">
+              <input type="checkbox" id="debrisToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <span>🔊</span> Alarme de Colisão
+            </span>
+            <label class="switch">
+              <input type="checkbox" id="alarmToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>Tempestade Solar</span>
+            <span id="solarStormVal">0%</span>
+          </div>
+          <input type="range" id="solarStormSlider" class="solar-slider" min="0" max="100" value="0">
+        </div>
+
+        <!-- Section: Planetary Defense Shield (TASK_004) -->
+        <div class="defense-section">
+          <h2>🛡️ Defesa Planetária</h2>
+          
+          <div class="defense-status-row">
+            <span style="font-size: 0.85rem; color: #94a3b8;">Escudo Energético:</span>
+            <span id="shieldStatusText" style="font-family: 'Orbitron', monospace; font-weight: bold; color: #00ffff;">100% [ATIVO]</span>
+          </div>
+          <div class="shield-bar-container">
+            <div id="shieldBarFill" class="shield-bar-fill"></div>
+          </div>
+
+          <button id="spawnAsteroidBtn" class="btn-defense-action" style="margin-top: 4px;">
+            <span>☄️</span> Simular Ameaça de Asteroide
+          </button>
+
+          <!-- Threat Tracker Widget (Active when asteroid is incoming) -->
+          <div id="threatTracker" class="threat-tracker" style="display: none;">
+            <div style="font-weight: bold; color: #ff0055; font-family: 'Orbitron', sans-serif; display: flex; justify-content: space-between;">
+              <span>🚨 AMEAÇA DETECTADA</span>
+              <span id="threatEta">ETA: 00s</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; color: #cbd5e1;">
+              <span>Distância Orbital:</span>
+              <span id="threatDistance" style="font-family: monospace;">5.50u</span>
+            </div>
+          </div>
+
+          <!-- Laser Cooldown Status -->
+          <div id="laserCooldownContainer" style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748b;">
+              <span>CANHÃO INTERCEPTOR LASER:</span>
+              <span id="cooldownText" style="color: #00ffaa;">PRONTO</span>
+            </div>
+            <div class="cooldown-bar-container">
+              <div id="cooldownBarFill" class="cooldown-bar-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Telemetry -->
+      <div id="telemetrySidebar" class="hud-panel telemetry-panel">
+        <h2>Telemetria</h2>
+        <div class="tel-row">
+          <span>Alvo:</span>
+          <span id="telName">-</span>
+        </div>
+        <div class="tel-row">
+          <span>Categoria:</span>
+          <span id="telCategory">-</span>
+        </div>
+        <div class="tel-row">
+          <span>Status:</span>
+          <span id="telStatus" style="color: #00ffaa;">OPERACIONAL</span>
+        </div>
+        
+        <div id="telDetails">
+          <!-- Dynamic rows added here -->
+        </div>
+
+        <!-- Laser Fire Button (Visible when Satellite or Station selected) -->
+        <button id="fireLaserBtn" class="btn-defense-action btn-fire-laser" style="display: none;">
+          <span>🎯</span> Disparar Interceptor Laser
+        </button>
+
+        <button id="releaseFocusBtn" class="btn-release">
+          <span>🔓</span> Liberar Foco
+        </button>
+      </div>
+    </div>
+
+    <div class="hud-instructions">
+      Clique nos Satélites, Estações Ciano ou no seu Pino para focar a câmera. Arraste para girar a Terra.
+    </div>
+
     <script type="module" src="index.js"></script>
   </body>
 </html>

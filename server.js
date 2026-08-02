@@ -19,6 +19,9 @@ app.use(cors({
   origin: function (origin, callback) {
     // Permite requisições sem origin (como Postman, apps mobile, ou same-origin)
     if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV === 'test' && (origin.startsWith('http://127.0.0.1') || origin.startsWith('http://localhost'))) {
+      return callback(null, true);
+    }
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'A política de CORS para este site não permite acesso da Origem especificada.';
       return callback(new Error(msg), false);
@@ -34,7 +37,14 @@ app.use(express.json());
 app.use(express.static('./', {
     maxAge: '1h', // Cache de 1 hora para assets estáticos
     etag: true,
-    lastModified: true
+    lastModified: true,
+    // HTML não pode ser cacheado de forma agressiva: senão o navegador segura
+    // uma versão antiga da página por até 1h (ex.: rodapé quebrado já corrigido).
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    }
 }));
 
 // Cache headers para páginas HTML
@@ -118,6 +128,7 @@ createHtmlRoute('/jogos/it_simulator', 'jogos/it_simulator.html');
 createHtmlRoute('/jogos/tabuleiro_galton', 'jogos/tabuleiro_galton.html');
 createHtmlRoute('/jogos/pinball', 'jogos/pinball.html');
 createHtmlRoute('/jogos/voxel_city', 'jogos/voxel_city.html');
+createHtmlRoute('/jogos/rede_neural_evolutiva', 'jogos/rede_neural_evolutiva.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -140,6 +151,7 @@ createHtmlRoute('/visual_effects', 'visual_effects/index.html');
 createHtmlRoute('/chess', 'chess/index.html');
 createHtmlRoute('/lazy_gardner', 'lazy_gardner/index.html');
 createHtmlRoute('/voxel_city', 'voxel_city/index.html');
+createHtmlRoute('/rede_neural_evolutiva', 'rede_neural_evolutiva/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
@@ -154,12 +166,15 @@ app.use(helmet());
 app.use(
   helmet.contentSecurityPolicy({
     directives: {
-      defaultSrc: ["'self'"], // Permite carregar recursos do mesmo domínio
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Permite scripts do mesmo domínio e inline (AJUSTE CONFORME NECESSÁRIO)
-      // Adicione outras diretivas conforme necessário (styleSrc, imgSrc, etc.)
+      defaultSrc: ["'self'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "blob:"],
+      workerSrc: ["'self'", "blob:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https://unpkg.com", "https://chessboardjs.com", "https://chessboardjs.com/img/"],
     },
   })
 );
+
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos

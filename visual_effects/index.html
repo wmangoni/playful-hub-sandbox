@@ -145,6 +145,77 @@
             display:none;
             visibility:hidden
         }
+
+        /* === TASK_002: Modal de upload de música customizada === */
+        .custom-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        .custom-modal {
+            background: #0a192f;
+            border: 2px solid #00bcd4;
+            border-radius: 12px;
+            padding: 28px;
+            width: 90%;
+            max-width: 460px;
+            color: #fff;
+            box-shadow: 0 0 25px rgba(0, 188, 212, 0.5);
+            text-align: center;
+        }
+        .custom-modal h2 {
+            color: #00e5ff;
+            margin-bottom: 18px;
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+        }
+        .custom-field {
+            text-align: left;
+            margin-bottom: 16px;
+        }
+        .custom-field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #b2ebf2;
+        }
+        .custom-field input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            background: #112240;
+            border: 1px dashed #00bcd4;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .custom-modal .file-status {
+            font-size: 12px;
+            color: #80deea;
+            margin-top: 4px;
+            min-height: 14px;
+        }
+        .cyan-btn {
+            background-color: #00bcd4;
+            box-shadow: 0 0 10px rgba(0, 188, 212, 0.6);
+        }
+        .cyan-btn:hover { background-color: #00acc1; }
+        .custom-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        .template-link {
+            display: inline-block;
+            margin-bottom: 18px;
+            color: #00e5ff;
+            font-size: 13px;
+            text-decoration: underline;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -221,7 +292,35 @@
         </div>
         
         <div class="control-group">
-            <label>
+            <div class="control-label">
+                <span>Visual Theme:</span>
+            </div>
+            <select id="themeSelect" style="width:100%; padding:5px; background:#222; color:#fff; border:1px solid #00bcd4; border-radius:4px; font-size:12px;">
+                <option value="cyberpunk">Retro Cyberpunk 🏙️</option>
+                <option value="vaporwave">Vaporwave Sunset 🌅</option>
+                <option value="nebula">Cosmic Nebula 🌌</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Synth Waveform:</span>
+            </div>
+            <select id="synthWaveSelect" style="width:100%; padding:5px; background:#222; color:#fff; border:1px solid #4caf50; border-radius:4px; font-size:12px;">
+                <option value="sine">Sine Wave (Flute) 🎵</option>
+                <option value="triangle">Triangle (Chiptune) 👾</option>
+                <option value="sawtooth">Sawtooth (Saw Synth) ⚡</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label style="font-size:12px;">
+                <input type="checkbox" id="synthEnabled" checked> Enable Synth Clicks
+            </label>
+        </div>
+
+        <div class="control-group">
+            <label style="font-size:12px;">
                 <input type="checkbox" id="rainbowMode"> Rainbow Mode
             </label>
         </div>
@@ -259,14 +358,177 @@
             rainbowMode: false
         };
         
-        // Mouse position
+        // TASK_003: Temas visuais, sintetizador procedural, notas especiais e game feel
+        let currentTheme = 'cyberpunk'; // 'cyberpunk' | 'vaporwave' | 'nebula'
+        let synthEnabled = true;
+        let frenzyTime = 0; // Segundos restantes do Modo Frenesi
+        let hasShield = false; // Estado do escudo (máx 1)
+        let shakeTime = 0;
+        let shakeIntensity = 0;
+
         let mouse = {
             x: 0,
             y: 0,
             isMoving: false,
-            lastMoveTime: 0
+            lastMoveTime: Date.now()
         };
-        
+
+        // Escala Pentatônica Menor de Lá (A Minor Pentatonic Scale)
+        const PENTATONIC_SCALE = [
+            220.00, // A3
+            261.63, // C4
+            293.66, // D4
+            329.63, // E4
+            392.00, // G4
+            440.00, // A4
+            523.25, // C5
+            587.33, // D5
+            659.25, // E5
+            783.99, // G5
+            880.00, // A5
+            1046.50,// C6
+            1174.66,// D6
+            1318.51,// E6
+            1567.98 // G6
+        ];
+
+        class ProceduralSynth {
+            constructor() {
+                this.ctx = null;
+                this.waveType = 'sine'; // 'sine' | 'triangle' | 'sawtooth'
+                this.activeNodes = {};
+            }
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn("AudioContext não suportado para synth:", e);
+                }
+            }
+
+            playNote(frequency, duration = 0.3) {
+                if (!synthEnabled) return;
+                this.init();
+                if (!this.ctx) return;
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gainNode = this.ctx.createGain();
+
+                    osc.type = this.waveType;
+                    osc.frequency.setValueAtTime(frequency, this.ctx.currentTime);
+
+                    const now = this.ctx.currentTime;
+                    gainNode.gain.setValueAtTime(0, now);
+                    gainNode.gain.linearRampToValueAtTime(0.25, now + 0.02); // Attack
+                    gainNode.gain.exponentialRampToValueAtTime(0.08, now + 0.1); // Decay
+                    gainNode.gain.setValueAtTime(0.08, now + Math.max(0.1, duration - 0.05)); // Sustain
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration); // Release
+
+                    osc.connect(gainNode);
+                    gainNode.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch (e) {
+                    console.warn("Erro no playNote synth:", e);
+                }
+            }
+
+            startHoldNote(noteId, frequency) {
+                if (!synthEnabled) return;
+                this.init();
+                if (!this.ctx) return;
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                if (this.activeNodes[noteId]) return;
+
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gainNode = this.ctx.createGain();
+
+                    osc.type = this.waveType;
+                    osc.frequency.setValueAtTime(frequency, this.ctx.currentTime);
+
+                    const now = this.ctx.currentTime;
+                    gainNode.gain.setValueAtTime(0, now);
+                    gainNode.gain.linearRampToValueAtTime(0.2, now + 0.05);
+
+                    osc.connect(gainNode);
+                    gainNode.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    this.activeNodes[noteId] = { osc, gainNode };
+                } catch (e) {
+                    console.warn("Erro no startHoldNote synth:", e);
+                }
+            }
+
+            stopHoldNote(noteId) {
+                if (!this.activeNodes[noteId]) return;
+                try {
+                    const { osc, gainNode } = this.activeNodes[noteId];
+                    const now = this.ctx.currentTime;
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+                    osc.stop(now + 0.1);
+                } catch (e) {}
+                delete this.activeNodes[noteId];
+            }
+        }
+
+        const synth = new ProceduralSynth();
+
+        function getStringFrequency(stringIndex) {
+            const idx = Math.abs(stringIndex) % PENTATONIC_SCALE.length;
+            return PENTATONIC_SCALE[idx];
+        }
+
+        function applyRippleForce(stringIndex, centerIdx, force) {
+            if (!strings || stringIndex < 0 || stringIndex >= strings.length) return;
+            const string = strings[stringIndex];
+            if (!string || !string.points) return;
+            const width = 15;
+            for (let i = -width; i <= width; i++) {
+                const idx = centerIdx + i;
+                if (idx >= 0 && idx < string.points.length) {
+                    const distFactor = 1 - Math.abs(i) / width;
+                    string.points[idx].velocity += force * distFactor * (Math.random() * 0.4 + 0.6);
+                }
+            }
+        }
+
+        function triggerRipple(stringIndex, targetX, force) {
+            const pointCount = 100;
+            const centerIdx = Math.min(pointCount - 1, Math.max(0, Math.floor((targetX / canvas.width) * (pointCount - 1))));
+
+            applyRippleForce(stringIndex, centerIdx, force);
+            applyRippleForce(stringIndex - 1, centerIdx, force * 0.5);
+            applyRippleForce(stringIndex + 1, centerIdx, force * 0.5);
+            applyRippleForce(stringIndex - 2, centerIdx, force * 0.25);
+            applyRippleForce(stringIndex + 2, centerIdx, force * 0.25);
+        }
+
+        function triggerScreenShake(duration, intensity) {
+            shakeTime = duration;
+            shakeIntensity = intensity;
+        }
+
+        function applyScreenShake() {
+            if (shakeTime > 0) {
+                const dx = (Math.random() - 0.5) * shakeIntensity;
+                const dy = (Math.random() - 0.5) * shakeIntensity;
+                canvas.style.transform = `translate(${dx}px, ${dy}px)`;
+                shakeTime -= 16.67;
+                if (shakeTime <= 0) {
+                    canvas.style.transform = 'translate(0px, 0px)';
+                }
+            }
+        }
+
         // Renomear a classe String para VibratingString
         class VibratingString {
             constructor(y, index) {
@@ -308,6 +570,12 @@
                     // Natural vibration
                     const naturalVibration = Math.sin(time * speed + i * 0.1 + this.offset) * 2;
                     point.velocity += naturalVibration;
+
+                    // Vibração reativa aos graves da música (Audio Reactive)
+                    if (audioBass > 0) {
+                        point.velocity += audioBass * params.vibrationAmplitude * 0.15
+                            * Math.sin(time * 8 + i * 0.2 + this.offset);
+                    }
                     
                     // Apply physics
                     point.velocity *= 0.95; // Damping
@@ -370,6 +638,354 @@
         const obstacleHitSound = new Audio('../assets/sounds/enemy_hit.mp3');
         obstacleHitSound.volume = 0.7; // Ajuste o volume conforme necessário
 
+        // === TASK_002: Web Audio API (visualizador reativo de frequências) ===
+        let audioCtx = null;
+        let analyser = null;
+        let sourceNode = null;
+        let audioDataArray = null;
+        let audioBass = 0;    // intensidade dos graves (0..1)
+        let audioTreble = 0;  // intensidade dos agudos (0..1)
+
+        function initAudioAnalysis(audioElement) {
+            if (audioCtx) return; // só inicializa uma vez (MediaElementSource é único por elemento)
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                sourceNode = audioCtx.createMediaElementSource(audioElement);
+                sourceNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                audioDataArray = new Uint8Array(analyser.frequencyBinCount);
+            } catch (e) {
+                console.warn('Web Audio API indisponível, seguindo sem reatividade:', e);
+                analyser = null;
+            }
+        }
+
+        function calculateAverage(arr, start, end) {
+            let sum = 0, count = 0;
+            for (let i = start; i < end && i < arr.length; i++) { sum += arr[i]; count++; }
+            return count ? sum / count : 0;
+        }
+
+        function updateAudioReactivity() {
+            if (!analyser) return;
+            analyser.getByteFrequencyData(audioDataArray);
+            audioBass = calculateAverage(audioDataArray, 0, 10) / 255;     // graves (bumbo/baixo)
+            audioTreble = calculateAverage(audioDataArray, 80, 120) / 255; // agudos (pratos/vocais)
+        }
+
+        function hexToRgb(hex) {
+            const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : null;
+        }
+        function blendColors(hex1, hex2, t) {
+            const c1 = hexToRgb(hex1), c2 = hexToRgb(hex2);
+            if (!c1 || !c2) return hex1;
+            const r = Math.round(c1.r + (c2.r - c1.r) * t);
+            const g = Math.round(c1.g + (c2.g - c1.g) * t);
+            const b = Math.round(c1.b + (c2.b - c1.b) * t);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        // === TASK_003: Renderização de Temas Visuais e Partículas ===
+        function drawThemeBackground() {
+            if (currentTheme === 'cyberpunk') {
+                // Fundo Cyberpunk reativo aos graves
+                const baseBg = analyser ? blendColors(params.backgroundColor, '#1d0c24', Math.min(1, audioBass * 0.6)) : params.backgroundColor;
+                ctx.fillStyle = baseBg;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Grade virtual 3D com linhas convergentes
+                ctx.strokeStyle = 'rgba(0, 229, 255, 0.15)';
+                ctx.lineWidth = 1.5;
+                const horizonY = canvas.height * 0.4;
+                const lineCount = 20;
+
+                for (let i = 0; i <= lineCount; i++) {
+                    const xOffset = (i / lineCount) * canvas.width;
+                    ctx.beginPath();
+                    ctx.moveTo(canvas.width / 2, horizonY);
+                    ctx.lineTo(xOffset, canvas.height);
+                    ctx.stroke();
+                }
+
+                const time = Date.now() * 0.002 * (1 + audioBass * 2);
+                const gridLines = 10;
+                for (let i = 0; i < gridLines; i++) {
+                    const progress = ((i + time) % gridLines) / gridLines;
+                    const y = horizonY + (canvas.height - horizonY) * Math.pow(progress, 2);
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+            } else if (currentTheme === 'vaporwave') {
+                // Gradiente vertical retro de anoitecer
+                const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                grad.addColorStop(0, '#2e0854');
+                grad.addColorStop(0.5, '#8b008b');
+                grad.addColorStop(1, '#ff69b4');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Sol aramado central
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height * 0.45;
+                const baseRadius = Math.min(canvas.width, canvas.height) * 0.22;
+                const currentRadius = baseRadius + (audioBass * baseRadius * 0.2);
+
+                const sunGrad = ctx.createLinearGradient(centerX, centerY - currentRadius, centerX, centerY + currentRadius);
+                sunGrad.addColorStop(0, '#ffcc00');
+                sunGrad.addColorStop(1, '#ff007f');
+                ctx.fillStyle = sunGrad;
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, currentRadius, 0, Math.PI, true);
+                ctx.fill();
+
+                // Linhas pretas horizontais cortando o sol
+                ctx.fillStyle = '#2e0854';
+                const stripeCount = 6;
+                for (let i = 0; i < stripeCount; i++) {
+                    const sy = centerY + (i / stripeCount) * currentRadius * 0.9;
+                    const sh = 4 + i * 2;
+                    ctx.fillRect(centerX - currentRadius - 10, sy, currentRadius * 2 + 20, sh);
+                }
+
+                // Grade aramada inferior
+                ctx.strokeStyle = 'rgba(255, 0, 127, 0.25)';
+                ctx.lineWidth = 1;
+                const gridStartY = centerY;
+                for (let i = 0; i <= 16; i++) {
+                    const x = (i / 16) * canvas.width;
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, gridStartY);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+
+                const time = Date.now() * 0.001 * (1 + audioBass * 1.5);
+                for (let i = 0; i < 8; i++) {
+                    const progress = ((i + time) % 8) / 8;
+                    const y = gridStartY + (canvas.height - gridStartY) * Math.pow(progress, 1.8);
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+            } else if (currentTheme === 'nebula') {
+                // Poeira estelar fluida em rotação orbital
+                const time = Date.now() * 0.0003;
+                const angle = time % (Math.PI * 2);
+
+                const c1X = canvas.width / 2 + Math.cos(angle) * canvas.width * 0.25;
+                const c1Y = canvas.height / 2 + Math.sin(angle) * canvas.height * 0.25;
+                const c2X = canvas.width / 2 - Math.cos(angle + Math.PI/2) * canvas.width * 0.2;
+                const c2Y = canvas.height / 2 - Math.sin(angle + Math.PI/2) * canvas.height * 0.2;
+
+                const grad = ctx.createRadialGradient(c1X, c1Y, 10, c2X, c2Y, Math.max(canvas.width, canvas.height) * 0.85);
+                grad.addColorStop(0, '#4b0082');
+                grad.addColorStop(0.3, '#191970');
+                grad.addColorStop(0.7, '#240a34');
+                grad.addColorStop(1, '#05020c');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Spot de luz suave
+                const reactiveRad = 200 + audioBass * 300;
+                const spotGrad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 50, canvas.width / 2, canvas.height / 2, reactiveRad);
+                spotGrad.addColorStop(0, 'rgba(218, 165, 32, 0.12)');
+                spotGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = spotGrad;
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, reactiveRad, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        let sparkles = [];
+        function emitThemeParticles(intensity) {
+            const count = Math.floor(intensity * 4);
+            for (let i = 0; i < count; i++) {
+                if (currentTheme === 'cyberpunk') {
+                    sparkles.push({
+                        x: Math.random() * canvas.width,
+                        y: canvas.height + 10,
+                        vy: -(1 + Math.random() * 3.5) * (0.5 + intensity),
+                        vx: Math.random() * 1.5 - 0.75,
+                        size: 2 + Math.random() * 4,
+                        life: 1.0,
+                        hue: 300 + Math.random() * 40,
+                        type: 'square'
+                    });
+                } else if (currentTheme === 'vaporwave') {
+                    sparkles.push({
+                        x: Math.random() * canvas.width,
+                        y: canvas.height + 20,
+                        vy: -(0.5 + Math.random() * 1.5) * (0.8 + intensity),
+                        vx: Math.sin(Math.random() * Math.PI) * 0.3,
+                        size: 3 + Math.random() * 8,
+                        life: 1.0,
+                        hue: 180 + Math.random() * 40,
+                        type: 'bubble'
+                    });
+                } else if (currentTheme === 'nebula') {
+                    sparkles.push({
+                        x: Math.random() * canvas.width,
+                        y: -10,
+                        vy: (2 + Math.random() * 4) * (0.7 + intensity),
+                        vx: -(1 + Math.random() * 2),
+                        size: 1.5 + Math.random() * 2.5,
+                        life: 1.0,
+                        hue: 45 + Math.random() * 15,
+                        type: 'star'
+                    });
+                }
+            }
+        }
+
+        function updateThemeParticles() {
+            for (const s of sparkles) {
+                s.y += s.vy || 0;
+                s.x += s.vx || 0;
+                s.life -= (s.type === 'bubble') ? 0.008 : 0.016;
+            }
+            sparkles = sparkles.filter(s => s.life > 0 && s.y > -30 && s.y < canvas.height + 30 && s.x > -30 && s.x < canvas.width + 30);
+        }
+
+        function drawThemeParticles() {
+            for (const s of sparkles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, s.life);
+                if (s.type === 'square') {
+                    ctx.fillStyle = `hsl(${s.hue}, 100%, 70%)`;
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = `hsl(${s.hue}, 100%, 60%)`;
+                    ctx.fillRect(s.x - s.size / 2, s.y - s.size / 2, s.size, s.size);
+                } else if (s.type === 'bubble') {
+                    ctx.strokeStyle = `hsla(${s.hue}, 100%, 80%, 0.7)`;
+                    ctx.fillStyle = `hsla(${s.hue}, 100%, 85%, 0.15)`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (s.type === 'star') {
+                    ctx.strokeStyle = `hsla(${s.hue}, 100%, 75%, ${s.life})`;
+                    ctx.lineWidth = s.size;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x, s.y);
+                    ctx.lineTo(s.x - (s.vx || 0) * 3, s.y - (s.vy || 0) * 3);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsl(${s.hue || 180}, 100%, 75%)`;
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = `hsl(${s.hue || 180}, 100%, 70%)`;
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        // Desenhar estrela de 5 pontas para Frenzy Note
+        function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / spikes;
+
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.lineTo(cx, cy - outerRadius);
+            ctx.closePath();
+        }
+
+        function drawFrenzyNote(note, stringY) {
+            const hue = (Date.now() * 0.15) % 360;
+            ctx.save();
+            ctx.fillStyle = `hsl(${hue}, 100%, 65%)`;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+            drawStar(ctx, note.x, stringY, 5, note.radius * 1.3, note.radius * 0.6);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawShieldShape(ctx, cx, cy, size) {
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - size);
+            ctx.lineTo(cx + size * 0.85, cy - size * 0.6);
+            ctx.lineTo(cx + size * 0.85, cy + size * 0.25);
+            ctx.quadraticCurveTo(cx, cy + size, cx, cy + size * 1.1);
+            ctx.quadraticCurveTo(cx, cy + size, cx - size * 0.85, cy + size * 0.25);
+            ctx.lineTo(cx - size * 0.85, cy - size * 0.6);
+            ctx.closePath();
+        }
+
+        function drawShieldNote(note, stringY) {
+            ctx.save();
+            ctx.fillStyle = '#00ff87';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ff87';
+            drawShieldShape(ctx, note.x, stringY, note.radius);
+            ctx.fill();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            drawShieldShape(ctx, note.x, stringY, note.radius * 0.65);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawFrenzyHUD() {
+            if (frenzyTime <= 0) return;
+            const barWidth = 280;
+            const barHeight = 14;
+            const x = (canvas.width - barWidth) / 2;
+            const y = 22;
+            const progress = frenzyTime / 8.0;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(x - 12, y - 20, barWidth + 24, barHeight + 28);
+
+            const hue = (Date.now() * 0.2) % 360;
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillStyle = `hsl(${hue}, 100%, 75%)`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`⚡ FRENZY MODE (x2) ⚡`, canvas.width / 2, y - 4);
+
+            ctx.fillStyle = '#222';
+            ctx.fillRect(x, y, barWidth, barHeight);
+
+            const grad = ctx.createLinearGradient(x, 0, x + barWidth, 0);
+            grad.addColorStop(0, '#ff007f');
+            grad.addColorStop(1, '#00f0ff');
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y, barWidth * Math.max(0, progress), barHeight);
+
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, barWidth, barHeight);
+            ctx.restore();
+        }
+
         // Variáveis globais do jogo
         let gameActive = false;
         let score = 0;
@@ -377,33 +993,62 @@
         let lives = 3;
         let level = 1;
         let notes = [];
-        let obstacles = [];
         let captureZones = [];
+
+        // === TASK_002: estado do modo de música customizada / notas time-driven ===
+        let customMode = false;        // true quando jogando faixa customizada
+        let customAudioURL = null;     // object URL do áudio carregado
+        let pendingNoteMap = null;     // mapa JSON validado aguardando início
+        let noteQueue = [];            // notas customizadas ainda não spawnadas (ordenadas por time)
+        let customLaneCount = 4;       // nº de "lanes" detectado no mapa
+        let mouseDown = false;         // estado do botão do mouse (para hold notes)
+        const T_VIEW = 2.0;            // segundos de antecedência de visualização das notas
         
         // Animation loop
         function animate() {
-            // Clear canvas
-            ctx.fillStyle = params.backgroundColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+            // Aplicar efeito de tremedeira de tela (Screen Shake)
+            applyScreenShake();
+
+            // Extrair frequências da música ativa
+            updateAudioReactivity();
+
+            // Atualizar timer do Modo Frenesi
+            if (frenzyTime > 0) {
+                frenzyTime -= 1 / 60;
+                if (frenzyTime < 0) frenzyTime = 0;
+                emitThemeParticles(1.0);
+            }
+
+            // Fundo temático dinâmico
+            drawThemeBackground();
+
             // Check if mouse has been inactive
             if (Date.now() - mouse.lastMoveTime > 100) {
                 mouse.isMoving = false;
             }
-            
-            // Update and draw strings
+
+            // Update e draw das cordas com suporte a modo arco-íris / frenzy
+            ctx.save();
+            ctx.shadowBlur = 10 + audioBass * 25;
+            ctx.shadowColor = (params.rainbowMode || frenzyTime > 0) ? 'rgba(255,255,255,0.8)' : params.stringColor;
             strings.forEach(string => {
                 string.update();
                 string.draw();
             });
-            
+            ctx.restore();
+
+            // Emissão e atualização de partículas do tema ativo
+            if (analyser && audioTreble > 0.3) emitThemeParticles(audioTreble);
+            updateThemeParticles();
+            drawThemeParticles();
+
             // Adicionar elementos do jogo se estiver ativo
             if (gameActive) {
                 updateNotes();
-                updateObstacles();
                 drawCaptureZones();
+                drawFrenzyHUD();
             }
-            
+
             requestAnimationFrame(animate);
         }
         
@@ -438,6 +1083,9 @@
             stringColor: document.getElementById('stringColor'),
             backgroundColor: document.getElementById('backgroundColor'),
             rainbowMode: document.getElementById('rainbowMode'),
+            themeSelect: document.getElementById('themeSelect'),
+            synthWaveSelect: document.getElementById('synthWaveSelect'),
+            synthEnabled: document.getElementById('synthEnabled'),
             
             stringCountValue: document.getElementById('stringCountValue'),
             vibrationSpeedValue: document.getElementById('vibrationSpeedValue'),
@@ -471,6 +1119,9 @@
             controls.stringColor.value = params.stringColor;
             controls.backgroundColor.value = params.backgroundColor;
             controls.rainbowMode.checked = params.rainbowMode;
+            if (controls.themeSelect) controls.themeSelect.value = currentTheme;
+            if (controls.synthWaveSelect) controls.synthWaveSelect.value = synth.waveType;
+            if (controls.synthEnabled) controls.synthEnabled.checked = synthEnabled;
         }
         
         // Setup control event listeners
@@ -479,6 +1130,24 @@
             controls.stringCountValue.textContent = params.stringCount;
             createStrings();
         });
+
+        if (controls.themeSelect) {
+            controls.themeSelect.addEventListener('change', (e) => {
+                currentTheme = e.target.value;
+            });
+        }
+
+        if (controls.synthWaveSelect) {
+            controls.synthWaveSelect.addEventListener('change', (e) => {
+                synth.waveType = e.target.value;
+            });
+        }
+
+        if (controls.synthEnabled) {
+            controls.synthEnabled.addEventListener('change', (e) => {
+                synthEnabled = e.target.checked;
+            });
+        }
         
         controls.vibrationSpeed.addEventListener('input', () => {
             params.vibrationSpeed = parseInt(controls.vibrationSpeed.value);
@@ -584,87 +1253,48 @@
         createStrings();
         animate();
 
-        // Função para gerar obstáculos
-        function startObstacleGenerator() {
-            const obstacleInterval = setInterval(() => {
-                if (!gameActive) {
-                    clearInterval(obstacleInterval);
-                    return;
-                }
-                
-                // Lógica para gerar obstáculos...
-                if (Math.random() < 0.1 + (level * 0.02)) {
-                    createObstacle();
-                }
-            }, 2000 - (level * 100));
-        }
-        
-        // Função para atualizar obstáculos
-        function updateObstacles() {
-            obstacles.forEach(obstacle => {
-                if (!obstacle.active) return;
-                
-                // Mover obstáculo
-                obstacle.x += obstacle.speed;
-                
-                // Verificar se passou da tela
-                if (obstacle.x > canvas.width) {
-                    obstacle.active = false;
-                }
-                
-                // Desenhar obstáculo
-                ctx.beginPath();
-                ctx.arc(obstacle.x, strings[obstacle.stringIndex].points[0].y, obstacle.radius, 0, Math.PI * 2);
-                ctx.fillStyle = 'red';
-                ctx.fill();
-                ctx.strokeStyle = 'darkred';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            });
-            
-            // Remover obstáculos inativos
-            obstacles = obstacles.filter(obstacle => obstacle.active);
-        }
-        
-        // Função para criar obstáculo
-        function createObstacle() {
-            const stringIndex = Math.floor(Math.random() * strings.length);
-            
-            obstacles.push({
-                stringIndex,
-                x: 0,
-                speed: 3 + (level * 0.3),
-                radius: 12,
-                active: true
-            });
-        }
 
-        // Função para quando um obstáculo é atingido (seja por clique ou por passar)
-        function hitObstacle(obstacle, clicked = false) {
-            // Tocar som de acerto de obstáculo
+
+        // Nota Mina atingida: penaliza ou consome escudo
+        function hitMine(note) {
             obstacleHitSound.currentTime = 0;
-            obstacleHitSound.play().catch(error => console.error("Erro ao tocar som de obstáculo:", error));
+            obstacleHitSound.play().catch(error => console.error("Erro ao tocar som de mina:", error));
 
-            // Reduzir vida
-            lives--;
+            const stringY = strings[note.stringIndex].points[0].y;
+            triggerRipple(note.stringIndex, note.x, 100);
 
-            // Resetar combo
-            combo = 0;
-
-            // Mostrar feedback visual
-            const stringY = strings[obstacle.stringIndex].points[0].y;
-            showFeedback("HIT!", obstacle.x, stringY, "red");
-
-            // Desativar obstáculo
-            obstacle.active = false;
-
-            // Atualizar UI
-            updateScoreDisplay();
-
-            // Verificar game over
-            if (lives <= 0) {
-                gameOver();
+            if (hasShield) {
+                hasShield = false;
+                showFeedback("SHIELD BLOCK!", note.x, stringY, "#00ff87");
+                triggerScreenShake(200, 5);
+            } else {
+                score = Math.max(0, score - 150); // score nunca fica negativo
+                combo = 0;
+                showFeedback("MINA! -150", note.x, stringY, "red");
+                triggerScreenShake(300, 10);
             }
+
+            note.active = false;
+            updateScoreDisplay();
+        }
+
+        // Iniciar a sustentação de uma Hold Note ao pressionar sobre a cabeça na zona
+        function startHoldIfAny(x, y) {
+            const zoneX = canvas.width * 0.8;
+            for (const note of notes) {
+                if (!note.active || note.type !== 'hold' || note.holdComplete || note.holdBroken) continue;
+                const stringY = strings[note.stringIndex].points[0].y;
+                const headClose = Math.abs(x - note.x) <= note.radius * 2 && Math.abs(y - stringY) <= 45;
+                const inWindow = note.x >= zoneX - 40 && note.x <= zoneX + 60;
+                if (headClose && inWindow) {
+                    note.holding = true;
+                    note.holdStarted = true;
+                    const freq = getStringFrequency(note.stringIndex);
+                    synth.startHoldNote(note.stringIndex, freq);
+                    return true;
+                }
+            }
+            return false;
         }
 
         // Substituir a função checkNoteCapture por uma versão mais simples
@@ -682,7 +1312,16 @@
 
                 // Verificar se o clique foi próximo o suficiente da nota
                 if (distance <= note.radius * 2) { // Aumentar um pouco a área de clique
-                    // Verificar se a nota está na zona de captura
+                    // Mina: clicar é sempre punido (independe da zona)
+                    if (note.type === 'mine') {
+                        hitMine(note);
+                        return;
+                    }
+                    // Hold note é tratada pelo sistema de segurar (mousedown), não por clique simples
+                    if (note.type === 'hold') {
+                        continue;
+                    }
+                    // Verificar se a nota normal está na zona de captura
                     const zone = captureZones[note.stringIndex];
                     if (Math.abs(note.x - zone.x) <= zone.width / 2 + note.radius) { // Ajustar verificação da zona
                         // Capturar nota
@@ -690,31 +1329,7 @@
                         const precisionFactor = 1 - (Math.abs(note.x - zone.x) / (zone.width / 2));
                         captureNote(note, Math.max(0, precisionFactor)); // Garante que precisão não seja negativa
                         return; // Sai após capturar uma nota
-                    } else {
-                        // Nota clicada fora da zona de captura (considerar como erro ou ignorar?)
-                        // showFeedback("TOO EARLY/LATE!", note.x, stringY, "yellow");
-                        // Por enquanto, vamos ignorar cliques fora da zona para simplificar
-                        // return;
                     }
-                }
-            }
-
-            // Verificar cliques em obstáculos
-            for (let i = 0; i < obstacles.length; i++) {
-                const obstacle = obstacles[i];
-                if (!obstacle.active) continue;
-
-                // Obter a posição Y da corda
-                const stringY = strings[obstacle.stringIndex].points[0].y;
-
-                // Calcular a distância entre o clique e o obstáculo
-                const distance = Math.sqrt(Math.pow(x - obstacle.x, 2) + Math.pow(y - stringY, 2));
-
-                // Verificar se o clique foi próximo o suficiente do obstáculo
-                if (distance <= obstacle.radius * 1.5) { // Área de clique um pouco maior que o raio visual
-                    // Atingiu obstáculo com clique
-                    hitObstacle(obstacle, true); // Passa true para indicar que foi clicado
-                    return; // Sai após atingir um obstáculo
                 }
             }
 
@@ -743,13 +1358,38 @@
         // Adicionar evento de clique para o jogo
         canvas.addEventListener('click', (e) => {
             if (!gameActive) return;
-            
+
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             checkNoteCapture(x, y);
         });
+
+        // Pressionar/soltar para mecânica de Hold Notes
+        canvas.addEventListener('mousedown', (e) => {
+            if (!gameActive) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            mouse.x = x; mouse.y = y;
+            mouseDown = true;
+            startHoldIfAny(x, y);
+        });
+        window.addEventListener('mouseup', () => { mouseDown = false; });
+        canvas.addEventListener('mouseleave', () => { mouseDown = false; });
+
+        // Suporte a toque para Hold Notes (mobile)
+        canvas.addEventListener('touchstart', (e) => {
+            if (!gameActive) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            mouse.x = x; mouse.y = y;
+            mouseDown = true;
+            startHoldIfAny(x, y);
+        }, { passive: true });
+        window.addEventListener('touchend', () => { mouseDown = false; });
 
         // Adicionar botão para iniciar o jogo
         function addStartGameButton() {
@@ -788,29 +1428,43 @@
                 <h2 style="margin-bottom: 15px; color: #4caf50;">Como Jogar</h2>
                 <p style="margin-bottom: 10px;"><strong>Objetivo:</strong> Capture as notas musicais clicando diretamente nelas quando estiverem na zona de captura.</p>
                 
-                <div style="display: flex; justify-content: space-around; margin: 20px 0;">
+                <div style="display: flex; justify-content: space-around; margin: 20px 0; flex-wrap: wrap; gap: 10px;">
                     <div style="text-align: center;">
                         <div style="width: 20px; height: 20px; background-color: cyan; border-radius: 50%; margin: 0 auto;"></div>
-                        <p>Azul: 10 pontos</p>
+                        <p>Azul: 10 pts</p>
                     </div>
                     <div style="text-align: center;">
                         <div style="width: 20px; height: 20px; background-color: lime; border-radius: 50%; margin: 0 auto;"></div>
-                        <p>Verde: 20 pontos</p>
+                        <p>Verde: 20 pts</p>
                     </div>
                     <div style="text-align: center;">
                         <div style="width: 20px; height: 20px; background-color: gold; border-radius: 50%; margin: 0 auto;"></div>
-                        <p>Dourado: 50 pontos</p>
+                        <p>Dourado: 50 pts</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: yellow; border-radius: 50%; margin: 0 auto;"></div>
+                        <p>Amarela: Segure!</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: gold; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); margin: 0 auto;"></div>
+                        <p>Estrela: Frenesi (x2)!</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 20px; height: 20px; background-color: #00ff87; border-radius: 3px; margin: 0 auto;"></div>
+                        <p>Escudo: Proteção</p>
                     </div>
                     <div style="text-align: center;">
                         <div style="width: 20px; height: 20px; background-color: red; border-radius: 50%; margin: 0 auto;"></div>
-                        <p>Vermelho: Obstáculo!</p>
+                        <p>Vermelha: Mina!</p>
                     </div>
                 </div>
-                
-                <p style="margin-bottom: 10px;"><strong>Controles:</strong> Clique diretamente nas notas quando estiverem na zona de captura (área destacada).</p>
-                <p style="margin-bottom: 10px;"><strong>Combo:</strong> Acerte notas consecutivas para aumentar seu multiplicador (até 5x).</p>
-                <p style="margin-bottom: 10px;"><strong>Vidas:</strong> Você tem 3 vidas. Você perde uma vida quando uma nota passa sem ser capturada ou quando acerta um obstáculo.</p>
-                <p><strong>Dica:</strong> As notas brilham mais intensamente quando estão na zona de captura!</p>
+
+                <p style="margin-bottom: 8px;"><strong>Notas normais:</strong> Clique diretamente nelas na zona de captura.</p>
+                <p style="margin-bottom: 8px;"><strong>Nota Sustentada (amarela):</strong> Pressione e <em>segure</em> até a cauda passar.</p>
+                <p style="margin-bottom: 8px;"><strong>Estrela de Frenesi:</strong> Ativa o ⚡ Frenzy Mode (8s de pontuação dobrada x2)!</p>
+                <p style="margin-bottom: 8px;"><strong>Escudo (verde):</strong> Concede 🛡️ 1 proteção contra minas ou notas perdidas!</p>
+                <p style="margin-bottom: 8px;"><strong>Mina (vermelha):</strong> NÃO clique! (-150 pts e zera combo).</p>
+                <p><strong>Temas & Synth:</strong> Troque temas (Cyberpunk/Vaporwave/Nebula) e ajuste a onda do sintetizador no menu lateral!</p>
             `;
             
             // Botão de início
@@ -838,43 +1492,208 @@
             
             startButton.addEventListener('click', () => {
                 document.body.removeChild(startScreen);
-                // Tenta iniciar a música de fundo
+                // Modo default (música relaxante em loop)
+                customMode = false;
+                backgroundMusic.src = '../assets/sounds/happy-relaxing-loop.mp3';
+                backgroundMusic.loop = true;
+                // Inicializar análise de áudio (requer gesto do usuário)
+                initAudioAnalysis(backgroundMusic);
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
                 backgroundMusic.play().catch(error => {
                     console.error("Erro ao tocar música de fundo:", error);
-                    // Opcional: Mostrar uma mensagem ao usuário que o áudio pode precisar de interação
                 });
                 initGame();
             });
-            
+
+            // Botão para carregar música customizada (estilo ciano/neon)
+            const customButton = document.createElement('button');
+            customButton.textContent = '🎵 Carregar Música Customizada';
+            customButton.className = 'cyan-btn';
+            customButton.style.padding = '12px 24px';
+            customButton.style.fontSize = '18px';
+            customButton.style.color = 'white';
+            customButton.style.border = 'none';
+            customButton.style.borderRadius = '5px';
+            customButton.style.cursor = 'pointer';
+            customButton.style.marginTop = '15px';
+            customButton.style.transition = 'all 0.3s ease';
+            customButton.addEventListener('mouseover', () => { customButton.style.transform = 'scale(1.05)'; });
+            customButton.addEventListener('mouseout', () => { customButton.style.transform = 'scale(1)'; });
+            customButton.addEventListener('click', () => openCustomMusicModal(startScreen));
+
             // Adicionar elementos ao container
             startScreen.appendChild(gameTitle);
             startScreen.appendChild(instructions);
             startScreen.appendChild(startButton);
-            
+            startScreen.appendChild(customButton);
+
             // Adicionar à página
             document.body.appendChild(startScreen);
+        }
+
+        // === TASK_002: Modal de upload de música customizada ===
+        const NOTE_MAP_TEMPLATE = {
+            songName: "Minha Musica Customizada",
+            notes: [
+                { time: 2.0, lane: 0, type: "normal" },
+                { time: 3.5, lane: 1, type: "hold", duration: 1.5 },
+                { time: 5.0, lane: 2, type: "obstacle" }
+            ]
+        };
+
+        function openCustomMusicModal(startScreen) {
+            let loadedAudioFile = null;
+            let loadedNoteMap = null;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-modal-overlay';
+
+            const modal = document.createElement('div');
+            modal.className = 'custom-modal';
+            modal.innerHTML = `
+                <h2>🎵 Música Customizada</h2>
+                <a class="template-link" id="downloadTemplate">⬇ Baixar template.json</a>
+                <div class="custom-field">
+                    <label>Arquivo de áudio (.mp3 ou .ogg):</label>
+                    <input type="file" id="audioFileInput" accept=".mp3,.ogg,audio/*">
+                    <div class="file-status" id="audioStatus"></div>
+                </div>
+                <div class="custom-field">
+                    <label>Mapa de notas (.json):</label>
+                    <input type="file" id="jsonFileInput" accept=".json,application/json">
+                    <div class="file-status" id="jsonStatus"></div>
+                </div>
+                <div class="custom-modal-actions">
+                    <button class="cyan-btn" id="startCustomBtn" disabled style="opacity:0.5;">Iniciar</button>
+                    <button id="cancelCustomBtn" style="background-color:#555;">Cancelar</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const audioInput = modal.querySelector('#audioFileInput');
+            const jsonInput = modal.querySelector('#jsonFileInput');
+            const audioStatus = modal.querySelector('#audioStatus');
+            const jsonStatus = modal.querySelector('#jsonStatus');
+            const startCustomBtn = modal.querySelector('#startCustomBtn');
+            const cancelBtn = modal.querySelector('#cancelCustomBtn');
+            const templateLink = modal.querySelector('#downloadTemplate');
+
+            // Link de download do template via data URI
+            const templateData = 'data:text/json;charset=utf-8,' +
+                encodeURIComponent(JSON.stringify(NOTE_MAP_TEMPLATE, null, 2));
+            templateLink.setAttribute('href', templateData);
+            templateLink.setAttribute('download', 'template.json');
+
+            function refreshStartState() {
+                const ready = !!loadedAudioFile && !!loadedNoteMap;
+                startCustomBtn.disabled = !ready;
+                startCustomBtn.style.opacity = ready ? '1' : '0.5';
+            }
+
+            audioInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) { loadedAudioFile = null; audioStatus.textContent = ''; refreshStartState(); return; }
+                loadedAudioFile = file;
+                audioStatus.style.color = '#80deea';
+                audioStatus.textContent = `✓ ${file.name}`;
+                refreshStartState();
+            });
+
+            jsonInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) { loadedNoteMap = null; jsonStatus.textContent = ''; refreshStartState(); return; }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const parsed = JSON.parse(ev.target.result);
+                        if (!parsed || !Array.isArray(parsed.notes)) throw new Error('Campo "notes" ausente');
+                        loadedNoteMap = parsed;
+                        jsonStatus.style.color = '#80deea';
+                        jsonStatus.textContent = `✓ ${file.name} (${parsed.notes.length} notas)`;
+                    } catch (err) {
+                        loadedNoteMap = null;
+                        jsonStatus.style.color = '#ff5252';
+                        jsonStatus.textContent = 'JSON inválido: ' + err.message;
+                    }
+                    refreshStartState();
+                };
+                reader.onerror = () => {
+                    loadedNoteMap = null;
+                    jsonStatus.style.color = '#ff5252';
+                    jsonStatus.textContent = 'Erro ao ler o arquivo.';
+                    refreshStartState();
+                };
+                reader.readAsText(file);
+            });
+
+            cancelBtn.addEventListener('click', () => document.body.removeChild(overlay));
+
+            startCustomBtn.addEventListener('click', () => {
+                if (!loadedAudioFile || !loadedNoteMap) return;
+                document.body.removeChild(overlay);
+                if (startScreen && startScreen.parentNode) document.body.removeChild(startScreen);
+                startCustomGame(loadedAudioFile, loadedNoteMap);
+            });
+        }
+
+        // Preparar e iniciar uma partida com música customizada
+        function startCustomGame(audioFile, noteMap) {
+            customMode = true;
+
+            // Construir a fila de notas a partir do JSON
+            const rawNotes = Array.isArray(noteMap.notes) ? noteMap.notes : [];
+            const parsed = rawNotes.map(n => ({
+                time: Number(n.time) || 0,
+                lane: Number(n.lane) || 0,
+                type: (n.type === 'hold') ? 'hold' : (n.type === 'obstacle' || n.type === 'mine') ? 'mine' : 'normal',
+                duration: Number(n.duration) || 0
+            })).filter(n => n.time >= 0).sort((a, b) => a.time - b.time);
+
+            customLaneCount = Math.max(4, ...parsed.map(n => n.lane + 1));
+            noteQueue = parsed;
+
+            // Configurar o áudio customizado no mesmo elemento (MediaElementSource é único)
+            if (customAudioURL) URL.revokeObjectURL(customAudioURL);
+            customAudioURL = URL.createObjectURL(audioFile);
+            backgroundMusic.src = customAudioURL;
+            backgroundMusic.loop = false;
+
+            initAudioAnalysis(backgroundMusic);
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+            // Fim da música encerra a partida
+            backgroundMusic.onended = () => { if (gameActive && customMode) gameOver(); };
+
+            backgroundMusic.play().catch(error => console.error("Erro ao tocar música customizada:", error));
+            initGame();
         }
 
         // Inicializar o jogo
         function initGame() {
             // Configurar zonas de captura
             setupCaptureZones();
-            
+
             // Resetar variáveis
             score = 0;
             combo = 0;
             lives = 3;
             level = 1;
+            frenzyTime = 0;
+            hasShield = false;
             notes = [];
-            obstacles = [];
-            
-            // Iniciar geradores de notas e obstáculos
-            startNoteGenerator();
-            startObstacleGenerator();
-            
+            sparkles = [];
+
+            if (customMode) {
+                // Notas vêm da fila baseada no tempo do áudio; sem geradores procedurais.
+            } else {
+                // Iniciar geradores procedurais
+                startNoteGenerator();
+            }
+
             // Atualizar UI
             updateScoreDisplay();
-            
+
             // Ativar o jogo
             gameActive = true;
         }
@@ -888,7 +1707,7 @@
                 captureZones.push({
                     stringIndex: index,
                     x: canvas.width * 0.8, // Posição horizontal da zona
-                    width: 80, // Aumentar a largura da zona de 50 para 80
+                    width: 80,
                     active: true
                 });
             });
@@ -906,91 +1725,281 @@
                 if (Math.random() < 0.3 + (level * 0.05)) {
                     createNote();
                 }
-            }, 1000 - (level * 50)); // Intervalo diminui com o nível
+            }, 1000 - (level * 50));
         }
 
-        // Criar uma nova nota
+        // Criar uma nova nota (modo procedural / áudio default)
         function createNote() {
             const stringIndex = Math.floor(Math.random() * strings.length);
-            const noteType = Math.random();
-            
-            let color, points;
-            
-            if (noteType > 0.95) { // 5% de chance para notas douradas
-                color = 'gold';
-                points = 50;
-            } else if (noteType > 0.6) { // 35% de chance para notas verdes
-                color = 'lime';
-                points = 20;
-            } else { // 60% de chance para notas azuis
-                color = 'cyan';
-                points = 10;
+            const speed = 2 + (level * 0.5);
+            const roll = Math.random();
+
+            const note = { stringIndex, x: 0, speed, radius: 15, active: true, type: 'normal', custom: false };
+
+            if (roll < 0.05) {
+                // Estrela de Frenesi (Frenzy Note)
+                note.type = 'frenzy';
+                note.color = 'gold';
+                note.points = 40;
+            } else if (roll < 0.13) {
+                // Coração de Proteção (Shield Note)
+                note.type = 'shield';
+                note.color = '#00ff87';
+                note.points = 30;
+            } else if (roll < 0.25) {
+                // Nota Mina
+                note.type = 'mine';
+                note.color = 'red';
+                note.points = 0;
+            } else if (roll < 0.40) {
+                // Nota Sustentada (Hold - amarela com cauda)
+                note.type = 'hold';
+                note.color = 'yellow';
+                note.points = 30;
+                note.duration = 0.8 + Math.random() * 1.2;
+                note.tailLength = note.duration * speed * 60;
+                note.holding = false;
+                note.holdStarted = false;
+                note.holdBroken = false;
+                note.holdComplete = false;
+            } else {
+                // Notas normais (azul/verde/dourada)
+                const c = Math.random();
+                if (c > 0.95) { note.color = 'gold'; note.points = 50; }
+                else if (c > 0.6) { note.color = 'lime'; note.points = 20; }
+                else { note.color = 'cyan'; note.points = 10; }
             }
-            
-            notes.push({
-                stringIndex,
-                x: 0, // Começa na esquerda
-                speed: 2 + (level * 0.5), // Velocidade aumenta com o nível
-                color,
-                points,
-                radius: 15,
-                active: true
-            });
+
+            notes.push(note);
         }
 
-        // Modificar a função drawNotes para destacar melhor as notas
+        // === TASK_002: construção de notas customizadas (time-driven) ===
+        function laneToStringIndex(lane) {
+            const lc = customLaneCount || 4;
+            const frac = (lane + 0.5) / lc;
+            return Math.min(strings.length - 1, Math.max(0, Math.floor(frac * strings.length)));
+        }
+
+        function buildCustomNote(q, zoneX) {
+            const note = {
+                stringIndex: laneToStringIndex(q.lane),
+                x: 0, radius: 15, active: true, custom: true, time: q.time, type: q.type
+            };
+            if (q.type === 'frenzy') {
+                note.color = 'gold';
+                note.points = 40;
+            } else if (q.type === 'shield') {
+                note.color = '#00ff87';
+                note.points = 30;
+            } else if (q.type === 'hold') {
+                note.duration = q.duration || 1.0;
+                note.color = 'yellow';
+                note.points = 30;
+                note.tailLength = zoneX * (note.duration / T_VIEW);
+                note.holding = false;
+                note.holdStarted = false;
+                note.holdBroken = false;
+                note.holdComplete = false;
+            } else if (q.type === 'mine' || q.type === 'obstacle') {
+                note.type = 'mine';
+                note.color = 'red';
+                note.points = 0;
+            } else {
+                note.color = 'cyan';
+                note.points = 10;
+            }
+            return note;
+        }
+
+        // Renderização de notas por tipo
         function drawNotes() {
             notes.forEach(note => {
                 if (!note.active) return;
-                
                 const stringY = strings[note.stringIndex].points[0].y;
-                
-                // Desenhar círculo da nota
-                ctx.beginPath();
-                ctx.arc(note.x, stringY, note.radius, 0, Math.PI * 2);
-                ctx.fillStyle = note.color;
-                ctx.fill();
-                
-                // Adicionar brilho
-                ctx.beginPath();
-                ctx.arc(note.x, stringY, note.radius + 3, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Verificar se está na zona de captura
-                const zone = captureZones[note.stringIndex];
-                if (Math.abs(note.x - zone.x) <= zone.width / 2) {
-                    // Destacar nota na zona de captura
-                    ctx.beginPath();
-                    ctx.arc(note.x, stringY, note.radius + 6, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
+                if (note.type === 'frenzy') drawFrenzyNote(note, stringY);
+                else if (note.type === 'shield') drawShieldNote(note, stringY);
+                else if (note.type === 'hold') drawHoldNote(note, stringY);
+                else if (note.type === 'mine') drawMineNote(note, stringY);
+                else drawNormalNote(note, stringY);
             });
         }
+
+        function drawNormalNote(note, stringY) {
+            // Círculo da nota
+            ctx.beginPath();
+            ctx.arc(note.x, stringY, note.radius, 0, Math.PI * 2);
+            ctx.fillStyle = note.color;
+            ctx.fill();
+
+            // Brilho externo
+            ctx.beginPath();
+            ctx.arc(note.x, stringY, note.radius + 3, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Destaque ao entrar na zona de captura
+            const zone = captureZones[note.stringIndex];
+            if (zone && Math.abs(note.x - zone.x) <= zone.width / 2) {
+                ctx.beginPath();
+                ctx.arc(note.x, stringY, note.radius + 6, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        function drawHoldNote(note, stringY) {
+            const tailLen = note.tailLength || 0;
+            const broken = note.holdBroken;
+            const headColor = broken ? '#888' : (note.holdComplete ? '#7fffd4' : 'yellow');
+            const tailColor = broken ? 'rgba(140,140,140,0.4)'
+                                     : (note.holding ? 'rgba(255, 235, 59, 0.6)' : 'rgba(255, 235, 59, 0.35)');
+
+            // Cauda: retângulo ao longo da corda, atrás da cabeça
+            ctx.save();
+            ctx.fillStyle = tailColor;
+            ctx.fillRect(note.x - tailLen, stringY - note.radius * 0.7, tailLen, note.radius * 1.4);
+            ctx.restore();
+
+            // Cabeça com brilho neon
+            ctx.save();
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = broken ? '#888' : '#00e5ff';
+            ctx.beginPath();
+            ctx.arc(note.x, stringY, note.radius, 0, Math.PI * 2);
+            ctx.fillStyle = headColor;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawMineNote(note, stringY) {
+            // Piscar dinâmico baseado em seno do tempo
+            const blink = (Math.sin(Date.now() * 0.02) + 1) / 2; // 0..1
+            const radius = note.radius + blink * 4;
+            ctx.save();
+            ctx.globalAlpha = 0.55 + blink * 0.45;
+            ctx.shadowBlur = 10 + blink * 20;
+            ctx.shadowColor = 'red';
+            ctx.beginPath();
+            ctx.arc(note.x, stringY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff1744';
+            ctx.fill();
+            ctx.strokeStyle = 'darkred';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // "X" de aviso no centro
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            const r = note.radius * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(note.x - r, stringY - r); ctx.lineTo(note.x + r, stringY + r);
+            ctx.moveTo(note.x + r, stringY - r); ctx.lineTo(note.x - r, stringY + r);
+            ctx.stroke();
+            ctx.restore();
+        }
         
-        // Modificar a função updateNotes para incluir a função drawNotes
+        // Atualização de notas: suporta modo procedural e modo customizado (time-driven)
         function updateNotes() {
-            notes.forEach((note, index) => {
+            const zoneX = canvas.width * 0.8;
+
+            // Modo customizado: spawnar notas que entraram na janela de visão (T_VIEW segundos antes)
+            if (customMode) {
+                const t = backgroundMusic.currentTime;
+                while (noteQueue.length && (noteQueue[0].time - t) <= T_VIEW) {
+                    notes.push(buildCustomNote(noteQueue.shift(), zoneX));
+                }
+            }
+
+            notes.forEach(note => {
                 if (!note.active) return;
-                
-                // Mover nota
-                note.x += note.speed;
-                
-                // Verificar se passou da tela
-                if (note.x > canvas.width) {
-                    note.active = false;
-                    notePassed(note);
+                const stringY = strings[note.stringIndex].points[0].y;
+
+                if (note.custom) {
+                    const t = backgroundMusic.currentTime;
+                    // Posição sincronizada com o tempo da música (independe do FPS)
+                    note.x = zoneX * (1 - (note.time - t) / T_VIEW);
+
+                    if (note.type === 'hold') {
+                        handleHoldProgress(note, stringY, zoneX);
+                        if (t >= note.time + note.duration + 0.15) {
+                            finalizeHold(note);
+                            note.active = false;
+                        }
+                    } else if (t >= note.time + 0.15) {
+                        // Passou da zona com tolerância
+                        note.active = false;
+                        if (note.type !== 'mine') notePassed(note); // mina evitada não penaliza
+                    }
+                } else {
+                    // Modo procedural: move por velocidade
+                    note.x += note.speed;
+                    if (note.type === 'hold') handleHoldProgress(note, stringY, zoneX);
+
+                    if (note.x > canvas.width) {
+                        note.active = false;
+                        if (note.type === 'hold') finalizeHold(note);
+                        else if (note.type !== 'mine') notePassed(note); // mina evitada não penaliza
+                    }
                 }
             });
-            
+
             // Remover notas inativas
             notes = notes.filter(note => note.active);
-            
+
             // Desenhar notas
             drawNotes();
+        }
+
+        // Progresso de sustentação de uma Hold Note (+5 pts por frame enquanto segura)
+        function handleHoldProgress(note, stringY, zoneX) {
+            if (note.holdComplete || note.holdBroken || !note.holding) return;
+
+            // Continua válido enquanto o mouse estiver pressionado e próximo da corda
+            const onString = mouseDown && Math.abs(mouse.y - stringY) <= 45;
+            if (!onString) {
+                note.holdBroken = true;
+                note.holding = false;
+                synth.stopHoldNote(note.stringIndex);
+                combo = 0;
+                showFeedback("BREAK!", zoneX, stringY, "gray");
+                updateScoreDisplay();
+                return;
+            }
+
+            // Pontuação contínua de sustentação
+            score += (frenzyTime > 0) ? 10 : 5;
+
+            // Completou: a extremidade da cauda passou a linha de captura
+            const tailStartX = note.x - (note.tailLength || 0);
+            if (tailStartX >= zoneX) {
+                note.holdComplete = true;
+                note.holding = false;
+                synth.stopHoldNote(note.stringIndex);
+                combo++;
+                showFeedback("HOLD!", zoneX, stringY, "gold");
+                updateScoreDisplay();
+                checkLevelUp();
+            }
+        }
+
+        // Finaliza uma Hold Note ao sair de cena
+        function finalizeHold(note) {
+            if (note.holdComplete) return;
+            synth.stopHoldNote(note.stringIndex);
+            const stringY = strings[note.stringIndex].points[0].y;
+            if (note.holdStarted) {
+                // Tentou segurar mas não completou
+                if (!note.holdBroken) {
+                    combo = 0;
+                    showFeedback("BREAK!", note.x, stringY, "gray");
+                    updateScoreDisplay();
+                }
+            } else {
+                // Nunca tentou segurar = nota perdida (perde vida)
+                notePassed(note);
+            }
         }
 
         // Desenhar zonas de captura
@@ -1006,6 +2015,20 @@
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(zone.x - zone.width/2, y - 40, zone.width, 80);
+
+                // Aura neon verde quando o Escudo está ativo
+                if (hasShield) {
+                    const angle = Date.now() * 0.003;
+                    ctx.save();
+                    ctx.strokeStyle = '#00ff87';
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = '#00ff87';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(zone.x, y, 36, angle, angle + Math.PI * 1.5);
+                    ctx.stroke();
+                    ctx.restore();
+                }
                 
                 // Adicionar linha central para indicar o ponto ideal de captura
                 ctx.beginPath();
@@ -1020,19 +2043,35 @@
         // Capturar uma nota
         function captureNote(note, precision) {
             // Tocar som de captura
-            noteCaptureSound.currentTime = 0; // Reinicia o som para permitir toques rápidos
+            noteCaptureSound.currentTime = 0;
             noteCaptureSound.play().catch(error => console.error("Erro ao tocar som de captura:", error));
+
+            // Tocar nota procedural de acordo com a escala pentatônica da corda
+            const freq = getStringFrequency(note.stringIndex);
+            synth.playNote(freq, 0.3);
+
+            // Ondulação (Ripple) na corda ao capturar a nota
+            triggerRipple(note.stringIndex, note.x, 80);
 
             // Pontos base + bônus de precisão
             let earnedPoints = note.points;
             
-            if (precision > 0.9) {
-                earnedPoints += 5; // Perfect timing
-                showFeedback("PERFECT!", note.x, strings[note.stringIndex].points[0].y, "gold");
-            } else if (precision > 0.7) {
-                showFeedback("GREAT!", note.x, strings[note.stringIndex].points[0].y, "lime");
+            if (note.type === 'frenzy') {
+                frenzyTime = 8.0;
+                triggerScreenShake(300, 8);
+                showFeedback("FRENZY!", note.x, strings[note.stringIndex].points[0].y, "gold");
+            } else if (note.type === 'shield') {
+                hasShield = true;
+                showFeedback("SHIELD UP!", note.x, strings[note.stringIndex].points[0].y, "#00ff87");
             } else {
-                showFeedback("GOOD", note.x, strings[note.stringIndex].points[0].y, "white");
+                if (precision > 0.9) {
+                    earnedPoints += 5; // Perfect timing
+                    showFeedback("PERFECT!", note.x, strings[note.stringIndex].points[0].y, "gold");
+                } else if (precision > 0.7) {
+                    showFeedback("GREAT!", note.x, strings[note.stringIndex].points[0].y, "lime");
+                } else {
+                    showFeedback("GOOD", note.x, strings[note.stringIndex].points[0].y, "white");
+                }
             }
             
             // Aplicar multiplicador de combo
@@ -1042,6 +2081,8 @@
             if (combo >= 20) multiplier = 5;
             else if (combo >= 10) multiplier = 3;
             else if (combo >= 5) multiplier = 2;
+
+            if (frenzyTime > 0) multiplier *= 2;
             
             score += earnedPoints * multiplier;
             
@@ -1102,30 +2143,29 @@
         // Quando o jogador erra uma nota
         function missedNote() {
             combo = 0;
-            
             showFeedback("MISS!", mouse.x, mouse.y, "yellow");
-            
             updateScoreDisplay();
         }
 
-        // Adicionar função para quando uma nota passa da tela sem ser capturada
+        // Quando uma nota passa da tela sem ser capturada
         function notePassed(note) {
-            // Reduzir vida
-            lives--;
-            
-            // Resetar combo
-            combo = 0;
-            
-            // Mostrar feedback visual
-            showFeedback("LOST!", canvas.width, strings[note.stringIndex].points[0].y, "red");
-            
-            // Atualizar UI
-            updateScoreDisplay();
-            
-            // Verificar game over
-            if (lives <= 0) {
-                gameOver();
+            const stringY = strings[note.stringIndex].points[0].y;
+            triggerRipple(note.stringIndex, canvas.width, 40);
+
+            if (hasShield) {
+                hasShield = false;
+                showFeedback("SHIELD BLOCK!", canvas.width * 0.9, stringY, "#00ff87");
+                triggerScreenShake(200, 5);
+            } else {
+                lives--;
+                combo = 0;
+                showFeedback("LOST!", canvas.width, stringY, "red");
+                if (lives <= 0) {
+                    gameOver();
+                }
             }
+
+            updateScoreDisplay();
         }
 
         // Verificar aumento de nível
@@ -1164,8 +2204,12 @@
         // Game over
         function gameOver() {
             gameActive = false;
+            backgroundMusic.onended = null;
             backgroundMusic.pause(); // Pausa a música de fundo
             backgroundMusic.currentTime = 0; // Opcional: reseta a música para o início
+            // Após o game over, "Jogar Novamente" volta para o modo default
+            customMode = false;
+            noteQueue = [];
             
             // Verificar se a pontuação atual é um high score
             const isHighScore = checkHighScore(score);
@@ -1270,6 +2314,12 @@
             
             restartButton.addEventListener('click', () => {
                 document.body.removeChild(gameOverScreen);
+                // Retomar a música default no replay
+                backgroundMusic.src = '../assets/sounds/happy-relaxing-loop.mp3';
+                backgroundMusic.loop = true;
+                backgroundMusic.currentTime = 0;
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                backgroundMusic.play().catch(() => {});
                 initGame();
             });
             
@@ -1449,13 +2499,17 @@
             if (combo >= 20) multiplier = 5;
             else if (combo >= 10) multiplier = 3;
             else if (combo >= 5) multiplier = 2;
+            if (frenzyTime > 0) multiplier *= 2;
             
+            const shieldBadge = hasShield ? '<div style="color:#00ff87; font-weight:bold; margin-top:4px;">🛡️ Shield Active</div>' : '';
+
             // Atualizar conteúdo
             scoreDisplay.innerHTML = `
                 <div style="font-size: 24px; font-weight: bold;">Score: ${score}</div>
                 <div>Combo: ${combo} (x${multiplier})</div>
                 <div>Lives: ${'❤️'.repeat(lives)}</div>
                 <div>Level: ${level}</div>
+                ${shieldBadge}
             `;
         }
 

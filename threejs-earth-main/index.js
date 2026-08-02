@@ -8,18 +8,24 @@ const w = window.innerWidth;
 const h = window.innerHeight;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
-camera.position.z = 5;
+camera.position.set(0, 1.5, 3.5);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(w, h);
 document.body.appendChild(renderer.domElement);
-// THREE.ColorManagement.enabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
 const earthGroup = new THREE.Group();
 earthGroup.rotation.z = -23.4 * Math.PI / 180;
 scene.add(earthGroup);
-new OrbitControls(camera, renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.minDistance = 1.25;
+controls.maxDistance = 10;
+
 const detail = 12;
 const loader = new THREE.TextureLoader();
 const geometry = new THREE.IcosahedronGeometry(1, detail);
@@ -29,7 +35,7 @@ const material = new THREE.MeshPhongMaterial({
   bumpMap: loader.load("./textures/01_earthbump1k.jpg"),
   bumpScale: 0.04,
 });
-// material.map.colorSpace = THREE.SRGBColorSpace;
+
 const earthMesh = new THREE.Mesh(geometry, material);
 earthGroup.add(earthMesh);
 
@@ -46,7 +52,6 @@ const cloudsMat = new THREE.MeshStandardMaterial({
   opacity: 0.8,
   blending: THREE.AdditiveBlending,
   alphaMap: loader.load('./textures/05_earthcloudmaptrans.jpg'),
-  // alphaTest: 0.3,
 });
 const cloudsMesh = new THREE.Mesh(geometry, cloudsMat);
 cloudsMesh.scale.setScalar(1.003);
@@ -64,6 +69,970 @@ const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
 sunLight.position.set(-2, 0.5, 1.5);
 scene.add(sunLight);
 
+// Group containers to allow global show/hide toggles
+const satellitesGroup = new THREE.Group();
+scene.add(satellitesGroup);
+
+const orbitsGroup = new THREE.Group();
+scene.add(orbitsGroup);
+
+const stationsGroup = new THREE.Group();
+earthMesh.add(stationsGroup); // rotates with the earth
+
+const debrisGroup = new THREE.Group();
+scene.add(debrisGroup);
+
+// Clickable objects registry for Raycasting
+const clickableObjects = [];
+
+// ===================== TASK_002 & TASK_003 =====================
+
+// --- 1. Satélites e órbitas dinâmicas ---
+const satellitesData = [
+  { radius: 1.6, inclination: 0,             speed: 0.005, angle: 0,   color: 0x00ff88 }, // Equatorial
+  { radius: 1.8, inclination: Math.PI / 2,   speed: 0.004, angle: 1.2, color: 0x00ddff }, // Polar
+  { radius: 1.5, inclination: Math.PI / 6,   speed: 0.006, angle: 2.5, color: 0xffaa00 }, // Inclinada 30°
+  { radius: 1.7, inclination: Math.PI / 4,   speed: 0.003, angle: 3.8, color: 0xff00aa }, // Inclinada 45°
+  { radius: 1.9, inclination: -Math.PI / 3,  speed: 0.002, angle: 5.0, color: 0xaa66ff }  // Inclinada -60°
+];
+
+function createSatellite(emissiveHex, index) {
+  const sat = new THREE.Group();
+  sat.name = `Satellite_${index}`;
+  sat.userData = { 
+    type: 'satellite', 
+    index: index, 
+    name: `Satélite ${['Equatorial', 'Polar', 'Inclinada 30°', 'Inclinada 45°', 'Inclinada -60°'][index]}` 
+  };
+
+  // Corpo central metálico
+  const bodyGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.12, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.1 });
+  sat.add(new THREE.Mesh(bodyGeo, bodyMat));
+
+  // Painéis solares (com auto-iluminação para visibilidade no lado noturno - recomendação do PO)
+  const panelGeo = new THREE.BoxGeometry(0.18, 0.05, 0.01);
+  const panelMat = new THREE.MeshStandardMaterial({
+    color: 0x0055ff, metalness: 0.8, roughness: 0.2,
+    emissive: emissiveHex, emissiveIntensity: 0.6
+  });
+  const panelLeft = new THREE.Mesh(panelGeo, panelMat);
+  panelLeft.position.x = -0.12;
+  sat.add(panelLeft);
+  const panelRight = panelLeft.clone();
+  panelRight.position.x = 0.12;
+  sat.add(panelRight);
+
+  // Antena direcional apontando para o planeta
+  const dishGeo = new THREE.ConeGeometry(0.03, 0.05, 8);
+  const dishMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 });
+  const dishMesh = new THREE.Mesh(dishGeo, dishMat);
+  dishMesh.position.y = -0.07;
+  dishMesh.rotation.x = Math.PI;
+  sat.add(dishMesh);
+
+  // Anel de Alerta de Colisão (vermelho neon piscante) - TASK_003
+  const alertRingGeo = new THREE.RingGeometry(0.12, 0.14, 16);
+  const alertRingMat = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9
+  });
+  const alertRing = new THREE.Mesh(alertRingGeo, alertRingMat);
+  alertRing.name = "alertRing";
+  alertRing.rotation.x = Math.PI / 2;
+  alertRing.visible = false;
+  sat.add(alertRing);
+
+  return sat;
+}
+
+function createOrbitLine(orbitRadius, inclination, color) {
+  const points = [];
+  const segments = 128;
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i / segments) * Math.PI * 2;
+    points.push(new THREE.Vector3(
+      orbitRadius * Math.cos(theta),
+      orbitRadius * Math.sin(theta) * Math.sin(inclination),
+      orbitRadius * Math.sin(theta) * Math.cos(inclination)
+    ));
+  }
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({
+    color: color, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending
+  });
+  return new THREE.Line(geometry, material);
+}
+
+const satellitesMeshes = [];
+satellitesData.forEach((sat, index) => {
+  const mesh = createSatellite(sat.color, index);
+  satellitesGroup.add(mesh);
+  satellitesMeshes.push(mesh);
+  
+  const orbitLine = createOrbitLine(sat.radius, sat.inclination, sat.color);
+  orbitsGroup.add(orbitLine);
+  
+  clickableObjects.push(mesh);
+});
+
+// --- 2. Geolocalização por IP e pino 3D ---
+function convertGeoToCartesian(lat, lon, radius) {
+  const phi = lat * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180); // alinha com o mapeamento UV padrão
+  return new THREE.Vector3(
+    -radius * Math.cos(phi) * Math.sin(theta),
+    radius * Math.sin(phi),
+    radius * Math.cos(phi) * Math.cos(theta)
+  );
+}
+
+function createLocationPin(position) {
+  const pinGroup = new THREE.Group();
+  pinGroup.name = "UserLocationPin";
+
+  const coneGeo = new THREE.ConeGeometry(0.02, 0.08, 8);
+  const coneMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.9 });
+  const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+  coneMesh.position.y = 0.04;
+  coneMesh.rotation.x = Math.PI;
+  pinGroup.add(coneMesh);
+
+  const ringGeo = new THREE.RingGeometry(0.001, 0.04, 16);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3300, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.rotation.x = Math.PI / 2;
+  pinGroup.add(ringMesh);
+
+  pinGroup.position.copy(position);
+  const normal = position.clone().normalize();
+  pinGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+
+  earthMesh.add(pinGroup); // Gira junto com a terra
+  return { pinGroup, ringMesh };
+}
+
+let locationPin = null;
+let userLocation = null;
+async function getUserLocation() {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (res.ok) {
+      const d = await res.json();
+      const lat = (typeof d.latitude === 'number') ? d.latitude : d.lat;
+      const lon = (typeof d.longitude === 'number') ? d.longitude : d.lon;
+      if (typeof lat === 'number' && typeof lon === 'number') return { lat, lon };
+    }
+  } catch (e) {
+    console.warn('Falha no geolookup IP. Usando fallback São Paulo/BR:', e);
+  }
+  return { lat: -23.5505, lon: -46.6333 }; // Fallback robusto: São Paulo
+}
+
+getUserLocation().then(loc => {
+  userLocation = loc;
+  const pos = convertGeoToCartesian(loc.lat, loc.lon, 1.025);
+  locationPin = createLocationPin(pos);
+  
+  locationPin.pinGroup.userData = {
+    type: 'user_pin',
+    name: 'Sua Localização',
+    lat: loc.lat,
+    lon: loc.lon
+  };
+  clickableObjects.push(locationPin.pinGroup);
+});
+
+// ===================== TASK_003: IMPLEMENTATION =====================
+
+// --- 1. Estações Terrestres de Observação ---
+const stations = [];
+const stationsData = [
+  { name: "Cabo Canaveral (EUA)", lat: 28.3922, lon: -80.6077 },
+  { name: "Baikonur (Cazaquistão)", lat: 45.9650, lon: 63.3050 },
+  { name: "Kourou (Guiana Francesa)", lat: 5.1597, lon: -52.6502 }
+];
+
+stationsData.forEach(st => {
+  const pos = convertGeoToCartesian(st.lat, st.lon, 1.008);
+  const markerGroup = new THREE.Group();
+  markerGroup.name = st.name;
+  markerGroup.userData = {
+    type: 'station',
+    name: st.name,
+    lat: st.lat,
+    lon: st.lon
+  };
+
+  // Anel ciano neon na superfície
+  const ringGeo = new THREE.RingGeometry(0.015, 0.025, 16);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffff,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.8
+  });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.rotation.x = Math.PI / 2;
+  markerGroup.add(ringMesh);
+
+  // Pequeno ponto central
+  const dotGeo = new THREE.SphereGeometry(0.008, 8, 8);
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+  const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+  markerGroup.add(dotMesh);
+
+  markerGroup.position.copy(pos);
+  const normal = pos.clone().normalize();
+  markerGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+
+  stationsGroup.add(markerGroup);
+  stations.push({ markerGroup, ringMesh });
+  clickableObjects.push(markerGroup);
+});
+
+// --- 2. Vento Solar, Auroras Polares e Tempestades Geomagnéticas ---
+
+// A. Auroras Polares (Norte e Sul)
+function createAuroraRing(yOffset, isNorth) {
+  const auroraGeo = new THREE.TorusGeometry(0.35, 0.03, 8, 64);
+  const auroraMat = new THREE.MeshBasicMaterial({
+    color: isNorth ? 0x00ff66 : 0x00aaff,
+    transparent: true,
+    opacity: 0.35,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide
+  });
+  const auroraMesh = new THREE.Mesh(auroraGeo, auroraMat);
+  auroraMesh.position.y = yOffset;
+  auroraMesh.rotation.x = Math.PI / 2;
+  auroraMesh.scale.set(1.0, 1.0, 0.2); // Fita achatada verticalmente
+  earthMesh.add(auroraMesh); // Rotaciona junto com a terra
+  return auroraMesh;
+}
+
+const auroraNorth = createAuroraRing(0.94, true);
+const auroraSouth = createAuroraRing(-0.94, false);
+
+// B. Partículas de Vento Solar (LineSegments para efeito de alongamento neon)
+const solarWindCount = 60;
+const solarWindPositions = new Float32Array(solarWindCount * 6); // 2 pontos por linha, 3 coords
+const solarWindLifes = new Float32Array(solarWindCount);
+const solarWindSpeeds = new Float32Array(solarWindCount);
+
+// Direção do vento: do Sol para a Terra
+const sunPos = new THREE.Vector3(-2, 0.5, 1.5);
+const windDir = sunPos.clone().negate().normalize();
+const uVector = new THREE.Vector3(0, 1, 0).cross(windDir).normalize();
+const vVector = windDir.clone().cross(uVector).normalize();
+
+function resetWindLine(i) {
+  const diskCenter = sunPos.clone().normalize().multiplyScalar(4.0); // Spawna distante
+  const radius = 0.2 + Math.random() * 1.6;
+  const angle = Math.random() * Math.PI * 2;
+  
+  const pos = diskCenter.clone()
+    .addScaledVector(uVector, Math.cos(angle) * radius)
+    .addScaledVector(vVector, Math.sin(angle) * radius);
+      
+  const idx = i * 6;
+  solarWindPositions[idx] = pos.x;
+  solarWindPositions[idx + 1] = pos.y;
+  solarWindPositions[idx + 2] = pos.z;
+  
+  const end = pos.clone().addScaledVector(windDir, 0.12);
+  solarWindPositions[idx + 3] = end.x;
+  solarWindPositions[idx + 4] = end.y;
+  solarWindPositions[idx + 5] = end.z;
+  
+  solarWindLifes[i] = 0.0;
+  solarWindSpeeds[i] = 0.02 + Math.random() * 0.03;
+}
+
+for (let i = 0; i < solarWindCount; i++) {
+  resetWindLine(i);
+  solarWindLifes[i] = Math.random(); // Stagger inicial
+}
+
+const solarWindGeometry = new THREE.BufferGeometry();
+solarWindGeometry.setAttribute('position', new THREE.BufferAttribute(solarWindPositions, 3));
+
+const solarWindMaterial = new THREE.LineBasicMaterial({
+  color: 0x00ffcc,
+  transparent: true,
+  opacity: 0.35,
+  blending: THREE.AdditiveBlending
+});
+
+const solarWindLines = new THREE.LineSegments(solarWindGeometry, solarWindMaterial);
+scene.add(solarWindLines);
+
+// --- 3. Lixo Espacial (Space Debris) ---
+const debrisCount = 40;
+const debrisData = [];
+
+function createSpaceDebris() {
+  for (let i = 0; i < debrisCount; i++) {
+    const size = 0.01 + Math.random() * 0.014;
+    // Tetrahedron para forma caótica irregular
+    const debrisGeo = new THREE.TetrahedronGeometry(size);
+    const debrisMat = new THREE.MeshStandardMaterial({
+      color: 0x888888,
+      metalness: 0.9,
+      roughness: 0.3,
+      emissive: 0x333333,
+      emissiveIntensity: 0.5
+    });
+    const mesh = new THREE.Mesh(debrisGeo, debrisMat);
+    
+    // Parâmetros orbitais caóticos
+    const radius = 1.35 + Math.random() * 0.65;
+    const inclination = (Math.random() - 0.5) * Math.PI;
+    const speed = (0.002 + Math.random() * 0.005) * (Math.random() > 0.5 ? 1 : -1);
+    const angle = Math.random() * Math.PI * 2;
+    
+    debrisGroup.add(mesh);
+    
+    debrisData.push({
+      mesh,
+      radius,
+      inclination,
+      speed,
+      angle
+    });
+  }
+}
+
+createSpaceDebris();
+
+// --- 4. Interatividade e Raycasting de Cliques ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let currentTarget = null;
+let lastTargetPos = null;
+
+function onPointerDown(event) {
+  // Ignorar cliques na interface HUD
+  if (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT' || event.target.closest('.hud-panel')) {
+    return;
+  }
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(clickableObjects, true);
+
+  if (intersects.length > 0) {
+    let hitObj = intersects[0].object;
+    let matched = null;
+    
+    // Procura na cadeia de pais se algum é o topo da lista de clicáveis
+    while (hitObj && hitObj !== scene) {
+      if (clickableObjects.includes(hitObj)) {
+        matched = hitObj;
+        break;
+      }
+      hitObj = hitObj.parent;
+    }
+    
+    if (matched) {
+      selectTarget(matched);
+    }
+  }
+}
+
+function selectTarget(target) {
+  currentTarget = target;
+  lastTargetPos = null;
+  document.getElementById('telemetrySidebar').style.display = 'flex';
+  playBeep(587.33, 0.08); // som sutil de feedback
+}
+
+window.addEventListener('pointerdown', onPointerDown);
+
+// Botão Liberar Foco
+document.getElementById('releaseFocusBtn').addEventListener('click', () => {
+  currentTarget = null;
+  lastTargetPos = null;
+  document.getElementById('telemetrySidebar').style.display = 'none';
+  playBeep(392.00, 0.1);
+});
+
+// --- 5. Síntese de Áudio com Web Audio API ---
+let audioCtx = null;
+let alarmInterval = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+// Inicializar áudio no primeiro clique do usuário
+window.addEventListener('click', initAudio);
+window.addEventListener('touchstart', initAudio);
+
+function playBeep(freq, duration) {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    
+    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    console.error("Erro no som simples:", e);
+  }
+}
+
+function playCollisionAlarm() {
+  initAudio();
+  if (!audioCtx) return;
+  if (alarmInterval) return; // Alarme já em reprodução
+
+  alarmInterval = setInterval(() => {
+    // Verificar se o alarme está mutado no painel HTML
+    const alarmCheckbox = document.getElementById('alarmToggle');
+    if (alarmCheckbox && !alarmCheckbox.checked) return;
+
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Som tático agudo
+      osc.frequency.linearRampToValueAtTime(440, audioCtx.currentTime + 0.15); // Rampa de descida
+      
+      gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    } catch (e) {
+      console.error("Erro no sintetizador de alarme:", e);
+    }
+  }, 250);
+}
+
+function stopCollisionAlarm() {
+  if (alarmInterval) {
+    clearInterval(alarmInterval);
+    alarmInterval = null;
+  }
+}
+
+// --- 6. Toggles e Sliders do HTML ---
+const satellitesToggle = document.getElementById('satellitesToggle');
+const solarWindToggle = document.getElementById('solarWindToggle');
+const aurorasToggle = document.getElementById('aurorasToggle');
+const debrisToggle = document.getElementById('debrisToggle');
+const solarStormSlider = document.getElementById('solarStormSlider');
+const solarStormVal = document.getElementById('solarStormVal');
+const scanlines = document.getElementById('scanlines');
+const controlPanel = document.getElementById('controlPanel');
+const telemetrySidebar = document.getElementById('telemetrySidebar');
+
+solarStormSlider.addEventListener('input', () => {
+  const val = parseInt(solarStormSlider.value);
+  solarStormVal.textContent = val + '%';
+  
+  if (val >= 80) {
+    scanlines.classList.add('active');
+    controlPanel.classList.add('glitch');
+    telemetrySidebar.classList.add('glitch');
+    document.querySelectorAll('h1, h2').forEach(el => el.classList.add('glitch'));
+  } else {
+    scanlines.classList.remove('active');
+    controlPanel.classList.remove('glitch');
+    telemetrySidebar.classList.remove('glitch');
+    document.querySelectorAll('h1, h2').forEach(el => el.classList.remove('glitch'));
+  }
+});
+
+satellitesToggle.addEventListener('change', () => {
+  const show = satellitesToggle.checked;
+  satellitesGroup.visible = show;
+  orbitsGroup.visible = show;
+  
+  // Liberar foco se o satélite atual focado for ocultado
+  if (!show && currentTarget && currentTarget.userData.type === 'satellite') {
+    currentTarget = null;
+    lastTargetPos = null;
+    document.getElementById('telemetrySidebar').style.display = 'none';
+  }
+});
+
+solarWindToggle.addEventListener('change', () => {
+  solarWindLines.visible = solarWindToggle.checked;
+});
+
+aurorasToggle.addEventListener('change', () => {
+  auroraNorth.visible = aurorasToggle.checked;
+  auroraSouth.visible = aurorasToggle.checked;
+});
+
+debrisToggle.addEventListener('change', () => {
+  debrisGroup.visible = debrisToggle.checked;
+});
+
+// ===================== TASK_004: PLANETARY DEFENSE SHIELD & ASTEROID INTERCEPTION =====================
+
+// --- 1. Escudo Defletor Energético Global ---
+let shieldIntegrity = 100; // Percentage (0 - 100)
+let shieldBaseOpacity = 0.04;
+let shieldCurrentOpacity = 0.04;
+
+const shieldGeo = new THREE.SphereGeometry(1.14, 48, 48);
+const shieldMat = new THREE.MeshBasicMaterial({
+  color: 0x00ffff,
+  wireframe: true,
+  transparent: true,
+  opacity: shieldBaseOpacity,
+  blending: THREE.AdditiveBlending
+});
+const shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+scene.add(shieldMesh);
+
+// --- 2. Estado do Asteroide Ameaçador e Lasers ---
+let activeAsteroid = null;
+let laserCooldown = 0.0; // segundos
+let isChargingLaser = false;
+
+// Array para partículas de estilhaços/explosão
+const explosionParticles = [];
+
+// Elementos da HUD
+const shieldBarFill = document.getElementById('shieldBarFill');
+const shieldStatusText = document.getElementById('shieldStatusText');
+const spawnAsteroidBtn = document.getElementById('spawnAsteroidBtn');
+const threatTracker = document.getElementById('threatTracker');
+const threatEta = document.getElementById('threatEta');
+const threatDistance = document.getElementById('threatDistance');
+const cooldownText = document.getElementById('cooldownText');
+const cooldownBarFill = document.getElementById('cooldownBarFill');
+const fireLaserBtn = document.getElementById('fireLaserBtn');
+
+function updateShieldUI() {
+  if (shieldBarFill && shieldStatusText) {
+    shieldBarFill.style.width = `${shieldIntegrity}%`;
+    if (shieldIntegrity <= 20 && shieldIntegrity > 0) {
+      shieldBarFill.classList.add('critical');
+      shieldStatusText.textContent = `${shieldIntegrity}% [CRÍTICO]`;
+      shieldStatusText.style.color = '#ff0055';
+    } else if (shieldIntegrity === 0) {
+      shieldBarFill.classList.add('critical');
+      shieldStatusText.textContent = `0% [DESATIVADO]`;
+      shieldStatusText.style.color = '#ff0055';
+    } else {
+      shieldBarFill.classList.remove('critical');
+      shieldStatusText.textContent = `${shieldIntegrity}% [ATIVO]`;
+      shieldStatusText.style.color = '#00ffff';
+    }
+  }
+}
+
+// Criar marca de cratera na superfície da Terra em caso de impacto direto
+function createCraterMark(worldImpactPos) {
+  const localPos = earthMesh.worldToLocal(worldImpactPos.clone());
+  const craterGeo = new THREE.CircleGeometry(0.035, 16);
+  const craterMat = new THREE.MeshBasicMaterial({
+    color: 0xff2200,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85
+  });
+  const craterMesh = new THREE.Mesh(craterGeo, craterMat);
+  
+  craterMesh.position.copy(localPos);
+  const normal = localPos.clone().normalize();
+  craterMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+  craterMesh.position.addScaledVector(normal, 0.002); // ligeiramente elevado da superfície
+  
+  earthMesh.add(craterMesh);
+  
+  // Fade out suave da marca de impacto após 12 segundos
+  const fadeInterval = setInterval(() => {
+    craterMat.opacity -= 0.02;
+    if (craterMat.opacity <= 0) {
+      clearInterval(fadeInterval);
+      earthMesh.remove(craterMesh);
+      craterGeo.dispose();
+      craterMat.dispose();
+    }
+  }, 300);
+}
+
+// Spawna um Asteroide em rota de colisão
+function spawnAsteroid() {
+  if (activeAsteroid) {
+    return;
+  }
+  initAudio();
+
+  const radiusSize = 0.045 + Math.random() * 0.025;
+  const geo = new THREE.DodecahedronGeometry(radiusSize, 1);
+  
+  // Deforma os vértices para rugosidade irregular
+  const posAttr = geo.attributes.position;
+  for (let i = 0; i < posAttr.count; i++) {
+    const vx = posAttr.getX(i);
+    const vy = posAttr.getY(i);
+    const vz = posAttr.getZ(i);
+    const factor = 0.8 + Math.random() * 0.4;
+    posAttr.setXYZ(i, vx * factor, vy * factor, vz * factor);
+  }
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6e5246,
+    roughness: 0.9,
+    metalness: 0.1,
+    flatShading: true
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+
+  // Spawna em uma coordenada esférica aleatória distante (raio 5.5)
+  const u = Math.random();
+  const v = Math.random();
+  const theta = u * 2.0 * Math.PI;
+  const phi = Math.acos(2.0 * v - 1.0);
+  const spawnRadius = 5.5;
+
+  mesh.position.set(
+    spawnRadius * Math.sin(phi) * Math.cos(theta),
+    spawnRadius * Math.sin(phi) * Math.sin(theta),
+    spawnRadius * Math.cos(phi)
+  );
+
+  scene.add(mesh);
+
+  // Rastro de fogo/partículas no asteroide
+  const trailCount = 15;
+  const trailGeo = new THREE.BufferGeometry();
+  const trailPos = new Float32Array(trailCount * 3);
+  for (let i = 0; i < trailCount * 3; i++) trailPos[i] = 0;
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+
+  const trailMat = new THREE.PointsMaterial({
+    color: 0xff4400,
+    size: 0.025,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending
+  });
+  const trailPoints = new THREE.Points(trailGeo, trailMat);
+  scene.add(trailPoints);
+
+  const direction = new THREE.Vector3().copy(mesh.position).normalize().negate();
+  const speed = 0.012 + Math.random() * 0.008;
+
+  activeAsteroid = {
+    mesh,
+    trailPoints,
+    direction,
+    speed,
+    createdAt: Date.now()
+  };
+
+  if (threatTracker) threatTracker.style.display = 'flex';
+  if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = true;
+
+  playBeep(440, 0.2);
+}
+
+if (spawnAsteroidBtn) {
+  spawnAsteroidBtn.addEventListener('click', spawnAsteroid);
+}
+
+// --- 3. Partículas de Explosão / Estilhaços ---
+function createExplosionParticles(originPos) {
+  const pCount = 24;
+  const geom = new THREE.BufferGeometry();
+  const positions = new Float32Array(pCount * 3);
+  const velocities = [];
+
+  for (let i = 0; i < pCount; i++) {
+    const idx = i * 3;
+    positions[idx] = originPos.x;
+    positions[idx + 1] = originPos.y;
+    positions[idx + 2] = originPos.z;
+
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos((Math.random() * 2) - 1);
+    const speed = 0.02 + Math.random() * 0.035;
+
+    velocities.push(new THREE.Vector3(
+      speed * Math.sin(phi) * Math.cos(theta),
+      speed * Math.sin(phi) * Math.sin(theta),
+      speed * Math.cos(phi)
+    ));
+  }
+
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const mat = new THREE.PointsMaterial({
+    color: 0xffbb00,
+    size: 0.03,
+    transparent: true,
+    opacity: 1.0,
+    blending: THREE.AdditiveBlending
+  });
+
+  const points = new THREE.Points(geom, mat);
+  scene.add(points);
+
+  explosionParticles.push({
+    points,
+    velocities,
+    opacity: 1.0,
+    createdAt: Date.now()
+  });
+}
+
+function updateExplosionParticles() {
+  const now = Date.now();
+  for (let i = explosionParticles.length - 1; i >= 0; i--) {
+    const item = explosionParticles[i];
+    const geom = item.points.geometry;
+    const posAttr = geom.attributes.position;
+
+    for (let j = 0; j < posAttr.count; j++) {
+      posAttr.setX(j, posAttr.getX(j) + item.velocities[j].x);
+      posAttr.setY(j, posAttr.getY(j) + item.velocities[j].y);
+      posAttr.setZ(j, posAttr.getZ(j) + item.velocities[j].z);
+    }
+    posAttr.needsUpdate = true;
+
+    item.opacity -= 0.03;
+    item.points.material.opacity = Math.max(0, item.opacity);
+
+    if (item.opacity <= 0.0 || now - item.createdAt > 1200) {
+      scene.remove(item.points);
+      geom.dispose();
+      item.points.material.dispose();
+      explosionParticles.splice(i, 1);
+    }
+  }
+}
+
+// --- 4. Disparo do Canhão Interceptor Laser ---
+function fireLaser() {
+  if (!activeAsteroid || isChargingLaser || laserCooldown > 0) return;
+  initAudio();
+
+  isChargingLaser = true;
+  playLaserChargeSound();
+
+  // Seleciona a origem do laser: se houver satélite ou estação selecionado, usa ele; senão usa a 1ª estação
+  let launcherObj = currentTarget;
+  if (!launcherObj || (launcherObj.userData.type !== 'satellite' && launcherObj.userData.type !== 'station')) {
+    launcherObj = stations[0] ? stations[0].markerGroup : satellitesMeshes[0];
+  }
+
+  setTimeout(() => {
+    if (!activeAsteroid) {
+      isChargingLaser = false;
+      return;
+    }
+
+    const startPos = new THREE.Vector3();
+    launcherObj.getWorldPosition(startPos);
+    const endPos = activeAsteroid.mesh.position.clone();
+
+    // Determina cor do feixe (Ciano para Satélites/Estações padrão, Vermelho para Estações Terrestres)
+    const isStation = launcherObj.userData && launcherObj.userData.type === 'station';
+    const laserColor = isStation ? 0xff0055 : 0x00ffff;
+
+    const laserGeo = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
+    const laserMat = new THREE.LineBasicMaterial({
+      color: laserColor,
+      linewidth: 3,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending
+    });
+    const laserLine = new THREE.Line(laserGeo, laserMat);
+    scene.add(laserLine);
+
+    playLaserFireSound();
+    playExplosionSound();
+
+    // Estilhaços e destruição do asteroide
+    createExplosionParticles(endPos);
+
+    scene.remove(activeAsteroid.mesh);
+    scene.remove(activeAsteroid.trailPoints);
+    activeAsteroid.mesh.geometry.dispose();
+    activeAsteroid.mesh.material.dispose();
+    activeAsteroid.trailPoints.geometry.dispose();
+    activeAsteroid.trailPoints.material.dispose();
+    activeAsteroid = null;
+
+    if (threatTracker) threatTracker.style.display = 'none';
+    if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = false;
+
+    // Fade out do raio laser
+    setTimeout(() => {
+      scene.remove(laserLine);
+      laserGeo.dispose();
+      laserMat.dispose();
+    }, 160);
+
+    isChargingLaser = false;
+    laserCooldown = 3.0; // 3 segundos de recarga
+  }, 400); // Tempo da animação de carga do laser
+}
+
+if (fireLaserBtn) {
+  fireLaserBtn.addEventListener('click', fireLaser);
+}
+
+// --- 5. Efeitos Sonoros Web Audio API (Sintetizador Analógico Nativo) ---
+function playLaserChargeSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.4);
+
+    gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.4);
+  } catch (e) {
+    console.error("Erro no som de carga de laser:", e);
+  }
+}
+
+function playLaserFireSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(220, audioCtx.currentTime + 0.25);
+
+    gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch (e) {
+    console.error("Erro no som de disparo de laser:", e);
+  }
+}
+
+function playShieldImpactSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(90, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(45, audioCtx.currentTime + 0.6);
+
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+  } catch (e) {
+    console.error("Erro no som de impacto no escudo:", e);
+  }
+}
+
+function playExplosionSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const bufferSize = audioCtx.sampleRate * 0.5;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noiseNode = audioCtx.createBufferSource();
+    noiseNode.buffer = buffer;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+    noiseNode.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    noiseNode.start();
+    noiseNode.stop(audioCtx.currentTime + 0.5);
+  } catch (e) {
+    console.error("Erro no som de explosão:", e);
+  }
+}
+
+// Hook de depuração/teste (TASK_002, TASK_003 & TASK_004)
+window.__earth = {
+  satellitesData, satellitesMeshes,
+  convertGeoToCartesian,
+  getUserLocation,
+  getLocationPin: () => locationPin,
+  getUserLocationValue: () => userLocation,
+  glowMesh, scene, earthMesh,
+  stations, clickableObjects,
+  auroras: { north: auroraNorth, south: auroraSouth },
+  solarWind: solarWindLines,
+  debris: debrisData,
+  getCurrentTarget: () => currentTarget,
+  shieldMesh,
+  spawnAsteroid,
+  fireLaser,
+  getActiveAsteroid: () => activeAsteroid,
+  getShieldIntegrity: () => shieldIntegrity,
+  setShieldIntegrity: (val) => { shieldIntegrity = val; updateShieldUI(); }
+};
+
+// ===================== RENDER LOOP =====================
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -72,6 +1041,347 @@ function animate() {
   cloudsMesh.rotation.y += 0.0023;
   glowMesh.rotation.y += 0.002;
   stars.rotation.y -= 0.0002;
+
+  const stormSlider = document.getElementById('solarStormSlider');
+  const stormIntensity = parseFloat(stormSlider.value) / 100 || 0.0;
+  const speedMult = 1.0 + stormIntensity * 3.0;
+
+  // --- Translação e orientação dos satélites ---
+  satellitesData.forEach((sat, index) => {
+    sat.angle += sat.speed;
+    const mesh = satellitesMeshes[index];
+    mesh.position.x = sat.radius * Math.cos(sat.angle);
+    mesh.position.y = sat.radius * Math.sin(sat.angle) * Math.sin(sat.inclination);
+    mesh.position.z = sat.radius * Math.sin(sat.angle) * Math.cos(sat.inclination);
+    mesh.lookAt(0, 0, 0);     // Antena voltada ao centro
+    mesh.rotateX(Math.PI / 2);
+  });
+
+  // --- Pulsação do pino de geolocalização do usuário ---
+  if (locationPin) {
+    const scaleFactor = 1.0 + 0.5 * Math.sin(Date.now() * 0.005);
+    locationPin.ringMesh.scale.set(scaleFactor, scaleFactor, 1);
+    locationPin.ringMesh.material.opacity = Math.max(0, 0.6 - (scaleFactor - 1.0) * 0.6);
+  }
+
+  // --- Oscilação do brilho Fresnel da atmosfera ---
+  const pulseTime = Date.now() * 0.0015;
+  glowMesh.material.uniforms.fresnelScale.value = (0.8 + 0.15 * Math.sin(pulseTime)) * (1.0 - stormIntensity * 0.15); // sutilmente enfraquece no solstício
+
+  // --- Pulsação das estações terrestres (Ciano) ---
+  stations.forEach(st => {
+    const scaleFactor = 1.0 + 0.4 * Math.sin(Date.now() * 0.008);
+    st.ringMesh.scale.set(scaleFactor, scaleFactor, 1);
+    st.ringMesh.material.opacity = Math.max(0, 0.8 - (scaleFactor - 1.0) * 2.0);
+  });
+
+  // --- Animação e Oscilação Orgânica das Auroras ---
+  if (auroraNorth.visible) {
+    const time = Date.now() * 0.001;
+    auroraNorth.rotation.z = time * 0.06;
+    auroraSouth.rotation.z = -time * 0.05;
+
+    const scaleN = 1.0 + 0.05 * Math.sin(time * 2.5);
+    const scaleS = 1.0 + 0.04 * Math.sin(time * 2.1 + 1.0);
+    auroraNorth.scale.set(scaleN, scaleN, 0.2 + stormIntensity * 0.4);
+    auroraSouth.scale.set(scaleS, scaleS, 0.2 + stormIntensity * 0.4);
+
+    auroraNorth.position.y = 0.94 + 0.015 * Math.sin(time * 1.8);
+    auroraSouth.position.y = -0.94 - 0.015 * Math.sin(time * 1.8 + 0.5);
+
+    auroraNorth.material.opacity = (0.22 + 0.12 * Math.sin(time * 3.0)) * (1.0 + stormIntensity * 2.0);
+    auroraSouth.material.opacity = (0.22 + 0.12 * Math.sin(time * 2.7)) * (1.0 + stormIntensity * 2.0);
+
+    // Ajuste de HSL com a tempestade
+    if (stormIntensity > 0.8) {
+      auroraNorth.material.color.setHex(0x00ff33);
+      auroraSouth.material.color.setHex(0x00ffff);
+    } else {
+      auroraNorth.material.color.setHex(0x00ff66);
+      auroraSouth.material.color.setHex(0x00aaff);
+    }
+  }
+
+  // --- Animação do Vento Solar ---
+  if (solarWindLines.visible) {
+    const posAttr = solarWindGeometry.attributes.position;
+    for (let i = 0; i < solarWindCount; i++) {
+      solarWindLifes[i] += 0.004 * speedMult;
+      if (solarWindLifes[i] >= 1.0) {
+        resetWindLine(i);
+        continue;
+      }
+
+      const idx = i * 6;
+      let px = posAttr.getX(i * 2);
+      let py = posAttr.getY(i * 2);
+      let pz = posAttr.getZ(i * 2);
+      
+      let pos = new THREE.Vector3(px, py, pz);
+      const step = solarWindSpeeds[i] * speedMult;
+      pos.addScaledVector(windDir, step);
+
+      // Deflexão ao redor do campo magnético terrestre
+      const distToCenter = pos.length();
+      if (distToCenter < 1.4) {
+        const radial = pos.clone().normalize();
+        pos.addScaledVector(radial, (1.4 - distToCenter) * 0.45);
+      }
+
+      posAttr.setXYZ(i * 2, pos.x, pos.y, pos.z);
+      const end = pos.clone().addScaledVector(windDir, 0.12 + stormIntensity * 0.08);
+      posAttr.setXYZ(i * 2 + 1, end.x, end.y, end.z);
+    }
+    posAttr.needsUpdate = true;
+    
+    // Cor e brilho dependentes da intensidade da tempestade
+    solarWindMaterial.color.setHSL(0.48 - stormIntensity * 0.15, 1.0, 0.5 + stormIntensity * 0.2);
+    solarWindMaterial.opacity = 0.2 + stormIntensity * 0.55;
+  }
+
+  // --- Movimentação do Lixo Espacial e Detecção de Colisão ---
+  let collisionDetected = false;
+  let threatenedSatIndex = -1;
+  let collisionDebrisId = -1;
+
+  // Oculta anéis de alerta por padrão
+  satellitesMeshes.forEach(mesh => {
+    const ring = mesh.getObjectByName("alertRing");
+    if (ring) ring.visible = false;
+  });
+
+  debrisData.forEach((debris, dIdx) => {
+    debris.angle += debris.speed;
+    debris.mesh.position.x = debris.radius * Math.cos(debris.angle);
+    debris.mesh.position.y = debris.radius * Math.sin(debris.angle) * Math.sin(debris.inclination);
+    debris.mesh.position.z = debris.radius * Math.sin(debris.angle) * Math.cos(debris.inclination);
+    debris.mesh.rotation.x += 0.01;
+    debris.mesh.rotation.y += 0.02;
+  });
+
+  // Só checa colisão se detritos e satélites estão visíveis
+  if (debrisGroup.visible && satellitesGroup.visible) {
+    satellitesMeshes.forEach((satMesh, sIdx) => {
+      const satPos = new THREE.Vector3();
+      satMesh.getWorldPosition(satPos);
+
+      debrisData.forEach((debris, dIdx) => {
+        const debPos = new THREE.Vector3();
+        debris.mesh.getWorldPosition(debPos);
+
+        const dist = satPos.distanceTo(debPos);
+        if (dist < 0.15) {
+          collisionDetected = true;
+          threatenedSatIndex = sIdx;
+          collisionDebrisId = dIdx;
+
+          // Habilitar e piscar anel de aviso no satélite sob risco
+          const ring = satMesh.getObjectByName("alertRing");
+          if (ring) {
+            ring.visible = true;
+            ring.material.opacity = (Math.floor(Date.now() / 150) % 2 === 0) ? 0.9 : 0.15;
+            const sc = 1.0 + 0.15 * Math.sin(Date.now() * 0.025);
+            ring.scale.set(sc, sc, 1);
+          }
+        }
+      });
+    });
+  }
+
+  // Ativação da UI e Alarme de Colisão
+  const warningBanner = document.getElementById('warningBanner');
+  const warningMessage = document.getElementById('warningMessage');
+
+  if (collisionDetected) {
+    const satName = ['Equatorial', 'Polar', 'Inclinado 30°', 'Inclinado 45°', 'Inclinado -60°'][threatenedSatIndex];
+    warningMessage.textContent = `COLLISION WARNING: DEBRIS OBJ-[${collisionDebrisId}] CLOSE TO SAT-[${satName.toUpperCase()}]`;
+    warningBanner.style.display = 'flex';
+    playCollisionAlarm();
+  } else {
+    warningBanner.style.display = 'none';
+    stopCollisionAlarm();
+  }
+
+  // --- Câmera e Foco Orbitais Suaves (LERP & Active Follow) ---
+  if (currentTarget) {
+    const targetPos = new THREE.Vector3();
+    currentTarget.getWorldPosition(targetPos);
+    
+    // LERP do ponto de foco dos OrbitControls
+    controls.target.lerp(targetPos, 0.05);
+
+    // Ajusta a câmera aplicando o deslocamento delta do satélite para mantê-lo centrado sem travar rotações
+    if (!lastTargetPos) {
+      lastTargetPos = targetPos.clone();
+    }
+    const moveDelta = new THREE.Vector3().subVectors(targetPos, lastTargetPos);
+    camera.position.add(moveDelta);
+    lastTargetPos.copy(targetPos);
+
+    // Atualiza a barra de telemetria
+    const data = currentTarget.userData;
+    let name = data.name || "Desconhecido";
+    let category = "Objeto Espacial";
+    let statusText = "OPERACIONAL";
+    let statusColor = "#00ffaa";
+    let detailsHtml = "";
+
+    if (data.type === 'satellite') {
+      category = "Satélite Artificial";
+      const satIdx = data.index;
+      const satInfo = satellitesData[satIdx];
+      const alt = (satInfo.radius - 1.0) * 6371;
+      const speed = satInfo.speed * 6371 * 60;
+      const battery = Math.min(100, Math.max(5, Math.floor(95 + 5 * Math.sin(Date.now() * 0.001))));
+      const temp = (15 + 2 * Math.sin(Date.now() * 0.0005)).toFixed(1);
+      const signal = Math.max(10, Math.floor(85 + 15 * Math.sin(Date.now() * 0.002) + (Math.random() - 0.5) * 5));
+
+      detailsHtml = `
+        <div class="tel-row"><span>Órbita:</span> <span>${['Equatorial', 'Polar', 'Inclinada 30°', 'Inclinada 45°', 'Inclinada -60°'][satIdx]}</span></div>
+        <div class="tel-row"><span>Altitude:</span> <span>${alt.toFixed(0)} km</span></div>
+        <div class="tel-row"><span>Velocidade:</span> <span>${speed.toFixed(0)} km/h</span></div>
+        <div class="tel-row"><span>Força Sinal:</span> <span>${signal}%</span></div>
+        <div class="tel-row"><span>Bateria:</span> <span>${battery}%</span></div>
+        <div class="tel-row"><span>Temp. Painel:</span> <span>${temp} °C</span></div>
+      `;
+
+      if (threatenedSatIndex === satIdx) {
+        statusText = "AVISO DE COLISÃO";
+        statusColor = "#ff0055";
+      }
+    } else if (data.type === 'station') {
+      category = "Estação Terrestre";
+      const signal = Math.max(10, Math.floor(90 + 10 * Math.sin(Date.now() * 0.001) + (Math.random() - 0.5) * 3));
+      const activeUsers = Math.floor(8 + 4 * Math.sin(Date.now() * 0.0001));
+
+      detailsHtml = `
+        <div class="tel-row"><span>Latitude:</span> <span>${data.lat.toFixed(4)}°</span></div>
+        <div class="tel-row"><span>Longitude:</span> <span>${data.lon.toFixed(4)}°</span></div>
+        <div class="tel-row"><span>Sinal Uplink:</span> <span>${signal}%</span></div>
+        <div class="tel-row"><span>Operadores:</span> <span>${activeUsers}</span></div>
+      `;
+    } else if (data.type === 'user_pin') {
+      category = "Sua Geolocalização";
+      detailsHtml = `
+        <div class="tel-row"><span>Latitude:</span> <span>${data.lat.toFixed(4)}°</span></div>
+        <div class="tel-row"><span>Longitude:</span> <span>${data.lon.toFixed(4)}°</span></div>
+        <div class="tel-row"><span>Status GPS:</span> <span>CONECTADO</span></div>
+        <div class="tel-row"><span>Precisão:</span> <span>Aproximada por IP</span></div>
+      `;
+    }
+
+    document.getElementById('telName').textContent = name;
+    document.getElementById('telCategory').textContent = category;
+    document.getElementById('telStatus').textContent = statusText;
+    document.getElementById('telStatus').style.color = statusColor;
+    document.getElementById('telDetails').innerHTML = detailsHtml;
+
+  } else {
+    // Retorna foco ao centro da Terra
+    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+    lastTargetPos = null;
+  }
+
+  // --- Atualização do Escudo Defletor Energético (TASK_004) ---
+  if (shieldIntegrity > 0) {
+    shieldMesh.visible = true;
+    shieldCurrentOpacity += (shieldBaseOpacity - shieldCurrentOpacity) * 0.05;
+    shieldMesh.material.opacity = shieldCurrentOpacity;
+    shieldMesh.rotation.y += 0.003;
+  } else {
+    shieldMesh.visible = false;
+  }
+
+  // --- Atualização do Cooldown do Laser (TASK_004) ---
+  if (laserCooldown > 0) {
+    laserCooldown = Math.max(0, laserCooldown - 0.016);
+    const cdPct = (laserCooldown / 3.0) * 100;
+    if (cooldownBarFill) cooldownBarFill.style.width = `${cdPct}%`;
+    if (cooldownText) cooldownText.textContent = `RECARREGANDO (${laserCooldown.toFixed(1)}s)`;
+  } else {
+    if (cooldownBarFill) cooldownBarFill.style.width = '0%';
+    if (cooldownText) cooldownText.textContent = isChargingLaser ? 'CARREGANDO FEIXE...' : 'PRONTO';
+  }
+
+  // --- Atualização e Movimentação do Asteroide Hostil (TASK_004) ---
+  if (activeAsteroid) {
+    const ast = activeAsteroid;
+    ast.mesh.position.addScaledVector(ast.direction, ast.speed);
+    ast.mesh.rotation.x += 0.015;
+    ast.mesh.rotation.y += 0.02;
+
+    // Rastro de fumaça/fogo
+    const tPosAttr = ast.trailPoints.geometry.attributes.position;
+    for (let i = tPosAttr.count - 1; i > 0; i--) {
+      tPosAttr.setXYZ(i, tPosAttr.getX(i - 1), tPosAttr.getY(i - 1), tPosAttr.getZ(i - 1));
+    }
+    tPosAttr.setXYZ(0, ast.mesh.position.x, ast.mesh.position.y, ast.mesh.position.z);
+    tPosAttr.needsUpdate = true;
+
+    const distToCenter = ast.mesh.position.length();
+    const etaSec = Math.max(0, Math.floor((distToCenter - 1.14) / (ast.speed * 60)));
+
+    if (threatDistance) threatDistance.textContent = `${distToCenter.toFixed(2)}u`;
+    if (threatEta) threatEta.textContent = `ETA: ${etaSec < 10 ? '0' : ''}${etaSec}s`;
+
+    // Checagem de Colisão com Escudo (d <= 1.14) quando Escudo está Ativo
+    if (shieldIntegrity > 0 && distToCenter <= 1.14) {
+      shieldCurrentOpacity = 0.6;
+      shieldIntegrity = Math.max(0, shieldIntegrity - 20);
+      updateShieldUI();
+      playShieldImpactSound();
+      createExplosionParticles(ast.mesh.position);
+
+      scene.remove(ast.mesh);
+      scene.remove(ast.trailPoints);
+      ast.mesh.geometry.dispose();
+      ast.mesh.material.dispose();
+      ast.trailPoints.geometry.dispose();
+      ast.trailPoints.material.dispose();
+      activeAsteroid = null;
+
+      if (threatTracker) threatTracker.style.display = 'none';
+      if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = false;
+    } 
+    // Checagem de Colisão Direta com a Terra (d <= 1.01) quando Escudo está Caído (0%)
+    else if (shieldIntegrity <= 0 && distToCenter <= 1.01) {
+      const impactPos = ast.mesh.position.clone();
+      createCraterMark(impactPos);
+      createExplosionParticles(impactPos);
+      playExplosionSound();
+
+      const scanlinesEl = document.getElementById('scanlines');
+      if (scanlinesEl) {
+        scanlinesEl.classList.add('active');
+        setTimeout(() => scanlinesEl.classList.remove('active'), 400);
+      }
+
+      scene.remove(ast.mesh);
+      scene.remove(ast.trailPoints);
+      ast.mesh.geometry.dispose();
+      ast.mesh.material.dispose();
+      ast.trailPoints.geometry.dispose();
+      ast.trailPoints.material.dispose();
+      activeAsteroid = null;
+
+      if (threatTracker) threatTracker.style.display = 'none';
+      if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = false;
+    }
+  }
+
+  // Partículas de explosão
+  updateExplosionParticles();
+
+  // Visibilidade do botão de disparo no painel de telemetria
+  if (fireLaserBtn) {
+    if (activeAsteroid && currentTarget && (currentTarget.userData.type === 'satellite' || currentTarget.userData.type === 'station')) {
+      fireLaserBtn.style.display = 'flex';
+    } else {
+      fireLaserBtn.style.display = 'none';
+    }
+  }
+
+  controls.update();
   renderer.render(scene, camera);
 }
 

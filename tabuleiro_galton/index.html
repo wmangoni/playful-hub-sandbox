@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tabuleiro de Galton (Layouts)</title>
+    <title>Tabuleiro de Galton (Simulador Estatístico)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         body {
             display: flex;
@@ -11,125 +14,384 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #1a1a1a;
-            color: #eee;
-            flex-direction: column;
-            font-family: sans-serif;
+            background: radial-gradient(circle at center, #18191e 0%, #0d0e12 100%);
+            color: #f1f3f9;
+            font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .app-container {
+            display: flex;
+            flex-direction: row;
+            gap: 30px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            max-width: 1000px;
+            width: 100%;
+        }
+        @media (max-width: 900px) {
+            .app-container {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+        .canvas-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
         canvas {
-            border: 1px solid #444;
-            background-color: #1a1a1a;
+            background-color: #0d0e12;
             display: block;
-            margin-bottom: 15px; /* Espaço entre canvas e controles */
         }
-        #controls {
+        .sidebar-container {
+            flex: 1;
             display: flex;
-            flex-wrap: wrap; /* Permite que os controles quebrem linha se necessário */
-            gap: 10px 15px; /* Espaçamento vertical e horizontal */
-            align-items: center;
-            justify-content: center; /* Centraliza os controles */
-            max-width: 600px; /* Limita largura dos controles */
-            width: 95%; /* Usa quase toda a largura disponível */
+            flex-direction: column;
+            gap: 15px;
+            min-width: 320px;
         }
-        button, select {
-            padding: 8px 12px; /* Ajuste padding */
-            font-size: 0.9em; /* Ajuste fonte */
+        .section-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #00ffcc;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+            margin: 0 0 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 6px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        button {
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
-            background-color: #333;
-            color: #eee;
-            border: 1px solid #555;
-            border-radius: 4px;
-            transition: background-color 0.2s, border-color 0.2s;
+            background: rgba(255, 255, 255, 0.06);
+            color: #f1f3f9;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        button:hover, select:hover {
-            background-color: #444;
-            border-color: #00ccff;
+        button:hover {
+            background: rgba(0, 255, 204, 0.15);
+            border-color: #00ffcc;
+            box-shadow: 0 0 12px rgba(0, 255, 204, 0.2);
+            transform: translateY(-1px);
         }
         button:active {
-            background-color: #555;
+            transform: translateY(1px);
         }
-        /* Estilo específico para o select */
+        #resetBtn {
+            background: rgba(255, 51, 102, 0.1);
+            border-color: rgba(255, 51, 102, 0.3);
+            color: #ff3366;
+        }
+        #resetBtn:hover {
+            background: rgba(255, 51, 102, 0.25);
+            border-color: #ff3366;
+            box-shadow: 0 0 12px rgba(255, 51, 102, 0.3);
+        }
+        .control-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .control-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #b0b3b8;
+        }
+        .control-value {
+            font-weight: 600;
+            color: #00ffcc;
+        }
         select {
-           appearance: none; /* Remove aparência padrão */
-           background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23CCCCCC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.6-3.6%205.4-7.9%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
-           background-repeat: no-repeat;
-           background-position: right 10px top 50%;
-           background-size: .65em auto;
-           padding-right: 30px; /* Espaço para a seta */
+            width: 100%;
+            padding: 10px;
+            font-size: 0.85rem;
+            background: #14151a;
+            color: #f1f3f9;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
         }
-        label {
-            margin-left: 5px; /* Reduzido */
+        select:hover {
+            border-color: #00ffcc;
         }
         input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            outline: none;
+            accent-color: #00ffcc;
+            margin: 4px 0;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            color: #b0b3b8;
             cursor: pointer;
-            accent-color: #00ccff;
-            vertical-align: middle; /* Alinha melhor com o texto */
+            user-select: none;
+        }
+        .checkbox-row input {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            accent-color: #00ffcc;
+        }
+        .stats-card {
+            background: rgba(0, 255, 204, 0.04);
+            border: 1px solid rgba(0, 255, 204, 0.15);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95rem;
+            font-weight: 600;
         }
         #totalBalls {
-            min-width: 70px; /* Ajustado */
-            text-align: right;
-            font-size: 0.9em;
+            color: #00ffcc;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
         }
-        .control-group { /* Agrupa label e input/select */
-           display: inline-flex;
-           align-items: center;
-           gap: 5px;
+        .challenge-card {
+            background: rgba(255, 235, 59, 0.04);
+            border: 1px solid rgba(255, 235, 59, 0.2);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
-
+        .challenge-title {
+            color: #ffeb3b;
+            text-shadow: 0 0 10px rgba(255, 235, 59, 0.3);
+        }
+        .challenge-info {
+            font-size: 0.8rem;
+            color: #d1d5db;
+            line-height: 1.3;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px dashed rgba(255, 235, 59, 0.3);
+        }
+        .challenge-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .match-badge {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+        .challenge-btn {
+            background: rgba(255, 235, 59, 0.15);
+            border-color: #ffeb3b;
+            color: #ffeb3b;
+        }
+        .challenge-btn:hover {
+            background: rgba(255, 235, 59, 0.3);
+            border-color: #fff176;
+            box-shadow: 0 0 12px rgba(255, 235, 59, 0.4);
+        }
     </style>
 </head>
 <body>
-    <canvas id="galtonCanvas"></canvas>
-    <div id="controls">
-        <button id="addBallBtn">Adicionar 1</button>
-        <button id="add10BallsBtn">Adicionar 10</button>
-        <button id="resetBtn">Resetar</button>
-         <div class="control-group">
-             <label for="layoutSelector">Layout:</label>
-             <select id="layoutSelector">
-                 <option value="triangle">Triangular</option>
-                 <option value="grid" selected>Grade</option>
-                 <!-- Adicionar mais opções aqui -->
-             </select>
-         </div>
-         <div class="control-group">
-            <label for="speedSlider">Velocidade:</label>
-            <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
-         </div>
-         <span id="totalBalls">Total: 0</span>
+    <div class="app-container">
+        <div class="canvas-container">
+            <canvas id="galtonCanvas"></canvas>
+        </div>
+        <div class="sidebar-container">
+            <div class="stats-card">
+                <span>Esferas Simuladas</span>
+                <span id="totalBalls">Total: 0</span>
+            </div>
+            
+            <div class="challenge-card">
+                <div class="section-title challenge-title">🎯 Modo Desafio (Target Fitting)</div>
+                <div class="control-row">
+                    <label for="challengeSelector" style="font-size:0.8rem; color:#b0b3b8;">Selecionar Desafio</label>
+                    <select id="challengeSelector">
+                        <option value="none">Livre (Sem Desafio)</option>
+                        <option value="skewed">Desafio 1: Curva Inclinada (Skewed Right)</option>
+                        <option value="bimodal">Desafio 2: Twin Peaks (Bimodal)</option>
+                        <option value="uniform">Desafio 3: Grade Uniforme</option>
+                    </select>
+                </div>
+                <div id="challengeInfoBox" class="challenge-info" style="display:none;">
+                    Selecione um desafio para começar.
+                </div>
+                <div id="challengeStatusBox" class="challenge-status" style="display:none;">
+                    <span>Aderência (Match):</span>
+                    <span id="matchPercentDisplay" class="match-badge">0%</span>
+                </div>
+                <div class="button-group" style="grid-template-columns: 1fr 1fr;">
+                    <button id="startChallengeBtn" class="challenge-btn">Iniciar Desafio</button>
+                    <button id="cancelChallengeBtn" style="background:rgba(255,255,255,0.05); color:#aaa;">Cancelar</button>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <div class="section-title">Controles Principais</div>
+                <div class="button-group">
+                    <button id="addBallBtn">+1 Esfera</button>
+                    <button id="add10BallsBtn">+10 Esferas</button>
+                    <button id="resetBtn">Resetar</button>
+                </div>
+                
+                <div class="control-row">
+                    <div class="control-header">
+                        <label for="layoutSelector">Configuração do Tabuleiro</label>
+                    </div>
+                    <select id="layoutSelector">
+                        <option value="triangle">Triangular (Normal)</option>
+                        <option value="bimodal">Bimodal (Dois Triângulos)</option>
+                        <option value="uniform">Uniforme (Grade Regular)</option>
+                    </select>
+                </div>
+                
+                <div class="control-row">
+                    <div class="control-header">
+                        <label for="speedSlider">Velocidade</label>
+                        <span class="control-value" id="speedVal">1.0x</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+                </div>
+            </div>
+
+            <div class="control-card">
+                <div class="section-title">Parâmetros Probabilísticos</div>
+                <div class="control-row">
+                    <div class="control-header">
+                        <label for="probSlider">Binomial Assimétrica (Chance Direita)</label>
+                        <span class="control-value" id="probVal">50%</span>
+                    </div>
+                    <input type="range" id="probSlider" min="0.1" max="0.9" step="0.01" value="0.5">
+                </div>
+            </div>
+
+            <div class="control-card">
+                <div class="section-title">Física Experimental</div>
+                <div class="control-row">
+                    <div class="control-header">
+                        <label for="gravitySlider">Gravidade</label>
+                        <span class="control-value" id="gravityVal">1.0x</span>
+                    </div>
+                    <input type="range" id="gravitySlider" min="0.1" max="3.0" step="0.1" value="1.0">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-header">
+                        <label for="elasticitySlider">Elasticidade (Rebote)</label>
+                        <span class="control-value" id="elasticityVal">60%</span>
+                    </div>
+                    <input type="range" id="elasticitySlider" min="0" max="100" step="5" value="60">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-header">
+                        <label for="radiusSlider">Tamanho da Esfera</label>
+                        <span class="control-value" id="radiusVal">5px</span>
+                    </div>
+                    <input type="range" id="radiusSlider" min="3" max="10" step="1" value="5">
+                </div>
+            </div>
+
+            <div class="control-card">
+                <div class="section-title">Visual & Interação</div>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="showGaussCheck" checked>
+                    <span>Exibir Curva de Gauss</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="ballCollisionCheck">
+                    <span>Colisão entre Esferas</span>
+                </label>
+            </div>
+        </div>
     </div>
 
     <script>
         const canvas = document.getElementById('galtonCanvas');
         const ctx = canvas.getContext('2d');
-        const controls = document.getElementById('controls');
         const addBallBtn = document.getElementById('addBallBtn');
         const add10BallsBtn = document.getElementById('add10BallsBtn');
         const resetBtn = document.getElementById('resetBtn');
         const speedSlider = document.getElementById('speedSlider');
-        const layoutSelector = document.getElementById('layoutSelector'); // Pega o select
+        const speedVal = document.getElementById('speedVal');
+        const layoutSelector = document.getElementById('layoutSelector');
+        const probSlider = document.getElementById('probSlider');
+        const probVal = document.getElementById('probVal');
+        const gravitySlider = document.getElementById('gravitySlider');
+        const gravityVal = document.getElementById('gravityVal');
+        const elasticitySlider = document.getElementById('elasticitySlider');
+        const elasticityVal = document.getElementById('elasticityVal');
+        const radiusSlider = document.getElementById('radiusSlider');
+        const radiusVal = document.getElementById('radiusVal');
+        const showGaussCheck = document.getElementById('showGaussCheck');
+        const ballCollisionCheck = document.getElementById('ballCollisionCheck');
         const totalBallsSpan = document.getElementById('totalBalls');
 
-        // --- Configurações ---
+        // Modo Desafio UI
+        const challengeSelector = document.getElementById('challengeSelector');
+        const challengeInfoBox = document.getElementById('challengeInfoBox');
+        const challengeStatusBox = document.getElementById('challengeStatusBox');
+        const matchPercentDisplay = document.getElementById('matchPercentDisplay');
+        const startChallengeBtn = document.getElementById('startChallengeBtn');
+        const cancelChallengeBtn = document.getElementById('cancelChallengeBtn');
+
+        // --- Configurações & Parâmetros Físicos ---
         let canvasWidth = 600;
         let canvasHeight = 600;
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
 
-        const ballRadius = 5;
+        let ballRadius = 5;
         const pegRadius = 4;
-        const numRowsTriangle = 15; // Específico para o layout triangular
-        const gravity = 0.15;
-        const restitution = 0.6;
+        const numRowsTriangle = 15; // Específico para o layout triangular/normal
+        const baseGravity = 0.15;
+        let gravityMultiplier = 1.0;
+        let restitution = 0.6; // Elasticidade (0 a 1)
+        let probabilityRight = 0.5; // Probabilidade binomial (0.1 a 0.9)
         const horizontalRandomness = 0.4;
         const binHeight = 80;
         const topOffset = 60; // Espaço no topo antes dos pinos
 
-        // Cores Tema Dark Neon (sem mudanças)
+        // Cores Tema Dark Neon
         const pegColor = '#aaa';
         const ballColor = '#00ccff';
         const ballShadowColor = 'rgba(0, 204, 255, 0.7)';
-        const binColor = '#666';
+        const binColor = 'rgba(255, 255, 255, 0.1)';
         const histogramColor = '#ff3366';
         const histogramShadowColor = 'rgba(255, 51, 102, 0.6)';
 
@@ -138,74 +400,306 @@
         let bins = [];
         let simulationSpeed = 1;
         let totalBallCount = 0;
+        let showGauss = true;
+        let ballCollisionEnabled = false;
 
-        // --- Funções ---
+        // --- Sintetizador Web Audio API ---
+        let audioCtx = null;
+        const PENTATONIC_SCALE = [130.81, 146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playCollisionTone(xPos) {
+            if (!audioCtx) return;
+            const xRatio = Math.max(0, Math.min(1, xPos / canvasWidth));
+            const scaleIndex = Math.floor(xRatio * PENTATONIC_SCALE.length);
+            const frequency = PENTATONIC_SCALE[scaleIndex] || 261.63;
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.12);
+        }
+
+        function playAudio(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            if (type === 'teleport') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'split') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+            } else if (type === 'victory') {
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, index) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.1);
+                    g.gain.setValueAtTime(0.1, audioCtx.currentTime + index * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + index * 0.1 + 0.25);
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.start(audioCtx.currentTime + index * 0.1);
+                    o.stop(audioCtx.currentTime + index * 0.1 + 0.25);
+                });
+            }
+        }
+
+        // --- Modo Desafio Data ---
+        let activeChallengeKey = 'none';
+        let challengeCompleted = false;
+
+        const CHALLENGES = {
+            skewed: {
+                id: 'skewed',
+                name: 'Desafio 1: Curva Inclinada',
+                description: 'Dispare esferas com viés de 70% à direita e alcance MSE < 0.015 em relação à curva teórica após 100 bolinhas.',
+                setup: () => {
+                    probabilityRight = 0.7;
+                    probSlider.value = 0.7;
+                    layoutSelector.value = 'triangle';
+                    probVal.textContent = '70%';
+                    setup();
+                },
+                check: () => {
+                    const collected = bins.reduce((sum, b) => sum + b.count, 0);
+                    if (collected < 100) return { success: false, match: Math.min(100, Math.round((collected / 100) * 100)), msg: `Colete 100 bolinhas (${collected}/100)` };
+
+                    const M = bins.length;
+                    const p = 0.7;
+                    const mean = (M - 1) * p;
+                    const sigma = Math.sqrt((M - 1) * p * (1 - p));
+                    let sumSqError = 0;
+
+                    for (let i = 0; i < M; i++) {
+                        const xStat = i;
+                        const exponent = -Math.pow(xStat - mean, 2) / (2 * Math.pow(sigma, 2));
+                        const targetPdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+                        const realProp = bins[i].count / collected;
+                        sumSqError += Math.pow(realProp - targetPdf, 2);
+                    }
+                    const mse = sumSqError / M;
+                    const matchPercent = Math.max(0, Math.min(100, Math.round((1 - mse / 0.03) * 100)));
+
+                    return {
+                        success: mse < 0.015,
+                        match: matchPercent,
+                        msg: `MSE: ${mse.toFixed(4)} (${matchPercent}% Match) | Bolinhas: ${collected}/100`
+                    };
+                }
+            },
+            bimodal: {
+                id: 'bimodal',
+                name: 'Desafio 2: Twin Peaks',
+                description: 'Acumule pelo menos 25 bolinhas nas colunas 3 e 12, com no máximo 10 nas colunas centrais (6 a 9).',
+                setup: () => {
+                    layoutSelector.value = 'bimodal';
+                    setup();
+                },
+                check: () => {
+                    const col3 = bins[3]?.count || 0;
+                    const col12 = bins[12]?.count || 0;
+                    const centralSum = (bins[6]?.count || 0) + (bins[7]?.count || 0) + (bins[8]?.count || 0) + (bins[9]?.count || 0);
+
+                    const success = col3 >= 25 && col12 >= 25 && centralSum <= 10;
+                    const matchPercent = Math.round(Math.min(100, ((Math.min(col3, 25) + Math.min(col12, 25)) / 50) * 100 * (centralSum > 10 ? 0.3 : 1.0)));
+
+                    return {
+                        success: success,
+                        match: matchPercent,
+                        msg: `Col 3: ${col3}/25 | Col 12: ${col12}/25 | Centro: ${centralSum}/10`
+                    };
+                }
+            },
+            uniform: {
+                id: 'uniform',
+                name: 'Desafio 3: Grade Uniforme',
+                description: 'Dispare exatamente 120 esferas. A diferença máxima entre a maior e a menor coluna deve ser <= 15.',
+                setup: () => {
+                    layoutSelector.value = 'uniform';
+                    setup();
+                },
+                check: () => {
+                    const collected = bins.reduce((sum, b) => sum + b.count, 0);
+                    if (collected < 120) return { success: false, match: Math.min(100, Math.round((collected / 120) * 100)), msg: `Dispare 120 bolinhas (${collected}/120)` };
+
+                    const counts = bins.map(b => b.count);
+                    const maxVal = Math.max(...counts);
+                    const minVal = Math.min(...counts);
+                    const diff = maxVal - minVal;
+
+                    const success = diff <= 15;
+                    const matchPercent = Math.max(0, Math.min(100, Math.round((1 - Math.max(0, diff - 15) / 30) * 100)));
+
+                    return {
+                        success: success,
+                        match: matchPercent,
+                        msg: `Diferença Máxima: ${diff} (Meta <= 15) | Bolinhas: ${collected}/120`
+                    };
+                }
+            }
+        };
+
+        // --- Funções Principais ---
+
+        function assignSpecialPegs() {
+            pegs.forEach(p => { p.type = 'normal'; p.color = pegColor; });
+            if (pegs.length < 15) return;
+
+            // Teleport Portal In & Out
+            const inIdx = Math.floor(pegs.length * 0.35);
+            const outIdx = Math.floor(pegs.length * 0.65);
+            if (pegs[inIdx]) {
+                pegs[inIdx].type = 'portal-in';
+                pegs[inIdx].color = '#00d2ff';
+            }
+            if (pegs[outIdx]) {
+                pegs[outIdx].type = 'portal-out';
+                pegs[outIdx].color = '#ff9f43';
+            }
+
+            // Splitter Peg
+            const splitIdx = Math.floor(pegs.length * 0.15);
+            if (pegs[splitIdx]) {
+                pegs[splitIdx].type = 'splitter';
+                pegs[splitIdx].color = '#b833ff';
+            }
+
+            // Vortex Peg
+            const vortexIdx = Math.floor(pegs.length * 0.8);
+            if (pegs[vortexIdx]) {
+                pegs[vortexIdx].type = 'vortex';
+                pegs[vortexIdx].color = '#00ffcc';
+            }
+        }
 
         function setup() {
             balls = [];
-            pegs = []; // Limpa os pinos existentes
+            pegs = [];
             bins = [];
             totalBallCount = 0;
+            challengeCompleted = false;
             updateTotalBallsDisplay();
 
-            const selectedLayout = layoutSelector.value; // Obtém o layout selecionado
-
-            // --- Geração dos Pinos (depende do layout) ---
-            const availableHeight = canvasHeight - binHeight - topOffset - 30; // Altura disponível para pinos
+            const selectedLayout = layoutSelector.value;
+            const availableHeight = canvasHeight - binHeight - topOffset - 30;
 
             if (selectedLayout === 'triangle') {
-                // Layout Triangular (código original adaptado)
                 const numRows = numRowsTriangle;
                 const rowSpacing = availableHeight / (numRows + 1);
-                const initialHorizontalSpacing = 30; // Pode precisar ajustar
 
                 for (let i = 0; i < numRows; i++) {
                     const numPegsInRow = i + 1;
                     const y = topOffset + (i + 1) * rowSpacing;
-                    // Ajusta o espaçamento horizontal para tentar preencher mais a largura
-                    const requiredWidth = (numPegsInRow + 1) * (pegRadius * 3); // Largura mínima necessária
-                    let currentHorizontalSpacing = Math.max(pegRadius * 3, (canvasWidth * 0.8) / Math.max(1, numPegsInRow)); // Espaçamento dinâmico
-                    // Garante que o espaçamento não seja menor que o diâmetro + folga
+                    let currentHorizontalSpacing = Math.max(pegRadius * 3, (canvasWidth * 0.8) / Math.max(1, numPegsInRow));
                     currentHorizontalSpacing = Math.max(currentHorizontalSpacing, pegRadius * 2.5);
-
 
                     const totalWidthForRow = (numPegsInRow - 1) * currentHorizontalSpacing;
                     let startX = (canvasWidth - totalWidthForRow) / 2;
-                    // Garante que o startX não seja muito pequeno (colidindo com a borda)
                     startX = Math.max(startX, pegRadius * 2 + 10);
 
                     for (let j = 0; j < numPegsInRow; j++) {
                         const x = startX + j * currentHorizontalSpacing;
-                         // Garante que o pino não saia pela direita
-                         if (x < canvasWidth - (pegRadius * 2 + 10)) {
-                             pegs.push({ x, y, radius: pegRadius });
-                         }
+                        if (x < canvasWidth - (pegRadius * 2 + 10)) {
+                            pegs.push({ x, y, radius: pegRadius });
+                        }
                     }
                 }
-            } else if (selectedLayout === 'grid') {
-                // Layout em Grade
-                const gridRows = 10; // Número de linhas na grade (ajustável)
-                const gridCols = 11; // Número de colunas na grade (ajustável)
+            } else if (selectedLayout === 'bimodal') {
+                const numRows = 11;
+                const rowSpacing = availableHeight / (numRows + 1);
+                
+                for (let i = 0; i < numRows; i++) {
+                    const numPegsInRow = i + 1;
+                    const y = topOffset + (i + 1) * rowSpacing;
+                    
+                    let spacing = Math.max(pegRadius * 2.5, (canvasWidth * 0.38) / Math.max(1, numPegsInRow));
+                    const totalWidth = (numPegsInRow - 1) * spacing;
+                    
+                    const startX1 = (canvasWidth * 0.26) - totalWidth / 2;
+                    for (let j = 0; j < numPegsInRow; j++) {
+                        const x = startX1 + j * spacing;
+                        if (x > 15 && x < canvasWidth / 2 - 15) {
+                            pegs.push({ x, y, radius: pegRadius });
+                        }
+                    }
+                    
+                    const startX2 = (canvasWidth * 0.74) - totalWidth / 2;
+                    for (let j = 0; j < numPegsInRow; j++) {
+                        const x = startX2 + j * spacing;
+                        if (x > canvasWidth / 2 + 15 && x < canvasWidth - 15) {
+                            pegs.push({ x, y, radius: pegRadius });
+                        }
+                    }
+                }
+                
+                const divRows = 6;
+                const divSpacingY = rowSpacing;
+                for (let i = 0; i < divRows; i++) {
+                    const y = topOffset + i * divSpacingY;
+                    const spread = i * 16;
+                    pegs.push({ x: canvasWidth / 2 - spread, y, radius: pegRadius });
+                    if (spread > 0) {
+                        pegs.push({ x: canvasWidth / 2 + spread, y, radius: pegRadius });
+                    }
+                }
+            } else if (selectedLayout === 'uniform') {
+                const gridRows = 11;
+                const gridCols = 13;
                 const rowSpacing = availableHeight / (gridRows + 1);
-                const colSpacing = (canvasWidth * 0.9) / (gridCols -1); // Usa 90% da largura
-
-                const startX = canvasWidth * 0.05; // Margem lateral
-                const offsetX = colSpacing / 2; // Deslocamento para linhas pares
-
+                const colSpacing = canvasWidth / (gridCols + 1);
+                
                 for (let i = 0; i < gridRows; i++) {
                     const y = topOffset + (i + 1) * rowSpacing;
-                    const isEvenRow = i % 2 === 0;
                     for (let j = 0; j < gridCols; j++) {
-                        const x = startX + j * colSpacing + (isEvenRow ? offsetX : 0);
+                        const x = (j + 1) * colSpacing;
                         pegs.push({ x, y, radius: pegRadius });
                     }
                 }
             }
-            // --- Fim da Geração dos Pinos ---
 
-            // Calcular coletores (bins) - A quantidade depende do layout triangular original ou pode ser fixa
-            // Vamos manter baseado no numRowsTriangle para consistência inicial, mas pode ser ajustado.
-            const numBins = numRowsTriangle + 1;
+            // Atribuir Pinos Especiais aos pinos gerados
+            assignSpecialPegs();
+
+            // Inicializar colunas receptoras (bins)
+            const numBins = numRowsTriangle + 1; // 16 bins
             const binWidth = canvasWidth / numBins;
             for (let i = 0; i < numBins; i++) {
                 bins.push({
@@ -216,21 +710,38 @@
                     count: 0
                 });
             }
+
+            updateUI();
         }
 
-        // --- createBall, update, draw, gameLoop, updateTotalBallsDisplay (sem mudanças lógicas) ---
-        // (O código dessas funções permanece o mesmo da versão anterior "dark neon")
         function createBall() {
+            // Se for Desafio 3 (Uniforme), bloqueia disparo após 120 esferas
+            if (activeChallengeKey === 'uniform' && totalBallCount >= 120) {
+                return;
+            }
+
             totalBallCount++;
             updateTotalBallsDisplay();
-            const startX = canvasWidth / 2 + (Math.random() - 0.5) * 5;
+
+            const selectedLayout = layoutSelector.value;
+            let startX;
+            if (selectedLayout === 'uniform') {
+                startX = 0.1 * canvasWidth + Math.random() * (0.8 * canvasWidth);
+            } else if (selectedLayout === 'bimodal') {
+                startX = Math.random() < 0.5 ? (canvasWidth * 0.26) : (canvasWidth * 0.74);
+                startX += (Math.random() - 0.5) * 6;
+            } else {
+                startX = canvasWidth / 2 + (Math.random() - 0.5) * 5;
+            }
+
             balls.push({
                 x: startX,
                 y: ballRadius + 10,
                 vx: (Math.random() - 0.5) * 1,
                 vy: 0,
                 radius: ballRadius,
-                active: true
+                active: true,
+                color: ballColor
             });
         }
 
@@ -238,14 +749,75 @@
             const effectiveDt = dt * simulationSpeed;
             if (effectiveDt <= 0) return;
 
-            balls.forEach((ball, index) => {
+            // 1. Colisões círculo-círculo entre esferas (se ativado)
+            if (ballCollisionEnabled) {
+                for (let i = 0; i < balls.length; i++) {
+                    const b1 = balls[i];
+                    if (!b1.active) continue;
+                    for (let j = i + 1; j < balls.length; j++) {
+                        const b2 = balls[j];
+                        if (!b2.active) continue;
+
+                        const dx = b2.x - b1.x;
+                        const dy = b2.y - b1.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const minDist = b1.radius + b2.radius;
+
+                        if (dist < minDist) {
+                            const nx = dx / (dist || 1);
+                            const ny = dy / (dist || 1);
+
+                            const kx = b1.vx - b2.vx;
+                            const ky = b1.vy - b2.vy;
+                            const vn = kx * nx + ky * ny;
+
+                            if (vn > 0) {
+                                const impulse = (1 + restitution) * vn / 2;
+                                b1.vx -= impulse * nx;
+                                b1.vy -= impulse * ny;
+                                b2.vx += impulse * nx;
+                                b2.vy += impulse * ny;
+
+                                const overlap = minDist - dist;
+                                b1.x -= nx * overlap * 0.51;
+                                b1.y -= ny * overlap * 0.51;
+                                b2.x += nx * overlap * 0.51;
+                                b2.y += ny * overlap * 0.51;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Identificar pinos vortex ativos para atração gravitacional
+            const vortexPegs = pegs.filter(p => p.type === 'vortex');
+
+            // 2. Integração cinemática e colisões com obstáculos estáticos e especiais
+            balls.forEach((ball) => {
                 if (!ball.active) return;
 
-                ball.vy += gravity * effectiveDt;
+                // Atração radial do Vortex Peg
+                vortexPegs.forEach(vortex => {
+                    const dx = vortex.x - ball.x;
+                    const dy = vortex.y - ball.y;
+                    const distSq = dx * dx + dy * dy;
+                    const dist = Math.sqrt(distSq);
+                    if (dist < 40 && dist > 0) {
+                        // Limitador d_min para evitar estilingada física instável
+                        const dMin = pegRadius + ball.radius + 2;
+                        const clampedDist = Math.max(dist, dMin);
+                        const force = 1500 / (clampedDist * clampedDist * clampedDist);
+                        ball.vx += dx * force * effectiveDt;
+                        ball.vy += dy * force * effectiveDt;
+                    }
+                });
+
+                // Gravidade
+                ball.vy += baseGravity * gravityMultiplier * effectiveDt;
                 ball.x += ball.vx * effectiveDt;
                 ball.y += ball.vy * effectiveDt;
 
-                // Colisão com paredes
+                // Paredes laterais
                 if (ball.x - ball.radius < 0) {
                     ball.x = ball.radius;
                     ball.vx *= -restitution;
@@ -255,130 +827,317 @@
                 }
 
                 // Colisão com pinos
-                pegs.forEach(peg => {
+                for (let peg of pegs) {
                     const dx = ball.x - peg.x;
                     const dy = ball.y - peg.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     const minDistance = ball.radius + peg.radius;
 
                     if (distance < minDistance) {
+                        // Portal Teletransporte In
+                        if (peg.type === 'portal-in') {
+                            const portalOut = pegs.find(p => p.type === 'portal-out');
+                            if (portalOut) {
+                                ball.x = portalOut.x;
+                                ball.y = portalOut.y + portalOut.radius + ball.radius + 2;
+                                ball.vy = Math.abs(ball.vy) * 1.05;
+                                ball.vx = (Math.random() - 0.5) * 2;
+                                playAudio('teleport');
+                                break;
+                            }
+                        }
+
+                        // Splitter (Multiplicador)
+                        if (peg.type === 'splitter' && balls.length < 150) {
+                            ball.active = false;
+                            const speed = 2.5;
+                            balls.push({
+                                x: peg.x - 8,
+                                y: peg.y + peg.radius + 6,
+                                vx: -1.8,
+                                vy: 1.5,
+                                radius: ballRadius,
+                                color: '#39ff14',
+                                active: true
+                            });
+                            balls.push({
+                                x: peg.x + 8,
+                                y: peg.y + peg.radius + 6,
+                                vx: 1.8,
+                                vy: 1.5,
+                                radius: ballRadius,
+                                color: '#39ff14',
+                                active: true
+                            });
+                            playAudio('split');
+                            break;
+                        }
+
                         const nx = dx / distance;
                         const ny = dy / distance;
                         const relativeVelocity = ball.vx * nx + ball.vy * ny;
 
                         if (relativeVelocity < 0) {
+                            const goRight = Math.random() < probabilityRight;
+                            const driftSign = goRight ? 1 : -1;
+
                             const impulse = -(1 + restitution) * relativeVelocity;
                             ball.vx += impulse * nx;
                             ball.vy += impulse * ny;
-                            ball.vx += (Math.random() - 0.5) * horizontalRandomness;
+
+                            ball.vx += driftSign * horizontalRandomness * (0.6 + Math.random() * 0.8);
 
                             const overlap = minDistance - distance;
                             ball.x += nx * overlap * 0.51;
                             ball.y += ny * overlap * 0.51;
+
+                            playCollisionTone(peg.x);
                         }
                     }
-                });
+                }
 
-                // Verificar coletores
-                 if (ball.y + ball.radius > canvasHeight - binHeight && ball.y < canvasHeight + ball.radius) {
+                // Entrada nos coletores (bins)
+                if (ball.y + ball.radius > canvasHeight - binHeight && ball.y < canvasHeight + ball.radius) {
                     let collected = false;
                     for (let i = 0; i < bins.length; i++) {
                         if (ball.x >= bins[i].x && ball.x < bins[i].x + bins[i].width) {
-                             if (ball.y + ball.radius >= canvasHeight - 1 ) {
+                            if (ball.y + ball.radius >= canvasHeight - 1) {
                                 bins[i].count++;
                                 ball.active = false;
                                 collected = true;
                                 break;
-                             }
+                            }
                         }
                     }
                     if (!collected && ball.y + ball.radius > canvasHeight - 1) {
-                         let closestBin = 0;
-                         let minDist = Infinity;
-                         for(let i=0; i < bins.length; i++) {
-                             const binCenterX = bins[i].x + bins[i].width / 2;
-                             const dist = Math.abs(ball.x - binCenterX);
-                             if (dist < minDist) {
-                                 minDist = dist;
-                                 closestBin = i;
-                             }
-                         }
-                         if (bins[closestBin]) { // Verifica se o bin existe
+                        let closestBin = 0;
+                        let minDist = Infinity;
+                        for (let i = 0; i < bins.length; i++) {
+                            const binCenterX = bins[i].x + bins[i].width / 2;
+                            const dist = Math.abs(ball.x - binCenterX);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                closestBin = i;
+                            }
+                        }
+                        if (bins[closestBin]) {
                             bins[closestBin].count++;
-                         }
-                         ball.active = false;
+                        }
+                        ball.active = false;
                     }
                 } else if (ball.y - ball.radius > canvasHeight) {
-                     ball.active = false;
+                    ball.active = false;
                 }
             });
-         }
+
+            // Processar checagem do Modo Desafio
+            if (activeChallengeKey !== 'none' && CHALLENGES[activeChallengeKey]) {
+                const res = CHALLENGES[activeChallengeKey].check();
+                matchPercentDisplay.textContent = `${res.match}%`;
+                challengeInfoBox.textContent = res.msg;
+
+                if (res.success && !challengeCompleted) {
+                    challengeCompleted = true;
+                    playAudio('victory');
+                    challengeInfoBox.innerHTML = `🎉 <strong>DESAFIO CONCLUÍDO COM SUCESSO!</strong><br>${res.msg}`;
+                    challengeInfoBox.style.borderColor = '#00ffcc';
+                    challengeInfoBox.style.color = '#00ffcc';
+                }
+            }
+        }
+
+        // Desenhar Curva Teórica de Gauss ou Metas do Desafio
+        function drawGaussianCurve() {
+            const collectedBalls = bins.reduce((sum, b) => sum + b.count, 0);
+
+            // Desenhar linha amarela alvo no modo desafio
+            if (activeChallengeKey === 'skewed') {
+                const M = bins.length;
+                const p = 0.7;
+                const mean = (M - 1) * p;
+                const sigma = Math.sqrt((M - 1) * p * (1 - p));
+
+                ctx.beginPath();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.setLineDash([6, 6]);
+
+                const scaleY = (binHeight - 5) / Math.max(1, ...bins.map(b => b.count), 15);
+                const targetBalls = 100;
+
+                for (let xCanvas = 0; xCanvas <= canvasWidth; xCanvas += 2) {
+                    const xStat = (xCanvas / canvasWidth) * M - 0.5;
+                    const exponent = -Math.pow(xStat - mean, 2) / (2 * Math.pow(sigma, 2));
+                    const pdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+                    const expectedHeight = Math.max(collectedBalls, targetBalls) * pdf * scaleY;
+                    const yCanvas = (canvasHeight - binHeight) + binHeight - expectedHeight;
+
+                    if (xCanvas === 0) ctx.moveTo(xCanvas, yCanvas);
+                    else ctx.lineTo(xCanvas, yCanvas);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (activeChallengeKey === 'bimodal') {
+                ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.setLineDash([4, 4]);
+
+                // Destacar Col 3 e Col 12
+                [3, 12].forEach(colIdx => {
+                    if (bins[colIdx]) {
+                        ctx.strokeRect(bins[colIdx].x + 2, canvasHeight - binHeight, bins[colIdx].width - 4, binHeight);
+                    }
+                });
+                ctx.setLineDash([]);
+            } else if (activeChallengeKey === 'uniform') {
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.setLineDash([4, 4]);
+                const targetY = canvasHeight - (120 / bins.length) * 4;
+                ctx.beginPath();
+                ctx.moveTo(0, targetY);
+                ctx.lineTo(canvasWidth, targetY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            if (!showGauss || collectedBalls === 0) return;
+
+            const M = bins.length;
+            const p = probabilityRight;
+            const mean = (M - 1) * p;
+            const variance = (M - 1) * p * (1 - p);
+            const sigma = Math.sqrt(variance);
+
+            if (sigma < 0.01) return;
+
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#00ffcc';
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = 'rgba(0, 255, 204, 0.8)';
+
+            const maxCount = Math.max(1, ...bins.map(b => b.count));
+            const scaleY = (binHeight - 5) / maxCount;
+
+            for (let xCanvas = 0; xCanvas <= canvasWidth; xCanvas += 2) {
+                const xStat = (xCanvas / canvasWidth) * M - 0.5;
+                const exponent = -Math.pow(xStat - mean, 2) / (2 * Math.pow(sigma, 2));
+                const pdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+                const expectedHeight = collectedBalls * pdf * scaleY;
+                const yCanvas = (canvasHeight - binHeight) + binHeight - expectedHeight;
+
+                if (xCanvas === 0) ctx.moveTo(xCanvas, yCanvas);
+                else ctx.lineTo(xCanvas, yCanvas);
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
 
         function draw() {
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
 
-            // Desenhar pinos
-            ctx.fillStyle = pegColor;
+            // 1. Desenhar pinos normais e especiais
             pegs.forEach(peg => {
                 ctx.beginPath();
                 ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI * 2);
-                ctx.fill();
+                if (peg.type && peg.type !== 'normal') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = peg.color;
+                    ctx.fillStyle = peg.color;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Anel espiral/pulsante para Vortex
+                    if (peg.type === 'vortex') {
+                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(peg.x, peg.y, peg.radius + 6, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                } else {
+                    ctx.fillStyle = pegColor;
+                    ctx.fill();
+                }
             });
 
-            // Desenhar coletores (divisórias e fundo)
+            // 2. Desenhar divisórias das colunas receptoras (bins)
             ctx.strokeStyle = binColor;
             ctx.lineWidth = 1;
             for (let i = 1; i < bins.length; i++) {
-                const x = bins[i].x; // Usa a posição x do bin
+                const x = bins[i].x;
                 ctx.beginPath();
                 ctx.moveTo(x, canvasHeight - binHeight);
                 ctx.lineTo(x, canvasHeight);
                 ctx.stroke();
             }
-             // Adicionar bordas laterais dos coletores
-             ctx.beginPath();
-             ctx.moveTo(1, canvasHeight - binHeight);
-             ctx.lineTo(1, canvasHeight);
-             ctx.moveTo(canvasWidth - 1, canvasHeight - binHeight);
-             ctx.lineTo(canvasWidth - 1, canvasHeight);
-             ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(1, canvasHeight - binHeight);
+            ctx.lineTo(1, canvasHeight);
+            ctx.moveTo(canvasWidth - 1, canvasHeight - binHeight);
+            ctx.lineTo(canvasWidth - 1, canvasHeight);
+            ctx.stroke();
 
+            // 3. Desenhar histograma como empilhamento analógico
+            const maxCount = Math.max(1, ...bins.map(b => b.count));
+            
+            ctx.fillStyle = 'rgba(255, 51, 102, 0.04)';
+            bins.forEach(bin => {
+                if (bin.count > 0) {
+                    const barHeight = (bin.count / maxCount) * (binHeight - 5);
+                    ctx.fillRect(bin.x + 1, canvasHeight - barHeight, bin.width - 2, barHeight);
+                }
+            });
 
-             // Desenhar histograma (com brilho)
-             const maxCount = Math.max(1, ...bins.map(b => b.count));
-             ctx.fillStyle = histogramColor;
-             ctx.shadowBlur = 10;
-             ctx.shadowColor = histogramShadowColor;
+            ctx.fillStyle = histogramColor;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = histogramShadowColor;
+            
+            bins.forEach(bin => {
+                if (bin.count > 0) {
+                    const diameter = ballRadius * 2;
+                    const ballsPerRow = Math.max(1, Math.floor((bin.width - 2) / diameter));
+                    const maxRowCount = Math.max(1, ...bins.map(b => Math.ceil(b.count / ballsPerRow)));
+                    
+                    const rowSpacing = Math.min(diameter, (binHeight - 6) / maxRowCount);
+                    
+                    for (let i = 0; i < bin.count; i++) {
+                        const row = Math.floor(i / ballsPerRow);
+                        const col = i % ballsPerRow;
+                        
+                        const rowCountInThisLine = Math.min(ballsPerRow, bin.count - row * ballsPerRow);
+                        const startX = bin.x + (bin.width - rowCountInThisLine * diameter) / 2 + ballRadius;
+                        
+                        const x = startX + col * diameter;
+                        const y = canvasHeight - 1 - ballRadius - row * rowSpacing;
+                        
+                        ctx.beginPath();
+                        ctx.arc(x, y, ballRadius * 0.9, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            });
 
-             bins.forEach(bin => {
-                 const barHeight = (bin.count / maxCount) * (binHeight - 5);
-                 if (bin.count > 0) {
-                     ctx.fillRect(
-                         bin.x + 2,
-                         canvasHeight - barHeight - 2,
-                         bin.width - 4,
-                         barHeight
-                     );
-                 }
-             });
+            // 4. Desenhar curva teórica ou metas
+            drawGaussianCurve();
 
-             // Desenhar bolinhas (com brilho)
-             ctx.fillStyle = ballColor;
-             ctx.shadowBlur = 8;
-             ctx.shadowColor = ballShadowColor;
+            // 5. Desenhar esferas ativas
+            balls.forEach(ball => {
+                if (!ball.active) return;
+                ctx.fillStyle = ball.color || ballColor;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = ball.color ? ball.color : ballShadowColor;
 
-             balls.forEach(ball => {
-                 if (!ball.active) return;
-                 ctx.beginPath();
-                 ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-                 ctx.fill();
-             });
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
 
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
-         }
+        }
 
         let lastTime = 0;
         function gameLoop(timestamp) {
@@ -395,9 +1154,26 @@
             totalBallsSpan.textContent = `Total: ${totalBallCount}`;
         }
 
+        function updateUI() {
+            speedVal.textContent = `${simulationSpeed.toFixed(1)}x`;
+            probVal.textContent = `${Math.round(probabilityRight * 100)}%`;
+            gravityVal.textContent = `${gravityMultiplier.toFixed(1)}x`;
+            elasticityVal.textContent = `${Math.round(restitution * 100)}%`;
+            radiusVal.textContent = `${ballRadius}px`;
+        }
+
+        // --- Interceptação do Primeiro Clique para Áudio ---
+        window.addEventListener('pointerdown', initAudio, { once: true });
+        window.addEventListener('keydown', initAudio, { once: true });
+
         // --- Event Listeners ---
-        addBallBtn.addEventListener('click', createBall);
+        addBallBtn.addEventListener('click', () => {
+            initAudio();
+            createBall();
+        });
+        
         add10BallsBtn.addEventListener('click', () => {
+            initAudio();
             let count = 0;
             const intervalId = setInterval(() => {
                 if (count < 10) {
@@ -406,21 +1182,92 @@
                 } else {
                     clearInterval(intervalId);
                 }
-            }, 50);
+            }, 60);
         });
 
-        // Resetar agora também chama setup para redesenhar pinos se layout mudou
-        resetBtn.addEventListener('click', setup);
+        resetBtn.addEventListener('click', () => {
+            initAudio();
+            setup();
+        });
 
-        // Quando o layout mudar, chamar setup() para reconfigurar o tabuleiro
-        layoutSelector.addEventListener('change', setup);
+        layoutSelector.addEventListener('change', () => {
+            initAudio();
+            setup();
+        });
 
         speedSlider.addEventListener('input', (e) => {
             simulationSpeed = parseFloat(e.target.value);
+            updateUI();
+        });
+
+        probSlider.addEventListener('input', (e) => {
+            probabilityRight = parseFloat(e.target.value);
+            updateUI();
+        });
+
+        gravitySlider.addEventListener('input', (e) => {
+            gravityMultiplier = parseFloat(e.target.value);
+            updateUI();
+        });
+
+        elasticitySlider.addEventListener('input', (e) => {
+            restitution = parseFloat(e.target.value) / 100;
+            updateUI();
+        });
+
+        radiusSlider.addEventListener('input', (e) => {
+            ballRadius = parseInt(e.target.value);
+            updateUI();
+        });
+
+        showGaussCheck.addEventListener('change', (e) => {
+            showGauss = e.target.checked;
+        });
+
+        ballCollisionCheck.addEventListener('change', (e) => {
+            ballCollisionEnabled = e.target.checked;
+        });
+
+        // Eventos do Modo Desafio
+        challengeSelector.addEventListener('change', (e) => {
+            const key = e.target.value;
+            if (key !== 'none' && CHALLENGES[key]) {
+                challengeInfoBox.style.display = 'block';
+                challengeInfoBox.style.borderColor = 'rgba(255, 235, 59, 0.3)';
+                challengeInfoBox.style.color = '#d1d5db';
+                challengeInfoBox.textContent = CHALLENGES[key].description;
+            } else {
+                challengeInfoBox.style.display = 'none';
+                challengeStatusBox.style.display = 'none';
+            }
+        });
+
+        startChallengeBtn.addEventListener('click', () => {
+            initAudio();
+            const key = challengeSelector.value;
+            if (key !== 'none' && CHALLENGES[key]) {
+                activeChallengeKey = key;
+                challengeCompleted = false;
+                challengeStatusBox.style.display = 'flex';
+                challengeInfoBox.style.display = 'block';
+                challengeInfoBox.style.borderColor = 'rgba(255, 235, 59, 0.3)';
+                challengeInfoBox.style.color = '#d1d5db';
+                matchPercentDisplay.textContent = '0%';
+                CHALLENGES[key].setup();
+            }
+        });
+
+        cancelChallengeBtn.addEventListener('click', () => {
+            activeChallengeKey = 'none';
+            challengeCompleted = false;
+            challengeSelector.value = 'none';
+            challengeInfoBox.style.display = 'none';
+            challengeStatusBox.style.display = 'none';
+            setup();
         });
 
         // --- Inicialização ---
-        setup(); // Configura o tabuleiro com o layout selecionado inicialmente
+        setup();
         lastTime = performance.now();
         requestAnimationFrame(gameLoop);
     </script>
