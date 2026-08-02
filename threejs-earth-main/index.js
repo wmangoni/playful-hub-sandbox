@@ -592,7 +592,425 @@ debrisToggle.addEventListener('change', () => {
   debrisGroup.visible = debrisToggle.checked;
 });
 
-// Hook de depuração/teste (TASK_002 & TASK_003)
+// ===================== TASK_004: PLANETARY DEFENSE SHIELD & ASTEROID INTERCEPTION =====================
+
+// --- 1. Escudo Defletor Energético Global ---
+let shieldIntegrity = 100; // Percentage (0 - 100)
+let shieldBaseOpacity = 0.04;
+let shieldCurrentOpacity = 0.04;
+
+const shieldGeo = new THREE.SphereGeometry(1.14, 48, 48);
+const shieldMat = new THREE.MeshBasicMaterial({
+  color: 0x00ffff,
+  wireframe: true,
+  transparent: true,
+  opacity: shieldBaseOpacity,
+  blending: THREE.AdditiveBlending
+});
+const shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+scene.add(shieldMesh);
+
+// --- 2. Estado do Asteroide Ameaçador e Lasers ---
+let activeAsteroid = null;
+let laserCooldown = 0.0; // segundos
+let isChargingLaser = false;
+
+// Array para partículas de estilhaços/explosão
+const explosionParticles = [];
+
+// Elementos da HUD
+const shieldBarFill = document.getElementById('shieldBarFill');
+const shieldStatusText = document.getElementById('shieldStatusText');
+const spawnAsteroidBtn = document.getElementById('spawnAsteroidBtn');
+const threatTracker = document.getElementById('threatTracker');
+const threatEta = document.getElementById('threatEta');
+const threatDistance = document.getElementById('threatDistance');
+const cooldownText = document.getElementById('cooldownText');
+const cooldownBarFill = document.getElementById('cooldownBarFill');
+const fireLaserBtn = document.getElementById('fireLaserBtn');
+
+function updateShieldUI() {
+  if (shieldBarFill && shieldStatusText) {
+    shieldBarFill.style.width = `${shieldIntegrity}%`;
+    if (shieldIntegrity <= 20 && shieldIntegrity > 0) {
+      shieldBarFill.classList.add('critical');
+      shieldStatusText.textContent = `${shieldIntegrity}% [CRÍTICO]`;
+      shieldStatusText.style.color = '#ff0055';
+    } else if (shieldIntegrity === 0) {
+      shieldBarFill.classList.add('critical');
+      shieldStatusText.textContent = `0% [DESATIVADO]`;
+      shieldStatusText.style.color = '#ff0055';
+    } else {
+      shieldBarFill.classList.remove('critical');
+      shieldStatusText.textContent = `${shieldIntegrity}% [ATIVO]`;
+      shieldStatusText.style.color = '#00ffff';
+    }
+  }
+}
+
+// Criar marca de cratera na superfície da Terra em caso de impacto direto
+function createCraterMark(worldImpactPos) {
+  const localPos = earthMesh.worldToLocal(worldImpactPos.clone());
+  const craterGeo = new THREE.CircleGeometry(0.035, 16);
+  const craterMat = new THREE.MeshBasicMaterial({
+    color: 0xff2200,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85
+  });
+  const craterMesh = new THREE.Mesh(craterGeo, craterMat);
+  
+  craterMesh.position.copy(localPos);
+  const normal = localPos.clone().normalize();
+  craterMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+  craterMesh.position.addScaledVector(normal, 0.002); // ligeiramente elevado da superfície
+  
+  earthMesh.add(craterMesh);
+  
+  // Fade out suave da marca de impacto após 12 segundos
+  const fadeInterval = setInterval(() => {
+    craterMat.opacity -= 0.02;
+    if (craterMat.opacity <= 0) {
+      clearInterval(fadeInterval);
+      earthMesh.remove(craterMesh);
+      craterGeo.dispose();
+      craterMat.dispose();
+    }
+  }, 300);
+}
+
+// Spawna um Asteroide em rota de colisão
+function spawnAsteroid() {
+  if (activeAsteroid) {
+    return;
+  }
+  initAudio();
+
+  const radiusSize = 0.045 + Math.random() * 0.025;
+  const geo = new THREE.DodecahedronGeometry(radiusSize, 1);
+  
+  // Deforma os vértices para rugosidade irregular
+  const posAttr = geo.attributes.position;
+  for (let i = 0; i < posAttr.count; i++) {
+    const vx = posAttr.getX(i);
+    const vy = posAttr.getY(i);
+    const vz = posAttr.getZ(i);
+    const factor = 0.8 + Math.random() * 0.4;
+    posAttr.setXYZ(i, vx * factor, vy * factor, vz * factor);
+  }
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6e5246,
+    roughness: 0.9,
+    metalness: 0.1,
+    flatShading: true
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+
+  // Spawna em uma coordenada esférica aleatória distante (raio 5.5)
+  const u = Math.random();
+  const v = Math.random();
+  const theta = u * 2.0 * Math.PI;
+  const phi = Math.acos(2.0 * v - 1.0);
+  const spawnRadius = 5.5;
+
+  mesh.position.set(
+    spawnRadius * Math.sin(phi) * Math.cos(theta),
+    spawnRadius * Math.sin(phi) * Math.sin(theta),
+    spawnRadius * Math.cos(phi)
+  );
+
+  scene.add(mesh);
+
+  // Rastro de fogo/partículas no asteroide
+  const trailCount = 15;
+  const trailGeo = new THREE.BufferGeometry();
+  const trailPos = new Float32Array(trailCount * 3);
+  for (let i = 0; i < trailCount * 3; i++) trailPos[i] = 0;
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+
+  const trailMat = new THREE.PointsMaterial({
+    color: 0xff4400,
+    size: 0.025,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending
+  });
+  const trailPoints = new THREE.Points(trailGeo, trailMat);
+  scene.add(trailPoints);
+
+  const direction = new THREE.Vector3().copy(mesh.position).normalize().negate();
+  const speed = 0.012 + Math.random() * 0.008;
+
+  activeAsteroid = {
+    mesh,
+    trailPoints,
+    direction,
+    speed,
+    createdAt: Date.now()
+  };
+
+  if (threatTracker) threatTracker.style.display = 'flex';
+  if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = true;
+
+  playBeep(440, 0.2);
+}
+
+if (spawnAsteroidBtn) {
+  spawnAsteroidBtn.addEventListener('click', spawnAsteroid);
+}
+
+// --- 3. Partículas de Explosão / Estilhaços ---
+function createExplosionParticles(originPos) {
+  const pCount = 24;
+  const geom = new THREE.BufferGeometry();
+  const positions = new Float32Array(pCount * 3);
+  const velocities = [];
+
+  for (let i = 0; i < pCount; i++) {
+    const idx = i * 3;
+    positions[idx] = originPos.x;
+    positions[idx + 1] = originPos.y;
+    positions[idx + 2] = originPos.z;
+
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos((Math.random() * 2) - 1);
+    const speed = 0.02 + Math.random() * 0.035;
+
+    velocities.push(new THREE.Vector3(
+      speed * Math.sin(phi) * Math.cos(theta),
+      speed * Math.sin(phi) * Math.sin(theta),
+      speed * Math.cos(phi)
+    ));
+  }
+
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const mat = new THREE.PointsMaterial({
+    color: 0xffbb00,
+    size: 0.03,
+    transparent: true,
+    opacity: 1.0,
+    blending: THREE.AdditiveBlending
+  });
+
+  const points = new THREE.Points(geom, mat);
+  scene.add(points);
+
+  explosionParticles.push({
+    points,
+    velocities,
+    opacity: 1.0,
+    createdAt: Date.now()
+  });
+}
+
+function updateExplosionParticles() {
+  const now = Date.now();
+  for (let i = explosionParticles.length - 1; i >= 0; i--) {
+    const item = explosionParticles[i];
+    const geom = item.points.geometry;
+    const posAttr = geom.attributes.position;
+
+    for (let j = 0; j < posAttr.count; j++) {
+      posAttr.setX(j, posAttr.getX(j) + item.velocities[j].x);
+      posAttr.setY(j, posAttr.getY(j) + item.velocities[j].y);
+      posAttr.setZ(j, posAttr.getZ(j) + item.velocities[j].z);
+    }
+    posAttr.needsUpdate = true;
+
+    item.opacity -= 0.03;
+    item.points.material.opacity = Math.max(0, item.opacity);
+
+    if (item.opacity <= 0.0 || now - item.createdAt > 1200) {
+      scene.remove(item.points);
+      geom.dispose();
+      item.points.material.dispose();
+      explosionParticles.splice(i, 1);
+    }
+  }
+}
+
+// --- 4. Disparo do Canhão Interceptor Laser ---
+function fireLaser() {
+  if (!activeAsteroid || isChargingLaser || laserCooldown > 0) return;
+  initAudio();
+
+  isChargingLaser = true;
+  playLaserChargeSound();
+
+  // Seleciona a origem do laser: se houver satélite ou estação selecionado, usa ele; senão usa a 1ª estação
+  let launcherObj = currentTarget;
+  if (!launcherObj || (launcherObj.userData.type !== 'satellite' && launcherObj.userData.type !== 'station')) {
+    launcherObj = stations[0] ? stations[0].markerGroup : satellitesMeshes[0];
+  }
+
+  setTimeout(() => {
+    if (!activeAsteroid) {
+      isChargingLaser = false;
+      return;
+    }
+
+    const startPos = new THREE.Vector3();
+    launcherObj.getWorldPosition(startPos);
+    const endPos = activeAsteroid.mesh.position.clone();
+
+    // Determina cor do feixe (Ciano para Satélites/Estações padrão, Vermelho para Estações Terrestres)
+    const isStation = launcherObj.userData && launcherObj.userData.type === 'station';
+    const laserColor = isStation ? 0xff0055 : 0x00ffff;
+
+    const laserGeo = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
+    const laserMat = new THREE.LineBasicMaterial({
+      color: laserColor,
+      linewidth: 3,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending
+    });
+    const laserLine = new THREE.Line(laserGeo, laserMat);
+    scene.add(laserLine);
+
+    playLaserFireSound();
+    playExplosionSound();
+
+    // Estilhaços e destruição do asteroide
+    createExplosionParticles(endPos);
+
+    scene.remove(activeAsteroid.mesh);
+    scene.remove(activeAsteroid.trailPoints);
+    activeAsteroid.mesh.geometry.dispose();
+    activeAsteroid.mesh.material.dispose();
+    activeAsteroid.trailPoints.geometry.dispose();
+    activeAsteroid.trailPoints.material.dispose();
+    activeAsteroid = null;
+
+    if (threatTracker) threatTracker.style.display = 'none';
+    if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = false;
+
+    // Fade out do raio laser
+    setTimeout(() => {
+      scene.remove(laserLine);
+      laserGeo.dispose();
+      laserMat.dispose();
+    }, 160);
+
+    isChargingLaser = false;
+    laserCooldown = 3.0; // 3 segundos de recarga
+  }, 400); // Tempo da animação de carga do laser
+}
+
+if (fireLaserBtn) {
+  fireLaserBtn.addEventListener('click', fireLaser);
+}
+
+// --- 5. Efeitos Sonoros Web Audio API (Sintetizador Analógico Nativo) ---
+function playLaserChargeSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.4);
+
+    gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.4);
+  } catch (e) {
+    console.error("Erro no som de carga de laser:", e);
+  }
+}
+
+function playLaserFireSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(220, audioCtx.currentTime + 0.25);
+
+    gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch (e) {
+    console.error("Erro no som de disparo de laser:", e);
+  }
+}
+
+function playShieldImpactSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(90, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(45, audioCtx.currentTime + 0.6);
+
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+  } catch (e) {
+    console.error("Erro no som de impacto no escudo:", e);
+  }
+}
+
+function playExplosionSound() {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const bufferSize = audioCtx.sampleRate * 0.5;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noiseNode = audioCtx.createBufferSource();
+    noiseNode.buffer = buffer;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+    noiseNode.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    noiseNode.start();
+    noiseNode.stop(audioCtx.currentTime + 0.5);
+  } catch (e) {
+    console.error("Erro no som de explosão:", e);
+  }
+}
+
+// Hook de depuração/teste (TASK_002, TASK_003 & TASK_004)
 window.__earth = {
   satellitesData, satellitesMeshes,
   convertGeoToCartesian,
@@ -604,7 +1022,13 @@ window.__earth = {
   auroras: { north: auroraNorth, south: auroraSouth },
   solarWind: solarWindLines,
   debris: debrisData,
-  getCurrentTarget: () => currentTarget
+  getCurrentTarget: () => currentTarget,
+  shieldMesh,
+  spawnAsteroid,
+  fireLaser,
+  getActiveAsteroid: () => activeAsteroid,
+  getShieldIntegrity: () => shieldIntegrity,
+  setShieldIntegrity: (val) => { shieldIntegrity = val; updateShieldUI(); }
 };
 
 // ===================== RENDER LOOP =====================
@@ -856,6 +1280,105 @@ function animate() {
     // Retorna foco ao centro da Terra
     controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
     lastTargetPos = null;
+  }
+
+  // --- Atualização do Escudo Defletor Energético (TASK_004) ---
+  if (shieldIntegrity > 0) {
+    shieldMesh.visible = true;
+    shieldCurrentOpacity += (shieldBaseOpacity - shieldCurrentOpacity) * 0.05;
+    shieldMesh.material.opacity = shieldCurrentOpacity;
+    shieldMesh.rotation.y += 0.003;
+  } else {
+    shieldMesh.visible = false;
+  }
+
+  // --- Atualização do Cooldown do Laser (TASK_004) ---
+  if (laserCooldown > 0) {
+    laserCooldown = Math.max(0, laserCooldown - 0.016);
+    const cdPct = (laserCooldown / 3.0) * 100;
+    if (cooldownBarFill) cooldownBarFill.style.width = `${cdPct}%`;
+    if (cooldownText) cooldownText.textContent = `RECARREGANDO (${laserCooldown.toFixed(1)}s)`;
+  } else {
+    if (cooldownBarFill) cooldownBarFill.style.width = '0%';
+    if (cooldownText) cooldownText.textContent = isChargingLaser ? 'CARREGANDO FEIXE...' : 'PRONTO';
+  }
+
+  // --- Atualização e Movimentação do Asteroide Hostil (TASK_004) ---
+  if (activeAsteroid) {
+    const ast = activeAsteroid;
+    ast.mesh.position.addScaledVector(ast.direction, ast.speed);
+    ast.mesh.rotation.x += 0.015;
+    ast.mesh.rotation.y += 0.02;
+
+    // Rastro de fumaça/fogo
+    const tPosAttr = ast.trailPoints.geometry.attributes.position;
+    for (let i = tPosAttr.count - 1; i > 0; i--) {
+      tPosAttr.setXYZ(i, tPosAttr.getX(i - 1), tPosAttr.getY(i - 1), tPosAttr.getZ(i - 1));
+    }
+    tPosAttr.setXYZ(0, ast.mesh.position.x, ast.mesh.position.y, ast.mesh.position.z);
+    tPosAttr.needsUpdate = true;
+
+    const distToCenter = ast.mesh.position.length();
+    const etaSec = Math.max(0, Math.floor((distToCenter - 1.14) / (ast.speed * 60)));
+
+    if (threatDistance) threatDistance.textContent = `${distToCenter.toFixed(2)}u`;
+    if (threatEta) threatEta.textContent = `ETA: ${etaSec < 10 ? '0' : ''}${etaSec}s`;
+
+    // Checagem de Colisão com Escudo (d <= 1.14) quando Escudo está Ativo
+    if (shieldIntegrity > 0 && distToCenter <= 1.14) {
+      shieldCurrentOpacity = 0.6;
+      shieldIntegrity = Math.max(0, shieldIntegrity - 20);
+      updateShieldUI();
+      playShieldImpactSound();
+      createExplosionParticles(ast.mesh.position);
+
+      scene.remove(ast.mesh);
+      scene.remove(ast.trailPoints);
+      ast.mesh.geometry.dispose();
+      ast.mesh.material.dispose();
+      ast.trailPoints.geometry.dispose();
+      ast.trailPoints.material.dispose();
+      activeAsteroid = null;
+
+      if (threatTracker) threatTracker.style.display = 'none';
+      if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = false;
+    } 
+    // Checagem de Colisão Direta com a Terra (d <= 1.01) quando Escudo está Caído (0%)
+    else if (shieldIntegrity <= 0 && distToCenter <= 1.01) {
+      const impactPos = ast.mesh.position.clone();
+      createCraterMark(impactPos);
+      createExplosionParticles(impactPos);
+      playExplosionSound();
+
+      const scanlinesEl = document.getElementById('scanlines');
+      if (scanlinesEl) {
+        scanlinesEl.classList.add('active');
+        setTimeout(() => scanlinesEl.classList.remove('active'), 400);
+      }
+
+      scene.remove(ast.mesh);
+      scene.remove(ast.trailPoints);
+      ast.mesh.geometry.dispose();
+      ast.mesh.material.dispose();
+      ast.trailPoints.geometry.dispose();
+      ast.trailPoints.material.dispose();
+      activeAsteroid = null;
+
+      if (threatTracker) threatTracker.style.display = 'none';
+      if (spawnAsteroidBtn) spawnAsteroidBtn.disabled = false;
+    }
+  }
+
+  // Partículas de explosão
+  updateExplosionParticles();
+
+  // Visibilidade do botão de disparo no painel de telemetria
+  if (fireLaserBtn) {
+    if (activeAsteroid && currentTarget && (currentTarget.userData.type === 'satellite' || currentTarget.userData.type === 'station')) {
+      fireLaserBtn.style.display = 'flex';
+    } else {
+      fireLaserBtn.style.display = 'none';
+    }
   }
 
   controls.update();

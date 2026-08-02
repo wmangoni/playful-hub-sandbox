@@ -468,3 +468,19 @@ function playExplosionSound() {
    As sprites das novas armas (Rifle de Plasma e Lançador de Mísseis) devem ser desenhadas na HUD (Canvas 2D) com formas e geometrias neon correspondentes ao estilo retrô do jogo.
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Seleção de Armas via Teclado**: **Decisão:** Mude a estrutura para usar mapeamento por índice ou uma array ordenada (ex: `1 -> pistol`, `2 -> shotgun`, `3 -> plasma`, `4 -> rocket`). Isso torna a lógica escalável.
+2. **Posicionamento e Spawn das Pickups**: **Decisão:** O ideal é um spawn dinâmico periódico em posições aleatórias que estejam vazias e transitáveis. Isso evita termos que alterar muito os arrays estáticos do mapa.
+3. **Integração do Áudio Procedural**: **Decisão:** Chame as funções de síntese (`playPlasmaLaserSound`) diretamente da rotina de disparo. O sistema de buffers legados pode permanecer apenas para sons que precisem dos samples nativos.
+4. **Visibilidade do Minimapa**: **Decisão:** Intercepte a tecla `M` no evento `keydown` no handler global, alternando diretamente a variável `showMinimap`, e não gerencie em estado contínuo (no objeto `keys`) para evitar repetição acidental de toques.
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `3d_shooter`
+* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.

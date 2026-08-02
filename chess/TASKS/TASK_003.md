@@ -632,3 +632,48 @@ Como Tech Lead Veterano, conduzi a revisão técnica das alterações introduzid
 **Veredito**: Aprovado com louvor! O código é aditivo, limpo, robusto e livre de regressões. O status foi movido para `Ready for QA`.
 
 *Revisado e assinado por: Antigravity - Veteran Game Tech Lead (TL)*
+
+---
+
+## Evidencias de Testes
+
+A tarefa foi validada e testada com sucesso via automação baseada em Puppeteer.
+
+### 📋 Resultados da execução da suíte de testes E2E (`tests/qa_chess.test.js`)
+```
+--- STARTING QA TEST SUITE FOR CHESS (TASK_003) ---
+Loading puppeteer (ESM)...
+Test server running on http://127.0.0.1:3089
+
+--- Test 1: Verifying layout & elements ---
+Clock panel exists: true
+Clock displays exist: White=true, Black=true
+Puzzle panel exists: true
+Toggle Hints button exists: true
+
+--- Test 2: Testing clock presets ---
+Initial time (Zen): White=∞, Black=∞
+Switching to Bullet 1+0 preset...
+Bullet 1+0 time: White=01:00, Black=01:00
+Switching to Blitz 3+2 preset...
+Blitz 3+2 time: White=03:00, Black=03:00
+
+--- Test 3: Testing Puzzle Trainer Mode ---
+Activating Puzzle 1: Scholar's Mate...
+Active puzzle: Xeque-Mate do Pastor (Mate em 1) (isSolving=true)
+Executing incorrect move (e2 to e4)...
+Incorrect move accepted: false
+Puzzle status: ❌ Lance incorreto! O puzzle foi reiniciado.
+Executing correct move (h5 to f7)...
+Correct move accepted: true
+Puzzle success status: 🏆 SUCESSO TÁTICO! A Dama apoiada pelo Bispo esmaga a defesa do Rei.
+
+--- Test 4: Testing Computer Hints toggle ---
+Hints button text initially: 💡 Dicas: Ligadas
+Clicking Toggle Hints button...
+Hints button text after toggle: 💡 Dicas: Desligadas
+
+=============================================
+🎉 ALL CHESS TASK_003 TESTS PASSED SUCCESSFULLY!
+=============================================
+```

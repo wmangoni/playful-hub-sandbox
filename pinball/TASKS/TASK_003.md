@@ -213,6 +213,22 @@ Abaixo estão listadas duas dúvidas conceituais cruciais para alinhamento de ga
    * *Dúvida*: O sintetizador da trilha sonora de fundo (`startAmbientDrone()`) deve ser completamente pausado quando o jogo estiver no menu de Game Over ou pausado, ou deve modular para um tom mais grave e estático de baixa intensidade?
    * *Proposta do PO*: Deve modular para um tom grave estático com volume reduzido (5% do volume base) e filtro passa-baixas fechado em 150Hz. Isso mantém o ambiente do jogo imersivo e pulsante mesmo na derrota, convidando o jogador a pressionar 'Enter' para reiniciar instantaneamente.
 
+3. **Duração da Skin Dourada da Bola**:
+   * *Dúvida*: Qual a duração exata da skin dourada temporária obtida ao derrotar o Rogue AI Core? Ela dura um tempo fixo (ex: 15 segundos) ou até que o jogador perca a bola atual?
+   * *Proposta do Dev*: Sugerimos que dure até o fim da bola atual ou por um período de 20 segundos (o que ocorrer primeiro), mantendo a recompensa visual ativa sem se tornar permanente.
+
+4. **Representação Visual do Sensor do Skill Shot**:
+   * *Dúvida*: O pino sensor do Skill Shot em `(350, 40)` deve ter alguma indicação visual na mesa, ou deve permanecer invisível ao jogador?
+   * *Proposta do Dev*: Sugerimos desenhar um anel circular neon pulsante (cor amarela ou verde) com baixa opacidade para guiar visualmente o jogador sobre onde mirar no lançamento.
+
+5. **Mecânica de Colisão com a Firewall Barrier**:
+   * *Dúvida*: A barreira Firewall no centro deve se comportar como bumper (aplicando força de repulsão extra) ou como uma parede padrão (reflexão simples de velocidade elástica)?
+   * *Proposta do Dev*: Sugerimos que se comporte como uma parede linear padrão com coeficiente de restituição de 0.5 (com faíscas laranja/vermelhas), apenas bloqueando o caminho e exigindo dois acertos para ser destruída.
+
+6. **Implementação do Efeito CSS Glitch**:
+   * *Dúvida*: Como deve ser o comportamento visual do CSS Glitch ao sofrer o Glitch Pulse do chefe?
+   * *Proposta do Dev*: Sugerimos criar uma classe CSS com efeito de distorção de cor e tremores horizontais rápidos (usando transform e clip-path/filtros) aplicada temporariamente ao `#gameCanvas` por 0.5s para indicar o impacto visual do pulso.
+
 ---
 
 ## 💡 Decisões e Resoluções do Tech Lead (TL)
@@ -228,13 +244,40 @@ As resoluções e diretrizes arquiteturais para a implementação segura de Bata
 ### 3. Gerenciamento de Memória e Desconexão de Nós de Áudio
 * **Diretriz**: Para evitar vazamentos de memória (memory leaks) e acúmulo de nós órfãos de processamento DSP de áudio no navegador, todos os nós criados dinamicamente (como `OscillatorNode`, `GainNode` e `BufferSourceNode`) **devem** ser explicitamente parados e desconectados do mixer principal (`masterVolume` ou `AudioContext.destination`) após a conclusão do seu ciclo de reprodução. Utilize o callback `osc.onended = () => { osc.disconnect(); gain.disconnect(); }` para garantir a liberação segura de recursos.
 
+### 4. Duração da Skin Dourada
+* **Decisão**: Aprovada a sugestão. Duração fixa pelo fim da bola atual ou por 20 segundos (o que ocorrer primeiro).
+
+### 5. Sensor do Skill Shot
+* **Decisão**: Sim, desenhe um anel neon com baixa opacidade. A legibilidade visual para mecânicas de precisão é fundamental.
+
+### 6. Mecânica de Firewall Barrier
+* **Decisão**: Aprovado o uso de barreira linear elástica (`restitution = 0.5`) com destruição após 2 acertos, fornecendo bloqueio puro sem impulso de bumper.
+
+### 7. Efeito CSS Glitch
+* **Decisão**: Pode usar classes de CSS temporárias via `classList.add('glitch-effect')`. A manipulação DOM é ideal e leve para filtros nesse caso.
+
 ---
 
-## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+## ❓ Dúvidas e Observações do Desenvolvedor
 
-* **Identificação do Jogo**: `pinball` (Pinball Retro Arcade)
-* **Ação**: Elaboração e refinamento da especificação da Batalha contra o Chefe (Rogue AI Core), Skill Shot e Sintetizador Web Audio API concluída.
-* **Status do Backlog**: Homologado e atualizado no [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) para o status `✅ Refined`.
-* **Destino**: A especificação `TASK_003.md` está 100% pronta para ser assumida por um desenvolvedor.
+* **Status da Tarefa**: Em Desenvolvimento (In Progress) ➡️ Concluído (Dev complete).
+* **Observações Técnicas de Implementação**:
+  1. **Batalha contra o Chefe (Rogue AI Core)**:
+     - Implementado o objeto `bossState` com trigger ao atingir 15.000 pts ou 3 cruzamentos de rampas/multiplicadores superiores.
+     - 3 Escudos orbitais com 50 HP cada rodando em ângulo a 45px do núcleo. Dano de -15 HP ao colidir a bola com faíscas ciano.
+     - Núcleo invulnerável até a queda dos 3 escudos, após o qual sofre -50 HP por impacto direto da bola.
+     - Ataque *Glitch Pulse* (8s): pulso vermelho que reduz 30% a velocidade da bola e aplica classe CSS `.glitch-effect` no canvas por 0.5s.
+     - Ataque *EMP Shockwave* (12s): flash amarelo e desabilita flipper afetado (alternado/aleatório) por 2.0s retornando ao `restAngle` com opacidade 50%.
+     - Ataque *Firewall Barrier*: tijolo central (`x: 200, y: 300`) ativado com HP < 150 do Boss, destruído com 2 acertos.
+     - Vitória (+15.000 pts, +1 vida se < 3, explosão de 40 partículas douradas, skin dourada na bola por 20s ou até o fim da vida).
+  2. **Skill Shot de Precisão**:
+     - Marcador visual da Green Zone (75%-85% pull) no meter do plunger.
+     - Anel neon indicador do sensor em `x: 350, y: 40`.
+     - Validação dentro de 1.5s após disparo na Green Zone concedendo `CRITICAL SKILL SHOT!`, +3.000 pts e +1 ao multiplicador.
+  3. **Sintetizador Web Audio API (`SoundSynth`)**:
+     - Inicialização lazy no primeiro clique/tecla.
+     - Sons proceduralmente sintetizados para Flipper Flip, Bumper Hit (com throttling de 60ms), Boss Damage (ruído branco + dente de serra), Vitória do Boss, Skill Shot e Cyber Drone de fundo modulado por velocidade da bola (com atenuação no Game Over).
+     - Desconexão automática dos nós de áudio após finalização (`osc.onended`).
 
-*Assinado: Tech Lead - Antigravity*
+*Assinado: Software Engineer - Antigravity*
+

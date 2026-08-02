@@ -43,6 +43,16 @@
             transition: box-shadow 0.3s ease;
         }
 
+        /* TASK_003: Efeito Glitch no Canvas */
+        #gameCanvas.glitch-effect {
+            animation: glitchAnim 0.1s steps(2) infinite;
+        }
+        @keyframes glitchAnim {
+            0% { transform: translate(2px, -2px) skewX(2deg); filter: hue-rotate(90deg) contrast(150%); }
+            50% { transform: translate(-2px, 2px) skewX(-2deg); filter: hue-rotate(-90deg) brightness(130%); }
+            100% { transform: translate(0, 0) skewX(0deg); filter: none; }
+        }
+
         #gameInfo {
             margin-top: 20px;
             background: rgba(18, 19, 32, 0.65);
@@ -102,6 +112,190 @@
     </div>
 
     <script>
+        // === TASK_003: Sintetizador de Áudio Procedural (Web Audio API) ===
+        class SoundSynth {
+            constructor() {
+                this.ctx = null;
+                this.masterVolume = null;
+                this.ambientGain = null;
+                this.ambientOsc = null;
+                this.ambientFilter = null;
+                this.lastSoundTime = {};
+            }
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContextClass();
+                    this.masterVolume = this.ctx.createGain();
+                    this.masterVolume.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    this.masterVolume.connect(this.ctx.destination);
+                    this.startAmbientDrone();
+                } catch (e) {
+                    console.warn('AudioContext failed to initialize:', e);
+                }
+            }
+
+            throttle(key, minMs) {
+                const now = performance.now();
+                if (this.lastSoundTime[key] && (now - this.lastSoundTime[key] < minMs)) {
+                    return true;
+                }
+                this.lastSoundTime[key] = now;
+                return false;
+            }
+
+            playFlipperFlip() {
+                if (!this.ctx) return;
+                if (this.throttle('flipper', 40)) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.05);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            playBumperHit(freq) {
+                if (!this.ctx) return;
+                if (this.throttle('bumper_' + freq, 60)) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq || 440, now);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.35);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            playBossDamage() {
+                if (!this.ctx) return;
+                if (this.throttle('bossDamage', 60)) return;
+                const now = this.ctx.currentTime;
+                const bufferSize = Math.floor(this.ctx.sampleRate * 0.15);
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noiseNode = this.ctx.createBufferSource();
+                noiseNode.buffer = buffer;
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.4, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+                const oscGain = this.ctx.createGain();
+                oscGain.gain.setValueAtTime(0.3, now);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                noiseNode.connect(noiseGain);
+                noiseGain.connect(this.masterVolume);
+                osc.connect(oscGain);
+                oscGain.connect(this.masterVolume);
+
+                noiseNode.start(now);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                noiseNode.onended = () => { noiseNode.disconnect(); noiseGain.disconnect(); };
+                osc.onended = () => { osc.disconnect(); oscGain.disconnect(); };
+            }
+
+            playBossDefeat() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [440, 554.37, 659.25, 880];
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.1);
+                    gain.gain.setValueAtTime(0.5, now + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.4);
+                    osc.connect(gain);
+                    gain.connect(this.masterVolume);
+                    osc.start(now + i * 0.1);
+                    osc.stop(now + i * 0.1 + 0.45);
+                    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+                });
+            }
+
+            playSkillShot() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.08);
+                    gain.gain.setValueAtTime(0.4, now + i * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.masterVolume);
+                    osc.start(now + i * 0.08);
+                    osc.stop(now + i * 0.08 + 0.35);
+                    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+                });
+            }
+
+            startAmbientDrone() {
+                if (!this.ctx) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    this.ambientOsc = this.ctx.createOscillator();
+                    this.ambientGain = this.ctx.createGain();
+                    this.ambientFilter = this.ctx.createBiquadFilter();
+
+                    this.ambientOsc.type = 'triangle';
+                    this.ambientOsc.frequency.setValueAtTime(55, now); // A1
+
+                    this.ambientFilter.type = 'lowpass';
+                    this.ambientFilter.frequency.setValueAtTime(300, now);
+
+                    this.ambientGain.gain.setValueAtTime(0.08, now);
+
+                    this.ambientOsc.connect(this.ambientFilter);
+                    this.ambientFilter.connect(this.ambientGain);
+                    this.ambientGain.connect(this.masterVolume);
+
+                    this.ambientOsc.start(now);
+                } catch (e) {
+                    console.warn('Ambient drone start failed:', e);
+                }
+            }
+
+            updateAmbient(ballSpeed, isGameActive) {
+                if (!this.ctx || !this.ambientFilter || !this.ambientGain) return;
+                const now = this.ctx.currentTime;
+                if (!isGameActive) {
+                    this.ambientGain.gain.setTargetAtTime(0.015, now, 0.1);
+                    this.ambientFilter.frequency.setTargetAtTime(150, now, 0.1);
+                } else {
+                    const targetFreq = Math.min(1000, 200 + ballSpeed * 80);
+                    this.ambientGain.gain.setTargetAtTime(0.08, now, 0.1);
+                    this.ambientFilter.frequency.setTargetAtTime(targetFreq, now, 0.1);
+                }
+            }
+        }
+        const soundSynth = new SoundSynth();
+
         // Game Canvas Setup
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -115,6 +309,7 @@
         let gameActive = true;
         let gameStarted = false;
         let particles = []; // For visual effects
+        let floatingTexts = []; // TASK_003: Popups neon flutuantes
 
         // --- Variáveis de Segurança da Bola ---
         let ballStuckTimer = 0; // Timer para bola parada
@@ -135,7 +330,6 @@
         const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + Math.PI / 4; // Mirror active angle
 
         // Ball properties
-        // TASK_002: fábrica de bolas (cada uma carrega o próprio rastro e stuckTimer)
         function createBall(x, y, launched = false) {
             return {
                 xInitial: canvasWidth - 24,
@@ -146,7 +340,8 @@
                 isLaunched: launched,
                 trail: [],
                 maxTrailLength: 12,
-                stuckTimer: 0 // TASK_002: stuck individual por bola (decisão do TL)
+                stuckTimer: 0,
+                hasTriggeredSkillShot: false
             };
         }
         let ball = createBall(canvasWidth - 24, canvasHeight - 89, false); // bola "corrente" (ponteiro)
@@ -160,6 +355,30 @@
         let bounceBoost = 1;              // amplifica rebotes no overdrive
         let globalScoreMultiplier = 1;   // 2x durante o OVERCLOCK
         let frameFlashTimer = 0;         // flash vermelho da moldura ao perder uma bola no multiball
+
+        // === TASK_003: Estrutura do Chefe (Rogue AI Core) e Skill Shot ===
+        const bossState = {
+            active: false,
+            hp: 300,
+            maxHp: 300,
+            x: 200,
+            y: 80,
+            radius: 25,
+            angle: 0,
+            rotationSpeed: 0.02,
+            shields: [], // [{ id, hp, maxHp, angle, radius }]
+            activeEmpFlipper: null, // 'left' | 'right' | null
+            empTimer: 12.0,
+            empDurationTimer: 0,
+            glitchPulseTimer: 8.0,
+            glitchRingActive: false,
+            glitchRingRadius: 0,
+            activeFirewall: null, // { x, y, width, height, hp }
+            upperCrossings: 0,
+            goldSkinTimer: 0
+        };
+
+        const skillShotSensor = { x: 350, y: 40, radius: 15 };
 
         // Estado das missões
         const missionsState = { label: '', detail: '', barRatio: 0, accent: '#00f0ff' };
@@ -187,7 +406,9 @@
             pullDistance: 0, // How far it's pulled back
             maxPull: 60, // Max pixels it can be pulled
             springStiffness: 0.4, // Power based on pull distance
-            charging: false
+            charging: false,
+            lastPlungerPull: 0,
+            launchTimestamp: 0
         };
 
         // Flipper properties - Revised for Pivot Rotation
@@ -206,7 +427,7 @@
             isActivating: false, // Is the key pressed?
             isUp: false, // Is it fully up? (Used for state checking)
             color: '#E0E0E0',
-            isLeft: false
+            isLeft: true
         };
 
         const rightFlipper = {
@@ -223,58 +444,62 @@
             color: '#E0E0E0',
             isLeft: false
         };
-        const FLIPPER_ROTATE_SPEED = 0.5; // Radians per frame step (adjust for speed)
+        const FLIPPER_ROTATE_SPEED = 0.5; // Radians per frame step
 
         // Obstacles - Bumpers
         const bumpers = [
-            // TASK_001: paleta neon synthwave (pink / gold / cyan / green)
-            { x: 100, y: 150, radius: 18, points: 10, color: '#ff2e97', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
-            { x: 200, y: 200, radius: 22, points: 15, color: '#ffcc00', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
-            { x: 300, y: 150, radius: 18, points: 10, color: '#ff2e97', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
-            { x: 150, y: 300, radius: 15, points: 5, color: '#39ff14', hitColor: '#ffffff', isHit: false, hitTimer: 0 },
-            { x: 250, y: 300, radius: 15, points: 5, color: '#00f0ff', hitColor: '#ffffff', isHit: false, hitTimer: 0 }
+            { x: 100, y: 150, radius: 18, points: 10, color: '#ff2e97', hitColor: '#ffffff', isHit: false, hitTimer: 0, freq: 440 },
+            { x: 200, y: 200, radius: 22, points: 15, color: '#ffcc00', hitColor: '#ffffff', isHit: false, hitTimer: 0, freq: 523.25 },
+            { x: 300, y: 150, radius: 18, points: 10, color: '#ff2e97', hitColor: '#ffffff', isHit: false, hitTimer: 0, freq: 587.33 },
+            { x: 150, y: 300, radius: 15, points: 5, color: '#39ff14', hitColor: '#ffffff', isHit: false, hitTimer: 0, freq: 659.25 },
+            { x: 250, y: 300, radius: 15, points: 5, color: '#00f0ff', hitColor: '#ffffff', isHit: false, hitTimer: 0, freq: 783.99 }
         ];
         const BUMPER_HIT_DURATION = 8; // Frames the hit color shows
 
         // Multiplier zones
         const multiplierZones = [
-            // TASK_001: barreiras holográficas neon
             { x: 50, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 46, 151, 0.2)', borderColor: 'rgba(255, 46, 151, 0.8)' },
             { x: 290, y: 100, width: 60, height: 60, multiplier: 2, color: 'rgba(255, 46, 151, 0.2)', borderColor: 'rgba(255, 46, 151, 0.8)' },
             { x: 170, y: 100, width: 60, height: 60, multiplier: 3, color: 'rgba(57, 255, 20, 0.2)', borderColor: 'rgba(57, 255, 20, 0.8)' },
             { x: 170, y: 250, width: 60, height: 60, multiplier: 5, color: 'rgba(0, 240, 255, 0.2)', borderColor: 'rgba(0, 240, 255, 0.8)' }
         ];
 
-        // Walls and boundaries - Defined as line segments for better collision
+        // Walls and boundaries
         const walls = [
-            // Outer Walls
-            { x1: 10, y1: 10, x2: 10, y2: canvasHeight - 80 }, // Left straight
-            { x1: canvasWidth - 10, y1: 10, x2: canvasWidth - 10, y2: canvasHeight }, // Right straight (full height for launcher lane)
-            { x1: 350, y1: 0, x2: canvasWidth - 10, y2: 50 }, // Top diagonal straight
-            { x1: 10, y1: 0, x2: canvasWidth - 10, y2: 0 }, // Top straight
+            { x1: 10, y1: 10, x2: 10, y2: canvasHeight - 80 },
+            { x1: canvasWidth - 10, y1: 10, x2: canvasWidth - 10, y2: canvasHeight },
+            { x1: 350, y1: 0, x2: canvasWidth - 10, y2: 50 },
+            { x1: 10, y1: 0, x2: canvasWidth - 10, y2: 0 },
 
-            // Bottom Diagonal Walls
-            { x1: 10, y1: canvasHeight - 80, x2: leftFlipper.pivotX - flipperWidth/3, y2: leftFlipper.pivotY + 10 }, // Bottom Left Diagonal
-            { x1: canvasWidth - 10, y1: canvasHeight - 80, x2: rightFlipper.pivotX + flipperWidth/3, y2: rightFlipper.pivotY + 10 }, // Bottom Right Diagonal (adjusted start y)
+            { x1: 10, y1: canvasHeight - 80, x2: leftFlipper.pivotX - flipperWidth/3, y2: leftFlipper.pivotY + 10 },
+            { x1: canvasWidth - 10, y1: canvasHeight - 80, x2: rightFlipper.pivotX + flipperWidth/3, y2: rightFlipper.pivotY + 10 },
 
-            // Walls around flippers leading to drain (adjust points carefully)
-            { x1: leftFlipper.pivotX + flipperWidth/1.5, y1: leftFlipper.pivotY+15, x2: canvasWidth/2 - 10, y2: canvasHeight}, // Left side of drain
-            { x1: rightFlipper.pivotX - flipperWidth/1.5, y1: rightFlipper.pivotY+15, x2: canvasWidth/2 + 10, y2: canvasHeight}, // Right side of drain
+            { x1: leftFlipper.pivotX + flipperWidth/1.5, y1: leftFlipper.pivotY+15, x2: canvasWidth/2 - 10, y2: canvasHeight},
+            { x1: rightFlipper.pivotX - flipperWidth/1.5, y1: rightFlipper.pivotY+15, x2: canvasWidth/2 + 10, y2: canvasHeight},
 
-            // Launcher lane wall
-            { x1: canvasWidth - 45, y1: 100, x2: canvasWidth - 45, y2: canvasHeight - launcher.height - 10 } // Inner wall of launcher lane
+            { x1: canvasWidth - 45, y1: 100, x2: canvasWidth - 45, y2: canvasHeight - launcher.height - 10 }
         ];
 
         // Event listeners
+        const initAudio = () => soundSynth.init();
+        document.addEventListener('pointerdown', initAudio, { once: true });
+        document.addEventListener('keydown', initAudio, { once: true });
+
         document.addEventListener('keydown', function(e) {
             if (e.key === ' ' || e.key === 'Spacebar') {
                 launcher.charging = true;
             }
             if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'z') {
-                leftFlipper.isActivating = true;
+                if (bossState.activeEmpFlipper !== 'left') {
+                    if (!leftFlipper.isActivating) soundSynth.playFlipperFlip();
+                    leftFlipper.isActivating = true;
+                }
             }
-            if (e.key === 'ArrowRight' || e.key === '/') { // Forward slash often used
-                rightFlipper.isActivating = true;
+            if (e.key === 'ArrowRight' || e.key === '/') {
+                if (bossState.activeEmpFlipper !== 'right') {
+                    if (!rightFlipper.isActivating) soundSynth.playFlipperFlip();
+                    rightFlipper.isActivating = true;
+                }
             }
             if (e.key === 'Enter' && !gameActive) {
                 resetGame();
@@ -287,7 +512,7 @@
                     launchBall();
                 }
                 launcher.charging = false;
-                launcher.pullDistance = 0; // Reset pull on release
+                launcher.pullDistance = 0;
             }
             if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'z') {
                 leftFlipper.isActivating = false;
@@ -303,15 +528,27 @@
             lives = 3;
             currentMultiplier = 1;
             gameActive = true;
-            gameStarted = false; // Needs to be started again by launching
+            gameStarted = false;
             particles = [];
+            floatingTexts = [];
 
-            resetBallToLauncher(); // TASK_002: nova bola única na lane
-            // Reset de missões e modos de gravidade
+            resetBallToLauncher();
             setPhysicsMode('normal', 0);
             hackGridHits.clear(); hackGridTimer = 0; hackGridDone = false;
             overclockZoneTime = 0; overclockTimer = 0; globalScoreMultiplier = 1;
             lowerBumperStreak = 0; firewallProgress = 0; frameFlashTimer = 0;
+
+            // Reset Boss
+            bossState.active = false;
+            bossState.hp = 300;
+            bossState.shields = [];
+            bossState.activeEmpFlipper = null;
+            bossState.empTimer = 12.0;
+            bossState.empDurationTimer = 0;
+            bossState.glitchPulseTimer = 8.0;
+            bossState.activeFirewall = null;
+            bossState.upperCrossings = 0;
+            bossState.goldSkinTimer = 0;
 
             leftFlipper.currentAngle = leftFlipper.restAngle;
             rightFlipper.currentAngle = rightFlipper.restAngle;
@@ -321,18 +558,16 @@
             updateScoreDisplay();
         }
 
-         function resetBallPosition() {
-            console.log("Resetting ball position (stuck or out of bounds)");
-            ball.x = ball.xInitial; // Posição inicial no lançador
+        function resetBallPosition() {
+            ball.x = ball.xInitial;
             ball.y = ball.yInitial;
             ball.speedX = 0;
             ball.speedY = 0;
-            ball.isLaunched = false; // Precisa ser lançada novamente
-            ball.trail = []; // TASK_001: limpa o rastro
-            launcher.pullDistance = 0; // Reseta o lançador também
-            ball.stuckTimer = 0; // Reseta o timer de parada desta bola
-            // NÃO mexe em lives ou currentMultiplier
-             createParticles(ball.x, ball.y, 5, '#8888FF'); // Efeito visual de reset
+            ball.isLaunched = false;
+            ball.trail = [];
+            launcher.pullDistance = 0;
+            ball.stuckTimer = 0;
+            createParticles(ball.x, ball.y, 5, '#8888FF');
         }
 
         function checkBallStuckOrOutOfBounds(deltaTime) {
@@ -341,7 +576,6 @@
                 return;
             }
 
-            // --- Verificar se está parada (timer individual por bola) ---
             const currentSpeedSq = ball.speedX * ball.speedX + ball.speedY * ball.speedY;
             if (currentSpeedSq < STUCK_VELOCITY_THRESHOLD * STUCK_VELOCITY_THRESHOLD) {
                 ball.stuckTimer += deltaTime;
@@ -350,7 +584,6 @@
             }
 
             if (ball.stuckTimer > MAX_STUCK_TIME_SECONDS) {
-                // TASK_002: no multibola, teletransporta SÓ esta bola para o topo (decisão do TL)
                 if (activeBalls.length > 1) {
                     createParticles(ball.x, ball.y, 10, '#00f0ff');
                     ball.x = 200; ball.y = 50;
@@ -364,60 +597,43 @@
                 return;
             }
 
-            // --- Verificar se está fora dos limites seguros (antes de cair no dreno) ---
-            // Define limites seguros (um pouco dentro das paredes e acima da área de perigo dos flippers)
             const safeMinX = 10 + ball.radius;
-            const safeMaxX = canvasWidth - 10 - ball.radius; // Ajustar se a lane do lançador for diferente
+            const safeMaxX = canvasWidth - 10 - ball.radius;
             const safeMinY = 10 + ball.radius;
-            const safeMaxY = canvasHeight - 20; // Acima da área onde o dreno normal ocorre
+            const safeMaxY = canvasHeight - 20;
 
-            if (ball.x < safeMinX || ball.x > safeMaxX || ball.y < safeMinY)
-            {
-                // Considera fora de bounds APENAS se NÃO estiver na área do lançador inicial
-                // E se não estiver caindo na área do dreno (o check de dreno normal cuidará disso)
+            if (ball.x < safeMinX || ball.x > safeMaxX || ball.y < safeMinY) {
                 const isInLauncherArea = ball.x > canvasWidth - 45 - ball.radius && ball.y > canvasHeight - launcher.height - 10 - ball.radius;
-
-                if (!isInLauncherArea && ball.y < safeMaxY) { // Só reseta se estiver acima da área de perigo
-                     console.warn(`Ball out of safe bounds (${ball.x.toFixed(0)}, ${ball.y.toFixed(0)}), resetting.`);
+                if (!isInLauncherArea && ball.y < safeMaxY) {
                      resetBallPosition();
                      return;
                  }
             }
-            // Nota: Não precisamos checar ball.y > safeMaxY aqui,
-            // pois a lógica de perda de vida já cuida da queda total.
-        }
-
-        function resetBall() {
-            ball.x = ball.xInitial; // Posição inicial no lançador
-            ball.y = ball.yInitial;
-            ball.speedX = 0;
-            ball.speedY = 0;
-            ball.isLaunched = false;
-            ball.trail = []; // TASK_001: limpa o rastro
-            launcher.pullDistance = 0;
-            currentMultiplier = 1; // Reset multiplier on losing a ball
         }
 
         function launchBall() {
-            // TASK_002: lança a bola que estiver na lane do lançador (não lançada)
             const b = activeBalls.find(x => !x.isLaunched);
-            if (b && launcher.pullDistance > 5) { // Require some pull
+            if (b && launcher.pullDistance > 5) {
                 b.isLaunched = true;
                 b.speedY = -(launcher.pullDistance * launcher.springStiffness * 1.4);
-                b.speedX = -1 - Math.random(); // Slight random angle leftwards
+                b.speedX = -1 - Math.random();
+                b.hasTriggeredSkillShot = false;
+                launcher.lastPlungerPull = launcher.pullDistance;
+                launcher.launchTimestamp = performance.now();
                 launcher.pullDistance = 0;
                 if (!gameStarted) gameStarted = true;
-                createParticles(b.x, b.y + 10, 10, '#FFFF88'); // Launch sparks
+                createParticles(b.x, b.y + 10, 10, '#FFFF88');
             }
             launcher.charging = false;
         }
 
-        // === TASK_002: pontuação com multiplicador de sobrevivência (× nº de bolas) + overclock ===
         function addScore(base) {
             score += Math.round(base * currentMultiplier * activeBalls.length * globalScoreMultiplier);
+            if (!bossState.active && (score >= 15000 || bossState.upperCrossings >= 3)) {
+                spawnBoss();
+            }
         }
 
-        // Dreno por bola — só perde vida quando a ÚLTIMA bola cai
         function handleDrainCheck(b, index) {
             if (b.y > canvasHeight + b.radius * 2) {
                 activeBalls.splice(index, 1);
@@ -431,7 +647,7 @@
                     }
                     updateScoreDisplay();
                 } else {
-                    frameFlashTimer = 0.25; // ainda há bolas: flash vermelho de aviso
+                    frameFlashTimer = 0.25;
                 }
             }
         }
@@ -444,7 +660,6 @@
             currentMultiplier = 1;
         }
 
-        // Spawna 2 bolas adicionais (Multiball) a partir de portais neon superiores
         function spawnMultiball() {
             const spawns = [{ x: 150, y: 60 }, { x: 250, y: 60 }];
             spawns.forEach(s => {
@@ -452,11 +667,10 @@
                 nb.speedX = (Math.random() - 0.5) * 4;
                 nb.speedY = 2 + Math.random() * 2;
                 activeBalls.push(nb);
-                createParticles(s.x, s.y, 14, '#00f0ff'); // faíscas elétricas do portal
+                createParticles(s.x, s.y, 14, '#00f0ff');
             });
         }
 
-        // Colisão elástica 2D bola-bola (massas iguais) — troca de velocidades normais
         function checkBallToBallCollisions() {
             for (let i = 0; i < activeBalls.length; i++) {
                 for (let j = i + 1; j < activeBalls.length; j++) {
@@ -467,16 +681,13 @@
                     if (dist < minDist && dist > 0) {
                         const overlap = minDist - dist;
                         const nX = dx / dist, nY = dy / dist;
-                        // resolve penetração igualmente
                         b1.x -= nX * (overlap / 2); b1.y -= nY * (overlap / 2);
                         b2.x += nX * (overlap / 2); b2.y += nY * (overlap / 2);
-                        // tangente
                         const tX = -nY, tY = nX;
                         const v1n = b1.speedX * nX + b1.speedY * nY;
                         const v1t = b1.speedX * tX + b1.speedY * tY;
                         const v2n = b2.speedX * nX + b2.speedY * nY;
                         const v2t = b2.speedX * tX + b2.speedY * tY;
-                        // troca das componentes normais (massas iguais)
                         b1.speedX = v2n * nX + v1t * tX; b1.speedY = v2n * nY + v1t * tY;
                         b2.speedX = v1n * nX + v2t * tX; b2.speedY = v1n * nY + v2t * tY;
                         createParticles(b1.x + nX * b1.radius, b1.y + nY * b1.radius, 8, '#ffffff');
@@ -485,7 +696,6 @@
             }
         }
 
-        // === TASK_002: modos de gravidade mutáveis ===
         function setPhysicsMode(mode, duration) {
             activePhysicsMode = mode;
             physicsModeTimer = duration;
@@ -505,21 +715,22 @@
             }
         }
 
-        // === TASK_002: temporizadores e HUD das missões ===
         function updateMissions(dt) {
-            // HACK THE GRID — janela de 15s
             if (hackGridTimer > 0 && !hackGridDone) {
                 hackGridTimer -= dt;
                 if (hackGridTimer <= 0) { hackGridHits.clear(); }
             }
-            // OVERCLOCK — bônus 2x temporário
             if (overclockTimer > 0) {
                 overclockTimer -= dt;
                 if (overclockTimer <= 0) { globalScoreMultiplier = 1; }
             }
 
-            // Descritor de HUD: prioriza missão em andamento
-            if (overclockTimer > 0) {
+            if (bossState.active) {
+                missionsState.label = 'BOSS: ROGUE AI CORE';
+                missionsState.detail = `HP: ${Math.max(0, bossState.hp)}/${bossState.maxHp}`;
+                missionsState.barRatio = Math.max(0, bossState.hp / bossState.maxHp);
+                missionsState.accent = '#ff0033';
+            } else if (overclockTimer > 0) {
                 missionsState.label = 'SYSTEM OVERCLOCK · 2x';
                 missionsState.detail = `TIME LEFT: ${overclockTimer.toFixed(1)}s`;
                 missionsState.barRatio = overclockTimer / 20;
@@ -537,9 +748,7 @@
             }
         }
 
-        // Registra hit de bumper nas missões (chamado de checkBumperCollisions)
         function registerBumperHitForMissions(index) {
-            // HACK THE GRID: bumpers superiores 0,1,2
             if (index <= 2) {
                 if (hackGridHits.size === 0) { hackGridTimer = 15; hackGridDone = false; }
                 if (hackGridTimer > 0) {
@@ -554,7 +763,6 @@
                     }
                 }
             } else {
-                // OVERDRIVE: bumpers inferiores (3,4) sucessivos
                 lowerBumperStreak++;
                 if (lowerBumperStreak >= 3) {
                     lowerBumperStreak = 0;
@@ -563,7 +771,6 @@
             }
         }
 
-        // Alvos físicos da FIREWALL CRACK (chamado por bola no update loop)
         function checkFirewallTargets() {
             const target = firewallTargets[firewallProgress];
             if (!target) return;
@@ -580,6 +787,233 @@
             }
         }
 
+        // === TASK_003: Lógica do Chefe e Ataques ===
+        function spawnBoss() {
+            if (bossState.active) return;
+            bossState.active = true;
+            bossState.hp = 300;
+            bossState.shields = [
+                { id: 0, hp: 50, maxHp: 50 },
+                { id: 1, hp: 50, maxHp: 50 },
+                { id: 2, hp: 50, maxHp: 50 }
+            ];
+            bossState.activeEmpFlipper = null;
+            bossState.empTimer = 12.0;
+            bossState.glitchPulseTimer = 8.0;
+            bossState.activeFirewall = null;
+            createParticles(bossState.x, bossState.y, 35, '#ff0033');
+            spawnFloatingText('ROGUE AI CORE AWAKENED!', canvasWidth / 2, 160, '#ff0033');
+        }
+
+        function updateBoss(dt) {
+            if (!bossState.active) return;
+
+            bossState.angle += bossState.rotationSpeed;
+
+            // Atualiza escudos
+            bossState.shields.forEach((shield, index) => {
+                if (shield.hp > 0) {
+                    const currentAngle = bossState.angle + (index * (Math.PI * 2 / 3));
+                    shield.x = bossState.x + 45 * Math.cos(currentAngle);
+                    shield.y = bossState.y + 45 * Math.sin(currentAngle);
+                }
+            });
+
+            // Ataque 1: Glitch Pulse (a cada 8s)
+            bossState.glitchPulseTimer -= dt;
+            if (bossState.glitchPulseTimer <= 0) {
+                bossState.glitchPulseTimer = 8.0;
+                bossState.glitchRingActive = true;
+                bossState.glitchRingRadius = 10;
+            }
+
+            if (bossState.glitchRingActive) {
+                bossState.glitchRingRadius += 140 * dt;
+                if (bossState.glitchRingRadius > 75) {
+                    bossState.glitchRingActive = false;
+                } else {
+                    // Checa colisão da bola com o anel
+                    activeBalls.forEach(b => {
+                        const dist = Math.hypot(b.x - bossState.x, b.y - bossState.y);
+                        if (Math.abs(dist - bossState.glitchRingRadius) < 15) {
+                            b.speedX *= 0.7;
+                            b.speedY *= 0.7;
+                            canvas.classList.add('glitch-effect');
+                            setTimeout(() => canvas.classList.remove('glitch-effect'), 500);
+                        }
+                    });
+                }
+            }
+
+            // Ataque 2: EMP Shockwave (a cada 12s)
+            if (bossState.empDurationTimer > 0) {
+                bossState.empDurationTimer -= dt;
+                if (bossState.empDurationTimer <= 0) {
+                    bossState.activeEmpFlipper = null;
+                }
+            } else {
+                bossState.empTimer -= dt;
+                if (bossState.empTimer <= 0) {
+                    bossState.empTimer = 12.0;
+                    bossState.empDurationTimer = 2.0;
+                    bossState.activeEmpFlipper = (Math.random() < 0.5) ? 'left' : 'right';
+                    const flipper = bossState.activeEmpFlipper === 'left' ? leftFlipper : rightFlipper;
+                    flipper.isActivating = false;
+                    createParticles(flipper.pivotX, flipper.pivotY, 15, '#ffd700');
+                    spawnFloatingText('EMP PULSE!', flipper.pivotX, flipper.pivotY - 20, '#ffd700');
+                }
+            }
+
+            // Ataque 3: Firewall Barrier (se Boss HP < 150)
+            if (bossState.hp < 150 && !bossState.activeFirewall) {
+                bossState.activeFirewall = { x: 170, y: 290, width: 60, height: 16, hp: 2 };
+                spawnFloatingText('FIREWALL DEPLOYED!', canvasWidth / 2, 270, '#ffaa00');
+            }
+        }
+
+        function checkBossCollisions() {
+            if (!bossState.active) return;
+
+            const allShieldsDown = bossState.shields.every(s => s.hp <= 0);
+
+            activeBalls.forEach(b => {
+                // 1. Colisão com Escudos Orbitais
+                bossState.shields.forEach(shield => {
+                    if (shield.hp > 0) {
+                        const dx = b.x - shield.x;
+                        const dy = b.y - shield.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < b.radius + 8) {
+                            shield.hp -= 15;
+                            createParticles(shield.x, shield.y, 10, '#00f0ff');
+                            soundSynth.playBossDamage();
+
+                            // Reflete a bola
+                            const nx = dx / (dist || 1);
+                            const ny = dy / (dist || 1);
+                            const reflected = reflectVelocity(b.speedX, b.speedY, nx, ny);
+                            b.speedX = reflected.x * 1.1;
+                            b.speedY = reflected.y * 1.1;
+
+                            if (shield.hp <= 0) {
+                                createParticles(shield.x, shield.y, 20, '#ff0033');
+                                spawnFloatingText('SHIELD DOWN!', shield.x, shield.y - 10, '#00f0ff');
+                            }
+                        }
+                    }
+                });
+
+                // 2. Colisão com o Núcleo do Chefe
+                const cdx = b.x - bossState.x;
+                const cdy = b.y - bossState.y;
+                const cdist = Math.hypot(cdx, cdy);
+                if (cdist < b.radius + bossState.radius) {
+                    const nx = cdx / (cdist || 1);
+                    const ny = cdy / (cdist || 1);
+
+                    if (!allShieldsDown) {
+                        // Invulnerável: repulsa sem dano
+                        const reflected = reflectVelocity(b.speedX, b.speedY, nx, ny);
+                        b.speedX = reflected.x * 1.1;
+                        b.speedY = reflected.y * 1.1;
+                        createParticles(b.x, b.y, 5, '#888888');
+                    } else {
+                        // Núcleo Vulnerável: Dano ao Chefe
+                        bossState.hp -= 50;
+                        createParticles(bossState.x, bossState.y, 18, '#ff0033');
+                        soundSynth.playBossDamage();
+
+                        const reflected = reflectVelocity(b.speedX, b.speedY, nx, ny);
+                        b.speedX = reflected.x * 1.2;
+                        b.speedY = reflected.y * 1.2;
+
+                        if (bossState.hp <= 0) {
+                            defeatBoss();
+                        }
+                    }
+                }
+
+                // 3. Colisão com a Firewall Barrier
+                if (bossState.activeFirewall && bossState.activeFirewall.hp > 0) {
+                    const fw = bossState.activeFirewall;
+                    if (b.x + b.radius > fw.x && b.x - b.radius < fw.x + fw.width &&
+                        b.y + b.radius > fw.y && b.y - b.radius < fw.y + fw.height) {
+
+                        fw.hp -= 1;
+                        createParticles(b.x, b.y, 12, '#ffaa00');
+                        soundSynth.playBossDamage();
+                        b.speedY = -Math.abs(b.speedY) * 0.8;
+
+                        if (fw.hp <= 0) {
+                            bossState.activeFirewall = null;
+                            createParticles(fw.x + fw.width/2, fw.y + fw.height/2, 20, '#ff5500');
+                        }
+                    }
+                }
+            });
+        }
+
+        function defeatBoss() {
+            bossState.active = false;
+            bossState.hp = 0;
+            addScore(15000);
+            if (lives < 3) lives++;
+            bossState.goldSkinTimer = 20.0;
+            createParticles(bossState.x, bossState.y, 40, '#ffd700');
+            soundSynth.playBossDefeat();
+            spawnFloatingText('BOSS DEFEATED! +15,000', canvasWidth / 2, 180, '#ffd700');
+            updateScoreDisplay();
+        }
+
+        // === TASK_003: Skill Shot e Sensor ===
+        function checkSkillShotSensor(b) {
+            if (!b.isLaunched || b.hasTriggeredSkillShot) return;
+
+            const dx = b.x - skillShotSensor.x;
+            const dy = b.y - skillShotSensor.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < b.radius + skillShotSensor.radius) {
+                b.hasTriggeredSkillShot = true;
+                bossState.upperCrossings++;
+
+                const timeElapsed = (performance.now() - launcher.launchTimestamp) / 1000;
+                const pullRatio = launcher.lastPlungerPull / launcher.maxPull;
+
+                if (timeElapsed <= 1.5 && pullRatio >= 0.75 && pullRatio <= 0.85) {
+                    triggerCriticalSkillShot();
+                }
+            }
+        }
+
+        function triggerCriticalSkillShot() {
+            addScore(3000);
+            currentMultiplier += 1;
+            soundSynth.playSkillShot();
+            spawnFloatingText('CRITICAL SKILL SHOT!', canvasWidth / 2, 220, '#00f0ff');
+            createParticles(skillShotSensor.x, skillShotSensor.y, 25, '#00f0ff');
+            updateScoreDisplay();
+        }
+
+        function spawnFloatingText(text, x, y, color) {
+            floatingTexts.push({
+                text: text,
+                x: x,
+                y: y,
+                color: color,
+                alpha: 1.0,
+                vy: -1.0
+            });
+        }
+
+        function updateFloatingTexts(dt) {
+            floatingTexts.forEach(ft => {
+                ft.y += ft.vy;
+                ft.alpha -= 0.8 * dt;
+            });
+            floatingTexts = floatingTexts.filter(ft => ft.alpha > 0);
+        }
+
         let lastDisplayedScore = 0;
         function updateScoreDisplay() {
             const scoreEl = document.getElementById('score');
@@ -587,10 +1021,9 @@
             document.getElementById('lives').textContent = lives;
             document.getElementById('multiplier').textContent = currentMultiplier + 'x';
 
-            // TASK_001: pulso de feedback ao somar pontos
             if (score > lastDisplayedScore) {
                 scoreEl.classList.remove('score-bump');
-                void scoreEl.offsetWidth; // re-dispara a animação
+                void scoreEl.offsetWidth;
                 scoreEl.classList.add('score-bump');
             }
             lastDisplayedScore = score;
@@ -600,34 +1033,41 @@
         function drawBall() {
             if (!gameActive) return;
 
-            // 1. TASK_001: Rastro neon cyberpunk (círculos decrescentes)
+            const isGold = bossState.goldSkinTimer > 0;
+
             for (let i = 0; i < ball.trail.length; i++) {
                 const pos = ball.trail[i];
                 const ratio = i / ball.trail.length;
                 const radius = ball.radius * (0.3 + 0.7 * ratio);
                 ctx.beginPath();
                 ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(0, 240, 255, ${0.18 * ratio})`;
+                ctx.fillStyle = isGold ? `rgba(255, 215, 0, ${0.25 * ratio})` : `rgba(0, 240, 255, ${0.18 * ratio})`;
                 ctx.fill();
                 ctx.closePath();
             }
 
-            // 2. Bola de aço cromado com reflexo de estúdio neon
             const grad = ctx.createRadialGradient(
                 ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, ball.radius * 0.1,
                 ball.x, ball.y, ball.radius
             );
-            grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.3, '#dcdcdc');
-            grad.addColorStop(0.75, '#4a4a5a');
-            grad.addColorStop(1, '#1e1e24');
+            if (isGold) {
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.3, '#fff7a0');
+                grad.addColorStop(0.75, '#ffd700');
+                grad.addColorStop(1, '#b8860b');
+            } else {
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.3, '#dcdcdc');
+                grad.addColorStop(0.75, '#4a4a5a');
+                grad.addColorStop(1, '#1e1e24');
+            }
 
             ctx.save();
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fillStyle = grad;
-            ctx.shadowColor = '#00f0ff';
-            ctx.shadowBlur = 8;
+            ctx.shadowColor = isGold ? '#ffd700' : '#00f0ff';
+            ctx.shadowBlur = isGold ? 14 : 8;
             ctx.fill();
             ctx.closePath();
             ctx.restore();
@@ -635,53 +1075,45 @@
 
         function drawLauncher() {
             ctx.save();
-            // Base plate for launcher
-             ctx.fillStyle = '#333';
-             ctx.fillRect(canvasWidth - 45, canvasHeight - launcher.height - 10, 35, launcher.height + 10);
+            ctx.fillStyle = '#333';
+            ctx.fillRect(canvasWidth - 45, canvasHeight - launcher.height - 10, 35, launcher.height + 10);
 
-
-            // Spring simulation based on pullDistance
             const currentHeight = launcher.height - launcher.pullDistance;
-            const springBaseY = launcher.y + launcher.height; // Bottom of spring path
+            const springBaseY = launcher.y + launcher.height;
 
-            // Draw the visible plunger part (cromado degradê)
             const plungerGrad = ctx.createLinearGradient(launcher.x - launcher.width / 2, 0, launcher.x + launcher.width / 2, 0);
             plungerGrad.addColorStop(0, '#3a3a48');
             plungerGrad.addColorStop(0.5, '#d8d8e0');
             plungerGrad.addColorStop(1, '#3a3a48');
             ctx.fillStyle = plungerGrad;
             ctx.fillRect(launcher.x - launcher.width / 2, springBaseY - currentHeight, launcher.width, currentHeight);
-            // Draw plunger top cap
+
             ctx.fillStyle = '#eef';
             ctx.fillRect(launcher.x - launcher.width / 2 - 2, springBaseY - currentHeight - 5, launcher.width + 4, 5);
 
-
-            // Draw Spring visualization (compressed part) — cromo neon
             ctx.strokeStyle = '#8fa0c0';
             ctx.lineWidth = 3;
             ctx.beginPath();
-            const startY = springBaseY - currentHeight; // Top of visible plunger
-            const endY = springBaseY; // Bottom fixed point
+            const startY = springBaseY - currentHeight;
+            const endY = springBaseY;
             const visibleSpringLength = endY - startY;
-            const waves = Math.max(2, Math.floor(8 * (visibleSpringLength / launcher.height))); // Fewer waves when compressed
+            const waves = Math.max(2, Math.floor(8 * (visibleSpringLength / launcher.height)));
 
-            ctx.moveTo(launcher.x, startY); // Start at plunger top center
+            ctx.moveTo(launcher.x, startY);
             for (let i = 0; i < waves; i++) {
-                // Zigzag pattern
                 const waveX = launcher.x + (i % 2 === 0 ? 1 : -1) * launcher.width * 0.6;
                 const waveY = startY + (i + 0.5) * (visibleSpringLength / waves);
                 ctx.lineTo(waveX, waveY);
             }
-            ctx.lineTo(launcher.x, endY); // End at base center
+            ctx.lineTo(launcher.x, endY);
             ctx.stroke();
 
-
-            // TASK_001: Power Meter como equalizador de LEDs segmentados sci-fi
+            // TASK_001 & TASK_003: Power Meter com Green Zone para Skill Shot
             const meterX = canvasWidth - 60;
             const meterY = canvasHeight - launcher.height - 10;
             const meterWidth = 9;
             const meterHeight = launcher.height;
-            // moldura
+
             ctx.fillStyle = 'rgba(8,10,18,0.9)';
             ctx.fillRect(meterX - 1, meterY - 1, meterWidth + 2, meterHeight + 2);
 
@@ -690,17 +1122,20 @@
             const segH = (meterHeight - gap * (SEGMENTS - 1)) / SEGMENTS;
             const powerRatio = Math.min(1, launcher.pullDistance / launcher.maxPull);
             const litCount = Math.round(powerRatio * SEGMENTS);
+
             for (let i = 0; i < SEGMENTS; i++) {
-                const t = i / (SEGMENTS - 1); // 0 base -> 1 topo
-                // cor LED: verde -> amarelo -> vermelho conforme sobe
-                const ledColor = t < 0.5 ? '#39ff14' : (t < 0.8 ? '#ffd700' : '#ff2e97');
+                const t = i / (SEGMENTS - 1);
+                const isGreenZone = (t >= 0.75 && t <= 0.85);
+                let ledColor = t < 0.5 ? '#39ff14' : (t < 0.8 ? '#ffd700' : '#ff2e97');
+                if (isGreenZone) ledColor = '#00f0ff'; // Zona de precisão em Ciano Neon
+
                 const segY = meterY + meterHeight - (i + 1) * segH - i * gap;
                 if (i < litCount) {
                     ctx.fillStyle = ledColor;
                     ctx.shadowColor = ledColor;
-                    ctx.shadowBlur = 8;
+                    ctx.shadowBlur = isGreenZone ? 12 : 8;
                 } else {
-                    ctx.fillStyle = 'rgba(40,44,56,0.7)';
+                    ctx.fillStyle = isGreenZone ? 'rgba(0, 240, 255, 0.25)' : 'rgba(40,44,56,0.7)';
                     ctx.shadowBlur = 0;
                 }
                 ctx.fillRect(meterX, segY, meterWidth, segH);
@@ -712,58 +1147,51 @@
 
         function drawFlipper(flipper) {
             ctx.save();
-            // Translate to the PIVOT point
             ctx.translate(flipper.pivotX, flipper.pivotY);
             ctx.rotate(flipper.currentAngle);
 
-            // Draw the flipper rectangle relative to the pivot
-            // If it's the left flipper, its visual body extends to the left of the pivot
-            // If right, it extends to the right. Pivot is at one end.
+            const isEmp = (bossState.activeEmpFlipper === (flipper.isLeft ? 'left' : 'right'));
+            if (isEmp) {
+                ctx.globalAlpha = 0.5;
+            }
+
             const drawX = flipper.isLeft ? -flipper.width : 0;
 
-             // Add gradient and shadow for better look
-             const gradient = ctx.createLinearGradient(drawX, -flipper.height / 2, drawX, flipper.height / 2);
-             gradient.addColorStop(0, '#ffffff');
-             gradient.addColorStop(0.5, '#d8d8e6');
-             gradient.addColorStop(1, '#9aa0b8');
-             ctx.fillStyle = gradient;
-             ctx.strokeStyle = '#00f0ff'; // borda neon ciano (TASK_001)
-             ctx.lineWidth = 1.5;
+            const gradient = ctx.createLinearGradient(drawX, -flipper.height / 2, drawX, flipper.height / 2);
+            gradient.addColorStop(0, isEmp ? '#ffffaa' : '#ffffff');
+            gradient.addColorStop(0.5, isEmp ? '#ddcc66' : '#d8d8e6');
+            gradient.addColorStop(1, isEmp ? '#998833' : '#9aa0b8');
+            ctx.fillStyle = gradient;
+            ctx.strokeStyle = isEmp ? '#ffd700' : '#00f0ff';
+            ctx.lineWidth = 1.5;
 
-             ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
-             ctx.shadowBlur = 8;
-             ctx.shadowOffsetX = 0;
-             ctx.shadowOffsetY = 0;
+            ctx.shadowColor = isEmp ? 'rgba(255, 215, 0, 0.8)' : 'rgba(0, 240, 255, 0.6)';
+            ctx.shadowBlur = 8;
 
-             ctx.beginPath();
-             ctx.rect(drawX, -flipper.height / 2, flipper.width, flipper.height);
-             ctx.fill();
-             ctx.stroke();
-             ctx.closePath();
+            ctx.beginPath();
+            ctx.rect(drawX, -flipper.height / 2, flipper.width, flipper.height);
+            ctx.fill();
+            ctx.stroke();
+            ctx.closePath();
 
-             // Reset shadow
-             ctx.shadowColor = 'transparent';
-
-            // Draw pivot point visually (optional)
-             ctx.fillStyle = '#444';
-             ctx.beginPath();
-             ctx.arc(0, 0, flipper.height/1.5, 0, Math.PI * 2); // Circle at pivot
-             ctx.fill();
-
+            ctx.shadowColor = 'transparent';
+            ctx.fillStyle = isEmp ? '#ffaa00' : '#444';
+            ctx.beginPath();
+            ctx.arc(0, 0, flipper.height/1.5, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.restore();
         }
 
         function drawBumpers() {
             bumpers.forEach(bumper => {
-                // TASK_001: cor base sempre neon; o "hit" expande e intensifica o bloom
                 const displayColor = bumper.color;
                 let currentRadius = bumper.radius;
                 let glowIntensity = 10;
 
                 if (bumper.isHit) {
-                    const factor = bumper.hitTimer / BUMPER_HIT_DURATION; // 1 -> 0
-                    currentRadius = bumper.radius * (1 + factor * 0.25); // pulso elástico
+                    const factor = bumper.hitTimer / BUMPER_HIT_DURATION;
+                    currentRadius = bumper.radius * (1 + factor * 0.25);
                     glowIntensity = 25 + factor * 15;
                 }
 
@@ -784,7 +1212,6 @@
                 ctx.shadowBlur = glowIntensity;
                 ctx.fill();
 
-                // Borda neon (mais grossa e branca no impacto)
                 ctx.strokeStyle = bumper.isHit ? '#ffffff' : shadeColor(displayColor, 30);
                 ctx.lineWidth = bumper.isHit ? 3 : 1.5;
                 ctx.stroke();
@@ -794,14 +1221,12 @@
         }
 
         function drawMultiplierZones() {
-            // TASK_001: barreiras holográficas de laser reativas (crawling dashes + pulsação)
             const time = performance.now();
             multiplierZones.forEach(zone => {
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(zone.x, zone.y, zone.width, zone.height);
 
-                // Preenchimento holográfico com pulsação senoidal
                 const pulse = 0.08 + Math.sin(time / 250) * 0.04;
                 const grad = ctx.createLinearGradient(zone.x, zone.y, zone.x + zone.width, zone.y + zone.height);
                 grad.addColorStop(0, zone.borderColor.replace('0.8', pulse.toFixed(3)));
@@ -809,7 +1234,6 @@
                 ctx.fillStyle = grad;
                 ctx.fill();
 
-                // Linha laser pontilhada rastejante (crawling)
                 ctx.strokeStyle = zone.borderColor;
                 ctx.lineWidth = 2.5;
                 ctx.shadowColor = zone.borderColor;
@@ -820,7 +1244,6 @@
                 ctx.closePath();
                 ctx.setLineDash([]);
 
-                // Texto multiplicador retro
                 ctx.font = '900 16px "Orbitron", sans-serif';
                 ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
@@ -831,8 +1254,132 @@
             });
         }
 
+        function drawSkillShotSensor() {
+            const time = performance.now();
+            const pulse = 0.5 + Math.sin(time / 150) * 0.3;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(skillShotSensor.x, skillShotSensor.y, skillShotSensor.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(0, 240, 255, ${pulse})`;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 10;
+            ctx.stroke();
+
+            ctx.font = '900 8px "Orbitron", sans-serif';
+            ctx.fillStyle = '#00f0ff';
+            ctx.textAlign = 'center';
+            ctx.fillText('TARGET', skillShotSensor.x, skillShotSensor.y + 3);
+            ctx.restore();
+        }
+
+        function drawBoss() {
+            if (!bossState.active) return;
+            const time = performance.now();
+
+            ctx.save();
+
+            // 1. Desenha Anel de Glitch Pulse se Ativo
+            if (bossState.glitchRingActive) {
+                ctx.beginPath();
+                ctx.arc(bossState.x, bossState.y, bossState.glitchRingRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 0, 51, 0.7)';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#ff0033';
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+            }
+
+            // 2. Desenha Núcleo Central do Chefe (Pentágono Giratório Red Glowing)
+            ctx.translate(bossState.x, bossState.y);
+            ctx.rotate(bossState.angle);
+
+            ctx.beginPath();
+            const sides = 5;
+            for (let i = 0; i < sides; i++) {
+                const a = (i * Math.PI * 2) / sides;
+                const px = bossState.radius * Math.cos(a);
+                const py = bossState.radius * Math.sin(a);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+
+            const allShieldsDown = bossState.shields.every(s => s.hp <= 0);
+            ctx.fillStyle = allShieldsDown ? '#ff0033' : '#aa0022';
+            ctx.shadowColor = '#ff0033';
+            ctx.shadowBlur = 15 + Math.sin(time / 100) * 8;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+
+            // 3. Desenha Barra de Vida do Chefe
+            ctx.save();
+            const barW = 80;
+            const barH = 6;
+            const barX = bossState.x - barW / 2;
+            const barY = bossState.y - bossState.radius - 16;
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(barX, barY, barW, barH);
+            ctx.fillStyle = '#ff0033';
+            ctx.shadowColor = '#ff0033';
+            ctx.shadowBlur = 8;
+            ctx.fillRect(barX, barY, barW * Math.max(0, bossState.hp / bossState.maxHp), barH);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barW, barH);
+            ctx.restore();
+
+            // 4. Desenha Escudos Orbitais
+            bossState.shields.forEach(shield => {
+                if (shield.hp > 0) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(shield.x, shield.y, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = '#00f0ff';
+                    ctx.shadowColor = '#00f0ff';
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            });
+
+            // 5. Desenha Firewall Barrier se ativa
+            if (bossState.activeFirewall && bossState.activeFirewall.hp > 0) {
+                const fw = bossState.activeFirewall;
+                ctx.save();
+                ctx.fillStyle = fw.hp === 2 ? '#ffaa00' : '#ff4400';
+                ctx.shadowColor = '#ffaa00';
+                ctx.shadowBlur = 12;
+                ctx.fillRect(fw.x, fw.y, fw.width, fw.height);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(fw.x, fw.y, fw.width, fw.height);
+                ctx.restore();
+            }
+        }
+
+        function drawFloatingTexts() {
+            ctx.save();
+            ctx.font = '900 13px "Orbitron", sans-serif';
+            ctx.textAlign = 'center';
+            floatingTexts.forEach(ft => {
+                ctx.fillStyle = ft.color;
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.shadowColor = ft.color;
+                ctx.shadowBlur = 8;
+                ctx.fillText(ft.text, ft.x, ft.y);
+            });
+            ctx.restore();
+        }
+
         function drawWalls() {
-            // TASK_001: paredes com LED neon ciano
             ctx.save();
             ctx.strokeStyle = '#1f6f8f';
             ctx.lineWidth = 5;
@@ -849,7 +1396,6 @@
         }
 
         function drawParticles() {
-            // TASK_001: faíscas neon alongadas pelo vetor de velocidade (velocity stretching)
             particles.forEach(p => {
                 ctx.save();
                 ctx.beginPath();
@@ -865,156 +1411,121 @@
                 ctx.closePath();
                 ctx.restore();
 
-                // Física das partículas
                 p.x += p.vx;
                 p.y += p.vy;
-                p.vy += 0.05; // gravidade sutil
+                p.vy += 0.05;
                 p.alpha = Math.max(0, p.alpha - p.decay);
                 p.size *= 0.97;
             });
-            // Limpa partículas mortas
             particles = particles.filter(p => p.alpha > 0 && p.size > 0.4);
         }
 
-
-        // --- Collision Detection ---
-
-        // Helper: Calculate distance between two points squared (faster than sqrt)
         function distSq(x1, y1, x2, y2) {
             const dx = x2 - x1;
             const dy = y2 - y1;
             return dx * dx + dy * dy;
         }
 
-        // Helper: Closest point on a line segment to a point
         function closestPointOnSegment(px, py, x1, y1, x2, y2) {
             const lineLenSq = distSq(x1, y1, x2, y2);
-            if (lineLenSq < 0.0001) return { x: x1, y: y1, t: 0 }; // Segment is a point
+            if (lineLenSq < 0.0001) return { x: x1, y: y1, t: 0 };
 
-            // Project point onto the line containing the segment
             const t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / lineLenSq;
+            if (t < 0) return { x: x1, y: y1, t: 0 };
+            if (t > 1) return { x: x2, y: y2, t: 1 };
 
-            if (t < 0) return { x: x1, y: y1, t: 0 }; // Closest point is p1
-            if (t > 1) return { x: x2, y: y2, t: 1 }; // Closest point is p2
-
-            // Closest point is within the segment
             const closestX = x1 + t * (x2 - x1);
             const closestY = y1 + t * (y2 - y1);
             return { x: closestX, y: closestY, t: t };
         }
 
-         // Helper: Reflect velocity vector off a normal vector
-         function reflectVelocity(vx, vy, normalX, normalY) {
-             const speed = Math.sqrt(vx*vx + vy*vy);
-             const dot = vx * normalX + vy * normalY;
-             // Reflect velocity vector: v' = v - 2 * (v . n) * n
-             const reflectVx = vx - 2 * dot * normalX;
-             const reflectVy = vy - 2 * dot * normalY;
-             // Optionally normalize and scale, or just return reflected components
-             // Normalizing and scaling by original speed might prevent weird speed changes
-             const reflectSpeed = Math.sqrt(reflectVx*reflectVx + reflectVy*reflectVy);
-             if (reflectSpeed === 0) return {x: 0, y: 0}; // Avoid division by zero
-             return { x: (reflectVx / reflectSpeed) * speed, y: (reflectVy / reflectSpeed) * speed };
-         }
+        function reflectVelocity(vx, vy, normalX, normalY) {
+            const speed = Math.sqrt(vx*vx + vy*vy);
+            const dot = vx * normalX + vy * normalY;
+            const reflectVx = vx - 2 * dot * normalX;
+            const reflectVy = vy - 2 * dot * normalY;
+            const reflectSpeed = Math.sqrt(reflectVx*reflectVx + reflectVy*reflectVy);
+            if (reflectSpeed === 0) return {x: 0, y: 0};
+            return { x: (reflectVx / reflectSpeed) * speed, y: (reflectVy / reflectSpeed) * speed };
+        }
 
-         function checkWallCollisions() {
-             const restitution = 0.5; // Bounciness factor
+        function checkWallCollisions() {
+            const restitution = 0.5;
 
-             walls.forEach(wall => {
-                 const { x: closestX, y: closestY } = closestPointOnSegment(ball.x, ball.y, wall.x1, wall.y1, wall.x2, wall.y2);
-                 const distanceSquared = distSq(ball.x, ball.y, closestX, closestY);
+            walls.forEach(wall => {
+                const { x: closestX, y: closestY } = closestPointOnSegment(ball.x, ball.y, wall.x1, wall.y1, wall.x2, wall.y2);
+                const distanceSquared = distSq(ball.x, ball.y, closestX, closestY);
 
-                 if (distanceSquared < ball.radius * ball.radius) {
-                    // Collision occurred
-                     // Move ball out of collision slightly to prevent sticking
-                     const overlap = ball.radius - Math.sqrt(distanceSquared);
-                     const dx = ball.x - closestX;
-                     const dy = ball.y - closestY;
-                     const collisionDist = Math.sqrt(dx*dx + dy*dy);
-                     // Avoid division by zero if somehow distance is zero
+                if (distanceSquared < ball.radius * ball.radius) {
+                    const overlap = ball.radius - Math.sqrt(distanceSquared);
+                    const dx = ball.x - closestX;
+                    const dy = ball.y - closestY;
+                    const collisionDist = Math.sqrt(dx*dx + dy*dy);
                     const moveX = collisionDist < 0.01 ? 0 : (dx / collisionDist) * overlap;
                     const moveY = collisionDist < 0.01 ? 0 : (dy / collisionDist) * overlap;
-                     ball.x += moveX;
-                     ball.y += moveY;
+                    ball.x += moveX;
+                    ball.y += moveY;
 
-
-                     // Calculate the normal vector of the wall segment
-                     let wallDx = wall.x2 - wall.x1;
-                     let wallDy = wall.y2 - wall.y1;
-                     // Normal vector (perpendicular, pointing "outward" from the wall)
-                     // Need consistent winding or knowledge of which side is "inside"
-                     // Simple approach: Use normal pointing away from ball center
-                     let normalX = -(wallDy);
-                     let normalY = wallDx;
-                     // Ensure normal points away from ball
-                     if ((ball.x - closestX) * normalX + (ball.y - closestY) * normalY < 0) {
-                         normalX *= -1;
-                         normalY *= -1;
-                     }
-                     const normalLen = Math.sqrt(normalX*normalX + normalY*normalY);
-                     if (normalLen > 0.01) {
+                    let wallDx = wall.x2 - wall.x1;
+                    let wallDy = wall.y2 - wall.y1;
+                    let normalX = -(wallDy);
+                    let normalY = wallDx;
+                    if ((ball.x - closestX) * normalX + (ball.y - closestY) * normalY < 0) {
+                        normalX *= -1;
+                        normalY *= -1;
+                    }
+                    const normalLen = Math.sqrt(normalX*normalX + normalY*normalY);
+                    if (normalLen > 0.01) {
                         normalX /= normalLen;
                         normalY /= normalLen;
-                     } else { // Segment is a point, use direction from ball? Not ideal. Default normal?
-                         normalX = moveX / overlap; // Use penetration direction if normal fails
-                         normalY = moveY / overlap;
-                     }
+                    } else {
+                        normalX = moveX / overlap;
+                        normalY = moveY / overlap;
+                    }
 
-
-                     // Reflect velocity using the calculated normal
-                     const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
-                     ball.speedX = reflected.x * restitution;
-                     ball.speedY = reflected.y * restitution;
-                      // Optional: Add small sound effect here
-                      createParticles(closestX, closestY, 3, '#AAAAAA'); // Wall sparks
-                 }
+                    const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
+                    ball.speedX = reflected.x * restitution;
+                    ball.speedY = reflected.y * restitution;
+                    createParticles(closestX, closestY, 3, '#AAAAAA');
+                }
             });
-            // TASK_002: o dreno é tratado por bola em handleDrainCheck (suporte a multibola)
         }
 
         function checkBumperCollisions() {
             bumpers.forEach((bumper, index) => {
-                 if (bumper.hitTimer > 0) bumper.hitTimer--; // Decrement hit timer
+                 if (bumper.hitTimer > 0) bumper.hitTimer--;
                  else bumper.isHit = false;
 
                  const distanceSquared = distSq(ball.x, ball.y, bumper.x, bumper.y);
                  const radiiSumSquared = (ball.radius + bumper.radius) * (ball.radius + bumper.radius);
 
                 if (distanceSquared < radiiSumSquared) {
-                    // Collision!
                     const distance = Math.sqrt(distanceSquared);
                     const overlap = (ball.radius + bumper.radius) - distance;
 
-                     // Normal of collision (from bumper center to ball center)
-                     const normalX = (ball.x - bumper.x) / distance;
-                     const normalY = (ball.y - bumper.y) / distance;
+                    const normalX = (ball.x - bumper.x) / distance;
+                    const normalY = (ball.y - bumper.y) / distance;
 
-                     // Move ball out of collision
-                     ball.x += normalX * overlap;
-                     ball.y += normalY * overlap;
+                    ball.x += normalX * overlap;
+                    ball.y += normalY * overlap;
 
-                     // Reflect velocity (basic reflection off the normal)
-                     const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
+                    const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
+                    const currentSpeed = Math.sqrt(ball.speedX**2 + ball.speedY**2);
+                    const minBounceSpeed = 5 * bounceBoost;
+                    const bounceSpeed = Math.max(minBounceSpeed, currentSpeed * BUMPER_BOUNCE);
+                    const speedFactor = bounceSpeed / Math.sqrt(reflected.x**2 + reflected.y**2);
 
-                     // Apply bounce factor and ensure minimum speed away from bumper
-                     const currentSpeed = Math.sqrt(ball.speedX**2 + ball.speedY**2);
-                     const minBounceSpeed = 5 * bounceBoost; // TASK_002: +40% no overdrive
-                     const bounceSpeed = Math.max(minBounceSpeed, currentSpeed * BUMPER_BOUNCE);
+                    ball.speedX = reflected.x * speedFactor;
+                    ball.speedY = reflected.y * speedFactor;
 
-                     const speedFactor = bounceSpeed / Math.sqrt(reflected.x**2 + reflected.y**2);
-
-                     ball.speedX = reflected.x * speedFactor;
-                     ball.speedY = reflected.y * speedFactor;
-
-
-                    // Score and visual feedback
-                    if (!bumper.isHit) { // Prevent scoring multiple times on one hit
-                         addScore(bumper.points); // TASK_002: × multiplicador × nº bolas × overclock
+                    if (!bumper.isHit) {
+                         addScore(bumper.points);
                          updateScoreDisplay();
                          bumper.isHit = true;
                          bumper.hitTimer = BUMPER_HIT_DURATION;
-                          createParticles(ball.x, ball.y, 15, bumper.hitColor); // Bumper hit sparks
-                          registerBumperHitForMissions(index); // TASK_002: missões/overdrive
+                         soundSynth.playBumperHit(bumper.freq);
+                         createParticles(ball.x, ball.y, 15, bumper.hitColor);
+                         registerBumperHitForMissions(index);
                      }
                 }
             });
@@ -1029,7 +1540,6 @@
                            currentMultiplier = zone.multiplier;
                            updateScoreDisplay();
                       }
-                      // TASK_002: zonas centrais (índices 2,3) alimentam o OVERCLOCK
                       if (index === 2 || index === 3) {
                            overclockZoneTime += (dt || 0);
                            if (overclockZoneTime >= 3.0 && overclockTimer <= 0) {
@@ -1038,67 +1548,57 @@
                                 createParticles(ball.x, ball.y, 18, '#ff2e97');
                            }
                       }
-                      // TASK_002: zona central inferior (índice 3) dispara LOW GRAVITY
                       if (index === 3 && activePhysicsMode !== 'low_gravity') {
                            setPhysicsMode('low_gravity', 12);
                            createParticles(ball.x, ball.y, 16, '#00f0ff');
                       }
                  }
             });
-         }
+        }
 
-         function checkFlipperCollisions() {
+        function checkFlipperCollisions() {
             checkSingleFlipperCollision(leftFlipper);
             checkSingleFlipperCollision(rightFlipper);
         }
 
         function checkSingleFlipperCollision(flipper) {
             const ballRadiusSq = ball.radius * ball.radius;
+            const angle = flipper.currentAngle;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const halfHeight = flipper.height / 2;
+            const drawX = flipper.isLeft ? -flipper.width : 0;
 
-            // 1. Define the flipper rectangle vertices in world space based on current angle
-             const angle = flipper.currentAngle;
-             const cos = Math.cos(angle);
-             const sin = Math.sin(angle);
-             const halfHeight = flipper.height / 2;
-             const drawX = flipper.isLeft ? -flipper.width : 0; // Start X relative to pivot
-
-             // Calculate corner positions relative to pivot, then add pivot world coords
-             const corners = [
-                { x: drawX, y: -halfHeight },         // Top-start corner
-                { x: drawX + flipper.width, y: -halfHeight }, // Top-end corner
-                { x: drawX + flipper.width, y: halfHeight },  // Bottom-end corner
-                { x: drawX, y: halfHeight }           // Bottom-start corner
+            const corners = [
+                { x: drawX, y: -halfHeight },
+                { x: drawX + flipper.width, y: -halfHeight },
+                { x: drawX + flipper.width, y: halfHeight },
+                { x: drawX, y: halfHeight }
             ].map(p => ({
                 x: flipper.pivotX + p.x * cos - p.y * sin,
                 y: flipper.pivotY + p.x * sin + p.y * cos
             }));
 
-            // 2. Check collision with the four line segments of the flipper rectangle
             for (let i = 0; i < 4; i++) {
                 const p1 = corners[i];
-                const p2 = corners[(i + 1) % 4]; // Next corner, wraps around
-                 const { x: closestX, y: closestY } = closestPointOnSegment(ball.x, ball.y, p1.x, p1.y, p2.x, p2.y);
-                 const distanceSquared = distSq(ball.x, ball.y, closestX, closestY);
+                const p2 = corners[(i + 1) % 4];
+                const { x: closestX, y: closestY } = closestPointOnSegment(ball.x, ball.y, p1.x, p1.y, p2.x, p2.y);
+                const distanceSquared = distSq(ball.x, ball.y, closestX, closestY);
 
-                 if (distanceSquared < ballRadiusSq) {
-                     // Collision with this edge
-                     // Move ball out slightly
+                if (distanceSquared < ballRadiusSq) {
                      const overlap = ball.radius - Math.sqrt(distanceSquared);
                      const dx = ball.x - closestX;
                      const dy = ball.y - closestY;
                      const collisionDist = Math.sqrt(dx*dx + dy*dy);
                      const moveX = collisionDist < 0.01 ? 0 : (dx / collisionDist) * overlap;
                      const moveY = collisionDist < 0.01 ? 0 : (dy / collisionDist) * overlap;
-                     ball.x += moveX * 1.1; // Move slightly more to ensure separation
+                     ball.x += moveX * 1.1;
                      ball.y += moveY * 1.1;
 
-                     // Calculate edge normal
                      let edgeDx = p2.x - p1.x;
                      let edgeDy = p2.y - p1.y;
                      let normalX = -edgeDy;
                      let normalY = edgeDx;
-                     // Ensure normal points outward (away from flipper center, approximate)
-                     // A better way involves checking against flipper's pre-rotation axes
                      if ((closestX - flipper.pivotX) * normalX + (closestY - flipper.pivotY) * normalY < 0) {
                          normalX *= -1;
                          normalY *= -1;
@@ -1109,87 +1609,87 @@
                          normalY /= normalLen;
                       }
 
-
-                     // Reflect velocity
                      const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
-                      // Add flipper impulse/angular velocity effect (× overdrive boost)
                       let impulseX = 0;
-                      let impulseY = -FLIPPER_STRENGTH * bounceBoost; // Base upward impulse
+                      let impulseY = -FLIPPER_STRENGTH * bounceBoost;
                       impulseX += (flipper.isLeft ? FLIPPER_SIDE_STRENGTH : -FLIPPER_SIDE_STRENGTH) * bounceBoost;
-                      // TASK_002 (decisão TL #2): momentum proporcional à distância do pivô (v = ω·r)
                       if (flipper.angularVelocity !== 0) {
                            const r = Math.hypot(closestX - flipper.pivotX, closestY - flipper.pivotY);
-                           const rFactor = Math.min(1.4, r / flipper.width); // ponta transmite mais força
+                           const rFactor = Math.min(1.4, r / flipper.width);
                            impulseY -= Math.abs(flipper.angularVelocity) * 40 * rFactor * bounceBoost;
                        }
 
-                     // Apply combined reflection and impulse
                      ball.speedX = reflected.x * 0.5 + impulseX;
                      ball.speedY = reflected.y * 0.5 + impulseY;
 
-                     // Add score, visual effect (× sobrevivência/overclock)
                      addScore(1);
                      updateScoreDisplay();
-                     createParticles(closestX, closestY, 8, '#FFFFFF'); // Flipper hit sparks
-                      // Optional: Play flipper sound
-
-                     return; // Only handle one edge collision per frame
+                     createParticles(closestX, closestY, 8, '#FFFFFF');
+                     return;
                  }
              }
-         }
+        }
 
-
-        // --- Update Game Logic ---
         function updateFlippers(deltaTime) {
-             // Update Left Flipper Angle
+             // Flipper esquerdo
+             if (bossState.activeEmpFlipper === 'left') {
+                 leftFlipper.isActivating = false;
+             }
              const leftTargetAngle = leftFlipper.isActivating ? leftFlipper.activeAngle : leftFlipper.restAngle;
              const leftAngleDiff = leftTargetAngle - leftFlipper.currentAngle;
-             // Apply angular velocity based on difference, clamped by max speed
-              leftFlipper.angularVelocity = Math.sign(leftAngleDiff) * Math.min(Math.abs(leftAngleDiff), FLIPPER_ROTATE_SPEED);
-              if (Math.abs(leftAngleDiff) > 0.01) { // Check difference before updating
-                   leftFlipper.currentAngle += leftFlipper.angularVelocity;
-               } else {
-                   leftFlipper.currentAngle = leftTargetAngle; // Snap to target angle
-                   leftFlipper.angularVelocity = 0;
-               }
-              leftFlipper.isUp = leftFlipper.currentAngle === leftFlipper.activeAngle;
+             leftFlipper.angularVelocity = Math.sign(leftAngleDiff) * Math.min(Math.abs(leftAngleDiff), FLIPPER_ROTATE_SPEED);
+             if (Math.abs(leftAngleDiff) > 0.01) {
+                  leftFlipper.currentAngle += leftFlipper.angularVelocity;
+              } else {
+                  leftFlipper.currentAngle = leftTargetAngle;
+                  leftFlipper.angularVelocity = 0;
+              }
+             leftFlipper.isUp = leftFlipper.currentAngle === leftFlipper.activeAngle;
 
-
-             // Update Right Flipper Angle
+             // Flipper direito
+             if (bossState.activeEmpFlipper === 'right') {
+                 rightFlipper.isActivating = false;
+             }
              const rightTargetAngle = rightFlipper.isActivating ? rightFlipper.activeAngle : rightFlipper.restAngle;
              const rightAngleDiff = rightTargetAngle - rightFlipper.currentAngle;
              rightFlipper.angularVelocity = Math.sign(rightAngleDiff) * Math.min(Math.abs(rightAngleDiff), FLIPPER_ROTATE_SPEED);
-              if (Math.abs(rightAngleDiff) > 0.01) {
+             if (Math.abs(rightAngleDiff) > 0.01) {
                  rightFlipper.currentAngle += rightFlipper.angularVelocity;
              } else {
                  rightFlipper.currentAngle = rightTargetAngle;
                  rightFlipper.angularVelocity = 0;
              }
-              rightFlipper.isUp = rightFlipper.currentAngle === rightFlipper.activeAngle;
+             rightFlipper.isUp = rightFlipper.currentAngle === rightFlipper.activeAngle;
         }
 
         function update(timestamp) {
-            if (!gameActive) return; // Don't update if game over
+            if (!gameActive) {
+                soundSynth.updateAmbient(0, false);
+                return;
+            }
 
-            // Calcular deltaTime
             if (!lastTimestamp) lastTimestamp = timestamp;
-            const deltaTime = Math.min(0.1, (timestamp - lastTimestamp) / 1000); // Delta em segundos, com limite
+            const deltaTime = Math.min(0.1, (timestamp - lastTimestamp) / 1000);
             lastTimestamp = timestamp;
 
-            // Update launcher pull distance (atua na bola ainda não lançada)
             const launchReady = activeBalls.find(b => !b.isLaunched);
             if (launcher.charging && launchReady) {
                 launcher.pullDistance += 90 * deltaTime;
                 if (launcher.pullDistance > launcher.maxPull) launcher.pullDistance = launcher.maxPull;
             }
 
-            // Update flippers + TASK_002 timers
-            updateFlippers();
+            updateFlippers(deltaTime);
             updatePhysicsMode(deltaTime);
             updateMissions(deltaTime);
+            updateBoss(deltaTime);
+            checkBossCollisions();
+            updateFloatingTexts(deltaTime);
+
+            if (bossState.goldSkinTimer > 0) bossState.goldSkinTimer -= deltaTime;
             if (frameFlashTimer > 0) frameFlashTimer -= deltaTime;
 
-            // TASK_002: itera todas as bolas ativas (ponteiro global `ball`)
+            let maxBallSpeed = 0;
+
             for (let i = activeBalls.length - 1; i >= 0; i--) {
                 ball = activeBalls[i];
                 if (ball.isLaunched) {
@@ -1198,6 +1698,9 @@
                     ball.y += ball.speedY;
                     ball.speedX *= currentFriction;
                     ball.speedY *= currentFriction;
+
+                    const curSpeed = Math.hypot(ball.speedX, ball.speedY);
+                    if (curSpeed > maxBallSpeed) maxBallSpeed = curSpeed;
 
                     ball.trail.push({ x: ball.x, y: ball.y });
                     if (ball.trail.length > ball.maxTrailLength) ball.trail.shift();
@@ -1208,30 +1711,26 @@
                     checkMultiplierZoneCollisions(deltaTime);
                     checkFlipperCollisions();
                     checkFirewallTargets();
+                    checkSkillShotSensor(ball);
                 }
                 handleDrainCheck(ball, i);
             }
 
-            // TASK_002: colisão elástica entre bolas (multiball)
             checkBallToBallCollisions();
+            soundSynth.updateAmbient(maxBallSpeed, true);
 
-            // Update bumper hit state timers
             bumpers.forEach(bumper => {
-               if (bumper.hitTimer > 0) bumper.hitTimer -= 1; // Simples contador de frames
-                // Alternativa baseada em tempo:
-                // if (bumper.hitTimer > 0) bumper.hitTimer -= deltaTime;
+               if (bumper.hitTimer > 0) bumper.hitTimer -= 1;
                 else bumper.isHit = false;
             });
         }
 
-        // --- Main Draw Function ---
         function drawGameOver() {
             ctx.save();
             ctx.fillStyle = 'rgba(5, 6, 12, 0.88)';
             ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
             ctx.textAlign = 'center';
-            // GAME OVER em Press Start 2P magenta com glow neon
             ctx.fillStyle = '#ff2e97';
             ctx.font = '24px "Press Start 2P", monospace';
             ctx.shadowColor = '#ff007f';
@@ -1239,7 +1738,6 @@
             ctx.fillText('GAME', canvasWidth / 2, canvasHeight / 2 - 80);
             ctx.fillText('OVER', canvasWidth / 2, canvasHeight / 2 - 40);
 
-            // Placar final em Orbitron dourado
             ctx.fillStyle = '#ffd700';
             ctx.shadowColor = '#ffaa00';
             ctx.shadowBlur = 14;
@@ -1259,17 +1757,15 @@
         }
 
         function drawInstructions() {
-            if (!gameStarted && gameActive) { // Show only if game not started AND not game over
+            if (!gameStarted && gameActive) {
                 ctx.save();
                 ctx.fillStyle = 'rgba(5, 6, 12, 0.9)';
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-                // TASK_001: scanlines estilo CRT
                 ctx.fillStyle = 'rgba(0, 240, 255, 0.04)';
                 for (let y = 0; y < canvasHeight; y += 4) ctx.fillRect(0, y, canvasWidth, 2);
 
                 ctx.textAlign = 'center';
-                // Logo neon piscante (pulsa com o tempo)
                 const t = performance.now();
                 const glow = 12 + Math.sin(t / 200) * 8;
                 ctx.fillStyle = '#ff2e97';
@@ -1295,7 +1791,7 @@
                 ctx.shadowColor = '#39ff14';
                 ctx.shadowBlur = 8;
                 ctx.font = '700 14px "Orbitron", sans-serif';
-                ctx.fillText('Hit Bumpers & Zones for Points!', canvasWidth / 2, canvasHeight / 2 + 60);
+                ctx.fillText('Defeat Rogue AI Core & Skill Shots!', canvasWidth / 2, canvasHeight / 2 + 60);
 
                 ctx.fillStyle = '#ffd700';
                 ctx.shadowColor = '#ffaa00';
@@ -1306,35 +1802,32 @@
         }
 
         function draw() {
-            // Clear canvas
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-            // Draw game elements (order matters for layering)
-            drawTableGrid();            // TASK_002: grade CRT reativa ao modo de gravidade
+            drawTableGrid();
             drawMultiplierZones();
-            drawFirewallTargets();      // TASK_002: alvos da missão Firewall
+            drawSkillShotSensor();
+            drawFirewallTargets();
             drawWalls();
             drawBumpers();
+            drawBoss();
             drawLauncher();
             drawParticles();
             drawFlipper(leftFlipper);
             drawFlipper(rightFlipper);
-            // TASK_002: desenha todas as bolas ativas (ponteiro global `ball`)
             activeBalls.forEach(b => { ball = b; drawBall(); });
 
-            drawMissionsHUD();          // TASK_002: HUD glassmorphic de missões
+            drawMissionsHUD();
+            drawFloatingTexts();
             if (frameFlashTimer > 0) drawFrameFlash();
 
-            // If game over, show message overlay
             if (!gameActive) {
                 drawGameOver();
             }
 
-            // Show instructions if game hasn't started (and not game over)
             drawInstructions();
         }
 
-        // === TASK_002: grade CRT eletrostática reativa ao modo de gravidade ===
         function drawTableGrid() {
             ctx.save();
             ctx.lineWidth = 1;
@@ -1354,7 +1847,6 @@
             ctx.restore();
         }
 
-        // === TASK_002: alvos físicos da FIREWALL CRACK (o próximo acende) ===
         function drawFirewallTargets() {
             const time = performance.now();
             firewallTargets.forEach((t, i) => {
@@ -1370,7 +1862,6 @@
             });
         }
 
-        // === TASK_002: HUD glassmorphic de missões (canvas, topo-esquerdo) ===
         function drawMissionsHUD() {
             if (!gameStarted || !gameActive) return;
             const x = 12, y = 12, w = 168, h = 46;
@@ -1381,7 +1872,7 @@
             ctx.beginPath();
             if (ctx.roundRect) ctx.roundRect(x, y, w, h, 8); else ctx.rect(x, y, w, h);
             ctx.fill(); ctx.stroke();
-            // título da missão
+
             ctx.fillStyle = missionsState.accent;
             ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 6;
             ctx.font = '700 11px "Orbitron", sans-serif';
@@ -1391,7 +1882,7 @@
             ctx.fillStyle = '#cdd6f4';
             ctx.font = '10px "Orbitron", sans-serif';
             ctx.fillText(missionsState.detail, x + 10, y + 32);
-            // barra de progresso/tempo
+
             const barX = x + 10, barY = y + 37, barW = w - 20, barH = 4;
             ctx.fillStyle = 'rgba(255,255,255,0.12)';
             ctx.fillRect(barX, barY, barW, barH);
@@ -1401,7 +1892,6 @@
             ctx.restore();
         }
 
-        // === TASK_002: flash vermelho da moldura ao perder bola no multiball ===
         function drawFrameFlash() {
             ctx.save();
             ctx.strokeStyle = `rgba(255, 30, 60, ${Math.min(0.8, frameFlashTimer * 3)})`;
@@ -1410,10 +1900,7 @@
             ctx.restore();
         }
 
-
-        // --- Utility Functions ---
-         function createParticles(x, y, count, color) {
-             // TASK_001: faíscas de curto-circuito com física de amortecimento
+        function createParticles(x, y, count, color) {
              const rgb = hexToRgb(color) || { r: 255, g: 0, b: 128 };
              for (let i = 0; i < count; i++) {
                  const angle = Math.random() * Math.PI * 2;
@@ -1423,18 +1910,18 @@
                     x: x,
                     y: y,
                     vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 0.8, // viés térmico/gravitacional para cima
+                    vy: Math.sin(angle) * speed - 0.8,
                     r: rgb.r,
                     g: rgb.g,
                     b: rgb.b,
                     alpha: 1,
-                    decay: 1 / (life * 60), // decaimento por frame (~60 FPS)
+                    decay: 1 / (life * 60),
                     size: 1.5 + Math.random() * 2
                 });
             }
         }
 
-         function hexToRgb(hex) {
+        function hexToRgb(hex) {
              if (!hex) return null;
              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
              return result ? {
@@ -1442,20 +1929,17 @@
                  g: parseInt(result[2], 16),
                  b: parseInt(result[3], 16)
              } : null;
-         }
+        }
 
-         function shadeColor(hexColor, percent) {
+        function shadeColor(hexColor, percent) {
             if (!hexColor) return '#000000';
              let rgb = hexToRgb(hexColor);
              if (!rgb) return '#000000';
              let { r, g, b } = rgb;
-
-            const amount = Math.round(2.55 * percent); // Convert percent (-100 to 100) to 0-255 range delta
-
+            const amount = Math.round(2.55 * percent);
              r = Math.min(255, Math.max(0, r + amount));
              g = Math.min(255, Math.max(0, g + amount));
              b = Math.min(255, Math.max(0, b + amount));
-
             const rr = r.toString(16).padStart(2, '0');
             const gg = g.toString(16).padStart(2, '0');
             const bb = b.toString(16).padStart(2, '0');
@@ -1463,16 +1947,14 @@
         }
 
         // --- Game Loop ---
-        function gameLoop(timestamp) { // Adicionar timestamp
-            update(timestamp); // Passa o timestamp para update
+        function gameLoop(timestamp) {
+            update(timestamp);
             draw();
             requestAnimationFrame(gameLoop);
         }
 
-        // --- Start the game ---
-        var lastTimestamp = 0; // Inicializar lastTimestamp globalmente também
+        var lastTimestamp = 0;
         updateScoreDisplay();
-        // Iniciar o loop com requestAnimationFrame para obter o primeiro timestamp
         requestAnimationFrame(gameLoop);
     </script>
 </body>

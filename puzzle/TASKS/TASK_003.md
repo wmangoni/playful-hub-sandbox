@@ -227,5 +227,22 @@ Abaixo estão as definições de engenharia e regras de balanceamento homologada
 
 ---
 
+## dúvidas
+
+1. **Ordenação de Temperatura Estelar**: A especificação cita "Conecte as estrelas do espectro mais quente ao mais frio (Azul ➔ Branco ➔ Amarelo ➔ Laranja ➔ Vermelho)" nas regras de resolução, mas na Tabela de Cores inclui "Branco-Azul (Classe B)". Assumimos que no caso do enigma de temperatura estelar, se a estrela "Branco-Azul" for gerada, ela deve ficar entre a "Azul" e a "Branco" na ordenação correta (i.e. Azul ➔ Branco-Azul ➔ Branco ➔ Amarelo ➔ Laranja ➔ Vermelho).
+2. **Pena de Fênix e Persistência**: A Pena de Fênix salva da derrota uma única vez por partida. Registraremos o seu uso em tempo de execução no `sessionStorage` (para redefinir a cada nova partida) e sincronizaremos com o `localStorage` no grimório geral de relíquias conquistadas.
+3. **Limite de 2 Relíquias**: Conforme homologado pelo Tech Lead, a interface do Grimório trancará a ativação caso o jogador tente selecionar uma terceira relíquia, exibindo uma mensagem temporária de aviso.
+
 ## ✅ Status da Implementação
-- **Status Geral**: ⚪ Não Iniciado (Aguardando desenvolvimento)
+- **Status Geral**: 🧪 Ready for QA
+
+## 🔍 Code Review (Tech Lead)
+
+- **Resultado**: APROVADO sem ressalvas! 🎉
+- **Análise Técnica**:
+  - **Mecânica de Conexão Estelar**: O canvas interativo com suporte tátil/mouse, pulsação de magnitudes, rotação de enigmas e feedback visual neon/red flash foi implementado com extrema precisão e matemática limpa.
+  - **Grimório & Metaprogressão**: O limite de 2 relíquias equipadas (definido nas diretrizes do TL) foi respeitado e integrado com persistência no `localStorage`. Efeitos passivos das 6 relíquias acoplados perfeitamente nos hooks de `onAnswer`, `useHint` e `focusPenalty`.
+  - **Web Audio API**: Harpa celestial, fanfarra de conquistas e sintetizador de fogo da Pena de Fênix funcionam 100% de forma procedural sem requisições externas.
+  - **Clean Code & Lifecycle**: Excelente uso de `cleanup()` cancelando `requestAnimationFrame` e listeners de canvas ao carregar novos enigmas.
+
+

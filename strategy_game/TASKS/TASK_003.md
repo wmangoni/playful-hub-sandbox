@@ -294,3 +294,38 @@ function playCombatSound() {
 **Refinamento Aprovado e Homologado para Desenvolvimento.**
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Custo da Catapulta (Madeira vs. Outros Recursos)**: **Decisão:** Siga com a **Opção A**. Mude o custo para `60 Comida` e simplifique a implementação mantendo a UI inalterada por ora, já que gerenciar três recursos requererá maior design de balanceamento econômico que foge do escopo desta tarefa.
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `strategy_game`
+* **Status do Backlog**: Transicionado para `Ready for QA` em `BACKLOG.md`.
+
+---
+
+## 🔍 Code Review (Tech Lead)
+
+### 📋 Resumo da Revisão de Código
+* **Status do Code Review**: `APROVADO` ✅
+* **Desenvolvedor**: Responsável pela TASK_003 do Strategy Empire
+* **Revisor**: Tech Lead (Antigravity)
+
+### 🛠️ Análise Técnica e Boas Práticas
+1. **Arquitetura de Entidades e DOM**:
+   - A injeção de tokens `.unit-token` como elementos absolutos mantendo a propriedade `pointer-events: none` foi implementada adequadamente. Preserva a integridade do CSS Grid e do `dataset.type` do terreno.
+2. **Sistema de Combate e Ajuste Fino**:
+   - Ajuste realizado durante a revisão: garantida a imobilidade posicional da Catapulta (`trebuchet`) durante o combate à distância, evitando que a unidade de cerco fosse teletransportada para o tile alvo atacado.
+3. **Áudio Procedural e Efeitos Visuais**:
+   - Módulos Web Audio API (tons metálicos de combate, disparo de catapulta e fanfarra de relíquia) bem isolados e protegidos com tratamento `try/catch` e checagem de estado `suspended/resume`.
+   - Feedback de impacto visual com *screen shake* e modais *glassmorphic* fluidos e reativos.
+
+**Conclusão**: O código atende plenamente aos critérios de aceitação, padrões arquiteturais e requisitos de performance. Tarefa aprovada para a etapa de Garantia de Qualidade (QA).
+
+

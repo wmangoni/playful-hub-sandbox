@@ -10,8 +10,17 @@
     <!-- End Google Tag Manager -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎯 The Archer</title>
+    <title>🎯 The Archer - Special Edition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -19,203 +28,367 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            /* Phase 1: Improved Background Gradient */
-            background: linear-gradient(to bottom, #87CEEB 0%, #a1dff7 60%, #bdebff 100%);
+            background: linear-gradient(to bottom, #1a2a3a 0%, #2c475e 50%, #3d5a73 100%);
             overflow: hidden;
-            /* Use a cleaner sans-serif for general text */
             font-family: 'Lato', Arial, sans-serif;
+            color: #fff;
         }
 
-        /* Thematic font for specific elements */
-        #score-container, #arrows-left, #game-over h2, button {
+        #score-container, #arrows-left, #instructions, #wind-container, #combo-container {
+            position: absolute;
+            background: linear-gradient(to bottom, rgba(245, 222, 179, 0.92) 0%, rgba(238, 210, 165, 0.92) 100%);
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 2px solid #b8860b;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.3);
+            color: #4a280d;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        #score-container, #arrows-left, #combo-container, #wind-container {
             font-family: 'Cinzel Decorative', cursive;
         }
 
-        /* 12. UI Container Styling */
-        #score-container, #arrows-left, #instructions {
-            position: absolute;
-            /* Parchment background using gradient */
-            background: linear-gradient(to bottom, rgba(245, 222, 179, 0.85) 0%, rgba(238, 210, 165, 0.85) 100%); /* Wheat/Beige tones */
-            padding: 10px 15px; /* Slightly more padding */
-            border-radius: 3px; /* Sharper corners */
-            border: 1px solid #b8860b; /* Dark Goldenrod border */
-            box-shadow: inset 0 0 5px rgba(0,0,0,0.1), 2px 2px 4px rgba(0,0,0,0.2); /* Inner and outer shadow */
-            color: #502d0e; /* Dark brown text */
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        #score-container { top: 10px; left: 10px; }
-        #arrows-left { top: 55px; /* Adjust if needed based on score container height */ left: 10px; }
+        #score-container { top: 12px; left: 12px; }
+        #arrows-left { top: 55px; left: 12px; }
+        #combo-container { top: 98px; left: 12px; color: #8b0000; }
+        #wind-container { top: 141px; left: 12px; display: flex; align-items: center; gap: 6px; font-family: 'Lato', sans-serif; font-size: 13px; }
+        
         #instructions {
-            top: 10px; right: 10px;
-            max-width: 190px; /* Adjust width */
+            top: 12px; right: 12px;
+            max-width: 210px;
             text-align: left;
-            font-family: 'Lato', Arial, sans-serif; /* Use cleaner font for instructions */
-            font-size: 13px;
-            font-weight: normal; /* Normal weight for instructions */
-            line-height: 1.4;
+            font-family: 'Lato', Arial, sans-serif;
+            font-size: 12px;
+            font-weight: normal;
+            line-height: 1.35;
         }
-        #instructions p { margin: 4px 0; } /* Adjust spacing */
+        #instructions p { margin: 3px 0; }
+        #instructions span.key {
+            background: #4a280d;
+            color: #f5dee5;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 11px;
+        }
 
+        /* Ammo Selector Bar */
+        #ammo-bar {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: rgba(20, 15, 10, 0.85);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 2px solid #b8860b;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+
+        .ammo-slot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 54px;
+            height: 54px;
+            background: linear-gradient(135deg, #2b1e16, #423023);
+            border: 2px solid #654321;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .ammo-slot:hover {
+            border-color: #ffd700;
+            transform: translateY(-2px);
+        }
+
+        .ammo-slot.active {
+            border-color: #00ffcc;
+            box-shadow: 0 0 12px #00ffcc;
+            background: linear-gradient(135deg, #3d2c1f, #5a412f);
+        }
+
+        .ammo-slot.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #444;
+        }
+
+        .ammo-key {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .ammo-icon {
+            font-size: 20px;
+            margin-top: 4px;
+        }
+
+        .ammo-count {
+            font-size: 11px;
+            font-weight: bold;
+            color: #fff;
+            margin-top: 2px;
+        }
 
         #game-container {
             position: relative;
             width: 800px;
             height: 500px;
-            background-color: transparent; /* Let body gradient show through */
-            border: 3px solid #654321; /* Darker wood-like border */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); /* Add depth */
+            background: linear-gradient(to bottom, #87CEEB 0%, #a1dff7 60%, #bdebff 100%);
+            border: 4px solid #4a280d;
+            border-radius: 8px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
             overflow: hidden;
+            transition: filter 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* --- Phase 1: Clouds (Add cloud divs in HTML) --- */
+        #game-container.bullet-time-active {
+            filter: saturate(0.5) contrast(1.3) brightness(0.9);
+            box-shadow: 0 0 35px rgba(255, 69, 0, 0.7);
+        }
+
+        /* Dynamic Bullet Time Overlay Banner */
+        #bullet-time-banner {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Cinzel Decorative', cursive;
+            font-size: 24px;
+            color: #ff3300;
+            text-shadow: 0 0 10px #ffcc00, 0 0 20px #ff3300;
+            letter-spacing: 4px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 35;
+            transition: opacity 0.2s ease;
+        }
+        #game-container.bullet-time-active #bullet-time-banner {
+            opacity: 1;
+            animation: pulseText 0.5s infinite alternate;
+        }
+        @keyframes pulseText {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.1); }
+        }
+
+        /* Clouds */
         .cloud {
             position: absolute;
             background-color: #ffffff;
             opacity: 0.85;
-            border-radius: 50% 60% 40% 70% / 60% 50% 70% 40%; /* Irregular shape */
-            filter: blur(1px); /* Slightly soft edges */
-            animation: slideCloud 40s linear infinite; /* Cloud movement */
+            border-radius: 50% 60% 40% 70% / 60% 50% 70% 40%;
+            filter: blur(1px);
+            pointer-events: none;
         }
-        /* Unique properties for different clouds */
-        #cloud1 { width: 120px; height: 50px; top: 50px; left: 10%; animation-duration: 50s; }
-        #cloud2 { width: 90px; height: 40px; top: 100px; left: 70%; animation-duration: 65s; opacity: 0.7; }
-        #cloud3 { width: 150px; height: 60px; top: 80px; left: 40%; animation-duration: 55s; }
+        #cloud1 { width: 130px; height: 55px; top: 40px; left: 10%; }
+        #cloud2 { width: 100px; height: 45px; top: 90px; left: 65%; opacity: 0.7; }
+        #cloud3 { width: 140px; height: 60px; top: 70px; left: 38%; }
 
-        /* Composite cloud shapes using pseudo-elements */
-        .cloud::before, .cloud::after {
-            content: '';
+        /* Storm Cloud Obstacle */
+        #storm-cloud {
             position: absolute;
-            background-color: inherit; /* Same color as parent */
-            border-radius: 50%;
-            opacity: inherit;
-            filter: inherit;
+            width: 120px;
+            height: 45px;
+            top: 60px;
+            left: 300px;
+            background: linear-gradient(to bottom, #3a4146, #1f2428);
+            border-radius: 40px;
+            box-shadow: 0 0 15px rgba(75, 0, 130, 0.6);
+            z-index: 5;
+            pointer-events: none;
         }
-        .cloud::before { /* Smaller blob on one side */
-            width: 60%; height: 70%; top: -25%; left: 10%;
+        #storm-cloud::after {
+            content: '⚡';
+            position: absolute;
+            bottom: -8px;
+            left: 45%;
+            font-size: 14px;
+            animation: lightningFlash 0.6s infinite alternate;
         }
-        .cloud::after { /* Another smaller blob */
-            width: 50%; height: 60%; top: 10%; right: 5%;
+        @keyframes lightningFlash {
+            0% { opacity: 0.2; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1.2); }
         }
 
-        @keyframes slideCloud {
-            from { transform: translateX(-10%); }
-            to { transform: translateX(10%); } /* Adjust based on desired drift */
-            /* Use different to/from for different clouds if needed */
-             /* Example: 0% {transform: translateX(-200px);} 100% {transform: translateX(900px);} */
+        /* Rotating Wooden Shield Obstacle */
+        #wooden-shield {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            top: 230px;
+            left: 480px;
+            z-index: 6;
+            transform-origin: center center;
+            pointer-events: none;
         }
-        /* --- End Clouds --- */
-
 
         #archer {
             position: absolute;
             bottom: 50px;
-            left: 100px;
+            left: 90px;
             width: 50px;
             height: 80px;
-            background: none;
+            z-index: 4;
         }
-
-        /* SVG specific styles if needed */
-        #archer svg {
-            width: 100%;
-            height: 100%;
-            display: block; /* Prevent extra space below SVG */
-        }
+        #archer svg { width: 100%; height: 100%; }
 
         #bow {
             position: absolute;
-            /* Phase 1: Adjust position/size for curved bow SVG */
-            bottom: 60px; /* Raise slightly to align better with archer SVG */
-            left: 140px; /* Adjust horizontal position */
-            width: 20px; /* Narrower div, SVG will provide visual width */
-            height: 90px; /* Taller to contain the SVG curve */
-            background: none; /* SVG provides visuals */
-            transform-origin: center 75%; /* Rotate near the handle */
+            bottom: 55px;
+            left: 130px;
+            width: 20px;
+            height: 90px;
+            transform-origin: center 75%;
+            z-index: 4;
         }
-        /* SVG specific styles */
-         #bow svg {
-             width: 100%; /* Control overall SVG container size */
-             height: 100%;
-             display: block;
-             overflow: visible; /* Allow stroke to potentially exceed viewbox slightly if needed */
-         }
+        #bow svg { width: 100%; height: 100%; overflow: visible; }
 
-        #arrow {
+        #bow-string-visual {
             position: absolute;
-            bottom: 90px; /* Align with bow handle */
-            left: 145px; /* Align with bow handle */
-            width: 35px; /* Slightly longer */
-            height: 2px;
-            background-color: #444; /* Darker shaft */
-            display: none;
-            transform-origin: 5px center; /* Pivot slightly ahead of base */
-            z-index: 1; /* Arrow above bow potentially */
+            width: 2px;
+            height: 85%;
+            background-color: #eee;
+            top: 7%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3;
+            transition: transform 0.05s ease-out;
         }
 
-        /* Phase 1: Arrow Feathers (Fletching) */
-        #arrow::before, #arrow::after {
+        /* Arrow styling */
+        .arrow-entity {
+            position: absolute;
+            width: 38px;
+            height: 3px;
+            background-color: #3e2723;
+            transform-origin: 5px center;
+            z-index: 8;
+            pointer-events: none;
+        }
+        .arrow-entity::before, .arrow-entity::after {
             content: '';
             position: absolute;
-            width: 10px;
-            height: 5px;
-            background-color: #A0522D; /* Feather color (Sienna) */
-            right: -2px; /* Position at the back */
-            transform-origin: right center;
+            width: 9px;
+            height: 4px;
+            background-color: #8d6e63;
+            right: 0px;
         }
-        #arrow::before {
-            top: -4px;
-            transform: rotate(-35deg) skewX(-20deg);
-        }
-        #arrow::after {
-            bottom: -4px;
-            transform: rotate(35deg) skewX(20deg);
-        }
-
-        #arrowhead {
+        .arrow-entity::before { top: -3px; transform: rotate(-30deg); }
+        .arrow-entity::after { bottom: -3px; transform: rotate(30deg); }
+        .arrowhead {
             position: absolute;
-            left: 35px; /* Match new arrow width */
+            left: 38px;
             top: -4px;
             width: 0;
             height: 0;
-            border-left: 8px solid #333; /* Darker head */
-            border-top: 5px solid transparent;
-            border-bottom: 5px solid transparent;
+            border-left: 9px solid #212121;
+            border-top: 5.5px solid transparent;
+            border-bottom: 5.5px solid transparent;
         }
 
-        #balloon {
+        /* Special Arrow Variants */
+        .arrow-entity.type-fire {
+            background-color: #ff3300;
+            box-shadow: 0 0 8px #ff6600, 0 0 14px #ffcc00;
+        }
+        .arrow-entity.type-fire .arrowhead {
+            border-left-color: #ffff00;
+        }
+
+        .arrow-entity.type-gravity {
+            background-color: #00e5ff;
+            box-shadow: 0 0 10px #00e5ff, 0 0 18px #7c4dff;
+        }
+        .arrow-entity.type-gravity .arrowhead {
+            border-left-color: #00ffff;
+        }
+
+        /* Gravity aura field */
+        .gravity-field {
             position: absolute;
-            width: 40px;
-            height: 50px;
-            /* Phase 1: Gradient for 3D effect */
+            width: 120px;
+            height: 120px;
+            border: 2px dashed #00ffff;
+            border-radius: 50%;
+            top: -58px;
+            left: -58px;
+            opacity: 0.5;
+            animation: rotateField 2s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes rotateField {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Aiming Arrow Preview */
+        #aim-arrow {
+            position: absolute;
+            bottom: 90px;
+            left: 135px;
+            width: 38px;
+            height: 3px;
+            background-color: #3e2723;
+            display: none;
+            transform-origin: 5px center;
+            z-index: 7;
+        }
+
+        /* Balloon */
+        .balloon-entity {
+            position: absolute;
+            width: 42px;
+            height: 52px;
             background: radial-gradient(circle at 30% 30%, #ff8888, #ff0000 60%, #cc0000 95%);
             border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-            bottom: 250px;
-            right: 100px;
-            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2); /* Inner shadow */
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.25), 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 5;
+            transition: transform 0.1s ease;
         }
-        /* Phase 1: Balloon Knot */
-        #balloon::after {
+        .balloon-entity::after {
             content: '';
             position: absolute;
             width: 6px;
             height: 6px;
-            background: #aa0000; /* Darker red */
+            background: #aa0000;
             border-radius: 50%;
-            bottom: -3px; /* Position at the bottom */
+            bottom: -3px;
             left: 50%;
             transform: translateX(-50%);
         }
-
-        #balloon-string {
+        .balloon-string {
             position: absolute;
-            width: 1px; /* Thinner */
-            height: 30px;
-            background-color: #555; /* Dark Grey */
-            bottom: 220px;
-            right: 119px; /* Adjusted slightly */
-            z-index: -1; /* Behind balloon knot */
+            width: 1.5px;
+            height: 32px;
+            background-color: #444;
+            z-index: 4;
+        }
+
+        /* Golden Balloon */
+        .balloon-entity.golden {
+            background: radial-gradient(circle at 30% 30%, #fff2a3, #ffd700 60%, #b8860b 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2), 0 0 15px #ffd700;
+            animation: goldenGlow 1.2s infinite alternate;
+        }
+        .balloon-entity.golden::after { background: #8b6508; }
+        @keyframes goldenGlow {
+            0% { filter: drop-shadow(0 0 4px #ffd700); }
+            100% { filter: drop-shadow(0 0 14px #ffffff); }
         }
 
         #ground {
@@ -223,220 +396,109 @@
             bottom: 0;
             width: 100%;
             height: 50px;
-            /* Phase 1: Gradient for ground */
-            background: linear-gradient(to bottom, #6B8E23 0%, #556B2F 80%); /* Olive green gradient */
-            border-top: 2px solid #4A442A; /* Darker top edge */
+            background: linear-gradient(to bottom, #556B2F 0%, #3e4f22 100%);
+            border-top: 3px solid #2d3b19;
+            z-index: 3;
         }
 
-        /* Game Over Screen Styling */
+        #power-indicator {
+            position: absolute;
+            bottom: 60px;
+            left: 60px;
+            width: 12px;
+            height: 100px;
+            background-color: rgba(30, 30, 30, 0.7);
+            border: 1.5px solid #ffd700;
+            border-radius: 4px;
+            display: none;
+            overflow: hidden;
+            z-index: 10;
+        }
+        #power-bar {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #ff0000, #ffcc00, #00ff00);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            transition: height 0.05s linear;
+        }
+
+        /* Visual Particles & Floaters */
+        .spark-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 25;
+            animation: particleFade 0.4s ease-out forwards;
+        }
+        @keyframes particleFade {
+            0% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+        }
+
+        .floater-text {
+            position: absolute;
+            font-family: 'Cinzel Decorative', cursive;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 6px #000;
+            pointer-events: none;
+            z-index: 30;
+            animation: floatUp 0.9s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-35px) scale(1.2); }
+        }
+
         #game-over {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            /* Similar parchment style */
-            background: linear-gradient(to bottom, rgba(245, 222, 179, 0.95) 0%, rgba(238, 210, 165, 0.95) 100%);
-            padding: 30px 40px;
-            border-radius: 5px;
-            border: 2px solid #8B4513; /* Saddle Brown */
-            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            background: linear-gradient(to bottom, rgba(245, 222, 179, 0.96) 0%, rgba(238, 210, 165, 0.96) 100%);
+            padding: 30px 45px;
+            border-radius: 12px;
+            border: 3px solid #8B4513;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
             text-align: center;
-            display: none; /* Controlled by JS */
-            color: #654321; /* Darker brown text */
+            display: none;
+            color: #4a280d;
+            z-index: 50;
         }
         #game-over h2 {
-            font-size: 2em;
-            color: #8B0000; /* Dark Red */
-            margin-bottom: 15px;
-            font-weight: 700; /* Bolder */
+            font-size: 2.2em;
+            color: #8B0000;
+            margin: 0 0 10px 0;
         }
         #game-over p {
             font-size: 1.1em;
             margin-bottom: 20px;
-            font-family: 'Lato', sans-serif;
         }
         #final-score {
             font-weight: bold;
-            font-size: 1.2em;
-            color: #006400; /* Dark Green */
+            font-size: 1.3em;
+            color: #006400;
         }
-        
-        /* Button Styling */
         button {
-            padding: 10px 25px;
-            background: linear-gradient(to bottom, #8B4513, #A0522D); /* Brown gradient */
-            color: #fff8dc; /* Cornsilk white */
-            border: 1px solid #654321;
-            border-radius: 5px;
+            padding: 12px 28px;
+            background: linear-gradient(to bottom, #8B4513, #654321);
+            color: #fff8dc;
+            border: 2px solid #3d2612;
+            border-radius: 8px;
             cursor: pointer;
-            margin-top: 10px;
             font-size: 1.1em;
             font-weight: bold;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
-            transition: transform 0.1s ease, box-shadow 0.1s ease;
-            box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+            font-family: 'Cinzel Decorative', cursive;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transition: all 0.15s ease;
         }
         button:hover {
-            background: linear-gradient(to bottom, #A0522D, #8B4513); /* Invert gradient */
-            box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+            background: linear-gradient(to bottom, #a0522d, #8b4513);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5);
         }
-         button:active {
-             transform: translateY(1px);
-             box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-         }
-        
-        /* 13. Power Indicator Rework (Vertical) */
-        #power-indicator {
-            position: absolute;
-            /* Position vertically next to archer */
-            bottom: 60px;
-            left: 70px; /* Adjust to be left of the archer */
-            width: 12px; /* Narrow width */
-            height: 100px; /* Taller height */
-            background-color: rgba(50, 50, 50, 0.6); /* Dark semi-transparent background */
-            border: 1px solid #000;
-            border-radius: 3px;
-            display: none; /* Controlled by JS */
-            overflow: hidden; /* Keep gradient contained */
-             /* Optional: Add pulse while charging */
-            animation: pulseIndicator 1s infinite alternate;
-        }
-
-        /* Pulse Animation (Optional) */
-        @keyframes pulseIndicator {
-            from { box-shadow: 0 0 3px #fff; }
-            to   { box-shadow: 0 0 8px #ff0; }
-        }
-        
-        #power-bar {
-            width: 100%; /* Fill width */
-            height: 0%; /* Start at 0% height */
-            /* Gradient Fill */
-            background: linear-gradient(to top, #ff0000, #ffcc00, #00ff00); /* Red -> Yellow -> Green */
-            position: absolute; /* Position within indicator */
-            bottom: 0; /* Align to bottom */
-            left: 0;
-            transition: height 0.05s linear; /* Smooth height transition */
-        }
-        
-        #debug-info {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background-color: rgba(255, 255, 255, 0.7);
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 12px;
-            display: none;
-        }
-
-        /* 7. Balloon Animation */
-        #balloon, #balloon-string {
-            /* Add animation */
-            animation: bobbingBalloon 3s ease-in-out infinite alternate;
-        }
-        #balloon {
-            /* Slight delay difference for variation */
-            animation-delay: -0.5s;
-        }
-
-        @keyframes bobbingBalloon {
-            from { transform: translateY(0px) rotate(-1deg); }
-            to   { transform: translateY(-5px) rotate(1deg); }
-        }
-
-        /* 8. Bow String Visual */
-        #bow-string-visual {
-            position: absolute;
-            width: 1px; /* String thickness */
-            height: 90%; /* Span most of the bow height */
-            background-color: #ccc; /* Light grey string */
-            top: 5%; /* Align vertically */
-            left: 50%; /* Center horizontally initially */
-            transform: translateX(-50%); /* Accurate centering */
-            border-radius: 1px;
-            z-index: 0; /* Behind arrow */
-            /* Smooth transitions when released */
-            transition: transform 0.1s ease-out;
-        }
-
-        /* 9. Arrow Launch Effect */
-        .launch-spark {
-            position: absolute;
-            width: 8px;
-            height: 8px;
-            background-color: yellow;
-            border-radius: 50%;
-            opacity: 0.8;
-            transform: scale(1);
-            pointer-events: none; /* Ignore mouse events */
-            z-index: 2; /* Above bow/arrow */
-            animation: launchEffect 0.2s ease-out forwards;
-        }
-
-        @keyframes launchEffect {
-            0% { opacity: 0.8; transform: scale(1); }
-            100% { opacity: 0; transform: scale(2.5); }
-        }
-
-        /* 10. Arrow Trail */
-        .arrow-trail-dot {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background-color: rgba(255, 255, 200, 0.7); /* Light yellow */
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 0; /* Behind arrow maybe? */
-            opacity: 1;
-            animation: fadeOutTrail 0.5s linear forwards;
-        }
-
-        @keyframes fadeOutTrail {
-            from { opacity: 0.7; transform: scale(1); }
-            to   { opacity: 0; transform: scale(0.3); }
-        }
-
-        /* 11. Balloon Pop Effect */
-        .balloon-fragment {
-            position: absolute;
-            width: 8px;
-            height: 8px;
-            background: radial-gradient(circle, #ff8888, #ff0000 70%); /* Match balloon color */
-            border-radius: 2px; /* Small squares or circles */
-            /* border-radius: 50%; */
-            pointer-events: none;
-            opacity: 1;
-            /* Define animation with custom properties for direction */
-            animation: popFragment 0.6s ease-out forwards;
-        }
-
-        @keyframes popFragment {
-            0% {
-                opacity: 1;
-                transform: translate(0, 0) scale(1) rotate(0deg);
-            }
-            100% {
-                opacity: 0;
-                /* Use CSS variables for dynamic direction */
-                transform: translate(var(--tx, 0), var(--ty, 0)) scale(0) rotate(var(--rot, 0deg));
-            }
-        }
-
-        /* --- End Phase 2 --- */
-
-        /* Existing styles below... ensure elements like arrow position/origin are correct */
-        #arrow {
-             /* ... existing styles ... */
-             bottom: 90px;
-             left: 145px;
-             transform-origin: 5px center; /* Make sure this is reasonable */
-             z-index: 1;
-         }
-         #bow {
-             /* ... existing styles ... */
-             transform-origin: center 75%; /* Pivot near the handle */
-             z-index: 0; /* Behind Arrow */
-         }
     </style>
 </head>
 <body>
@@ -444,695 +506,781 @@
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
-    
+
     <div id="game-container">
+        <div id="bullet-time-banner">⚡ BULLET-TIME ⚡</div>
         <div id="score-container">🎯 Pontos: <span id="score">0</span></div>
         <div id="arrows-left">➵ Flechas: <span id="arrows-counter">5</span></div>
-        <div id="instructions">
-            <p>Clique e arraste para atirar</p>
-            <p>Solte para lançar a flecha</p>
-            <p>Acerte o balão vermelho!</p>
+        <div id="combo-container">🔥 Combo: x<span id="combo-counter">0</span></div>
+        <div id="wind-container">
+            <span>💨 Vento:</span>
+            <span id="wind-val">0.0</span>
         </div>
-        <!-- Phase 1: Add Cloud Elements -->
+
+        <div id="instructions">
+            <p><strong>Controles:</strong></p>
+            <p>Arraste para mirar e carregar força.</p>
+            <p>Solte para disparar.</p>
+            <p><span class="key">1</span> Normal | <span class="key">2</span> Tripla | <span class="key">3</span> Fogo | <span class="key">4</span> Gravitacional</p>
+        </div>
+
+        <!-- Clouds -->
         <div class="cloud" id="cloud1"></div>
         <div class="cloud" id="cloud2"></div>
         <div class="cloud" id="cloud3"></div>
-        <!-- End Clouds -->
+
+        <!-- Storm Cloud Obstacle -->
+        <div id="storm-cloud"></div>
+
+        <!-- Rotating Shield Obstacle -->
+        <div id="wooden-shield">
+            <svg viewBox="0 0 50 50" width="100%" height="100%">
+                <circle cx="25" cy="25" r="22" fill="#8B4513" stroke="#4A280D" stroke-width="4"/>
+                <circle cx="25" cy="25" r="14" fill="#A0522D" stroke="#CD853F" stroke-width="2"/>
+                <circle cx="25" cy="25" r="5" fill="#C0C0C0" stroke="#808080" stroke-width="1.5"/>
+                <line x1="25" y1="3" x2="25" y2="47" stroke="#4A280D" stroke-width="2"/>
+                <line x1="3" y1="25" x2="47" y2="25" stroke="#4A280D" stroke-width="2"/>
+            </svg>
+        </div>
 
         <div id="ground"></div>
+
+        <!-- Archer -->
         <div id="archer">
-            <!-- Phase 1: Simple Archer SVG -->
             <svg viewBox="0 0 50 80" xmlns="http://www.w3.org/2000/svg">
-                <!-- Head -->
                 <circle cx="25" cy="15" r="10" fill="#E0AC69"/>
-                <!-- Body -->
                 <rect x="15" y="25" width="20" height="40" fill="#8B4513" rx="3"/>
-                <!-- Simple legs -->
-                <rect x="17" y="65" width="6" height="15" fill="#654321" />
-                <rect x="27" y="65" width="6" height="15" fill="#654321" />
+                <rect x="17" y="65" width="6" height="15" fill="#4a280d"/>
+                <rect x="27" y="65" width="6" height="15" fill="#4a280d"/>
+                <!-- Eye -->
+                <circle cx="29" cy="14" r="1.5" fill="#000"/>
             </svg>
         </div>
         
+        <!-- Bow -->
         <div id="bow">
-            <!-- Phase 1: Simple Curved Bow SVG -->
             <svg viewBox="-5 -5 30 100" xmlns="http://www.w3.org/2000/svg">
-                <path d="M 10 0 Q 30 45 10 90"
-                      stroke="#8B4513"
-                      stroke-width="5"
-                      stroke-linecap="round"
-                      fill="none" />
+                <path d="M 10 0 Q 30 45 10 90" stroke="#8B4513" stroke-width="5" stroke-linecap="round" fill="none" />
             </svg>
             <div id="bow-string-visual"></div>
         </div>
 
-        <div id="arrow">
-            <div id="arrowhead"></div>
+        <!-- Aim Preview Arrow -->
+        <div id="aim-arrow" class="arrow-entity">
+            <div class="arrowhead"></div>
         </div>
+
+        <!-- Power Indicator Bar -->
         <div id="power-indicator">
             <div id="power-bar"></div>
         </div>
-        <div id="balloon"></div>
-        <div id="balloon-string"></div>
+
+        <!-- Balloon -->
+        <div id="balloon" class="balloon-entity"></div>
+        <div id="balloon-string" class="balloon-string"></div>
+
+        <!-- Ammo Bar HUD -->
+        <div id="ammo-bar">
+            <div class="ammo-slot active" id="slot-normal" onclick="selectArrowType('normal')">
+                <span class="ammo-key">1</span>
+                <span class="ammo-icon">🏹</span>
+                <span class="ammo-count">∞</span>
+            </div>
+            <div class="ammo-slot" id="slot-split" onclick="selectArrowType('split')">
+                <span class="ammo-key">2</span>
+                <span class="ammo-icon">🏹3</span>
+                <span class="ammo-count" id="count-split">3</span>
+            </div>
+            <div class="ammo-slot" id="slot-fire" onclick="selectArrowType('fire')">
+                <span class="ammo-key">3</span>
+                <span class="ammo-icon">🔥</span>
+                <span class="ammo-count" id="count-fire">2</span>
+            </div>
+            <div class="ammo-slot" id="slot-gravity" onclick="selectArrowType('gravity')">
+                <span class="ammo-key">4</span>
+                <span class="ammo-icon">🌀</span>
+                <span class="ammo-count" id="count-gravity">2</span>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
         <div id="game-over">
             <h2>Fim de Jogo!</h2>
             <p>Sua pontuação final: <span id="final-score">0</span></p>
-            <button id="restart-button">Jogar Novamente</button>
+            <button id="restart-button" onclick="restartGame()">Jogar Novamente</button>
         </div>
-        <div id="debug-info"></div>
     </div>
 
     <script>
-        // Elementos do jogo
+        // Game State Variables
+        let score = 0;
+        let arrowsLeft = 5;
+        let comboStreak = 0;
+        let gameOver = false;
+        let isDragging = false;
+        let startX, startY;
+        let arrowAngle = 0;
+        let arrowSpeed = 0;
+        let timeScale = 1.0;
+        let bulletTimeTimer = null;
+        let isBulletTime = false;
+        let windSpeed = 0;
+
+        // Selected Arrow & Ammo
+        let selectedArrowType = 'normal';
+        let ammo = {
+            split: 3,
+            fire: 2,
+            gravity: 2
+        };
+
+        // Active Entities
+        let activeArrows = []; // Array holding active arrow objects: { id, x, y, vx, vy, type, angle, isRicocheted, element, extraEl }
+        let balloonData = { x: 600, y: 250, isGolden: false };
+        let stormCloud = { x: 300, y: 60, vx: 1.2, width: 120, height: 45 };
+        let woodenShield = { x: 480, y: 230, radius: 22, angle: 0, rotSpeed: 0.04 };
+
+        // DOM References
         const gameContainer = document.getElementById('game-container');
         const bow = document.getElementById('bow');
-        const arrow = document.getElementById('arrow');
+        const bowStringVisual = document.getElementById('bow-string-visual');
+        const aimArrow = document.getElementById('aim-arrow');
         const balloon = document.getElementById('balloon');
         const balloonString = document.getElementById('balloon-string');
         const scoreElement = document.getElementById('score');
         const arrowsCounter = document.getElementById('arrows-counter');
-        const finalScoreElement = document.getElementById('final-score');
-        const gameOverElement = document.getElementById('game-over');
-        const restartButton = document.getElementById('restart-button');
+        const comboCounter = document.getElementById('combo-counter');
+        const windVal = document.getElementById('wind-val');
         const powerIndicator = document.getElementById('power-indicator');
         const powerBar = document.getElementById('power-bar');
-        const debugInfo = document.getElementById('debug-info');
-        
-        // Variáveis do jogo
-        let score = 0;
-        let arrowsLeft = 5;
-        let arrowFired = false;
-        let arrowAngle = 0;
-        let arrowSpeed = 0;
-        let arrowVelocityX = 0;
-        let arrowVelocityY = 0;
-        let arrowX = 50;
-        let arrowY = 0;
-        let gravity = 0.25;
-        let isDragging = false;
-        let startX, startY;
-        let gameOver = false;
-        let powerFactor = 0.2;
-        let debugMode = true;  // Ativar/desativar informações de debug
+        const gameOverElement = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        const stormCloudEl = document.getElementById('storm-cloud');
+        const woodenShieldEl = document.getElementById('wooden-shield');
 
-        const bowStringVisual = document.getElementById('bow-string-visual');
-        // Track frame count for trail timing
-        let frameCount = 0;
+        // Web Audio API Procedural Synthesizer
+        let audioCtx = null;
 
-
-        function handleAimMove(clientX, clientY) {
-            const dx = startX - clientX;
-            const dy = clientY - startY; // Keep inverted dy
-
-            const maxPull = 150;
-            const distance = Math.min(Math.sqrt(dx * dx + dy * dy), maxPull);
-            arrowAngle = Math.atan2(dy, dx);
-
-            // Visual Rotation
-            bow.style.transform = `rotate(${arrowAngle}rad)`;
-            arrow.style.transform = `rotate(${arrowAngle}rad)`;
-
-            // Bow string pull animation etc...
-            const stringPullDistance = -distance * 0.4;
-            bowStringVisual.style.transform = `translateX(calc(-50% + ${stringPullDistance}px))`;
-            const arrowPullOffset = stringPullDistance + 5;
-            arrow.style.left = (145 + arrowPullOffset) + 'px';
-            arrowSpeed = distance * powerFactor;
-
-            // --- Update Vertical Power Bar ---
-            const powerPercentage = (distance / maxPull) * 100;
-            powerBar.style.height = powerPercentage + '%'; // <<< Set height instead
-
-            // Remove old color changing logic, gradient handles it
-            /*
-            if (powerPercentage < 33) powerBar.style.backgroundColor = 'green';
-            else if (powerPercentage < 66) powerBar.style.backgroundColor = 'yellow';
-            else powerBar.style.backgroundColor = 'red';
-            */
-
-            // Optional: Add/Remove pulse animation class while dragging
-            // if (!powerIndicator.classList.contains('charging')) {
-            //     powerIndicator.classList.add('charging'); // You'd need a .charging class with the animation
-            // }
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
         }
 
-        gameContainer.addEventListener('mousemove', function(e) {
-            if (!isDragging || gameOver) return;
-            handleAimMove(e.clientX, e.clientY);
-        });
-        gameContainer.addEventListener('touchmove', function(e) {
-            if (!isDragging || gameOver) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            handleAimMove(touch.clientX, touch.clientY);
-        });
+        function playTensionSound(powerRatio) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150 + powerRatio * 250, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+            } catch (e) {}
+        }
 
-        // --- Modify mouseup/touchend event listener ---
-        function handleFire() {
+        function playLaunchSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                if (type === 'fire') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.18);
+                } else if (type === 'gravity') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.25);
+                } else if (type === 'split') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(550, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(250, audioCtx.currentTime + 0.12);
+                } else {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.12);
+                }
+
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.18);
+            } catch (e) {}
+        }
+
+        function playPopSound(isGolden) {
+            if (!audioCtx) return;
+            try {
+                if (isGolden) {
+                    // Golden Fanfare Chime
+                    const freqs = [523.25, 659.25, 783.99, 1046.50];
+                    freqs.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.05);
+                        gain.gain.setValueAtTime(0.25, audioCtx.currentTime + idx * 0.05);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.05 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(audioCtx.currentTime + idx * 0.05);
+                        osc.stop(audioCtx.currentTime + idx * 0.05 + 0.3);
+                    });
+                } else {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(350, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1100, audioCtx.currentTime + 0.09);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                }
+            } catch (e) {}
+        }
+
+        function playBounceSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+            } catch (e) {}
+        }
+
+        function playCloudHitSound() {
+            if (!audioCtx) return;
+            try {
+                // Noise burst for sizzle
+                const bufferSize = audioCtx.sampleRate * 0.12;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+                noise.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+            } catch (e) {}
+        }
+
+        function playComboBreakSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } catch (e) {}
+        }
+
+        // Arrow HUD Selection
+        function selectArrowType(type) {
+            initAudio();
+            if (type !== 'normal' && ammo[type] <= 0) return;
+            selectedArrowType = type;
+            document.querySelectorAll('.ammo-slot').forEach(slot => slot.classList.remove('active'));
+            document.getElementById(`slot-${type}`).classList.add('active');
+        }
+
+        function updateAmmoHUD() {
+            document.getElementById('count-split').textContent = ammo.split;
+            document.getElementById('count-fire').textContent = ammo.fire;
+            document.getElementById('count-gravity').textContent = ammo.gravity;
+
+            ['split', 'fire', 'gravity'].forEach(t => {
+                const slot = document.getElementById(`slot-${t}`);
+                if (ammo[t] <= 0) {
+                    slot.classList.add('disabled');
+                    if (selectedArrowType === t) {
+                        selectArrowType('normal');
+                    }
+                } else {
+                    slot.classList.remove('disabled');
+                }
+            });
+        }
+
+        // Spawn Arrows into activeArrows Array
+        function spawnArrow(angleOffset = 0, speedMultiplier = 1, type = 'normal') {
+            if (arrowsLeft <= 0) return;
+
+            const baseAngle = arrowAngle + angleOffset;
+            const speed = arrowSpeed * speedMultiplier;
+            const vx = Math.cos(baseAngle) * speed;
+            const vy = -Math.sin(baseAngle) * speed;
+
+            const arrowEl = document.createElement('div');
+            arrowEl.className = `arrow-entity type-${type}`;
+            arrowEl.innerHTML = '<div class="arrowhead"></div>';
+            
+            let extraEl = null;
+            if (type === 'gravity') {
+                extraEl = document.createElement('div');
+                extraEl.className = 'gravity-field';
+                arrowEl.appendChild(extraEl);
+            }
+
+            // Initial Position near bow pivot (135px left, 90px bottom)
+            const initialX = 135;
+            const initialY = 90;
+            arrowEl.style.left = `${initialX}px`;
+            arrowEl.style.bottom = `${initialY}px`;
+            arrowEl.style.transform = `rotate(${-baseAngle}rad)`;
+            gameContainer.appendChild(arrowEl);
+
+            const arrowObj = {
+                id: Math.random(),
+                x: initialX,
+                y: initialY,
+                vx: vx,
+                vy: vy,
+                angle: baseAngle,
+                type: type,
+                isRicocheted: false,
+                element: arrowEl,
+                extraEl: extraEl
+            };
+
+            activeArrows.push(arrowObj);
+            playLaunchSound(type);
+            return arrowObj;
+        }
+
+        function fireArrows() {
+            if (arrowsLeft <= 0 || gameOver) return;
+
+            if (selectedArrowType === 'normal') {
+                spawnArrow(0, 1, 'normal');
+            } else if (selectedArrowType === 'split' && ammo.split > 0) {
+                spawnArrow(-0.15, 1, 'split');
+                spawnArrow(0, 1, 'split');
+                spawnArrow(0.15, 1, 'split');
+                ammo.split--;
+            } else if (selectedArrowType === 'fire' && ammo.fire > 0) {
+                spawnArrow(0, 1.1, 'fire');
+                ammo.fire--;
+            } else if (selectedArrowType === 'gravity' && ammo.gravity > 0) {
+                spawnArrow(0, 0.95, 'gravity');
+                ammo.gravity--;
+            }
+
+            arrowsLeft--;
+            arrowsCounter.textContent = arrowsLeft;
+            updateAmmoHUD();
+        }
+
+        // Aiming Drag Handlers
+        function handleAimMove(clientX, clientY) {
+            if (!isDragging || gameOver) return;
+            initAudio();
+
+            const dx = startX - clientX;
+            const dy = clientY - startY;
+            const maxPull = 150;
+            const distance = Math.min(Math.hypot(dx, dy), maxPull);
+
+            arrowAngle = Math.atan2(dy, dx);
+            if (arrowAngle > Math.PI / 2) arrowAngle = Math.PI / 2;
+            if (arrowAngle < -Math.PI * 0.7) arrowAngle = -Math.PI * 0.7;
+
+            bow.style.transform = `rotate(${-arrowAngle}rad)`;
+            aimArrow.style.transform = `rotate(${-arrowAngle}rad)`;
+
+            const stringPull = -distance * 0.4;
+            bowStringVisual.style.transform = `translateX(calc(-50% + ${stringPull}px))`;
+            aimArrow.style.left = `${135 + stringPull}px`;
+            aimArrow.style.display = 'block';
+
+            arrowSpeed = distance * 0.22;
+            const powerRatio = distance / maxPull;
+            powerIndicator.style.display = 'block';
+            powerBar.style.height = `${powerRatio * 100}%`;
+
+            playTensionSound(powerRatio);
+        }
+
+        function handleAimRelease() {
             if (!isDragging || gameOver) return;
             isDragging = false;
-            bowStringVisual.style.transform = `translateX(-50%)`;
 
-            const initialVx = Math.cos(arrowAngle) * arrowSpeed;
-            const initialVy = Math.sin(arrowAngle) * arrowSpeed;
-
-            arrowVelocityX = initialVx;
-            arrowVelocityY = -initialVy;
-
-            // Double-check logging
-            console.log(`
-                Angle: ${arrowAngle.toFixed(2)}
-                rad (${(arrowAngle * 180/Math.PI).toFixed(1)}deg)
-                Speed: ${arrowSpeed.toFixed(2)}
-                Vx: ${arrowVelocityX.toFixed(2)}
-                Vy: ${arrowVelocityY.toFixed(2)}`);
-
-
-            createLaunchSpark();
-
-            arrowFired = true;
-            frameCount = 0;
-            updateArrow();
-            setTimeout(() => {
-                powerIndicator.style.display = 'none';
-                powerBar.style.height = '0%'; // Reset height
-                // powerIndicator.classList.remove('charging'); // Remove pulse class
-            }, 100);
-        }
-
-
-        gameContainer.addEventListener('mouseup', handleFire);
-        gameContainer.addEventListener('touchend', function(e) {
-            e.preventDefault(); // Prevent potential click event after touch
-            handleFire();
-        });
-
-        // --- Modify mouseleave/touchcancel event listener ---
-        function handleAimCancel() {
-            if (isDragging && !arrowFired && !gameOver) {
-                isDragging = false;
-                // Reset bow string visual
-                bowStringVisual.style.transform = `translateX(-50%)`;
-
-                arrow.style.left = '145px';
-                arrow.style.transform = 'rotate(0rad)';
-                bow.style.transform = 'rotate(0rad)';
-                arrow.style.display = 'none';
-                powerIndicator.style.display = 'none';
-                powerBar.style.height = '0%'; // Reset height
-                arrowSpeed = 0;
-            }
-        }
-        gameContainer.addEventListener('mouseleave', handleAimCancel);
-        // Optional: Add touchcancel for robustness
-        // gameContainer.addEventListener('touchcancel', handleAimCancel);
-
-
-        // Phase 2: Function to create launch spark
-        function createLaunchSpark() {
-            const spark = document.createElement('div');
-            spark.className = 'launch-spark';
-            // Position near bow handle/arrow start
-            const bowRect = bow.getBoundingClientRect();
-            const containerRect = gameContainer.getBoundingClientRect();
-            spark.style.left = (bowRect.left - containerRect.left + bowRect.width * 0.5) + 'px'; // Centered horizontally on bow approx
-            spark.style.bottom = (containerRect.bottom - bowRect.top - bowRect.height * 0.25) + 'px'; // Near upper part of handle approx
-            gameContainer.appendChild(spark);
-
-            // Remove spark after animation
-            setTimeout(() => {
-                if (spark.parentNode === gameContainer) { // Check if it hasn't been removed already
-                    gameContainer.removeChild(spark);
-                }
-            }, 200); // Match animation duration
-        }
-
-
-        // --- Modify updateArrow function ---
-        function updateArrow() {
-            if (!arrowFired) return;
-            frameCount++; // Increment frame count
-
-            // Apply gravity...
-            arrowVelocityY -= gravity;
-
-            // Update position...
-            arrowX += arrowVelocityX;
-            arrowY += arrowVelocityY;
-            const currentBottom = 90 + arrowY;
-            const currentLeft = 145 + arrowX; // Base position + delta X (since origin changed)
-
-            arrow.style.bottom = currentBottom + 'px';
-            arrow.style.left = currentLeft + 'px';
-
-            // Calculate angle...
-            const currentAngle = Math.atan2(arrowVelocityY, arrowVelocityX);
-            arrow.style.transform = `rotate(${currentAngle}rad)`;
-
-            // Phase 2: Create Trail Dot periodically
-             if (frameCount % 3 === 0) { // Adjust frequency (lower number = more dots)
-                 createTrailDot(currentLeft + 15, currentBottom + 1); // Position near arrow center/tip
-             }
-
-
-            // Check collision...
-            const hitBalloon = checkCollision();
-
-            // Check bounds...
-            const arrowRect = arrow.getBoundingClientRect();
-            const containerRect = gameContainer.getBoundingClientRect();
-            const outOfBounds =
-                arrowRect.right < containerRect.left - 50 || // Give some leeway
-                arrowRect.left > containerRect.right + 50 ||
-                arrowRect.bottom < containerRect.top - 50 ||
-                arrowRect.top > containerRect.bottom + 50; // Check if way out, not just touching edge
-
-            if (outOfBounds) {
-                resetArrow();
-                arrowsLeft--;
-                arrowsCounter.textContent = arrowsLeft;
-                if (arrowsLeft <= 0 && !gameOver) endGame(); // Check !gameOver prevents multiple calls
-            } else if (hitBalloon) {
-                // Let checkCollision handle balloon pop effects
-                resetArrow();
-            } else {
-                requestAnimationFrame(updateArrow);
-            }
-        }
-
-        // Phase 2: Function to create a trail dot
-        function createTrailDot(x, y) {
-             const dot = document.createElement('div');
-             dot.className = 'arrow-trail-dot';
-             dot.style.left = x + 'px';
-             dot.style.bottom = y + 'px';
-             gameContainer.appendChild(dot);
-
-             // Remove dot after animation (match CSS duration)
-             setTimeout(() => {
-                if (dot.parentNode === gameContainer) {
-                     gameContainer.removeChild(dot);
-                }
-             }, 500);
-         }
-
-
-        // --- Modify checkCollision function ---
-        function checkCollision() {
-            const arrowRect = arrow.getBoundingClientRect();
-            const balloonRect = balloon.getBoundingClientRect();
-
-            // Optimization: Check if balloon is even visible before checking bounds
-             if (balloon.style.display === 'none') return false;
-
-
-            if (
-                arrowRect.left < balloonRect.right &&
-                arrowRect.right > balloonRect.left &&
-                arrowRect.top < balloonRect.bottom &&
-                arrowRect.bottom > balloonRect.top
-            ) {
-                score += 100;
-                scoreElement.textContent = score;
-
-                // Phase 2: Trigger Balloon Pop Effect
-                createBalloonPopEffect(balloonRect);
-
-                // Hide original balloon immediately
-                balloon.style.display = 'none';
-                balloonString.style.display = 'none';
-
-                // Respawn after a delay
-                setTimeout(positionBalloon, 1500); // Slightly longer delay after pop
-
-                return true;
-            }
-            return false;
-        }
-
-        // Phase 2: Function to create balloon pop effect
-        function createBalloonPopEffect(balloonRect) {
-            const containerRect = gameContainer.getBoundingClientRect();
-            const popX = balloonRect.left - containerRect.left + balloonRect.width / 2;
-            const popY = balloonRect.top - containerRect.top + balloonRect.height / 2;
-
-            const fragmentCount = 8; // Number of fragments
-            for (let i = 0; i < fragmentCount; i++) {
-                const fragment = document.createElement('div');
-                fragment.className = 'balloon-fragment';
-                fragment.style.left = popX + 'px';
-                fragment.style.top = popY + 'px'; // Use top instead of bottom for easier translate calc
-
-                // Calculate random direction and distance for animation
-                const angle = Math.random() * Math.PI * 2;
-                const distance = 40 + Math.random() * 40; // Fly out 40-80px
-                const rotation = Math.random() * 360; // Random end rotation
-
-                // Set CSS custom properties for the animation
-                fragment.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
-                fragment.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
-                fragment.style.setProperty('--rot', `${rotation}deg`);
-
-                gameContainer.appendChild(fragment);
-
-                // Remove fragment after animation (match CSS duration)
-                setTimeout(() => {
-                    if (fragment.parentNode === gameContainer) {
-                         gameContainer.removeChild(fragment);
-                    }
-                 }, 600);
-            }
-            // Optional: Play pop sound here if you add audio later
-        }
-
-        // --- Modify resetArrow function ---
-        function resetArrow() {
-            arrowFired = false;
-            arrowX = 0; // Reset relative X
-            arrowY = 0;
-            arrowVelocityX = 0;
-            arrowVelocityY = 0;
-            arrow.style.display = 'none';
-            arrow.style.left = '145px'; // Reset initial position
-            arrow.style.bottom = '90px';
-            arrow.style.transform = 'rotate(0rad)'; // Reset rotation
-            // powerIndicator.style.display = 'none'; // Hide power indicator (already hidden after fire timeout)
-            bowStringVisual.style.transform = 'translateX(-50%)'; // Ensure string is reset visually
-            // bowStringVisual.style.height = '90%';
-            // Optional: Clear any remaining trail dots? Might not be necessary with timeouts.
-
-            if (powerIndicator.style.display !== 'none') {
-                powerIndicator.style.display = 'none';
-                powerBar.style.height = '0%';
-                // powerIndicator.classList.remove('charging');
-            }
-         }
-
-        // Make sure initGame calls resetArrow initially or sets default styles
-        function initGame() {
-            score = 0;
-            arrowsLeft = 5;
-            gameOver = false;
-            scoreElement.textContent = score;
-            arrowsCounter.textContent = arrowsLeft;
-            gameOverElement.style.display = 'none';
-            resetArrow(); // This now resets the power bar height too
-            powerIndicator.style.display = 'none'; // Explicitly hide at start
-            powerBar.style.height = '0%';
-            positionBalloon();
-        }
-        
-        // Posiciona o balão aleatoriamente
-        function positionBalloon() {
-            const minRight = 100;
-            const maxRight = 400;  // Aumentado para usar mais área
-            const minBottom = 150;
-            const maxBottom = 400;  // Aumentado para usar mais área
-            
-            const rightPos = Math.floor(Math.random() * (maxRight - minRight + 1)) + minRight;
-            const bottomPos = Math.floor(Math.random() * (maxBottom - minBottom + 1)) + minBottom;
-            
-            balloon.style.right = rightPos + 'px';
-            balloon.style.bottom = bottomPos + 'px';
-            balloonString.style.right = (rightPos + 19) + 'px';
-            balloonString.style.bottom = (bottomPos - 30) + 'px';
-            
-            balloon.style.display = 'block';
-            balloonString.style.display = 'block';
-        }
-        
-        
-        // Reinicia o jogo
-        function restartGame() {
-            initGame();
-        }
-        
-        // Verifica colisão entre a flecha e o balão
-        function checkCollision() {
-            const arrowRect = arrow.getBoundingClientRect();
-            const balloonRect = balloon.getBoundingClientRect();
-            
-            if (
-                arrowRect.left < balloonRect.right &&
-                arrowRect.right > balloonRect.left &&
-                arrowRect.top < balloonRect.bottom &&
-                arrowRect.bottom > balloonRect.top
-            ) {
-                // Colisão detectada
-                score += 100;
-                scoreElement.textContent = score;
-                
-                // Esconde o balão e reposiciona
-                balloon.style.display = 'none';
-                balloonString.style.display = 'none';
-                
-                setTimeout(positionBalloon, 1000);
-                
-                return true;
-            }
-            
-            return false;
-        }
-        
-        // Atualiza a posição da flecha
-        function updateArrow() {
-            if (!arrowFired) return;
-            
-            // Aplica a gravidade à velocidade vertical
-            arrowVelocityY -= gravity;
-            
-            // Atualiza a posição da flecha
-            arrowX += arrowVelocityX;
-            arrowY += arrowVelocityY;
-            
-            arrow.style.bottom = (90 + arrowY) + 'px';
-            arrow.style.left = (100 + arrowX) + 'px';
-            
-            // Calcula o ângulo com base na trajetória atual
-            const currentAngle = Math.atan2(arrowVelocityY, arrowVelocityX);
-            arrow.style.transform = `rotate(${currentAngle * -1}rad)`;
-            
-            // Exibe informações de debug se estiver ativado
-            if (debugMode) {
-                debugInfo.textContent = `Ângulo: ${(currentAngle * 180 / Math.PI).toFixed(2)}°, 
-                                         VelX: ${arrowVelocityX.toFixed(2)}, 
-                                         VelY: ${arrowVelocityY.toFixed(2)}`;
-            }
-            
-            // Verifica colisão
-            const hitBalloon = checkCollision();
-            
-            // Verifica se a flecha saiu da tela
-            const arrowRect = arrow.getBoundingClientRect();
-            const containerRect = gameContainer.getBoundingClientRect();
-            
-            if (
-                arrowRect.left > containerRect.right ||
-                arrowRect.bottom < containerRect.top ||
-                arrowRect.top > containerRect.bottom
-            ) {
-                resetArrow();
-                arrowsLeft--;
-                arrowsCounter.textContent = arrowsLeft;
-                
-                // Verifica se o jogo acabou
-                if (arrowsLeft <= 0) {
-                    endGame();
-                }
-            } else if (hitBalloon) {
-                resetArrow();
-            } else {
-                // Continua atualizando a posição
-                requestAnimationFrame(updateArrow);
-            }
-        }
-        
-        // Reseta a flecha para atirar novamente
-        function resetArrow() {
-            arrowFired = false;
-            arrowX = 50;
-            arrowY = 0;
-            arrowVelocityX = 0;
-            arrowVelocityY = 0;
-            arrow.style.display = 'none';
-            arrow.style.left = '150px';
-            arrow.style.bottom = '90px';
-            arrow.style.transform = 'rotate(0deg)';
+            aimArrow.style.display = 'none';
+            bowStringVisual.style.transform = 'translateX(-50%)';
             powerIndicator.style.display = 'none';
+            powerBar.style.height = '0%';
+
+            if (arrowSpeed > 1) {
+                fireArrows();
+            }
+            arrowSpeed = 0;
         }
-        
-        // Finaliza o jogo
-        function endGame() {
-            gameOver = true;
-            finalScoreElement.textContent = score;
-            gameOverElement.style.display = 'block';
-        }
-        
-        // Eventos de mouse/touch
-        gameContainer.addEventListener('mousedown', function(e) {
-            if (gameOver || arrowFired) return;
-            
+
+        // Events
+        gameContainer.addEventListener('mousedown', (e) => {
+            if (gameOver) return;
             isDragging = true;
             startX = e.clientX;
             startY = e.clientY;
-            
-            // Mostra a flecha e o indicador de potência
-            arrow.style.display = 'block';
-            powerIndicator.style.display = 'block';
+            initAudio();
         });
-        
-        gameContainer.addEventListener('mousemove', function(e) {
-            if (!isDragging || gameOver) return;
-            
-            const dx = startX - e.clientX;
-            const dy = startY - e.clientY;
-            
-            // Limita o quanto pode puxar o arco
-            const maxPull = 150;
-            const distance = Math.min(Math.sqrt(dx * dx + dy * dy), maxPull);
-            
-            // Calcula o ângulo
-            arrowAngle = Math.atan2(dy, dx);
-            
-            // Permite um ângulo mais amplo
-            if (arrowAngle > Math.PI / 2) {  // Limita ângulo superior (90 graus)
-                arrowAngle = Math.PI / 2;
-            } else if (arrowAngle < -Math.PI * 0.7) {  // Limita ângulo inferior (-126 graus)
-                arrowAngle = -Math.PI * 0.7;
-            }
-            
-            // Ajusta o arco e a flecha para visualização durante mira
-            bow.style.transform = `rotate(${arrowAngle}rad)`;
-            arrow.style.transform = `rotate(${arrowAngle}rad)`;
-            
-            // Calcula a velocidade baseada na distância e ângulo
-            arrowSpeed = distance * powerFactor;
-            
-            // Atualiza o indicador de potência
-            const powerPercentage = (distance / maxPull) * 100;
-            //powerBar.style.width = powerPercentage + '%';
-            
-            if (powerPercentage < 33) {
-                powerBar.style.backgroundColor = 'green';
-            } else if (powerPercentage < 66) {
-                powerBar.style.backgroundColor = 'yellow';
-            } else {
-                powerBar.style.backgroundColor = 'red';
-            }
+
+        gameContainer.addEventListener('mousemove', (e) => handleAimMove(e.clientX, e.clientY));
+        gameContainer.addEventListener('mouseup', handleAimRelease);
+        gameContainer.addEventListener('mouseleave', () => {
+            if (isDragging) handleAimRelease();
         });
-        
-        gameContainer.addEventListener('mouseup', function() {
-            if (!isDragging || gameOver) return;
-            
-            isDragging = false;
-            
-            // Decompõe a velocidade em componentes X e Y de acordo com o ângulo
-            arrowVelocityX = Math.cos(arrowAngle *-1) * arrowSpeed;
-            arrowVelocityY = Math.sin(arrowAngle *-1) * arrowSpeed;
-            
-            // Atira a flecha
-            arrowFired = true;
-            updateArrow();
-        });
-        
-        // Evitar arrastar o mouse para fora
-        gameContainer.addEventListener('mouseleave', function() {
-            if (isDragging && !arrowFired && !gameOver) {
-                isDragging = false;
-                if (arrowSpeed > 0) {
-                    // Decompõe a velocidade em componentes X e Y
-                    arrowVelocityX = Math.cos(arrowAngle) * arrowSpeed;
-                    arrowVelocityY = Math.sin(arrowAngle) * arrowSpeed;
-                    
-                    arrowFired = true;
-                    updateArrow();
-                }
-            }
-        });
-        
-        // Eventos de toque para dispositivos móveis
-        gameContainer.addEventListener('touchstart', function(e) {
-            if (gameOver || arrowFired) return;
-            
+
+        gameContainer.addEventListener('touchstart', (e) => {
+            if (gameOver) return;
             e.preventDefault();
             isDragging = true;
-            const touch = e.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            
-            // Mostra a flecha e o indicador de potência
-            arrow.style.display = 'block';
-            powerIndicator.style.display = 'block';
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            initAudio();
         });
-        
-        gameContainer.addEventListener('touchmove', function(e) {
-            if (!isDragging || gameOver) return;
-            
-            e.preventDefault();
-            const touch = e.touches[0];
-            const dx = startX - touch.clientX;
-            const dy = startY - touch.clientY;
-            
-            // Limita o quanto pode puxar o arco
-            const maxPull = 150;
-            const distance = Math.min(Math.sqrt(dx * dx + dy * dy), maxPull);
-            
-            // Calcula o ângulo
-            arrowAngle = Math.atan2(dy, dx);
-            
-            // Permite um ângulo mais amplo
-            if (arrowAngle > Math.PI / 2) {
-                arrowAngle = Math.PI /.2;
-            } else if (arrowAngle < -Math.PI * 0.7) {
-                arrowAngle = -Math.PI * 0.7;
+        gameContainer.addEventListener('touchmove', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                handleAimMove(e.touches[0].clientX, e.touches[0].clientY);
             }
-            
-            // Ajusta o arco e a flecha
-            bow.style.transform = `rotate(${arrowAngle * -1}rad)`;
-            arrow.style.transform = `rotate(${arrowAngle * -1}rad)`;
-            
-            // Calcula a velocidade com base na distância puxada
-            arrowSpeed = distance * powerFactor;
-            
-            // Atualiza o indicador de potência
-            const powerPercentage = (distance / maxPull) * 100;
-            //powerBar.style.width = powerPercentage + '%';
-            
-            if (powerPercentage < 33) {
-                powerBar.style.backgroundColor = 'green';
-            } else if (powerPercentage < 66) {
-                powerBar.style.backgroundColor = 'yellow';
+        });
+        gameContainer.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handleAimRelease();
+        });
+
+        // Keyboard Hotkeys (1-4)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1') selectArrowType('normal');
+            if (e.key === '2') selectArrowType('split');
+            if (e.key === '3') selectArrowType('fire');
+            if (e.key === '4') selectArrowType('gravity');
+        });
+
+        // Balloon Management
+        function positionBalloon() {
+            const minX = 400;
+            const maxX = 720;
+            const minY = 140;
+            const maxY = 400;
+
+            balloonData.x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
+            balloonData.y = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
+            balloonData.isGolden = Math.random() < 0.22; // 22% Golden Balloon Chance
+
+            balloon.style.left = `${balloonData.x}px`;
+            balloon.style.bottom = `${balloonData.y}px`;
+            balloonString.style.left = `${balloonData.x + 20}px`;
+            balloonString.style.bottom = `${balloonData.y - 30}px`;
+
+            if (balloonData.isGolden) {
+                balloon.classList.add('golden');
             } else {
-                powerBar.style.backgroundColor = 'red';
+                balloon.classList.remove('golden');
             }
-        });
-        
-        gameContainer.addEventListener('touchend', function(e) {
-            if (!isDragging || gameOver) return;
-            
-            e.preventDefault();
-            isDragging = false;
-            
-            // Decompõe a velocidade em componentes X e Y
-            arrowVelocityX = Math.cos(arrowAngle) * arrowSpeed;
-            arrowVelocityY = Math.sin(arrowAngle) * arrowSpeed;
-            
-            // Atira a flecha
-            arrowFired = true;
-            updateArrow();
-        });
-        
-        // Ativa/desativa modo de debug com a tecla 'd'
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'd' || e.key === 'D') {
-                debugMode = !debugMode;
-                debugInfo.style.display = debugMode ? 'block' : 'none';
+
+            balloon.style.display = 'block';
+            balloonString.style.display = 'block';
+        }
+
+        function createSparkEffect(x, y, color = '#ffd700', count = 10) {
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'spark-particle';
+                particle.style.left = `${x}px`;
+                particle.style.bottom = `${y}px`;
+                particle.style.width = `${Math.random() * 6 + 4}px`;
+                particle.style.height = particle.style.width;
+                particle.style.backgroundColor = color;
+                particle.style.boxShadow = `0 0 8px ${color}`;
+
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 45 + 15;
+                particle.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+                particle.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+
+                gameContainer.appendChild(particle);
+                setTimeout(() => particle.remove(), 400);
             }
-        });
-        
-        // Botão de reiniciar
-        restartButton.addEventListener('click', restartGame);
-        
-        // Inicializa o jogo
+        }
+
+        function createFloaterText(x, y, text, color = '#ffd700') {
+            const floater = document.createElement('div');
+            floater.className = 'floater-text';
+            floater.textContent = text;
+            floater.style.left = `${x}px`;
+            floater.style.bottom = `${y}px`;
+            floater.style.color = color;
+            gameContainer.appendChild(floater);
+            setTimeout(() => floater.remove(), 900);
+        }
+
+        // Bullet-Time System
+        function activateBulletTime() {
+            if (isBulletTime) return;
+            isBulletTime = true;
+            timeScale = 0.25;
+            gameContainer.classList.add('bullet-time-active');
+
+            if (bulletTimeTimer) clearTimeout(bulletTimeTimer);
+            bulletTimeTimer = setTimeout(deactivateBulletTime, 3000);
+        }
+
+        function deactivateBulletTime() {
+            isBulletTime = false;
+            timeScale = 1.0;
+            gameContainer.classList.remove('bullet-time-active');
+            if (bulletTimeTimer) {
+                clearTimeout(bulletTimeTimer);
+                bulletTimeTimer = null;
+            }
+        }
+
+        // Main Game Physics Loop
+        function gameLoop() {
+            if (gameOver) return;
+
+            const dt = 1.0 * timeScale;
+
+            // 1. Update Storm Cloud (horizontal bounce)
+            stormCloud.x += stormCloud.vx * dt;
+            if (stormCloud.x <= 200 || stormCloud.x >= 650) {
+                stormCloud.vx *= -1;
+            }
+            stormCloudEl.style.left = `${stormCloud.x}px`;
+
+            // 2. Update Wooden Shield Rotation
+            woodenShield.angle += woodenShield.rotSpeed * dt;
+            woodenShieldEl.style.transform = `rotate(${woodenShield.angle}rad)`;
+
+            // 3. Process Active Arrows
+            for (let i = activeArrows.length - 1; i >= 0; i--) {
+                const arrow = activeArrows[i];
+
+                // Apply Gravity arrow magnetic pull on balloon
+                if (arrow.type === 'gravity' && balloon.style.display !== 'none') {
+                    const arrowTipX = arrow.x + Math.cos(arrow.angle) * 38;
+                    const arrowTipY = arrow.y + Math.sin(arrow.angle) * 38;
+                    const dx = arrowTipX - (balloonData.x + 20);
+                    const dy = arrowTipY - (balloonData.y + 25);
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist < 80) {
+                        const pullForce = (80 - dist) * 0.08 * dt;
+                        balloonData.x += (dx / dist) * pullForce;
+                        balloonData.y += (dy / dist) * pullForce;
+                        balloon.style.left = `${balloonData.x}px`;
+                        balloon.style.bottom = `${balloonData.y}px`;
+                        balloonString.style.left = `${balloonData.x + 20}px`;
+                        balloonString.style.bottom = `${balloonData.y - 30}px`;
+                    }
+                }
+
+                // Physics updates
+                if (arrow.type !== 'gravity') {
+                    arrow.vx += windSpeed * 0.03 * dt; // Wind effect
+                }
+                arrow.vy -= 0.22 * dt; // Gravity
+
+                arrow.x += arrow.vx * dt;
+                arrow.y += arrow.vy * dt;
+
+                if (!arrow.isRicocheted) {
+                    arrow.angle = Math.atan2(arrow.vy, arrow.vx);
+                } else {
+                    arrow.angle += 0.2 * dt; // Tumble on ricochet
+                }
+
+                arrow.element.style.left = `${arrow.x}px`;
+                arrow.element.style.bottom = `${arrow.y}px`;
+                arrow.element.style.transform = `rotate(${-arrow.angle}rad)`;
+
+                const arrowTipX = arrow.x + Math.cos(arrow.angle) * 38;
+                const arrowTipY = arrow.y + Math.sin(arrow.angle) * 38;
+
+                // Bullet-time check: Trigger if last arrow close to balloon or golden balloon
+                if (arrowsLeft === 0 && !isBulletTime && balloon.style.display !== 'none') {
+                    const distToBalloon = Math.hypot(arrowTipX - (balloonData.x + 20), arrowTipY - (balloonData.y + 25));
+                    if (distToBalloon < 85) {
+                        activateBulletTime();
+                    }
+                }
+
+                // Collision A: Storm Cloud (Desintegrates arrow)
+                if (
+                    arrowTipX >= stormCloud.x && arrowTipX <= stormCloud.x + stormCloud.width &&
+                    arrowTipY >= 500 - (stormCloud.y + stormCloud.height) && arrowTipY <= 500 - stormCloud.y
+                ) {
+                    createSparkEffect(arrowTipX, arrowTipY, '#00ffff', 14);
+                    playCloudHitSound();
+                    arrow.element.remove();
+                    activeArrows.splice(i, 1);
+                    continue;
+                }
+
+                // Collision B: Rotating Wooden Shield (Ricochet physics)
+                const shieldCenterX = woodenShield.x + 22;
+                const shieldCenterY = woodenShield.y + 22;
+                const distToShield = Math.hypot(arrowTipX - shieldCenterX, arrowTipY - (500 - shieldCenterY));
+
+                if (distToShield < woodenShield.radius + 6 && !arrow.isRicocheted) {
+                    arrow.vx = -arrow.vx * 0.55;
+                    arrow.vy = (arrow.vy > 0 ? -1 : 1) * Math.abs(arrow.vy) * 0.35 + (Math.random() * 2 - 1);
+                    arrow.isRicocheted = true;
+                    createSparkEffect(arrowTipX, arrowTipY, '#cd853f', 10);
+                    createFloaterText(arrowTipX, arrowTipY, 'RICOCHETE!', '#ffd700');
+                    playBounceSound();
+                }
+
+                // Collision C: Balloon Hit
+                if (balloon.style.display !== 'none') {
+                    const balloonBoxLeft = balloonData.x;
+                    const balloonBoxRight = balloonData.x + 42;
+                    const balloonBoxBottom = balloonData.y;
+                    const balloonBoxTop = balloonData.y + 52;
+
+                    if (
+                        arrowTipX >= balloonBoxLeft && arrowTipX <= balloonBoxRight &&
+                        arrowTipY >= balloonBoxBottom && arrowTipY <= balloonBoxTop
+                    ) {
+                        // Pop Balloon!
+                        comboStreak++;
+                        comboCounter.textContent = comboStreak;
+
+                        const pts = balloonData.isGolden ? 300 : (100 + (comboStreak - 1) * 20);
+                        score += pts;
+                        scoreElement.textContent = score;
+
+                        // Golden balloon or Combo multiples of 5 gives +1 Ammo Refill!
+                        let refillMsg = '';
+                        if (balloonData.isGolden || comboStreak % 5 === 0) {
+                            const ammoTypes = ['split', 'fire', 'gravity'];
+                            const randomAmmo = ammoTypes[Math.floor(Math.random() * ammoTypes.length)];
+                            ammo[randomAmmo]++;
+                            updateAmmoHUD();
+                            refillMsg = ` +1 ${randomAmmo.toUpperCase()}!`;
+                        }
+
+                        createFloaterText(balloonData.x, balloonData.y + 20, `+${pts}${refillMsg}`, balloonData.isGolden ? '#ffff00' : '#00ffcc');
+                        createSparkEffect(balloonData.x + 20, balloonData.y + 25, balloonData.isGolden ? '#ffd700' : '#ff3333', 18);
+                        playPopSound(balloonData.isGolden);
+
+                        balloon.style.display = 'none';
+                        balloonString.style.display = 'none';
+
+                        if (balloonData.isGolden && Math.hypot(arrow.vx, arrow.vy) > 8) {
+                            activateBulletTime();
+                        }
+
+                        setTimeout(positionBalloon, 1200);
+
+                        // If not fire arrow, destroy arrow on balloon hit
+                        if (arrow.type !== 'fire') {
+                            arrow.element.remove();
+                            activeArrows.splice(i, 1);
+                            continue;
+                        }
+                    }
+                }
+
+                // Check Bounds / Ground
+                if (arrow.x < 0 || arrow.x > 820 || arrow.y < 45 || arrow.y > 550) {
+                    arrow.element.remove();
+                    activeArrows.splice(i, 1);
+                }
+            }
+
+            // Check Game Over Condition
+            if (arrowsLeft === 0 && activeArrows.length === 0 && !gameOver) {
+                setTimeout(endGame, 800);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function generateNewWind() {
+            windSpeed = (Math.random() * 4.4 - 2.2); // -2.2 to +2.2
+            const dir = windSpeed >= 0 ? '➡️' : '⬅️';
+            windVal.textContent = `${dir} ${Math.abs(windSpeed).toFixed(1)}`;
+        }
+
+        function initGame() {
+            score = 0;
+            arrowsLeft = 5;
+            comboStreak = 0;
+            gameOver = false;
+
+            ammo = { split: 3, fire: 2, gravity: 2 };
+            selectArrowType('normal');
+            updateAmmoHUD();
+
+            scoreElement.textContent = score;
+            arrowsCounter.textContent = arrowsLeft;
+            comboCounter.textContent = comboStreak;
+            gameOverElement.style.display = 'none';
+
+            activeArrows.forEach(a => a.element.remove());
+            activeArrows = [];
+
+            generateNewWind();
+            positionBalloon();
+            deactivateBulletTime();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        function endGame() {
+            if (gameOver) return;
+            gameOver = true;
+            if (comboStreak === 0) playComboBreakSound();
+            deactivateBulletTime();
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+        }
+
+        // Start initial game
         initGame();
     </script>
 </body>

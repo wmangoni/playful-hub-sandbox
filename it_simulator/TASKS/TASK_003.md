@@ -649,3 +649,32 @@ Abaixo estão detalhadas as inclusões visuais para exibir os Contratos Ativos e
 Este escopo eleva a complexidade do **Company Simulator** para um padrão de excelência de simulador de estúdio, garantindo diversão e imersão total!
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Dependência Crítica da TASK_002**: **Decisão:** Você pode começar o front-end visual e a estrutura paralela (Quadro de Contratos e Audio engine), mockando as variáveis de freelancer até que a TASK_002 seja mesclada. Evite refatoração de arrays da `this.developers` até o merge.
+2. **Valores da Dívida Técnica**: **Decisão:** Siga o detalhamento técnico: `+4%` para Rushing e `+2%` por Freelancer ativo. A diferença será retificada na história de usuário no próximo refinamento de regras.
+3. **Custo Operacional Adicional**: **Decisão:** Adote a fórmula contínua (`this.techDebt * 30`). É melhor computacionalmente e distribui a penalidade suavemente para o jogador em vez de solavancos agressivos de custo.
+
+---
+
+## 🔍 Code Review
+
+- **Data da Revisão**: 2026-08-02
+- **Revisor**: Tech Lead (TL)
+- **Resultado**: ✅ **Aprovado para QA (Ready for QA)**
+
+### 📊 Avaliação Geral do Código
+1. **Quadro de Contratos (Bidding Board)**: Excelente implementação de `ClientContract` com geração procedural rotativa de 3 contratos por mês e suporte a até 2 contratos simultâneos. Mecânica de "Rushing" funcional com estresse extra e acúmulo de Tech Debt.
+2. **Sistema de Dívida Técnica (Tech Debt)**: Cálculo contínuo de custos de manutenção (`techDebt * 30`), redução da força de trabalho por débito técnico e risco proporcional de vazamento de dados. Ação `Refactor Systems ($15,000)` para redução de 25% implementada corretamente.
+3. **Áudio Procedural (`CorporateAudioEngine`)**: Síntese procedural de lo-fi BGM com escala pentatônica e SFX dinâmicos (sucesso, falha, crise, burnout, clique) via Web Audio API pura sem dependências externas.
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `it_simulator`
+* **Status do Backlog**: Transicionado para `Ready for QA` em `BACKLOG.md`.
+

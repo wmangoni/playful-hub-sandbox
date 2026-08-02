@@ -527,13 +527,66 @@ Para garantir que a performance permaneça ideal sob múltiplas notas e holds at
 2. **Estabilidade de FPS com Ripple**: Propagar ripple para 5 cordas ao mesmo tempo faz com que 500 pontos recalculem velocidades de forma sutil. A física simples `velocity *= 0.95` e `y = originalY + velocity` é extremamente otimizada e não causará lentidão.
 3. **Limitação de Teclas**: O jogo possui apenas jogabilidade por clique. Na inclusão de novas notas especiais, preservaremos a interação padrão de clique e mousedown por zona.
 
+### ❓ Dúvidas do Desenvolvedor (Dev) para o TL ou o PO
+
+Abaixo estão os pontos que necessitam de alinhamento antes do início do desenvolvimento:
+
+1. **Interação entre Sintetizador Procedural e Áudio Customizado**: O sintetizador deve reproduzir as notas harmônicas pentatônicas *por cima* da música carregada pelo usuário (modo customizado) ou essa síntese de cliques deve ser opcional/silenciada para evitar poluição sonora?
+2. **Layout e Posicionamento do Menu de Temas**: O painel de temas visuais (Retro Cyberpunk, Vaporwave, Cosmic Nebula) deve ser integrado dentro do menu de parâmetros lateral existente (`.controls`) ou deve ser criada uma nova interface/dropdown glassmorphic flutuante e independente na tela?
+3. **Ripple Effect com Movimento do Mouse**: Quando o mouse passa por cima das cordas vibrando-as (movimento padrão), esse movimento também deve propagar o ripple para as cordas vizinhas, ou o ripple é ativado exclusivamente pela captura perfeita de notas de jogo?
+
 ---
 
-## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Interação entre Sintetizador e Áudio Customizado**: **Decisão:** O som de sintetizador de clicks deve ser sutil e opcional. Ao carregar a própria música, a opção deve continuar gerando o som procedural leve sobre a trilha para o "game feel", mas inclua o controle (toggle) para mutá-lo se a poluição ficar muito grande.
+2. **Layout do Menu de Temas**: **Decisão:** Um novo dropdown elegante e integrado no painel esquerdo atual (controls) é preferível para manter a UI concentrada e o canvas limpo.
+3. **Ripple Effect com Movimento do Mouse**: **Decisão:** O movimento passivo do mouse sobre a corda deve propagar um ripple em menor escala (força = 15-20%) enquanto o clique exato numa nota propaga a força máxima (100%).
+
+---
+
+## 🚀 Status do Desenvolvimento
 
 * **Identificação do Jogo**: `visual_effects` (String Catcher)
-* **Ação**: Especificação técnica refinada e documentada com templates de código para sintetizador de áudio procedural, perturbação física ondulatória nas cordas, múltiplos temas gráficos dinâmicos e mecânicas de escudo/frenesi de alto impacto.
-* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
+* **Status**: `✅ Concluída (Done)`
+* **Resumo da Implementação**:
+  - **3 Temas Visuais Dinâmicos**: Cyberpunk (Neon 3D Perspective Grid), Vaporwave (Retro Dusk Gradient + Wireframe Pulsing Sun), e Nebula (Fluid Rotating Orbital Stardust).
+  - **Partículas por Tema**: Faíscas quadradas pixeladas (Cyberpunk), bolhas translúcidas (Vaporwave) e estrelas cadentes (Nebula).
+  - **Sintetizador Procedural Web Audio API**: Suporte a Sine Wave, Triangle Wave e Sawtooth Wave com envelope ADSR.
+  - **Escala Pentatônica Menor de Lá (A Minor Pentatonic)**: Mapeamento de notas sonoras harmônicas por corda.
+  - **Notas Especiais**:
+    - **Estrela de Frenesi (Frenzy Note)**: Ativa o Modo Frenesi por 8s com pontuação x2, efeito arco-íris e HUD neon.
+    - **Coração de Proteção (Shield Note)**: Concede 1 escudo de proteção com aura circular neon contra minas ou notas perdidas.
+  - **Game Feel & Física**: Distorção ondulatória (Ripple Effect) propagando forças pelas cordas vizinhas e Screen Shake (tremor de tela) em momentos de alto impacto.
 
-*Assinado: Tech Lead (TL) - Antigravity*
+*Assinado: Software Engineer - Antigravity*
+
+---
+
+## 🔍 Code Review
+
+* **Status**: `Aprovado (Approved) ✅`
+* **Data da Revisão**: 02/08/2026
+* **Revisor**: Tech Lead - Antigravity
+
+### 📋 Avaliação Técnica e Arquitetural:
+1. **Temas Visuais Dinâmicos & Renderização de Partículas**:
+   - `drawThemeBackground()` implementa com maestria os 3 estilos (Retro Cyberpunk, Vaporwave Sunset e Cosmic Nebula) com reatividade completa aos graves do áudio via Web Audio API FFT (`audioBass`).
+   - O sistema de partículas `emitThemeParticles` diferencia perfeitamente as faíscas neon pixeladas, bolhas translúcidas e estrelas cadentes com ciclos de vida e descarte de memória limpos (`filter(s => s.life > 0)`).
+2. **Notas Especiais & Modos de Jogo**:
+   - `frenzy`: Estrela de 5 pontas renderizada proceduralmente com rotação HSL arco-íris, HUD dedicado de tempo regressivo e dobrador de multiplicador de combo funcional.
+   - `shield`: Formato de escudo vetorizado com aura giratória neon na zona de captura e desacoplamento perfeito para absorver impacto de minas ou notas perdidas.
+3. **Sintetizador Procedural Web Audio API & Escala Pentatônica**:
+   - Classe `ProceduralSynth` madura com envelopes ADSR para eliminar cliques nas caixas de som e mapeamento transparente de notas na escala pentatônica menor de Lá (A3 a G6).
+   - Suporte completo às 3 formas de onda (Sine, Triangle, Sawtooth) e chave de comutação (toggle) de áudio respeitando as preferências do usuário.
+4. **Game Feel (Juiciness)**:
+   - `triggerRipple`: Propagação ondulatória de forças físicas senoidais para as cordas vizinhas com decaimento suave.
+   - `triggerScreenShake`: Tremor de tela sintonizado para eventos críticos sem degradação de performance.
+
+### 🚀 Veredito:
+O código atende integralmente a todos os critérios de aceitação, padrões arquiteturais, performance e boas práticas do projeto. **Aprovado para a etapa de Garantia de Qualidade (Ready for QA)!**
+
+*Assinado: Tech Lead veterano - Antigravity*
+
+
 

@@ -340,3 +340,64 @@ function evaluateDianaDecision(handStrength, activePot, currentBet, playerChips)
 **Resultado da Avaliação**: APROVADO com louvor. A distribuição física de cartas 3D com delay staggered elevou o jogo.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## Evidencias de Testes
+
+A tarefa foi validada e testada com sucesso via automação baseada em Puppeteer.
+
+### 📋 Resultados da execução da suíte de testes E2E (`tests/qa_poker.test.js`)
+```
+--- STARTING QA TEST SUITE FOR POKER BOT REMOVAL ---
+Loading puppeteer (ESM)...
+Test server running on http://127.0.0.1:3088
+
+Navigating to Poker game page...
+Clicking "Single Player" button...
+Initial players count: 4
+
+--- Test Case 1: AI 1 goes bankrupt ---
+Players count after AI 1 bankruptcy: 3
+Is AI 1 still in the game? false
+
+--- Test Case 2: AI 2 goes bankrupt (Human Victory) ---
+[DIALOG] ALERT: Parabéns! Você venceu o jogo! Todos os oponentes faliram.
+Is mode select screen visible (Human Won)? true
+
+--- Test Case 3: Human goes bankrupt (Defeat) ---
+Clicking "Single Player" button to restart...
+[DIALOG] ALERT: Você faliu! Fim de jogo.
+Is mode select screen visible (Human Bankrupt)? true
+
+--- Test Case 4: Verify Tournament Selection Overlay & Wallet ---
+Clicking "Modo Torneio" button...
+Is tournament overlay visible? true
+Wallet display: $1000
+Number of tournament cards: 3
+Clicking tournament overlay "Voltar" button...
+Is tournament overlay visible after closing? false
+
+--- Test Case 5: Verify Profile Modal & Trophy Gallery ---
+Clicking "Perfil & Troféus" button...
+Is profile overlay visible? true
+Number of trophy slots: 3
+Clicking profile overlay "Fechar" button...
+Is profile overlay visible after closing? false
+
+--- Test Case 6: Verify 3D Chip Stacks calculation ---
+Chip calculation for $1280: {"black":2,"green":2,"blue":1,"red":3}
+
+--- Test Case 7: Start Tournament & Check HUD, Blinds and Roles ---
+Opening tournament overlay again...
+Clicking Bronze Pub Cup tournament card...
+Blinds HUD display style: block
+Blinds HUD text: 10 / 20
+Active players in tournament: ["Jogador","Arthur \"The Shark\"","Beatriz \"Calling Station\"","Caio \"The Maniac\""]
+Do all players have correct blind roles? true
+Tokens assigned - Dealer: true, SB: true, BB: true
+
+=============================================
+🎉 ALL POKER TASK_003 TESTS PASSED SUCCESSFULLY!
+=============================================
+```

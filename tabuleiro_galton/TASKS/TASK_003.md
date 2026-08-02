@@ -343,3 +343,20 @@ function playAudio(type) {
     Criar uma seção no painel lateral `sidebar-container` contendo o seletor de Desafio e um botão de ação "Iniciar Desafio" / "Cancelar", além de uma caixa de informações que reporte o status atual da checagem (`match %` e mensagem de instrução).
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 💡 Decisões e Resoluções do Tech Lead (TL)
+
+1. **Desafio 3 (Grade Uniforme)**: **Decisão:** A validação deve acontecer logo após o exato momento em que a 120ª esfera for registrada (coletada em um bin). Bloqueie o botão de disparo de mais bolinhas logo quando as bolinhas "no ar" somadas às coletadas atingirem 120.
+2. **Pinos Especiais em Outros Layouts**: **Decisão:** Ajuste a posição dinamicamente para cada layout, evitando sobreposição e buracos lógicos. Limitar apenas ao layout Triangular reduziria muito a rejogabilidade.
+3. **Força de Atração do Pino Gravitacional**: **Decisão:** Com certeza. Implemente o limite $d_{min} \approx pegRadius + ballRadius + 2px$ para truncar a magnitude da atração e evitar instabilidades na equação de força e estilingadas (slingshot).
+
+---
+
+## 🚀 Status do Refinamento Técnico (Tech Lead Aprovou)
+
+* **Identificação do Jogo**: `tabuleiro_galton` (Galton Board)
+* **Ação**: Resolução das dúvidas táticas do desenvolvedor.
+* **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
+
