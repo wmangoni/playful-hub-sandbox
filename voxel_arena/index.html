@@ -647,6 +647,240 @@
         const ARENA_SIZE = 100;
 
         // =====================================================================
+        // === TASK_001 — VFX System (Dynamic Lights & Skill Effects)
+        // =====================================================================
+
+        const activeVFX = [];
+
+        function updateVFX(scene, dt) {
+            for (let i = activeVFX.length - 1; i >= 0; i--) {
+                const vfx = activeVFX[i];
+                vfx.life -= dt * 1000;
+                const age = 1.0 - (vfx.life / vfx.maxLife);
+
+                if (vfx.group.customUpdate) {
+                    vfx.group.customUpdate(dt, age);
+                }
+
+                if (vfx.light) {
+                    vfx.light.intensity = vfx.initialIntensity * Math.cos(age * Math.PI / 2);
+                }
+
+                if (vfx.life <= 0) {
+                    scene.remove(vfx.group);
+                    vfx.group.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(m => m.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    });
+                    activeVFX.splice(i, 1);
+                }
+            }
+        }
+
+        function spawnDynamicSkillVFX(scene, position, type) {
+            const vfxGroup = new THREE.Group();
+            vfxGroup.position.copy(position);
+
+            let lightColor, lightIntensity, lightDistance, duration;
+
+            if (type === 'spin') {
+                lightColor = 0xffd700;
+                lightIntensity = 4.0;
+                lightDistance = 15;
+                duration = 300;
+
+                const ringGeo = new THREE.TorusGeometry(5, 0.4, 8, 32);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xffd700, transparent: true, opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                vfxGroup.add(ring);
+
+                vfxGroup.customUpdate = (dt, age) => {
+                    ring.rotation.z += dt * 15;
+                    ring.scale.setScalar(1 + age * 2.0);
+                    ringMat.opacity = 1.0 - age;
+                };
+            } else if (type === 'heal') {
+                lightColor = 0x00ff88;
+                lightIntensity = 5.0;
+                lightDistance = 12;
+                duration = 600;
+
+                const particles = [];
+                const partGeo = new THREE.SphereGeometry(0.2, 4, 4);
+                const partMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true });
+
+                for (let i = 0; i < 12; i++) {
+                    const part = new THREE.Mesh(partGeo, partMat);
+                    const angle = (i / 12) * Math.PI * 2;
+                    part.position.set(Math.cos(angle) * 1.5, 0.2 * i, Math.sin(angle) * 1.5);
+                    vfxGroup.add(part);
+                    particles.push(part);
+                }
+
+                vfxGroup.customUpdate = (dt, age) => {
+                    particles.forEach((p, idx) => {
+                        const angle = (idx / 12) * Math.PI * 2 + age * Math.PI * 4;
+                        p.position.x = Math.cos(angle) * (1.5 - age * 0.5);
+                        p.position.z = Math.sin(angle) * (1.5 - age * 0.5);
+                        p.position.y += dt * 4;
+                    });
+                    partMat.opacity = 1.0 - age;
+                };
+            } else if (type === 'ult') {
+                lightColor = 0xff00ff;
+                lightIntensity = 8.0;
+                lightDistance = 40;
+                duration = 800;
+
+                const domeGeo = new THREE.SphereGeometry(1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                const domeMat = new THREE.MeshBasicMaterial({
+                    color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.9,
+                    blending: THREE.AdditiveBlending
+                });
+                const dome = new THREE.Mesh(domeGeo, domeMat);
+                vfxGroup.add(dome);
+
+                vfxGroup.customUpdate = (dt, age) => {
+                    const currentRadius = 1 + age * 28;
+                    dome.scale.setScalar(currentRadius);
+                    domeMat.opacity = 1.0 - Math.pow(age, 2);
+                };
+            }
+
+            const pLight = new THREE.PointLight(lightColor, lightIntensity, lightDistance, 1.5);
+            pLight.position.set(0, 1.5, 0);
+            pLight.castShadow = true;
+            pLight.shadow.bias = -0.002;
+            vfxGroup.add(pLight);
+
+            scene.add(vfxGroup);
+
+            activeVFX.push({
+                group: vfxGroup,
+                light: pLight,
+                initialIntensity: lightIntensity,
+                maxLife: duration,
+                life: duration
+            });
+        }
+
+        function spawnDashGhosts(scene, playerMesh, fromPos, toPos) {
+            const ghostCount = 4;
+            for (let i = 0; i < ghostCount; i++) {
+                const t = (i + 1) / (ghostCount + 1);
+                const pos = new THREE.Vector3().lerpVectors(fromPos, toPos, t);
+                const ghostGroup = playerMesh.clone(true);
+
+                ghostGroup.position.copy(pos);
+                ghostGroup.rotation.copy(playerMesh.rotation);
+                ghostGroup.scale.copy(playerMesh.scale);
+
+                ghostGroup.traverse(child => {
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            const clonedMats = child.material.map(m => {
+                                const cm = m.clone();
+                                cm.transparent = true;
+                                cm.opacity = 0.35;
+                                cm.blending = THREE.AdditiveBlending;
+                                cm.depthWrite = false;
+                                if (cm.emissive) cm.emissive = new THREE.Color(0x0066ff);
+                                if (cm.emissiveIntensity !== undefined) cm.emissiveIntensity = 2.0;
+                                return cm;
+                            });
+                            child.material = clonedMats;
+                        } else {
+                            const cm = child.material.clone();
+                            cm.transparent = true;
+                            cm.opacity = 0.35;
+                            cm.blending = THREE.AdditiveBlending;
+                            cm.depthWrite = false;
+                            if (cm.emissive) cm.emissive = new THREE.Color(0x0066ff);
+                            if (cm.emissiveIntensity !== undefined) cm.emissiveIntensity = 2.0;
+                            child.material = cm;
+                        }
+                    }
+                });
+
+                scene.add(ghostGroup);
+
+                activeVFX.push({
+                    group: ghostGroup,
+                    light: null,
+                    initialIntensity: 0,
+                    maxLife: 300,
+                    life: 300,
+                    customUpdate: (dt, age) => {
+                        ghostGroup.traverse(child => {
+                            if (child.material) {
+                                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach(m => { m.opacity = 0.35 * (1 - age); });
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        let audioCtx = null;
+
+        function initSkillAudio() {
+            if (!audioCtx) {
+                try { audioCtx = new AudioContext(); } catch (e) {}
+            }
+        }
+
+        function playSkillSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+                switch (type) {
+                    case 'spin':
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                        break;
+                    case 'dash':
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.2);
+                        break;
+                    case 'heal':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(784, audioCtx.currentTime + 0.4);
+                        break;
+                    case 'ult':
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(60, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 0.6);
+                        break;
+                    default:
+                        osc.type = 'sine';
+                }
+
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.6);
+            } catch (e) {}
+        }
+
+        // =====================================================================
         // === TASK_003 — Screen Shake, DOM Popups, Active Hazards & Boss Combat
         // =====================================================================
 
