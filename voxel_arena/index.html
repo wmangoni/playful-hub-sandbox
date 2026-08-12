@@ -1974,63 +1974,108 @@
 
             createMesh() {
                 const group = new THREE.Group();
-                const armorColor = 0x3498db;
-                const skinColor = 0xffccaa;
-                const darkColor = 0x2c3e50;
 
-                const bodyGeo = new THREE.BoxGeometry(0.8, 1.0, 0.5);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: armorColor });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                const armorMat = new THREE.MeshStandardMaterial({ color: 0x2e6fd8, metalness: 0.5, roughness: 0.35 });
+                const goldMat = new THREE.MeshStandardMaterial({ color: 0xffc93c, metalness: 0.7, roughness: 0.3 });
+                const darkMat = new THREE.MeshStandardMaterial({ color: 0x1f3a5f, metalness: 0.4, roughness: 0.5 });
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xffccaa, roughness: 0.8 });
+                const cyanEmissiveMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 1.6 });
+                const capeMat = new THREE.MeshStandardMaterial({ color: 0xd9283c, roughness: 0.7 });
+
+                // Corpo (primeiro filho: usado pelo flash de dano)
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), armorMat);
                 body.position.y = 1.2; body.castShadow = true;
                 group.add(body);
 
-                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-                const headMat = new THREE.MeshStandardMaterial({ color: skinColor });
-                const head = new THREE.Mesh(headGeo, headMat);
+                // Peitoral dourado + núcleo emissivo
+                const chest = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.06), goldMat);
+                chest.position.set(0, 1.3, -0.27);
+                group.add(chest);
+                const core = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.08), cyanEmissiveMat);
+                core.position.set(0, 1.35, -0.31);
+                group.add(core);
+
+                // Cinto
+                const belt = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.15, 0.52), darkMat);
+                belt.position.y = 0.75;
+                group.add(belt);
+
+                // Capa
+                const cape = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.3, 0.1), capeMat);
+                cape.position.set(0, 1.5, 0.3);
+                group.add(cape);
+
+                // Cabeça + olhos
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
                 head.position.y = 2.0; head.castShadow = true;
                 group.add(head);
 
-                const helmGeo = new THREE.BoxGeometry(0.55, 0.2, 0.55);
-                const helmMat = new THREE.MeshStandardMaterial({ color: darkColor });
-                const helm = new THREE.Mesh(helmGeo, helmMat);
-                helm.position.y = 2.2;
-                group.add(helm);
-
                 const eyeGeo = new THREE.BoxGeometry(0.1, 0.05, 0.05);
-                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                const leftEye = new THREE.Mesh(eyeGeo, cyanEmissiveMat);
                 leftEye.position.set(-0.15, 2.0, -0.26);
                 group.add(leftEye);
-                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                const rightEye = new THREE.Mesh(eyeGeo, cyanEmissiveMat);
                 rightEye.position.set(0.15, 2.0, -0.26);
                 group.add(rightEye);
 
-                const armGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25);
-                const armMat = new THREE.MeshStandardMaterial({ color: armorColor });
+                // Elmo azul com crista dourada e visor emissivo
+                const helm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.55), armorMat);
+                helm.position.y = 2.2;
+                group.add(helm);
+                const crest = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.5), goldMat);
+                crest.position.set(0, 2.42, 0);
+                group.add(crest);
+                const visor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.06), cyanEmissiveMat);
+                visor.position.set(0, 2.2, -0.29);
+                group.add(visor);
 
-                const leftArm = new THREE.Mesh(armGeo, armMat);
+                // Ombros (ombratas)
+                const pauldronGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const leftPauldron = new THREE.Mesh(pauldronGeo, goldMat);
+                leftPauldron.position.set(-0.6, 1.6, 0);
+                group.add(leftPauldron);
+                const rightPauldron = new THREE.Mesh(pauldronGeo, goldMat);
+                rightPauldron.position.set(0.6, 1.6, 0);
+                group.add(rightPauldron);
+
+                // Braços
+                const armGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25);
+                const leftArm = new THREE.Mesh(armGeo, armorMat);
                 leftArm.position.set(-0.6, 1.2, 0);
                 group.add(leftArm);
-
-                const rightArm = new THREE.Mesh(armGeo, armMat);
+                const rightArm = new THREE.Mesh(armGeo, armorMat);
                 rightArm.position.set(0.6, 1.2, 0);
                 group.add(rightArm);
 
+                // Pernas + botas
                 const legGeo = new THREE.BoxGeometry(0.3, 0.9, 0.3);
-                const legMat = new THREE.MeshStandardMaterial({ color: darkColor });
-
-                const leftLeg = new THREE.Mesh(legGeo, legMat);
+                const leftLeg = new THREE.Mesh(legGeo, darkMat);
                 leftLeg.position.set(-0.25, 0.45, 0);
                 group.add(leftLeg);
-
-                const rightLeg = new THREE.Mesh(legGeo, legMat);
+                const rightLeg = new THREE.Mesh(legGeo, darkMat);
                 rightLeg.position.set(0.25, 0.45, 0);
                 group.add(rightLeg);
 
-                const swordGeo = new THREE.BoxGeometry(0.1, 1.8, 0.1);
-                const swordMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
-                const sword = new THREE.Mesh(swordGeo, swordMat);
-                sword.position.set(0, -0.4, -0.5);
+                const bootGeo = new THREE.BoxGeometry(0.34, 0.2, 0.34);
+                const leftBoot = new THREE.Mesh(bootGeo, goldMat);
+                leftBoot.position.set(-0.25, 0.08, 0);
+                group.add(leftBoot);
+                const rightBoot = new THREE.Mesh(bootGeo, goldMat);
+                rightBoot.position.set(0.25, 0.08, 0);
+                group.add(rightBoot);
+
+                // Espada energética (lâmina emissiva + guarda e cabo dourados)
+                const sword = new THREE.Group();
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.7, 0.1), cyanEmissiveMat);
+                blade.position.set(0, -0.7, 0);
+                sword.add(blade);
+                const guard = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.12), goldMat);
+                guard.position.set(0, 0.12, 0);
+                sword.add(guard);
+                const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.1), darkMat);
+                hilt.position.set(0, 0.35, 0);
+                sword.add(hilt);
+                sword.position.set(0, -0.3, -0.5);
                 sword.rotation.x = -Math.PI / 2;
                 rightArm.add(sword);
                 this.rightArm = rightArm;
