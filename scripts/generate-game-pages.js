@@ -425,6 +425,31 @@ const gamesData = {
         ],
         tags: ['3D', 'Voxel', 'Mundo Aberto', 'Delivery', 'Carros', 'Simulação'],
         relatedGames: ['driving_simulator', '3d_shooter', 'strategy_game']
+    },
+    'voxel_arena': {
+        title: 'Voxel Arena',
+        description: 'Sobreviva em uma arena voxel vibrante neste hack n slash 3D. Enfrente ondas de inimigos, use habilidades especiais, evolua seu herói e derrote o boss final.',
+        keywords: 'voxel, arena, hack and slash, ação, sobrevivência, 3D, habilidades, boss, PlayfulHub',
+        genre: 'Ação / Hack n Slash',
+        developer: 'PlayfulHub',
+        features: 'Gráficos 3D voxel, ondas de inimigos, 4 habilidades especiais, upgrades roguelite, boss multi-fase',
+        objective: 'Sobreviva às ondas de inimigos, suba de nível e derrote o boss final da arena.',
+        controls: [
+            { key: 'WASD', action: 'Mover o herói' },
+            { key: 'Mouse', action: 'Mirar / girar câmera' },
+            { key: 'Clique Esq.', action: 'Atacar' },
+            { key: 'Clique Dir.', action: 'Defender' },
+            { key: '1-4', action: 'Habilidades (Spin, Dash, Cura, Ultimate)' },
+            { key: 'Scroll', action: 'Zoom da câmera' }
+        ],
+        tips: [
+            'Use o Dash para escapar quando estiver cercado',
+            'Guarde a Ultimate para grandes grupos de inimigos',
+            'Fique em movimento para não ser encurralado',
+            'Colete os orbes de XP para subir de nível e escolher upgrades'
+        ],
+        tags: ['3D', 'Voxel', 'Arena', 'Ação', 'Sobrevivência', 'Hack n Slash'],
+        relatedGames: ['voxel_city', '3d_shooter', 'archer']
     }
 };
 
@@ -473,6 +498,7 @@ function generateRelatedGamesHTML(relatedGames) {
             'tabuleiro_galton': '🧔',
             'pinball': '🎱',
             'voxel_city': '🏙️',
+            'voxel_arena': '⚔️',
             'driving_simulator': '🚗'
         };
         
