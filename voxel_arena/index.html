@@ -1792,58 +1792,115 @@
 
             createEnvironment() {
                 this.envMeshes = [];
-                const treeGeo = new THREE.BoxGeometry(1, 4, 1);
-                const treeMat = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 0.95 });
+                this._hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+                const dummy = new THREE.Object3D();
+
+                const collectPositions = (count, minDist, range) => {
+                    const arr = [];
+                    let guard = 0;
+                    while (arr.length < count && guard++ < count * 20) {
+                        const x = (Math.random() - 0.5) * ARENA_SIZE * range;
+                        const z = (Math.random() - 0.5) * ARENA_SIZE * range;
+                        if (Math.abs(x) < minDist && Math.abs(z) < minDist) continue;
+                        arr.push({ x, z });
+                    }
+                    return arr;
+                };
+
+                // Trees (InstancedMesh: tronco + copa)
+                const trunkGeo = new THREE.BoxGeometry(1, 4, 1);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.9 });
                 const leafGeo = new THREE.BoxGeometry(3, 3, 3);
-                const leafMat = new THREE.MeshStandardMaterial({ color: 0x13241b, roughness: 1.0 });
+                const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
 
-                for (let i = 0; i < 20; i++) {
-                    const x = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
-                    const z = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
-                    if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                const trees = collectPositions(20, 10, 0.8);
+                const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
+                const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, trees.length);
+                trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
+                leafMesh.castShadow = true; leafMesh.receiveShadow = true;
 
-                    const trunk = new THREE.Mesh(treeGeo, treeMat);
-                    trunk.position.set(x, 2, z);
-                    trunk.castShadow = true; trunk.receiveShadow = true;
-                    this.scene.add(trunk);
-                    this.envMeshes.push(trunk);
+                const leafColors = [0x3fae4a, 0x2f9e3f, 0x57c24a, 0xd98a2b, 0x8a4bbf];
+                const leafColor = new THREE.Color();
+                trees.forEach((t, idx) => {
+                    const s = 0.9 + Math.random() * 0.7;
+                    const rot = Math.random() * Math.PI;
+                    dummy.position.set(t.x, 2 * s, t.z);
+                    dummy.rotation.set(0, rot, 0);
+                    dummy.scale.setScalar(s);
+                    dummy.updateMatrix();
+                    trunkMesh.setMatrixAt(idx, dummy.matrix);
 
-                    const leaves = new THREE.Mesh(leafGeo, leafMat);
-                    leaves.position.set(x, 5, z);
-                    leaves.castShadow = true; leaves.receiveShadow = true;
-                    this.scene.add(leaves);
-                    this.envMeshes.push(leaves);
-                }
+                    dummy.position.set(t.x, 5 * s, t.z);
+                    dummy.updateMatrix();
+                    leafMesh.setMatrixAt(idx, dummy.matrix);
 
+                    leafColor.setHex(leafColors[Math.floor(Math.random() * leafColors.length)]);
+                    leafMesh.setColorAt(idx, leafColor);
+
+                    this.envMeshes.push({ mesh: trunkMesh, index: idx, x: t.x, z: t.z });
+                    this.envMeshes.push({ mesh: leafMesh, index: idx, x: t.x, z: t.z });
+                });
+
+                this.scene.add(trunkMesh);
+                this.scene.add(leafMesh);
+
+                // Rocks (InstancedMesh)
                 const rockGeo = new THREE.DodecahedronGeometry(1);
-                const rockMat = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.9 });
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+                const rocks = collectPositions(15, 5, 0.9);
+                const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, rocks.length);
+                rockMesh.castShadow = true; rockMesh.receiveShadow = true;
 
-                for (let i = 0; i < 15; i++) {
-                    const x = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
-                    const z = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
-                    if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+                const rockColor = new THREE.Color();
+                rocks.forEach((r, idx) => {
+                    const s = 1 + Math.random() * 2;
+                    dummy.position.set(r.x, s / 2, r.z);
+                    dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                    dummy.scale.setScalar(s);
+                    dummy.updateMatrix();
+                    rockMesh.setMatrixAt(idx, dummy.matrix);
 
-                    const rock = new THREE.Mesh(rockGeo, rockMat);
-                    const scale = 1 + Math.random() * 2;
-                    rock.scale.set(scale, scale, scale);
-                    rock.position.set(x, scale / 2, z);
-                    rock.castShadow = true; rock.receiveShadow = true;
-                    this.scene.add(rock);
-                    this.envMeshes.push(rock);
-                }
+                    const g = 0.55 + Math.random() * 0.25;
+                    rockColor.setRGB(g * 1.05, g, g * 0.9);
+                    rockMesh.setColorAt(idx, rockColor);
+
+                    this.envMeshes.push({ mesh: rockMesh, index: idx, x: r.x, z: r.z });
+                });
+
+                this.scene.add(rockMesh);
+
+                // Crystals emissivos (InstancedMesh)
+                const crystalGeo = new THREE.OctahedronGeometry(0.7);
+                const crystalMat = new THREE.MeshStandardMaterial({
+                    color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 1.6,
+                    roughness: 0.2, metalness: 0.3
+                });
+                const crystals = collectPositions(14, 6, 0.85);
+                const crystalMesh = new THREE.InstancedMesh(crystalGeo, crystalMat, crystals.length);
+                crystals.forEach((cr, idx) => {
+                    const s = 0.5 + Math.random() * 1.2;
+                    dummy.position.set(cr.x, 0.4 * s, cr.z);
+                    dummy.rotation.set(0, Math.random() * Math.PI, 0);
+                    dummy.scale.setScalar(s);
+                    dummy.updateMatrix();
+                    crystalMesh.setMatrixAt(idx, dummy.matrix);
+
+                    this.envMeshes.push({ mesh: crystalMesh, index: idx, x: cr.x, z: cr.z });
+                });
+
+                this.scene.add(crystalMesh);
             }
 
             clearCenterObstacles(radius = 10) {
                 if (!this.envMeshes) return;
-                for (let i = this.envMeshes.length - 1; i >= 0; i--) {
-                    const mesh = this.envMeshes[i];
-                    if (mesh.position.length() < radius) {
-                        this.scene.remove(mesh);
-                        if (mesh.geometry) mesh.geometry.dispose();
-                        if (mesh.material) mesh.material.dispose();
-                        this.envMeshes.splice(i, 1);
+                const dirty = new Set();
+                for (const entry of this.envMeshes) {
+                    if (Math.sqrt(entry.x * entry.x + entry.z * entry.z) < radius) {
+                        entry.mesh.setMatrixAt(entry.index, this._hiddenMatrix);
+                        dirty.add(entry.mesh);
                     }
                 }
+                dirty.forEach(m => { m.instanceMatrix.needsUpdate = true; });
             }
         }
 
