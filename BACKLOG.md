@@ -15,7 +15,7 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_002.md` | Space Shooter | Sistema de Power-Ups, Naves Desbloqueáveis e Placar de Recordes Local | In Progress | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_002.md) |
 | `TASK_002.md` | Strategy Empire | Sistema de Névoa de Guerra (Fog of War) e Diplomacia Básica com IA | In Progress | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/strategy_game/TASKS/TASK_002.md) |
 | `TASK_002.md` | Company Simulator | Sistema de Estresse/Burnout, Crises Satíricas em Produção e Contratação de Freelancers | In Progress | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/it_simulator/TASKS/TASK_002.md) |
-| `TASK_002.md` | The Archer | Vento Lateral Dinâmico, Balões Especiais e Multiplicador de Combo | In Progress | Média-Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/archer/TASKS/TASK_002.md) |
+| `TASK_002.md` | The Archer | Vento Lateral Dinâmico, Balões Especiais e Multiplicador de Combo | Ready for QA | Média-Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/archer/TASKS/TASK_002.md) |
 | `TASK_002.md` | Tetris | Peça Fantasma (Ghost Piece), Modo Contra o Tempo (Time Attack) e Áudio Retro Sintético | 🎉 Ready for deploy | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tetris/TASKS/TASK_002.md) |
 | `TASK_002.md` | Poker Texas Hold'em | Personalidades de IA, Sistema de Blefe e Assistente de Probabilidade (Hand Tracker) | 🎉 Ready for deploy | Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/poker/TASKS/TASK_002.md) |
 | `TASK_002.md` | String Catcher | Upload de Músicas Customizadas, Novas Notas Rítmicas e Efeitos Reativos de Áudio | 🎉 Ready for deploy | Média | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/visual_effects/TASKS/TASK_002.md) |
@@ -62,9 +62,16 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_004.md` | Poker Texas Hold'em | Mesa VIP High Roller (Customização), Dealer Virtual Ativo, Analisador de Replay e Áudio de Cassino | In Progress | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/poker/TASKS/TASK_004.md) |
 | `TASK_004.md` | Three.js Earth | Simulação de Defesa Planetária: Intercepção de Asteroides e Escudo Defletor Energético | 🎉 Ready for deploy | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/threejs-earth-main/TASKS/TASK_004.md) |
 | `TASK_004.md` | Space Shooter | Anomalias Gravitacionais (Buracos Negros), Customização de Armamento no Hangar e Missão de Escolta | 🎉 Ready for deploy | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_004.md) |
-| `TASK_004.md` | Chess | Modo Duelo Pass-and-Play com Rotação 3D do Tabuleiro, Análise de Partida com Classificação de Lances (Game Review) e Mural de Conquistas (Achievements) | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/chess/TASKS/TASK_004.md) |
+| `TASK_004.md` | Chess | Modo Duelo Pass-and-Play com Rotação 3D do Tabuleiro, Análise de Partida com Classificação de Lances (Game Review) e Mural de Conquistas (Achievements) | 🎉 Ready for deploy | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/chess/TASKS/TASK_004.md) |
 | `TASK_004.md` | 3D Shooter | Elementos Interativos de Level Design: Portas com Chaves, Paredes Secretas e Barris Explosivos | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/3d_shooter/TASKS/TASK_004.md) |
 | `TASK_004.md` | RPG Adventure Quest | Especialização de Classes, Quadro de Missões Secundárias e Level Design Tático (Portas Seladas & Alavancas) | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_004.md) |
+| `TASK_004.md` | Driving Simulator | Sistema de Nitro NOS com Motion Blur, Perseguição Policial (Heat Level & Spike Strips), Clima Dinâmico e Áudio Adaptativo Synthesizer | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_004.md) |
+| `TASK_004.md` | Voxel City | Clima Dinâmico (Chuva & Pistas Escorregadias), Missões de Passageiros (Crazy Taxi Mode) e Iluminação Neon Noturna | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_city/TASKS/TASK_004.md) |
+| `TASK_004.md` | Strategy Empire | Árvore de Tecnologias por Eras, Maravilha do Império com Cerco Final e Campeão Imperial Heroico | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/strategy_game/TASKS/TASK_004.md) |
+| `TASK_004.md` | The Archer | Chefe Sky Leviathan (Dragão dos Céus), Rajadas de Vento Dinâmicas, Armaria de Arcos Equipáveis e Skill Shot Zoom | ✅ Refined | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/archer/TASKS/TASK_004.md) |
+
+
+
 
 
 
