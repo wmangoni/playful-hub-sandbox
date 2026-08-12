@@ -374,7 +374,7 @@
             border: 2px solid rgba(211, 175, 55, 0.3);
             border-radius: 12px; padding: 20px;
             display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-            text-align: center; cursor: pointer;
+            text-align: center; cursor: default;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.02);
             transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), border-color 0.4s, box-shadow 0.4s;
             backdrop-filter: blur(10px);
@@ -385,6 +385,23 @@
             border-color: rgba(229, 193, 88, 0.9);
             box-shadow: 0 20px 40px rgba(229, 193, 88, 0.25), 0 0 30px rgba(229, 193, 88, 0.15);
         }
+        .upgrade-card.selected {
+            transform: translateY(-15px) rotateY(3deg);
+            border-color: #ffd700;
+            box-shadow: 0 20px 40px rgba(255, 215, 0, 0.45), 0 0 35px rgba(255, 215, 0, 0.35), inset 0 0 25px rgba(255, 215, 0, 0.08);
+        }
+        .upgrade-card.selected .icon-placeholder {
+            background: rgba(229, 193, 88, 0.3);
+            box-shadow: 0 0 20px rgba(229, 193, 88, 0.55);
+        }
+        .draft-hint {
+            margin-top: 28px;
+            font-family: 'Outfit', sans-serif;
+            color: #8a94a6;
+            font-size: 15px;
+            letter-spacing: 2px;
+        }
+        .draft-hint strong { color: #e5c158; }
         .upgrade-card .icon-placeholder {
             width: 60px; height: 60px; border-radius: 50%;
             background: rgba(229, 193, 88, 0.1);
@@ -699,6 +716,7 @@
             <h1>Escolha seu Poder</h1>
         </div>
         <div id="cards-wrapper"></div>
+        <p class="draft-hint"><strong>A</strong> / <strong>D</strong> para navegar &nbsp;·&nbsp; <strong>F</strong> para selecionar</p>
     </div>
 
     <div id="game-over-screen" class="screen hidden">
@@ -2835,6 +2853,13 @@
                     if (e.code === 'Enter' && !e.repeat && this.isRunning && !this.gameOver) {
                         this.togglePause();
                     }
+                    const draftModal = document.getElementById('upgrade-modal');
+                    if (draftModal && !draftModal.classList.contains('hidden')) {
+                        if (e.repeat) return;
+                        if (e.code === 'KeyA') { e.preventDefault(); this.moveDraftSelection(-1); }
+                        else if (e.code === 'KeyD') { e.preventDefault(); this.moveDraftSelection(1); }
+                        else if (e.code === 'KeyF') { e.preventDefault(); this.selectDraftCard(); }
+                    }
                 });
 
                 this.renderer.domElement.addEventListener('click', () => {
@@ -3014,6 +3039,11 @@
             triggerUpgradeDraft() {
                 this.isRunning = false;
                 document.exitPointerLock();
+                if (this.input) {
+                    this.input.keys = {};
+                    this.input.mouseDown = false;
+                    this.input.mouseRightDown = false;
+                }
                 const modal = document.getElementById('upgrade-modal');
                 const wrapper = document.getElementById('cards-wrapper');
                 document.getElementById('level-badge').textContent = `LEVEL ${this.player.level}`;
@@ -3025,7 +3055,7 @@
                     picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
                 }
 
-                picks.forEach(up => {
+                this.draftCards = picks.map(up => {
                     const card = document.createElement('div');
                     card.className = 'upgrade-card';
                     card.innerHTML = `
@@ -3033,18 +3063,44 @@
                         <div class="icon-placeholder">${up.icon}</div>
                         <h3>${up.name}</h3>
                         <p>${up.desc}</p>`;
-                    card.addEventListener('click', () => {
-                        up.apply(this.player);
-                        modal.classList.add('hidden');
-                        this.isRunning = true;
-                        if (this.renderer && this.renderer.domElement) {
-                            this.renderer.domElement.requestPointerLock();
-                        }
-                    });
                     wrapper.appendChild(card);
+                    return { up, card };
                 });
 
+                this.draftSelection = 0;
+                this.updateDraftSelection();
+
                 modal.classList.remove('hidden');
+            }
+
+            moveDraftSelection(dir) {
+                if (!this.draftCards || !this.draftCards.length) return;
+                this.draftSelection = (this.draftSelection + dir + this.draftCards.length) % this.draftCards.length;
+                this.updateDraftSelection();
+            }
+
+            updateDraftSelection() {
+                this.draftCards.forEach((item, i) => {
+                    item.card.classList.toggle('selected', i === this.draftSelection);
+                });
+            }
+
+            selectDraftCard() {
+                if (!this.draftCards || !this.draftCards.length) return;
+                const item = this.draftCards[this.draftSelection];
+                if (!item) return;
+                this.applyDraftCard(item.up);
+            }
+
+            applyDraftCard(up) {
+                up.apply(this.player);
+                document.getElementById('upgrade-modal').classList.add('hidden');
+                this.draftCards = [];
+                this.draftSelection = 0;
+                this.isRunning = true;
+                if (this.renderer && this.renderer.domElement) {
+                    this.renderer.domElement.requestPointerLock();
+                }
             }
 
             onResize() {
