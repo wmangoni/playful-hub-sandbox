@@ -542,6 +542,75 @@
             font-weight: bold;
             color: #ffffff;
         }
+
+        /* =====================================================================
+           === Menu de Pausa & Opções
+           ===================================================================== */
+        #pause-menu {
+            z-index: 50;
+            background: radial-gradient(circle, rgba(12, 17, 28, 0.95) 0%, rgba(5, 7, 10, 0.98) 100%);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+        #pause-menu h1 { font-size: 48px; margin-bottom: 30px; }
+
+        .options-panel {
+            width: 420px;
+            background: rgba(15, 20, 32, 0.75);
+            border: 2px solid rgba(211, 175, 55, 0.35);
+            border-radius: 12px;
+            padding: 24px 28px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            margin-bottom: 24px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 16px 0;
+        }
+        .option-row label {
+            font-family: 'Outfit', sans-serif;
+            color: #e5c158;
+            font-size: 14px;
+            letter-spacing: 1px;
+            min-width: 180px;
+            text-align: left;
+        }
+        .option-row input[type="range"] {
+            flex: 1;
+            accent-color: #e5c158;
+            cursor: pointer;
+        }
+        .option-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #e5c158;
+            cursor: pointer;
+        }
+        .option-value {
+            font-family: 'Outfit', sans-serif;
+            color: #ffffff;
+            font-size: 13px;
+            min-width: 40px;
+            text-align: right;
+        }
+        .option-checkbox label { min-width: 180px; }
+
+        .pause-buttons { display: flex; gap: 16px; }
+        .pause-buttons button { font-size: 18px; padding: 12px 28px; }
+
+        .pause-hint {
+            margin-top: 20px;
+            font-family: 'Outfit', sans-serif;
+            color: #8a94a6;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+        .pause-hint strong { color: #e5c158; }
     </style>
     <script type="importmap">
         {
@@ -640,11 +709,56 @@
         </div>
         <button id="restart-btn" class="hidden">Try Again</button>
     </div>
+
+    <!-- Menu de Pausa / Opções -->
+    <div id="pause-menu" class="screen hidden">
+        <h1>Pausado</h1>
+        <div class="options-panel">
+            <div class="option-row">
+                <label for="opt-sensitivity">Sensibilidade do Mouse</label>
+                <input type="range" id="opt-sensitivity" min="1" max="20" step="1">
+                <span class="option-value" id="sens-value"></span>
+            </div>
+            <div class="option-row">
+                <label for="opt-brightness">Brilho / Iluminação</label>
+                <input type="range" id="opt-brightness" min="50" max="150" step="5">
+                <span class="option-value" id="bright-value"></span>
+            </div>
+            <div class="option-row">
+                <label for="opt-volume">Volume</label>
+                <input type="range" id="opt-volume" min="0" max="100" step="5">
+                <span class="option-value" id="vol-value"></span>
+            </div>
+            <div class="option-row">
+                <label for="opt-fov">Campo de Visão (FOV)</label>
+                <input type="range" id="opt-fov" min="40" max="100" step="2">
+                <span class="option-value" id="fov-value"></span>
+            </div>
+            <div class="option-row option-checkbox">
+                <label for="opt-shadows">Sombras (qualidade)</label>
+                <input type="checkbox" id="opt-shadows">
+            </div>
+        </div>
+        <div class="pause-buttons">
+            <button id="resume-btn">Continuar</button>
+            <button id="restart-pause-btn">Reiniciar</button>
+        </div>
+        <p class="pause-hint">Aperte <strong>Enter</strong> para continuar</p>
+    </div>
     <script type="module">
         import * as THREE from 'three';
 
         // --- Game Constants ---
         const ARENA_SIZE = 100;
+
+        // Configurações ajustáveis do jogador (menu de pausa)
+        const gameSettings = {
+            sensitivity: 0.006,
+            brightness: 1.0,
+            volume: 1.0,
+            fov: 60,
+            shadows: true
+        };
 
         // =====================================================================
         // === TASK_002 — Enemy Config, Wave Config & Upgrade Pool
@@ -865,11 +979,22 @@
         }
 
         let audioCtx = null;
+        let masterGain = null;
 
         function initSkillAudio() {
             if (!audioCtx) {
-                try { audioCtx = new AudioContext(); } catch (e) {}
+                try {
+                    audioCtx = new AudioContext();
+                    masterGain = audioCtx.createGain();
+                    masterGain.gain.value = gameSettings.volume;
+                    masterGain.connect(audioCtx.destination);
+                } catch (e) {}
             }
+        }
+
+        function setMasterVolume(value) {
+            gameSettings.volume = value;
+            if (masterGain) masterGain.gain.value = value;
         }
 
         function playSkillSound(type) {
@@ -878,7 +1003,7 @@
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
-                gain.connect(audioCtx.destination);
+                gain.connect(masterGain || audioCtx.destination);
                 gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
 
@@ -2110,8 +2235,8 @@
                 }
 
                 if (document.pointerLockElement) {
-                    this.yaw -= input.mouseX * 0.004;
-                    this.pitch -= input.mouseY * 0.004;
+                    this.yaw -= input.mouseX * gameSettings.sensitivity;
+                    this.pitch -= input.mouseY * gameSettings.sensitivity;
                     this.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.pitch));
                 }
 
@@ -2644,17 +2769,17 @@
                 this.scene.background = new THREE.Color(0x5aa0dc);
                 this.scene.fog = new THREE.FogExp2(0xc9e4f0, 0.02);
 
-                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera = new THREE.PerspectiveCamera(gameSettings.fov, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.camera.position.set(0, 15, 15);
                 this.camera.lookAt(0, 0, 0);
 
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.enabled = gameSettings.shadows;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                this.renderer.toneMappingExposure = 1.15;
+                this.renderer.toneMappingExposure = 1.15 * gameSettings.brightness;
                 this.container.appendChild(this.renderer.domElement);
 
                 const hemiLight = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.95);
@@ -2699,17 +2824,95 @@
 
                 this.clock = new THREE.Clock();
                 this.isRunning = false;
+                this.isPaused = false;
                 this.timeLeft = 300;
                 this.gameOver = false;
 
                 window.addEventListener('resize', () => this.onResize());
                 document.getElementById('start-btn').addEventListener('click', () => this.start());
 
-                this.renderer.domElement.addEventListener('click', () => {
-                    if (this.isRunning) this.renderer.domElement.requestPointerLock();
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Enter' && !e.repeat && this.isRunning && !this.gameOver) {
+                        this.togglePause();
+                    }
                 });
 
+                this.renderer.domElement.addEventListener('click', () => {
+                    if (this.isRunning && !this.isPaused && !this.gameOver) {
+                        this.renderer.domElement.requestPointerLock();
+                    }
+                });
+
+                this.setupPauseMenu();
+
                 this.animate();
+            }
+
+            setupPauseMenu() {
+                document.getElementById('resume-btn').addEventListener('click', () => this.togglePause());
+                document.getElementById('restart-pause-btn').addEventListener('click', () => location.reload());
+
+                const sensSlider = document.getElementById('opt-sensitivity');
+                const brightSlider = document.getElementById('opt-brightness');
+                const volSlider = document.getElementById('opt-volume');
+                const fovSlider = document.getElementById('opt-fov');
+                const shadowsCb = document.getElementById('opt-shadows');
+                const sensValue = document.getElementById('sens-value');
+                const brightValue = document.getElementById('bright-value');
+                const volValue = document.getElementById('vol-value');
+                const fovValue = document.getElementById('fov-value');
+
+                sensSlider.value = Math.round(gameSettings.sensitivity * 1000);
+                brightSlider.value = Math.round(gameSettings.brightness * 100);
+                volSlider.value = Math.round(gameSettings.volume * 100);
+                fovSlider.value = gameSettings.fov;
+                shadowsCb.checked = gameSettings.shadows;
+
+                const refresh = () => {
+                    sensValue.textContent = (sensSlider.value / 1000).toFixed(3);
+                    brightValue.textContent = `${brightSlider.value}%`;
+                    volValue.textContent = `${volSlider.value}%`;
+                    fovValue.textContent = `${fovSlider.value}°`;
+                };
+                refresh();
+
+                sensSlider.addEventListener('input', () => {
+                    gameSettings.sensitivity = sensSlider.value / 1000;
+                    refresh();
+                });
+                brightSlider.addEventListener('input', () => {
+                    gameSettings.brightness = brightSlider.value / 100;
+                    this.renderer.toneMappingExposure = 1.15 * gameSettings.brightness;
+                    refresh();
+                });
+                volSlider.addEventListener('input', () => {
+                    setMasterVolume(volSlider.value / 100);
+                    refresh();
+                });
+                fovSlider.addEventListener('input', () => {
+                    gameSettings.fov = Number(fovSlider.value);
+                    this.camera.fov = gameSettings.fov;
+                    this.camera.updateProjectionMatrix();
+                    refresh();
+                });
+                shadowsCb.addEventListener('change', () => {
+                    gameSettings.shadows = shadowsCb.checked;
+                    this.renderer.shadowMap.enabled = gameSettings.shadows;
+                    this.renderer.shadowMap.needsUpdate = true;
+                });
+            }
+
+            togglePause() {
+                if (this.isPaused) {
+                    this.isPaused = false;
+                    document.getElementById('pause-menu').classList.add('hidden');
+                    this.input.resetFrame();
+                    this.renderer.domElement.requestPointerLock();
+                } else {
+                    this.isPaused = true;
+                    document.getElementById('pause-menu').classList.remove('hidden');
+                    document.exitPointerLock();
+                }
             }
 
             createSkyDome() {
@@ -2857,6 +3060,11 @@
 
                 if (this.hitstopTimer > 0) {
                     this.hitstopTimer -= realDt;
+                    this.renderer.render(this.scene, this.camera);
+                    return;
+                }
+
+                if (this.isPaused) {
                     this.renderer.render(this.scene, this.camera);
                     return;
                 }
