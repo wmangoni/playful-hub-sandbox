@@ -2513,8 +2513,8 @@
             constructor() {
                 this.container = document.getElementById('game-container');
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x0a0c16);
-                this.scene.fog = new THREE.FogExp2(0x0a0c16, 0.03);
+                this.scene.background = new THREE.Color(0x5aa0dc);
+                this.scene.fog = new THREE.FogExp2(0xc9e4f0, 0.02);
 
                 this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.camera.position.set(0, 15, 15);
@@ -2543,6 +2543,8 @@
                 dirLight.shadow.mapSize.height = 2048;
                 this.scene.add(dirLight);
 
+                this.createSkyDome();
+
                 this.input = new Input();
                 this.arena = new Arena(this.scene);
                 this.player = new Player(this.scene, this.camera);
@@ -2564,7 +2566,7 @@
                 this.bossDamageDealt = 0;
 
                 this.currentWave = 1;
-                this.baseFogColor = new THREE.Color(0x0a0c16);
+                this.baseFogColor = new THREE.Color(0xc9e4f0);
                 this.fogFlashTimer = 0;
 
                 this.clock = new THREE.Clock();
@@ -2580,6 +2582,27 @@
                 });
 
                 this.animate();
+            }
+
+            createSkyDome() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 16; canvas.height = 512;
+                const c = canvas.getContext('2d');
+                const grad = c.createLinearGradient(0, 0, 0, 512);
+                grad.addColorStop(0.0, '#2b5aa7');
+                grad.addColorStop(0.45, '#5aa0dc');
+                grad.addColorStop(0.75, '#a8d4ef');
+                grad.addColorStop(1.0, '#c9e4f0');
+                c.fillStyle = grad;
+                c.fillRect(0, 0, 16, 512);
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                this.skyDomeMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false });
+                const geo = new THREE.SphereGeometry(400, 32, 16);
+                this.skyDome = new THREE.Mesh(geo, this.skyDomeMat);
+                this.skyDome.renderOrder = -1;
+                this.skyDome.frustumCulled = false;
+                this.scene.add(this.skyDome);
             }
 
             start() {
@@ -2631,14 +2654,18 @@
 
                 const startBg = this.scene.background.clone();
                 const targetBg = new THREE.Color(0x1c052e);
+                const skyStart = this.skyDomeMat ? this.skyDomeMat.color.clone() : null;
                 let t = 0;
                 const transition = () => {
                     t += 0.05;
                     if (t <= 1) {
                         this.scene.background.lerpColors(startBg, targetBg, t);
+                        if (this.skyDomeMat && skyStart) {
+                            this.skyDomeMat.color.lerpColors(skyStart, targetBg, t);
+                        }
                         if (this.scene.fog) {
                             this.scene.fog.color.lerpColors(startBg, targetBg, t);
-                            this.scene.fog.density = THREE.MathUtils.lerp(0.03, 0.038, t);
+                            this.scene.fog.density = THREE.MathUtils.lerp(0.02, 0.038, t);
                         }
                         requestAnimationFrame(transition);
                     }
