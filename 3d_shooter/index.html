@@ -625,23 +625,28 @@
               id: `enemy_${Date.now()}_6`
             },
             {
-              x: 8.5,
-              y: 12.5,
+              x: 12.5,
+              y: 14.5,
               type: 'cyber_imp',
               id: `enemy_${Date.now()}_7`
             }
-          ].map(e => ({
-            ...e,
-            ...enemyTypes[e.type], // Copy base stats
-            angle: Math.random() * Math.PI * 2,
-            state: 'idle', // idle, chase, attack, dying, dead
-            lastAttackTimestamp: 0,
-            targetPos: null,
-            currentHealth: enemyTypes[e.type].health,
-            lastHitTimestamp: 0,
-            isHit: false,
-            isVisible: true,
-          }));
+          ].map(e => {
+            const spawnPos = findNearestOpenCell(e.x, e.y); // garante spawn fora de paredes
+            return {
+              ...e,
+              x: spawnPos.x,
+              y: spawnPos.y,
+              ...enemyTypes[e.type], // Copy base stats
+              angle: Math.random() * Math.PI * 2,
+              state: 'idle', // idle, chase, attack, dying, dead
+              lastAttackTimestamp: 0,
+              targetPos: null,
+              currentHealth: enemyTypes[e.type].health,
+              lastHitTimestamp: 0,
+              isHit: false,
+              isVisible: true,
+            };
+          });
           pickups = []; // Clear previous pickups
           // Initialize particle pool
           particlePool = [];
@@ -660,7 +665,8 @@
               alpha: 0,
               life: 0,
               maxLife: 0,
-              size: 0
+              size: 0,
+              noGravity: false
             });
           }
           scanMapForPickups(); // Populate pickups based on map codes
@@ -1083,6 +1089,26 @@
           return cellType >= 1 && cellType <= 4; // Check if it's one of the wall types
         }
 
+        // Retorna a célula caminhável mais próxima de (sx, sy), "desprendendo" qualquer spawn
+        // que caia dentro de uma parede (ex.: canto onde duas paredes se encontram).
+        function findNearestOpenCell(sx, sy) {
+          const cx = Math.floor(sx);
+          const cy = Math.floor(sy);
+          if (!isWall(cx, cy)) return { x: sx, y: sy };
+          for (let radius = 1; radius <= 10; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+              for (let dx = -radius; dx <= radius; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue; // apenas o anel externo
+                const nx = cx + dx;
+                const ny = cy + dy;
+                if (nx < 0 || ny < 0 || nx >= mapWidth || ny >= mapHeight) continue;
+                if (!isWall(nx, ny)) return { x: nx + 0.5, y: ny + 0.5 };
+              }
+            }
+          }
+          return { x: 3.5, y: 3.5 }; // Fallback: área de spawn do jogador
+        }
+
 
         // --- Web Audio API Synthesizers ---
         function playPlasmaLaserSound() {
@@ -1255,6 +1281,7 @@
             damage: damage,
             color: color,
             active: true,
+            trailTimer: 0,
             life: type === 'plasma' ? 3.0 : (type === 'rocket' ? 5.0 : 4.0)
           });
         }
@@ -1281,6 +1308,7 @@
             const p = particlePool.find(item => !item.active);
             if (p) {
               p.active = true;
+              p.noGravity = false;
               p.x = ex;
               p.y = ey;
               p.z = 0.5;
@@ -1332,6 +1360,37 @@
           }
         }
 
+        // Emite partículas de rastro atrás de projéteis de plasma/rocket, reutilizando o pool global.
+        function emitProjectileTrail(p) {
+          if (OPTIMIZE_MODE === 2) return; // modo de performance máxima: sem rastro
+          const isRocket = p.type === 'rocket';
+          const count = isRocket ? 2 : 1;
+          for (let i = 0; i < count; i++) {
+            const pt = particlePool.find(item => !item.active);
+            if (!pt) return; // pool cheio: descarta sem alocar
+            pt.active = true;
+            pt.x = p.x + (Math.random() - 0.5) * 0.1;
+            pt.y = p.y + (Math.random() - 0.5) * 0.1;
+            pt.z = 0.5 + (Math.random() - 0.5) * 0.1;
+            // leve deriva para trás do projétil (efeito de cauda)
+            pt.vx = -p.vx * 0.12 + (Math.random() - 0.5) * 0.4;
+            pt.vy = -p.vy * 0.12 + (Math.random() - 0.5) * 0.4;
+            pt.vz = isRocket ? (0.3 + Math.random() * 0.7) : (Math.random() - 0.5) * 0.4;
+            pt.noGravity = true; // plasma/rastro flutuam, sem cair
+            if (isRocket) {
+              const c = hexToRgb(Math.random() > 0.5 ? '#ff6600' : '#ffcc00');
+              pt.r = c.r; pt.g = c.g; pt.b = c.b;
+            } else {
+              const c = hexToRgb(Math.random() > 0.5 ? '#00f3ff' : '#66ffff');
+              pt.r = c.r; pt.g = c.g; pt.b = c.b;
+            }
+            pt.alpha = 0.85;
+            pt.life = isRocket ? 0.4 + Math.random() * 0.3 : 0.25 + Math.random() * 0.2;
+            pt.maxLife = pt.life;
+            pt.size = isRocket ? 2.5 + Math.random() * 2.0 : 1.5 + Math.random() * 1.5;
+          }
+        }
+
         function updateProjectiles(dt) {
           for (let i = projectiles.length - 1; i >= 0; i--) {
             const p = projectiles[i];
@@ -1343,6 +1402,15 @@
             p.x += p.vx * dt;
             p.y += p.vy * dt;
             p.life -= dt;
+
+            // Rastro de partículas para plasma/rocket (efeito visual premium, com taxa limitada)
+            if (p.type === 'plasma' || p.type === 'rocket') {
+              p.trailTimer -= dt;
+              if (p.trailTimer <= 0) {
+                p.trailTimer = (p.type === 'rocket' ? 0.02 : 0.035);
+                emitProjectileTrail(p);
+              }
+            }
 
             const gridX = Math.floor(p.x);
             const gridY = Math.floor(p.y);
@@ -2024,6 +2092,7 @@
             const p = particlePool.find(item => !item.active);
             if (p) {
               p.active = true;
+              p.noGravity = false;
               p.x = ex; p.y = ey; p.z = 0.5;
               p.vx = Math.cos(pAngle) * pSpeed;
               p.vy = Math.sin(pAngle) * pSpeed;
@@ -2173,7 +2242,9 @@
             p.y += p.vy * dt;
             
             // Apply gravity and speed on Z
-            p.vz -= GRAVITY * dt;
+            if (!p.noGravity) {
+              p.vz -= GRAVITY * dt;
+            }
             p.z += p.vz * dt;
             
             // Floor collision (Z = 0)
@@ -2288,6 +2359,7 @@
             renderSpritesSimple();
             renderParticles();
           }
+          renderProjectiles(); // Plasma/Rocket com efeito de partículas
           renderBarrels(); // TASK_004
           renderPuddles(); // TASK_004
           
@@ -2485,8 +2557,8 @@
           // Combine enemies, pickups, and projectiles into one list for Z-sorting
           const sprites = [
             ...enemies.filter(e => e.state !== 'dead'),
-            ...pickups,
-            ...projectiles
+            ...pickups
+            // Projectiles are now rendered separately via renderProjectiles() with particle effects
           ];
           
           // Calculate distance and angle for each sprite
@@ -2849,6 +2921,52 @@
             ctx.beginPath();
             ctx.ellipse(screenX, groundY, rad, rad * 0.35, 0, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        function renderProjectiles() {
+          for (let i = 0; i < projectiles.length; i++) {
+            const p = projectiles[i];
+            if (!p.active) continue;
+
+            const dx = p.x - player.x;
+            const dy = p.y - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            let angle = Math.atan2(dy, dx) - player.angle;
+            while (angle < -Math.PI) angle += 2 * Math.PI;
+            while (angle > Math.PI) angle -= 2 * Math.PI;
+            if (dist <= 0.1 || Math.abs(angle) >= FOV / 1.8) continue;
+
+            const perpDist = dist * Math.cos(angle);
+            const screenX = Math.tan(angle) * (screenWidth / 2) / Math.tan(FOV / 2) + screenWidth / 2;
+            const sx = Math.floor(screenX);
+            if (sx < 0 || sx >= screenWidth || perpDist >= zBuffer[sx]) continue; // atrás de parede
+
+            const relativeZ = p.z - 0.5; // altura do olho do jogador
+            const projectedY = (screenHeight / 2) - (relativeZ / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2));
+
+            const isRocket = p.type === 'rocket';
+            const baseSize = isRocket ? 0.55 : 0.35;
+            const coreSize = Math.max(2, Math.min(18, (baseSize / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2))));
+
+            if (OPTIMIZE_MODE === 2) {
+              // modo performance máxima: quadrado simples, sem glow
+              ctx.fillStyle = p.color;
+              ctx.fillRect(sx - (coreSize >> 1), Math.floor(projectedY) - (coreSize >> 1), coreSize, coreSize);
+              continue;
+            }
+
+            // Glow aditivo (núcleo energético) — plasma ciano / foguete laranja
+            const rgb = hexToRgb(p.color);
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`;
+            ctx.beginPath(); ctx.arc(screenX, projectedY, coreSize * 2.0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`;
+            ctx.beginPath(); ctx.arc(screenX, projectedY, coreSize * 1.2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = `rgba(255, 255, 255, 0.9)`;
+            ctx.beginPath(); ctx.arc(screenX, projectedY, coreSize * 0.5, 0, Math.PI * 2); ctx.fill();
             ctx.restore();
           }
         }
@@ -3540,6 +3658,7 @@
             if (!p) return; // Pool is full
             
             p.active = true;
+            p.noGravity = false;
             p.x = x + (Math.random() - 0.5) * 0.05;
             p.y = y + (Math.random() - 0.5) * 0.05;
             
