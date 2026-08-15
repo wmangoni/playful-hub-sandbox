@@ -200,6 +200,85 @@
             cursor: pointer;
         }
         #selectCarBtn:hover { background: #45a049; }
+
+        /* === TASK_004: HUD Nitro NOS, Heat Level, Clima e Motion Blur === */
+        #nitroLabel {
+            position: absolute;
+            bottom: 52px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00e5ff;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(0,229,255,0.9);
+            pointer-events: none;
+        }
+        #nitroBarContainer {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 260px;
+            height: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 229, 255, 0.6);
+            border-radius: 8px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        #nitroBar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00e5ff, #00b0ff, #7c4dff);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+        }
+        #heatLevel {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 26px;
+            letter-spacing: 4px;
+            pointer-events: none;
+        }
+        #heatLevel .star { text-shadow: 0 0 8px rgba(255,60,60,0.8); }
+        #heatLevel.blinking .star { animation: heatBlink 0.4s steps(2) infinite; }
+        @keyframes heatBlink { 0% { opacity: 1; } 50% { opacity: 0.25; } 100% { opacity: 1; } }
+        #weatherIndicator {
+            position: absolute;
+            top: 50px;
+            right: 30px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        #speedLines {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            box-shadow: inset 0 0 180px 40px rgba(0, 229, 255, 0.16);
+            background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 229, 255, 0.05) 100%);
+        }
+        #speedLines.active { opacity: 1; }
+        #weatherBtns { display: flex; gap: 8px; align-items: center; }
+        #weatherBtns .wbtn {
+            pointer-events: auto;
+            background: #263238;
+            color: #cfd8dc;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #weatherBtns .wbtn.active { background: #00b0ff; color: #fff; outline: 2px solid #00e5ff; }
     </style>
 </head>
 <body>
@@ -252,6 +331,13 @@
         <div id="minimapContainer">
             <canvas id="minimap"></canvas>
         </div>
+
+        <!-- TASK_004: Nitro NOS, Heat Level, Clima e Motion Blur -->
+        <div id="nitroLabel">NITRO NOS</div>
+        <div id="nitroBarContainer"><div id="nitroBar"></div></div>
+        <div id="heatLevel"></div>
+        <div id="weatherIndicator">☀️ Ensolarado</div>
+        <div id="speedLines"></div>
     </div>
 
     <div id="garageScreen">
@@ -262,6 +348,12 @@
             <span style="color:#8fa3c7; font-size:14px;">Modo:</span>
             <button id="modeCoins" class="mode-btn" data-mode="coins" style="pointer-events:auto; background:#4CAF50; color:#fff; border:none; border-radius:8px; padding:8px 16px; cursor:pointer; outline:2px solid #ffd54a;">🪙 Coleta de Moedas</button>
             <button id="modeTrial" class="mode-btn" data-mode="time_trial" style="pointer-events:auto; background:#37474f; color:#fff; border:none; border-radius:8px; padding:8px 16px; cursor:pointer;">⏱️ Time Trial (Drift Ghost)</button>
+        </div>
+        <div id="weatherBtns" style="margin-top:14px; display:flex; gap:10px; align-items:center;">
+            <span style="color:#8fa3c7; font-size:14px;">Clima:</span>
+            <button class="wbtn" data-weather="sunny">☀️ Ensolarado</button>
+            <button class="wbtn" data-weather="rainy">🌧️ Chuva Neon</button>
+            <button class="wbtn" data-weather="foggy">🌫️ Névoa Densa</button>
         </div>
         <button id="selectCarBtn">INICIAR CORRIDA</button>
     </div>
@@ -789,13 +881,14 @@
         const keys = {};
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
+            initAudioEngine(); // TASK_004: autoplay exige primeiro gesto do jogador
             if (e.key === ' ') {
                 // Só reinicia depois de escolher o carro na garagem
                 if (carChosen && (!gameState.started || gameState.playerScore >= MAX_SCORE || gameState.aiScore >= MAX_SCORE)) {
                     resetGame();
                 }
             }
-            if (e.key.toLowerCase() === 'f') { toggleHeadlightsManual(); }
+            if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'l') { toggleHeadlightsManual(); }
         });
         window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
         window.addEventListener('blur', () => { Object.keys(keys).forEach(k => keys[k] = false); });
@@ -849,6 +942,7 @@
             } else {
                 aiCar.visible = true;
                 for (let i = 0; i < COIN_COUNT; i++) createCoin();
+                spawnGravelCoins(); // TASK_004: moedas bônus do atalho off-road
                 if (lapHud) lapHud.style.display = 'none';
                 if (ghostMesh) ghostMesh.visible = false;
             }
@@ -866,6 +960,28 @@
 
             updateUI();
             updateTask3HUD();
+
+            // TASK_004: reset de nitro, polícia, pneus e clima
+            nitroSystem.charge = 0; nitroSystem.isActive = false; nitroSystem.duration = 0;
+            hasPoppedTires = false;
+            nitroFlames.forEach(f => playerCar.remove(f));
+            nitroFlames.length = 0;
+            policePursuit.heatLevel = 0;
+            policePursuit.infractionTimer = 0;
+            policePursuit.copCars.forEach(c => { scene.remove(c.mesh); disposeMesh(c.mesh); });
+            policePursuit.copCars.length = 0;
+            policePursuit.spikeStrips.forEach(s => { scene.remove(s); disposeMesh(s); });
+            policePursuit.spikeStrips.length = 0;
+            weatherManager.timer = 0;
+            applyWeatherVisuals();
+            updateHeatHUD();
+            updateWeatherHUD();
+            updateNitroHUD();
+            stopPoliceSiren();
+            camera.fov = NITRO_BASE_FOV;
+            camera.updateProjectionMatrix();
+            document.getElementById('speedLines').classList.remove('active');
+
             document.getElementById('message').style.display = 'none';
         }
 
@@ -1175,10 +1291,19 @@
                 // reciclagem
                 if (Math.abs(t.mesh.position.z - pz) > 150) spawnTrafficCar(t);
 
+                // TASK_004: ultrapassagem fina (near-miss) recarrega nitro +10%
+                const dTraffic = t.mesh.position.distanceTo(playerCar.position);
+                if (t.nearMissCooldown > 0) t.nearMissCooldown -= dt;
+                if (gameState.started && dTraffic < 4.5 && Math.abs(gameState.playerSpeed) > 0.2 && t.nearMissCooldown <= 0) {
+                    t.nearMissCooldown = 2;
+                    nitroSystem.charge = Math.min(100, nitroSystem.charge + 10);
+                }
+
                 // colisão com o jogador -> freada drástica + dano + repulsão física (TASK_003)
-                if (gameState.started && t.mesh.position.distanceTo(playerCar.position) < TRAFFIC_COLLISION_DISTANCE) {
+                if (gameState.started && dTraffic < TRAFFIC_COLLISION_DISTANCE) {
                     gameState.playerSpeed *= 0.2;
                     if (gameState.playerHealth !== undefined) applyDamage('player', 15);
+                    increaseHeat(1); // TASK_004: colidir com civis eleva o Heat Level
                     const pushX = playerCar.position.x - t.mesh.position.x;
                     const pushZ = playerCar.position.z - t.mesh.position.z;
                     const dist = Math.hypot(pushX, pushZ) || 1.0;
@@ -1222,7 +1347,7 @@
             const s = getDayNightState(timeOfDay);
             scene.background.copy(s.bg);
             scene.fog.color.copy(s.bg);
-            scene.fog.far = 80 + (s.ambInt / 0.6) * 420; // visibilidade cai à noite
+            scene.fog.far = (weatherManager.current === 'foggy') ? 28 : (80 + (s.ambInt / 0.6) * 420); // visibilidade cai à noite; névoa densa sobrepõe (TASK_004)
             dirLight.intensity = s.dirInt;
             ambientLight.intensity = s.ambInt;
             const ti = document.getElementById('timeIndicator');
@@ -1477,6 +1602,7 @@
                             isAirborne = true;
                             verticalVelocity = Math.abs(gameState.playerSpeed) * 0.45;
                             triggerBulletTime();
+                            nitroSystem.charge = Math.min(100, nitroSystem.charge + 20); // TASK_004: stunt +20%
                         }
                         break;
                     }
@@ -1536,6 +1662,13 @@
             if (dist < repairPad.radius && Math.abs(gameState.playerSpeed) < 0.03) {
                 gameState.playerHealth = Math.min(100, gameState.playerHealth + 25 * dt);
                 gameState.playerFuel = Math.min(100, gameState.playerFuel + 25 * dt);
+                if (hasPoppedTires) hasPoppedTires = false; // TASK_004: reparo dos pneus
+                if (policePursuit.heatLevel > 0) { // TASK_004: limpeza instantânea do Heat Level
+                    policePursuit.heatLevel = 0;
+                    policePursuit.infractionTimer = 0;
+                    syncCopCount();
+                    updateHeatHUD();
+                }
                 if (Math.random() < 0.15) spawnHealingRing();
             }
         }
@@ -1634,6 +1767,462 @@
             }
         }
 
+        // ===================== TASK_004 =====================
+
+        // --- Estado global ---
+        const nitroSystem = { charge: 0, isActive: false, duration: 0 };
+        const policePursuit = { heatLevel: 0, copCars: [], spikeStrips: [], infractionTimer: 0, spikeTimer: 0 };
+        const weatherManager = { current: 'sunny', rainParticles: [], fogDensity: 0.005, timer: 0 };
+        const proceduralAudioEngine = { audioCtx: null, engineOsc: null, engineGain: null, sirenOsc: null, sirenGain: null, sirenLfo: null };
+        const NITRO_BASE_FOV = 75;
+        const NITRO_FOV = 85;
+        const nitroFlames = [];
+        const sharedNitroFlameGeometry = new THREE.SphereGeometry(0.28, 6, 6);
+        const sharedNitroFlameMaterial = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+        let hasPoppedTires = false;
+        let isInTunnel = false;
+        let tunnelGroup = null;
+        const routeZones = [];
+
+        // --- HUD ---
+        function updateNitroHUD() {
+            const nb = document.getElementById('nitroBar');
+            if (nb) nb.style.width = nitroSystem.charge + '%';
+        }
+        function updateHeatHUD() {
+            const hl = document.getElementById('heatLevel');
+            if (!hl) return;
+            let html = '';
+            for (let i = 1; i <= 5; i++) {
+                html += `<span class="star" style="color:${i <= policePursuit.heatLevel ? '#ffd54a' : '#333'}">★</span>`;
+            }
+            hl.innerHTML = html;
+        }
+        function updateWeatherHUD() {
+            const wi = document.getElementById('weatherIndicator');
+            if (!wi) return;
+            const labels = { sunny: '☀️ Ensolarado', rainy: '🌧️ Chuva Neon', foggy: '🌫️ Névoa Densa' };
+            wi.textContent = labels[weatherManager.current] || labels.sunny;
+        }
+
+        // --- Nitro NOS ---
+        function spawnNitroFlames() {
+            if (nitroFlames.length > 36) return;
+            const flame = new THREE.Mesh(sharedNitroFlameGeometry, sharedNitroFlameMaterial);
+            const side = (nitroFlames.length % 2 === 0) ? 0.6 : -0.6;
+            flame.position.set(side, 0.35, -1.7);
+            flame.userData = { life: 0.6 + Math.random() * 0.3, vel: new THREE.Vector3((Math.random() - 0.5) * 0.05, Math.random() * 0.04, -(0.12 + Math.random() * 0.2)) };
+            playerCar.add(flame);
+            nitroFlames.push(flame);
+        }
+        function updateNitroFlames() {
+            for (let i = nitroFlames.length - 1; i >= 0; i--) {
+                const f = nitroFlames[i];
+                f.userData.life -= 0.04;
+                f.position.add(f.userData.vel);
+                f.scale.multiplyScalar(1.04);
+                f.material.opacity = Math.max(0, f.userData.life * 1.2);
+                if (f.userData.life <= 0) {
+                    playerCar.remove(f);
+                    nitroFlames.splice(i, 1);
+                }
+            }
+        }
+        function updateNitroSystem(dt) {
+            const wantsNitro = (keys['shift'] || keys[' ']) && gameState.started;
+            if (wantsNitro && nitroSystem.charge > 20 && !nitroSystem.isActive) {
+                nitroSystem.isActive = true;
+                playNitroActivateSound();
+            }
+            if (nitroSystem.isActive) {
+                nitroSystem.charge = Math.max(0, nitroSystem.charge - dt * 25);
+                nitroSystem.duration += dt;
+                if (nitroSystem.charge <= 0 || !wantsNitro) {
+                    nitroSystem.isActive = false;
+                    playTurboBlowOffSound();
+                }
+            }
+            // FOV warp (Motion Blur)
+            const targetFov = nitroSystem.isActive ? NITRO_FOV : NITRO_BASE_FOV;
+            camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, dt * (nitroSystem.isActive ? 5 : 4));
+            camera.updateProjectionMatrix();
+
+            if (nitroSystem.isActive) spawnNitroFlames();
+            updateNitroFlames();
+
+            const sl = document.getElementById('speedLines');
+            if (sl) sl.classList.toggle('active', nitroSystem.isActive);
+            updateNitroHUD();
+        }
+
+        // --- Perseguição Policial ---
+        function createCopCar() {
+            const cop = createCar(0x0a0a0a);
+            cop.children.forEach(c => { if (c.material && c.material.color) c.material.color.setHex(0x0a0a0a); });
+            const lightBar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.35), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            lightBar.position.set(0, 1.25, 0);
+            cop.add(lightBar);
+            const redLight = new THREE.PointLight(0xff0000, 0, 14);
+            redLight.position.set(-0.3, 1.45, 0);
+            cop.add(redLight);
+            const blueLight = new THREE.PointLight(0x0000ff, 0, 14);
+            blueLight.position.set(0.3, 1.45, 0);
+            cop.add(blueLight);
+            return { mesh: cop, redLight, blueLight, speed: 0.24 + Math.random() * 0.06, nearMissCooldown: 0 };
+        }
+        function syncCopCount() {
+            const desired = (raceMode === 'time_trial') ? 0 : policePursuit.heatLevel;
+            while (policePursuit.copCars.length < desired) {
+                const cop = createCopCar();
+                cop.mesh.position.set(playerCar.position.x + (Math.random() - 0.5) * 20, 0, playerCar.position.z - 55 - Math.random() * 35);
+                scene.add(cop.mesh);
+                policePursuit.copCars.push(cop);
+            }
+            while (policePursuit.copCars.length > desired) {
+                const c = policePursuit.copCars.pop();
+                scene.remove(c.mesh);
+                disposeMesh(c.mesh);
+            }
+        }
+        function increaseHeat(amount = 1) {
+            policePursuit.heatLevel = Math.min(5, policePursuit.heatLevel + amount);
+            policePursuit.infractionTimer = 0;
+            syncCopCount();
+            updateHeatHUD();
+        }
+        function updateHeatLevel(dt) {
+            if (policePursuit.heatLevel <= 0) return;
+            policePursuit.infractionTimer += dt;
+            if (policePursuit.infractionTimer >= 8) {
+                policePursuit.infractionTimer = 0;
+                policePursuit.heatLevel = Math.max(0, policePursuit.heatLevel - 1);
+                syncCopCount();
+                updateHeatHUD();
+            }
+            const hl = document.getElementById('heatLevel');
+            if (hl) hl.classList.toggle('blinking', policePursuit.infractionTimer > 6);
+        }
+        function updatePoliceAI(dt) {
+            let sirenNear = false;
+            policePursuit.copCars.forEach(cop => {
+                if (!gameState.started) return;
+                const target = playerCar.position.clone().add(new THREE.Vector3(Math.sin(playerCar.rotation.y) * 8, 0, Math.cos(playerCar.rotation.y) * 8));
+                const dir = target.sub(cop.mesh.position).normalize();
+                cop.mesh.position.addScaledVector(dir, cop.speed);
+                cop.mesh.lookAt(playerCar.position);
+                // giroflex
+                const on = Math.sin(Date.now() * 0.012) > 0;
+                cop.redLight.intensity = on ? 3.0 : 0.0;
+                cop.blueLight.intensity = on ? 0.0 : 3.0;
+
+                const distToPlayer = cop.mesh.position.distanceTo(playerCar.position);
+                if (distToPlayer < 60) sirenNear = true;
+
+                // ultrapassagem em alta velocidade eleva o Heat Level
+                if (cop.nearMissCooldown > 0) cop.nearMissCooldown -= dt;
+                if (distToPlayer < 6 && Math.abs(gameState.playerSpeed) > 0.25 && cop.nearMissCooldown <= 0) {
+                    cop.nearMissCooldown = 3;
+                    increaseHeat(1);
+                }
+                // colisão (PIT)
+                if (distToPlayer < 2.8) {
+                    gameState.playerSpeed *= 0.4;
+                    applyDamage('player', 10);
+                    increaseHeat(1);
+                    flashCollision();
+                    shakeIntensity = 0.35;
+                }
+            });
+            if (sirenNear) playPoliceSiren(); else stopPoliceSiren();
+        }
+        function spawnSpikeStrip() {
+            const strip = new THREE.Group();
+            const spikeMat = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+            const spikeGeom = new THREE.ConeGeometry(0.14, 0.5, 6);
+            for (let i = -4; i <= 4; i++) {
+                const spike = new THREE.Mesh(spikeGeom, spikeMat);
+                spike.position.set(i * 1.05, 0.25, 0);
+                strip.add(spike);
+            }
+            const ahead = 90;
+            strip.position.set(
+                playerCar.position.x + Math.sin(playerCar.rotation.y) * ahead,
+                0.05,
+                playerCar.position.z + Math.cos(playerCar.rotation.y) * ahead
+            );
+            strip.rotation.y = playerCar.rotation.y;
+            strip.userData = { triggered: false };
+            scene.add(strip);
+            policePursuit.spikeStrips.push(strip);
+            if (policePursuit.spikeStrips.length > 8) {
+                const old = policePursuit.spikeStrips.shift();
+                scene.remove(old);
+                disposeMesh(old);
+            }
+        }
+        function checkSpikeStripCollisions() {
+            policePursuit.spikeStrips.forEach(strip => {
+                if (strip.userData.triggered) return;
+                const dx = playerCar.position.x - strip.position.x;
+                const dz = playerCar.position.z - strip.position.z;
+                if (Math.hypot(dx, dz) < 2.6) {
+                    strip.userData.triggered = true;
+                    hasPoppedTires = true;
+                    shakeIntensity = 0.5;
+                    playTireBurstSound();
+                }
+            });
+        }
+        function updateSpikeStrips(dt) {
+            if (raceMode === 'time_trial' || policePursuit.heatLevel < 3) {
+                policePursuit.spikeTimer = 0;
+                return;
+            }
+            policePursuit.spikeTimer += dt;
+            if (policePursuit.spikeTimer >= 12) {
+                policePursuit.spikeTimer = 0;
+                spawnSpikeStrip();
+            }
+        }
+
+        // --- Clima Dinâmico ---
+        function setWeather(type) {
+            weatherManager.current = type;
+            weatherManager.timer = 0;
+            applyWeatherVisuals();
+            updateWeatherHUD();
+        }
+        function initRainParticles() {
+            const dropGeom = new THREE.BoxGeometry(0.06, 0.5, 0.06);
+            const dropMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
+            for (let i = 0; i < 300; i++) {
+                const drop = new THREE.Mesh(dropGeom, dropMat);
+                drop.position.set((Math.random() - 0.5) * 60, Math.random() * 40, (Math.random() - 0.5) * 60);
+                drop.visible = false;
+                scene.add(drop);
+                weatherManager.rainParticles.push(drop);
+            }
+        }
+        function updateRain(dt) {
+            weatherManager.rainParticles.forEach(p => {
+                p.position.y -= dt * 42;
+                if (p.position.y < 0) {
+                    p.position.y = 40;
+                    p.position.x = playerCar.position.x + (Math.random() - 0.5) * 60;
+                    p.position.z = playerCar.position.z + (Math.random() - 0.5) * 60;
+                }
+            });
+        }
+        function applyWeatherVisuals() {
+            const rainy = weatherManager.current === 'rainy';
+            const foggy = weatherManager.current === 'foggy';
+            roadMaterial.roughness = rainy ? 0.15 : 0.6;
+            roadMaterial.metalness = rainy ? 0.5 : 0.0;
+            weatherManager.rainParticles.forEach(p => { p.visible = rainy; });
+            weatherManager.fogDensity = foggy ? 0.035 : 0.005;
+        }
+        function updateWeather(dt) {
+            weatherManager.timer += dt;
+            if (weatherManager.timer >= 90) {
+                const options = ['sunny', 'rainy', 'foggy'];
+                setWeather(options[(options.indexOf(weatherManager.current) + 1) % options.length]);
+            }
+            if (weatherManager.current === 'rainy') updateRain(dt);
+        }
+
+        // --- Bifurcação de Rotas (Rota A/B/C) ---
+        function isInZone(type, x, z) {
+            for (const zz of routeZones) {
+                if (zz.type === type && x >= zz.minX && x <= zz.maxX && z >= zz.minZ && z <= zz.maxZ) return true;
+            }
+            return false;
+        }
+        function spawnGravelCoins() {
+            for (let i = 0; i < 8; i++) {
+                const coin = new THREE.Mesh(sharedCoinGeometry, sharedCoinMaterial);
+                coin.position.set(20 + i * 13, 1, 120);
+                coin.castShadow = true;
+                scene.add(coin);
+                coins.push(coin);
+            }
+        }
+        function buildBranchingRoutes() {
+            // Rota B: Túnel Ciber-Neon sobre a avenida principal
+            tunnelGroup = new THREE.Group();
+            const tunnelLen = 90, tunnelRadius = 11, tunnelZ = -150;
+            const tunnelGeom = new THREE.CylinderGeometry(tunnelRadius, tunnelRadius, tunnelLen, 24, 1, true);
+            const tunnelMat = new THREE.MeshStandardMaterial({ color: 0x111a2b, roughness: 0.5, metalness: 0.7, side: THREE.BackSide });
+            const tunnel = new THREE.Mesh(tunnelGeom, tunnelMat);
+            tunnel.rotation.x = Math.PI / 2;
+            tunnel.position.set(0, 5, tunnelZ);
+            tunnelGroup.add(tunnel);
+
+            tunnelGroup.userData.panels = [];
+            for (let i = 0; i < 14; i++) {
+                const panel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(6, 1.4),
+                    new THREE.MeshBasicMaterial({ color: (i % 2 === 0 ? 0x00e5ff : 0xff00ff), side: THREE.DoubleSide, blending: THREE.AdditiveBlending, transparent: true })
+                );
+                const ang = (i / 14) * Math.PI * 2;
+                panel.position.set(Math.cos(ang) * (tunnelRadius - 0.4), 6, tunnelZ - tunnelLen / 2 + (i / 14) * tunnelLen);
+                panel.lookAt(0, 6, panel.position.z);
+                tunnelGroup.add(panel);
+                tunnelGroup.userData.panels.push(panel);
+            }
+            scene.add(tunnelGroup);
+            routeZones.push({ type: 'tunnel', minX: -tunnelRadius, maxX: tunnelRadius, minZ: tunnelZ - tunnelLen / 2, maxZ: tunnelZ + tunnelLen / 2 });
+
+            // Rota C: Atalho Off-Road de Cascalho (ligando avenida principal à rua leste)
+            const gravelMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1.0, metalness: 0 });
+            const gravel = new THREE.Mesh(new THREE.PlaneGeometry(130, 14), gravelMat);
+            gravel.rotation.x = -Math.PI / 2;
+            gravel.position.set(65, 0.02, 120);
+            gravel.receiveShadow = true;
+            scene.add(gravel);
+            routeZones.push({ type: 'gravel', minX: 0, maxX: 130, minZ: 113, maxZ: 127 });
+            spawnGravelCoins();
+
+            // Rota A: Cliffside (rua oeste) com vento lateral e penhasco
+            const cliffEdge = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ color: 0x2b6a4b, side: THREE.DoubleSide }));
+            cliffEdge.position.set(-150, 0.02, -225);
+            scene.add(cliffEdge);
+            routeZones.push({ type: 'cliffside', minX: -138, maxX: -122, minZ: -255, maxZ: -195 });
+        }
+        function updateRouteZones(dt) {
+            const px = playerCar.position.x, pz = playerCar.position.z;
+            isInTunnel = isInZone('tunnel', px, pz);
+            if (tunnelGroup && tunnelGroup.userData.panels) {
+                tunnelGroup.userData.panels.forEach((panel, i) => {
+                    panel.material.opacity = 0.5 + 0.5 * Math.sin(Date.now() * 0.006 + i * 0.7);
+                });
+            }
+            if (isInZone('cliffside', px, pz) && gameState.started) {
+                playerCar.position.x += Math.sin(Date.now() * 0.003) * 0.012;
+            }
+        }
+
+        // --- Áudio Procedural (Web Audio API) ---
+        function initAudioEngine() {
+            if (proceduralAudioEngine.audioCtx) return;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            const ctx = new AC();
+            proceduralAudioEngine.audioCtx = ctx;
+
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(80, ctx.currentTime);
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.06, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            proceduralAudioEngine.engineOsc = osc;
+            proceduralAudioEngine.engineGain = gain;
+        }
+        function updateEngineSound(speedRatio) {
+            if (!proceduralAudioEngine.engineOsc) return;
+            const targetFreq = 80 + speedRatio * 570;
+            proceduralAudioEngine.engineOsc.frequency.setTargetAtTime(targetFreq, proceduralAudioEngine.audioCtx.currentTime, 0.05);
+            const baseGain = isInTunnel ? 0.14 : 0.06;
+            proceduralAudioEngine.engineGain.gain.setTargetAtTime(gameState.started ? baseGain : 0.02, proceduralAudioEngine.audioCtx.currentTime, 0.1);
+        }
+        function playNitroActivateSound() {
+            if (!proceduralAudioEngine.audioCtx) return;
+            const ctx = proceduralAudioEngine.audioCtx;
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(850, ctx.currentTime + 0.3);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.22, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.32);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + 0.35);
+        }
+        function playTurboBlowOffSound() {
+            if (!proceduralAudioEngine.audioCtx) return;
+            const ctx = proceduralAudioEngine.audioCtx;
+            const bufferSize = Math.floor(ctx.sampleRate * 0.3);
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, ctx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.3);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.3, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            noise.connect(filter); filter.connect(g); g.connect(ctx.destination);
+            noise.start();
+        }
+        function playTireScreech() {
+            if (!proceduralAudioEngine.audioCtx) return;
+            const ctx = proceduralAudioEngine.audioCtx;
+            const bufferSize = Math.floor(ctx.sampleRate * 0.25);
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1800;
+            filter.Q.value = 0.8;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.15, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+            noise.connect(filter); filter.connect(g); g.connect(ctx.destination);
+            noise.start();
+        }
+        function playPoliceSiren() {
+            if (!proceduralAudioEngine.audioCtx || proceduralAudioEngine.sirenOsc) return;
+            const ctx = proceduralAudioEngine.audioCtx;
+            const osc = ctx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.value = 750;
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = 1.6;
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = 150;
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            const g = ctx.createGain();
+            g.gain.value = 0.05;
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(); lfo.start();
+            proceduralAudioEngine.sirenOsc = osc;
+            proceduralAudioEngine.sirenGain = g;
+            proceduralAudioEngine.sirenLfo = lfo;
+        }
+        function stopPoliceSiren() {
+            if (!proceduralAudioEngine.sirenOsc) return;
+            try {
+                proceduralAudioEngine.sirenOsc.stop();
+                if (proceduralAudioEngine.sirenLfo) proceduralAudioEngine.sirenLfo.stop();
+                proceduralAudioEngine.sirenGain.disconnect();
+            } catch (e) {}
+            proceduralAudioEngine.sirenOsc = null;
+            proceduralAudioEngine.sirenGain = null;
+            proceduralAudioEngine.sirenLfo = null;
+        }
+        function playTireBurstSound() {
+            if (!proceduralAudioEngine.audioCtx) return;
+            const ctx = proceduralAudioEngine.audioCtx;
+            const osc = ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(120, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.2);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.35, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + 0.22);
+        }
+
         // Loop de animação
         function animate() {
             requestAnimationFrame(animate);
@@ -1646,6 +2235,11 @@
             // Ciclo dia/noite roda sempre (inclusive na garagem)
             updateDayNight(dt);
 
+            // TASK_004: clima, rotas e áudio procedural rodam sempre
+            updateWeather(dt);
+            updateRouteZones(dt);
+            updateEngineSound(gameState.started ? Math.abs(gameState.playerSpeed) / playerPhysics.maxSpd : 0);
+
             if (gameState.started && gameState.playerScore < MAX_SCORE && gameState.aiScore < MAX_SCORE) {
                 // Controle do jogador (física por modelo + penalidade de grama)
                 const onGrass = !isOnRoad(playerCar.position.x, playerCar.position.z);
@@ -1655,7 +2249,16 @@
                 // TASK_003: penalidades de dano crítico e combustível esgotado
                 if (gameState.playerHealth < 25) maxSpd *= 0.6;
                 if (gameState.playerFuel <= 0) maxSpd = playerPhysics.maxSpd * 0.1;
-                const turnSpd = playerPhysics.turn;
+
+                // TASK_004: aderência por superfície (cascalho/chuva/pneu furado)
+                const surfaceGrip =
+                    (isInZone('gravel', playerCar.position.x, playerCar.position.z) ? 0.7 : 1) *
+                    (weatherManager.current === 'rainy' ? 0.65 : 1) *
+                    (hasPoppedTires ? 0.4 : 1);
+                // TASK_004: Nitro NOS (1.6x vel. máx. / 2.5x aceleração)
+                if (nitroSystem.isActive) { accel *= 2.5; maxSpd *= 1.6; }
+
+                const turnSpd = playerPhysics.turn * surfaceGrip;
                 let turning = 0;
 
                 if (!isSpunOut) {
@@ -1663,7 +2266,7 @@
                         gameState.playerSpeed = Math.min(gameState.playerSpeed + accel, maxSpd);
                         if (gameState.playerFuel > 0) gameState.playerFuel = Math.max(0, gameState.playerFuel - 1.5 * dt);
                     } else if (keys['arrowdown'] || keys['s']) {
-                        gameState.playerSpeed = Math.max(gameState.playerSpeed - accel, -maxSpd / 2);
+                        gameState.playerSpeed = Math.max(gameState.playerSpeed - accel * surfaceGrip, -maxSpd / 2);
                         if (gameState.playerFuel > 0) gameState.playerFuel = Math.max(0, gameState.playerFuel - 1.0 * dt);
                     } else {
                         gameState.playerSpeed *= 0.95;
@@ -1675,6 +2278,11 @@
                     if (playerPhysics.id === 'apex' && turning !== 0 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.75) {
                         playerCar.position.x += turning * 0.06;
                         addSkidMark();
+                    }
+                    // TASK_004: drift sustentado recarrega nitro (+15%/s) e canta pneus
+                    if (turning !== 0 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.75) {
+                        nitroSystem.charge = Math.min(100, nitroSystem.charge + 15 * dt);
+                        if (Math.random() < 0.15) playTireScreech();
                     }
                 } else {
                     gameState.playerSpeed *= 0.97; // sem controle durante o rodopio
@@ -1695,6 +2303,18 @@
                 // Tráfego e marcas
                 updateTraffic(dt);
                 updateSkidMarks(dt);
+
+                // TASK_004: nitro, polícia, pneus furados e física de fuga
+                updateNitroSystem(dt);
+                updatePoliceAI(dt);
+                updateHeatLevel(dt);
+                updateSpikeStrips(dt);
+                checkSpikeStripCollisions();
+                if (hasPoppedTires) {
+                    gameState.playerHealth = Math.max(0, gameState.playerHealth - 3 * dt);
+                    if (Math.random() < 0.5) playerCar.rotation.y += 0.012;
+                    else playerCar.rotation.y -= 0.012;
+                }
 
                 // IA
                 if (!gameState.aiTarget || !coins.includes(gameState.aiTarget)) {
@@ -1827,6 +2447,22 @@
         initRepairPad();
         document.getElementById('bestLapDisplay').textContent = bestLapTime !== null ? formatLapTime(bestLapTime) : '--';
 
+        // === TASK_004: clima, rotas e HUD ===
+        initRainParticles();
+        buildBranchingRoutes();
+        applyWeatherVisuals();
+        updateHeatHUD();
+        updateWeatherHUD();
+        updateNitroHUD();
+        document.querySelectorAll('.wbtn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setWeather(btn.dataset.weather);
+                document.querySelectorAll('.wbtn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+        document.querySelectorAll('.wbtn').forEach(b => { if (b.dataset.weather === weatherManager.current) b.classList.add('active'); });
+
         function selectModeUI(mode) {
             selectedMode = mode;
             const coinsBtn = document.getElementById('modeCoins');
@@ -1858,7 +2494,17 @@
             selectMode: (m) => { selectedMode = m; raceMode = m; },
             getRaceMode: () => raceMode, getBestLap: () => bestLapTime,
             getFlags: () => ({ isSpunOut, isAirborne, timeScale, verticalVelocity, spinTimer, lapArmed, activeLapTime, ghostExists: !!ghostMesh, lapFrames: activeLapFrames.length }),
-            setLapReplay: (d) => { lapReplayData = d; }, createGhostMesh, updateGhostCar, updateLapTimer
+            setLapReplay: (d) => { lapReplayData = d; }, createGhostMesh, updateGhostCar, updateLapTimer,
+            // TASK_004
+            nitroSystem, policePursuit, weatherManager, proceduralAudioEngine,
+            getNitro: () => nitroSystem.charge, isNitroActive: () => nitroSystem.isActive,
+            getHeatLevel: () => policePursuit.heatLevel, increaseHeat,
+            setWeather, getWeather: () => weatherManager.current,
+            hasPoppedTires: () => hasPoppedTires, isInTunnel: () => isInTunnel,
+            updateNitroSystem, updatePoliceAI, updateWeather, updateHeatLevel, checkSpikeStripCollisions,
+            spawnSpikeStrip, syncCopCount, playPoliceSiren, stopPoliceSiren,
+            initAudioEngine, updateEngineSound, playTurboBlowOffSound, playNitroActivateSound,
+            routeZones, isInZone, spawnGravelCoins
         };
     </script>
 </body>
