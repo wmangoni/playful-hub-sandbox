@@ -224,7 +224,21 @@ function updateTaxiMission(dt) {
 ---
 
 ## 💡 Decisões e Resoluções do Tech Lead (TL)
-*(Seção a ser preenchida pelo Tech Lead durante o refinamento)*
+
+1. **Otimização de Sombras e Performance nos Faróis (Aprovado)**:
+   * **Decisão**: Aprovada a desativação de `castShadow = false` nos `SpotLight` dos faróis noturnos do veículo do jogador. A projeção de iluminação difusa e o volume translúcido de luz garantem uma excelente estética retrô/neon noturna sem incorrer em penalidades pesadas de rasterização de sombras em GPU.
+   * **Diretriz Técnica**: Manter o sombreamento dinâmico restrito exclusivamente à luz direcional primária (`DirectionalLight`), otimizando o shadow map com `shadow.mapSize.width = 1024` e `shadow.mapSize.height = 1024`.
+
+2. **Limite de Spawn de Passageiros de Táxi (Aprovado)**:
+   * **Decisão**: Limite mantido em no máximo **2 passageiros de táxi ativos** simultaneamente em todo o mapa.
+   * **Diretriz Técnica**: Utilizar um array de controle `activeTaxiPassengers = []` e validar seu `length` antes de marcar novos pedestres gerados proceduralmente como alvos de táxi. Os ícones no minimapa e no espaço 3D devem ser removidos limparmente (`dispose()` de malha e sprite) assim que o passageiro embarcar ou expirar.
+
+3. **Filtro de Áudio para Entrada/Saída do Veículo (Aprovado)**:
+   * **Decisão**: Aprovada a modulação dinâmica do sintetizador de chuva na Web Audio API ao alternar a posição do jogador (a pé vs. dirigindo).
+   * **Diretriz Técnica**: Utilizar um `BiquadFilterNode` tipo `lowpass` com frequência de corte a 1200Hz e ganho a 0.8 quando dentro do veículo (simulando o isolamento acústico da cabine do carro), ajustando a frequência para 3500Hz e ganho a 0.8 quando a pé. O `AudioContext` deve ser inicializado ou resumido obrigatoriamente no primeiro clique/input físico do usuário para respeitar políticas de autoplay.
+
+*Status da Especificação*: ✅ **Aprovado pelo Tech Lead** - Tarefa refinada e pronta para ser assumida pelo time de desenvolvimento.
+
 
 ---
 

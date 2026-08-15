@@ -657,5 +657,51 @@ Como PO experiente em level design e focado na imersão e na excelente experiên
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
 
+---
+
+## 🏎️ 30. Elaboração e Criação de Nova Tarefa: Driving Simulator (TASK_004) - ✅ LIDA E CONFIRMADA PELO TECH LEAD
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Driving Simulator (driving_simulator)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Sistema de Nitro NOS com Motion Blur e Distorção de FOV**: Projetei a mecânica de carga de Nitro via ações de pilotagem de risco (drifts, ultrapassagens finas de tráfego a menos de 1.8 unidades e decolagem em rampas). A ativação multiplica a velocidade por 1.6x, expande dinamicamente o campo de visão (FOV de 60° a 85°) no Three.js via LERP e injeta partículas de chamas neon nos escapamentos.
+    *   **Perseguição Policial e Faixas de Espinhos (Spike Strips)**: Desenhei um sistema de nível de procura (Heat Level 1 a 5 estrelas) acionado por colisões intencionais com tráfego. Adicionei viaturas de polícia com giroflex pulsante e IA de manobra de interceptação em V, além de faixas de espinhos na pista que estouram os pneus, reduzindo a tração lateral em 65% até o reparo no Pit Stop Pad.
+    *   **Clima Dinâmico e Aquaplanagem**: Projetei a transição de clima para chuva neon e névoa densa. Na chuva, o roughness do asfalto diminui para 0.15 para reflexos especulares intensos e a aderência cai 35%, com efeito de aquaplanagem e borrifos de água nas rodas.
+    *   **Bifurcação de Rotas e Túnel Ciber-Neon**: Desenhei ramificações de pista permitindo escolher entre a Pista da Costa, o Túnel Ciber-Neon (com acústica e luzes neon) e o Atalho Off-Road de Cascalho.
+    *   **Áudio Adaptativo Sintetizado (Web Audio API)**: Projetei a síntese sonora procedural nativa sem assets externos para som do motor varrendo de 80Hz a 650Hz, válvula de alívio do turbo (Blow-Off Valve "pshhht"), cantar de pneus e sirenes policiais.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Gerenciamento de Autoplay da Web Audio API*: Para respeitar as políticas de navegadores modernos, a inicialização do AudioContext do motor não deve ocorrer na carga da página, mas sim no primeiro evento de clique ou tecla pressionada pelo jogador.
+    2.  *Descarte de Instâncias no Clima Dinâmico*: A alternância entre sol me chuva pode acumular partículas de chuva órfãs. Recomendei reaproveitar o array `rainParticles` e invocar `.dispose()` em geometrias e materiais ao desativar o efeito.
+    3.  *Isolamento de Viaturas no Time Trial*: Para garantir a competitividade das voltas rápidas no modo Time Trial, as viaturas policiais e Spike Strips devem ficar desativadas durante este modo, mantendo o Nitro liberado.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🏛️ 31. Elaboração e Criação de Nova Tarefa: Strategy Empire (TASK_004) - ✅ LIDA E CONFIRMADA PELO TECH LEAD
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Strategy Empire (strategy_game)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/strategy_game/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Árvore de Tecnologias por Eras (Tech Tree & Age Progression)**: Desenhei o avanço tecnológico através de 3 eras distintas (Bronze, Ferro e Imperial) com um painel glassmorphic da Árvore Tecnológica. Cada era desbloqueia melhorias econômicas e militares (ex: Irrigação, Mineração, Armaduras, Balística Superior e Estradas Pavimentadas).
+    *   **Maravilha do Império (Imperial Wonder 🏛️/⚡) & Evento de Cerco Final**: Criei a mecânica clímax de vitória por hegemonia. A construção da Maravilha ocupa uma área 2x2 no grid e dispara um **Evento de Cerco Final (60 segundos / 12 ticks)**, forçando todas as IAs rivais e acampamentos bárbaros a romper tréguas e lançarem uma marcha massiva desesperada para tentar destruir a estrutura antes da conclusão.
+    *   **Unidade Heroica (Campeão Imperial 🛡️/👑)**: Especifiquei a convocação do Campeão Imperial na Era Imperial com aura dourada cintilante e a habilidade ativa *Grito de Guerra (War Cry)* (tecla `W`), que emite uma onda de choque radial no Canvas e concede `+2 de Força de Combate` para tropas aliadas adjacentes por 2 turnos.
+    *   **Modo Campanha Tática (3 Capítulos de Level Design)**: Desenhei 3 cenários táticos pré-configurados (*O Cerco de Valoria*, *A Rota das Relíquias* e *A Guerra dos Três Tronos*) para oferecer desafios de level design focados com persistência de progresso em `localStorage`.
+    *   **Áudio Adaptativo e Juiciness no Web Audio API**: Projetei a síntese sonora procedural com transição dinâmica de arranjos acústicos tranquilos para batidas arpejadas Cyber-Sintéticas aceleradas durante o cerco final, além de efeitos dedicados para o Grito de Guerra e subida de era.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Injeção e Bounding Box 2x2 da Maravilha*: A estrutura 2x2 ocupa 4 células no CSS Grid. O desenvolvedor deve ancorar a renderização no tile superior-esquerdo e atribuir a classe `.wonder-tile-group` cobrindo as 4 células, atribuindo o dataset `dataset.building = 'wonder'` a todos os 4 tiles para compartilhamento de HP.
+    2.  *Pathfinding Eficiente durante o Cerco Final*: Com múltiplos saqueadores e tropas de IAs marchando simultaneamente rumo à Maravilha, a movimentação deve utilizar vetor cartesiano direto (distância Manhattan) contornando apenas tiles de água para evitar sobrecarga no loop de frames.
+    3.  *Reparo Manual da Maravilha*: A Maravilha não deve regenerar HP automaticamente. O jogador pode interagir e gastar `50 Madeira` e `50 Ouro` para restaurar `50 HP` com tempo de recarga de 5 segundos.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+
+
 
 

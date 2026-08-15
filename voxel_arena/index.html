@@ -647,6 +647,272 @@
         const ARENA_SIZE = 100;
 
         // =====================================================================
+        // === TASK_002 — Enemy Config, Wave Config & Upgrade Pool
+        // =====================================================================
+
+        const ENEMY_CONFIG = {
+            basic:  { hp: 30,  speed: 6, damage: 5,  attackCd: 1.5, scale: 1.0, xp: 15,
+                      armor: 0x5a2d8c, flesh: 0x7a4bbf, eye: 0xff2244 },
+            brute:  { hp: 120, speed: 3, damage: 15, attackCd: 1.5, scale: 1.8, xp: 40,
+                      armor: 0x9a1f1f, flesh: 0xc04040, eye: 0xffaa00 },
+            stalker:{ hp: 25,  speed: 9, damage: 6,  attackCd: 0.8, scale: 0.7, xp: 20,
+                      armor: 0x0d7a5a, flesh: 0x1f9a78, eye: 0x00e5ff }
+        };
+
+        const WAVE_CONFIG = {
+            1: { duration: 60, spawnInterval: 3.0, maxEnemies: 8,  ratios: { basic: 1.0, brute: 0.0, stalker: 0.0 } },
+            2: { duration: 60, spawnInterval: 2.5, maxEnemies: 12, ratios: { basic: 0.8, brute: 0.2, stalker: 0.0 }, elite: true },
+            3: { duration: 60, spawnInterval: 2.0, maxEnemies: 15, ratios: { basic: 0.6, brute: 0.2, stalker: 0.2 }, elite: true },
+            4: { duration: 60, spawnInterval: 1.5, maxEnemies: 18, ratios: { basic: 0.4, brute: 0.3, stalker: 0.3 }, elite: true },
+            5: { duration: 60, spawnInterval: 1.0, maxEnemies: 25, ratios: { basic: 0.3, brute: 0.35, stalker: 0.35 }, elite: true }
+        };
+
+        const UPGRADE_POOL = [
+            { rarity: 'Raro',   icon: '⚔', name: 'Gume Afiado',       desc: '+30% Dano de Ataque',         apply(p) { p.damageMultiplier   += 0.30; } },
+            { rarity: 'Comum',  icon: '🏃', name: 'Passos Ligeiros',   desc: '+15% Velocidade',             apply(p) { p.speedMultiplier     += 0.15; } },
+            { rarity: 'Raro',   icon: '⚡', name: 'Vigor Renovado',    desc: '+25% Regeneração de Stamina',  apply(p) { p.staminaRegenBonus   += 0.25; } },
+            { rarity: 'Comum',  icon: '💨', name: 'Impulso Alongado',  desc: '+20% Alcance do Dash',        apply(p) { p.dashRangeMult       += 0.20; } },
+            { rarity: 'Raro',   icon: '💚', name: 'Essência Curativa', desc: '+40% Cura',                   apply(p) { p.healMult            += 0.40; } },
+            { rarity: 'Épico',  icon: '💥', name: 'Cataclisma',        desc: '+50% Dano da Ultimate',       apply(p) { p.ultMult             += 0.50; } },
+            { rarity: 'Comum',  icon: '🕐', name: 'Ritmo Acelerado',   desc: '-15% Cooldown das Skills',    apply(p) { p.skills.forEach(s => s.cdMult *= 0.85); } },
+            { rarity: 'Comum',  icon: '❤', name: 'Vitalidade',        desc: '+25 Vida Máxima',              apply(p) { p.stats.maxHp += 25; p.stats.hp = Math.min(p.stats.maxHp, p.stats.hp + 25); } }
+        ];
+
+        // =====================================================================
+        // === TASK_001 — VFX System (Dynamic Lights & Skill Effects)
+        // =====================================================================
+
+        const activeVFX = [];
+
+        function updateVFX(scene, dt) {
+            for (let i = activeVFX.length - 1; i >= 0; i--) {
+                const vfx = activeVFX[i];
+                vfx.life -= dt * 1000;
+                const age = 1.0 - (vfx.life / vfx.maxLife);
+
+                if (vfx.group.customUpdate) {
+                    vfx.group.customUpdate(dt, age);
+                }
+
+                if (vfx.light) {
+                    vfx.light.intensity = vfx.initialIntensity * Math.cos(age * Math.PI / 2);
+                }
+
+                if (vfx.life <= 0) {
+                    scene.remove(vfx.group);
+                    vfx.group.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(m => m.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    });
+                    activeVFX.splice(i, 1);
+                }
+            }
+        }
+
+        function spawnDynamicSkillVFX(scene, position, type) {
+            const vfxGroup = new THREE.Group();
+            vfxGroup.position.copy(position);
+
+            let lightColor, lightIntensity, lightDistance, duration;
+
+            if (type === 'spin') {
+                lightColor = 0xffd700;
+                lightIntensity = 4.0;
+                lightDistance = 15;
+                duration = 300;
+
+                const ringGeo = new THREE.TorusGeometry(5, 0.4, 8, 32);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xffd700, transparent: true, opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                vfxGroup.add(ring);
+
+                vfxGroup.customUpdate = (dt, age) => {
+                    ring.rotation.z += dt * 15;
+                    ring.scale.setScalar(1 + age * 2.0);
+                    ringMat.opacity = 1.0 - age;
+                };
+            } else if (type === 'heal') {
+                lightColor = 0x00ff88;
+                lightIntensity = 5.0;
+                lightDistance = 12;
+                duration = 600;
+
+                const particles = [];
+                const partGeo = new THREE.SphereGeometry(0.2, 4, 4);
+                const partMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true });
+
+                for (let i = 0; i < 12; i++) {
+                    const part = new THREE.Mesh(partGeo, partMat);
+                    const angle = (i / 12) * Math.PI * 2;
+                    part.position.set(Math.cos(angle) * 1.5, 0.2 * i, Math.sin(angle) * 1.5);
+                    vfxGroup.add(part);
+                    particles.push(part);
+                }
+
+                vfxGroup.customUpdate = (dt, age) => {
+                    particles.forEach((p, idx) => {
+                        const angle = (idx / 12) * Math.PI * 2 + age * Math.PI * 4;
+                        p.position.x = Math.cos(angle) * (1.5 - age * 0.5);
+                        p.position.z = Math.sin(angle) * (1.5 - age * 0.5);
+                        p.position.y += dt * 4;
+                    });
+                    partMat.opacity = 1.0 - age;
+                };
+            } else if (type === 'ult') {
+                lightColor = 0xff00ff;
+                lightIntensity = 8.0;
+                lightDistance = 40;
+                duration = 800;
+
+                const domeGeo = new THREE.SphereGeometry(1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                const domeMat = new THREE.MeshBasicMaterial({
+                    color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.9,
+                    blending: THREE.AdditiveBlending
+                });
+                const dome = new THREE.Mesh(domeGeo, domeMat);
+                vfxGroup.add(dome);
+
+                vfxGroup.customUpdate = (dt, age) => {
+                    const currentRadius = 1 + age * 28;
+                    dome.scale.setScalar(currentRadius);
+                    domeMat.opacity = 1.0 - Math.pow(age, 2);
+                };
+            }
+
+            const pLight = new THREE.PointLight(lightColor, lightIntensity, lightDistance, 1.5);
+            pLight.position.set(0, 1.5, 0);
+            pLight.castShadow = true;
+            pLight.shadow.bias = -0.002;
+            vfxGroup.add(pLight);
+
+            scene.add(vfxGroup);
+
+            activeVFX.push({
+                group: vfxGroup,
+                light: pLight,
+                initialIntensity: lightIntensity,
+                maxLife: duration,
+                life: duration
+            });
+        }
+
+        function spawnDashGhosts(scene, playerMesh, fromPos, toPos) {
+            const ghostCount = 4;
+            for (let i = 0; i < ghostCount; i++) {
+                const t = (i + 1) / (ghostCount + 1);
+                const pos = new THREE.Vector3().lerpVectors(fromPos, toPos, t);
+                const ghostGroup = playerMesh.clone(true);
+
+                ghostGroup.position.copy(pos);
+                ghostGroup.rotation.copy(playerMesh.rotation);
+                ghostGroup.scale.copy(playerMesh.scale);
+
+                ghostGroup.traverse(child => {
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            const clonedMats = child.material.map(m => {
+                                const cm = m.clone();
+                                cm.transparent = true;
+                                cm.opacity = 0.35;
+                                cm.blending = THREE.AdditiveBlending;
+                                cm.depthWrite = false;
+                                if (cm.emissive) cm.emissive = new THREE.Color(0x0066ff);
+                                if (cm.emissiveIntensity !== undefined) cm.emissiveIntensity = 2.0;
+                                return cm;
+                            });
+                            child.material = clonedMats;
+                        } else {
+                            const cm = child.material.clone();
+                            cm.transparent = true;
+                            cm.opacity = 0.35;
+                            cm.blending = THREE.AdditiveBlending;
+                            cm.depthWrite = false;
+                            if (cm.emissive) cm.emissive = new THREE.Color(0x0066ff);
+                            if (cm.emissiveIntensity !== undefined) cm.emissiveIntensity = 2.0;
+                            child.material = cm;
+                        }
+                    }
+                });
+
+                scene.add(ghostGroup);
+
+                activeVFX.push({
+                    group: ghostGroup,
+                    light: null,
+                    initialIntensity: 0,
+                    maxLife: 300,
+                    life: 300,
+                    customUpdate: (dt, age) => {
+                        ghostGroup.traverse(child => {
+                            if (child.material) {
+                                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach(m => { m.opacity = 0.35 * (1 - age); });
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        let audioCtx = null;
+
+        function initSkillAudio() {
+            if (!audioCtx) {
+                try { audioCtx = new AudioContext(); } catch (e) {}
+            }
+        }
+
+        function playSkillSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+                switch (type) {
+                    case 'spin':
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                        break;
+                    case 'dash':
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.2);
+                        break;
+                    case 'heal':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(784, audioCtx.currentTime + 0.4);
+                        break;
+                    case 'ult':
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(60, audioCtx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 0.6);
+                        break;
+                    default:
+                        osc.type = 'sine';
+                }
+
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.6);
+            } catch (e) {}
+        }
+
+        // =====================================================================
         // === TASK_003 — Screen Shake, DOM Popups, Active Hazards & Boss Combat
         // =====================================================================
 
@@ -1437,31 +1703,48 @@
                 const canvas = document.createElement('canvas');
                 canvas.width = 512; canvas.height = 512;
                 const c = canvas.getContext('2d');
-                c.fillStyle = '#0f131a';
+
+                c.fillStyle = '#4f8f3f';
                 c.fillRect(0, 0, 512, 512);
-                for (let i = 0; i < 8000; i++) {
+
+                for (let i = 0; i < 6000; i++) {
                     const x = Math.random() * 512, y = Math.random() * 512;
                     const size = 1 + Math.random() * 3;
-                    const b = Math.random() * 12;
-                    c.fillStyle = `rgba(${b + 10}, ${b + 15}, ${b + 22}, ${0.1 + Math.random() * 0.15})`;
+                    const shade = Math.random();
+                    const r = 70 + Math.round(shade * 50);
+                    const g = 135 + Math.round(shade * 55);
+                    const b = 55 + Math.round(shade * 40);
+                    c.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.15 + Math.random() * 0.2})`;
                     c.fillRect(x, y, size, size);
                 }
-                c.strokeStyle = 'rgba(211, 175, 55, 0.08)';
+
+                for (let i = 0; i < 30; i++) {
+                    const x = Math.random() * 512, y = Math.random() * 512;
+                    const r = 10 + Math.random() * 30;
+                    c.fillStyle = 'rgba(180, 180, 168, 0.25)';
+                    c.beginPath();
+                    c.ellipse(x, y, r, r * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+                    c.fill();
+                }
+
+                c.strokeStyle = 'rgba(211, 175, 55, 0.18)';
                 c.lineWidth = 2;
                 for (let i = 0; i <= 512; i += 64) {
                     c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 512); c.stroke();
                     c.beginPath(); c.moveTo(0, i); c.lineTo(512, i); c.stroke();
                 }
+
                 const tex = new THREE.CanvasTexture(canvas);
                 tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
                 tex.repeat.set(8, 8);
+                tex.colorSpace = THREE.SRGBColorSpace;
                 return tex;
             }
 
             createFloor() {
                 const geo = new THREE.PlaneGeometry(ARENA_SIZE, ARENA_SIZE);
                 const mat = new THREE.MeshStandardMaterial({
-                    color: 0x141923, roughness: 0.95, metalness: 0.1,
+                    color: 0xffffff, roughness: 0.9, metalness: 0.05,
                     map: this.createFloorTexture()
                 });
                 this.mesh = new THREE.Mesh(geo, mat);
@@ -1469,9 +1752,9 @@
                 this.mesh.receiveShadow = true;
                 this.scene.add(this.mesh);
 
-                const grid = new THREE.GridHelper(ARENA_SIZE, 20, 0x0e7a8c, 0x0a3a44);
+                const grid = new THREE.GridHelper(ARENA_SIZE, 20, 0x9fe0c0, 0x4a8a6a);
                 grid.material.transparent = true;
-                grid.material.opacity = 0.35;
+                grid.material.opacity = 0.22;
                 grid.position.y = 0.02;
                 this.scene.add(grid);
             }
@@ -1480,7 +1763,10 @@
                 const wallHeight = 10;
                 const halfSize = ARENA_SIZE / 2;
                 const wallGeo = new THREE.BoxGeometry(ARENA_SIZE, wallHeight, 2);
-                const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f1320, roughness: 0.9, metalness: 0.15 });
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x8a7a6a, roughness: 0.85, metalness: 0.1 });
+
+                const trimGeo = new THREE.BoxGeometry(ARENA_SIZE, 0.6, 2.3);
+                const trimMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 1.2, roughness: 0.4, metalness: 0.6 });
 
                 const walls = [
                     { pos: [0, wallHeight / 2, -halfSize], rot: 0 },
@@ -1495,63 +1781,126 @@
                     mesh.rotation.y = w.rot;
                     mesh.receiveShadow = true;
                     this.scene.add(mesh);
+
+                    const trim = new THREE.Mesh(trimGeo, trimMat);
+                    trim.position.set(...w.pos);
+                    trim.position.y = wallHeight - 0.3;
+                    trim.rotation.y = w.rot;
+                    this.scene.add(trim);
                 });
             }
 
             createEnvironment() {
                 this.envMeshes = [];
-                const treeGeo = new THREE.BoxGeometry(1, 4, 1);
-                const treeMat = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 0.95 });
+                this._hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+                const dummy = new THREE.Object3D();
+
+                const collectPositions = (count, minDist, range) => {
+                    const arr = [];
+                    let guard = 0;
+                    while (arr.length < count && guard++ < count * 20) {
+                        const x = (Math.random() - 0.5) * ARENA_SIZE * range;
+                        const z = (Math.random() - 0.5) * ARENA_SIZE * range;
+                        if (Math.abs(x) < minDist && Math.abs(z) < minDist) continue;
+                        arr.push({ x, z });
+                    }
+                    return arr;
+                };
+
+                // Trees (InstancedMesh: tronco + copa)
+                const trunkGeo = new THREE.BoxGeometry(1, 4, 1);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.9 });
                 const leafGeo = new THREE.BoxGeometry(3, 3, 3);
-                const leafMat = new THREE.MeshStandardMaterial({ color: 0x13241b, roughness: 1.0 });
+                const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
 
-                for (let i = 0; i < 20; i++) {
-                    const x = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
-                    const z = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
-                    if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                const trees = collectPositions(20, 10, 0.8);
+                const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
+                const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, trees.length);
+                trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
+                leafMesh.castShadow = true; leafMesh.receiveShadow = true;
 
-                    const trunk = new THREE.Mesh(treeGeo, treeMat);
-                    trunk.position.set(x, 2, z);
-                    trunk.castShadow = true; trunk.receiveShadow = true;
-                    this.scene.add(trunk);
-                    this.envMeshes.push(trunk);
+                const leafColors = [0x3fae4a, 0x2f9e3f, 0x57c24a, 0xd98a2b, 0x8a4bbf];
+                const leafColor = new THREE.Color();
+                trees.forEach((t, idx) => {
+                    const s = 0.9 + Math.random() * 0.7;
+                    const rot = Math.random() * Math.PI;
+                    dummy.position.set(t.x, 2 * s, t.z);
+                    dummy.rotation.set(0, rot, 0);
+                    dummy.scale.setScalar(s);
+                    dummy.updateMatrix();
+                    trunkMesh.setMatrixAt(idx, dummy.matrix);
 
-                    const leaves = new THREE.Mesh(leafGeo, leafMat);
-                    leaves.position.set(x, 5, z);
-                    leaves.castShadow = true; leaves.receiveShadow = true;
-                    this.scene.add(leaves);
-                    this.envMeshes.push(leaves);
-                }
+                    dummy.position.set(t.x, 5 * s, t.z);
+                    dummy.updateMatrix();
+                    leafMesh.setMatrixAt(idx, dummy.matrix);
 
+                    leafColor.setHex(leafColors[Math.floor(Math.random() * leafColors.length)]);
+                    leafMesh.setColorAt(idx, leafColor);
+
+                    this.envMeshes.push({ mesh: trunkMesh, index: idx, x: t.x, z: t.z });
+                    this.envMeshes.push({ mesh: leafMesh, index: idx, x: t.x, z: t.z });
+                });
+
+                this.scene.add(trunkMesh);
+                this.scene.add(leafMesh);
+
+                // Rocks (InstancedMesh)
                 const rockGeo = new THREE.DodecahedronGeometry(1);
-                const rockMat = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.9 });
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+                const rocks = collectPositions(15, 5, 0.9);
+                const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, rocks.length);
+                rockMesh.castShadow = true; rockMesh.receiveShadow = true;
 
-                for (let i = 0; i < 15; i++) {
-                    const x = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
-                    const z = (Math.random() - 0.5) * ARENA_SIZE * 0.9;
-                    if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+                const rockColor = new THREE.Color();
+                rocks.forEach((r, idx) => {
+                    const s = 1 + Math.random() * 2;
+                    dummy.position.set(r.x, s / 2, r.z);
+                    dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                    dummy.scale.setScalar(s);
+                    dummy.updateMatrix();
+                    rockMesh.setMatrixAt(idx, dummy.matrix);
 
-                    const rock = new THREE.Mesh(rockGeo, rockMat);
-                    const scale = 1 + Math.random() * 2;
-                    rock.scale.set(scale, scale, scale);
-                    rock.position.set(x, scale / 2, z);
-                    rock.castShadow = true; rock.receiveShadow = true;
-                    this.scene.add(rock);
-                    this.envMeshes.push(rock);
-                }
+                    const g = 0.55 + Math.random() * 0.25;
+                    rockColor.setRGB(g * 1.05, g, g * 0.9);
+                    rockMesh.setColorAt(idx, rockColor);
+
+                    this.envMeshes.push({ mesh: rockMesh, index: idx, x: r.x, z: r.z });
+                });
+
+                this.scene.add(rockMesh);
+
+                // Crystals emissivos (InstancedMesh)
+                const crystalGeo = new THREE.OctahedronGeometry(0.7);
+                const crystalMat = new THREE.MeshStandardMaterial({
+                    color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 1.6,
+                    roughness: 0.2, metalness: 0.3
+                });
+                const crystals = collectPositions(14, 6, 0.85);
+                const crystalMesh = new THREE.InstancedMesh(crystalGeo, crystalMat, crystals.length);
+                crystals.forEach((cr, idx) => {
+                    const s = 0.5 + Math.random() * 1.2;
+                    dummy.position.set(cr.x, 0.4 * s, cr.z);
+                    dummy.rotation.set(0, Math.random() * Math.PI, 0);
+                    dummy.scale.setScalar(s);
+                    dummy.updateMatrix();
+                    crystalMesh.setMatrixAt(idx, dummy.matrix);
+
+                    this.envMeshes.push({ mesh: crystalMesh, index: idx, x: cr.x, z: cr.z });
+                });
+
+                this.scene.add(crystalMesh);
             }
 
             clearCenterObstacles(radius = 10) {
                 if (!this.envMeshes) return;
-                for (let i = this.envMeshes.length - 1; i >= 0; i--) {
-                    const mesh = this.envMeshes[i];
-                    if (mesh.position.length() < radius) {
-                        this.scene.remove(mesh);
-                        if (mesh.geometry) mesh.geometry.dispose();
-                        if (mesh.material) mesh.material.dispose();
-                        this.envMeshes.splice(i, 1);
+                const dirty = new Set();
+                for (const entry of this.envMeshes) {
+                    if (Math.sqrt(entry.x * entry.x + entry.z * entry.z) < radius) {
+                        entry.mesh.setMatrixAt(entry.index, this._hiddenMatrix);
+                        dirty.add(entry.mesh);
                     }
                 }
+                dirty.forEach(m => { m.instanceMatrix.needsUpdate = true; });
             }
         }
 
@@ -1625,63 +1974,108 @@
 
             createMesh() {
                 const group = new THREE.Group();
-                const armorColor = 0x3498db;
-                const skinColor = 0xffccaa;
-                const darkColor = 0x2c3e50;
 
-                const bodyGeo = new THREE.BoxGeometry(0.8, 1.0, 0.5);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: armorColor });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                const armorMat = new THREE.MeshStandardMaterial({ color: 0x2e6fd8, metalness: 0.5, roughness: 0.35 });
+                const goldMat = new THREE.MeshStandardMaterial({ color: 0xffc93c, metalness: 0.7, roughness: 0.3 });
+                const darkMat = new THREE.MeshStandardMaterial({ color: 0x1f3a5f, metalness: 0.4, roughness: 0.5 });
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xffccaa, roughness: 0.8 });
+                const cyanEmissiveMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 1.6 });
+                const capeMat = new THREE.MeshStandardMaterial({ color: 0xd9283c, roughness: 0.7 });
+
+                // Corpo (primeiro filho: usado pelo flash de dano)
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), armorMat);
                 body.position.y = 1.2; body.castShadow = true;
                 group.add(body);
 
-                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-                const headMat = new THREE.MeshStandardMaterial({ color: skinColor });
-                const head = new THREE.Mesh(headGeo, headMat);
+                // Peitoral dourado + núcleo emissivo
+                const chest = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.06), goldMat);
+                chest.position.set(0, 1.3, -0.27);
+                group.add(chest);
+                const core = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.08), cyanEmissiveMat);
+                core.position.set(0, 1.35, -0.31);
+                group.add(core);
+
+                // Cinto
+                const belt = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.15, 0.52), darkMat);
+                belt.position.y = 0.75;
+                group.add(belt);
+
+                // Capa
+                const cape = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.3, 0.1), capeMat);
+                cape.position.set(0, 1.5, 0.3);
+                group.add(cape);
+
+                // Cabeça + olhos
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
                 head.position.y = 2.0; head.castShadow = true;
                 group.add(head);
 
-                const helmGeo = new THREE.BoxGeometry(0.55, 0.2, 0.55);
-                const helmMat = new THREE.MeshStandardMaterial({ color: darkColor });
-                const helm = new THREE.Mesh(helmGeo, helmMat);
-                helm.position.y = 2.2;
-                group.add(helm);
-
                 const eyeGeo = new THREE.BoxGeometry(0.1, 0.05, 0.05);
-                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                const leftEye = new THREE.Mesh(eyeGeo, cyanEmissiveMat);
                 leftEye.position.set(-0.15, 2.0, -0.26);
                 group.add(leftEye);
-                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                const rightEye = new THREE.Mesh(eyeGeo, cyanEmissiveMat);
                 rightEye.position.set(0.15, 2.0, -0.26);
                 group.add(rightEye);
 
-                const armGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25);
-                const armMat = new THREE.MeshStandardMaterial({ color: armorColor });
+                // Elmo azul com crista dourada e visor emissivo
+                const helm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.55), armorMat);
+                helm.position.y = 2.2;
+                group.add(helm);
+                const crest = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.5), goldMat);
+                crest.position.set(0, 2.42, 0);
+                group.add(crest);
+                const visor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.06), cyanEmissiveMat);
+                visor.position.set(0, 2.2, -0.29);
+                group.add(visor);
 
-                const leftArm = new THREE.Mesh(armGeo, armMat);
+                // Ombros (ombratas)
+                const pauldronGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const leftPauldron = new THREE.Mesh(pauldronGeo, goldMat);
+                leftPauldron.position.set(-0.6, 1.6, 0);
+                group.add(leftPauldron);
+                const rightPauldron = new THREE.Mesh(pauldronGeo, goldMat);
+                rightPauldron.position.set(0.6, 1.6, 0);
+                group.add(rightPauldron);
+
+                // Braços
+                const armGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25);
+                const leftArm = new THREE.Mesh(armGeo, armorMat);
                 leftArm.position.set(-0.6, 1.2, 0);
                 group.add(leftArm);
-
-                const rightArm = new THREE.Mesh(armGeo, armMat);
+                const rightArm = new THREE.Mesh(armGeo, armorMat);
                 rightArm.position.set(0.6, 1.2, 0);
                 group.add(rightArm);
 
+                // Pernas + botas
                 const legGeo = new THREE.BoxGeometry(0.3, 0.9, 0.3);
-                const legMat = new THREE.MeshStandardMaterial({ color: darkColor });
-
-                const leftLeg = new THREE.Mesh(legGeo, legMat);
+                const leftLeg = new THREE.Mesh(legGeo, darkMat);
                 leftLeg.position.set(-0.25, 0.45, 0);
                 group.add(leftLeg);
-
-                const rightLeg = new THREE.Mesh(legGeo, legMat);
+                const rightLeg = new THREE.Mesh(legGeo, darkMat);
                 rightLeg.position.set(0.25, 0.45, 0);
                 group.add(rightLeg);
 
-                const swordGeo = new THREE.BoxGeometry(0.1, 1.8, 0.1);
-                const swordMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
-                const sword = new THREE.Mesh(swordGeo, swordMat);
-                sword.position.set(0, -0.4, -0.5);
+                const bootGeo = new THREE.BoxGeometry(0.34, 0.2, 0.34);
+                const leftBoot = new THREE.Mesh(bootGeo, goldMat);
+                leftBoot.position.set(-0.25, 0.08, 0);
+                group.add(leftBoot);
+                const rightBoot = new THREE.Mesh(bootGeo, goldMat);
+                rightBoot.position.set(0.25, 0.08, 0);
+                group.add(rightBoot);
+
+                // Espada energética (lâmina emissiva + guarda e cabo dourados)
+                const sword = new THREE.Group();
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.7, 0.1), cyanEmissiveMat);
+                blade.position.set(0, -0.7, 0);
+                sword.add(blade);
+                const guard = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.12), goldMat);
+                guard.position.set(0, 0.12, 0);
+                sword.add(guard);
+                const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.1), darkMat);
+                hilt.position.set(0, 0.35, 0);
+                sword.add(hilt);
+                sword.position.set(0, -0.3, -0.5);
                 sword.rotation.x = -Math.PI / 2;
                 rightArm.add(sword);
                 this.rightArm = rightArm;
@@ -2247,8 +2641,8 @@
             constructor() {
                 this.container = document.getElementById('game-container');
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x0a0c16);
-                this.scene.fog = new THREE.FogExp2(0x0a0c16, 0.03);
+                this.scene.background = new THREE.Color(0x5aa0dc);
+                this.scene.fog = new THREE.FogExp2(0xc9e4f0, 0.02);
 
                 this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.camera.position.set(0, 15, 15);
@@ -2257,12 +2651,16 @@
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.15;
                 this.container.appendChild(this.renderer.domElement);
 
-                const ambient = new THREE.AmbientLight(0x3a4a6a, 0.45);
-                this.scene.add(ambient);
+                const hemiLight = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.95);
+                this.scene.add(hemiLight);
 
-                const dirLight = new THREE.DirectionalLight(0x7ec0ee, 2.0);
+                const dirLight = new THREE.DirectionalLight(0xffe0b3, 2.6);
                 dirLight.position.set(-20, 30, -20);
                 dirLight.castShadow = true;
                 dirLight.shadow.camera.left = -50;
@@ -2272,6 +2670,8 @@
                 dirLight.shadow.mapSize.width = 2048;
                 dirLight.shadow.mapSize.height = 2048;
                 this.scene.add(dirLight);
+
+                this.createSkyDome();
 
                 this.input = new Input();
                 this.arena = new Arena(this.scene);
@@ -2294,7 +2694,7 @@
                 this.bossDamageDealt = 0;
 
                 this.currentWave = 1;
-                this.baseFogColor = new THREE.Color(0x0a0c16);
+                this.baseFogColor = new THREE.Color(0xc9e4f0);
                 this.fogFlashTimer = 0;
 
                 this.clock = new THREE.Clock();
@@ -2310,6 +2710,27 @@
                 });
 
                 this.animate();
+            }
+
+            createSkyDome() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 16; canvas.height = 512;
+                const c = canvas.getContext('2d');
+                const grad = c.createLinearGradient(0, 0, 0, 512);
+                grad.addColorStop(0.0, '#2b5aa7');
+                grad.addColorStop(0.45, '#5aa0dc');
+                grad.addColorStop(0.75, '#a8d4ef');
+                grad.addColorStop(1.0, '#c9e4f0');
+                c.fillStyle = grad;
+                c.fillRect(0, 0, 16, 512);
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                this.skyDomeMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false });
+                const geo = new THREE.SphereGeometry(400, 32, 16);
+                this.skyDome = new THREE.Mesh(geo, this.skyDomeMat);
+                this.skyDome.renderOrder = -1;
+                this.skyDome.frustumCulled = false;
+                this.scene.add(this.skyDome);
             }
 
             start() {
@@ -2361,14 +2782,18 @@
 
                 const startBg = this.scene.background.clone();
                 const targetBg = new THREE.Color(0x1c052e);
+                const skyStart = this.skyDomeMat ? this.skyDomeMat.color.clone() : null;
                 let t = 0;
                 const transition = () => {
                     t += 0.05;
                     if (t <= 1) {
                         this.scene.background.lerpColors(startBg, targetBg, t);
+                        if (this.skyDomeMat && skyStart) {
+                            this.skyDomeMat.color.lerpColors(skyStart, targetBg, t);
+                        }
                         if (this.scene.fog) {
                             this.scene.fog.color.lerpColors(startBg, targetBg, t);
-                            this.scene.fog.density = THREE.MathUtils.lerp(0.03, 0.038, t);
+                            this.scene.fog.density = THREE.MathUtils.lerp(0.02, 0.038, t);
                         }
                         requestAnimationFrame(transition);
                     }
