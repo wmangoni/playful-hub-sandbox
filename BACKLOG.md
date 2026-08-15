@@ -78,16 +78,6 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_005.md` | RPG Adventure Quest | Sistema de Companheiros/Mascotes (Pets), Alquimia & Forja de Runas (Crafting) e Masmorra Volcânica do Dragão Vermelho | ✅ Refined | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_005.md) |
 | `TASK_005.md` | Space Shooter | Sistema de Drones Orbitais de Apoio (Wingman Drones), Enxames Xenomórficos com Comportamento de Bando (Boids Swarm Siege) e Chefe Titânico Star-Devourer Leviathan | 📋 Backlog | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_005.md) |
 | `TASK_005.md` | Driving Simulator | Sistema de Pistas Temáticas Multi-Bioma (Cyber City, Cânion Vulcânico e Geleira), Personalização Visual Hangar 3D, Combate Takedown e Batalha contra Chefe "Titan Rig" | 📋 Backlog | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_005.md) |
-| `TASK_005.md` | Voxel City | Pilotagem de Helicóptero Voxel, Caminhão Guincho Magnético, Purga de Nitro & Vácuo Aerodinâmico (Slipstream) e Modo Desastre Urbano (Incêndios & Terremoto) | 📋 Backlog | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_city/TASKS/TASK_005.md) |
-
-
-
-
-
-
-
-
-
 
 
 

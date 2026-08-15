@@ -276,8 +276,6 @@ function playTurboBlowOffSound() {
    * **Decisão**: Todos os materiais e geometrias instanciados para partículas de névoa, gotas de chuva, fogo de nitro e luzes de giroflex devem ser criados via Object Pooling ou liberados explicitamente via `.dispose()`.
    * **Diretriz Técnica**: Garantir que a inicialização do `AudioContext` da Web Audio API ocorra apenas no primeiro clique ou pressionar de tecla do jogador para respeitar as políticas de autoplay de navegadores modernos.
 
-*Status da Especificação*: ✅ **Refined / Aprovado pelo Tech Lead** - Pronta para ser assumida pelo time de desenvolvimento.
-
 ---
 
 ## 💻 Notas de Desenvolvimento (Dev complete)
@@ -301,4 +299,4 @@ Implementado em `driving_simulator/index.html` sobre a TASK_002 (tráfego, dia/n
 - **Tração de pneu furado**: usei `handlingFactor = 0.4` (coerente com "perde 60% de tração"); o pseudocódigo do TL sugeria 0.35 — mantive o critério de aceitação.
 - **FOV base**: a câmera original do jogo usa 75° (não 60° como no pseudocódigo); mantive 75° como base e faço o warp para 85° durante o Nitro para preservar o game feel existente.
 - **Faróis**: mantive a tecla `F` existente e adicionei `L` (mencionada nos critérios) como alias.
-- **Spike Strips**: spawnados a 90 unidades à frente do jogador, alinhados à sua direção de deslocamento, com cap de 8 faixas e descarte explícito.
+
