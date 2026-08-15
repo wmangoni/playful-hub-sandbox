@@ -140,3 +140,45 @@
 *   Habilidades passivas (como veneno agindo a cada tick) ou invocações de lacaios não devem saturar o barramento de áudio com múltiplos osciladores simultâneos. Estabelece-se uma restrição de polifonia máxima de 2 vozes para habilidades especiais de prestígio.
 *   Implementar a destruição explícita dos nós de áudio (`osc.disconnect()`, `gain.disconnect()`) no callback `onended` de cada sintetizador procedural para prevenir vazamentos de recursos de memória de áudio do browser.
 
+---
+
+## ❓ Dúvidas do Desenvolvedor (durante a implementação)
+
+> **Atenção TL/PO**: dúvidas/observações levantadas pelo programador durante a implementação da TASK_004.
+
+1. **"Espectro na Crypt" (Missão 2)**:
+   - *Observação*: A base de código **não possui** um inimigo chamado "Espectro" nas cenas da cripta. O único inimigo fantasmagórico é o **Fantasma de Drakmor** (chefe, `last_fight`). Interpretei "o Espectro" como esse chefe e a missão `purify_crypt` é concluída ao derrotá-lo. Solicito validação do TL; se desejarem um combate de Espectro dedicado na cripta, é um novo encontro a especificar.
+
+2. **Teste de Runas (Missão 3) — INT vs INT/LUCK**:
+   - *Observação*: A spec diz "Requer testes bem-sucedidos de **INT ou LUCK**". Implementei o teste como `checkType: "int"` (Dificuldade 10) para as 3 runas, pois o motor de rolagem suporta um único `checkType` por escolha. Se o TL preferir alternância INT/LUCK por runa, é uma troca simples no `scenes.json`.
+
+3. **Gating das barreiras também em navegação narrativa**:
+   - *Observação*: A spec exige interceptar o **clique no minimapa**. Além disso, também bloqueio transições diretas de cena (`loadScene`) para `final_chamber_entrance` e `crypt_puzzle_entrance` enquanto as alavancas não estiverem ativadas, para manter a coerência tática (caso contrário o jogador contornaria a barreira pelas escolhas de história). Isso força *backtracking* para achar as 2 alavancas; se considerarem rígido demais, posso limitar o bloqueio apenas ao minimapa.
+
+4. **Fúria Berserker / Lâmina Envenenada (frequência de uso)**:
+   - *Observação*: A spec não define cooldown para Fúria Berserker nem regras exatas para Lâmina Envenenada. Adotei: **Fúria** dura 3 turnos (reutilizável ao expirar); **Lâmina Envenenada** é um toggle que envenena os golpes físicos acertados (3 turnos, 2 dano/turno). Se preferirem cooldowns dedicados, ajusto os valores.
+
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+*(Preenchido pelo Programador)*
+
+Implementação completa da TASK_004 nos arquivos `/ded/index.html` e `/ded/assets/scenes.json`:
+
+1. **Especialização de Classes (Prestige Classes)**: modal glassmorphic `#specialization-modal` aberta ao atingir **Nível 3** (XP ≥ 150) via `changeXP()`. `gameState.isPaused = true` trava minimapa/loja durante a escolha. 6 subclasses com habilidades: Paladino (Escudo Sagrado, Golpe Sagrado), Berserker (Fúria, Golpe Devastador), Arcanista (Barreira de Mana, Explosão Arcana), Necromante (Drenar Vida, Invocar Esqueleto), Assassino (Lâmina Envenenada, Golpe de Misericórdia) e Dançarino das Sombras (Passo de Sombra, Ataque Sorrateiro). Integradas ao menu de combate `showSpecializationAbilityMenu()`.
+2. **Sistema de Missões**: `gameState.quests` + Diário de Missões retrátil (`#quest-journal`). 3 missões: Amuleto do Mercador (encontrado nos sarcófagos com 50% de chance; devolução ao mercador), Purificação das Sombras (derrotar o Fantasma) e Decifrador de Runas (3 runas: `crystal_chamber`, `lake_search`, `crypt`, com +2 no atributo principal).
+3. **Level Design Tático (Alavancas & Barreiras)**: `gameState.levers` (2 alavancas em `crystal_chamber` e `lake_search`). Nós `final_chamber_entrance` e `crypt_puzzle_entrance` bloqueados por barreira mágica neon (`isNodeLocked` + `triggerBarrierBlocked`) até ambas serem ativadas. Minimapa exibe ícones ⚙️/🎚️ (vermelho→ciano) e 🔒 nos nós selados.
+4. **Combate estendido**: `tempHp`, `mana`/`maxMana`, `effects` (fúria, sneak boost), `enemyPoison`, `skeleton`, `shadowStepActive`, `poisonBlade`, cooldowns por habilidade, `getPlayerAC()` com modificadores, `applyDamageToPlayer()` (Passo de Sombra → Barreira de Mana → Escudo Sagrado), `tickRoundEndEffects()` (veneno/esqueleto/cooldowns).
+5. **Áudio Procedural**: novos sintetizadores `playShield`, `playFury`, `playDrainLife`, `playPoison`, `playQuestComplete`, `playLever`, `playBarrierSealed`, `playLevelUp`, com `onended` → `disconnect()` e polifonia máx. de 2 vozes para habilidades de prestígio.
+6. **Juiciness**: floaters de XP/Ouro (`spawnFloater`) em combates e missões; flash neon de barreira (`#barrier-flash`).
+7. **Persistência**: `saveGame()`/`loadGame()` (localStorage `ded_save_v1`) serializando `player` (com `specialization`/`level`/`mana`), `quests`, `levers`, `visitedNodes` e cena atual; `loadGame()` restaura o progresso ao recarregar.
+8. **Validação local**: sintaxe JS/JSON validada (`node`); smoke test runtime (harness Node com stubs de DOM/Audio): especialização (Paladino/Arcanista), alavancas/barreiras, missões/runas, combate (Escudo Sagrado, Fúria, AC, absorção de dano), minimapa/diário e save/load — sem erros.
+
+*Assinado: Antigravity - Software Engineer*
+
+---
+
+## 🔍 Code Review e Aprovação (TL)
+*(Seção a ser preenchida pelo Tech Lead durante a revisão de código)*
+

@@ -140,13 +140,14 @@
         <div id="startScreen" class="overlay show">
             <h1>RETRO SHOOTER</h1>
             <h2>Canvas Mayhem</h2>
-            <p>Eliminate all hostile entities. Use WASD/Arrows to move, Mouse to aim/turn, Click/Space to shoot, Keys 1-4 to switch weapons, M for Minimap. ESC to Pause.</p>
+            <p>Eliminate all hostile entities. Use WASD/Arrows to move, Mouse to aim/turn, Click/Space to shoot, Keys 1-4 to switch weapons, E to interact (doors/secret walls), M for Minimap. ESC to Pause.</p>
              <div class="control-info">
                 <div><span>Move:</span> WASD / ↑↓</div>
                  <div><span>Strafe:</span> A / D</div>
                  <div><span>Turn:</span> ←→ / Mouse</div>
                  <div><span>Shoot:</span> Click / Space</div>
                  <div><span>Weapon:</span> 1 / 2 / 3 / 4</div>
+                 <div><span>Interact:</span> E</div>
                  <div><span>Minimap:</span> M</div>
                 <div><span>Pause:</span> ESC</div>
             </div>
@@ -244,29 +245,45 @@
         const pickupBobSpeed = 2;
         const pickupBobAmount = 0.05;
 
-        // Map Data (1-4: Walls, 5: Health Pickup, 6: Ammo Pickup)
+        // Map Data
+        // 0: floor | 1-4: walls | 5: health | 6: ammo | 7: plasma ammo | 8: rocket ammo
+        // 9: common door | 10: red door | 11: blue door | 12: secret wall | 13: red keycard | 14: blue keycard
         const mapData = [
           [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 6, 0, 7, 1],
           [1, 0, 2, 2, 0, 1, 1, 0, 1, 1, 0, 3, 0, 1, 0, 0, 0, 0, 0, 1],
           [1, 0, 2, 0, 0, 0, 0, 0, 0, 1, 0, 3, 0, 1, 1, 1, 1, 0, 1, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 0, 1, 0, 8, 1],
-          [1, 1, 1, 0, 1, 1, 1, 4, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+          [1, 1, 1, 9, 1, 1, 1, 4, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
           [1, 0, 0, 0, 0, 0, 1, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
           [1, 0, 3, 3, 0, 0, 1, 4, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
           [1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 7, 0, 1],
-          [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1],
-          [1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 5, 1],
-          [1, 5, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+          [1, 0, 14, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1],
+          [1, 1, 1, 1, 1, 11, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 5, 1],
+          [1, 5, 0, 0, 13, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
           [1, 0, 4, 4, 4, 4, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 1],
-          [1, 0, 4, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 1],
-          [1, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 1],
-          [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+          [1, 0, 4, 4, 6, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 1],
+          [1, 0, 4, 4, 5, 0, 2, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 1],
+          [1, 0, 0, 0, 12, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
           [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ];
         const mapWidth = mapData[0].length;
         const mapHeight = mapData.length;
+
+        // --- TASK_004: Interactive Level Design Constants ---
+        const TILE_DOOR_COMMON = 9;
+        const TILE_DOOR_RED = 10;
+        const TILE_DOOR_BLUE = 11;
+        const TILE_SECRET_WALL = 12;
+        const TILE_KEYCARD_RED = 13;
+        const TILE_KEYCARD_BLUE = 14;
+        const isDoorTile = (t) => t === TILE_DOOR_COMMON || t === TILE_DOOR_RED || t === TILE_DOOR_BLUE;
+        const doorColors = {
+          [TILE_DOOR_COMMON]: '#6b6b6b',
+          [TILE_DOOR_RED]: '#d32f2f',
+          [TILE_DOOR_BLUE]: '#1976d2'
+        };
 
         // Texture/Color Definitions
         const wallColors = {
@@ -473,6 +490,24 @@
             amount: 5,
             target: 'ammo_rocket',
             sound: 'pickupAmmo'
+          },
+          keycard_red: {
+            type: 13,
+            size: 0.25,
+            color: '#ff3333',
+            bob: true,
+            amount: 1,
+            target: 'key_red',
+            sound: 'pickupKeycard'
+          },
+          keycard_blue: {
+            type: 14,
+            size: 0.25,
+            color: '#3333ff',
+            bob: true,
+            amount: 1,
+            target: 'key_blue',
+            sound: 'pickupKeycard'
           }
         };
 
@@ -481,6 +516,14 @@
         let showMinimap = 1; // 0: Hidden, 1: Compact, 2: Expanded
         let screenShakeTimer = 0;
         let screenShakeIntensity = 0;
+
+        // --- TASK_004: Doors, Secret Walls, Barrels, Puddles & HUD banners ---
+        let doorsList = [];
+        let secretWalls = [];
+        let barrels = [];
+        let puddles = [];
+        let hudBanners = [];
+        let interactQueued = false; // edge-triggered 'E' press
 
         // --- Input Tracking ---
         const keys = {
@@ -498,7 +541,8 @@
           '2': false,
           '3': false,
           '4': false,
-          'm': false
+          'm': false,
+          'e': false
         };
         let mouseX = 0;
         let mouseY = 0;
@@ -529,9 +573,14 @@
             isReloading: false,
             reloadTimer: 0,
             score: 0,
-            isMoving: false
+            isMoving: false,
+            hasRedKey: false,
+            hasBlueKey: false
           };
           projectiles = []; // Clear projectiles
+          barrels = []; // Clear barrels (TASK_004)
+          puddles = []; // Clear puddles (TASK_004)
+          hudBanners = []; // Clear HUD banners (TASK_004)
           enemies = [ // Initial enemy placement
             {
               x: 6.5,
@@ -558,14 +607,14 @@
               id: `enemy_${Date.now()}_3`
             },
             {
-              x: 16.5,
-              y: 14.5,
+              x: 14.5,
+              y: 10.5,
               type: 'demon',
               id: `enemy_${Date.now()}_4`
             },
             {
-              x: 3.5,
-              y: 15.5,
+              x: 7.5,
+              y: 13.5,
               type: 'grunt',
               id: `enemy_${Date.now()}_5`
             },
@@ -615,6 +664,9 @@
             });
           }
           scanMapForPickups(); // Populate pickups based on map codes
+          initializeDoors(); // TASK_004: build doors list
+          initializeSecretWalls(); // TASK_004: build secret walls list
+          initializeBarrels(); // TASK_004: build barrels list
           isGameOver = false;
           isPaused = false;
           isVictory = false;
@@ -645,6 +697,66 @@
               }
             }
           }
+        }
+
+        // --- TASK_004: Initialize Doors, Secret Walls & Barrels ---
+        function initializeDoors() {
+          doorsList = [];
+          for (let y = 0; y < mapHeight; y++) {
+            for (let x = 0; x < mapWidth; x++) {
+              const cell = map[y][x];
+              if (isDoorTile(cell)) {
+                doorsList.push({
+                  x,
+                  y,
+                  type: cell,
+                  status: 'closed',
+                  progress: 0.0,
+                  openTimer: 0.0
+                });
+              }
+            }
+          }
+        }
+
+        function initializeSecretWalls() {
+          secretWalls = [];
+          for (let y = 0; y < mapHeight; y++) {
+            for (let x = 0; x < mapWidth; x++) {
+              if (map[y][x] === TILE_SECRET_WALL) {
+                secretWalls.push({
+                  x,
+                  y,
+                  state: 'hidden',
+                  alpha: 1.0,
+                  revealTimer: 0.0
+                });
+              }
+            }
+          }
+        }
+
+        function initializeBarrels() {
+          barrels = [];
+          const barrelSpawns = [
+            { x: 10.5, y: 3.5 },
+            { x: 4.5, y: 7.5 },
+            { x: 15.5, y: 10.5 },
+            { x: 10.5, y: 13.5 }
+          ];
+          barrelSpawns.forEach((s, i) => {
+            barrels.push({
+              x: s.x,
+              y: s.y,
+              radius: 0.4,
+              health: 20,
+              maxHealth: 20,
+              color: '#39ff14',
+              active: true,
+              isBarrel: true,
+              id: `barrel_${i}`
+            });
+          });
         }
 
         // --- Audio Functions ---
@@ -818,6 +930,9 @@
         function setupInputHandlers() {
           document.addEventListener('keydown', (e) => {
             if (e.key in keys) keys[e.key.toLowerCase()] = true; // Handle WASD case insensitivity
+            if (e.key === 'e' || e.key === 'E') {
+              interactQueued = true; // TASK_004: interaction (doors / secret walls)
+            }
             if (e.key === 'Escape') {
               if (gameStarted && !isGameOver) togglePause();
             }
@@ -960,6 +1075,11 @@
         function isWall(x, y) {
           if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) return true; // Treat out of bounds as wall
           const cellType = map[y][x];
+          if (isDoorTile(cellType)) {
+            const door = doorsList.find(d => d.x === x && d.y === y);
+            return !door || door.status !== 'open'; // closed/opening/closing block movement; open doors don't
+          }
+          if (cellType === TILE_SECRET_WALL) return true; // Secret wall is solid until revealed
           return cellType >= 1 && cellType <= 4; // Check if it's one of the wall types
         }
 
@@ -1027,6 +1147,98 @@
           osc.connect(gain).connect(masterGain);
           osc.start();
           osc.stop(audioContext.currentTime + 0.25);
+        }
+
+        // --- TASK_004: Procedural Sound Synthesizers ---
+        function playDoorSound(open) {
+          if (!audioContext || !isAudioInitialized) return;
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          const filter = audioContext.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(400, audioContext.currentTime);
+          osc.type = 'sawtooth';
+          if (open) {
+            osc.frequency.setValueAtTime(80, audioContext.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(180, audioContext.currentTime + 0.4);
+          } else {
+            osc.frequency.setValueAtTime(180, audioContext.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, audioContext.currentTime + 0.4);
+          }
+          gain.gain.setValueAtTime(0.15, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.4);
+          osc.connect(filter).connect(gain).connect(masterGain);
+          osc.start();
+          osc.stop(audioContext.currentTime + 0.4);
+        }
+
+        function playLockBuzzer() {
+          if (!audioContext || !isAudioInitialized) return;
+          for (let i = 0; i < 2; i++) {
+            const t = audioContext.currentTime + i * 0.16;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(130, t);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.18, t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+            osc.connect(gain).connect(masterGain);
+            osc.start(t);
+            osc.stop(t + 0.09);
+          }
+        }
+
+        function playSecretChime() {
+          if (!audioContext || !isAudioInitialized) return;
+          const notes = [261.63, 329.63, 392.00, 523.25];
+          notes.forEach((freq, i) => {
+            const t = audioContext.currentTime + i * 0.12;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+            osc.connect(gain).connect(masterGain);
+            osc.start(t);
+            osc.stop(t + 0.42);
+          });
+        }
+
+        function playToxicExplosionSound() {
+          if (!audioContext || !isAudioInitialized) return;
+          const bufferSize = audioContext.sampleRate * 0.6;
+          const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noiseSource = audioContext.createBufferSource();
+          noiseSource.buffer = buffer;
+          const filter = audioContext.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(400, audioContext.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(40, audioContext.currentTime + 0.6);
+          const gain = audioContext.createGain();
+          gain.gain.setValueAtTime(0.35, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.6);
+          noiseSource.connect(filter).connect(gain).connect(masterGain);
+          noiseSource.start();
+          noiseSource.stop(audioContext.currentTime + 0.6);
+        }
+
+        function playKeycardPickupSound() {
+          if (!audioContext || !isAudioInitialized) return;
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(600, audioContext.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.15, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+          osc.connect(gain).connect(masterGain);
+          osc.start();
+          osc.stop(audioContext.currentTime + 0.2);
         }
 
         // --- Projectile System ---
@@ -1142,6 +1354,28 @@
                 createImpactParticles(p.x, p.y, p.color, Math.atan2(p.vy, p.vx));
               }
               p.active = false;
+              projectiles.splice(i, 1);
+              continue;
+            }
+
+            // TASK_004: projectile vs barrel collision
+            for (let k = 0; k < barrels.length; k++) {
+              const b = barrels[k];
+              if (!b.active) continue;
+              const bdx = p.x - b.x;
+              const bdy = p.y - b.y;
+              if (Math.sqrt(bdx * bdx + bdy * bdy) < b.radius + p.radius) {
+                damageBarrel(b, p.damage);
+                if (p.type === 'rocket') {
+                  explodeRocket(p.x, p.y);
+                } else {
+                  createImpactParticles(p.x, p.y, p.color, Math.atan2(p.vy, p.vx));
+                }
+                p.active = false;
+                break;
+              }
+            }
+            if (!p.active) {
               projectiles.splice(i, 1);
               continue;
             }
@@ -1320,6 +1554,14 @@
             ctx.fillRect(rx - 2, ry - 2, 4, 4);
           });
 
+          barrels.forEach(b => {
+            if (!b.active) return;
+            const rx = showMinimap === 1 ? mx + size / 2 + (b.x - centerX) * scale : mx + b.x * (size / mapWidth);
+            const ry = showMinimap === 1 ? my + size / 2 + (b.y - centerY) * scale : my + b.y * (size / mapHeight);
+            ctx.fillStyle = '#39ff14';
+            ctx.fillRect(rx - 2, ry - 2, 4, 4);
+          });
+
           const px = showMinimap === 1 ? mx + size / 2 : mx + player.x * (size / mapWidth);
           const py = showMinimap === 1 ? my + size / 2 : my + player.y * (size / mapHeight);
 
@@ -1343,13 +1585,25 @@
           if (isPaused || isGameOver || isVictory) return;
           
           processInput(dt);
+          if (interactQueued) {
+            interactQueued = false;
+            checkPlayerInteraction(); // TASK_004: E key interaction
+          }
           updatePlayer(dt);
           updateProjectiles(dt);
           updateEnemies(dt);
           updatePickups(dt);
+          updateDoors(dt); // TASK_004
+          updateSecretWalls(dt); // TASK_004
+          updatePuddles(dt); // TASK_004
           updateParticles(dt);
           if (player.muzzleFlashTimer > 0) {
             player.muzzleFlashTimer = Math.max(0, player.muzzleFlashTimer - dt);
+          }
+          // TASK_004: HUD banners
+          for (let i = hudBanners.length - 1; i >= 0; i--) {
+            hudBanners[i].duration -= dt;
+            if (hudBanners[i].duration <= 0) hudBanners.splice(i, 1);
           }
           // updateActiveSounds(); // Update positions for looping sounds
           updateEnemySounds(); // <--- Add this call
@@ -1648,6 +1902,222 @@
           });
         }
 
+        // ==========================================
+        // TASK_004: Interactive Level Design Systems
+        // ==========================================
+
+        function checkPlayerInteraction() {
+          for (const dist of [0.6, 1.5]) {
+            const targetX = Math.floor(player.x + Math.cos(player.angle) * dist);
+            const targetY = Math.floor(player.y + Math.sin(player.angle) * dist);
+            const cell = map[targetY]?.[targetX];
+            if (isDoorTile(cell)) {
+              interactWithDoor(targetX, targetY);
+              return;
+            } else if (cell === TILE_SECRET_WALL) {
+              revealSecretWall(targetX, targetY);
+              return;
+            }
+          }
+        }
+
+        function interactWithDoor(x, y) {
+          const door = doorsList.find(d => d.x === x && d.y === y);
+          if (!door || door.status !== 'closed') return;
+          if (door.type === TILE_DOOR_RED && !player.hasRedKey) {
+            showHudBanner('RED KEY REQUIRED!', '#ff3333', 2.0);
+            playLockBuzzer();
+            return;
+          }
+          if (door.type === TILE_DOOR_BLUE && !player.hasBlueKey) {
+            showHudBanner('BLUE KEY REQUIRED!', '#3333ff', 2.0);
+            playLockBuzzer();
+            return;
+          }
+          door.status = 'opening';
+          playDoorSound(true);
+        }
+
+        function revealSecretWall(x, y) {
+          const sw = secretWalls.find(s => s.x === x && s.y === y);
+          if (!sw || sw.state !== 'hidden') return;
+          sw.state = 'revealing';
+          sw.revealTimer = 1.5;
+          playSecretChime();
+          showHudBanner('SECRET AREA REVEALED!', '#00e5ff', 2.0);
+        }
+
+        function updateDoors(dt) {
+          doorsList.forEach(door => {
+            if (door.status === 'opening') {
+              door.progress += dt / 1.0;
+              if (door.progress >= 1.0) {
+                door.progress = 1.0;
+                door.status = 'open';
+                door.openTimer = 5.0;
+              }
+            } else if (door.status === 'open') {
+              door.openTimer -= dt;
+              if (door.openTimer <= 0) {
+                if (checkEntitiesOnCell(door.x, door.y)) {
+                  door.openTimer = 2.0;
+                } else {
+                  door.status = 'closing';
+                }
+              }
+            } else if (door.status === 'closing') {
+              if (checkEntitiesOnCell(door.x, door.y)) {
+                door.status = 'opening';
+                return;
+              }
+              door.progress -= dt / 1.0;
+              if (door.progress <= 0.0) {
+                door.progress = 0.0;
+                door.status = 'closed';
+              }
+            }
+          });
+        }
+
+        function checkEntitiesOnCell(cx, cy) {
+          const centerX = cx + 0.5;
+          const centerY = cy + 0.5;
+          if (Math.hypot(player.x - centerX, player.y - centerY) < 0.8) return true;
+          for (const e of enemies) {
+            if (e.state === 'dead' || e.state === 'dying') continue;
+            if (Math.hypot(e.x - centerX, e.y - centerY) < 0.8) return true;
+          }
+          return false;
+        }
+
+        function updateSecretWalls(dt) {
+          for (let i = secretWalls.length - 1; i >= 0; i--) {
+            const sw = secretWalls[i];
+            if (sw.state !== 'revealing') continue;
+            sw.revealTimer -= dt;
+            sw.alpha = Math.max(0, sw.revealTimer / 1.5);
+            if (sw.revealTimer <= 0) {
+              map[sw.y][sw.x] = 0;
+              secretWalls.splice(i, 1);
+            }
+          }
+        }
+
+        function damageBarrel(barrel, amount) {
+          if (!barrel.active) return;
+          barrel.health -= amount;
+          if (barrel.health <= 0) {
+            barrel.active = false;
+            explodeBarrel(barrel.x, barrel.y);
+          }
+        }
+
+        function explodeBarrel(ex, ey) {
+          const splashRadius = 2.0;
+          const maxDamage = 80;
+          playToxicExplosionSound();
+          triggerScreenShake(8, 0.4);
+
+          for (let k = 0; k < 18; k++) {
+            const pAngle = Math.random() * Math.PI * 2;
+            const pSpeed = 1.0 + Math.random() * 3.0;
+            const p = particlePool.find(item => !item.active);
+            if (p) {
+              p.active = true;
+              p.x = ex; p.y = ey; p.z = 0.5;
+              p.vx = Math.cos(pAngle) * pSpeed;
+              p.vy = Math.sin(pAngle) * pSpeed;
+              p.vz = (Math.random() - 0.2) * 4;
+              p.r = 57; p.g = 255; p.b = 20;
+              p.alpha = 1.0;
+              p.maxLife = 0.4 + Math.random() * 0.4;
+              p.life = p.maxLife;
+              p.size = 4 + Math.random() * 4;
+            }
+          }
+
+          const dP = Math.hypot(player.x - ex, player.y - ey);
+          if (dP <= splashRadius) {
+            const dmg = Math.round(maxDamage * (1.0 - dP / splashRadius));
+            if (dmg > 0) {
+              player.health -= dmg;
+              triggerDamageOverlay();
+              if (player.health <= 0) triggerGameOver();
+            }
+          }
+
+          enemies.forEach(enemy => {
+            if (enemy.state === 'dead' || enemy.state === 'dying') return;
+            const dE = Math.hypot(enemy.x - ex, enemy.y - ey);
+            if (dE <= splashRadius) {
+              const dmg = Math.round(maxDamage * (1.0 - dE / splashRadius));
+              if (dmg > 0) {
+                enemy.currentHealth -= dmg;
+                enemy.lastHitTimestamp = Date.now();
+                enemy.isHit = true;
+                if (enemy.currentHealth <= 0 && enemy.state !== 'dying') {
+                  triggerEnemyDeath(enemy);
+                }
+              }
+            }
+          });
+
+          barrels.forEach(other => {
+            if (!other.active) return;
+            if (other.x === ex && other.y === ey) return;
+            const dB = Math.hypot(other.x - ex, other.y - ey);
+            if (dB <= splashRadius) {
+              const dmg = Math.round(maxDamage * (1.0 - dB / splashRadius));
+              other.health -= dmg;
+              if (other.health <= 0) {
+                const chain = other;
+                setTimeout(() => {
+                  if (chain.active) {
+                    chain.active = false;
+                    explodeBarrel(chain.x, chain.y);
+                  }
+                }, 150);
+              }
+            }
+          });
+
+          spawnToxicPuddle(ex, ey);
+        }
+
+        function spawnToxicPuddle(x, y) {
+          puddles.push({ x, y, radius: 0.4, timer: 4.0, alpha: 1.0 });
+        }
+
+        function updatePuddles(dt) {
+          for (let i = puddles.length - 1; i >= 0; i--) {
+            const p = puddles[i];
+            p.timer -= dt;
+            p.alpha = Math.min(1.0, p.timer / 1.0);
+            if (p.timer <= 0) {
+              puddles.splice(i, 1);
+              continue;
+            }
+            if (Math.hypot(player.x - p.x, player.y - p.y) < p.radius + 0.3) {
+              player.health -= 5 * dt;
+              triggerDamageOverlay();
+              if (player.health <= 0) triggerGameOver();
+            }
+            enemies.forEach(enemy => {
+              if (enemy.state === 'dead' || enemy.state === 'dying') return;
+              if (Math.hypot(enemy.x - p.x, enemy.y - p.y) < p.radius + 0.3) {
+                enemy.currentHealth -= 5 * dt;
+                if (enemy.currentHealth <= 0 && enemy.state !== 'dying') {
+                  triggerEnemyDeath(enemy);
+                }
+              }
+            });
+          }
+        }
+
+        function showHudBanner(text, color, duration) {
+          hudBanners.push({ text, color, duration, total: duration });
+        }
+
         function updatePickups(dt) {
           pickups.forEach((pickup, index) => {
             // Simple distance check for pickup
@@ -1672,6 +2142,14 @@
                   weapon.ammo = Math.min(weapon.maxAmmo, weapon.ammo + pickup.amount);
                   pickedUp = true;
                 }
+              } else if (pickup.target === 'key_red') {
+                player.hasRedKey = true;
+                pickedUp = true;
+                playKeycardPickupSound();
+              } else if (pickup.target === 'key_blue') {
+                player.hasBlueKey = true;
+                pickedUp = true;
+                playKeycardPickupSound();
               }
               
               if (pickedUp) {
@@ -1749,13 +2227,22 @@
             
             const wallType = map[ray.mapY]?.[ray.mapX];
             
-            if (wallType >= 1 && wallType <= 4) {
-              const wallStyle = wallColors[wallType];
+            let renderType = wallType;
+            let secretAlpha = 1.0;
+            if (wallType === TILE_SECRET_WALL) {
+              renderType = 1; // TASK_004: camouflage as brick
+              const sw = secretWalls.find(s => s.x === ray.mapX && s.y === ray.mapY);
+              secretAlpha = sw ? sw.alpha : 1.0;
+            }
+            
+            if (renderType >= 1 && renderType <= 4) {
+              const wallStyle = wallColors[renderType];
               const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
               let shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
               let baseWallColor = shadeColor(wallStyle.base, distanceFade * -80, shadeFactor);
               
               if (drawEnd > drawStart) {
+                ctx.globalAlpha = secretAlpha;
                 ctx.fillStyle = baseWallColor;
                 ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
                 
@@ -1768,6 +2255,24 @@
                   }
                   wallX -= Math.floor(wallX);
                   applyWallPattern(x, drawStart, drawEnd, wallX, wallStyle, baseWallColor);
+                }
+                ctx.globalAlpha = 1.0;
+              }
+            } else if (isDoorTile(wallType)) {
+              const doorColor = doorColors[wallType] || '#888888';
+              const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
+              const shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
+              const baseDoorColor = shadeColor(doorColor, distanceFade * -80, shadeFactor);
+              if (drawEnd > drawStart) {
+                ctx.fillStyle = baseDoorColor;
+                ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+                if (OPTIMIZE_MODE < 2) {
+                  const wX = ray.wallX ?? 0;
+                  const seam = Math.floor(wX * 32);
+                  if ((seam & 3) < 2) {
+                    ctx.fillStyle = shadeColor(baseDoorColor, -25);
+                    ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+                  }
                 }
               }
             } else if (drawEnd > drawStart) {
@@ -1783,6 +2288,8 @@
             renderSpritesSimple();
             renderParticles();
           }
+          renderBarrels(); // TASK_004
+          renderPuddles(); // TASK_004
           
           renderWeapon();
           renderHUD();
@@ -2263,6 +2770,89 @@
         //  and game logic (update, input handlers, state management, loop start) are present.
         // ==========================================
 
+        // --- TASK_004: Render Barrels (billboards) ---
+        function renderBarrels() {
+          for (const b of barrels) {
+            if (!b.active) continue;
+            const dx = b.x - player.x;
+            const dy = b.y - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            let angle = Math.atan2(dy, dx) - player.angle;
+            while (angle < -Math.PI) angle += 2 * Math.PI;
+            while (angle > Math.PI) angle -= 2 * Math.PI;
+            if (Math.abs(angle) > FOV / 1.8 || dist < 0.1) continue;
+
+            const perpDist = dist * Math.cos(angle);
+            const spriteHeight = Math.min(screenHeight * 1.5, screenHeight / perpDist * (b.radius * 2.2));
+            const spriteWidth = spriteHeight * 0.9;
+            const screenX = Math.tan(angle) * (screenWidth / 2) / Math.tan(FOV / 2) + screenWidth / 2;
+            const drawStartY = (screenHeight - spriteHeight) / 2;
+            const drawStartX = Math.floor(screenX - spriteWidth / 2);
+            const drawEndX = Math.floor(screenX + spriteWidth / 2);
+            const distanceFade = Math.min(1, perpDist / fogDepth);
+            const base = shadeColor(b.color, distanceFade * -80);
+
+            for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
+              if (stripe >= 0 && stripe < screenWidth && perpDist < zBuffer[stripe]) {
+                const sy = Math.max(0, Math.floor(drawStartY));
+                const ey = Math.min(screenHeight, Math.floor(drawStartY + spriteHeight));
+                if (ey <= sy) continue;
+                ctx.fillStyle = base;
+                ctx.fillRect(stripe, sy, 1, ey - sy);
+                const band = Math.floor((stripe - drawStartX) / (spriteWidth || 1) * 5);
+                if (band % 2 === 0) {
+                  ctx.fillStyle = shadeColor(base, -22);
+                  ctx.fillRect(stripe, sy + (ey - sy) * 0.35, 1, Math.max(1, (ey - sy) * 0.1));
+                  ctx.fillRect(stripe, sy + (ey - sy) * 0.75, 1, Math.max(1, (ey - sy) * 0.1));
+                }
+              }
+            }
+
+            const intScreenX = Math.floor(screenX);
+            if (intScreenX >= 0 && intScreenX < screenWidth && perpDist < zBuffer[intScreenX]) {
+              const hp = Math.max(0, b.health) / b.maxHealth;
+              const bw = Math.max(16, Math.floor(spriteWidth * 0.7));
+              const bh = 3;
+              const bx = Math.floor(screenX - bw / 2);
+              const by = Math.floor(drawStartY - 8);
+              const cby = Math.max(0, by);
+              if (cby < screenHeight) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(bx, cby, bw, bh);
+                ctx.fillStyle = hp > 0.5 ? '#39ff14' : '#ff3333';
+                ctx.fillRect(bx + 1, cby + 1, Math.floor((bw - 2) * hp), bh - 2);
+              }
+            }
+          }
+        }
+
+        // --- TASK_004: Render Toxic Puddles (floor decals) ---
+        function renderPuddles() {
+          for (const p of puddles) {
+            const dx = p.x - player.x;
+            const dy = p.y - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            let angle = Math.atan2(dy, dx) - player.angle;
+            while (angle < -Math.PI) angle += 2 * Math.PI;
+            while (angle > Math.PI) angle -= 2 * Math.PI;
+            if (Math.abs(angle) > FOV / 1.6 || dist < 0.1) continue;
+            const perpDist = dist * Math.cos(angle);
+            const screenX = Math.tan(angle) * (screenWidth / 2) / Math.tan(FOV / 2) + screenWidth / 2;
+            const intScreenX = Math.floor(screenX);
+            if (intScreenX < 0 || intScreenX >= screenWidth || perpDist >= zBuffer[intScreenX]) continue;
+            const relativeZ = -0.5;
+            const groundY = (screenHeight / 2) - (relativeZ / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2));
+            const rad = Math.max(2, (p.radius / perpDist) * (screenHeight / 2 / Math.tan(FOV / 2)) * 1.2);
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha)) * 0.55;
+            ctx.fillStyle = '#39ff14';
+            ctx.beginPath();
+            ctx.ellipse(screenX, groundY, rad, rad * 0.35, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
         function renderParticles() {
           for (let i = 0; i < particlePool.length; i++) {
             const p = particlePool[i];
@@ -2453,6 +3043,45 @@
           ctx.font = `bold ${fontSize * 1.4}px 'Lucida Console', Monaco, monospace`;
           ctx.fillText(`SCORE ${player.score}`, screenWidth / 2, margin + fontSize * 1.2);
           
+          // --- TASK_004: Keycard HUD indicators ---
+          const keyY = screenHeight - margin - barHeight - 40;
+          const keyX = margin;
+          const box = 22;
+          ctx.fillStyle = player.hasRedKey ? 'rgba(255,51,51,0.35)' : 'rgba(0,0,0,0.5)';
+          ctx.fillRect(keyX, keyY, box, box);
+          ctx.strokeStyle = player.hasRedKey ? '#ff3333' : 'rgba(120,30,30,0.5)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(keyX, keyY, box, box);
+          if (player.hasRedKey) {
+            ctx.fillStyle = '#ff3333';
+            ctx.font = `bold 14px 'Lucida Console', Monaco, monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('R', keyX + box / 2, keyY + box / 2 + 5);
+            ctx.textAlign = 'left';
+          }
+          const keyBX = keyX + box + 8;
+          ctx.fillStyle = player.hasBlueKey ? 'rgba(51,51,255,0.35)' : 'rgba(0,0,0,0.5)';
+          ctx.fillRect(keyBX, keyY, box, box);
+          ctx.strokeStyle = player.hasBlueKey ? '#3333ff' : 'rgba(30,30,120,0.5)';
+          ctx.strokeRect(keyBX, keyY, box, box);
+          if (player.hasBlueKey) {
+            ctx.fillStyle = '#3333ff';
+            ctx.font = `bold 14px 'Lucida Console', Monaco, monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('B', keyBX + box / 2, keyY + box / 2 + 5);
+            ctx.textAlign = 'left';
+          }
+
+          // --- TASK_004: HUD banners (key required / secret revealed) ---
+          hudBanners.forEach((banner, bi) => {
+            const blink = Math.floor(banner.duration * 8) % 2 === 0;
+            ctx.font = `bold ${fontSize * 1.2}px 'Lucida Console', Monaco, monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = blink ? banner.color : 'rgba(255,255,255,0.6)';
+            ctx.fillText(banner.text, screenWidth / 2, screenHeight / 2 - 40 - bi * 26);
+            ctx.textAlign = 'left';
+          });
+          
           
           // Reset styles
           ctx.shadowBlur = 0;
@@ -2570,6 +3199,24 @@
                 }
               }
               
+              // TASK_004: hitscan barrels (line vs circle)
+              let hitBarrel = null;
+              if (!hitEnemy) {
+                let bestBDist = ray.distance;
+                for (const b of barrels) {
+                  if (!b.active) continue;
+                  const bdx = b.x - player.x;
+                  const bdy = b.y - player.y;
+                  const t = bdx * Math.cos(shotAngle) + bdy * Math.sin(shotAngle);
+                  if (t < 0 || t > ray.distance) continue;
+                  const perp = Math.abs(-bdx * Math.sin(shotAngle) + bdy * Math.cos(shotAngle));
+                  if (perp <= b.radius && t < bestBDist) {
+                    bestBDist = t;
+                    hitBarrel = b;
+                  }
+                }
+              }
+
               if (hitEnemy) {
                 hitEnemy.currentHealth -= weapon.damage;
                 hitEnemy.lastHitTimestamp = Date.now();
@@ -2580,6 +3227,9 @@
                 if (hitEnemy.currentHealth <= 0 && hitEnemy.state !== 'dying') {
                   triggerEnemyDeath(hitEnemy);
                 }
+              } else if (hitBarrel) {
+                damageBarrel(hitBarrel, weapon.damage);
+                createImpactParticles(hitBarrel.x, hitBarrel.y, '#39ff14', shotAngle);
               } else {
                 const hitX = player.x + Math.cos(shotAngle) * ray.distance * 0.99;
                 const hitY = player.y + Math.sin(shotAngle) * ray.distance * 0.99;
@@ -2741,13 +3391,16 @@
           
           let hit = false;
           let side = 0;
+          let hitWallX = 0;
+          let hitIsDoor = false;
+          let hitDoorType = 0;
           const maxDist = 30;
           let distance = 0;
           let hitDist = maxDist; // Store exact hit distance
           
           // Optimized DDA loop: Check for Infinity conditions early
           while (!hit && distance < maxDist) {
-            let stepOnX = sideDistX < sideDistY;
+            const stepOnX = sideDistX < sideDistY;
             
             if (stepOnX) {
               if (deltaDistX === 1e30) break; // Cannot hit a vertical wall if ray is perfectly horizontal
@@ -2762,6 +3415,36 @@
               mapY += stepY;
               side = 1;
             }
+            
+            const tile = map[mapY]?.[mapX] ?? 1;
+            
+            // TASK_004: Sliding doors with fractional progress
+            if (isDoorTile(tile)) {
+              const door = doorsList.find(d => d.x === mapX && d.y === mapY);
+              if (door) {
+                let hitCoord;
+                if (side === 0) {
+                  hitCoord = originY + distance * dirY;
+                } else {
+                  hitCoord = originX + distance * dirX;
+                }
+                hitCoord -= Math.floor(hitCoord);
+                // Ray passes through the open section of the door
+                if (door.status !== 'closed' && hitCoord < door.progress) {
+                  continue;
+                }
+                hit = true;
+                hitDist = distance;
+                hitWallX = Math.max(0, Math.min(1, hitCoord - door.progress));
+                hitIsDoor = true;
+                hitDoorType = tile;
+                break;
+              }
+              hit = true;
+              hitDist = distance;
+              break;
+            }
+            
             if (isWall(mapX, mapY)) {
               hit = true;
               hitDist = distance; // Record the distance at which the wall was hit
@@ -2780,7 +3463,10 @@
             side: side,
             mapX: mapX | 0, // Ensure integer map coords
             mapY: mapY | 0,
-            angle: angle
+            angle: angle,
+            wallX: hitWallX,
+            isDoor: hitIsDoor,
+            doorType: hitDoorType
           };
         }
 

@@ -240,3 +240,46 @@ Excelente decisão de engenharia na arquitetura do resolvedor (reversão de hist
 **STATUS**: APROVADO PARA QA (Ready for QA)
 *Assinado: Tech Lead veterano*
 
+---
+
+## 🧪 Resultado dos testes
+
+**Data**: 15/08/2026  
+**Analista de QA**: QA Agent  
+**Ambiente de Testes**: Navegador Headless Chrome (Puppeteer v25.1.0) / `rubiks_cube/index.html`  
+**Resultado Geral**: ✅ **Aprovado** (`🎉 Ready for Deploy`)
+
+---
+
+### 📷 Evidências de Testes (Browser Testing Results)
+
+#### 1. Auto-Solver (Resolvedor Automático 3D)
+* **Critério de Aceitação**: Botão de Auto-Resolver, notação WCA gerada passo a passo, execução de rotações 3D com controles de reprodução (Play, Pause, Step Prev/Next, Slider de Velocidade).
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * O botão `#autoSolveBtn` ("🤖 Auto-Resolver") inicializa a fila de resolução baseada em histórico de movimentos WCA.
+  * Notações WCA (`Passo 1/2: U'`) são exibidas dinamicamente no indicador de texto `#solveMoveText`.
+  * Os botões de navegação e reprodução (`#solvePlayBtn`, `#solvePrevBtn`, `#solveNextBtn`) respondem reativamente ao estado da reprodução e o slider de velocidade ajusta o tempo de animação Tween.
+
+#### 2. Cronômetro Estilo WCA Stackmat
+* **Critério de Aceitação**: Ativação via Espaço (preparação vermelha 1s -> pronto verde), início ao soltar Espaço, congelamento ao pressionar qualquer tecla.
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * Pressionar Espaço altera a classe do visor `#timerDisplay` para `preparing` (visualmente vermelho).
+  * Manter Espaço por 1.0s altera a classe para `ready` (visualmente verde).
+  * Soltar a barra de Espaço inicia a contagem de tempo com precisão de milissegundos (classe `running`).
+  * Pressionar qualquer tecla no teclado imediatamente congela o visor (classe `stopped`) e grava o resultado final.
+
+#### 3. Histórico e Médias de Velocidade (Ao5 / Ao12)
+* **Critério de Aceitação**: Persistência no `localStorage`, tabela com últimas 10 resoluções, cálculo em tempo real de Ao5 e Ao12 (descartando o menor e maior tempo do grupo).
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * Cada resolução é persistida sob a chave `playful_hub_rubiks_solves` no `localStorage`.
+  * As resoluções são renderizadas reativamente na tabela `#solvesTable`.
+  * Validação matemática do Ao5: com 5 tempos de teste (10.000s, 12.000s, 14.000s, 16.000s, 20.000s), os valores extremos (10.000s e 20.000s) foram descartados e a média calculada resultou exatamente em `14.000s` (`statAo5: "14.000"`).
+
+---
+
+### 🚀 Conclusão
+A implementação em `rubiks_cube/index.html` atende a todos os critérios de aceitação com excelente qualidade e performance. Tarefa aprovada em QA e promovida para `🎉 Ready for Deploy`.
+

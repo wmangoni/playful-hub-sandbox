@@ -228,4 +228,46 @@ A implementação ficou impecável. A adição do drift e marcas de pneu para o 
 **STATUS**: APROVADO PARA QA (Ready for QA)
 *Assinado: Tech Lead veterano*
 
+---
+
+## 🧪 Resultado dos testes
+
+**Data**: 15/08/2026  
+**Analista de QA**: QA Agent  
+**Ambiente de Testes**: Navegador Headless Chrome (Puppeteer v25.1.0) / `driving_simulator/index.html`  
+**Resultado Geral**: ✅ **Aprovado** (`🎉 Ready for Deploy`)
+
+---
+
+### 📷 Evidências de Testes (Browser Testing Results)
+
+#### 1. Tráfego de Veículos com IA
+* **Critério de Aceitação**: Pool de carros trafegando nas faixas (fluxo e contra-fluxo), comportamentos de ultrapassagem inteligente ao se aproximar de veículos lentos (<20u), redução drástica de velocidade em colisões com o tráfego.
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * Pool de 6 veículos (`traffic`) instanciado e ativo em faixas `left` (x = -5) e `right` (x = 5), trafegando com posições e velocidades dinâmicas.
+  * Lógica de ultrapassagem (`isOvertaking`) realiza `lerp` suave de troca de faixa em 1.5s ao detectar veículos lentos à frente.
+  * Colisões com o jogador disparam desaceleração imediata (`gameState.playerSpeed *= 0.2`) e efeito visual de flash de colisão no canvas (`flashCollision`).
+
+#### 2. Ciclo Dinâmico de Dia/Noite e Faróis (Headlights)
+* **Critério de Aceitação**: Transição suave de iluminação em 120s (Dia -> Entardecer -> Noite -> Amanhecer), visibilidade noturna reduzida, faróis volumétricos acionados automaticamente e alternáveis manualmente via tecla `F`.
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * Teste do ciclo: Em `0s` o HUD exibe `☀️ Dia` com iluminação cheia. Em `70s` transita automaticamente para `🌙 Noite` com neblina/luz noturna reduzida.
+  * Ao anoitecer (`timeOfDay >= 50s`), os faróis e o feixe volumétrico `THREE.SpotLight` (`intensity: 5`) ativam automaticamente.
+  * O acionamento manual da tecla `F` desativa o modo automático e alterna o estado dos faróis (`headlightsOn: false`, `headlightsAuto: false`).
+
+#### 3. Seleção de Modelos de Carros na Garagem & Física Diferenciada
+* **Critério de Aceitação**: Hangar/Garagem no início do jogo com 3 modelos (*Apex Sport*, *Cruiser Sedan*, *Atlas SUV*) com atributos únicos de aceleração, velocidade máxima e penalidade de grama.
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * Overlay `#garageScreen` renderiza os 3 cards com especificações visuais de cada veículo.
+  * Selecionar *Apex Sport* aplica os atributos de física `maxSpd: 0.44`, `accel: 0.018` e `grassPenalty: 0.5`.
+  * Validação de atrito na grama: Quando `|playerCar.position.x| > 10` (fora da pista), o *Apex Sport* sofre redução de 50% na velocidade máxima (de `0.44` para `0.22`), enquanto o *Atlas SUV* mantém total imunidade (`grassPenalty: 0.0`).
+
+---
+
+### 🚀 Conclusão
+A implementação em `driving_simulator/index.html` cumpre todos os critérios de aceitação e diretrizes do Tech Lead com alto padrão visual e técnico. Tarefa aprovada em QA e promovida para `🎉 Ready for Deploy`.
+
 
