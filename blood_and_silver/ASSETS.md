@@ -19,6 +19,8 @@
 | `dungeon-props-and-objects-asset-pack` | Props: bomba, canhão, guilhotina, lâminas rotativas, caveira, teia, setas | Armadilhas/props |
 | `40-loot-icons-pixel-art` | **40 ícones de itens** (32×32), com e sem fundo | **Itens/passivos/armas** no HUD e popups |
 | `bow-and-crossbow-pixel-art-icons` | **48 ícones de arcos/bestas** (32×32), com/sem efeito e fundo | **Armas de projétil** (Arco/Besta) |
+| `icon-pack` | **48 ícones genéricos de RPG/fantasia** (32×32), com variantes de cor (recolor), sem nomes | Itens genéricos/consumíveis (poções, gemas) |
+| `shield-and-amulet-rpg-icons` | **48 ícones** (32×32): ~27 escudos + ~19 amuletos/pingentes + 2 peças especiais | **Passivos defensivos (escudos)** e **amuletos/trinkets** |
 | `ui-for-rpg` | Botões, ícones, números, painéis, menus, inventário, telas win/loose | **UI/HUD** |
 
 > Cada pacote traz pastas `PNG/` (sprites finais), `PSD/` (fontes editáveis — não usar em runtime), `ASEPRITE/` (quando houver) e `Tiled_files/` (mapas de referência `.tmx`). Use apenas `PNG/`.
@@ -90,10 +92,16 @@
 | Ícones com fundo | `40-loot-icons-pixel-art/2 Icons with back/Icons_01..40.png` |
 | Nomes dos 40 ícones | `40-loot-icons-pixel-art/Icons_name.txt` |
 | Ícones de arcos/bestas (32×32) | `bow-and-crossbow-pixel-art-icons/PNG/Transperent/Icon1..48.png` (e `Background/` para versão com fundo) |
+| Ícones genéricos de RPG (32×32) | `icon-pack/PNG/Transperent/Icon1..48.png` (e `Background/`) |
+| Ícones de escudos/amuletos (32×32) | `shield-and-amulet-rpg-icons/PNG/Transperent/Icon1..48.png` (e `Background/`) |
 
 > **Lista completa dos 40 ícones** (ordem de `Icons_name.txt`): pile of coins, Overgrown Crate, Emerald, Ruins, Torn Flag, Bump, Emerald Key, Night Mushroom, Ax, Bottle, Feather, Cheese, Raven Amulet, Pile of stones, Jasper, Spirit Orb, Tail, Boar skin, Meat, Burdyuk, Chitin Shield, Orb of Blood, Guard Sword, Ham, Cloth, Amulet, Map, Envelope, Letter, Test tube, Bomb, Axis, Mechanism, Wrench, Bottle of liquor, Pyrope, Boar Tusk, Sausage, Boar's Ring, Horned Helm.
 >
 > **Ícones de arco/besta**: 48 designs (Icon1..48) de arcos, bestas e flechas, nas versões `Transperent` (sem fundo) e `Background` (com fundo), e variantes `_no_effect` (sem glow/efeito).
+
+> **`icon-pack` (48 ícones genéricos, sem nomes)**: os objetos se repetem em **variantes de cor** (recolor) — a mesma forma em ~3 cores. O PSD confirma camadas de paleta (gold/silver/red/blue/green/…) e a peça `bottle` (garrafa/poção). Como não há nomes semânticos, a identificação final é visual no fatiamento. Uso sugerido: mapear **cor → raridade/elemento** (cinza=comum, verde=incomum, azul=raro, roxo=épico, dourado=lendário); garrafas/poções para consumíveis.
+
+> **`shield-and-amulet-rpg-icons` (48 ícones, sem nomes)**: ~27 **escudos** (corpo largo no topo, base pontuda) e ~19 **amuletos/pingentes** (gancho no topo + gema na base), mais 2 peças especiais (Icon31 = chave/talismã; Icon40 = par de escudos). Uso sugerido: **escudos → passivos defensivos** (escudo/barreira/armadura/dano refletido), **amuletos → trinkets/atributos**, **chave → item de progressão**; a **gema** presente em vários ícones pode indicar cor de sinergia/elemento.
 
 > Sugestão de mapeamento (itens ↔ ícones), conforme a spec `TASK_001.md`:
 > - **Armas**: Espada→`Guard Sword`(23), Machado→`Ax`(09), Arco→`bow Icon`, Besta→`bow Icon`, Água Benta→`Bottle`(10).
