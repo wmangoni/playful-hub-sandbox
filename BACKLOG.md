@@ -87,7 +87,7 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_007.md` | Sangue & Prata | Etapa 6 — Evoluções (Synergies) | ✅ Done | | Alta | [TASK_007.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_007.md) |
 | `TASK_008.md` | Sangue & Prata | Etapa 7 — Chefes (Boss Fight) com HP Escalado | ✅ Done | | Alta | [TASK_008.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_008.md) |
 | `TASK_009.md` | Sangue & Prata | Etapa 8 — Polish, SFX Procedural e Publicação no Hub | ✅ Done | | Alta | [TASK_009.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_009.md) |
-| `TASK_010.md` | Sangue & Prata | Melhorias Gráficas — Sprites (vampiros) e Cenário (chão, água e objetos) | 📋 Backlog | | Alta | [TASK_010.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_010.md) |
+| `TASK_010.md` | Sangue & Prata | Melhorias Gráficas — Sprites (vampiros) e Cenário (chão, água e objetos) | ✅ Done | | Alta | [TASK_010.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_010.md) |
 
 
 

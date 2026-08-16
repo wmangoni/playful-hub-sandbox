@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_010: Melhorias Gráficas — Sprites e Cenário
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — planejamento concluído e decisões aprovadas pelo PO; pronto para execução.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — melhorias gráficas implementadas.
 > **Escopo**: APENAS visual. **Não mexer em mecânica** (dano, HP, velocidade, spawn, colisão de jogabilidade, progressão).
 
 ---
