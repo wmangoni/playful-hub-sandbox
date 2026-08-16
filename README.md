@@ -17,7 +17,7 @@ O projeto conta com duas experiências distintas para exploração do catálogo:
 
 ## 📦 Catálogo de Minijogos e Experimentos
 
-O hub centraliza 19 minijogos e simuladores diferentes, acessíveis por rotas amigáveis e organizados em subdiretórios individuais:
+O hub centraliza 20 minijogos e simuladores diferentes, acessíveis por rotas amigáveis e organizados em subdiretórios individuais:
 
 1.  **3D Shooter (`/jogos/3d_shooter`)**: Tiro em primeira pessoa (FPS) 3D inspirado no clássico Doom, com labirintos e inimigos.
 2.  **RPG Adventure Quest (`/jogos/ded`)**: Uma jornada de aventura inspirada no clássico RPG de mesa Dungeons & Dragons.
@@ -38,6 +38,7 @@ O hub centraliza 19 minijogos e simuladores diferentes, acessíveis por rotas am
 17. **Voxel City (`/jogos/voxel_city`)**: Construtor e visualizador 3D de cidades em blocos estilo Voxel.
 18. **Rede Neural Evolutiva (`/rede_neural_evolutiva`)**: Experimento científico que mostra agentes virtuais evoluindo de forma autônoma.
 19. **Three.js Earth (`/threejs-earth-main`)**: Demonstração em 3D interativa do planeta Terra utilizando a biblioteca Three.js.
+20. **Sangue & Prata (`/jogos/blood_and_silver`)**: Roguelite gótico de sobrevivência com armas automáticas (espada, arco, besta, água benta), passivos, evoluções e chefes.
 
 ---
 

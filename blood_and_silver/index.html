@@ -418,7 +418,8 @@
         <div class="stats">
             Sobreviveu por <b id="goTime">00:00</b><br>
             Abates: <b id="goKills">0</b><br>
-            Nível: <b id="goLevel">1</b>
+            Nível: <b id="goLevel">1</b><br>
+            Recorde: <b id="goBest">00:00</b>
         </div>
         <button class="btn" id="restartBtn">Reiniciar</button>
     </div>
@@ -530,6 +531,7 @@
         const goTime = document.getElementById('goTime');
         const goKills = document.getElementById('goKills');
         const goLevel = document.getElementById('goLevel');
+        const goBest = document.getElementById('goBest');
 
         const ASSETS = {
             playerWalk: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_Walk_with_shadow.png',
@@ -596,6 +598,9 @@
 
         let lastTime = performance.now();
         let audio = null;
+        let shake = 0;
+        let bestTime = 0;
+        let lastCollect = 0;
 
         function loadAssets() {
             const paths = Object.values(ASSETS);
@@ -753,6 +758,7 @@
             particles.length = 0;
             damageTexts.length = 0;
             levelupOptions = [];
+            shake = 0;
             spawnEnemy();
             spawnEnemy();
             spawnEnemy();
@@ -771,6 +777,7 @@
                 goTime.textContent = formatTime(game.time);
                 goKills.textContent = String(game.kills);
                 goLevel.textContent = String(player.level);
+                goBest.textContent = formatTime(bestTime);
                 gameoverScreen.classList.remove('hidden');
             }
             if (s === 'levelup') levelupScreen.classList.remove('hidden');
@@ -785,6 +792,7 @@
 
         function endGame() {
             game.status = 'gameover';
+            saveBest();
             if (audio) audio.play('gameover');
             setStatus('gameover');
         }
@@ -793,6 +801,18 @@
             const m = Math.floor(t / 60);
             const s = Math.floor(t % 60);
             return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function loadBest() {
+            try { bestTime = parseFloat(localStorage.getItem('blood_and_silver_best') || '0') || 0; }
+            catch (e) { bestTime = 0; }
+        }
+
+        function saveBest() {
+            if (game.time > bestTime) {
+                bestTime = game.time;
+                try { localStorage.setItem('blood_and_silver_best', String(bestTime)); } catch (e) {}
+            }
         }
 
         function updateHud() {
@@ -1104,6 +1124,10 @@
                 if (dx * dx + dy * dy < pr * pr) {
                     o.alive = false;
                     player.xp += o.value;
+                    if (audio && game.time - lastCollect > 0.07) {
+                        lastCollect = game.time;
+                        audio.play('collect');
+                    }
                 }
             }
             if (player.xp >= player.xpToNext) {
@@ -1277,6 +1301,7 @@
             e.animTime = 0;
             e.alive = true;
             game.activeBoss = e;
+            shake = 10;
             if (audio) audio.play('boss');
         }
 
@@ -1305,6 +1330,7 @@
             game.kills += 1;
             if (e.isBoss) {
                 game.activeBoss = null;
+                shake = 20;
                 for (let i = 0; i < 10; i++) dropOrb(e.x + (Math.random() - 0.5) * 60, e.y + (Math.random() - 0.5) * 60);
                 spawnChest(e.x, e.y, Math.random() < 0.5 ? 'legendary' : 'rare');
                 spawnParticles(e.x, e.y, '#e8435b', 40);
@@ -1394,7 +1420,11 @@
             const infos = buildRouletteInfos(results);
             applyRouletteResults(results);
             renderChestPopup(c.rarity, infos, null);
-            if (audio) audio.play('chest');
+            if (audio) {
+                audio.play('chest');
+                setTimeout(function () { if (audio) audio.play('tick'); }, 220);
+                setTimeout(function () { if (audio) audio.play('tick'); }, 440);
+            }
             setStatus('chest');
         }
 
@@ -1472,6 +1502,7 @@
             if (player.hitCooldown > 0) return;
             player.hitCooldown = CONFIG.player.hitCooldown;
             player.hp -= dmg;
+            shake = 8;
             if (audio) audio.play('hurt');
             spawnDamageText(player.x, player.y - player.radius - 6, '-' + dmg, '#ff5a6e');
             if (player.hp <= 0) {
@@ -1571,6 +1602,7 @@
             updateChestCollection();
             updateParticles(dt);
             updateCamera();
+            shake = Math.max(0, shake - 60 * dt);
             updateHud();
         }
 
@@ -1811,6 +1843,9 @@
 
         function render() {
             ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (shake > 0) {
+                ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+            }
             drawGround();
             drawOrbs();
             drawDamageZones();
@@ -1900,6 +1935,8 @@
                     tone('sawtooth', 90, 45, 0.8, 0.3);
                     tone('sawtooth', 120, 60, 0.8, 0.2);
                 }
+                else if (name === 'collect') tone('sine', 760, 900, 0.06, 0.04);
+                else if (name === 'tick') tone('square', 500, 500, 0.04, 0.07);
                 else if (name === 'gameover') {
                     tone('sawtooth', 300, 60, 1.1, 0.28);
                     tone('square', 150, 40, 1.2, 0.2);
@@ -1923,6 +1960,7 @@
         initDamageZonePool();
         initChestPool();
         audio = initAudio();
+        loadBest();
         setStatus('menu');
         requestAnimationFrame(gameLoop);
     })();

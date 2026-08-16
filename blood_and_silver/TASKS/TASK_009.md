@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_009: Etapa 8 — Polish, SFX Procedural e Publicação no Hub
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — aguardando refinamento do TL.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — Etapa 8 implementada e testável.
 > **Spec guarda-chuva**: [`TASK_001.md`](./TASK_001.md) → seção 11 (Etapa 8).
 
 ## 🎯 Objetivo
