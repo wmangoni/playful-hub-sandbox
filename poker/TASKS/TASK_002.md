@@ -1,6 +1,6 @@
 # 📝 TASK-POKER: Personalidades de IA, Sistema de Blefe e Assistente de Probabilidade (Hand Tracker)
 
-**Status:** 🎉 Ready for deploy
+**Status:** ✅ Done
 
 ## 👤 User Story
 *   **Como** jogador estratégico no minijogo **Poker Texas Hold'em**,

@@ -598,12 +598,62 @@ Como **Tech Lead** do projeto, fiz uma avaliação minuciosa das propostas de en
 
 ---
 
-## 🧪 Observação QA
+## 🧪 Resultado dos testes
 
-**Data**: 31/05/2026  
-**Analista de QA**: Antigravity (QA)  
+**Data**: 15/08/2026  
+**Analista de QA**: QA Agent  
+**Ambiente de Testes**: Navegador Headless Chrome (Puppeteer v25.1.0) / `archer/index.html`  
+**Resultado Geral**: ❌ Reprovado (`🛠️ Requested Changes`)
 
-### 📋 Status da Validação
-*   **Testável**: ❌ Não
-*   **Motivo**: A funcionalidade (Vento Lateral Dinâmico, Balões Especiais e Multiplicador de Combo) está no status **`In Progress`** no backlog global e **não foi implementada** no código-fonte do minijogo (`archer/index.html`).
-*   **Ação**: A tarefa deve ser concluída pelo desenvolvedor, passar por Code Review pelo Tech Lead, ser aprovada e movida para `Ready for QA` antes que os testes no navegador possam ser efetuados e suas evidências registradas.
+---
+
+### 📷 Evidências de Testes (Browser Testing Results)
+
+#### 1. Indicador e Influência de Vento Lateral
+* **Critério de Aceitação**: 
+  * Exibir HUD com indicador visual da força e direção do vento (-5 a +5 m/s com seta/biruta).
+  * Vento deve mudar de intensidade e direção a cada 3 tiros ou a cada rodada.
+  * A física da flecha deve sofrer força lateral contínua igual à velocidade do vento multiplicada por fator de sensibilidade.
+* **Resultado do Teste**: ❌ **Falha**
+* **Evidência Observada**:
+  * O HUD exibe apenas um texto simples (`windVal`) sem o widget visual de seta/biruta rotacional (`#wind-hud` ausente).
+  * No teste de automação no navegador:
+    * Vento Inicial: `1.457 m/s`
+    * Vento após 3 disparos efetuados: `1.457 m/s` (Sem alteração).
+  * O vento é gerado apenas 1 vez na inicialização (`generateNewWind()`) e **não altera a cada 3 disparos**.
+
+#### 2. Balões com Efeitos Especiais (Explosivo, Criogênico, Fortuna)
+* **Critério de Aceitação**:
+  * Motor de spawning contínuo de balões subindo verticalmente pela tela.
+  * 3 novos tipos de balões especiais:
+    1. *Balão de Hélio Instável (Explosivo - Vermelho com Faíscas)*: detonação radial de 100px.
+    2. *Balão Criogênico (Azul Escuro)*: desaceleração de 60% na subida dos balões por 6s.
+    3. *Balão da Fortuna (Dourado)*: movimento veloz, bônus de 5x na pontuação.
+* **Resultado do Teste**: ❌ **Falha**
+* **Evidência Observada**:
+  * Apenas **1 balão estático** é renderizado no canvas (`bottom: 391px, left: 636px`), sem sistema de subida vertical contínua.
+  * As classes de balões especiais (`.balloon-explosive`, `.balloon-cryo`, `.balloon-fortune`) e o vetor de objetos de balões dinâmicos (`activeBalloons`) não estão implementados no código.
+
+#### 3. Sistema de Combo Streak & Multiplicadores
+* **Critério de Aceitação**:
+  * HUD de combo visível na tela com multiplicadores: 2x (3+ acertos), 3x (6+ acertos) e 5x (10+ acertos).
+  * Erros de tiro (flecha sair da tela ou cair no chão sem atingir balão) devem resetar o combo imediatamente para 1x.
+* **Resultado do Teste**: ❌ **Falha**
+* **Evidência Observada**:
+  * Elemento HUD `#combo-hud` com badges multiplicadoras de 2x, 3x e 5x ausente.
+  * O cálculo de pontuação utiliza adição linear (`100 + (comboStreak - 1) * 20`) e não os multiplicadores previstos.
+  * Tiros perdidos/erros no solo não zeram o contador de combo instantaneamente.
+
+---
+
+### 📝 Passos para Reprodução (Steps to Reproduce)
+1. Abrir `archer/index.html` no navegador.
+2. Observar os elementos do jogo: nota-se 1 único balão estático em vez de balões subindo continuamente.
+3. Realizar 3 disparos seguidos e checar o indicador de vento: o valor permanece inalterado.
+4. Inspecionar o DOM no DevTools: o widget `#wind-hud`, o container `#combo-hud` e os seletores `.balloon-explosive`, `.balloon-cryo`, `.balloon-fortune` não existem.
+5. Errar o alvo de propósito disparando a flecha contra o chão: o combo streak não é resetado para 1x.
+
+---
+
+### 🔄 Ação Requerida
+Retornar a tarefa para o desenvolvedor (`🛠️ Requested Changes`) para alinhar a implementação em `archer/index.html` com os critérios de aceitação do `TASK_002.md`.

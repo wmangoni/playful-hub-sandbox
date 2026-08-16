@@ -433,3 +433,46 @@ O multiplicador de velocidade ganho no draft roguelite (`speedMultiplier`) deve 
 **Resultado da Avaliação**: APROVADO. A mecânica roguelite enriquece a longevidade e a diversão do jogo de forma espetacular.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3094)  
+*Script de Automação:* `tests/qa_voxel_arena_task002.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Novos Inimigos Dinâmicos (Voxel Brute & Shadow Stalker)**:
+   - *Voxel Brute*: Escala $1.8\times$, 120 HP, dano 15, olhos âmbar (`#ffcc00`, emissive 3.5), drop de 40 XP.
+   - *Shadow Stalker*: Escala $0.7\times$, 25 HP, velocidade 9, cooldown de ataque ágil 0.8s, olhos ciano (`#00ffff`, emissive 3.5), drop de 20 XP.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Sistema de Ondas Dinâmicas (5 Ondas Progressivas)**:
+   - Configuração de 5 ondas escalonadas com tempos, taxas de spawn e limites de inimigos ativos ($8 \rightarrow 25$).
+   - Seleção probabilística ponderada por proporções (`basic`, `brute`, `stalker`).
+   - **Resultado:** ✅ Aprovado.
+
+3. **Mecânica de XP Orbs e Atração Magnética**:
+   - Spawn de octaedro dourado giratório com flutuação senoidal no local da morte física do inimigo.
+   - Atração física magnética com aceleração progressiva quando o jogador está a menos de 8.0 unidades.
+   - Absorção instantânea ao contato com ganho de XP e atualização do HUD.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Painel de Upgrades Roguelite (Draft System Modal)**:
+   - Pausa sistêmica imediata ao atingir $XP_{req} = level \times 120$.
+   - Modal suspensa glassmorphic com 3 cartas de upgrade aleatórias e distintas sorteadas do `UPGRADE_POOL`.
+   - Seleção com mouse/teclado, aplicação dos modificadores de atributos, fechamento de modal e retomada fluida.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Combate Tático e Gestão de Stamina**:
+   - Custos de stamina validados para ataque e habilidades.
+   - Bloqueio por exaustão e regeneração natural e em repouso.
+   - **Resultado:** ✅ Aprovado.
+
+6. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

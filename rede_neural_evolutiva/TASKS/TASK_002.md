@@ -153,3 +153,54 @@ A interface atual do jogo com fundo cinza básico de navegador padrão deve ser 
 - [x] **Exportação e Importação de Genomas (Cérebro Campeão)**: Botão de exportação imediata em formato JSON estruturado com metadados, validação de integridade/arquitetura das dimensões do genoma antes da importação, injeção automática em 20% da população com variação genética e reinício imediato.
 - [x] **Painel Estatístico de Curvas Evolutivas (Analytics)**: Gráfico de linhas dinâmico plotando o Fitness Máximo (Verde Limão) vs Fitness Médio (Roxo Neon) por geração. Interatividade via mouseover e mouseleave com linha guia pontilhada vertical e tooltip box detalhada.
 - [x] **Foco Interativo de Agentes**: Seleção individual pelo menu dropdown ou por clique direto no Canvas sobre qualquer jogador vivo, destacando-o com bordas neon douradas.
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3097)  
+*Script de Automação:* `tests/qa_rede_neural_evolutiva.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Estrutura de Canvases e Componentes de UI (Cyberpunk Dark Mode)**:
+   - `gameCanvas` ($600 \times 300$), `nnCanvas` ($400 \times 800$), `graphCanvas` ($600 \times 350$) presentes e com dimensões nominais validadas.
+   - Botões de ação (`exportBrainBtn`, `importBrainBtn`, `importFileInput`, `saveBestBtn`, `loadBestBtn`) e visualizador `jsonViewer` integrados.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Topologia Neural (Brain Inspector)**:
+   - Validação da arquitetura cerebral MLP nos 20 agentes ativos:
+     - Camada de Entrada: 3 neurônios.
+     - Camada Oculta 1: 8 neurônios.
+     - Camada Oculta 2: 4 neurônios.
+     - Camada de Saída: 1 neurônio motor.
+   - Matrizes de pesos e vetores de bias validados: `weights_in_h1` ($3 \times 8$), `bias_h1` (8), `weights_h1_h2` ($8 \times 4$), `bias_h2` (4), `weights_h2_out` ($4 \times 1$), `bias_out` (1).
+   - Renderização dinâmica em tempo real com sinapses excitatórias (verde) e inibitórias (vermelho) com espessura e pulsos elétricos.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Seleção e Foco Interativo em Agentes**:
+   - Seleção direcionada via dropdown `#focusAgentSelect` (ex: focar no Agente #2).
+   - Foco automático com fallback dinâmico para o melhor sobrevivente ao resetar para `auto` ou ao morrer o agente selecionado.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Exportação de Genoma JSON (Champion Brain Schema)**:
+   - Estrutura de metadados (`game`, `generation`, `fitness`, `timestamp`, `architecture`) em total conformidade com o schema estabelecido.
+   - Validação das chaves e tipos numéricos do objeto `genome`.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Validador de Importação e Injeção Genética (20% da População)**:
+   - Rejeição assertiva de JSON corrompido ou com formato/dimensões incompatíveis sem impacto no loop.
+   - Aceitação de genoma válido, clonagem com mutação suave em 20% dos indivíduos (`Math.ceil(NUM_PLAYERS * 0.2) = 4` agentes) e reinício imediato da geração com o novo cérebro.
+   - **Resultado:** ✅ Aprovado.
+
+6. **Gráfico de Convergência Evolutiva (Analytics & Tooltip Interativo)**:
+   - Plotagem de curvas duplas (Fitness Máximo em Verde Limão vs Fitness Médio em Roxo Neon).
+   - Interatividade de mouse (`mousemove` e `mouseleave`) com linha guia vertical e exibição de tooltip de dados estatísticos por geração.
+   - **Resultado:** ✅ Aprovado.
+
+7. **Estabilidade e Ausência de Erros de Runtime**:
+   - Execução do game loop contínuo sem nenhuma exceção no console do navegador (`0 erros`).
+   - **Resultado:** ✅ Aprovado.
+

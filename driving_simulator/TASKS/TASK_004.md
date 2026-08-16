@@ -276,4 +276,27 @@ function playTurboBlowOffSound() {
    * **Decisão**: Todos os materiais e geometrias instanciados para partículas de névoa, gotas de chuva, fogo de nitro e luzes de giroflex devem ser criados via Object Pooling ou liberados explicitamente via `.dispose()`.
    * **Diretriz Técnica**: Garantir que a inicialização do `AudioContext` da Web Audio API ocorra apenas no primeiro clique ou pressionar de tecla do jogador para respeitar as políticas de autoplay de navegadores modernos.
 
-*Status da Especificação*: ✅ **Refined / Aprovado pelo Tech Lead** - Pronta para ser assumida pelo time de desenvolvimento.
+---
+
+## 💻 Notas de Desenvolvimento (Dev complete)
+
+Implementado em `driving_simulator/index.html` sobre a TASK_002 (tráfego, dia/noite, garagem) e TASK_003 (obstáculos, pit stop, time trial). Todos os critérios de aceitação e as decisões do TL atendidos; validado localmente via servidor (`node tests/smoke.test.js`) e checagem de sintaxe do bloco `<script>`. Nenhum erro de runtime aparente.
+
+### O que foi entregue
+1. **Nitro NOS**: reservatório `nitroSystem.charge` (0–100%) recarregado por drift (+15%/s), near-miss com o tráfego (+10%) e saltos em rampa (+20%). Ativação por `Espaço`/`Shift` com carga >20%; consumo de 25%/s; vel. máx. ×1.6 e aceleração ×2.5; FOV warp `LERP` (75°→85°) com `camera.updateProjectionMatrix()`; chamas de escapamento ciano/azul (`THREE.AdditiveBlending`, geometria/material compartilhados via pooling) e overlay `#speedLines` (motion blur).
+2. **Perseguição policial**: Heat Level 1–5 estrelas (HUD `#heatLevel`, pisca durante decaimento); viaturas pretas com giroflex vermelho/azul (`THREE.PointLight` pulsantes) que interceptam o jogador e fazem PIT; colisão com civis/viaturas e ultrapassagem em alta velocidade elevam o Heat Level; decaimento de 1★/8s e limpeza instantânea no Pit Stop Pad; Spike Strips (Heat ≥3) que estouram os pneus (tração ×0.4, oscilação de volante, dreno contínuo de integridade até o reparo).
+3. **Clima dinâmico**: `weatherManager` alterna `sunny`/`rainy`/`foggy` a cada 90s ou por seleção na garagem; chuva neon (partículas ciano, `roughness=0.15` + `metalness` do asfalto, aquaplanagem −35% de aderência e frenagem alongada); névoa densa (`scene.fog.far=28`, `fogDensity=0.035`) exigindo faróis (teclas `F`/`L`).
+4. **Bifurcação de rotas**: Túnel Ciber-Neon (Rota B, painéis pulsantes + reverberação no motor), Atalho Off-Road de cascalho (Rota C, aderência reduzida + moedas bônus) e Cliffside (Rota A, vento lateral periódico).
+5. **Áudio procedural (Web Audio API)**: oscilador de motor dente-de-serra 80→650 Hz conforme a velocidade; turbo blow-off (ruído branco + lowpass); canto de pneus (bandpass) no drift; sirene FM com tremolo quando viaturas próximas; som de ativação do nitro e estouro de pneus. `AudioContext` inicializado apenas no primeiro gesto (keydown).
+
+### Decisões do TL implementadas
+- **Heat Level**: temporizador `infractionTimer` (1★ a cada 8s limpos) + `#heatLevel.blinking` durante o decaimento; limpeza instantânea no Pit Stop.
+- **Time Trial**: viaturas e spike strips desativados (`raceMode === 'time_trial'`); Nitro permanece ativo.
+- **WebGL/Audio**: geometrias/materiais de fogo, chuva e faíscas via pooling compartilhado; viaturas e spike strips liberados com `disposeMesh()`/`dispose()`; `AudioContext` só após primeiro gesto.
+
+### Observações para o TL
+- **Near-miss**: a especificação cita "1.8 unidades", porém a colisão com o tráfego ocorre a `TRAFFIC_COLLISION_DISTANCE = 3.2`. Usei o limiar de **4.5 unidades** (passagem rente sem tocar) com cooldown de 2s por veículo, para não conflitar com a colisão.
+- **Tração de pneu furado**: usei `handlingFactor = 0.4` (coerente com "perde 60% de tração"); o pseudocódigo do TL sugeria 0.35 — mantive o critério de aceitação.
+- **FOV base**: a câmera original do jogo usa 75° (não 60° como no pseudocódigo); mantive 75° como base e faço o warp para 85° durante o Nitro para preservar o game feel existente.
+- **Faróis**: mantive a tecla `F` existente e adicionei `L` (mencionada nos critérios) como alias.
+

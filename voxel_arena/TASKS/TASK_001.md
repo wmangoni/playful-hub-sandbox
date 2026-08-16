@@ -565,3 +565,42 @@ Todas as adições marcadas com `=== TASK_001 ===` / comentários `TASK_001:` pa
 **Resultado da Avaliação**: APROVADO COM RESSALVAS CORRIGIDAS. As otimizações de recursos GPU garantem que o jogo atinja e sustente 60 FPS por tempo indeterminado.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3092)  
+*Script de Automação:* `tests/qa_voxel_arena_task001.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Atmosfera de Arena Sombria & Iluminação Lunar (WebGL & Three.js)**:
+   - Névoa exponencial volumétrica densa (`THREE.FogExp2(0x0a0c16, 0.03)`).
+   - Fundo de catacumba escura (`#0a0c16`).
+   - Luz lunar direcional fria azulada/ciano (`#7ec0ee`, intensidade `2.0`, mapa de sombras `2048x2048`).
+   - **Resultado:** ✅ Aprovado.
+
+2. **Modelos Low-Poly Estilizados (Voxel Beasts)**:
+   - Inimigo composto por grupo hierárquico estruturado em 8 voxels (tronco, cabeça, braços de garra, pernas e olhos).
+   - Olhos rubis emissivos (`#ff2244`, intensidade emissiva $\ge 2.0$).
+   - **Resultado:** ✅ Aprovado.
+
+3. **VFX 3D Procedurais de Habilidades**:
+   - *Spin Attack*: Cilindro toroidal duplo contra-rotativo com emissão e decaimento dinâmico.
+   - *Heal*: 12 esferas esmeralda em órbita helicoidal ascendente.
+   - *Ultimate*: Domo wireframe semiesférico translúcido em expansão radial e desvanecimento quadrático.
+   - *Dash*: Instanciação de 3 a 4 silhuetas holográficas com materiais translúcidos aditivos e fade-out.
+   - **Resultado:** ✅ Aprovado.
+
+4. **HUD de Luxo Glassmorphism & Runas SVG Inline**:
+   - 4 slots de habilidade com acabamento de vidro fosco (`backdrop-filter: blur`), bordas metálicas e runas SVG inline geométricas temáticas (`spin`, `dash`, `heal`, `ult`).
+   - Barras de HP, Stamina e XP com design glassmorphic de luxo.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade WebGL e Ausência de Erros**:
+   - $0$ erros no console do navegador durante o loop contínuo do Three.js e animações de partículas.
+   - **Resultado:** ✅ Aprovado.
+

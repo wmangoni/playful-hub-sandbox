@@ -701,6 +701,258 @@ Como PO experiente em level design e focado na imersão e na excelente experiên
 
 *Assinado: Antigravity - Senior Game Product Owner (PO)*
 
+---
+
+## ⚔️ 32. Elaboração e Criação de Nova Tarefa: Voxel Arena (TASK_004) - ✅ LIDA E CONFIRMADA PELO TECH LEAD
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o jogo **Voxel Arena (voxel_arena)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_arena/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Seleção de Classes de Heróis (Paladino, Arquimago & Assassino)**: Projetei 3 classes jogáveis selecionáveis no menu inicial com modelos voxel 3D distintos e kits completos de habilidades exclusivas (ex: *Martelo de Titã* para Paladino, *Nova Arcana* e *Blink Holográfico* para Arquimago, e *Passo das Sombras* e *Tempestade de Adagas Executora* para Assassino).
+    *   **Sistema de Relíquias Místicas Equipáveis (Mystic Relics System)**: Introduzi a mecânica de baús de relíquias surgindo na arena que oferecem escolhas passivas estratégicas (ex: *Coração de Voxel*, *Anel do Trovão* com relâmpagos em cadeia, *Cálice Vampírico* com Roubo de Vida, e *Ampulheta Arcana*).
+    *   **Biomas Biomáticos & Hazards Dinâmicos de Arena**: Desenhei suporte para 3 arenas selecionáveis no menu principal (*Masmorra Sombria*, *Templo de Lava* com dano contínuo ao pisar na lava e geysers de fogo, e *Cripta de Gelo* com física de atrito reduzido/derrapagem em 40% e queda de estalactites do teto com aviso de área).
+    *   **Sintetizador Áudio Procedural Expandido (Web Audio API)**: Projetei a síntese sonora procedural nativa sem assets externos para conjuração de magias arcanas, chiado de adagas furtivas, impactos sagrados, arpejo triunfal de abertura de baú e estrondo de estalactites caindo no gelo.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Atrito Físico no Piso de Gelo*: A física de derrapagem na Cripta de Gelo exige interpolação escalar no vetor de velocidade do jogador (`playerVelocity.x * 0.94 + dir.x * accel * dt`) para dar a sensação de escorregar sem descontrolar a câmera.
+    2.  *Descarte Limpo de Malhas de Raios Elétricos*: A animação do *Anel do Trovão* (Chain Lightning) cria linhas dinâmicas de luz entre inimigos. Recomendei invocar `.dispose()` nas geometrias e materiais dos raios após 150ms para evitar estouro de memória no Three.js.
+    3.  *Stacking de Relíquias de Mesma Espécie*: As relíquias podem ser acumuladas em até 3x, exigindo que a rotina `applyRelicEffects()` revalide os multiplicadores acumulados no `playerState`.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🌿 33. Elaboração e Criação de Nova Tarefa: Lazy Gardener (TASK_004) - ✅ LIDA E CONFIRMADA PELO TECH LEAD
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o minijogo **Lazy Gardener (lazy_gardner)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/lazy_gardner/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Sistema de Automação Ciber-Botânica (Drones de Irrigação & Colheita)**: Projetei drones voxel 3D (`IrrigationDrone` e `HarvestDrone`) com patrulha procedural, raio trator e cones de água para transformar o loop idle em uma fábrica botânica automatizada (Botanic Factory Tycoon).
+    *   **Mutação Genética Radioativa (Sementes Mutantes Starfall)**: Introduzi o evento noturno de queda de meteoritos radioativos no jardim, gerando espécimes lendárias (*Lótus Quântica*, *Bambu de Plasma*, *Cacto Antigravitacional*) com pétalas levitantes em Three.js e valor 6.0x.
+    *   **Mercado B2B Corporativo (Corporate Botanic Contracts)**: Criei o sistema de contratos com megacorporações ciberpunk com metas de entrega por tempo limitado, recompensas massivas em ouro, XP de prestígio e prorrogação de contrato.
+    *   **Feira Noturna Neon & Festivais Bioluminescentes**: Implementei o ciclo Dia/Noite dinâmico com shaders emissivos bioluminescentes, multiplicador de vendas 2.0x e trilha sonora lofi chillout sintetizada via Web Audio API.
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Performance com Luzes Dinâmicas*: Para evitar queda de FPS no Three.js durante a Feira Noturna com muitas plantas emissivas, recomenda-se limitar as luzes reais (`THREE.PointLight`) a no máximo 6 instâncias principais, utilizando `emissiveIntensity` nos materiais para as demais.
+    2.  *Descarte Limpo do Meteorito Starfall*: O meteorito radioativo deve ser removido e desmembrado da cena após 90s, liberando o cristal *Star Fragment* interativo por Raycaster.
+    3.  *Navegação LERP dos Drones*: A translação dos drones sobre os canteiros deve usar interpolação vetorial LERP para evitar movimentações rígidas e garantir suavidade visual.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## ☄️ 34. Elaboração e Criação de Nova Tarefa: Pinball (TASK_004) - ✅ LIDA E CONFIRMADA PELO TECH LEAD
+
+Como PO experiente em level design e focado na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o minijogo **Pinball (pinball)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/pinball/TASKS/TASK_004.md):
+
+*   **O que foi feito**:
+    *   **Mesa Expandida Multinível (Upper Deck)**: Projetei a expansão espacial da mesa adicionando um andar superior (`y: 30` a `y: 130`) acessado por uma rampa helicoidal neon. A área possui 2 mini-flippers superiores acoplados aos botões principais e 3 alvos de hack ("Override Targets") que liberam o *Upper Deck Jackpot* (+2.500 pts).
+    *   **Obstáculos Magnéticos Gravitacionais (Mag-Traps / Vórtex)**: Introduzi 2 vórtex eletromagnéticos laterais no centro da mesa que capturam a bola por 1.5s, acelerando seu giro orbital em 360° com emissão de partículas ciano/magenta e disparando-a em super-velocidade ($1.8\times$).
+    *   **Modo Mago Ciberpunk (Cyberpunk Wizard Mode - "MATRIX OVERLOAD")**: Desenhei o clímax definitivo de febre arcade ativado ao derrotar o Boss + 2 Missões + Upper Jackpot. Durante 30 segundos, a mesa libera 4 bolas simultâneas em febre neon, fixa o multiplicador em 5x, ativa shader de chuva matricial (Matrix Rain) e modula a trilha sonora sintetizada para Synthwave a 160 BPM.
+    *   **Tabela de Recordes Local (High-Score Leaderboard & Badges)**: Implementei a persistência em `localStorage` para os 5 melhores recordes de todos os tempos com modal glassmorphic de 3 iniciais (estilo arcade retrô), datas e insígnias de conquistas (ex: 🛡️ *Boss Slayer*, 🎯 *Skill Master*, 🔮 *Wizard Master*, ⚡ *Multiball King*).
+
+*   **Percalços Técnicos Identificados (Recomendações)**:
+    1.  *Acoplamento de Controles dos Mini-Flippers*: Recomendado o acoplamento direto das teclas dos flippers principais (`Z`/`LeftArrow` e `RightArrow`) para controlar simultaneamente os flippers do Upper Deck, mantendo a jogabilidade intuitiva e minimalista.
+    2.  *Retorno de Segurança do Upper Deck*: A queda de bola no Upper Deck não deve penalizar vidas. O fluxo deságua diretamente na área central da mesa principal (`y: 140`) sobre os bumpers.
+    3.  *Tratamento de Performance do Shader Matrix Rain*: A chuva matricial é desenhada de forma leve no Canvas 2D limitando o array de partículas a no máximo 40 instâncias para garantir 60 FPS fluídos.
+    4.  *Fallback Gracioso de LocalStorage*: Em navegadores com restrições rígidas de privacidade ou modo anônimo, a rotina de recordes chaveia suavemente para um estado em memória sem emitir erros no console.
+
+*   **Transição de Status**: A nova especificação foi registrada com sucesso no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+### 35. Elaboração e Especificação de Level Design: Rede Neural Evolutiva (`TASK_004.md`)
+
+Como PO experiente em level design e focado no game feel, na interatividade tátil e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o minijogo **Rede Neural Evolutiva (rede_neural_evolutiva)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/rede_neural_evolutiva/TASKS/TASK_004.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Modo Duelo Humano vs IA (Human vs AI Race/Survival)**: Desenhei um modo de corrida e sobrevivência em tempo real onde o jogador humano assume o controle direto de um bloco (`Player Alpha` ciano brilhante com indicador flutuante `"YOU"`) controlado por `Espaço`/`Seta para Cima`/`W`. O humano compete simultaneamente na mesma pista contra a população de IA (ou contra o cérebro carregado da elite), com placar dinâmico de liderança e banner de vitória ao quebrar o recorde histórico.
+    *   **Mecanismo de Especiação por Nichos Ecológicos (NEAT Speciation & Island Model)**: Implementei a medição de distância genética $D(g_1, g_2)$ entre os pesos e vieses da MLP, agrupando a população em até 4 espécies genéticas com auras coloridas exclusivas (Ciano, Magenta, Esmeralda, Âmbar). Apliquei a partilha de fitness ($f'_i = f_i / \sqrt{N_{species}}$) para evitar a convergência prematura em mínimos locais e garantir diversidade genética continuada.
+    *   **Chefe Obstáculo Dinâmico ("Titanus Core")**: Projetei um evento de chefe arcade que surge a cada 1000 pontos acumulados. O robô obstáculo possui linha guia de aviso amarela subterrânea, feixe de plasma horizontal de 15px de altura e capacidade de fragmentação em mini-jumpers de velocidades alternadas, disparando alertas visuais e sonoros táticos (`"WARNING: TITANUS CORE APPROACHING"`).
+    *   **Visualizador de Topologia Neon 3D & Genetic Cluster Map 2D**: Atualizei o painel visualizador da rede neural para renderizar os neurônios em projeção 3D isométrica com feixes de luz neon pulsantes proporcionais à magnitude dos pesos ($|w|$), além de um minimapa de clusters 2D que plota a evolução e dispersão das espécies no espaço genético.
+    *   **Sintetizador de Áudio e Feedback de Combate**: Efeitos procedurais via Web Audio API para o pulso do humano, laser de plasma do chefe, alarme bitonal e fanfarra triunfal em escala maior de 4 notas.
+
+*   **Percalços Técnicos Identificados (Direcionamentos & Soluções)**:
+    1.  *Sincronização de FPS no Modo Duelo*: Ao ativar o Modo Duelo Humano vs IA, a velocidade de simulação é travada automaticamente em `1x` para evitar que a aceleração do jogo prejudique os tempo de reação do ser humano.
+    2.  *Paridade de Regras e Spectator Mode*: O jogador humano tem 1 vida por geração. Se ele colidir, permanece com 40% de opacidade espectando o restante da rodada da IA até a próxima geração recomeçar.
+    3.  *Estabilidade do Cluster Map*: A limitação fixada em 4 espécies neon garante clareza visual no minimapa sem sobrecarregar a UI ou causar confusão de cores.
+
+*   **Transição de Status**: A especificação foi integrada e registrada no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🎵 36. Elaboração e Especificação de Level Design: String Catcher (`TASK_004.md`)
+
+Como PO experiente em level design e focado no game feel, no feedback tátil, na imersão e na excelente experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o minijogo **String Catcher (visual_effects)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/visual_effects/TASKS/TASK_004.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Modo Campanha de Level Design Rítmico ("Synth Odyssey")**: Desenhei uma campanha temática artesanal de 5 fases (*Neon Genesis*, *Cyber Highway*, *Warp Acceleration*, *Quantum Glitch*, e *Cybernetic Kraken*) com curvas de aprendizado progressivas, Zonas Gravitacionais Warp (oscilação senoidal da velocidade das notas) e Glitch Inverted Notes.
+    *   **Batalha de Chefe Final ("Cybernetic Kraken")**: Projetei um chefe em 3 estágios com tentáculos bioluminescentes que bloqueiam cordas taticamente, barra de HP dedicada na HUD superior e desfecho viciante acionado pelo *Hyper Beam* do Overdrive.
+    *   **Editor Visual de Fases (Beatmap Studio & Creator)**: Criei uma suite modal/painel glassmorphism com timeline rítmica rolável (Grid Snapping em 1/4, 1/8, 1/16, BPM ajustável), paleta de pincéis de notas (Normal, Hold, Mina, Frenzy, Shield), Playtest instantâneo em 1 clique (`Espaço`) e exportação/importação de beatmaps em JSON simples.
+    *   **Sistema de Precisão Milimétrica (Hit Windows) & Offset Floaters**: Especifiquei a classificação matemática de acertos (🌟 *MARVELOUS* $\le \pm 22\text{ms}$, ✨ *PERFECT* $\le \pm 45\text{ms}$, 🎵 *GREAT* $\le \pm 80\text{ms}$, ❌ *MISS* $> 80\text{ms}$) com floaters visuais em tempo real indicando offset exato (ex: `-14ms` Early, `+9ms` Late) e Ranks finais de desempenho (S+, S, A, B, C, F).
+    *   **Mecânica de Super Carga OVERDRIVE**: Projetei a barra de carga ativada com 100% de energia, oferecendo 10s de pontuação quadruplicada (**4x**), Bullet-Time visual no canvas, emissão de ondas de plasma dourado e sub-bass sweep procedural sintetizado via Web Audio API.
+
+*   **Percalços Técnicos Identificados (Direcionamentos & Soluções)**:
+    1.  *Usabilidade do Editor em Telas Menores*: A timeline do Beatmap Studio pode ser extensa em notebooks/monitores compactos. Recomendei incluir um botão de toggle "Collapse Studio" para ocultar os seletores secundários e priorizar a visão do canvas das cordas.
+    2.  *Descarte Limpo de Hit Floaters*: Para manter a taxa de quadros travada em 60 FPS no Canvas 2D durante sequências densas de notas, a lista `activeHitFloaters` faz descarte automático de instâncias expiradas (`life <= 0`).
+    3.  *Persistência de Fases Customizadas*: Os mapas criados no editor usam chaveamento seguro no `localStorage` com tratamento de erro gracioso caso o armazenamento local atinja limites de quota.
+
+*   **Transição de Status**: A especificação foi devidamente registrada e integrada no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `✅ Refined`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🦠 37. Elaboração e Especificação de Level Design: Conway's Game of Life (`TASK_004.md`)
+
+Como PO experiente em level design, focado no game feel, interatividade e experiência do jogador, elaborei e criei formalmente a especificação técnica de **TASK_004** para o minijogo **Conway's Game of Life (gameoflife)** no arquivo [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/gameoflife/TASKS/TASK_004.md):
+
+*   **O que foi projetado e especificamente elaborado**:
+    *   **Simulação Multi-Espécies (Conway Bio-Wars - Eco-Territorial Rules)**: Criei mecânicas ecológicas de coexistência e competição espacial entre 3 espécies de células distintas (Ciano Neon `#00f3ff`, Magenta Neon `#ff00aa` e Dourado Neon `#ffcc00`). Adicionei voto de maioria para determinação da espécie no nascimento e assimilação territorial ("conquista") caso 4 ou mais vizinhos de uma única espécie adversária cerquem a célula. Inclui HUD com barra de biodiversidade e dominância populacional.
+    *   **Suíte de Pincéis Avançados (Automa Brush Suite)**: Desenhei novos seletores de pincel: Spray Caótico (distribuição aleatória em raio 1x1 a 5x5), Lançador de Gliders Orientável, Paredes Indestrutíveis (`grid[r][c] = 99` - obstáculo metálico com contorno neon que bloqueia contagem de vizinhos) e Borracha Neon Ativa.
+    *   **Filtros Neon Shaders & Pós-Processamento no Canvas**: Projetei opções estéticas como o Bloom Neon Glow (`ctx.filter`), Rastro de Fosfato Retiniano (CRT Motion Blur via `rgba(7, 9, 19, 0.22)`) e o Fundo Holográfico Matrix Rain com chuva binária.
+    *   **Importador e Exportador Universal RLE (LifeWiki Standard)**: Desenhei o parser e modal glassmorphic para colar arquivos no padrão `.rle` da comunidade global do Game of Life (descompactando repetições `b`, `o`, `$` e `!`), além de exportação direta do tabuleiro para RLE em 1 clique e download de Snapshot PNG.
+    *   **Áudio Adaptativo Multi-Espécies (Web Audio API Engine)**: Mapeei timbres sintetizados exclusivos para cada espécie (Senoidal para Ciano, Triangular para Magenta, Dente de Serra passa-baixa para Dourado) mantendo throttle de 120ms e limite de 4 vozes para prevenir cacofonia.
+
+*   **Percalços Técnicos Identificados & Soluções Recomendadas**:
+    1.  *Persistência de Paredes no Randomize*: Recomendo que o botão "Aleatório" preserve as paredes indestrutíveis desenhadas pelo jogador, preenchendo apenas células vivas nos espaços vazios, para permitir a criação de labirintos e batalhas territoriais estruturadas.
+    2.  *Imunidade das Paredes ao Buraco Negro*: Paredes indestrutíveis não devem ser devoradas pelo Buraco Negro da TASK_003, servindo como escudos táticos.
+    3.  *Exportação RLE x Multi-Espécies*: Como a especificação RLE padrão da LifeWiki lê apenas 2 estados (vivo/morto), a exportação RLE converterá todas as espécies para células vivas `o`. Para preservar os tipos e paredes, recomendei uma exportação secundária em formato JSON.
+
+*   **Transição de Status**: A tarefa foi inserida no backlog global [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status inicial `📋 Backlog` para ser puxada e refinada na esteira de desenvolvimento.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🎯 38. Elaboração e Criação de Nova Tarefa: 3D Shooter (`TASK_005.md`)
+
+Como PO experiente em jogos, focado em melhores práticas de level design e priorizando a experiência e imersão do jogador, elaborei e criei formalmente a especificação técnica da **TASK_005** para o minijogo **3D Shooter (3d_shooter)** no arquivo [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/3d_shooter/TASKS/TASK_005.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Modo Arena Survival por Ondas (Wave Survival Mode)**: Introdução de um modo de sobrevivência selecionável no menu inicial com escalada de dificuldade por ondas (1 a 10+), arena dedicada 24x24 com colunas de cobertura e geradores de spawn neon, 10s de fase de preparação entre ondas com spawn de kits médicos e munições, e HUD Glassmorphic com contagem de inimigos e combos.
+    *   **Inimigos Voadores Drones Anti-Gravidade (Tipo 13)**: Novo tipo de monstro voador com oscilação senoidal de altura no motor Raycaster DDA (`spriteYOffset`), movimentação helicoidal evasiva para desviar de mísseis e ataque com disparo duplo de lasers ciano paralelos.
+    *   **Elevadores Físicos de Nível (Tile Tipo 14)**: Plataformas de elevação que elevam a altura da visão e câmera do jogador (`player.eyeZ` de 0.0 a 1.2 unidades), permitindo vantage points elevados (*High Ground Advantage*) para disparar por cima de paredes da arena e acessar pickups estratégicos.
+    *   **Chefe Colossal "Cyber-Demon Core" (Multistage Boss)**: Batalha em 3 fases: Fase 1 (Escudo Hexagonal Defletor que exige destruir 2 geradores nos elevadores), Fase 2 (Mísseis termoguiados e Onda de Choque Sísmica de solo que força o jogador a saltar ou subir no elevador), e Fase 3 (Modo Berserker vermelho neon com varredura contínua de Hyper-Beam).
+    *   **Áudio Procedural via Web Audio API**: Zumbidos de levitação de drones, ruído mecânico de elevador subindo, rugido/onda de choque do boss e fanfarra triunfal de conclusão de onda sem carregar assets externos.
+
+*   **Percalços Técnicos Identificados & Soluções Recomendadas**:
+    1.  *Matemática de Y-Offset no Raycaster*: A introdução de elevadores (`player.eyeZ`) e drones voadores (`sprite.yOffset`) exige que o algoritmo `renderSprites()` calcule o deslocamento vertical proporcional à distância do raio (`transformY`), garantindo que o drone pareça voar acima do solo sem distorção perspectiva.
+    2.  *Evitando Furos no High Ground*: Quando o jogador se eleva no elevador ($eyeZ = 1.2$), paredes de 1.0 unidade de altura devem permitir visão por cima. O algoritmo de rendering do Raycasting deve desenhar o topo das paredes baixas quando vistas de cima para evitar vazamento visual no frustum.
+    3.  *Persistência de High Score*: Criada a chave `3dShooterSurvivalHighScore` no `localStorage` para salvar o recorde de onda e pontuação máxima do jogador.
+
+*   **Transição de Status**: A tarefa foi inserida com sucesso no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🐉 39. Elaboração e Especificação de Level Design: RPG Adventure Quest (`TASK_005.md`)
+
+Como PO experiente em level design e focado na imersão, game feel e retenção do jogador, elaborei e criei formalmente a especificação técnica de **TASK_005** para o jogo **RPG Adventure Quest (ded)** no arquivo [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_005.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Sistema de Companheiros/Mascotes de Combate (Pet System)**: Adote 3 tipos de companheiros no Santuário Ancestral: Coruja Arcana (Aethelgard - regeneração de Mana e Visão Astral), Lobo das Sombras (Fenris - ataques automáticos por turno e Mordida Dilacerante) e Golem de Pedra (Granite - absorção de dano físico e Provocação Rochosa). HUD dedicada ao lado do painel de combate com barra de energia e cooldown de habilidade ativa.
+    *   **Laboratório de Alquimia & Forja de Runas (Crafting System)**: Coleta de ingredientes rúnicos (*Erva Sangrenta*, *Pó Arcano*, *Minério de Obscuriana*, *Escama de Vulcano*) para forjar Elixires de Vida, Poções de Fúria e Encantamentos Rúnicos de Fogo/Proteção na modal glassmorphic de Crafting (`#crafting-modal`).
+    *   **Masmorra Volcânica & Batalha contra Pyrothrax**: Expansão do minimapa com 3 novas cenas em ambiente vulcânico (Ponte de Basalto com teste de DES, Ninho de Vivernes e Covil do Dragão). Batalha multi-fase contra o chefe *Pyrothrax, o Flagelo de Magma* (150 HP), com sopro de chamas telegrafado e modo Berserker com faíscas incandescentes no teto.
+    *   **Partículas & Sintetizador Web Audio API**: Motor de partículas de brasas incandescentes flutuando no Canvas, martelada de forja sintetizada, rugido grave de dragão ($120\text{Hz} \to 50\text{Hz}$), sopro de fogo e efeitos vocais nativos dos mascotes.
+
+*   **Percalços Técnicos Identificados & Soluções Recomendadas**:
+    1.  *Gestão de Inventário*: Para evitar poluição dos slots limitados de poções/equipamentos de combate do jogador, recomendei que os ingredientes de crafting sejam mantidos em uma estrutura separada (`gameState.crafting.materials`).
+    2.  *Troca de Mascotes no Santuário*: O jogador pode retornar ao nó `pet_sanctuary` para alterar seu companheiro livremente fora de combate, com a ressalva de que a lealdade/cooldown do novo mascote é iniciada do zero para evitar exploits de troca imediata.
+    3.  *Visual Incandescente no Minimapa*: Nós da Masmorra Volcânica devem ser renderizados no minimapa SVG com bordas de neon carmesim pulsante para alertar o jogador sobre o nível extremo de perigo.
+
+*   **Transição de Status**: A nova especificação foi registrada e inserida com sucesso no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🛸 40. Elaboração e Criação de Nova Tarefa: Space Shooter (`TASK_005.md`)
+
+Como PO experiente em jogos, focado em melhores práticas de level design, game feel e na experiência do jogador, elaborei e criei formalmente a especificação técnica da **TASK_005** para o minijogo **Space Shooter (space_shooter)** no arquivo [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_005.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Sistema de Drones Orbitais de Apoio (Wingman Support Drones)**: Adição da aba "Drones de Apoio" no Hangar permitindo equipar até 2 drones simultâneos (1 Aegis + 1 Striker) com órbita circular trigonométrica em torno da nave ($R = 45\text{px}, \omega = 2.0\text{rad/s}$). O Drone Aegis intercepta projéteis inimigos em um raio de $25\text{px}$ ativando ondas de dispersão e o Drone Striker dispara lasers automatizados a cada $800\text{ms}$ contra o alvo de menor HP.
+    *   **Modo Swarm Siege (Invasão de Enxames Xenomórficos)**: Introdução de ondas massivas de 12 a 24 mini-drones (*Xeno Swarmers*) com IA de bando baseada nas equações de Craig Reynolds (Separação, Coesão e Alinhamento) aliada a atração ao jogador. Explosões em cadeia geram floaters de combo neon e juiciness em tempo real.
+    *   **Chefe Titânico "Star-Devourer Leviathan" (Boss Fight Modular)**: Batalha modular em 3 fases com sub-partes destrutíveis independentes (Asa Esquerda $150\text{ HP}$, Asa Direita $150\text{ HP}$ e Núcleo Central $350\text{ HP}$ protegido por escudo holográfico invulnerável até a destruição de ambas as asas). Quando o núcleo atinge $<40\%\text{ HP}$, ativa o *Vórtice Abissal* telegrafado com repulsão magnética.
+    *   **Áudio Procedural com Web Audio API**: Síntese analógica nativa sem dependência de assets para absorção de escudo, laser duplo do drone striker, explosão de boids em cadeia e queda de tom sub-grave ($150\text{Hz} \to 30\text{Hz}$) ao quebrar partes do chefe.
+
+*   **Percalços Técnicos Identificados & Soluções Recomendadas**:
+    1.  *Desempenho de Boids Flocking*: O cálculo de distância $O(N^2)$ para 24 boids no DOM pode impactar a taxa de quadros em navegadores legados. Recomendo limitar o raio de vizinhança a $80\text{px}$ e utilizar throttle de amostragem de vizinhos em frames alternados.
+    2.  *Órbita Trigonômétrica dos Drones*: Para evitar travamentos ao pausar o jogo ou redimensionar a tela, o cálculo do ângulo orbital usa delta de tempo normalizado (`timestamp * 0.003`) acoplado ao loop principal `requestAnimationFrame`.
+    3.  *Persistência de Drones no LocalStorage*: Os estados `spaceShooterUnlockedDrones` e `spaceShooterActiveDrones` foram padronizados em arrays JSON serializados de forma compatível com a economia existente `spaceShooterCoins`.
+
+*   **Transição de Status**: A nova especificação foi registrada e inserida com sucesso no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🏎️ 41. Elaboração e Especificação de Level Design: Driving Simulator (`TASK_005.md`)
+
+Como PO experiente em jogos, focado em melhores práticas de level design, game feel e na jornada do jogador, elaborei e criei formalmente a especificação técnica da **TASK_005** para o minijogo **Driving Simulator (driving_simulator)** no arquivo [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_005.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Sistema de Pistas Temáticas Multi-Bioma (Multi-Track Level Design)**: Projetei a expansão do jogo com 3 pistas temáticas selecionáveis no menu/garagem:
+        *   *Pista 1: Neon City Flyovers (Metrópole Cyberpunk)*: Viadutos 3D elevados (`y = 15`), curvas inclinadas e Boost Pads neon ciano (+40% velocidade instantânea).
+        *   *Pista 2: Vulcano Ridge Pass (Cânion Vulcânico)*: Terreno acidentado com poças de lava incandescentes (dano contínuo de -15% integridade/s e fumaça preta) e queda de rochas abrasivas (Rockfall Hazards) telegrafadas por sombras no solo.
+        *   *Pista 3: Sub-Zero Glacier Sprint (Passagem da Geleira)*: Pista em túneis de gelo reflexivo (`roughness = 0.05`) reduzindo a aderência em 60%, paredes de gelo cristalino destruíveis por Nitro para revelar atalhos ocultos e tempestade de neve (Blizzard FX).
+    *   **Personalização Visual no Hangar 3D (Visual Tuning System)**: Especifiquei a adição de luzes *Neon Underglow* sob o chassi (com paleta Ciano, Magenta, Matrix, Dourado e ciclo RGB), *Spoilers 3D equipáveis* (*Sport Wing*, *Cyber GT* e *Titan Dual-Blade*) e *Acabamentos de Lataria* (Fosco, Brilhante e Metálico Cromado) com persistência em `localStorage`.
+    *   **Combate Veicular Tático & Takedowns Cinemáticos (Burnout Takedown Engine)**: Criei a mecânica de *Side Slam* (teclas `Q`/`E` para empurrão lateral) que, ao colidir rivais ou viaturas contra muretas ou perigos do cenário, aciona Bullet-Time de 600ms (`timeScale = 0.3`), tremor direcional de câmera, faíscas neon e bônus de +50% Nitro + 500 moedas.
+    *   **Batalha contra Chefe Colossal "Titan Rig" (18-Wheeler Boss Fight)**: Desenhei a batalha final contra um caminhão blindado gigante com barra de vida de 100 HP na HUD, que ataca com minas magnéticas, manchas de óleo em chamas e abalroamentos. O jogador deve desferir *Side Slams* nos tanques laterais de combustível energizados destacados em neon vermelho.
+    *   **Trilha Sonora Adaptativa Procedural Synthwave (Web Audio API Engine)**: Projetei a geração sonora em tempo real sem assets para linha de baixo pulsante em colcheias a 130 BPM, arpejos senoidais Synthwave adaptativos à velocidade, bateria sintetizada analógica e filtro de áudio abafado (*Muffle Filter*) durante derrapagens.
+
+*   **Percalços Técnicos Identificados & Soluções Recomendadas**:
+    1.  *Descarte Limpo de Fragmentos de Gelo*: Ao destruir barreiras de gelo na pista da geleira, o loop de animação deve invocar obrigatoriamente `.dispose()` em geometrias e materiais para prevenir vazamentos de memória no WebGL.
+    2.  *Desempenho da Síntese Synthwave*: A geração de múltiplos osciladores e envelopes em tempo real pode sobrecarregar threads de CPU em navegadores com hardware reduzido. Recomendei adicionar a opção "Áudio Synth: Alto / Baixo" no menu para atenuar vozes secundárias se necessário.
+    3.  *Persistência da Garagem Customizada*: A chave `driving_custom_garage` no `localStorage` serializa com segurança os estados visuais dos veículos sem interferir na carteira de moedas existente.
+
+*   **Transição de Status**: A nova especificação foi registrada e inserida com sucesso no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+---
+
+## 🚁 42. Elaboração e Especificação de Level Design: Voxel City (`TASK_005.md`)
+
+Como PO experiente em jogos, focado nas melhores práticas de level design e na primazia da experiência do jogador, elaborei e criei formalmente a especificação técnica da **TASK_005** para o minijogo **Voxel City (voxel_city)** no arquivo [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/voxel_city/TASKS/TASK_005.md):
+
+*   **O que foi projetado e especificado**:
+    *   **Pilotagem Aérea com Helicóptero Voxel (Air Operations & Helipad 🚁)**: Introduzi a navegação no eixo `Y` com o controle de altitude, guinada e inclinação do Helicóptero de Resgate Voxel 3D. O helicóptero possui rotores animados em tempo real, holofote de busca ciano orientável (`THREE.SpotLight`) e acesso pelo heliponto do arranha-céu central.
+    *   **Caminhão Guincho & Cabo Magnético (Tow Truck & Magnet Crane 🚛🧲)**: Adicionei o veículo de resgate veicular com cabo estendível de partículas e ímã ativável (`Shift` / `Espaço`) para rebocar carros civis quebrados até a Garagem Central em missões de resgate remuneradas (`+ $400 TOW BONUS`).
+    *   **Purga de Nitro Neon & Vácuo Aerodinâmico (Slipstream / Drafting 💨⚡)**: Projetei a manobra de purga visual de fumaça neon (`Tecla F`) para conceder tração limpa e aceleração inicial de 1.5s, além do vácuo aerodinâmico ao colar atrás de carros civis (ganho de +20% velocidade máxima e recarga 50% mais rápida do Nitro).
+    *   **Modo Desastre Urbano (Incêndios & Terremoto 🔥🏗️)**: Eventos aleatórios a cada 120s com sirene e foco de fogo neon nos edifícios voxel. O jogador combate o incêndio com o canhão de água 3D do Caminhão de Bombeiros ou com o balde de água do Helicóptero antes que a integridade da estrutura zere.
+    *   **Sintetizador de Áudio Procedural Web Audio API Engine**: Síntese procedural nativa para pás de helicóptero modulando ruído rosa via LFO ($8\text{Hz} \to 16\text{Hz}$), sopro de purga de ar comprimido, jorro pressurizado de água e sirene bitonal.
+
+*   **Percalços Técnicos Identificados & Soluções Recomendadas**:
+    1.  *Alcance de Câmera e Frustum de Visão Aérea*: A altitude de voo ($Y \approx 45$) pode cortar edifícios se `camera.far` for curto. Recomendei estender suavemente `camera.far = 500` e `scene.fog.far = 400` durante a pilotagem aérea.
+    2.  *Física de Colisão de Aeronaves*: Para evitar mortes punitivas, colisões aéreas em prédios causam ricochete elástico com perda de 20 HP e faíscas neon em vez de falha imediata.
+    3.  *Pool de Partículas de Água e Fogo*: O canhão de água reutiliza um buffer fixo de 250 instâncias de `THREE.Points` para manter a taxa de quadros em 60 FPS cravados.
+
+*   **Transição de Status**: A nova especificação foi registrada e inserida com sucesso no backlog central [BACKLOG.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/BACKLOG.md) no status `📋 Backlog`.
+
+*Assinado: Antigravity - Senior Game Product Owner (PO)*
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

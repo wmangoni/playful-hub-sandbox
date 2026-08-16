@@ -444,3 +444,39 @@ Todos os vazamentos de memória críticos foram solucionados seguindo as melhore
 *Status: 🚀 Ready for QA*
 *Responsável: Tech Lead (TL) - Antigravity*
 
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3096)  
+*Script de Automação:* `tests/qa_driving_simulator_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Level Design Interativo (Obstáculos e Rampas)**:
+   - 15 cones destrutíveis instanciados com física de colisão elástica, rotação angular, fade-out e pooling/respawn dinâmico à frente.
+   - 5 poças de óleo no asfalto causando spin-out de 360° por 1.2s com bloqueio momentâneo de controle e corte de 50% de velocidade.
+   - 3 rampas neon acionando voo parabólico realista, efeito **Bullet-Time** (`timeScale = 0.4`), tremor de câmera e faíscas no pouso.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Sistema de Ciclo de Gameplay (Dano, Combustível e Pit Stops)**:
+   - Integridade (`playerHealth`) sofrendo dano por colisões; emissão de fumaça cinza <50% e fogo com penalidade de velocidade <25%.
+   - Drenagem de combustível por aceleração e redução para marcha lenta a 0%.
+   - Pit Stop Pad no acostamento com anéis luminosos reparando e reabastecendo (+25%/s) com feedback visual de cura.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Modo Time Trial e Ghost Car Replay**:
+   - Seleção de modo (*Coleta de Moedas* vs *Time Trial*) na garagem.
+   - Gravação frame-a-frame de posições e rotação do jogador durante a volta rápida.
+   - Carro fantasma holográfico ciano semitransparente (`THREE.AdditiveBlending`) reproduzindo com precisão a volta recorde anterior.
+   - Persistência do melhor tempo (`bestLapTime`) em `localStorage`.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Gerenciamento de Memória e Estabilidade WebGL**:
+   - Pooling de cones e descarte explícito (`.dispose()`) de geometrias e materiais dinâmicos.
+   - $0$ erros no console do navegador durante o loop a 60 FPS.
+   - **Resultado:** ✅ Aprovado.
+
+

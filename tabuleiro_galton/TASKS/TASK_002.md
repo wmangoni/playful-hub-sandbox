@@ -186,4 +186,43 @@ Antes de passarmos à codificação da tarefa, precisamos sanar algumas dúvidas
 - [x] Modelagem de Distribuições Binomiais Assimétricas, Bimodais e Uniformes definida.
 - [x] Arquitetura de UI e integração dos controles físicos projetada.
 
-**Status**: `Refined`
+---
+
+## 🧪 Resultado dos testes
+
+**Data**: 15/08/2026  
+**Analista de QA**: QA Agent  
+**Ambiente de Testes**: Navegador Headless Chrome (Puppeteer v25.1.0) / `tabuleiro_galton/index.html`  
+**Resultado Geral**: ✅ **Aprovado** (`🎉 Ready for Deploy`)
+
+---
+
+### 📷 Evidências de Testes (Browser Testing Results)
+
+#### 1. Sobreposição da Curva de Gauss Teórica
+* **Critério de Aceitação**: Linha neon contínua sobreposta às colunas coletoras de esferas, com altura do pico central dinamicamente proporcional ao total de esferas acumuladas.
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * A função `drawGaussianCurve()` renderiza a curva verde neon (`#00ffcc`) com sombra em tempo real sobre o Canvas 2D.
+  * A densidade probabilística $P(x)$ e a escala vertical ($Scale_Y$) adaptam-se reativamente à quantidade acumulada de bolinhas coletadas nas 16 colunas.
+  * O checkbox `#showGaussCheck` alterna a visibilidade da curva perfeitamente.
+
+#### 2. Configuração de Distribuições Alternativas
+* **Critério de Aceitação**: Slider de distribuição binomial assimétrica (10% a 90% de chance para direita, padrão 50%), seleção de layouts alternativos (Bimodal / Uniforme).
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * O slider `#probSlider` atualizou para 80% (`probabilityRight: 0.8`), alterando a distribuição da colisão física esfera-pino com viés para a direita.
+  * O seletor `#layoutSelector` mudou para `bimodal` (`pegsCount: 143`), gerando a geometria de dois picos triangulares e canaletas centrais.
+
+#### 3. Sliders de Parâmetros de Física
+* **Critério de Aceitação**: Sliders para controle de Gravidade (0.1x a 3.0x), Elasticidade/Rebote (0% a 100%) e Diâmetro da Esfera (3px a 10px).
+* **Resultado do Teste**: ✅ **Sucesso**
+* **Evidência Observada**:
+  * Slider `#gravitySlider` alterado para 2.0x -> `gravityMultiplier: 2.0` (aceleração de queda duplicada).
+  * Slider `#elasticitySlider` alterado para 80% -> Coeficiente de restituição `restitution: 0.8` (rebote elástico intensificado).
+  * Slider `#radiusSlider` alterado para 7px -> Raio das bolinhas atualizado para `7px`.
+
+---
+
+### 🚀 Conclusão
+A implementação em `tabuleiro_galton/index.html` cumpre todos os critérios de aceitação estatísticos e de física. Tarefa aprovada em QA e promovida para `🎉 Ready for Deploy`.

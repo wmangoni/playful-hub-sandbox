@@ -399,3 +399,37 @@ Abaixo estão homologadas as resoluções técnicas para execução direta:
 - Exposição das variáveis e utilitários em `window.__arena`.
 - Status no `BACKLOG.md` atualizado para `Completed`.
 
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3095)  
+*Script de Automação:* `tests/qa_voxel_arena_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Chefe Colosso Voxel (Batalha Final de 3 Fases)**:
+   - Spawn e modelo gigante em escala $4.5\times$ com barra de HP dedicada no topo da tela.
+   - *Fase 1*: 3 Cristais Orbitais aplicam $90\%$ de redução de dano ao chefe até serem quebrados.
+   - *Fase 2*: Transição para ataque Hyperbeam canalizado com laser rotativo de 180°.
+   - *Fase 3*: Modo Overdrive Enraivecido abaixo de $35\%$ de HP, aumento de velocidade ($+55\%$), núcleo vermelho e geração de servos.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Armadilhas Ambientais Ativas (Active Hazards)**:
+   - *Lava Geysers*: Círculos de aviso piscante e colunas ativas de fogo com dano periódico a qualquer entidade no raio.
+   - *Gravity Nexus*: Fenda singular central com atração física gravitacional inversa sobre o jogador e entidades.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Game Feel & Feedback de Impacto**:
+   - *Hitstop*: Congelamento de $80\text{ms}$ no loop de simulação ao deferir/receber golpes de alto impacto.
+   - *Tremor de Câmera Direcional*: Offset direcional exponencial decrescente via `ScreenShakeManager`.
+   - *Números de Dano Flutuantes*: Popups 3D projetados no DOM com estilos diferenciados (Ciano, Crítico Ouro e Alerta Vermelho).
+   - **Resultado:** ✅ Aprovado.
+
+4. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+
+

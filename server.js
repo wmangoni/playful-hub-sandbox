@@ -129,6 +129,8 @@ createHtmlRoute('/jogos/tabuleiro_galton', 'jogos/tabuleiro_galton.html');
 createHtmlRoute('/jogos/pinball', 'jogos/pinball.html');
 createHtmlRoute('/jogos/voxel_city', 'jogos/voxel_city.html');
 createHtmlRoute('/jogos/rede_neural_evolutiva', 'jogos/rede_neural_evolutiva.html');
+createHtmlRoute('/jogos/voxel_arena', 'jogos/voxel_arena.html');
+createHtmlRoute('/jogos/threejs_earth', 'jogos/threejs_earth.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -152,6 +154,8 @@ createHtmlRoute('/chess', 'chess/index.html');
 createHtmlRoute('/lazy_gardner', 'lazy_gardner/index.html');
 createHtmlRoute('/voxel_city', 'voxel_city/index.html');
 createHtmlRoute('/rede_neural_evolutiva', 'rede_neural_evolutiva/index.html');
+createHtmlRoute('/voxel_arena', 'voxel_arena/index.html');
+createHtmlRoute('/threejs-earth-main', 'threejs-earth-main/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
