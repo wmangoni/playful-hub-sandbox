@@ -383,12 +383,20 @@
         const GRID_CELL = 64;
         const TWO_PI = Math.PI * 2;
 
+        function rgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+        }
+
         const CONFIG = {
             player: { radius: 16, maxHp: 100, speed: 220, hitCooldown: 0.7, collectRadius: 90 },
             skeleton: { radius: 14, hp: 20, speed: 62, damage: 6 },
             maxEnemies: 320,
             maxProjectiles: 200,
             maxOrbs: 400,
+            maxDamageZones: 48,
             spawnBase: 1.8,
             spawnMin: 0.25,
             orbValue: 1,
@@ -396,8 +404,11 @@
         };
 
         const WEAPONS = {
-            sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, icon: '⚔️' },
-            bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, icon: '🏹' }
+            sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, icon: '⚔️', color: '#ffcf82' },
+            axe: { name: 'Machado', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, icon: '🪓', color: '#ff8a72' },
+            bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, icon: '🏹', color: '#bfe6ff' },
+            crossbow: { name: 'Besta', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, icon: '🎯', color: '#7df0ff' },
+            holy_water: { name: 'Água Benta', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, icon: '🧪', color: '#b78aff' }
         };
 
         const PASSIVES = {
@@ -489,6 +500,7 @@
         const damageTexts = [];
         const projectiles = [];
         const xpOrbs = [];
+        const damageZones = [];
         const grid = new Map();
         let levelupOptions = [];
 
@@ -525,7 +537,7 @@
 
         function initProjectilePool() {
             for (let i = 0; i < CONFIG.maxProjectiles; i++) {
-                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, alive: false });
+                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', pierce: false, hits: null, alive: false });
             }
         }
 
@@ -535,12 +547,19 @@
             }
         }
 
+        function initDamageZonePool() {
+            for (let i = 0; i < CONFIG.maxDamageZones; i++) {
+                damageZones.push({ x: 0, y: 0, radius: 0, damage: 0, duration: 0, timer: 0, tick: 0, color: '#fff', alive: false });
+            }
+        }
+
         function makeWeapon(id) {
             const c = WEAPONS[id];
             return {
                 id: id, level: 1, maxLevel: c.maxLevel,
                 damage: c.damage, interval: c.interval, count: c.count,
-                range: c.range || 0, projectileSpeed: c.projectileSpeed || 0,
+                range: c.range || 0, area: c.area || 0, duration: c.duration || 0,
+                projectileSpeed: c.projectileSpeed || 0, pierce: !!c.pierce,
                 timer: 0, animTimer: 0
             };
         }
@@ -552,7 +571,8 @@
             w.damage = c.damage * (1 + (w.level - 1) * 0.3);
             w.interval = c.interval * Math.max(0.65, 1 - (w.level - 1) * 0.03);
             if (c.range) w.range = c.range * (1 + (w.level - 1) * 0.08);
-            if (w.id === 'bow') w.count = c.count + Math.floor((w.level - 1) / 3);
+            if (c.area) w.area = c.area * (1 + (w.level - 1) * 0.1);
+            if (w.id === 'bow' || w.id === 'crossbow' || w.id === 'holy_water') w.count = c.count + Math.floor((w.level - 1) / 3);
         }
 
         function nextLevelXP(level) {
@@ -609,6 +629,7 @@
             for (const e of enemies) e.alive = false;
             for (const p of projectiles) p.alive = false;
             for (const o of xpOrbs) o.alive = false;
+            for (const z of damageZones) z.alive = false;
             particles.length = 0;
             damageTexts.length = 0;
             levelupOptions = [];
@@ -755,10 +776,10 @@
         }
 
         function fireWeapon(w) {
-            if (w.id === 'sword') {
+            const c = WEAPONS[w.id];
+            if (c.behavior === 'melee-horizontal') {
                 if (audio) audio.play('sword');
                 w.animTimer = 0.22;
-                const c = WEAPONS.sword;
                 const range = w.range * player.stats.area;
                 const dmg = w.damage * player.stats.might;
                 const arcHalf = c.arcHalf;
@@ -778,10 +799,54 @@
                         hitEnemy(e, dmg, (dx / dist) * knockback, (dy / dist) * knockback);
                     }
                 }
-            } else if (w.id === 'bow') {
+            } else if (c.behavior === 'nearest-projectile') {
                 if (audio) audio.play('shoot');
                 const t = nearestEnemy();
                 if (t) spawnProjectiles(w, t);
+            } else if (c.behavior === 'random-area') {
+                if (audio) audio.play('holy');
+                spawnHolyWater(w);
+            }
+        }
+
+        function spawnHolyWater(w) {
+            const dmg = w.damage * player.stats.might;
+            const radius = w.area * player.stats.area;
+            for (let i = 0; i < w.count; i++) {
+                const z = damageZones.find(function (x) { return !x.alive; });
+                if (!z) break;
+                const ang = Math.random() * TWO_PI;
+                const dist = 40 + Math.random() * 130;
+                z.x = player.x + Math.cos(ang) * dist;
+                z.y = player.y + Math.sin(ang) * dist;
+                z.radius = radius;
+                z.damage = dmg;
+                z.duration = w.duration;
+                z.timer = 0;
+                z.tick = 0;
+                z.color = WEAPONS[w.id].color;
+                z.alive = true;
+            }
+        }
+
+        function updateDamageZones(dt) {
+            for (const z of damageZones) {
+                if (!z.alive) continue;
+                z.timer += dt;
+                z.tick -= dt;
+                if (z.timer >= z.duration) { z.alive = false; continue; }
+                if (z.tick <= 0) {
+                    z.tick = 0.5;
+                    for (const e of queryRange(z.x, z.y, z.radius + CONFIG.skeleton.radius)) {
+                        if (!e.alive) continue;
+                        const dx = e.x - z.x;
+                        const dy = e.y - z.y;
+                        const r = z.radius + e.radius;
+                        if (dx * dx + dy * dy < r * r) {
+                            hitEnemy(e, z.damage, 0, 0);
+                        }
+                    }
+                }
             }
         }
 
@@ -816,6 +881,9 @@
                 p.damage = dmg;
                 p.radius = 5;
                 p.life = 1.4;
+                p.pierce = w.pierce;
+                p.color = WEAPONS[w.id].color;
+                p.hits = [];
                 p.alive = true;
             }
         }
@@ -864,13 +932,18 @@
                 }
                 for (const e of queryRange(p.x, p.y, p.radius + CONFIG.skeleton.radius)) {
                     if (!e.alive) continue;
+                    if (p.hits && p.hits.indexOf(e) !== -1) continue;
                     const dx = e.x - p.x;
                     const dy = e.y - p.y;
                     const r = p.radius + e.radius;
                     if (dx * dx + dy * dy < r * r) {
                         hitEnemy(e, p.damage, p.vx * 0.06, p.vy * 0.06);
-                        p.alive = false;
-                        break;
+                        if (p.pierce) {
+                            p.hits.push(e);
+                        } else {
+                            p.alive = false;
+                            break;
+                        }
                     }
                 }
             }
@@ -1159,6 +1232,7 @@
             rebuildGrid();
             updateWeapons(dt);
             updateProjectiles(dt);
+            updateDamageZones(dt);
             updateXPOrbs(dt);
             updatePlayerCollisions();
             separateEnemies();
@@ -1198,28 +1272,50 @@
             ctx.shadowBlur = 0;
         }
 
-        function drawSwordArc() {
-            const w = player.weapons.find(function (x) { return x.id === 'sword'; });
-            if (!w || w.animTimer <= 0) return;
-            const t = 1 - w.animTimer / 0.22;
-            const range = w.range;
-            const arcHalf = WEAPONS.sword.arcHalf;
-            const sx = player.x - camera.x;
-            const sy = player.y - camera.y;
-            const alpha = (1 - t) * 0.16;
-            ctx.save();
-            ctx.shadowColor = 'rgba(255, 190, 120, 0.45)';
-            ctx.shadowBlur = 6;
-            ctx.fillStyle = 'rgba(255, 205, 130, ' + alpha + ')';
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.arc(sx, sy, range, player.facing - arcHalf, player.facing + arcHalf);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 230, 190, ' + (alpha * 0.55) + ')';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.restore();
+        function drawMeleeArcs() {
+            for (const w of player.weapons) {
+                const c = WEAPONS[w.id];
+                if (c.behavior !== 'melee-horizontal' || w.animTimer <= 0) continue;
+                const t = 1 - w.animTimer / 0.22;
+                const range = w.range * player.stats.area;
+                const arcHalf = c.arcHalf;
+                const sx = player.x - camera.x;
+                const sy = player.y - camera.y;
+                const alpha = (1 - t) * 0.16;
+                ctx.save();
+                ctx.shadowColor = rgba(c.color, 0.45);
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = rgba(c.color, alpha);
+                ctx.beginPath();
+                ctx.moveTo(sx, sy);
+                ctx.arc(sx, sy, range, player.facing - arcHalf, player.facing + arcHalf);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = rgba(c.color, alpha * 0.55 + 0.08);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function drawDamageZones() {
+            for (const z of damageZones) {
+                if (!z.alive) continue;
+                const sx = z.x - camera.x;
+                const sy = z.y - camera.y;
+                const a = Math.max(0.08, 0.3 * (1 - z.timer / z.duration));
+                ctx.save();
+                ctx.globalAlpha = a;
+                ctx.fillStyle = z.color;
+                ctx.beginPath();
+                ctx.arc(sx, sy, z.radius, 0, TWO_PI);
+                ctx.fill();
+                ctx.strokeStyle = z.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
         }
 
         function drawOrbs() {
@@ -1240,18 +1336,18 @@
 
         function drawProjectiles() {
             ctx.save();
-            ctx.shadowColor = 'rgba(150, 210, 255, 0.7)';
-            ctx.shadowBlur = 6;
             for (const p of projectiles) {
                 if (!p.alive) continue;
                 const sx = p.x - camera.x;
                 const sy = p.y - camera.y;
                 const ang = Math.atan2(p.vy, p.vx);
-                ctx.fillStyle = '#d7f0ff';
+                ctx.shadowColor = rgba(p.color, 0.7);
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = p.color;
                 ctx.beginPath();
                 ctx.arc(sx, sy, p.radius, 0, TWO_PI);
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(190, 230, 255, 0.6)';
+                ctx.strokeStyle = rgba(p.color, 0.6);
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(sx - Math.cos(ang) * 10, sy - Math.sin(ang) * 10);
@@ -1287,8 +1383,8 @@
             const sy = player.y - camera.y;
             const size = 64;
             let img, anim;
-            const sw = player.weapons.find(function (x) { return x.id === 'sword'; });
-            if (sw && sw.animTimer > 0) {
+            const meleeActive = player.weapons.some(function (w) { return WEAPONS[w.id].behavior === 'melee-horizontal' && w.animTimer > 0; });
+            if (meleeActive) {
                 img = images[ASSETS.playerAttack];
                 anim = ANIMS.attack;
             } else if (player.moving) {
@@ -1351,7 +1447,8 @@
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             drawGround();
             drawOrbs();
-            drawSwordArc();
+            drawDamageZones();
+            drawMeleeArcs();
             drawEnemies();
             drawPlayer();
             drawProjectiles();
@@ -1413,6 +1510,7 @@
                 if (ctx.state === 'suspended') ctx.resume();
                 if (name === 'sword') noiseSweep(0.18, 0.22, 'bandpass', 900, 250);
                 else if (name === 'shoot') tone('square', 700, 200, 0.08, 0.12);
+                else if (name === 'holy') noiseSweep(0.4, 0.2, 'lowpass', 700, 150);
                 else if (name === 'hit') tone('square', 220, 90, 0.07, 0.15);
                 else if (name === 'death') noiseSweep(0.3, 0.2, 'lowpass', 800, 120);
                 else if (name === 'hurt') tone('sawtooth', 140, 50, 0.25, 0.25);
@@ -1440,6 +1538,7 @@
         initEnemyPool();
         initProjectilePool();
         initOrbPool();
+        initDamageZonePool();
         audio = initAudio();
         setStatus('menu');
         requestAnimationFrame(gameLoop);
