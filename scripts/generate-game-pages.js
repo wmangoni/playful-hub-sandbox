@@ -450,6 +450,50 @@ const gamesData = {
         ],
         tags: ['3D', 'Voxel', 'Arena', 'Ação', 'Sobrevivência', 'Hack n Slash'],
         relatedGames: ['voxel_city', '3d_shooter', 'archer']
+    },
+    'rede_neural_evolutiva': {
+        title: 'Rede Neural Evolutiva',
+        description: 'Assista a uma rede neural artificial com algoritmo genético aprender a superar obstáculos em tempo real através de gerações de seleção natural.',
+        keywords: 'rede neural, inteligência artificial, evolução, IA, algoritmo genético, simulação, machine learning, PlayfulHub',
+        genre: 'Simulação / IA',
+        developer: 'PlayfulHub',
+        features: 'Visualizador de cérebro MLP, mutações em tempo real, editor sandbox de obstáculos, exportação de genoma',
+        objective: 'Observe a evolução da população de dinossauros neurais ou construa percursos de obstáculos para testar sua capacidade de adaptação.',
+        controls: [
+            { key: 'Espaço', action: 'Pular manualmente (modo teste)' },
+            { key: 'Mouse', action: 'Interagir com painéis de controle e gráficos' },
+            { key: 'Clique', action: 'Adicionar/remover obstáculos no modo Sandbox' }
+        ],
+        tips: [
+            'Aumente a taxa de mutação caso a população estagne em um nível de fitness',
+            'Use o visualizador de topologia para ver quais sinapses estão mais ativas',
+            'Exporte o genoma do melhor indivíduo para salvar seu progresso'
+        ],
+        tags: ['IA', 'Rede Neural', 'Evolução', 'Simulação', 'Ciência'],
+        relatedGames: ['gameoflife', 'tabuleiro_galton', 'it_simulator']
+    },
+    'threejs_earth': {
+        title: 'Three.js Earth',
+        description: 'Explore o globo terrestre tridimensional com simulação orbital de satélites em tempo real, camadas de atmosfera volumétrica, ciclo de iluminação solar e tempestades geomagnéticas.',
+        keywords: 'threejs, terra 3D, globo, astronomia, satélites, clima, órbita, shaders, PlayfulHub',
+        genre: 'Simulação / Astronomia 3D',
+        developer: 'PlayfulHub',
+        playUrl: '/threejs-earth-main/',
+        features: 'Renderização fotorrealista com Three.js, satélites orbitais rastreáveis, estações meteorológicas globais, shaders de atmosfera e tempestades solares',
+        objective: 'Interaja com o globo terrestre, monitore satélites em tempo real e inspecione dados climatológicos globais.',
+        controls: [
+            { key: 'Mouse / Arrastar', action: 'Rotacionar o planeta' },
+            { key: 'Scroll', action: 'Zoom da câmera' },
+            { key: 'Clique', action: 'Selecionar satélite ou estação meteorológica' },
+            { key: 'Painel HUD', action: 'Alternar camadas de nuvens, auroras e satélites' }
+        ],
+        tips: [
+            'Clique duas vezes em um satélite para centralizar a câmera em sua órbita',
+            'Ative o modo Tempestade Solar para visualizar as auroras boreais nos polos',
+            'Alterne as camadas de visualização no painel lateral para dados meteorológicos'
+        ],
+        tags: ['3D', 'Three.js', 'Terra', 'Simulação', 'Espaço', 'Ciência'],
+        relatedGames: ['space_shooter', 'voxel_city', 'rede_neural_evolutiva']
     }
 };
 
@@ -485,21 +529,28 @@ function generateRelatedGamesHTML(relatedGames) {
         if (!game) return '';
         
         const iconMap = {
-            'rubiks_cube': '🧩',
-            'strategy_game': '🏰',
-            'chess': '♟️',
-            '3d_shooter': '🔫',
-            'visual_effects': '🎵',
-            'snake': '🐍',
+            'puzzle': '🧩',
             'space_shooter': '🚀',
-            'archer': '🎯',
-            'poker': '♠️',
-            'it_simulator': '🏢',
-            'tabuleiro_galton': '🧔',
+            'ded': '🎲',
+            '3d_shooter': '🔫',
+            'chess': '♟️',
+            'tetris': '🎮',
+            'snake': '🐍',
+            'strategy_game': '🏰',
+            'rubiks_cube': '🎲',
+            'archer': '🏹',
+            'lazy_gardner': '🌱',
+            'gameoflife': '🧬',
+            'visual_effects': '✨',
+            'poker': '🃏',
+            'it_simulator': '💻',
+            'tabuleiro_galton': '📊',
             'pinball': '🎱',
             'voxel_city': '🏙️',
             'voxel_arena': '⚔️',
-            'driving_simulator': '🚗'
+            'driving_simulator': '🚗',
+            'rede_neural_evolutiva': '🧠',
+            'threejs_earth': '🌍'
         };
         
         return `
@@ -529,7 +580,7 @@ function generateGamePage(gameId, gameData) {
         '{{GAME_FEATURES}}': gameData.features,
         '{{GAME_OBJECTIVE}}': gameData.objective,
         // URL real do jogo (para onde o link deve levar)
-        '{{GAME_PLAY_URL}}': `/${gameId}/`,
+        '{{GAME_PLAY_URL}}': gameData.playUrl || `/${gameId}/`,
         '{{CONTROLS_HTML}}': generateControlsHTML(gameData.controls),
         '{{TIPS_HTML}}': generateTipsHTML(gameData.tips),
         '{{TAGS_HTML}}': generateTagsHTML(gameData.tags),

@@ -446,3 +446,38 @@ A implementação no Conway's Game of Life foi concluída com um alto padrão de
 Nenhum vazamento de memória ou problemas de concorrência com timers do loop foram identificados. O código está limpo, performático e estruturado adequadamente.
 Status alterado para **Ready for QA**.
 
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3094)  
+*Script de Automação:* `tests/qa_gameoflife_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Modo Desafio (Automata Puzzles)**:
+   - Painel alternável "Simulação Livre" $\leftrightarrow$ "Modo Desafio" funcional com HUD completo.
+   - **Nível 1 (O Defletor de Glider)**: Detecção de vitória quando uma célula atinge a `targetZone` demarcada em neon ciano em `(32..34, 32..34)`.
+   - **Nível 2 (O Estabilizador de Centelha)**: Avaliação correta de estabilização estática (Still Life puro) via comparação de snapshots de células vivas (`gridsEqualLive`).
+   - **Nível 3 (A Fábrica de Vida)**: Validação de vitória ao alcançar e sustentar população $\ge 50$ células na geração limite (geração 40).
+   - Bloqueio de inserção de células durante a execução da simulação no modo puzzle.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Eventos de Caos e Anomalias Ambientais**:
+   - **Raio Cósmico**: Disparo do feixe luminoso neon com mutação estocástica 3x3 no grid e exibição visual temporária.
+   - **Buraco Negro**: Efeito gravitacional com sucção e destruição de células vivas no raio central com geração de partículas.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Música Generativa Sintetizada (Web Audio API)**:
+   - Mapeamento das colunas ativas na escala pentatônica de Dó maior.
+   - Limitação de polifonia a 4 vozes simultâneas com priorização de células ancestrais (maior `age`).
+   - Controle de volume, botão de Mute e throttle de 120ms entre acordes sem travamentos ou ruídos.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante o loop e animações do Canvas.
+   - **Resultado:** ✅ Aprovado.
+
+

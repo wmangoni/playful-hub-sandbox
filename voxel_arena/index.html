@@ -1056,274 +1056,8 @@
         }
 
         // =====================================================================
-        // === TASK_002 — Enemy Config, Wave Config & Upgrade Pool
-        // =====================================================================
-
-        const ENEMY_CONFIG = {
-            basic:  { hp: 30,  speed: 6, damage: 5,  attackCd: 1.5, scale: 1.0, xp: 15,
-                      armor: 0x5a2d8c, flesh: 0x7a4bbf, eye: 0xff2244 },
-            brute:  { hp: 120, speed: 3, damage: 15, attackCd: 1.5, scale: 1.8, xp: 40,
-                      armor: 0x9a1f1f, flesh: 0xc04040, eye: 0xffaa00 },
-            stalker:{ hp: 25,  speed: 9, damage: 6,  attackCd: 0.8, scale: 0.7, xp: 20,
-                      armor: 0x0d7a5a, flesh: 0x1f9a78, eye: 0x00e5ff }
-        };
-
-        const WAVE_CONFIG = {
-            1: { duration: 60, spawnInterval: 3.0, maxEnemies: 8,  ratios: { basic: 1.0, brute: 0.0, stalker: 0.0 } },
-            2: { duration: 60, spawnInterval: 2.5, maxEnemies: 12, ratios: { basic: 0.8, brute: 0.2, stalker: 0.0 }, elite: true },
-            3: { duration: 60, spawnInterval: 2.0, maxEnemies: 15, ratios: { basic: 0.6, brute: 0.2, stalker: 0.2 }, elite: true },
-            4: { duration: 60, spawnInterval: 1.5, maxEnemies: 18, ratios: { basic: 0.4, brute: 0.3, stalker: 0.3 }, elite: true },
-            5: { duration: 60, spawnInterval: 1.0, maxEnemies: 25, ratios: { basic: 0.3, brute: 0.35, stalker: 0.35 }, elite: true }
-        };
-
-        const UPGRADE_POOL = [
-            { rarity: 'Raro',   icon: '⚔', name: 'Gume Afiado',       desc: '+30% Dano de Ataque',         apply(p) { p.damageMultiplier   += 0.30; } },
-            { rarity: 'Comum',  icon: '🏃', name: 'Passos Ligeiros',   desc: '+15% Velocidade',             apply(p) { p.speedMultiplier     += 0.15; } },
-            { rarity: 'Raro',   icon: '⚡', name: 'Vigor Renovado',    desc: '+25% Regeneração de Stamina',  apply(p) { p.staminaRegenBonus   += 0.25; } },
-            { rarity: 'Comum',  icon: '💨', name: 'Impulso Alongado',  desc: '+20% Alcance do Dash',        apply(p) { p.dashRangeMult       += 0.20; } },
-            { rarity: 'Raro',   icon: '💚', name: 'Essência Curativa', desc: '+40% Cura',                   apply(p) { p.healMult            += 0.40; } },
-            { rarity: 'Épico',  icon: '💥', name: 'Cataclisma',        desc: '+50% Dano da Ultimate',       apply(p) { p.ultMult             += 0.50; } },
-            { rarity: 'Comum',  icon: '🕐', name: 'Ritmo Acelerado',   desc: '-15% Cooldown das Skills',    apply(p) { p.skills.forEach(s => s.cdMult *= 0.85); } },
-            { rarity: 'Comum',  icon: '❤', name: 'Vitalidade',        desc: '+25 Vida Máxima',              apply(p) { p.stats.maxHp += 25; p.stats.hp = Math.min(p.stats.maxHp, p.stats.hp + 25); } }
-        ];
-
-        // =====================================================================
-        // === TASK_001 — VFX System (Dynamic Lights & Skill Effects)
-        // =====================================================================
-
-        const activeVFX = [];
-
-        function updateVFX(scene, dt) {
-            for (let i = activeVFX.length - 1; i >= 0; i--) {
-                const vfx = activeVFX[i];
-                vfx.life -= dt * 1000;
-                const age = 1.0 - (vfx.life / vfx.maxLife);
-
-                if (vfx.group.customUpdate) {
-                    vfx.group.customUpdate(dt, age);
-                }
-
-                if (vfx.light) {
-                    vfx.light.intensity = vfx.initialIntensity * Math.cos(age * Math.PI / 2);
-                }
-
-                if (vfx.life <= 0) {
-                    scene.remove(vfx.group);
-                    vfx.group.traverse(child => {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) {
-                            if (Array.isArray(child.material)) {
-                                child.material.forEach(m => m.dispose());
-                            } else {
-                                child.material.dispose();
-                            }
-                        }
-                    });
-                    activeVFX.splice(i, 1);
-                }
-            }
-        }
-
-        function spawnDynamicSkillVFX(scene, position, type) {
-            const vfxGroup = new THREE.Group();
-            vfxGroup.position.copy(position);
-
-            let lightColor, lightIntensity, lightDistance, duration;
-
-            if (type === 'spin') {
-                lightColor = 0xffd700;
-                lightIntensity = 4.0;
-                lightDistance = 15;
-                duration = 300;
-
-                const ringGeo = new THREE.TorusGeometry(5, 0.4, 8, 32);
-                const ringMat = new THREE.MeshBasicMaterial({
-                    color: 0xffd700, transparent: true, opacity: 0.8,
-                    blending: THREE.AdditiveBlending
-                });
-                const ring = new THREE.Mesh(ringGeo, ringMat);
-                ring.rotation.x = -Math.PI / 2;
-                vfxGroup.add(ring);
-
-                vfxGroup.customUpdate = (dt, age) => {
-                    ring.rotation.z += dt * 15;
-                    ring.scale.setScalar(1 + age * 2.0);
-                    ringMat.opacity = 1.0 - age;
-                };
-            } else if (type === 'heal') {
-                lightColor = 0x00ff88;
-                lightIntensity = 5.0;
-                lightDistance = 12;
-                duration = 600;
-
-                const particles = [];
-                const partGeo = new THREE.SphereGeometry(0.2, 4, 4);
-                const partMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true });
-
-                for (let i = 0; i < 12; i++) {
-                    const part = new THREE.Mesh(partGeo, partMat);
-                    const angle = (i / 12) * Math.PI * 2;
-                    part.position.set(Math.cos(angle) * 1.5, 0.2 * i, Math.sin(angle) * 1.5);
-                    vfxGroup.add(part);
-                    particles.push(part);
-                }
-
-                vfxGroup.customUpdate = (dt, age) => {
-                    particles.forEach((p, idx) => {
-                        const angle = (idx / 12) * Math.PI * 2 + age * Math.PI * 4;
-                        p.position.x = Math.cos(angle) * (1.5 - age * 0.5);
-                        p.position.z = Math.sin(angle) * (1.5 - age * 0.5);
-                        p.position.y += dt * 4;
-                    });
-                    partMat.opacity = 1.0 - age;
-                };
-            } else if (type === 'ult') {
-                lightColor = 0xff00ff;
-                lightIntensity = 8.0;
-                lightDistance = 40;
-                duration = 800;
-
-                const domeGeo = new THREE.SphereGeometry(1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-                const domeMat = new THREE.MeshBasicMaterial({
-                    color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.9,
-                    blending: THREE.AdditiveBlending
-                });
-                const dome = new THREE.Mesh(domeGeo, domeMat);
-                vfxGroup.add(dome);
-
-                vfxGroup.customUpdate = (dt, age) => {
-                    const currentRadius = 1 + age * 28;
-                    dome.scale.setScalar(currentRadius);
-                    domeMat.opacity = 1.0 - Math.pow(age, 2);
-                };
-            }
-
-            const pLight = new THREE.PointLight(lightColor, lightIntensity, lightDistance, 1.5);
-            pLight.position.set(0, 1.5, 0);
-            pLight.castShadow = true;
-            pLight.shadow.bias = -0.002;
-            vfxGroup.add(pLight);
-
-            scene.add(vfxGroup);
-
-            activeVFX.push({
-                group: vfxGroup,
-                light: pLight,
-                initialIntensity: lightIntensity,
-                maxLife: duration,
-                life: duration
-            });
-        }
-
-        function spawnDashGhosts(scene, playerMesh, fromPos, toPos) {
-            const ghostCount = 4;
-            for (let i = 0; i < ghostCount; i++) {
-                const t = (i + 1) / (ghostCount + 1);
-                const pos = new THREE.Vector3().lerpVectors(fromPos, toPos, t);
-                const ghostGroup = playerMesh.clone(true);
-
-                ghostGroup.position.copy(pos);
-                ghostGroup.rotation.copy(playerMesh.rotation);
-                ghostGroup.scale.copy(playerMesh.scale);
-
-                ghostGroup.traverse(child => {
-                    if (child.material) {
-                        if (Array.isArray(child.material)) {
-                            const clonedMats = child.material.map(m => {
-                                const cm = m.clone();
-                                cm.transparent = true;
-                                cm.opacity = 0.35;
-                                cm.blending = THREE.AdditiveBlending;
-                                cm.depthWrite = false;
-                                if (cm.emissive) cm.emissive = new THREE.Color(0x0066ff);
-                                if (cm.emissiveIntensity !== undefined) cm.emissiveIntensity = 2.0;
-                                return cm;
-                            });
-                            child.material = clonedMats;
-                        } else {
-                            const cm = child.material.clone();
-                            cm.transparent = true;
-                            cm.opacity = 0.35;
-                            cm.blending = THREE.AdditiveBlending;
-                            cm.depthWrite = false;
-                            if (cm.emissive) cm.emissive = new THREE.Color(0x0066ff);
-                            if (cm.emissiveIntensity !== undefined) cm.emissiveIntensity = 2.0;
-                            child.material = cm;
-                        }
-                    }
-                });
-
-                scene.add(ghostGroup);
-
-                activeVFX.push({
-                    group: ghostGroup,
-                    light: null,
-                    initialIntensity: 0,
-                    maxLife: 300,
-                    life: 300,
-                    customUpdate: (dt, age) => {
-                        ghostGroup.traverse(child => {
-                            if (child.material) {
-                                const mats = Array.isArray(child.material) ? child.material : [child.material];
-                                mats.forEach(m => { m.opacity = 0.35 * (1 - age); });
-                            }
-                        });
-                    }
-                });
-            }
-        }
-
-        let audioCtx = null;
-
-        function initSkillAudio() {
-            if (!audioCtx) {
-                try { audioCtx = new AudioContext(); } catch (e) {}
-            }
-        }
-
-        function playSkillSound(type) {
-            if (!audioCtx) return;
-            try {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-
-                switch (type) {
-                    case 'spin':
-                        osc.type = 'sawtooth';
-                        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-                        osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
-                        break;
-                    case 'dash':
-                        osc.type = 'square';
-                        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-                        osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.2);
-                        break;
-                    case 'heal':
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(523, audioCtx.currentTime);
-                        osc.frequency.linearRampToValueAtTime(784, audioCtx.currentTime + 0.4);
-                        break;
-                    case 'ult':
-                        osc.type = 'sawtooth';
-                        osc.frequency.setValueAtTime(60, audioCtx.currentTime);
-                        osc.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 0.6);
-                        break;
-                    default:
-                        osc.type = 'sine';
-                }
-
-                osc.start(audioCtx.currentTime);
-                osc.stop(audioCtx.currentTime + 0.6);
-            } catch (e) {}
-        }
-
-        // =====================================================================
         // === TASK_003 — Screen Shake, DOM Popups, Active Hazards & Boss Combat
-        // =====================================================================
+        // ==========================================================================================================================
 
         class ScreenShakeManager {
             constructor() {
@@ -3050,8 +2784,8 @@
             constructor() {
                 this.container = document.getElementById('game-container');
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x5aa0dc);
-                this.scene.fog = new THREE.FogExp2(0xc9e4f0, 0.02);
+                this.scene.background = new THREE.Color(0x0a0c16);
+                this.scene.fog = new THREE.FogExp2(0x0a0c16, 0.03);
 
                 this.camera = new THREE.PerspectiveCamera(gameSettings.fov, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.camera.position.set(0, 15, 15);
@@ -3066,10 +2800,10 @@
                 this.renderer.toneMappingExposure = 1.15 * gameSettings.brightness;
                 this.container.appendChild(this.renderer.domElement);
 
-                const hemiLight = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.95);
+                const hemiLight = new THREE.HemisphereLight(0x3a4a6a, 0x141923, 0.45);
                 this.scene.add(hemiLight);
 
-                const dirLight = new THREE.DirectionalLight(0xffe0b3, 2.6);
+                const dirLight = new THREE.DirectionalLight(0x7ec0ee, 2.0);
                 dirLight.position.set(-20, 30, -20);
                 dirLight.castShadow = true;
                 dirLight.shadow.camera.left = -50;
@@ -3328,6 +3062,7 @@
                         <div class="icon-placeholder">${up.icon}</div>
                         <h3>${up.name}</h3>
                         <p>${up.desc}</p>`;
+                    card.onclick = () => this.applyDraftCard(up);
                     wrapper.appendChild(card);
                     return { up, card };
                 });

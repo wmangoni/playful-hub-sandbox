@@ -297,5 +297,40 @@ function playBounceSound() {
 - Gerenciamento eficiente do array `activeArrows`.
 - Transição de status efetuada no `BACKLOG.md` de `In review` para `Ready for QA`.
 
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3093)  
+*Script de Automação:* `tests/qa_archer_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Obstáculos Físicos Dinâmicos**:
+   - Nuvem de tempestade móvel (`stormCloud`) no topo da tela com desintegração de flechas e faíscas elétricas.
+   - Escudo rotativo de madeira (`woodenShield`) aplicando física de colisão elástica, inversão de vetor de velocidade e queda com rotação descontrolada (`isRicocheted`).
+   - **Resultado:** ✅ Aprovado.
+
+2. **Arsenal de Flechas Especiais (Munição e Tipos)**:
+   - Suporte aos tipos: *Flecha Tripla (Split Shot)*, *Flecha de Fogo (Fire Arrow)* e *Flecha Gravitacional (Gravity Arrow)*.
+   - Seletores via teclado (`1`, `2`, `3`, `4`) e slots gráficos no HUD com contadores de munição dinâmicos.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Câmera Lenta de Ação (Bullet-Time)**:
+   - Desaceleração da velocidade de simulação para `0.25x` na aproximação final e restauração imediata para `1.0x`.
+   - Aplicação de desaturação e contraste cromático cinematográfico no container do jogo.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Sintetizador de Áudio Procedural (Web Audio API)**:
+   - Síntese em tempo real dos efeitos de tensão do arco (`playTensionSound`), disparo (`playLaunchSound`), estouro de balão (`playPopSound`), ricochete metálico (`playBounceSound`) e desintegração elétrica em nuvem (`playCloudHitSound`).
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+
+
 
 
