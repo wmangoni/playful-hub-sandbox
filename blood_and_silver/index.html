@@ -262,6 +262,18 @@
             text-shadow: 0 1px 3px #000;
         }
 
+        .passive-chip {
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #e9e2d8;
+            background: rgba(14, 12, 20, 0.8);
+            border: 1px solid #3a4a6b;
+            border-radius: 6px;
+            padding: 2px 8px;
+            text-shadow: 0 1px 3px #000;
+        }
+
         .upgrade-cards {
             display: flex;
             gap: 20px;
@@ -319,6 +331,7 @@
             </div>
             <div class="hud-stat" id="killText">Abates: 0</div>
             <div class="weapons-row" id="weaponsRow"></div>
+            <div class="weapons-row" id="passivesRow"></div>
         </div>
         <div class="hud-center">
             <div class="level-badge" id="levelText">Nv 1</div>
@@ -387,6 +400,17 @@
             bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, icon: '🏹' }
         };
 
+        const PASSIVES = {
+            amulet: { name: 'Amuleto', stat: 'area', amount: 0.10, maxLevel: 5, icon: '📿' },
+            pyrope: { name: 'Joia Carmesim', stat: 'might', amount: 0.10, maxLevel: 5, icon: '💎' },
+            mechanism: { name: 'Engrenagem', stat: 'cooldown', amount: 0.08, maxLevel: 5, icon: '⚙️' },
+            feather: { name: 'Pena', stat: 'speed', amount: 0.10, maxLevel: 5, icon: '🪶' },
+            meat: { name: 'Carne', stat: 'maxhp', amount: 15, maxLevel: 5, icon: '🥩' },
+            mushroom: { name: 'Cogumelo Noturno', stat: 'regen', amount: 0.5, maxLevel: 5, icon: '🍄' },
+            spirit_orb: { name: 'Orbe Espiritual', stat: 'magnet', amount: 15, maxLevel: 5, icon: '🔮' },
+            boar_ring: { name: 'Anel do Javali', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' }
+        };
+
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = false;
@@ -399,6 +423,7 @@
         const levelText = document.getElementById('levelText');
         const xpFill = document.getElementById('xpFill');
         const weaponsRow = document.getElementById('weaponsRow');
+        const passivesRow = document.getElementById('passivesRow');
         const startScreen = document.getElementById('startScreen');
         const gameoverScreen = document.getElementById('gameoverScreen');
         const levelupScreen = document.getElementById('levelupScreen');
@@ -448,6 +473,8 @@
             xpToNext: 5,
             collectRadius: CONFIG.player.collectRadius,
             weapons: [],
+            passives: [],
+            stats: { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1 },
             facing: Math.PI / 2,
             row: 1,
             moving: false,
@@ -532,14 +559,44 @@
             return Math.floor(5 + (level - 1) * 6);
         }
 
+        function makePassive(id) {
+            return { id: id, level: 1, maxLevel: PASSIVES[id].maxLevel };
+        }
+
+        function levelUpPassive(p) {
+            if (p.level >= p.maxLevel) return;
+            p.level++;
+            recomputeStats();
+        }
+
+        function recomputeStats() {
+            const s = { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1 };
+            for (const p of player.passives) {
+                const c = PASSIVES[p.id];
+                if (c.stat === 'cooldown') s.cooldown *= (1 - c.amount * p.level);
+                else s[c.stat] += c.amount * p.level;
+            }
+            const oldMax = player.maxHp;
+            player.stats = s;
+            player.maxHp = Math.round(CONFIG.player.maxHp + s.maxhp);
+            player.hp += (player.maxHp - oldMax);
+            player.speed = CONFIG.player.speed * s.move_speed;
+            player.collectRadius = CONFIG.player.collectRadius + s.magnet;
+        }
+
         function resetGame() {
             player.x = WORLD_W / 2;
             player.y = WORLD_H / 2;
-            player.hp = player.maxHp;
             player.level = 1;
             player.xp = 0;
             player.xpToNext = nextLevelXP(1);
             player.weapons = [makeWeapon('sword')];
+            player.passives = [];
+            player.stats = { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1 };
+            player.maxHp = CONFIG.player.maxHp;
+            player.speed = CONFIG.player.speed;
+            player.collectRadius = CONFIG.player.collectRadius;
+            player.hp = player.maxHp;
             player.facing = Math.PI / 2;
             player.row = 1;
             player.moving = false;
@@ -604,6 +661,7 @@
             levelText.textContent = 'Nv ' + player.level;
             xpFill.style.width = Math.max(0, Math.min(100, (player.xp / player.xpToNext) * 100)) + '%';
             updateWeaponsRow();
+            updatePassivesRow();
         }
 
         function updateWeaponsRow() {
@@ -614,6 +672,17 @@
                 chip.className = 'weapon-chip';
                 chip.textContent = c.icon + ' ' + w.level;
                 weaponsRow.appendChild(chip);
+            }
+        }
+
+        function updatePassivesRow() {
+            passivesRow.innerHTML = '';
+            for (const p of player.passives) {
+                const c = PASSIVES[p.id];
+                const chip = document.createElement('span');
+                chip.className = 'passive-chip';
+                chip.textContent = c.icon + ' ' + p.level;
+                passivesRow.appendChild(chip);
             }
         }
 
@@ -667,6 +736,9 @@
             player.y = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y));
 
             if (player.hitCooldown > 0) player.hitCooldown -= dt;
+            if (player.stats.regen > 0 && player.hp > 0 && player.hp < player.maxHp) {
+                player.hp = Math.min(player.maxHp, player.hp + player.stats.regen * dt);
+            }
             player.animTime += dt;
         }
 
@@ -677,7 +749,7 @@
                     w.timer -= dt;
                     continue;
                 }
-                w.timer = w.interval;
+                w.timer = w.interval * player.stats.cooldown;
                 fireWeapon(w);
             }
         }
@@ -687,7 +759,8 @@
                 if (audio) audio.play('sword');
                 w.animTimer = 0.22;
                 const c = WEAPONS.sword;
-                const range = w.range;
+                const range = w.range * player.stats.area;
+                const dmg = w.damage * player.stats.might;
                 const arcHalf = c.arcHalf;
                 const knockback = c.knockback;
                 const r2 = range * range;
@@ -702,7 +775,7 @@
                     while (diff < -Math.PI) diff += TWO_PI;
                     if (Math.abs(diff) <= arcHalf) {
                         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                        hitEnemy(e, w.damage, (dx / dist) * knockback, (dy / dist) * knockback);
+                        hitEnemy(e, dmg, (dx / dist) * knockback, (dy / dist) * knockback);
                     }
                 }
             } else if (w.id === 'bow') {
@@ -729,6 +802,8 @@
             const dx = target.x - player.x;
             const dy = target.y - player.y;
             const base = Math.atan2(dy, dx);
+            const spd = w.projectileSpeed * player.stats.speed;
+            const dmg = w.damage * player.stats.might;
             for (let i = 0; i < w.count; i++) {
                 const p = projectiles.find(function (x) { return !x.alive; });
                 if (!p) break;
@@ -736,9 +811,9 @@
                 const ang = base + spread;
                 p.x = player.x;
                 p.y = player.y;
-                p.vx = Math.cos(ang) * w.projectileSpeed;
-                p.vy = Math.sin(ang) * w.projectileSpeed;
-                p.damage = w.damage;
+                p.vx = Math.cos(ang) * spd;
+                p.vy = Math.sin(ang) * spd;
+                p.damage = dmg;
                 p.radius = 5;
                 p.life = 1.4;
                 p.alive = true;
@@ -833,11 +908,16 @@
 
         function buildUpgradeOptions() {
             const opts = [];
-            const sword = player.weapons.find(function (w) { return w.id === 'sword'; });
-            const bow = player.weapons.find(function (w) { return w.id === 'bow'; });
-            if (sword && sword.level < sword.maxLevel) opts.push({ kind: 'weapon', id: 'sword' });
-            if (!bow) opts.push({ kind: 'weapon', id: 'bow' });
-            else if (bow.level < bow.maxLevel) opts.push({ kind: 'weapon', id: 'bow' });
+            for (const id in WEAPONS) {
+                const w = player.weapons.find(function (x) { return x.id === id; });
+                if (!w) opts.push({ kind: 'weapon', id: id });
+                else if (w.level < w.maxLevel) opts.push({ kind: 'weapon', id: id });
+            }
+            for (const id in PASSIVES) {
+                const p = player.passives.find(function (x) { return x.id === id; });
+                if (!p) opts.push({ kind: 'passive', id: id });
+                else if (p.level < p.maxLevel) opts.push({ kind: 'passive', id: id });
+            }
             if (opts.length < 3) opts.push({ kind: 'heal' });
             for (let i = opts.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -864,12 +944,18 @@
                     icon = '❤️';
                     title = 'Restaurar Vida';
                     desc = '+' + CONFIG.healAmount + ' de vida';
-                } else {
+                } else if (opt.kind === 'weapon') {
                     const c = WEAPONS[opt.id];
                     const w = player.weapons.find(function (x) { return x.id === opt.id; });
                     icon = c.icon;
                     title = c.name;
                     desc = w ? ('Nível ' + w.level + ' → ' + (w.level + 1)) : 'NOVA ARMA';
+                } else {
+                    const c = PASSIVES[opt.id];
+                    const p = player.passives.find(function (x) { return x.id === opt.id; });
+                    icon = c.icon;
+                    title = c.name;
+                    desc = p ? ('Nível ' + p.level + ' → ' + (p.level + 1)) : 'NOVO PASSIVO';
                 }
                 el.innerHTML = '<div class="uc-icon">' + icon + '</div><div class="uc-title">' + title + '</div><div class="uc-desc">' + desc + '</div>';
                 el.addEventListener('click', function () { chooseUpgrade(i); });
@@ -882,10 +968,17 @@
             if (!opt) return;
             if (opt.kind === 'heal') {
                 player.hp = Math.min(player.maxHp, player.hp + CONFIG.healAmount);
-            } else {
+            } else if (opt.kind === 'weapon') {
                 const w = player.weapons.find(function (x) { return x.id === opt.id; });
                 if (w) levelUpWeapon(w);
                 else player.weapons.push(makeWeapon(opt.id));
+            } else if (opt.kind === 'passive') {
+                const p = player.passives.find(function (x) { return x.id === opt.id; });
+                if (p) levelUpPassive(p);
+                else {
+                    player.passives.push(makePassive(opt.id));
+                    recomputeStats();
+                }
             }
             levelupOptions = [];
             game.status = 'playing';
