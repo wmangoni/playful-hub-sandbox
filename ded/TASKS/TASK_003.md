@@ -377,4 +377,33 @@ Para garantir a robustez, performance e segurança durante a implementação des
 ---
 
 ## 🧪 Evidencias de Testes (QA Test Evidence)
-*   *Aguardando validação do QA para confirmação de deploy.*
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3102)  
+*Script de Automação:* `tests/qa_ded_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Combate Interativo por Turnos (Dedicated Combat Screen)**:
+   - Transição reativa para a tela dedicada de combate `#combat-screen` sem loops síncronos bloqueantes.
+   - Cards informativos de status do inimigo (Nome, HP reativo e AC).
+   - Botões de ações táticas habilitados: *Ataque Físico*, *Habilidades/Magias de Classe* (*Golpe Heroico*, *Míssil Mágico*, *Curar Ferimentos*, *Ataque Furtivo*), *Usar Item* e *Fugir*.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Minimapa de Exploração da Masmorra (Dynamic Dungeon Map & Fog of War)**:
+   - Abertura e fechamento retrátil do minimapa via `#btn-toggle-map`.
+   - Renderização SVG do grafo de exploração da Masmorra de Drakmor com conexões entre 27 nós e 30 arestas.
+   - Destaque neon para sala atual, diferenciação para nós visitados, adjacentes clicáveis e cobertura por Névoa de Guerra.
+   - Navegação direta e atualização progressiva da masmorra via `teleportToNode`.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Juiciness & Áudio Procedural (Web Audio API)**:
+   - Sintetizador `AudioEngine` funcional com geração de som analógico retrô (*ataque de espada*, *magia arcana*, *cura*, *derrota* e *fanfarra de vitória*).
+   - Ausência de dependência de arquivos externos de áudio com suporte a desbloqueio preguiçoso (*lazy instantiation*).
+   - **Resultado:** ✅ Aprovado.
+
+4. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

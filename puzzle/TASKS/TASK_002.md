@@ -454,3 +454,39 @@ As diretrizes técnicas acordadas pelo Tech Lead são:
 **Resultado da Avaliação**: APROVADO. O sistema procedural de áudio, geração e sanidade cria um jogo dinâmico, rejogável e polido.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3099)  
+*Script de Automação:* `tests/qa_puzzle_task002.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Geração Procedural de Enigmas (5 Tipos)**:
+   - Geração dinâmica de `sequence`, `pattern`, `memory`, `logic` e `perspective` via `ProceduralGenerator.generate(type, level)`.
+   - Renderização correta no DOM com opções de resposta matematicamente consistentes e 1 resposta correta válida.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Sistema de Foco Mental (Sanidade) & Combos**:
+   - Barra `#focus-bar` iniciada em 100%.
+   - Penalidade progressiva por erro ($-15\%$ a $-25\%$) e bônus por acerto ($+5\%$) com multiplicador de combo.
+   - Custo de $10\%$ de foco ao solicitar dica no modo Campanha.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Modos de Jogo (Endless & Time Attack)**:
+   - Modo *Time Attack*: Cronômetro regressivo com bônus de $+10\text{s}$ por acerto, penalidade de $-15\text{s}$ por erro e dedução de $-8\text{s}$ por dica sem custo de foco mental.
+   - Modo *Endless*: Dificuldade dinâmica progressiva e persistência do recorde (High Score) em `localStorage`.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Síntese de Áudio Procedural (Web Audio API)**:
+   - `AudioManager` inicializado via Autoplay Policy com drone sub-bass FM/LFO, arpejo de tríade maior para acerto, tom dissonante para erro e pulso cardíaco para sanidade crítica ($< 30\%$).
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

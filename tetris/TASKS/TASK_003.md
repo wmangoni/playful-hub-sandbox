@@ -472,3 +472,43 @@ Implementado em `tetris/index.html` sobre a base da TASK_002 (ghost piece, time 
 4. **Sons e Sincronização**: O sintetizador Web Audio API está livre de estouro de polifonia e o tratamento de autoplay respeita a interação do usuário. O clamp no `deltaTime` protege o jogo contra oscilações de abas em segundo plano e resolve o problema de inicialização.
 
 O código está limpo, performático e bem arquitetado para jogos HTML5 no canvas. Pronto para QA.
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3099)  
+*Script de Automação:* `tests/qa_tetris_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Curva de Gravidade e Level Up**:
+   - Validação da fórmula exponencial clássica `calculateDropInterval(level)` (Nível 1 = 1000ms, Nível 2 = 793ms, Nível 5 = 355ms, Nível 10 = 64ms, com cap de segurança em 50ms).
+   - Injeção e renderização da animação CSS do banner `.level-up-banner` no DOM ao avançar de nível.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Detecção de T-Spin e Sistema de Combos**:
+   - Implementação da **Regra dos 3 Cantos (3-Corner Rule)** validada para a peça T (índice 6) sob condição de rotação como última ação.
+   - Diferenciação precisa de T-Spins sem linhas (400), Single (800), Double (1200) e Triple (1600).
+   - Multiplicador de combo ($50 \times \text{comboCount} \times \text{level}$) acumulativo em limpezas consecutivas.
+   - Renderização dos popups flutuantes (`floatingTexts`) no canvas sem distorções de coordenadas.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Modo Sobrevivência (Garbage Rows & Pressão)**:
+   - Opção "Modo Sobrevivência" ativa no seletor `#gameModeSelect`.
+   - Inicialização do tabuleiro pré-populado com 5 linhas de blocos de lixo cinza (`#424242` / índice 8), cada uma com 1 buraco livre aleatório.
+   - Mecânica de `insertGarbageRow()` empurrando as linhas para cima e adicionando nova linha na base.
+   - Cronômetro de 12 segundos e exibição de `#survivalBox` e `#survivalTimer`.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Wall Kicks e Áudio Synth**:
+   - Rotações com compensação lateral e vertical funcionais sem travar o motor de colisão.
+   - Efeitos sonoros procedurais (`SoundSynth.playAlertTick` e `SoundSynth.playTSpin`) acionados sem erros.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

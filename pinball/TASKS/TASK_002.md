@@ -321,3 +321,38 @@ Para suportar multibola sem reescrever todas as funções de colisão, adotei o 
 **Resultado da Avaliação**: APROVADO. A mecânica de multibolas e gravidade mutável está robusta e pronta para o ambiente produtivo.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3098)  
+*Script de Automação:* `tests/qa_pinball_task002.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Mecânica de Multibolas (Multiball) & Colisão Elástica 2D**:
+   - `spawnMultiball()` gera $+2$ bolas metálicas (total 3 em jogo) com partículas elétricas neon.
+   - Colisão elástica bidimensional entre esferas metálicas com conservação de energia/momentum e resolução instantânea de penetração geométrica.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Multiplicador de Sobrevivência & Dreno Seguro**:
+   - Multiplicador de pontuação proporcional à quantidade de bolas ativas ($\times \text{activeBalls.length}$).
+   - Dreno de bolas individuais sem penalização de vidas até que a última esfera restante caia no dreno.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Modos de Gravidade Mutáveis (Low Gravity & Overdrive)**:
+   - Modo *Low Gravity*: Gravidade vertical reduzida em $50\%$ e atrito nulo ($1.0$).
+   - Modo *Overdrive*: Gravidade vertical aumentada em $+35\%$ e rebote ampliado em $+40\%$.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Sistema de Missões Ciber-Sintéticas & Alvos Firewall**:
+   - Missões "HACK THE GRID", "SYSTEM OVERCLOCK" e "FIREWALL CRACK" com validação de janelas de tempo, alvos físicos e HUD integrado.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

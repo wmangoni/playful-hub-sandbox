@@ -306,3 +306,36 @@ $$\text{TotalScore} = \text{BaseScore} + \text{HealthScore} + \text{SizeBonus}$$
 **Resultado da Avaliação**: APROVADO. A ampliação do minijogo idle com estufas e genética ficou primorosa.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3100)  
+*Script de Automação:* `tests/qa_lazy_gardener_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Estufas de Biomas Especiais (Three.js Iluminação e Materiais)**:
+   - Desbloqueio e alternância em tempo de execução para os biomas *Desert*, *Glacial* e *Cyberglow*.
+   - Atualização dinâmica da cor/textura do chão, do céu e da iluminação direcional.
+   - Aplicação correta dos modificadores de bioma (colheita aumentada no Desert e velocidade no Cyberglow).
+   - **Resultado:** ✅ Aprovado.
+
+2. **Sistema de Hibridização Genética (Crossbreeding) & Sementes Raras**:
+   - Detecção de adjacência espacial 3D ($< 1.8\text{u}$) entre espécies maduras distintas com disparo de polinização cruzada.
+   - Marcação de semente híbrida na planta receptora e concessão de sementes raras (`firelotus`, `crystalbamboo`, `goldpine`) na colheita.
+   - Plantio de híbridos com renderização de flores de textura gradiente e valor de colheita $4.0\times$.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Exposição Anual de Jardinagem (Flower Show)**:
+   - Avaliação algorítmica de pontuação baseada em raridade, umidade média e variação estética de tamanho.
+   - Atribuição de Medalhas de Ouro ($\ge 90\text{ pts}$), Prata e Bronze com concessão de moedas e buff global de velocidade de crescimento ($+50\%$).
+   - **Resultado:** ✅ Aprovado.
+
+4. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

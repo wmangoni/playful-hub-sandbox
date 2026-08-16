@@ -433,3 +433,42 @@ O gerador de partículas atual `createParticles` será refinado para gerar faís
 **Resultado da Avaliação**: APROVADO. A nova roupagem do Pimbal atinge o padrão visual AAA almejado para o Playful Hub.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3096)  
+*Script de Automação:* `tests/qa_pinball_task001.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Design Retro Arcade (Moldura Neon & HUD Glassmorphic)**:
+   - Moldura do canvas estilizada com borda metálica `#1a1b26`, cantos arredondados ($16\text{px}$) e sombras duplas em neon ciano e magenta.
+   - HUD `#gameInfo` com acabamento glassmorphic (`backdrop-filter: blur(12px) saturate(180%)`) e tipografia gamer `Press Start 2P` e `Orbitron`.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Rastro da Bola (Ghost Trail) & Bumpers Neon com Bloom**:
+   - Rastro cromado da bola (`ball.trail` com até 12 posições) com decaimento translúcido.
+   - Bumpers circulares em cores neon (`#ff2e97`, `#ffcc00`, `#39ff14`, `#00f0ff`) com expansão de impacto ($\times 1.25$) e efeito bloom radial dinâmico (`ctx.shadowBlur = 40`).
+   - **Resultado:** ✅ Aprovado.
+
+3. **Zonas de Multiplicação Holográficas & Power Meter**:
+   - Zonas multiplicadoras com preenchimento gradiente pulsante e linhas pontilhadas de laser rastejantes (`lineDashOffset`).
+   - Plunger/mola e barra indicadora de força segmentada em LEDs digitais independentes.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Sistema de Partículas (Velocity Stretching)**:
+   - Faíscas lineares orientadas pelo vetor de velocidade (`vx`, `vy`), `shadowBlur` e decaimento gradual por frame.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Feedback de Pontos (Score Bump)**:
+   - Animação CSS `.score-bump` (`@keyframes scoreBumpAnimation`) disparada a cada incremento no placar.
+   - **Resultado:** ✅ Aprovado.
+
+6. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

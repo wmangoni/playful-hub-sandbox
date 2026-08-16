@@ -350,3 +350,39 @@ A engine grava cada movimento da fila em `moveHistory` dentro de `processMoveQue
 **Resultado da Avaliação**: APROVADO. A fidelidade competitiva e didática do cubo de Rubik superou todas as expectativas.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3101)  
+*Script de Automação:* `tests/qa_rubiks_cube_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Gerador de Embaralhamento Oficial WCA**:
+   - Geração de 20 movimentos aleatórios validados conforme regras da World Cube Association (sem faces consecutivas e sem triplas no mesmo eixo).
+   - Conversão correta de lances e modificadores ($'$, $2$) integrada com a fila `moveQueue`.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Modo Tutorial Interativo (Margarida e Cruz Branca)**:
+   - Ativação do tutorial com HUD de instruções didáticas passo a passo.
+   - Filtro de foco visual reduzindo a opacidade das peças não-chave para $0.15$.
+   - Validação precisa de alinhamento com normais mundiais (`checkDaisyFormed` e `checkWhiteCrossFormed`).
+   - **Resultado:** ✅ Aprovado.
+
+3. **Temas Visuais Avançados & Esquemas de Cores**:
+   - Aplicação de temas 3D no Three.js: *Neon* com emissivos ativos ($\ge 0.7$), *Holographic* com transparência/metalness e *Classic*.
+   - Suporte e remapeamento dinâmico do esquema de cores *Japanese* e cores customizadas.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Galeria de Padrões Clássicos**:
+   - Execução e renderização das simetrias matemáticas *Checkerboard*, *Cube in a Cube*, *Anaconda* e *Six Spots*.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade Geral**:
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

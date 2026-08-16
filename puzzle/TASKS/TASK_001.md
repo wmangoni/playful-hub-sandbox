@@ -385,3 +385,36 @@ Para risco mínimo, mantive todas as regras de layout originais (grids, flex, `@
 **Resultado da Avaliação**: APROVADO. A qualidade estética do Labirinto Mental está excelente.
 
 *Assinado: Tech Lead (TL) - Antigravity*
+
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3097)  
+*Script de Automação:* `tests/qa_puzzle_task001.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Glassmorphism Místico e Tipografia Arcana**:
+   - `.game-container` com acabamento glassmorphic (`backdrop-filter: blur(16px) saturate(140%)`), bordas douradas sutis e sombras profundas.
+   - Títulos em tipografia rúnica majestosa `'Cinzel Decorative'` com degradê de preenchimento dourado (`background-clip: text`).
+   - Bloco narrativo em tipografia literária elegante `'Lora'` com borda dourada lateral.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Botões Alquímicos e Bioluminescência Rúnica**:
+   - Botões com gradientes de alta fidelidade e transições volumétricas com glow neon dourado no hover.
+   - Células dos enigmas (`.pattern-cell`, `.sequence-item`, `.memory-cell`) com gradientes radiais escuros e brilho rúnico.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Prisma de Cristal 3D Translúcido (Rotating Cube)**:
+   - Estrutura `.perspective-puzzle` com perspectiva configurada em `1200px`.
+   - Faces do cubo tridimensional com gradientes radiais translúcidos por cor, efeito `backdrop-filter: blur(5px)` e sombra projetada.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Integridade das Mecânicas e Estabilidade**:
+   - Resolução e fluxo de enigmas (Campanha, Rotação e Validação) funcionando perfeitamente sem regressões.
+   - $0$ erros no console do navegador durante toda a execução.
+   - **Resultado:** ✅ Aprovado.
+

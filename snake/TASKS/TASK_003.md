@@ -352,3 +352,41 @@ A implementação realizada no Snake Game atende com precisão a todos os crité
 Nenhum vazamento de memória ou violação de design foi encontrado. O código está limpo, performático e respeita as melhores práticas da plataforma.
 Status alterado para **Ready for QA**.
 
+---
+
+## 🧪 Evidências de Testes (QA Report)
+
+*Data da Execução:* 15/08/2026  
+*Ambiente:* Navegador Headless (Puppeteer v25.1.0) / Servidor Express Local (Porta 3095)  
+*Script de Automação:* `tests/qa_snake_task003.test.js`  
+*Status Geral dos Testes:* **APROVADO (100% dos testes passaram com sucesso)**
+
+### 📋 Itens e Critérios de Aceitação Testados:
+
+1. **Portais Dimensionais (Grid Portals)**:
+   - Ativação correta dos portais quando `score >= 10`.
+   - Coordenadas fixas e seguras: `portalA` em `(2, 10)` (Azul) e `portalB` em `(17, 10)` (Laranja).
+   - Teletransporte bidirecional instantâneo preservando o vetor de movimento original.
+   - **Resultado:** ✅ Aprovado.
+
+2. **Cobra Rival IA (Evolutive AI Rival)**:
+   - Spawn autônomo da cobra rival no grid com `score >= 20`.
+   - Navegação por heurística de distância Manhattan buscando ativamente a fruta e desviando de obstáculos, paredes e do jogador.
+   - Colisão do jogador contra a rival resultando em Game Over.
+   - **Resultado:** ✅ Aprovado.
+
+3. **Explosão da Rival e Maçãs Douradas (Golden Apples)**:
+   - Destruição da cobra rival ao ficar sem movimentos válidos, convertendo seus segmentos em Maçãs Douradas.
+   - Coleta de Maçã Dourada concedendo +3 pontos ao jogador e desaparecendo após o tempo limite.
+   - **Resultado:** ✅ Aprovado.
+
+4. **Juiciness Premium (Neon Particle Trails & Screen Shake)**:
+   - Emissão contínua de partículas neon coloridas na cauda da cobra com decaimento gradual de opacidade (`alpha`).
+   - Mecânica de `triggerScreenShake` vibrando o canvas por meio de translação controlada no contexto 2D durante eventos de impacto.
+   - **Resultado:** ✅ Aprovado.
+
+5. **Estabilidade Geral**:
+   - Execução estável do loop de jogo a 60 FPS com zero exceções no console.
+   - **Resultado:** ✅ Aprovado.
+
+
