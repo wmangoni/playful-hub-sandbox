@@ -1,6 +1,7 @@
 # 🧛 TASK-BLOOD_AND_SILVER_011: Melhorias de UI — Tooltips, Descrições e Tela de Pause
 
 > **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — implementado (tooltips, descrições de itens e tela de pause).
+> **Nota**: o visual dos elementos de UI (tooltip/pause) é aplicado via **CSS puro** — o bundle `ui-for-rpg/PNG` foi removido porque os PNGs não têm os elementos separados (não servem como fundo esticado).
 > **Escopo**: APENAS UI/informação. **Não mexer em mecânica** (dano, HP, velocidade, spawn, colisão de jogabilidade, progressão).
 
 ---
