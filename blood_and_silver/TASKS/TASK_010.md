@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_010: Melhorias Gráficas — Sprites e Cenário
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — planejamento concluído, aguardando aprovação para execução.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — planejamento concluído e decisões aprovadas pelo PO; pronto para execução.
 > **Escopo**: APENAS visual. **Não mexer em mecânica** (dano, HP, velocidade, spawn, colisão de jogabilidade, progressão).
 
 ---
@@ -91,7 +91,7 @@ Duas fontes possíveis:
 2. **Chefe = vampiro maior**: manter a lógica atual (escala 128×128 + glow vermelho), mas trocar o sprite — recomendo `Vampires3` (distingue visualmente do inimigo comum). Alternativa mínima: `Vampires1` escalado.
 3. **Chão**: tile `Ground_rocks` (2,2) repetido, renderizado de forma eficiente via `ctx.createPattern` (offscreen 16×16 → fill). Variação opcional com os tiles cópia `(27,3)/(30,3)/(29,16)` se forem visualmente diferentes.
 4. **Água**: 1–3 lagoas decorativas (não colidíveis) em posições determinísticas, com água aberta `(24,14)` + transições de costa (mapeadas na execução). Alternativa simples: só "poças" de água aberta sem borda.
-5. **Objetos decorativos**: espalhados com **PRNG semeado** (determinístico, mesmo mundo toda partida). **Não colidíveis** (mecânica inalterada). Desenhados na camada do chão (abaixo das entidades). Fonte recomendada: `Objects_separately/`; `Objects.png` como alternativa (mapear na execução).
+5. **Objetos decorativos**: espalhados com **PRNG semeado** (determinístico, mesmo mundo toda partida). **Não colidíveis** (mecânica inalterada). Desenhados na camada do chão (abaixo das entidades). Fonte: **`Objects_separately/`** (decisão final — objetos nomeados e já recortados; `Objects.png` descartado por ter conteúdo/índices divergentes do `.tmx`).
 6. **Escala**: manter 1:1 (personagem 64px = 4 tiles de 16px), `imageSmoothingEnabled = false`. Sem mudança de câmera/zoom.
 
 ---
@@ -122,7 +122,7 @@ Duas fontes possíveis:
 
 ### Passo C — Água decorativa
 1. Identificar visualmente (na execução) os tiles de transição de costa no `PNG/Water_coasts.png` (referência: água aberta em `(24,14)`; as bordas norte/sul/leste/oeste + cantos vêm das transições).
-2. Posicionar 1–3 lagoas (elipses/retângulos de tiles) em coordenadas fixas do mundo (ex.: cantos afastados), compostas de água aberta + borda de costa.
+2. Posicionar 1–3 lagoas (elipses/retângulos de tiles) em coordenadas fixas do mundo (ex.: cantos afastados), compostas de água aberta + borda de costa. (Fallback, se as transições forem difíceis de mapear: poças de água aberta sem borda.)
 3. Desenhar na camada do chão (abaixo das entidades). Não colidíveis.
 
 **Validação**: lagoas visíveis com borda, sem interferir na jogabilidade.
@@ -130,7 +130,7 @@ Duas fontes possíveis:
 ### Passo D — Objetos decorativos espalhados
 1. Implementar um **PRNG semeado** (ex.: `mulberry32(seed)`), com seed fixa.
 2. No `resetGame()`, gerar uma lista de objetos (tipo + x + y) uma única vez (não por frame), ex.: ~80–150 objetos distribuídos pelo mundo 4000×4000, evitando sobreposição (grade de ocupação).
-3. Tipos (de `Objects_separately/`, com `_shadow1`): Grave, Bones, Rock, Crystal, Tree, Dead_tree, Broken_tree, Ruin, Pile_sculls, Thorn_plant, Plant, Dead_arm. (Se preferir `Objects.png`, mapear os bounding boxes dos objetos na execução.)
+3. Tipos (de `Objects_separately/`, variante `_shadow1`): Grave, Bones, Rock, Crystal, Tree, Dead_tree, Broken_tree, Ruin, Pile_sculls, Thorn_plant, Plant, Dead_arm.
 4. `drawObjects()`: desenhar cada objeto na posição, na camada do chão. Não colidíveis.
 
 **Validação**: cenário "povoado" de túmulos/árvores/rochas, determinístico (mesmo layout toda partida), sem impacto mecânico.
@@ -156,11 +156,16 @@ Re-verifiquei cada item e garanti que:
 
 ---
 
-## ⚠️ 7. Riscos e questões abertas (decidir na execução)
+## ⚠️ 7. Decisões finais (aprovadas pelo PO) e validações de execução
 
-1. **Ordem das direções do vampiro**: inferida por pixels + nomes `.aseprite`; **confirmar visualmente** na execução (se invertido, é 1 linha de código a trocar).
-2. **Transições de costa**: o `PNG/Water_coasts.png` é repacked; mapear as bordas visualmente. Se ficar complexo, opção mínima = poças sem borda.
-3. **`Objects.png` vs `Objects_separately/`**: o PO pediu `Objects.png`, mas `Objects_separately/` é mais simples e já recortado. Recomendo `Objects_separately/` (mesma arte, mesmo pacote); confirmar com o PO.
-4. **Colisão de objetos**: plano assume **decorativo** (não colidível) para não alterar mecânica. Se o PO quiser colisão, vira tarefa de mecânica à parte.
-5. **Variação de chão**: os tiles cópia `(27,3)/(30,3)/(29,16)` podem ser variações ou duplicatas — confirmar visualmente antes de usar como variação.
-6. **Lich (256×256)**: disponível como decoração ou futuro mini-boss; fora do escopo desta tarefa.
+> Todos os pontos em aberto foram resolvidos seguindo as recomendações do planejamento.
+
+| # | Ponto | Decisão final |
+| :--- | :--- | :--- |
+| 1 | Fonte dos objetos | **`Objects_separately/`** (objetos nomeados/recortados). `Objects.png` descartado. |
+| 2 | Colisão dos objetos | **Decorativos, não colidíveis** (mecânica inalterada). |
+| 3 | Transições de costa (água) | Mapear visualmente no `PNG/Water_coasts.png` na execução; fallback se complexo = poças de água aberta sem borda. |
+| 4 | Variação de chão | Usar o tile base `(2,2)`; intercalar variações só se `(27,3)/(30,3)/(29,16)` forem visualmente distintas (validar na execução). |
+| 5 | Lich (256×256) | Fora do escopo desta tarefa. |
+| 6 | Ordem das direções do vampiro | Assumir `front,back,left,right`; **validar visualmente na execução** (ajuste de 1 linha se invertido). |
+| 7 | Sombra | `With_shadow` + variante `_shadow1` (padrão do jogador). |
