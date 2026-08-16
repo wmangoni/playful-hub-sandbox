@@ -85,7 +85,7 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_005.md` | Sangue & Prata | Etapa 4 — Arsenal Completo (Machado, Besta e Água Benta) | ✅ Done | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_005.md) |
 | `TASK_006.md` | Sangue & Prata | Etapa 5 — Baús e Roleta de Recompensa | ✅ Done | | Alta | [TASK_006.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_006.md) |
 | `TASK_007.md` | Sangue & Prata | Etapa 6 — Evoluções (Synergies) | ✅ Done | | Alta | [TASK_007.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_007.md) |
-| `TASK_008.md` | Sangue & Prata | Etapa 7 — Chefes (Boss Fight) com HP Escalado | 📋 Backlog | | Alta | [TASK_008.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_008.md) |
+| `TASK_008.md` | Sangue & Prata | Etapa 7 — Chefes (Boss Fight) com HP Escalado | ✅ Done | | Alta | [TASK_008.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_008.md) |
 | `TASK_009.md` | Sangue & Prata | Etapa 8 — Polish, SFX Procedural e Publicação no Hub | 📋 Backlog | | Alta | [TASK_009.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_009.md) |
 
 

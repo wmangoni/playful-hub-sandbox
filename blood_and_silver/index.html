@@ -326,6 +326,48 @@
         .reveal-card {
             animation: revealCard 0.45s ease-out both;
         }
+
+        .boss-bar {
+            position: fixed;
+            top: 76px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            text-align: center;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .boss-bar.hidden {
+            display: none;
+        }
+
+        .boss-name {
+            font-family: 'Cinzel', serif;
+            font-size: 16px;
+            font-weight: 900;
+            color: #ff5a6e;
+            text-shadow: 0 1px 4px #000;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+        }
+
+        .boss-hp {
+            height: 14px;
+            width: 100%;
+            background: rgba(10, 5, 8, 0.8);
+            border: 2px solid #a02030;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 0 12px rgba(255, 40, 70, 0.35);
+        }
+
+        .boss-hp-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #8c1f2f, #ff3b5a);
+            transition: width 0.1s linear;
+        }
     </style>
 </head>
 <body>
@@ -350,6 +392,11 @@
         <div class="hud-right">
             <div class="time" id="timeText">00:00</div>
         </div>
+    </div>
+
+    <div class="boss-bar hidden" id="bossBar">
+        <div class="boss-name">VAMPIRO ANCIÃO</div>
+        <div class="boss-hp"><div class="boss-hp-fill" id="bossHpFill"></div></div>
     </div>
 
     <div class="overlay" id="startScreen">
@@ -410,6 +457,7 @@
         const CONFIG = {
             player: { radius: 16, maxHp: 100, speed: 220, hitCooldown: 0.7, collectRadius: 90 },
             skeleton: { radius: 14, hp: 20, speed: 62, damage: 6 },
+            boss: { baseHp: 800, radius: 64, speed: 40, damage: 25, interval: 120 },
             maxEnemies: 320,
             maxProjectiles: 200,
             maxOrbs: 400,
@@ -423,6 +471,8 @@
             chestPity: 60,
             chestRadius: 16
         };
+
+        const MAX_ENEMY_RADIUS = Math.max(CONFIG.skeleton.radius, CONFIG.boss.radius);
 
         const WEAPONS = {
             sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
@@ -473,6 +523,8 @@
         const chestSubtitle = document.getElementById('chestSubtitle');
         const chestCards = document.getElementById('chestCards');
         const chestBtn = document.getElementById('chestBtn');
+        const bossBar = document.getElementById('bossBar');
+        const bossHpFill = document.getElementById('bossHpFill');
         const startBtn = document.getElementById('startBtn');
         const restartBtn = document.getElementById('restartBtn');
         const goTime = document.getElementById('goTime');
@@ -504,7 +556,9 @@
             time: 0,
             kills: 0,
             spawnTimer: 0,
-            chestTimer: 60
+            chestTimer: 60,
+            bossTimer: 120,
+            activeBoss: null
         };
 
         const player = {
@@ -566,7 +620,7 @@
                 enemies.push({
                     x: 0, y: 0, radius: CONFIG.skeleton.radius,
                     hp: 0, maxHp: 0, speed: 0, damage: CONFIG.skeleton.damage,
-                    alive: false, jitter: 0, jitterTimer: 0, animTime: 0
+                    alive: false, isBoss: false, jitter: 0, jitterTimer: 0, animTime: 0
                 });
             }
         }
@@ -688,6 +742,8 @@
             game.kills = 0;
             game.spawnTimer = 0.6;
             game.chestTimer = CONFIG.chestPity;
+            game.bossTimer = CONFIG.boss.interval;
+            game.activeBoss = null;
             game.status = 'playing';
             for (const e of enemies) e.alive = false;
             for (const p of projectiles) p.alive = false;
@@ -749,6 +805,17 @@
             xpFill.style.width = Math.max(0, Math.min(100, (player.xp / player.xpToNext) * 100)) + '%';
             updateWeaponsRow();
             updatePassivesRow();
+            updateBossHud();
+        }
+
+        function updateBossHud() {
+            if (game.activeBoss && game.activeBoss.alive) {
+                bossBar.classList.remove('hidden');
+                const pct = Math.max(0, Math.min(100, (game.activeBoss.hp / game.activeBoss.maxHp) * 100));
+                bossHpFill.style.width = pct + '%';
+            } else {
+                bossBar.classList.add('hidden');
+            }
         }
 
         function updateWeaponsRow() {
@@ -853,7 +920,7 @@
                 const arcHalf = c.arcHalf;
                 const knockback = c.knockback;
                 const r2 = range * range;
-                const queryR = range + CONFIG.skeleton.radius;
+                const queryR = range + MAX_ENEMY_RADIUS;
                 for (const e of queryRange(player.x, player.y, queryR)) {
                     if (!e.alive) continue;
                     const dx = e.x - player.x;
@@ -905,7 +972,7 @@
                 if (z.timer >= z.duration) { z.alive = false; continue; }
                 if (z.tick <= 0) {
                     z.tick = 0.5;
-                    for (const e of queryRange(z.x, z.y, z.radius + CONFIG.skeleton.radius)) {
+                    for (const e of queryRange(z.x, z.y, z.radius + MAX_ENEMY_RADIUS)) {
                         if (!e.alive) continue;
                         const dx = e.x - z.x;
                         const dy = e.y - z.y;
@@ -978,7 +1045,7 @@
         }
 
         function updatePlayerCollisions() {
-            for (const e of queryRange(player.x, player.y, player.radius + CONFIG.skeleton.radius)) {
+            for (const e of queryRange(player.x, player.y, player.radius + MAX_ENEMY_RADIUS)) {
                 if (!e.alive) continue;
                 const dx = e.x - player.x;
                 const dy = e.y - player.y;
@@ -999,7 +1066,7 @@
                     p.alive = false;
                     continue;
                 }
-                for (const e of queryRange(p.x, p.y, p.radius + CONFIG.skeleton.radius)) {
+                for (const e of queryRange(p.x, p.y, p.radius + MAX_ENEMY_RADIUS)) {
                     if (!e.alive) continue;
                     if (p.hits && p.hits.indexOf(e) !== -1) continue;
                     const dx = e.x - p.x;
@@ -1132,7 +1199,7 @@
         function separateEnemies() {
             for (const e of enemies) {
                 if (!e.alive) continue;
-                for (const o of queryRange(e.x, e.y, e.radius + CONFIG.skeleton.radius)) {
+                for (const o of queryRange(e.x, e.y, e.radius + MAX_ENEMY_RADIUS)) {
                     if (!o.alive || o === e) continue;
                     const dx = o.x - e.x;
                     const dy = o.y - e.y;
@@ -1170,12 +1237,56 @@
             e.y = player.y + Math.sin(angle) * d;
             e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
             e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
+            e.isBoss = false;
+            e.radius = CONFIG.skeleton.radius;
             e.hp = e.maxHp = CONFIG.skeleton.hp * (1 + game.time * 0.03);
             e.speed = CONFIG.skeleton.speed * (1 + game.time * 0.008);
+            e.damage = CONFIG.skeleton.damage;
             e.jitter = 0;
             e.jitterTimer = 0;
             e.animTime = Math.random() * 10;
             e.alive = true;
+        }
+
+        function computeBossHP() {
+            const weaponPower = player.weapons.reduce(function (s, w) { return s + w.level; }, 0);
+            const passivePower = player.passives.reduce(function (s, p) { return s + p.level; }, 0);
+            return Math.round(
+                CONFIG.boss.baseHp
+                * (1 + (player.level - 1) * 0.25)
+                * (1 + weaponPower * 0.05 + passivePower * 0.03)
+            );
+        }
+
+        function spawnBoss() {
+            const e = enemies.find(function (x) { return !x.alive; });
+            if (!e) return;
+            const angle = Math.random() * TWO_PI;
+            const d = (Math.max(VIEW_W, VIEW_H) / 2) + 140;
+            e.x = player.x + Math.cos(angle) * d;
+            e.y = player.y + Math.sin(angle) * d;
+            e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
+            e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
+            e.isBoss = true;
+            e.radius = CONFIG.boss.radius;
+            e.hp = e.maxHp = computeBossHP();
+            e.speed = CONFIG.boss.speed;
+            e.damage = CONFIG.boss.damage;
+            e.jitter = 0;
+            e.jitterTimer = 0;
+            e.animTime = 0;
+            e.alive = true;
+            game.activeBoss = e;
+            if (audio) audio.play('boss');
+        }
+
+        function updateBoss(dt) {
+            if (game.activeBoss && game.activeBoss.alive) return;
+            game.bossTimer -= dt;
+            if (game.bossTimer <= 0) {
+                game.bossTimer = CONFIG.boss.interval;
+                spawnBoss();
+            }
         }
 
         function hitEnemy(e, dmg, kbx, kby) {
@@ -1192,10 +1303,17 @@
         function killEnemy(e) {
             e.alive = false;
             game.kills += 1;
-            dropOrb(e.x, e.y);
-            if (Math.random() < CONFIG.chestDropChance) spawnChest(e.x, e.y, rollChestRarity());
+            if (e.isBoss) {
+                game.activeBoss = null;
+                for (let i = 0; i < 10; i++) dropOrb(e.x + (Math.random() - 0.5) * 60, e.y + (Math.random() - 0.5) * 60);
+                spawnChest(e.x, e.y, Math.random() < 0.5 ? 'legendary' : 'rare');
+                spawnParticles(e.x, e.y, '#e8435b', 40);
+            } else {
+                dropOrb(e.x, e.y);
+                if (Math.random() < CONFIG.chestDropChance) spawnChest(e.x, e.y, rollChestRarity());
+                spawnParticles(e.x, e.y, '#cfd6e6', 8);
+            }
             if (audio) audio.play('death');
-            spawnParticles(e.x, e.y, '#cfd6e6', 8);
             updateHud();
         }
 
@@ -1448,6 +1566,7 @@
             updatePlayerCollisions();
             separateEnemies();
             updateSpawns(dt);
+            updateBoss(dt);
             updateChests(dt);
             updateChestCollection();
             updateParticles(dt);
@@ -1655,7 +1774,15 @@
                     row = dy > 0 ? 0 : 1;
                 }
                 const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
-                drawSprite(img, row, frame, anim.frames, sx, sy, 64, 64, flip);
+                if (e.isBoss) {
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(255, 40, 70, 0.9)';
+                    ctx.shadowBlur = 22;
+                    drawSprite(img, row, frame, anim.frames, sx, sy, 128, 128, flip);
+                    ctx.restore();
+                } else {
+                    drawSprite(img, row, frame, anim.frames, sx, sy, 64, 64, flip);
+                }
             }
         }
 
@@ -1768,6 +1895,10 @@
                     tone('sawtooth', 300, 900, 0.4, 0.22);
                     setTimeout(function () { tone('sine', 600, 600, 0.2, 0.2); }, 200);
                     setTimeout(function () { tone('sine', 800, 800, 0.3, 0.2); }, 340);
+                }
+                else if (name === 'boss') {
+                    tone('sawtooth', 90, 45, 0.8, 0.3);
+                    tone('sawtooth', 120, 60, 0.8, 0.2);
                 }
                 else if (name === 'gameover') {
                     tone('sawtooth', 300, 60, 1.1, 0.28);
