@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_006: Etapa 5 — Baús e Roleta de Recompensa
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — aguardando refinamento do TL.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — Etapa 5 implementada e testável.
 > **Spec guarda-chuva**: [`TASK_001.md`](./TASK_001.md) → seção 11 (Etapa 5).
 
 ## 🎯 Objetivo
