@@ -260,6 +260,8 @@
             border-radius: 6px;
             padding: 3px 10px;
             text-shadow: 0 1px 3px #000;
+            pointer-events: auto;
+            cursor: help;
         }
 
         .passive-chip {
@@ -272,6 +274,8 @@
             border-radius: 6px;
             padding: 2px 8px;
             text-shadow: 0 1px 3px #000;
+            pointer-events: auto;
+            cursor: help;
         }
 
         .upgrade-cards {
@@ -315,6 +319,13 @@
         .upgrade-card .uc-desc {
             font-size: 13px;
             color: #c79aa4;
+        }
+
+        .upgrade-card .uc-prog {
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffd9a0;
         }
 
         @keyframes revealCard {
@@ -367,6 +378,148 @@
             width: 100%;
             background: linear-gradient(90deg, #8c1f2f, #ff3b5a);
             transition: width 0.1s linear;
+        }
+
+        .tooltip {
+            position: fixed;
+            z-index: 50;
+            pointer-events: none;
+            max-width: 270px;
+            padding: 14px 16px;
+            color: #f3e6d3;
+            background-image: url('../assets/ui-for-rpg/PNG/Action_panel.png');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-color: rgba(16, 8, 12, 0.96);
+            border: 1px solid #6b1f2a;
+            border-radius: 5px;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.75), 0 0 18px rgba(160, 40, 60, 0.25);
+            image-rendering: pixelated;
+            display: none;
+        }
+
+        .tooltip.visible { display: block; }
+
+        .tip-title {
+            font-family: 'Cinzel', serif;
+            font-size: 17px;
+            font-weight: 900;
+            color: #f3e6d3;
+            text-shadow: 0 1px 3px #000;
+        }
+
+        .tip-level {
+            font-size: 12px;
+            color: #c79aa4;
+            margin-top: 2px;
+            letter-spacing: 1px;
+        }
+
+        .tip-desc {
+            font-size: 13px;
+            color: #e9e2d8;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .tip-stats {
+            font-size: 13px;
+            color: #ffd9a0;
+            margin-top: 8px;
+            line-height: 1.6;
+        }
+
+        .tip-evo {
+            font-size: 11px;
+            color: #9fd0ff;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .pause-content {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+            justify-content: center;
+            max-width: 760px;
+            margin: 4px 0 22px;
+            text-align: left;
+        }
+
+        .pause-card {
+            min-width: 220px;
+            max-width: 240px;
+            padding: 22px 20px;
+            background-image: url('../assets/ui-for-rpg/PNG/character_panel.png');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-color: rgba(16, 8, 12, 0.9);
+            border: 1px solid #6b1f2a;
+            border-radius: 6px;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.7);
+            image-rendering: pixelated;
+        }
+
+        .pause-card .pc-title {
+            font-family: 'Cinzel', serif;
+            font-size: 20px;
+            font-weight: 900;
+            color: #f3e6d3;
+            margin-bottom: 14px;
+            text-shadow: 0 1px 4px #000;
+        }
+
+        .pause-card .pc-stat {
+            font-size: 14px;
+            color: #d8cdbf;
+            margin-top: 8px;
+        }
+
+        .pause-card .pc-stat b {
+            color: #f3e6d3;
+        }
+
+        .pause-lists {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 300px;
+        }
+
+        .pause-section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #c79aa4;
+            margin-bottom: 6px;
+        }
+
+        .pause-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            margin: 0 8px 8px 0;
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #f3e6d3;
+            background-image: url('../assets/ui-for-rpg/PNG/Action_panel.png');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-color: rgba(16, 8, 12, 0.88);
+            border: 1px solid #6b1f2a;
+            border-radius: 5px;
+            text-shadow: 0 1px 3px #000;
+            cursor: help;
+            image-rendering: pixelated;
+        }
+
+        .pause-row .pr-lv {
+            color: #ffd9a0;
+            font-size: 12px;
+            margin-left: 2px;
         }
     </style>
 </head>
@@ -437,6 +590,32 @@
         <button class="btn" id="chestBtn">Coletar</button>
     </div>
 
+    <div class="overlay hidden" id="pauseScreen">
+        <h1>PAUSADO</h1>
+        <div class="subtitle">Estatísticas da caçada</div>
+        <div class="pause-content">
+            <div class="pause-card">
+                <div class="pc-title" id="pauseLevel">Nv 1</div>
+                <div class="pc-stat">Abates: <b id="pauseKills">0</b></div>
+                <div class="pc-stat">Tempo: <b id="pauseTime">00:00</b></div>
+                <div class="pc-stat">Vida: <b id="pauseHp">100 / 100</b></div>
+            </div>
+            <div class="pause-lists">
+                <div class="pause-section">
+                    <div class="pause-section-title">ARMAS</div>
+                    <div id="pauseWeapons"></div>
+                </div>
+                <div class="pause-section">
+                    <div class="pause-section-title">PASSIVOS</div>
+                    <div id="pausePassives"></div>
+                </div>
+            </div>
+        </div>
+        <div class="hint">Pressione <span class="key">ENTER</span> para continuar</div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
     <script>
     (function () {
         'use strict';
@@ -476,11 +655,11 @@
         const MAX_ENEMY_RADIUS = Math.max(CONFIG.skeleton.radius, CONFIG.boss.radius);
 
         const WEAPONS = {
-            sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
-            axe: { name: 'Machado', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
-            bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, synergyPassive: 'feather', icon: '🏹', color: '#bfe6ff' },
-            crossbow: { name: 'Besta', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, synergyPassive: 'amulet', icon: '🎯', color: '#7df0ff' },
-            holy_water: { name: 'Água Benta', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, synergyPassive: 'mushroom', icon: '🧪', color: '#b78aff' }
+            sword: { name: 'Espada', desc: 'Golpeia em arco à sua volta.', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
+            axe: { name: 'Machado', desc: 'Golpe pesado e lento, com grande dano e empurrão.', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
+            bow: { name: 'Arco', desc: 'Dispara flechas no inimigo mais próximo.', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, synergyPassive: 'feather', icon: '🏹', color: '#bfe6ff' },
+            crossbow: { name: 'Besta', desc: 'Dispara virotes que atravessam vários inimigos.', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, synergyPassive: 'amulet', icon: '🎯', color: '#7df0ff' },
+            holy_water: { name: 'Água Benta', desc: 'Derrama água benta que queima uma área por alguns segundos.', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, synergyPassive: 'mushroom', icon: '🧪', color: '#b78aff' }
         };
 
         const EVOLVED_WEAPONS = {
@@ -492,14 +671,14 @@
         };
 
         const PASSIVES = {
-            amulet: { name: 'Amuleto', stat: 'area', amount: 0.10, maxLevel: 5, icon: '📿' },
-            pyrope: { name: 'Joia Carmesim', stat: 'might', amount: 0.10, maxLevel: 5, icon: '💎' },
-            mechanism: { name: 'Engrenagem', stat: 'cooldown', amount: 0.08, maxLevel: 5, icon: '⚙️' },
-            feather: { name: 'Pena', stat: 'speed', amount: 0.10, maxLevel: 5, icon: '🪶' },
-            meat: { name: 'Carne', stat: 'maxhp', amount: 15, maxLevel: 5, icon: '🥩' },
-            mushroom: { name: 'Cogumelo Noturno', stat: 'regen', amount: 0.5, maxLevel: 5, icon: '🍄' },
-            spirit_orb: { name: 'Orbe Espiritual', stat: 'magnet', amount: 15, maxLevel: 5, icon: '🔮' },
-            boar_ring: { name: 'Anel do Javali', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' }
+            amulet: { name: 'Amuleto', desc: 'Aumenta a área de efeito.', stat: 'area', amount: 0.10, maxLevel: 5, icon: '📿' },
+            pyrope: { name: 'Joia Carmesim', desc: 'Aumenta o dano das armas.', stat: 'might', amount: 0.10, maxLevel: 5, icon: '💎' },
+            mechanism: { name: 'Engrenagem', desc: 'Reduz o tempo de recarga das armas.', stat: 'cooldown', amount: 0.08, maxLevel: 5, icon: '⚙️' },
+            feather: { name: 'Pena', desc: 'Aumenta a velocidade dos projéteis.', stat: 'speed', amount: 0.10, maxLevel: 5, icon: '🪶' },
+            meat: { name: 'Carne', desc: 'Aumenta a vida máxima.', stat: 'maxhp', amount: 15, maxLevel: 5, icon: '🥩' },
+            mushroom: { name: 'Cogumelo Noturno', desc: 'Regenera vida aos poucos.', stat: 'regen', amount: 0.5, maxLevel: 5, icon: '🍄' },
+            spirit_orb: { name: 'Orbe Espiritual', desc: 'Atrai gemas de mais longe.', stat: 'magnet', amount: 15, maxLevel: 5, icon: '🔮' },
+            boar_ring: { name: 'Anel do Javali', desc: 'Aumenta a velocidade de movimento.', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' }
         };
 
         const canvas = document.getElementById('game');
@@ -532,6 +711,14 @@
         const goKills = document.getElementById('goKills');
         const goLevel = document.getElementById('goLevel');
         const goBest = document.getElementById('goBest');
+        const tooltip = document.getElementById('tooltip');
+        const pauseScreen = document.getElementById('pauseScreen');
+        const pauseLevel = document.getElementById('pauseLevel');
+        const pauseKills = document.getElementById('pauseKills');
+        const pauseTime = document.getElementById('pauseTime');
+        const pauseHp = document.getElementById('pauseHp');
+        const pauseWeapons = document.getElementById('pauseWeapons');
+        const pausePassives = document.getElementById('pausePassives');
 
         const ASSETS = {
             playerWalk: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_Walk_with_shadow.png',
@@ -775,6 +962,60 @@
             recomputeStats();
         }
 
+        const STAT_LABELS = {
+            area: 'área de efeito',
+            might: 'dano',
+            cooldown: 'recarga',
+            speed: 'vel. de projéteis',
+            maxhp: 'vida máxima',
+            regen: 'regeneração',
+            magnet: 'raio de coleta',
+            move_speed: 'vel. de movimento'
+        };
+
+        function passiveBonusText(c, level) {
+            if (c.stat === 'cooldown') return '-' + Math.round(c.amount * 100) + '% ' + STAT_LABELS[c.stat] + ' por nível';
+            if (c.stat === 'maxhp' || c.stat === 'magnet') return '+' + c.amount + ' ' + STAT_LABELS[c.stat] + ' por nível';
+            return '+' + Math.round(c.amount * 100) + '% ' + STAT_LABELS[c.stat] + ' por nível';
+        }
+
+        function describeWeapon(w) {
+            const c = WEAPONS[w.id];
+            const name = w.evolvedName || c.name;
+            let html = '<div class="tip-title">' + c.icon + ' ' + name + '</div>';
+            html += '<div class="tip-level">Nível ' + w.level + ' / ' + w.maxLevel + '</div>';
+            html += '<div class="tip-desc">' + c.desc + '</div>';
+            const lines = [];
+            lines.push('Dano: ' + Math.round(w.damage));
+            lines.push('Recarga: ' + w.interval.toFixed(2) + 's');
+            if (w.range) lines.push('Alcance: ' + Math.round(w.range));
+            if (w.area) lines.push('Área: ' + Math.round(w.area));
+            if (w.duration) lines.push('Duração: ' + w.duration.toFixed(1) + 's');
+            if (c.behavior === 'nearest-projectile' && w.count > 1) lines.push('Projéteis: ' + w.count);
+            else if (c.behavior === 'random-area' && w.count > 1) lines.push('Poças: ' + w.count);
+            if (w.pierce) lines.push('Atravessa inimigos');
+            html += '<div class="tip-stats">' + lines.join('<br>') + '</div>';
+            if (w.evolved) {
+                html += '<div class="tip-evo">✦ Evoluída</div>';
+            } else if (c.synergyPassive) {
+                html += '<div class="tip-evo">Evolui no nv ' + w.maxLevel + ' com ' + PASSIVES[c.synergyPassive].name + '</div>';
+            }
+            return html;
+        }
+
+        function describePassive(p) {
+            const c = PASSIVES[p.id];
+            let html = '<div class="tip-title">' + c.icon + ' ' + c.name + '</div>';
+            html += '<div class="tip-level">Nível ' + p.level + ' / ' + c.maxLevel + '</div>';
+            html += '<div class="tip-desc">' + c.desc + '</div>';
+            let total;
+            if (c.stat === 'cooldown') total = '-' + Math.round(c.amount * p.level * 100) + '%';
+            else if (c.stat === 'maxhp' || c.stat === 'magnet') total = '+' + (c.amount * p.level);
+            else total = '+' + Math.round(c.amount * p.level * 100) + '%';
+            html += '<div class="tip-stats">' + passiveBonusText(c, p.level) + '<br>Total atual: ' + total + '</div>';
+            return html;
+        }
+
         function recomputeStats() {
             const s = { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1 };
             for (const p of player.passives) {
@@ -838,6 +1079,7 @@
             gameoverScreen.classList.add('hidden');
             levelupScreen.classList.add('hidden');
             chestScreen.classList.add('hidden');
+            pauseScreen.classList.add('hidden');
             if (s === 'menu') startScreen.classList.remove('hidden');
             if (s === 'gameover') {
                 goTime.textContent = formatTime(game.time);
@@ -848,6 +1090,7 @@
             }
             if (s === 'levelup') levelupScreen.classList.remove('hidden');
             if (s === 'chest') chestScreen.classList.remove('hidden');
+            if (s === 'paused') pauseScreen.classList.remove('hidden');
         }
 
         function startGame() {
@@ -904,6 +1147,30 @@
             }
         }
 
+        function showTooltip(html, clientX, clientY) {
+            tooltip.innerHTML = html;
+            tooltip.classList.add('visible');
+            const pad = 16;
+            const tw = tooltip.offsetWidth || 220;
+            const th = tooltip.offsetHeight || 140;
+            let x = clientX + pad;
+            let y = clientY + pad;
+            if (x + tw > window.innerWidth - 8) x = clientX - tw - pad;
+            if (y + th > window.innerHeight - 8) y = clientY - th - pad;
+            tooltip.style.left = Math.max(8, x) + 'px';
+            tooltip.style.top = Math.max(8, y) + 'px';
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('visible');
+        }
+
+        function bindTooltip(el, getHtml) {
+            el.addEventListener('mouseenter', function (e) { showTooltip(getHtml(), e.clientX, e.clientY); });
+            el.addEventListener('mousemove', function (e) { showTooltip(getHtml(), e.clientX, e.clientY); });
+            el.addEventListener('mouseleave', hideTooltip);
+        }
+
         function updateWeaponsRow() {
             weaponsRow.innerHTML = '';
             for (const w of player.weapons) {
@@ -911,7 +1178,7 @@
                 const chip = document.createElement('span');
                 chip.className = 'weapon-chip';
                 chip.textContent = (w.evolved ? '✨' : '') + c.icon + ' ' + w.level;
-                chip.title = w.evolvedName || c.name;
+                bindTooltip(chip, function () { return describeWeapon(w); });
                 weaponsRow.appendChild(chip);
             }
         }
@@ -923,7 +1190,44 @@
                 const chip = document.createElement('span');
                 chip.className = 'passive-chip';
                 chip.textContent = c.icon + ' ' + p.level;
+                bindTooltip(chip, function () { return describePassive(p); });
                 passivesRow.appendChild(chip);
+            }
+        }
+
+        function renderPauseScreen() {
+            pauseLevel.textContent = 'Nv ' + player.level;
+            pauseKills.textContent = String(game.kills);
+            pauseTime.textContent = formatTime(game.time);
+            pauseHp.textContent = Math.ceil(player.hp) + ' / ' + player.maxHp;
+            pauseWeapons.innerHTML = '';
+            for (const w of player.weapons) {
+                const c = WEAPONS[w.id];
+                const name = w.evolvedName || c.name;
+                const row = document.createElement('span');
+                row.className = 'pause-row';
+                row.innerHTML = (w.evolved ? '✨' : '') + c.icon + ' ' + name + '<span class="pr-lv">Nv ' + w.level + '</span>';
+                bindTooltip(row, function () { return describeWeapon(w); });
+                pauseWeapons.appendChild(row);
+            }
+            pausePassives.innerHTML = '';
+            for (const p of player.passives) {
+                const c = PASSIVES[p.id];
+                const row = document.createElement('span');
+                row.className = 'pause-row';
+                row.innerHTML = c.icon + ' ' + c.name + '<span class="pr-lv">Nv ' + p.level + '</span>';
+                bindTooltip(row, function () { return describePassive(p); });
+                pausePassives.appendChild(row);
+            }
+        }
+
+        function togglePause() {
+            if (game.status === 'playing') {
+                renderPauseScreen();
+                setStatus('paused');
+                for (const k in keys) keys[k] = false;
+            } else if (game.status === 'paused') {
+                setStatus('playing');
             }
         }
 
@@ -939,6 +1243,7 @@
             else if (game.status === 'gameover' && k === 'enter') startGame();
             else if (game.status === 'levelup' && (k === '1' || k === '2' || k === '3')) chooseUpgrade(parseInt(k, 10) - 1);
             else if (game.status === 'chest' && (k === 'enter' || k === ' ')) closeChest();
+            else if ((game.status === 'playing' || game.status === 'paused') && k === 'enter') togglePause();
         }
 
         function onKeyUp(e) {
@@ -1238,25 +1543,28 @@
             opts.forEach(function (opt, i) {
                 const el = document.createElement('div');
                 el.className = 'upgrade-card';
-                let icon, title, desc;
+                let icon, title, desc, prog = '';
                 if (opt.kind === 'heal') {
                     icon = '❤️';
                     title = 'Restaurar Vida';
-                    desc = '+' + CONFIG.healAmount + ' de vida';
+                    desc = 'Recupera parte da sua vida.';
+                    prog = '+' + CONFIG.healAmount + ' de vida';
                 } else if (opt.kind === 'weapon') {
                     const c = WEAPONS[opt.id];
                     const w = player.weapons.find(function (x) { return x.id === opt.id; });
                     icon = c.icon;
                     title = c.name;
-                    desc = w ? ('Nível ' + w.level + ' → ' + (w.level + 1)) : 'NOVA ARMA';
+                    desc = c.desc;
+                    prog = w ? ('Nível ' + w.level + ' → ' + (w.level + 1)) : 'NOVA ARMA';
                 } else {
                     const c = PASSIVES[opt.id];
                     const p = player.passives.find(function (x) { return x.id === opt.id; });
                     icon = c.icon;
                     title = c.name;
-                    desc = p ? ('Nível ' + p.level + ' → ' + (p.level + 1)) : 'NOVO PASSIVO';
+                    desc = c.desc + '<br>' + passiveBonusText(c, 1);
+                    prog = p ? ('Nível ' + p.level + ' → ' + (p.level + 1)) : 'NOVO PASSIVO';
                 }
-                el.innerHTML = '<div class="uc-icon">' + icon + '</div><div class="uc-title">' + title + '</div><div class="uc-desc">' + desc + '</div>';
+                el.innerHTML = '<div class="uc-icon">' + icon + '</div><div class="uc-title">' + title + '</div><div class="uc-desc">' + desc + '</div><div class="uc-prog">' + prog + '</div>';
                 el.addEventListener('click', function () { chooseUpgrade(i); });
                 upgradeCards.appendChild(el);
             });
@@ -1544,15 +1852,18 @@
                 el.className = 'upgrade-card reveal-card';
                 el.style.borderColor = '#c98a5a';
                 el.style.boxShadow = '0 0 26px rgba(220, 150, 60, 0.6)';
-                el.innerHTML = '<div class="uc-icon">' + evoInfo.icon + '</div><div class="uc-title">' + evoInfo.newName + '</div><div class="uc-desc">EVOLUÇÃO! (' + evoInfo.oldName + ' → ' + evoInfo.newName + ')</div>';
+                const base = WEAPONS[evoInfo.id];
+                el.innerHTML = '<div class="uc-icon">' + evoInfo.icon + '</div><div class="uc-title">' + evoInfo.newName + '</div><div class="uc-desc">' + base.desc + '</div><div class="uc-prog">EVOLUÇÃO! (' + evoInfo.oldName + ' → ' + evoInfo.newName + ')</div>';
                 chestCards.appendChild(el);
             }
             infos.forEach(function (info, i) {
                 const el = document.createElement('div');
                 el.className = 'upgrade-card reveal-card';
                 el.style.animationDelay = ((evoInfo ? 1 : 0) + i * 0.25) + 's';
-                const desc = info.isNew ? 'NOVA ARMA' : ('Nível ' + info.level + ' → ' + (info.level + 1));
-                el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + desc + '</div>';
+                const c = WEAPONS[info.id];
+                const desc = c.desc;
+                const prog = info.isNew ? 'NOVA ARMA' : ('Nível ' + info.level + ' → ' + (info.level + 1));
+                el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + desc + '</div><div class="uc-prog">' + prog + '</div>';
                 chestCards.appendChild(el);
             });
         }
