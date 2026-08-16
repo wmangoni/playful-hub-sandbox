@@ -425,11 +425,19 @@
         };
 
         const WEAPONS = {
-            sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, icon: '⚔️', color: '#ffcf82' },
-            axe: { name: 'Machado', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, icon: '🪓', color: '#ff8a72' },
-            bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, icon: '🏹', color: '#bfe6ff' },
-            crossbow: { name: 'Besta', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, icon: '🎯', color: '#7df0ff' },
-            holy_water: { name: 'Água Benta', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, icon: '🧪', color: '#b78aff' }
+            sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
+            axe: { name: 'Machado', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
+            bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, synergyPassive: 'feather', icon: '🏹', color: '#bfe6ff' },
+            crossbow: { name: 'Besta', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, synergyPassive: 'amulet', icon: '🎯', color: '#7df0ff' },
+            holy_water: { name: 'Água Benta', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, synergyPassive: 'mushroom', icon: '🧪', color: '#b78aff' }
+        };
+
+        const EVOLVED_WEAPONS = {
+            sword: { name: 'Espada Rubra', damage: 55, count: 3, range: 120 },
+            axe: { name: 'Machado Tempestade', damage: 90, count: 2, interval: 1.1 },
+            bow: { name: 'Arco Celeste', damage: 30, count: 3, projectileSpeed: 520 },
+            crossbow: { name: 'Besta Espalhada', damage: 24, count: 5, pierce: true },
+            holy_water: { name: 'Água Sagrada', damage: 26, area: 130, duration: 4.5 }
         };
 
         const PASSIVES = {
@@ -565,7 +573,7 @@
 
         function initProjectilePool() {
             for (let i = 0; i < CONFIG.maxProjectiles; i++) {
-                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', pierce: false, hits: null, alive: false });
+                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', pierce: false, evolved: false, hits: null, alive: false });
             }
         }
 
@@ -594,6 +602,7 @@
                 damage: c.damage, interval: c.interval, count: c.count,
                 range: c.range || 0, area: c.area || 0, duration: c.duration || 0,
                 projectileSpeed: c.projectileSpeed || 0, pierce: !!c.pierce,
+                evolved: false, evolvedName: '',
                 timer: 0, animTimer: 0
             };
         }
@@ -607,6 +616,25 @@
             if (c.range) w.range = c.range * (1 + (w.level - 1) * 0.08);
             if (c.area) w.area = c.area * (1 + (w.level - 1) * 0.1);
             if (w.id === 'bow' || w.id === 'crossbow' || w.id === 'holy_water') w.count = c.count + Math.floor((w.level - 1) / 3);
+        }
+
+        function isEvolvable(w) {
+            return w.level >= w.maxLevel && !w.evolved && player.passives.some(function (p) { return p.id === WEAPONS[w.id].synergyPassive; });
+        }
+
+        function evolveWeapon(w) {
+            const evo = EVOLVED_WEAPONS[w.id];
+            const base = WEAPONS[w.id];
+            w.evolved = true;
+            w.evolvedName = evo.name;
+            if (evo.damage) w.damage = evo.damage;
+            if (evo.count) w.count = evo.count;
+            if (evo.range) w.range = evo.range;
+            if (evo.interval) w.interval = evo.interval;
+            if (evo.projectileSpeed) w.projectileSpeed = evo.projectileSpeed;
+            if (evo.area) w.area = evo.area;
+            if (evo.duration) w.duration = evo.duration;
+            return { id: w.id, icon: base.icon, oldName: base.name, newName: evo.name };
         }
 
         function nextLevelXP(level) {
@@ -729,7 +757,8 @@
                 const c = WEAPONS[w.id];
                 const chip = document.createElement('span');
                 chip.className = 'weapon-chip';
-                chip.textContent = c.icon + ' ' + w.level;
+                chip.textContent = (w.evolved ? '✨' : '') + c.icon + ' ' + w.level;
+                chip.title = w.evolvedName || c.name;
                 weaponsRow.appendChild(chip);
             }
         }
@@ -922,6 +951,7 @@
                 p.life = 1.4;
                 p.pierce = w.pierce;
                 p.color = WEAPONS[w.id].color;
+                p.evolved = w.evolved;
                 p.hits = [];
                 p.alive = true;
             }
@@ -1228,16 +1258,34 @@
 
         function openChest(c) {
             c.alive = false;
+            const evo = player.weapons.find(isEvolvable);
+            if (evo) {
+                const evoInfo = evolveWeapon(evo);
+                let infos = [];
+                if (c.rarity === 'legendary') {
+                    const results = rollRoulette('legendary');
+                    infos = buildRouletteInfos(results);
+                    applyRouletteResults(results);
+                }
+                renderChestPopup(c.rarity, infos, evoInfo);
+                if (audio) audio.play('evolve');
+                setStatus('chest');
+                return;
+            }
             const results = rollRoulette(c.rarity);
-            const infos = results.map(function (id) {
+            const infos = buildRouletteInfos(results);
+            applyRouletteResults(results);
+            renderChestPopup(c.rarity, infos, null);
+            if (audio) audio.play('chest');
+            setStatus('chest');
+        }
+
+        function buildRouletteInfos(results) {
+            return results.map(function (id) {
                 const cw = WEAPONS[id];
                 const existing = player.weapons.find(function (x) { return x.id === id; });
                 return { id: id, icon: cw.icon, name: cw.name, isNew: !existing, level: existing ? existing.level : 0 };
             });
-            applyRouletteResults(results);
-            renderChestPopup(c.rarity, infos);
-            if (audio) audio.play('chest');
-            setStatus('chest');
         }
 
         function rollRoulette(rarity) {
@@ -1271,16 +1319,24 @@
             }
         }
 
-        function renderChestPopup(rarity, infos) {
+        function renderChestPopup(rarity, infos, evoInfo) {
             if (rarity === 'legendary') chestTitle.textContent = 'BAÚ LENDÁRIO';
             else if (rarity === 'rare') chestTitle.textContent = 'BAÚ RARO';
             else chestTitle.textContent = 'BAÚ COMUM';
             chestSubtitle.textContent = 'Roleta de Recompensa';
             chestCards.innerHTML = '';
+            if (evoInfo) {
+                const el = document.createElement('div');
+                el.className = 'upgrade-card reveal-card';
+                el.style.borderColor = '#c98a5a';
+                el.style.boxShadow = '0 0 26px rgba(220, 150, 60, 0.6)';
+                el.innerHTML = '<div class="uc-icon">' + evoInfo.icon + '</div><div class="uc-title">' + evoInfo.newName + '</div><div class="uc-desc">EVOLUÇÃO! (' + evoInfo.oldName + ' → ' + evoInfo.newName + ')</div>';
+                chestCards.appendChild(el);
+            }
             infos.forEach(function (info, i) {
                 const el = document.createElement('div');
                 el.className = 'upgrade-card reveal-card';
-                el.style.animationDelay = (i * 0.25) + 's';
+                el.style.animationDelay = ((evoInfo ? 1 : 0) + i * 0.25) + 's';
                 const desc = info.isNew ? 'NOVA ARMA' : ('Nível ' + info.level + ' → ' + (info.level + 1));
                 el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + desc + '</div>';
                 chestCards.appendChild(el);
@@ -1441,7 +1497,7 @@
                 const alpha = (1 - t) * 0.16;
                 ctx.save();
                 ctx.shadowColor = rgba(c.color, 0.45);
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = w.evolved ? 14 : 6;
                 ctx.fillStyle = rgba(c.color, alpha);
                 ctx.beginPath();
                 ctx.moveTo(sx, sy);
@@ -1525,7 +1581,7 @@
                 const sy = p.y - camera.y;
                 const ang = Math.atan2(p.vy, p.vx);
                 ctx.shadowColor = rgba(p.color, 0.7);
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = p.evolved ? 12 : 6;
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
                 ctx.arc(sx, sy, p.radius, 0, TWO_PI);
@@ -1707,6 +1763,11 @@
                     tone('sine', 440, 440, 0.1, 0.16);
                     setTimeout(function () { tone('sine', 550, 550, 0.1, 0.16); }, 90);
                     setTimeout(function () { tone('sine', 660, 660, 0.16, 0.16); }, 180);
+                }
+                else if (name === 'evolve') {
+                    tone('sawtooth', 300, 900, 0.4, 0.22);
+                    setTimeout(function () { tone('sine', 600, 600, 0.2, 0.2); }, 200);
+                    setTimeout(function () { tone('sine', 800, 800, 0.3, 0.2); }, 340);
                 }
                 else if (name === 'gameover') {
                     tone('sawtooth', 300, 60, 1.1, 0.28);
