@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_004: Etapa 3 — Passivos (8 itens) e Status Globais
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — aguardando refinamento do TL.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — Etapa 3 implementada e testável.
 > **Spec guarda-chuva**: [`TASK_001.md`](./TASK_001.md) → seção 11 (Etapa 3).
 
 ## 🎯 Objetivo

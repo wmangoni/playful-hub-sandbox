@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_003: Etapa 2 — XP, Níveis e Popup de Level Up
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — aguardando refinamento do TL.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — Etapa 2 implementada e testável.
 > **Spec guarda-chuva**: [`TASK_001.md`](./TASK_001.md) → seção 11 (Etapa 2).
 
 ## 🎯 Objetivo

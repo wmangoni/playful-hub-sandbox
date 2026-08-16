@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_002: Etapa 1 — Núcleo Jogável (Câmera, Movimentação, Espada e Inimigos)
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — aguardando refinamento do TL.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — Etapa 1 implementada e testável.
 > **Spec guarda-chuva**: [`TASK_001.md`](./TASK_001.md) → seção 11 (Etapa 1).
 
 ## 🎯 Objetivo

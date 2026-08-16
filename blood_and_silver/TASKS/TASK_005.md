@@ -1,6 +1,6 @@
 # 🧛 TASK-BLOOD_AND_SILVER_005: Etapa 4 — Arsenal Completo (Machado, Besta e Água Benta)
 
-> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `📋 Backlog` — aguardando refinamento do TL.
+> **Jogo**: Sangue & Prata (`blood_and_silver`) · **Status**: `✅ Done` — Etapa 4 implementada e testável.
 > **Spec guarda-chuva**: [`TASK_001.md`](./TASK_001.md) → seção 11 (Etapa 4).
 
 ## 🎯 Objetivo
