@@ -260,6 +260,8 @@
             border-radius: 6px;
             padding: 3px 10px;
             text-shadow: 0 1px 3px #000;
+            pointer-events: auto;
+            cursor: help;
         }
 
         .passive-chip {
@@ -272,6 +274,8 @@
             border-radius: 6px;
             padding: 2px 8px;
             text-shadow: 0 1px 3px #000;
+            pointer-events: auto;
+            cursor: help;
         }
 
         .upgrade-cards {
@@ -315,6 +319,13 @@
         .upgrade-card .uc-desc {
             font-size: 13px;
             color: #c79aa4;
+        }
+
+        .upgrade-card .uc-prog {
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffd9a0;
         }
 
         @keyframes revealCard {
@@ -367,6 +378,136 @@
             width: 100%;
             background: linear-gradient(90deg, #8c1f2f, #ff3b5a);
             transition: width 0.1s linear;
+        }
+
+        .tooltip {
+            position: fixed;
+            z-index: 50;
+            pointer-events: none;
+            max-width: 270px;
+            padding: 14px 16px;
+            color: #f3e6d3;
+            background: linear-gradient(160deg, #2a1118 0%, #160a10 100%);
+            border: 1px solid #8c2a3a;
+            border-radius: 6px;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.75), 0 0 18px rgba(160, 40, 60, 0.35);
+            display: none;
+        }
+
+        .tooltip.visible { display: block; }
+
+        .tip-title {
+            font-family: 'Cinzel', serif;
+            font-size: 17px;
+            font-weight: 900;
+            color: #f3e6d3;
+            text-shadow: 0 1px 3px #000;
+        }
+
+        .tip-level {
+            font-size: 12px;
+            color: #c79aa4;
+            margin-top: 2px;
+            letter-spacing: 1px;
+        }
+
+        .tip-desc {
+            font-size: 13px;
+            color: #e9e2d8;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .tip-stats {
+            font-size: 13px;
+            color: #ffd9a0;
+            margin-top: 8px;
+            line-height: 1.6;
+        }
+
+        .tip-evo {
+            font-size: 11px;
+            color: #9fd0ff;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .pause-content {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+            justify-content: center;
+            max-width: 760px;
+            margin: 4px 0 22px;
+            text-align: left;
+        }
+
+        .pause-card {
+            min-width: 220px;
+            max-width: 240px;
+            padding: 22px 20px;
+            background: linear-gradient(160deg, #241019 0%, #120a0e 100%);
+            border: 1px solid #6b1f2a;
+            border-radius: 6px;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.7), inset 0 0 40px rgba(160, 40, 60, 0.12);
+        }
+
+        .pause-card .pc-title {
+            font-family: 'Cinzel', serif;
+            font-size: 20px;
+            font-weight: 900;
+            color: #f3e6d3;
+            margin-bottom: 14px;
+            text-shadow: 0 1px 4px #000;
+        }
+
+        .pause-card .pc-stat {
+            font-size: 14px;
+            color: #d8cdbf;
+            margin-top: 8px;
+        }
+
+        .pause-card .pc-stat b {
+            color: #f3e6d3;
+        }
+
+        .pause-lists {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 300px;
+        }
+
+        .pause-section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #c79aa4;
+            margin-bottom: 6px;
+        }
+
+        .pause-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            margin: 0 8px 8px 0;
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #f3e6d3;
+            background: linear-gradient(180deg, #241019 0%, #1a0a10 100%);
+            border: 1px solid #6b1f2a;
+            border-radius: 5px;
+            text-shadow: 0 1px 3px #000;
+            cursor: help;
+        }
+
+        .pause-row .pr-lv {
+            color: #ffd9a0;
+            font-size: 12px;
+            margin-left: 2px;
         }
     </style>
 </head>
@@ -437,6 +578,32 @@
         <button class="btn" id="chestBtn">Coletar</button>
     </div>
 
+    <div class="overlay hidden" id="pauseScreen">
+        <h1>PAUSADO</h1>
+        <div class="subtitle">Estatísticas da caçada</div>
+        <div class="pause-content">
+            <div class="pause-card">
+                <div class="pc-title" id="pauseLevel">Nv 1</div>
+                <div class="pc-stat">Abates: <b id="pauseKills">0</b></div>
+                <div class="pc-stat">Tempo: <b id="pauseTime">00:00</b></div>
+                <div class="pc-stat">Vida: <b id="pauseHp">100 / 100</b></div>
+            </div>
+            <div class="pause-lists">
+                <div class="pause-section">
+                    <div class="pause-section-title">ARMAS</div>
+                    <div id="pauseWeapons"></div>
+                </div>
+                <div class="pause-section">
+                    <div class="pause-section-title">PASSIVOS</div>
+                    <div id="pausePassives"></div>
+                </div>
+            </div>
+        </div>
+        <div class="hint">Pressione <span class="key">ENTER</span> para continuar</div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
     <script>
     (function () {
         'use strict';
@@ -476,11 +643,11 @@
         const MAX_ENEMY_RADIUS = Math.max(CONFIG.skeleton.radius, CONFIG.boss.radius);
 
         const WEAPONS = {
-            sword: { name: 'Espada', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
-            axe: { name: 'Machado', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
-            bow: { name: 'Arco', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, synergyPassive: 'feather', icon: '🏹', color: '#bfe6ff' },
-            crossbow: { name: 'Besta', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, synergyPassive: 'amulet', icon: '🎯', color: '#7df0ff' },
-            holy_water: { name: 'Água Benta', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, synergyPassive: 'mushroom', icon: '🧪', color: '#b78aff' }
+            sword: { name: 'Espada', desc: 'Golpeia em arco à sua volta.', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
+            axe: { name: 'Machado', desc: 'Golpe pesado e lento, com grande dano e empurrão.', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
+            bow: { name: 'Arco', desc: 'Dispara flechas no inimigo mais próximo.', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, synergyPassive: 'feather', icon: '🏹', color: '#bfe6ff' },
+            crossbow: { name: 'Besta', desc: 'Dispara virotes que atravessam vários inimigos.', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, synergyPassive: 'amulet', icon: '🎯', color: '#7df0ff' },
+            holy_water: { name: 'Água Benta', desc: 'Derrama água benta que queima uma área por alguns segundos.', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, synergyPassive: 'mushroom', icon: '🧪', color: '#b78aff' }
         };
 
         const EVOLVED_WEAPONS = {
@@ -492,14 +659,14 @@
         };
 
         const PASSIVES = {
-            amulet: { name: 'Amuleto', stat: 'area', amount: 0.10, maxLevel: 5, icon: '📿' },
-            pyrope: { name: 'Joia Carmesim', stat: 'might', amount: 0.10, maxLevel: 5, icon: '💎' },
-            mechanism: { name: 'Engrenagem', stat: 'cooldown', amount: 0.08, maxLevel: 5, icon: '⚙️' },
-            feather: { name: 'Pena', stat: 'speed', amount: 0.10, maxLevel: 5, icon: '🪶' },
-            meat: { name: 'Carne', stat: 'maxhp', amount: 15, maxLevel: 5, icon: '🥩' },
-            mushroom: { name: 'Cogumelo Noturno', stat: 'regen', amount: 0.5, maxLevel: 5, icon: '🍄' },
-            spirit_orb: { name: 'Orbe Espiritual', stat: 'magnet', amount: 15, maxLevel: 5, icon: '🔮' },
-            boar_ring: { name: 'Anel do Javali', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' }
+            amulet: { name: 'Amuleto', desc: 'Aumenta a área de efeito.', stat: 'area', amount: 0.10, maxLevel: 5, icon: '📿' },
+            pyrope: { name: 'Joia Carmesim', desc: 'Aumenta o dano das armas.', stat: 'might', amount: 0.10, maxLevel: 5, icon: '💎' },
+            mechanism: { name: 'Engrenagem', desc: 'Reduz o tempo de recarga das armas.', stat: 'cooldown', amount: 0.08, maxLevel: 5, icon: '⚙️' },
+            feather: { name: 'Pena', desc: 'Aumenta a velocidade dos projéteis.', stat: 'speed', amount: 0.10, maxLevel: 5, icon: '🪶' },
+            meat: { name: 'Carne', desc: 'Aumenta a vida máxima.', stat: 'maxhp', amount: 15, maxLevel: 5, icon: '🥩' },
+            mushroom: { name: 'Cogumelo Noturno', desc: 'Regenera vida aos poucos.', stat: 'regen', amount: 0.5, maxLevel: 5, icon: '🍄' },
+            spirit_orb: { name: 'Orbe Espiritual', desc: 'Atrai gemas de mais longe.', stat: 'magnet', amount: 15, maxLevel: 5, icon: '🔮' },
+            boar_ring: { name: 'Anel do Javali', desc: 'Aumenta a velocidade de movimento.', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' }
         };
 
         const canvas = document.getElementById('game');
@@ -532,12 +699,23 @@
         const goKills = document.getElementById('goKills');
         const goLevel = document.getElementById('goLevel');
         const goBest = document.getElementById('goBest');
+        const tooltip = document.getElementById('tooltip');
+        const pauseScreen = document.getElementById('pauseScreen');
+        const pauseLevel = document.getElementById('pauseLevel');
+        const pauseKills = document.getElementById('pauseKills');
+        const pauseTime = document.getElementById('pauseTime');
+        const pauseHp = document.getElementById('pauseHp');
+        const pauseWeapons = document.getElementById('pauseWeapons');
+        const pausePassives = document.getElementById('pausePassives');
 
         const ASSETS = {
             playerWalk: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_Walk_with_shadow.png',
             playerIdle: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_Idle_with_shadow.png',
             playerAttack: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_attack_with_shadow.png',
-            skeleton: '../assets/skeleton-top-down-pixel-art/PNG/Animation3.png'
+            enemyWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires1/With_shadow/Vampires1_Walk_with_shadow.png',
+            bossWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires3/With_shadow/Vampires3_Walk_with_shadow.png',
+            ground: '../assets/skeleton-top-down-pixel-art/PNG/Ground_rocks.png',
+            water: '../assets/skeleton-top-down-pixel-art/PNG/Water_coasts.png'
         };
 
         const FRAME = 64;
@@ -545,8 +723,37 @@
             walk: { frames: 6, fps: 9 },
             idle: { frames: 12, fps: 6 },
             attack: { frames: 8, fps: 24 },
-            skeleton: { frames: 6, fps: 8 }
+            enemyWalk: { frames: 6, fps: 8 },
+            bossWalk: { frames: 6, fps: 8 }
         };
+
+        const OBJ_DIR = '../assets/skeleton-top-down-pixel-art/PNG/Objects_separately/';
+        const OBJECT_CATALOG = [
+            { file: 'Grave_shadow1_1.png', w: 32, h: 32, weight: 3 },
+            { file: 'Grave_shadow1_5.png', w: 32, h: 32, weight: 3 },
+            { file: 'Grave_shadow1_11.png', w: 32, h: 32, weight: 3 },
+            { file: 'Grave_shadow1_16.png', w: 32, h: 32, weight: 3 },
+            { file: 'Bones_shadow1_1.png', w: 32, h: 32, weight: 2 },
+            { file: 'Bones_shadow1_8.png', w: 32, h: 32, weight: 2 },
+            { file: 'Rock_shadow1_1.png', w: 64, h: 64, weight: 3 },
+            { file: 'Rock_shadow1_3.png', w: 64, h: 64, weight: 3 },
+            { file: 'Crystal_shadow1_1.png', w: 64, h: 64, weight: 1 },
+            { file: 'Crystal_shadow1_3.png', w: 64, h: 64, weight: 1 },
+            { file: 'Tree_shadow1_1.png', w: 128, h: 128, weight: 2 },
+            { file: 'Tree_shadow1_2.png', w: 128, h: 128, weight: 2 },
+            { file: 'Dead_tree_shadow1_1.png', w: 128, h: 128, weight: 1 },
+            { file: 'Broken_tree_shadow1_2.png', w: 128, h: 128, weight: 1 },
+            { file: 'Ruin_shadow1_1.png', w: 128, h: 128, weight: 1 },
+            { file: 'Pile_sculls_shadow1.png', w: 128, h: 128, weight: 1 },
+            { file: 'Dead_arm_shadow1_1.png', w: 64, h: 64, weight: 1 },
+            { file: 'Thorn_plant_shadow1_1.png', w: 128, h: 128, weight: 1 }
+        ];
+
+        const PONDS = [
+            { x: 850, y: 1150, radius: 140 },
+            { x: 3150, y: 2850, radius: 180 },
+            { x: 2600, y: 650, radius: 120 }
+        ];
 
         const images = {};
         let assetsReady = false;
@@ -601,9 +808,12 @@
         let shake = 0;
         let bestTime = 0;
         let lastCollect = 0;
+        let groundPattern = null;
+        let waterPattern = null;
+        let scenery = [];
 
         function loadAssets() {
-            const paths = Object.values(ASSETS);
+            const paths = Object.values(ASSETS).concat(OBJECT_CATALOG.map(function (o) { return OBJ_DIR + o.file; }));
             let loaded = 0;
             paths.forEach(function (src) {
                 const img = new Image();
@@ -618,6 +828,36 @@
                 img.src = src;
                 images[src] = img;
             });
+        }
+
+        function mulberry32(seed) {
+            let a = seed >>> 0;
+            return function () {
+                a |= 0;
+                a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function generateScenery() {
+            scenery = [];
+            const rng = mulberry32(20260816);
+            const totalWeight = OBJECT_CATALOG.reduce(function (s, o) { return s + o.weight; }, 0);
+            for (let i = 0; i < 130; i++) {
+                const r = rng() * totalWeight;
+                let acc = 0;
+                let pick = OBJECT_CATALOG[0];
+                for (const o of OBJECT_CATALOG) {
+                    acc += o.weight;
+                    if (r < acc) { pick = o; break; }
+                }
+                const x = 110 + rng() * (WORLD_W - 220);
+                const y = 110 + rng() * (WORLD_H - 220);
+                if (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < 220) continue;
+                scenery.push({ file: OBJ_DIR + pick.file, w: pick.w, h: pick.h, x: x, y: y });
+            }
         }
 
         function initEnemyPool() {
@@ -710,6 +950,60 @@
             recomputeStats();
         }
 
+        const STAT_LABELS = {
+            area: 'área de efeito',
+            might: 'dano',
+            cooldown: 'recarga',
+            speed: 'vel. de projéteis',
+            maxhp: 'vida máxima',
+            regen: 'regeneração',
+            magnet: 'raio de coleta',
+            move_speed: 'vel. de movimento'
+        };
+
+        function passiveBonusText(c, level) {
+            if (c.stat === 'cooldown') return '-' + Math.round(c.amount * 100) + '% ' + STAT_LABELS[c.stat] + ' por nível';
+            if (c.stat === 'maxhp' || c.stat === 'magnet') return '+' + c.amount + ' ' + STAT_LABELS[c.stat] + ' por nível';
+            return '+' + Math.round(c.amount * 100) + '% ' + STAT_LABELS[c.stat] + ' por nível';
+        }
+
+        function describeWeapon(w) {
+            const c = WEAPONS[w.id];
+            const name = w.evolvedName || c.name;
+            let html = '<div class="tip-title">' + c.icon + ' ' + name + '</div>';
+            html += '<div class="tip-level">Nível ' + w.level + ' / ' + w.maxLevel + '</div>';
+            html += '<div class="tip-desc">' + c.desc + '</div>';
+            const lines = [];
+            lines.push('Dano: ' + Math.round(w.damage));
+            lines.push('Recarga: ' + w.interval.toFixed(2) + 's');
+            if (w.range) lines.push('Alcance: ' + Math.round(w.range));
+            if (w.area) lines.push('Área: ' + Math.round(w.area));
+            if (w.duration) lines.push('Duração: ' + w.duration.toFixed(1) + 's');
+            if (c.behavior === 'nearest-projectile' && w.count > 1) lines.push('Projéteis: ' + w.count);
+            else if (c.behavior === 'random-area' && w.count > 1) lines.push('Poças: ' + w.count);
+            if (w.pierce) lines.push('Atravessa inimigos');
+            html += '<div class="tip-stats">' + lines.join('<br>') + '</div>';
+            if (w.evolved) {
+                html += '<div class="tip-evo">✦ Evoluída</div>';
+            } else if (c.synergyPassive) {
+                html += '<div class="tip-evo">Evolui no nv ' + w.maxLevel + ' com ' + PASSIVES[c.synergyPassive].name + '</div>';
+            }
+            return html;
+        }
+
+        function describePassive(p) {
+            const c = PASSIVES[p.id];
+            let html = '<div class="tip-title">' + c.icon + ' ' + c.name + '</div>';
+            html += '<div class="tip-level">Nível ' + p.level + ' / ' + c.maxLevel + '</div>';
+            html += '<div class="tip-desc">' + c.desc + '</div>';
+            let total;
+            if (c.stat === 'cooldown') total = '-' + Math.round(c.amount * p.level * 100) + '%';
+            else if (c.stat === 'maxhp' || c.stat === 'magnet') total = '+' + (c.amount * p.level);
+            else total = '+' + Math.round(c.amount * p.level * 100) + '%';
+            html += '<div class="tip-stats">' + passiveBonusText(c, p.level) + '<br>Total atual: ' + total + '</div>';
+            return html;
+        }
+
         function recomputeStats() {
             const s = { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1 };
             for (const p of player.passives) {
@@ -759,6 +1053,7 @@
             damageTexts.length = 0;
             levelupOptions = [];
             shake = 0;
+            generateScenery();
             spawnEnemy();
             spawnEnemy();
             spawnEnemy();
@@ -772,6 +1067,7 @@
             gameoverScreen.classList.add('hidden');
             levelupScreen.classList.add('hidden');
             chestScreen.classList.add('hidden');
+            pauseScreen.classList.add('hidden');
             if (s === 'menu') startScreen.classList.remove('hidden');
             if (s === 'gameover') {
                 goTime.textContent = formatTime(game.time);
@@ -782,6 +1078,7 @@
             }
             if (s === 'levelup') levelupScreen.classList.remove('hidden');
             if (s === 'chest') chestScreen.classList.remove('hidden');
+            if (s === 'paused') pauseScreen.classList.remove('hidden');
         }
 
         function startGame() {
@@ -838,6 +1135,30 @@
             }
         }
 
+        function showTooltip(html, clientX, clientY) {
+            tooltip.innerHTML = html;
+            tooltip.classList.add('visible');
+            const pad = 16;
+            const tw = tooltip.offsetWidth || 220;
+            const th = tooltip.offsetHeight || 140;
+            let x = clientX + pad;
+            let y = clientY + pad;
+            if (x + tw > window.innerWidth - 8) x = clientX - tw - pad;
+            if (y + th > window.innerHeight - 8) y = clientY - th - pad;
+            tooltip.style.left = Math.max(8, x) + 'px';
+            tooltip.style.top = Math.max(8, y) + 'px';
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('visible');
+        }
+
+        function bindTooltip(el, getHtml) {
+            el.addEventListener('mouseenter', function (e) { showTooltip(getHtml(), e.clientX, e.clientY); });
+            el.addEventListener('mousemove', function (e) { showTooltip(getHtml(), e.clientX, e.clientY); });
+            el.addEventListener('mouseleave', hideTooltip);
+        }
+
         function updateWeaponsRow() {
             weaponsRow.innerHTML = '';
             for (const w of player.weapons) {
@@ -845,7 +1166,7 @@
                 const chip = document.createElement('span');
                 chip.className = 'weapon-chip';
                 chip.textContent = (w.evolved ? '✨' : '') + c.icon + ' ' + w.level;
-                chip.title = w.evolvedName || c.name;
+                bindTooltip(chip, function () { return describeWeapon(w); });
                 weaponsRow.appendChild(chip);
             }
         }
@@ -857,7 +1178,44 @@
                 const chip = document.createElement('span');
                 chip.className = 'passive-chip';
                 chip.textContent = c.icon + ' ' + p.level;
+                bindTooltip(chip, function () { return describePassive(p); });
                 passivesRow.appendChild(chip);
+            }
+        }
+
+        function renderPauseScreen() {
+            pauseLevel.textContent = 'Nv ' + player.level;
+            pauseKills.textContent = String(game.kills);
+            pauseTime.textContent = formatTime(game.time);
+            pauseHp.textContent = Math.ceil(player.hp) + ' / ' + player.maxHp;
+            pauseWeapons.innerHTML = '';
+            for (const w of player.weapons) {
+                const c = WEAPONS[w.id];
+                const name = w.evolvedName || c.name;
+                const row = document.createElement('span');
+                row.className = 'pause-row';
+                row.innerHTML = (w.evolved ? '✨' : '') + c.icon + ' ' + name + '<span class="pr-lv">Nv ' + w.level + '</span>';
+                bindTooltip(row, function () { return describeWeapon(w); });
+                pauseWeapons.appendChild(row);
+            }
+            pausePassives.innerHTML = '';
+            for (const p of player.passives) {
+                const c = PASSIVES[p.id];
+                const row = document.createElement('span');
+                row.className = 'pause-row';
+                row.innerHTML = c.icon + ' ' + c.name + '<span class="pr-lv">Nv ' + p.level + '</span>';
+                bindTooltip(row, function () { return describePassive(p); });
+                pausePassives.appendChild(row);
+            }
+        }
+
+        function togglePause() {
+            if (game.status === 'playing') {
+                renderPauseScreen();
+                setStatus('paused');
+                for (const k in keys) keys[k] = false;
+            } else if (game.status === 'paused') {
+                setStatus('playing');
             }
         }
 
@@ -873,6 +1231,7 @@
             else if (game.status === 'gameover' && k === 'enter') startGame();
             else if (game.status === 'levelup' && (k === '1' || k === '2' || k === '3')) chooseUpgrade(parseInt(k, 10) - 1);
             else if (game.status === 'chest' && (k === 'enter' || k === ' ')) closeChest();
+            else if ((game.status === 'playing' || game.status === 'paused') && k === 'enter') togglePause();
         }
 
         function onKeyUp(e) {
@@ -1172,25 +1531,28 @@
             opts.forEach(function (opt, i) {
                 const el = document.createElement('div');
                 el.className = 'upgrade-card';
-                let icon, title, desc;
+                let icon, title, desc, prog = '';
                 if (opt.kind === 'heal') {
                     icon = '❤️';
                     title = 'Restaurar Vida';
-                    desc = '+' + CONFIG.healAmount + ' de vida';
+                    desc = 'Recupera parte da sua vida.';
+                    prog = '+' + CONFIG.healAmount + ' de vida';
                 } else if (opt.kind === 'weapon') {
                     const c = WEAPONS[opt.id];
                     const w = player.weapons.find(function (x) { return x.id === opt.id; });
                     icon = c.icon;
                     title = c.name;
-                    desc = w ? ('Nível ' + w.level + ' → ' + (w.level + 1)) : 'NOVA ARMA';
+                    desc = c.desc;
+                    prog = w ? ('Nível ' + w.level + ' → ' + (w.level + 1)) : 'NOVA ARMA';
                 } else {
                     const c = PASSIVES[opt.id];
                     const p = player.passives.find(function (x) { return x.id === opt.id; });
                     icon = c.icon;
                     title = c.name;
-                    desc = p ? ('Nível ' + p.level + ' → ' + (p.level + 1)) : 'NOVO PASSIVO';
+                    desc = c.desc + '<br>' + passiveBonusText(c, 1);
+                    prog = p ? ('Nível ' + p.level + ' → ' + (p.level + 1)) : 'NOVO PASSIVO';
                 }
-                el.innerHTML = '<div class="uc-icon">' + icon + '</div><div class="uc-title">' + title + '</div><div class="uc-desc">' + desc + '</div>';
+                el.innerHTML = '<div class="uc-icon">' + icon + '</div><div class="uc-title">' + title + '</div><div class="uc-desc">' + desc + '</div><div class="uc-prog">' + prog + '</div>';
                 el.addEventListener('click', function () { chooseUpgrade(i); });
                 upgradeCards.appendChild(el);
             });
@@ -1478,15 +1840,18 @@
                 el.className = 'upgrade-card reveal-card';
                 el.style.borderColor = '#c98a5a';
                 el.style.boxShadow = '0 0 26px rgba(220, 150, 60, 0.6)';
-                el.innerHTML = '<div class="uc-icon">' + evoInfo.icon + '</div><div class="uc-title">' + evoInfo.newName + '</div><div class="uc-desc">EVOLUÇÃO! (' + evoInfo.oldName + ' → ' + evoInfo.newName + ')</div>';
+                const base = WEAPONS[evoInfo.id];
+                el.innerHTML = '<div class="uc-icon">' + evoInfo.icon + '</div><div class="uc-title">' + evoInfo.newName + '</div><div class="uc-desc">' + base.desc + '</div><div class="uc-prog">EVOLUÇÃO! (' + evoInfo.oldName + ' → ' + evoInfo.newName + ')</div>';
                 chestCards.appendChild(el);
             }
             infos.forEach(function (info, i) {
                 const el = document.createElement('div');
                 el.className = 'upgrade-card reveal-card';
                 el.style.animationDelay = ((evoInfo ? 1 : 0) + i * 0.25) + 's';
-                const desc = info.isNew ? 'NOVA ARMA' : ('Nível ' + info.level + ' → ' + (info.level + 1));
-                el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + desc + '</div>';
+                const c = WEAPONS[info.id];
+                const desc = c.desc;
+                const prog = info.isNew ? 'NOVA ARMA' : ('Nível ' + info.level + ' → ' + (info.level + 1));
+                el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + desc + '</div><div class="uc-prog">' + prog + '</div>';
                 chestCards.appendChild(el);
             });
         }
@@ -1606,23 +1971,25 @@
             updateHud();
         }
 
+        function makeTilePattern(src, tx, ty) {
+            const img = images[src];
+            if (!img || !img.complete || !img.naturalWidth) return null;
+            const c = document.createElement('canvas');
+            c.width = 16;
+            c.height = 16;
+            const cctx = c.getContext('2d');
+            cctx.imageSmoothingEnabled = false;
+            cctx.drawImage(img, tx * 16, ty * 16, 16, 16, 0, 0, 16, 16);
+            return ctx.createPattern(c, 'repeat');
+        }
+
         function drawGround() {
-            ctx.fillStyle = '#160d12';
-            ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-            ctx.strokeStyle = 'rgba(120, 60, 70, 0.06)';
-            ctx.lineWidth = 1;
-            const offX = camera.x % 64;
-            const offY = camera.y % 64;
-            ctx.beginPath();
-            for (let x = -offX; x <= VIEW_W; x += 64) {
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, VIEW_H);
-            }
-            for (let y = -offY; y <= VIEW_H; y += 64) {
-                ctx.moveTo(0, y);
-                ctx.lineTo(VIEW_W, y);
-            }
-            ctx.stroke();
+            if (!groundPattern) groundPattern = makeTilePattern(ASSETS.ground, 2, 2);
+            ctx.fillStyle = groundPattern || '#160d12';
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+            ctx.fillRect(camera.x - 20, camera.y - 20, VIEW_W + 40, VIEW_H + 40);
+            ctx.restore();
             drawBoundary();
         }
 
@@ -1634,6 +2001,35 @@
             ctx.shadowBlur = 18;
             ctx.strokeRect(-camera.x, -camera.y, w, h);
             ctx.shadowBlur = 0;
+        }
+
+        function drawWater() {
+            if (!waterPattern) waterPattern = makeTilePattern(ASSETS.water, 24, 14);
+            if (!waterPattern) return;
+            ctx.fillStyle = waterPattern;
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+            for (const pond of PONDS) {
+                ctx.beginPath();
+                ctx.arc(pond.x, pond.y, pond.radius, 0, TWO_PI);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(30, 60, 90, 0.55)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawObjects() {
+            for (const o of scenery) {
+                if (o.x + o.w < camera.x || o.x - o.w > camera.x + VIEW_W || o.y + o.h < camera.y || o.y - o.h > camera.y + VIEW_H) continue;
+                const img = images[o.file];
+                const sx = o.x - camera.x;
+                const sy = o.y - camera.y;
+                if (img && img.complete && img.naturalWidth) {
+                    ctx.drawImage(img, sx - o.w / 2, sy - o.h / 2, o.w, o.h);
+                }
+            }
         }
 
         function drawMeleeArcs() {
@@ -1789,8 +2185,8 @@
         }
 
         function drawEnemies() {
-            const img = images[ASSETS.skeleton];
-            const anim = ANIMS.skeleton;
+            const enemyImg = images[ASSETS.enemyWalk];
+            const bossImg = images[ASSETS.bossWalk];
             for (const e of enemies) {
                 if (!e.alive) continue;
                 const sx = e.x - camera.x;
@@ -1798,22 +2194,21 @@
                 const dx = player.x - e.x;
                 const dy = player.y - e.y;
                 let row;
-                let flip = false;
                 if (Math.abs(dx) > Math.abs(dy)) {
-                    row = 2;
-                    flip = dx > 0;
+                    row = dx > 0 ? 3 : 2;
                 } else {
                     row = dy > 0 ? 0 : 1;
                 }
+                const anim = e.isBoss ? ANIMS.bossWalk : ANIMS.enemyWalk;
                 const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
                 if (e.isBoss) {
                     ctx.save();
                     ctx.shadowColor = 'rgba(255, 40, 70, 0.9)';
                     ctx.shadowBlur = 22;
-                    drawSprite(img, row, frame, anim.frames, sx, sy, 128, 128, flip);
+                    drawSprite(bossImg, row, frame, anim.frames, sx, sy, 128, 128, false);
                     ctx.restore();
                 } else {
-                    drawSprite(img, row, frame, anim.frames, sx, sy, 64, 64, flip);
+                    drawSprite(enemyImg, row, frame, anim.frames, sx, sy, 64, 64, false);
                 }
             }
         }
@@ -1847,6 +2242,8 @@
                 ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
             }
             drawGround();
+            drawWater();
+            drawObjects();
             drawOrbs();
             drawDamageZones();
             drawChests();

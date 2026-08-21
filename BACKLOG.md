@@ -78,7 +78,7 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_005.md` | RPG Adventure Quest | Sistema de Companheiros/Mascotes (Pets), Alquimia & Forja de Runas (Crafting) e Masmorra Volcânica do Dragão Vermelho | ✅ Refined | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded/TASKS/TASK_005.md) |
 | `TASK_005.md` | Space Shooter | Sistema de Drones Orbitais de Apoio (Wingman Drones), Enxames Xenomórficos com Comportamento de Bando (Boids Swarm Siege) e Chefe Titânico Star-Devourer Leviathan | 📋 Backlog | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/space_shooter/TASKS/TASK_005.md) |
 | `TASK_005.md` | Driving Simulator | Sistema de Pistas Temáticas Multi-Bioma (Cyber City, Cânion Vulcânico e Geleira), Personalização Visual Hangar 3D, Combate Takedown e Batalha contra Chefe "Titan Rig" | 📋 Backlog | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/driving_simulator/TASKS/TASK_005.md) |
-| `TASK_005.md` | Pinball | Mecânica de Empurrão Físico (Table Nudge & Tilt), Slingshots Elétricos com Kickback Outlane Savers, Display DMD com Minigames de Hack e Locutor Vocoder Synthwave | 📋 Backlog | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/pinball/TASKS/TASK_005.md) |
+| `TASK_005.md` | Pinball | Mecânica de Empurrão Físico (Table Nudge & Tilt), Slingshots Elétricos com Kickback Outlane Savers, Display DMD com Minigames de Hack e Locutor Vocoder Synthwave | 🎉 Ready for Deploy | | Alta | [TASK_005.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/pinball/TASKS/TASK_005.md) |
 | `TASK_002.md` | Sangue & Prata | Etapa 1 — Núcleo Jogável: Câmera, Movimentação, Espada e Inimigos | ✅ Done | | Muito Alta | [TASK_002.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_002.md) |
 | `TASK_003.md` | Sangue & Prata | Etapa 2 — XP, Níveis e Popup de Level Up | ✅ Done | | Alta | [TASK_003.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_003.md) |
 | `TASK_004.md` | Sangue & Prata | Etapa 3 — Passivos (8 itens) e Status Globais | ✅ Done | | Alta | [TASK_004.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_004.md) |
@@ -87,6 +87,8 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_007.md` | Sangue & Prata | Etapa 6 — Evoluções (Synergies) | ✅ Done | | Alta | [TASK_007.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_007.md) |
 | `TASK_008.md` | Sangue & Prata | Etapa 7 — Chefes (Boss Fight) com HP Escalado | ✅ Done | | Alta | [TASK_008.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_008.md) |
 | `TASK_009.md` | Sangue & Prata | Etapa 8 — Polish, SFX Procedural e Publicação no Hub | ✅ Done | | Alta | [TASK_009.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_009.md) |
+| `TASK_010.md` | Sangue & Prata | Melhorias Gráficas — Sprites (vampiros) e Cenário (chão, água e objetos) | ✅ Done | | Alta | [TASK_010.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_010.md) |
+| `TASK_011.md` | Sangue & Prata | Melhorias de UI — Tooltips, Descrições de Itens e Tela de Pause | ✅ Done | | Alta | [TASK_011.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_011.md) |
 
 
 

@@ -16,7 +16,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        /* === TASK_001: Estética Retro-Futurista Synthwave / Cyberpunk === */
         body {
             background-color: #0d0e15;
             background-image: radial-gradient(circle at 50% 0%, #1a1030 0%, #0d0e15 55%, #05060a 100%);
@@ -53,32 +52,81 @@
             100% { transform: translate(0, 0) skewX(0deg); filter: none; }
         }
 
+        /* Painel superior de controles e temas da TASK_005 */
+        .top-toolbar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .arcade-btn {
+            background: rgba(18, 19, 32, 0.75);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            border-radius: 8px;
+            color: #00f0ff;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+        }
+        .arcade-btn:hover {
+            background: rgba(0, 240, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+            transform: translateY(-1px);
+        }
+        .arcade-btn:active {
+            transform: translateY(1px);
+        }
+
         #gameInfo {
-            margin-top: 20px;
-            background: rgba(18, 19, 32, 0.65);
+            margin-top: 15px;
+            background: rgba(18, 19, 32, 0.75);
             backdrop-filter: blur(12px) saturate(180%);
             -webkit-backdrop-filter: blur(12px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
-            padding: 15px 30px;
+            padding: 12px 24px;
             display: flex;
-            gap: 40px;
+            gap: 25px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
             font-family: 'Press Start 2P', monospace;
-            font-size: 11px;
+            font-size: 10px;
             letter-spacing: 1px;
             color: #aab;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         #gameInfo span {
             display: inline-block;
             font-family: 'Orbitron', sans-serif;
             font-weight: 900;
-            font-size: 18px;
+            font-size: 16px;
             color: #00f0ff;
             text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
             margin-left: 5px;
         }
         #gameInfo #score { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+
+        .kickback-indicator {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            background: rgba(57, 255, 20, 0.15);
+            border: 1px solid #39ff14;
+            color: #39ff14;
+            text-shadow: 0 0 6px #39ff14;
+        }
+        .kickback-indicator.offline {
+            background: rgba(255, 46, 99, 0.1);
+            border-color: rgba(255, 46, 99, 0.4);
+            color: #888;
+            text-shadow: none;
+        }
 
         /* Animação de feedback de pontos */
         .score-bump { animation: scoreBumpAnimation 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
@@ -89,10 +137,10 @@
         }
 
         h1 {
-            margin-bottom: 18px;
+            margin-bottom: 12px;
             font-family: 'Press Start 2P', monospace;
             color: #ff2e97;
-            font-size: 2em;
+            font-size: 1.8em;
             text-shadow: 0 0 10px #ff007f, 0 0 22px rgba(0, 240, 255, 0.5);
             letter-spacing: 4px;
         }
@@ -104,15 +152,25 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
     <h1>PIMBAL</h1>
+
+    <!-- Toolbar da TASK_005 -->
+    <div class="top-toolbar">
+        <button id="themeToggleBtn" class="arcade-btn" onclick="toggleTheme()">🎨 Theme: <span id="themeNameLabel">Synthwave</span> (T)</button>
+        <button id="nudgeLeftBtn" class="arcade-btn" onclick="performNudge(-1, -0.4)">⬅ Nudge (Q)</button>
+        <button id="nudgeCenterBtn" class="arcade-btn" onclick="performNudge(0, -1)">⬆ Nudge (W)</button>
+        <button id="nudgeRightBtn" class="arcade-btn" onclick="performNudge(1, -0.4)">Nudge ➡ (E)</button>
+    </div>
+
     <canvas id="gameCanvas" width="400" height="600"></canvas>
     <div id="gameInfo">
         <div>Score: <span id="score">0</span></div>
         <div>Lives: <span id="lives">3</span></div>
         <div>Multiplier: <span id="multiplier">1x</span></div>
+        <div id="kickbackIndicator" class="kickback-indicator">KICKBACK: READY</div>
     </div>
 
     <script>
-        // === TASK_003: Sintetizador de Áudio Procedural (Web Audio API) ===
+        // === TASK_003 & TASK_005: Sintetizador de Áudio Procedural (Web Audio API & Vocoder Synth) ===
         class SoundSynth {
             constructor() {
                 this.ctx = null;
@@ -179,6 +237,136 @@
                 osc.start(now);
                 osc.stop(now + 0.35);
                 osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            // TASK_005: Slingshot elétrico estroboscópico
+            playSlingshot() {
+                if (!this.ctx) return;
+                if (this.throttle('slingshot', 60)) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(950, now);
+                osc.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+                gain.gain.setValueAtTime(0.45, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.09);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            // TASK_005: Kickback laser pistão solenoide
+            playKickback() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(1400, now + 0.18);
+                gain.gain.setValueAtTime(0.55, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.22);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            // TASK_005: Impacto mecânico de Nudge
+            playNudge() {
+                if (!this.ctx) return;
+                if (this.throttle('nudge', 80)) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(45, now + 0.09);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.1);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            // TASK_005: Bip de aviso de TILT
+            playTiltWarning() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                [660, 880].forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.07);
+                    gain.gain.setValueAtTime(0.25, now + i * 0.07);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.masterVolume);
+                    osc.start(now + i * 0.07);
+                    osc.stop(now + i * 0.07 + 0.09);
+                    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+                });
+            }
+
+            // TASK_005: Alarme de corte TILT
+            playTiltAlarm() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(120, now + 0.4);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.45);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            // TASK_005: Bips do minigame DMD
+            playDmdBeep(freq = 800) {
+                if (!this.ctx) return;
+                if (this.throttle('dmd_beep', 40)) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                osc.connect(gain);
+                gain.connect(this.masterVolume);
+                osc.start(now);
+                osc.stop(now + 0.06);
+                osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+            }
+
+            // TASK_005: Cyber Announcer Vocoder (Síntese de voz com fallback gracioso)
+            speak(phrase) {
+                if ('speechSynthesis' in window) {
+                    try {
+                        window.speechSynthesis.cancel();
+                        const utter = new SpeechSynthesisUtterance(phrase);
+                        utter.pitch = 0.7; // Voz grave/robótica estilo vocoder
+                        utter.rate = 1.15;
+                        utter.volume = 0.75;
+                        const voices = window.speechSynthesis.getVoices();
+                        const synthVoice = voices.find(v => v.lang.includes('en') || v.name.includes('Google') || v.name.includes('David'));
+                        if (synthVoice) utter.voice = synthVoice;
+                        window.speechSynthesis.speak(utter);
+                    } catch (e) {
+                        // Silently fallback if voice speech fails
+                    }
+                }
             }
 
             playBossDamage() {
@@ -318,16 +506,19 @@
 
         // --- Constants ---
         const BALL_RADIUS = 8;
-        const GRAVITY = 0.2;
-        const FRICTION = 0.995; // Air resistance / rolling friction
-        const BUMPER_BOUNCE = 1.05; // How much speed increases on bumper hit
-        const FLIPPER_STRENGTH = 10; // Base upward speed boost from flipper
-        const FLIPPER_SIDE_STRENGTH = 4; // Sideways boost
+        const GRAVITY = 0.16; // Gravidade suave e arcade
+        const FRICTION = 0.997; // Fricção fluida
+        const MAX_BALL_SPEED = 10.5; // Limite de velocidade para jogabilidade perfeita
+        const BUMPER_BOUNCE = 1.02; // Coeficiente controlado de repulsão
+        const FLIPPER_STRENGTH = 7.8; // Impulso vertical equilibrado
+        const FLIPPER_SIDE_STRENGTH = 3.2; // Impulso lateral equilibrado
 
-        const LEFT_FLIPPER_REST_ANGLE = Math.PI / 6; // Point slightly up when resting
-        const LEFT_FLIPPER_ACTIVE_ANGLE = -Math.PI / 4; // Angle when flipped up
-        const RIGHT_FLIPPER_REST_ANGLE = Math.PI - Math.PI / 6; // Mirror rest angle
-        const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + Math.PI / 4; // Mirror active angle
+        const LEFT_FLIPPER_REST_ANGLE = 0.45; // Aponta ~26° para baixo e para o centro
+        const LEFT_FLIPPER_ACTIVE_ANGLE = -0.55; // Sobe ~-31° para cima e para o centro
+        const RIGHT_FLIPPER_REST_ANGLE = Math.PI - 0.45; // Aponta ~154° para baixo e para o centro
+        const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + 0.55; // Sobe ~211° para cima e para o centro
+
+        const MAX_ACTIVE_BALLS = 9; // Limite máximo estrito de 9 bolinhas simultâneas para garantir 60fps lisos
 
         // Ball properties
         function createBall(x, y, launched = false) {
@@ -341,6 +532,10 @@
                 trail: [],
                 maxTrailLength: 12,
                 stuckTimer: 0,
+                oscillationTimer: 0,
+                anchorPos: { x: x, y: y, timer: 0 },
+                lastBouncePos: { x: x, y: y },
+                consecutiveBounces: 0,
                 hasTriggeredSkillShot: false
             };
         }
@@ -411,28 +606,28 @@
             launchTimestamp: 0
         };
 
-        // Flipper properties - Revised for Pivot Rotation
-        const flipperHeight = 10;
-        const flipperWidth = 70; // Adjusted size
+        // Flipper properties - Precisely tuned for authentic pinball table geometry
+        const flipperHeight = 12;
+        const flipperWidth = 65;
 
         const leftFlipper = {
-            pivotX: 110, // Pivot X (closer to center)
-            pivotY: canvasHeight - 60, // Pivot Y
+            pivotX: 100, // Pivot X (fixed to left inlane guide)
+            pivotY: canvasHeight - 70, // Pivot Y
             width: flipperWidth,
             height: flipperHeight,
             restAngle: LEFT_FLIPPER_REST_ANGLE,
             activeAngle: LEFT_FLIPPER_ACTIVE_ANGLE,
             currentAngle: LEFT_FLIPPER_REST_ANGLE,
-            angularVelocity: 0, // For smooth animation
-            isActivating: false, // Is the key pressed?
-            isUp: false, // Is it fully up? (Used for state checking)
+            angularVelocity: 0,
+            isActivating: false,
+            isUp: false,
             color: '#E0E0E0',
             isLeft: true
         };
 
         const rightFlipper = {
-            pivotX: canvasWidth - 110, // Pivot X (mirror)
-            pivotY: canvasHeight - 60, // Pivot Y
+            pivotX: 265, // Pivot X (fixed to right inlane guide)
+            pivotY: canvasHeight - 70, // Pivot Y
             width: flipperWidth,
             height: flipperHeight,
             restAngle: RIGHT_FLIPPER_REST_ANGLE,
@@ -444,7 +639,124 @@
             color: '#E0E0E0',
             isLeft: false
         };
-        const FLIPPER_ROTATE_SPEED = 0.5; // Radians per frame step
+        const FLIPPER_ROTATE_SPEED = 0.55; // Radians per frame step
+
+        // === Imagem de Fundo da Mesa (Vaporwave Art) ===
+        const bgPinballImage = new Image();
+        bgPinballImage.src = '../assets/images/bg_pimbal_vaporwave.JPG';
+
+        // === TASK_005: Sistema de Temas Dinâmicos da Mesa ===
+        const THEMES = {
+            synthwave: {
+                name: 'Synthwave 1984',
+                bgGradient: 'radial-gradient(circle at 50% 0%, #1a1030 0%, #0d0e15 55%, #05060a 100%)',
+                canvasBg1: '#09090e',
+                canvasBg2: '#020204',
+                neonAccent: '#ff2e97',
+                neonSecondary: '#00f0ff',
+                neonTertiary: '#ffd700',
+                matrixRain: false,
+                bgAlpha: 0.72,
+                gravity: 0.16
+            },
+            vaporwave: {
+                name: 'Vaporwave Sunset',
+                bgGradient: 'radial-gradient(circle at 50% 0%, #3a0d4a 0%, #1a082b 55%, #0d0317 100%)',
+                canvasBg1: '#1b0a2a',
+                canvasBg2: '#0d0216',
+                neonAccent: '#ff7b00',
+                neonSecondary: '#ff007f',
+                neonTertiary: '#9400d3',
+                matrixRain: false,
+                bgAlpha: 0.88,
+                gravity: 0.14
+            },
+            matrix_void: {
+                name: 'Cyber Matrix Void',
+                bgGradient: 'radial-gradient(circle at 50% 0%, #06230f 0%, #031107 55%, #010502 100%)',
+                canvasBg1: '#030c05',
+                canvasBg2: '#010402',
+                neonAccent: '#39ff14',
+                neonSecondary: '#00ffcc',
+                neonTertiary: '#e0ffe0',
+                matrixRain: true,
+                bgAlpha: 0,
+                gravity: 0.16
+            }
+        };
+        let currentThemeKey = 'synthwave';
+
+        const matrixDrops = Array.from({ length: 25 }, () => ({
+            x: Math.random() * 400,
+            y: Math.random() * 600,
+            speed: 2 + Math.random() * 4,
+            chars: '0101XYZ#$@*+-/<>[]'
+        }));
+
+        // === TASK_005: Sistema de Nudge e TILT com Amortecimento de Mola ===
+        const tiltSystem = {
+            stressMeter: 0,        // 0 a 100
+            warnings: 0,           // 0, 1, 2
+            isTilted: false,
+            tiltTimer: 0,
+            decayRate: 16,         // perda de estresse por segundo
+            tableOffset: { x: 0, y: 0 },
+            springVel: { x: 0, y: 0 },
+            warningText: '',
+            warningTimer: 0
+        };
+
+        // === TASK_005: Slingshots Elétricos Triangulares ===
+        const slingshots = [
+            {
+                id: 'left',
+                p1: { x: 55, y: 460 },
+                p2: { x: 92, y: 505 },
+                p3: { x: 55, y: 505 },
+                faceP1: { x: 55, y: 460 },
+                faceP2: { x: 92, y: 505 },
+                kickPower: 7.2,
+                hitFlash: 0,
+                color: '#ff007f',
+                isLeft: true
+            },
+            {
+                id: 'right',
+                p1: { x: 310, y: 460 },
+                p2: { x: 273, y: 505 },
+                p3: { x: 310, y: 505 },
+                faceP1: { x: 310, y: 460 },
+                faceP2: { x: 273, y: 505 },
+                kickPower: 7.2,
+                hitFlash: 0,
+                color: '#00f0ff',
+                isLeft: false
+            }
+        ];
+
+        // === TASK_005: Sistema Kickback (Salva-Vidas nos Outlanes) ===
+        const kickbackState = {
+            leftActive: true,
+            rightActive: false,
+            flashTimer: 0,
+            chargeCount: 0
+        };
+
+        // === TASK_005: Painel DMD (Dot-Matrix Display 64x16) & Minigames ===
+        const dmdSystem = {
+            activeMode: 'DEFAULT', // 'DEFAULT' | 'CYBER_LOCKPICK' | 'FIREWALL_RUNNER'
+            cols: 64,
+            rows: 16,
+            grid: new Uint8Array(64 * 16),
+            scrollOffset: 0,
+            message: 'CYBER PINBALL 2099',
+            timer: 0,
+            lockTargetBit: 0,
+            lockProgress: 0,
+            lockSuccessTimer: 0,
+            runnerPlayerY: 8,
+            runnerObstacles: []
+        };
 
         // Obstacles - Bumpers
         const bumpers = [
@@ -466,18 +778,27 @@
 
         // Walls and boundaries
         const walls = [
-            { x1: 10, y1: 10, x2: 10, y2: canvasHeight - 80 },
-            { x1: canvasWidth - 10, y1: 10, x2: canvasWidth - 10, y2: canvasHeight },
-            { x1: 350, y1: 0, x2: canvasWidth - 10, y2: 50 },
-            { x1: 10, y1: 0, x2: canvasWidth - 10, y2: 0 },
+            // Parede lateral esquerda
+            { x1: 10, y1: 10, x2: 10, y2: 440 },
+            // Topo do campo principal
+            { x1: 10, y1: 10, x2: 330, y2: 10 },
+            // Arco de deflexão do topo direito (guia a bola do lançador para a esquerda)
+            { x1: 330, y1: 10, x2: 375, y2: 25 },
+            { x1: 375, y1: 25, x2: canvasWidth - 10, y2: 60 },
+            // Parede externa direita
+            { x1: canvasWidth - 10, y1: 60, x2: canvasWidth - 10, y2: canvasHeight },
+            // Divisória do lane do lançador
+            { x1: canvasWidth - 45, y1: 90, x2: canvasWidth - 45, y2: 440 },
 
-            { x1: 10, y1: canvasHeight - 80, x2: leftFlipper.pivotX - flipperWidth/3, y2: leftFlipper.pivotY + 10 },
-            { x1: canvasWidth - 10, y1: canvasHeight - 80, x2: rightFlipper.pivotX + flipperWidth/3, y2: rightFlipper.pivotY + 10 },
+            // Guia lateral esquerda inclinada para o pivô do flipper esquerdo
+            { x1: 10, y1: 440, x2: 100, y2: 530 },
+            // Dreno esquerdo abaixo do flipper
+            { x1: 85, y1: 545, x2: 135, y2: canvasHeight },
 
-            { x1: leftFlipper.pivotX + flipperWidth/1.5, y1: leftFlipper.pivotY+15, x2: canvasWidth/2 - 10, y2: canvasHeight},
-            { x1: rightFlipper.pivotX - flipperWidth/1.5, y1: rightFlipper.pivotY+15, x2: canvasWidth/2 + 10, y2: canvasHeight},
-
-            { x1: canvasWidth - 45, y1: 100, x2: canvasWidth - 45, y2: canvasHeight - launcher.height - 10 }
+            // Guia lateral direita inclinada para o pivô do flipper direito
+            { x1: canvasWidth - 45, y1: 440, x2: 265, y2: 530 },
+            // Dreno direito abaixo do flipper
+            { x1: 280, y1: 545, x2: 230, y2: canvasHeight }
         ];
 
         // Event listeners
@@ -486,16 +807,59 @@
         document.addEventListener('keydown', initAudio, { once: true });
 
         document.addEventListener('keydown', function(e) {
-            if (e.key === ' ' || e.key === 'Spacebar') {
-                launcher.charging = true;
+            const k = e.key.toLowerCase();
+
+            // Troca rápida de tema com tecla 'T'
+            if (k === 't') {
+                toggleTheme();
+                return;
             }
-            if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'z') {
+
+            // Ações de Nudge (Empurrão da mesa)
+            if (k === 'q' || (e.shiftKey && (e.key === 'ArrowLeft' || k === 'a'))) {
+                performNudge(-1, -0.4);
+                return;
+            }
+            if (k === 'e' || (e.shiftKey && (e.key === 'ArrowRight' || k === 'd'))) {
+                performNudge(1, -0.4);
+                return;
+            }
+            if (k === 'w' || e.key === 'ArrowUp') {
+                performNudge(0, -1);
+                return;
+            }
+
+            // Se a mesa estiver em TILT, controles são bloqueados
+            if (tiltSystem.isTilted) return;
+
+            // Tratamento do minigame DMD se estiver ativo
+            if (dmdSystem.activeMode === 'CYBER_LOCKPICK') {
+                if (k === 'z' || k === 'a' || e.key === 'ArrowLeft') {
+                    handleDmdLockpickInput(0);
+                    return;
+                }
+                if (k === 'x' || k === 'd' || e.key === 'ArrowRight') {
+                    handleDmdLockpickInput(1);
+                    return;
+                }
+            }
+
+            if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Space' || e.code === 'Space') {
+                // Se a bola ainda não foi lançada, carrega o plunger
+                if (activeBalls.some(b => !b.isLaunched)) {
+                    launcher.charging = true;
+                } else {
+                    // Se já estiver em jogo, a barra de espaço pode servir como Nudge frontal suave
+                    performNudge(0, -0.7);
+                }
+            }
+            if (e.key === 'ArrowLeft' || k === 'z' || k === 'a') {
                 if (bossState.activeEmpFlipper !== 'left') {
                     if (!leftFlipper.isActivating) soundSynth.playFlipperFlip();
                     leftFlipper.isActivating = true;
                 }
             }
-            if (e.key === 'ArrowRight' || e.key === '/') {
+            if (e.key === 'ArrowRight' || k === 'x' || k === 'd' || k === 'm' || e.key === '/') {
                 if (bossState.activeEmpFlipper !== 'right') {
                     if (!rightFlipper.isActivating) soundSynth.playFlipperFlip();
                     rightFlipper.isActivating = true;
@@ -507,19 +871,62 @@
         });
 
         document.addEventListener('keyup', function(e) {
-            if (e.key === ' ' || e.key === 'Spacebar') {
+            const k = e.key.toLowerCase();
+            if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Space' || e.code === 'Space') {
                 if (launcher.charging && activeBalls.some(b => !b.isLaunched)) {
                     launchBall();
                 }
                 launcher.charging = false;
                 launcher.pullDistance = 0;
             }
-            if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'z') {
+            if (e.key === 'ArrowLeft' || k === 'z' || k === 'a') {
                 leftFlipper.isActivating = false;
             }
-            if (e.key === 'ArrowRight' || e.key === '/') {
+            if (e.key === 'ArrowRight' || k === 'x' || k === 'd' || k === 'm' || e.key === '/') {
                 rightFlipper.isActivating = false;
             }
+        });
+
+        // Suporte a toque e clique de mouse no canvas
+        canvas.addEventListener('pointerdown', function(e) {
+            initAudio();
+            const rect = canvas.getBoundingClientRect();
+            const clientX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const clientY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            if (!gameActive) {
+                resetGame();
+                return;
+            }
+
+            if (tiltSystem.isTilted) return;
+
+            if (clientX > canvasWidth - 50 && activeBalls.some(b => !b.isLaunched)) {
+                launcher.charging = true;
+                return;
+            }
+
+            if (clientX < canvasWidth / 2) {
+                if (bossState.activeEmpFlipper !== 'left') {
+                    if (!leftFlipper.isActivating) soundSynth.playFlipperFlip();
+                    leftFlipper.isActivating = true;
+                }
+            } else {
+                if (bossState.activeEmpFlipper !== 'right') {
+                    if (!rightFlipper.isActivating) soundSynth.playFlipperFlip();
+                    rightFlipper.isActivating = true;
+                }
+            }
+        });
+
+        canvas.addEventListener('pointerup', function(e) {
+            if (launcher.charging && activeBalls.some(b => !b.isLaunched)) {
+                launchBall();
+            }
+            launcher.charging = false;
+            launcher.pullDistance = 0;
+            leftFlipper.isActivating = false;
+            rightFlipper.isActivating = false;
         });
 
         // Game functions
@@ -537,6 +944,29 @@
             hackGridHits.clear(); hackGridTimer = 0; hackGridDone = false;
             overclockZoneTime = 0; overclockTimer = 0; globalScoreMultiplier = 1;
             lowerBumperStreak = 0; firewallProgress = 0; frameFlashTimer = 0;
+
+            // Reset TILT System
+            tiltSystem.stressMeter = 0;
+            tiltSystem.warnings = 0;
+            tiltSystem.isTilted = false;
+            tiltSystem.tiltTimer = 0;
+            tiltSystem.warningText = '';
+            tiltSystem.warningTimer = 0;
+            tiltSystem.tableOffset = { x: 0, y: 0 };
+            tiltSystem.springVel = { x: 0, y: 0 };
+
+            // Reset Kickback
+            kickbackState.leftActive = true;
+            kickbackState.rightActive = false;
+            kickbackState.flashTimer = 0;
+            kickbackState.chargeCount = 0;
+            updateKickbackIndicator();
+
+            // Reset DMD System
+            dmdSystem.activeMode = 'DEFAULT';
+            dmdSystem.message = 'CYBER PINBALL 2099';
+            dmdSystem.timer = 0;
+            dmdSystem.lockProgress = 0;
 
             // Reset Boss
             bossState.active = false;
@@ -558,6 +988,257 @@
             updateScoreDisplay();
         }
 
+        // === TASK_005: Funções de Nudge & Sistema de TILT ===
+        function performNudge(dirX, dirY) {
+            if (!gameActive || tiltSystem.isTilted) return;
+            initAudio();
+
+            tiltSystem.stressMeter += 34;
+            tiltSystem.springVel.x += dirX * 22;
+            tiltSystem.springVel.y += dirY * 22;
+
+            activeBalls.forEach(b => {
+                if (b.isLaunched) {
+                    b.speedX += dirX * 1.5;
+                    b.speedY += dirY * 1.1;
+                }
+            });
+
+            soundSynth.playNudge();
+
+            if (tiltSystem.stressMeter >= 100) {
+                tiltSystem.isTilted = true;
+                tiltSystem.tiltTimer = 6.0;
+                tiltSystem.warningText = 'TILT! CONTROLS OFFLINE';
+                tiltSystem.warningTimer = 4.0;
+                leftFlipper.isActivating = false;
+                rightFlipper.isActivating = false;
+                soundSynth.playTiltAlarm();
+                soundSynth.speak('Tilt! System offline!');
+            } else if (tiltSystem.stressMeter >= 85 && tiltSystem.warnings < 2) {
+                tiltSystem.warnings = 2;
+                tiltSystem.warningText = 'WARNING 2 - TILT DANGER!';
+                tiltSystem.warningTimer = 1.8;
+                soundSynth.playTiltWarning();
+                soundSynth.speak('Danger! Tilt risk!');
+            } else if (tiltSystem.stressMeter >= 60 && tiltSystem.warnings < 1) {
+                tiltSystem.warnings = 1;
+                tiltSystem.warningText = 'WARNING 1 - TILT RISK';
+                tiltSystem.warningTimer = 1.8;
+                soundSynth.playTiltWarning();
+                soundSynth.speak('Warning! Excessive force!');
+            }
+        }
+
+        function updateTiltSystem(dt) {
+            // Decaimento de estresse
+            if (tiltSystem.stressMeter > 0) {
+                tiltSystem.stressMeter = Math.max(0, tiltSystem.stressMeter - tiltSystem.decayRate * dt);
+                if (tiltSystem.stressMeter === 0) {
+                    tiltSystem.warnings = 0;
+                }
+            }
+
+            // Duração do TILT
+            if (tiltSystem.isTilted) {
+                tiltSystem.tiltTimer -= dt;
+                if (tiltSystem.tiltTimer <= 0) {
+                    tiltSystem.isTilted = false;
+                    tiltSystem.stressMeter = 0;
+                    tiltSystem.warnings = 0;
+                    tiltSystem.warningText = '';
+                }
+            }
+
+            if (tiltSystem.warningTimer > 0) {
+                tiltSystem.warningTimer -= dt;
+            }
+
+            // Física de mola amortecida da mesa (Spring damping)
+            const springK = 180;
+            const damping = 14;
+            const forceX = -springK * tiltSystem.tableOffset.x - damping * tiltSystem.springVel.x;
+            const forceY = -springK * tiltSystem.tableOffset.y - damping * tiltSystem.springVel.y;
+            tiltSystem.springVel.x += forceX * dt;
+            tiltSystem.springVel.y += forceY * dt;
+            tiltSystem.tableOffset.x += tiltSystem.springVel.x * dt;
+            tiltSystem.tableOffset.y += tiltSystem.springVel.y * dt;
+        }
+
+        // === TASK_005: Sistema de Temas ===
+        function toggleTheme() {
+            initAudio();
+            const keys = Object.keys(THEMES);
+            const idx = keys.indexOf(currentThemeKey);
+            const nextKey = keys[(idx + 1) % keys.length];
+            setTheme(nextKey);
+        }
+
+        function setTheme(themeKey) {
+            if (!THEMES[themeKey]) return;
+            currentThemeKey = themeKey;
+            const theme = THEMES[themeKey];
+            currentGravity = theme.gravity;
+
+            const lbl = document.getElementById('themeNameLabel');
+            if (lbl) lbl.innerText = theme.name.split(' ')[0];
+
+            document.body.style.background = theme.bgGradient;
+            soundSynth.playSkillShot();
+            soundSynth.speak(theme.name);
+        }
+
+        function updateKickbackIndicator() {
+            const el = document.getElementById('kickbackIndicator');
+            if (!el) return;
+            if (kickbackState.leftActive || kickbackState.rightActive) {
+                el.className = 'kickback-indicator';
+                el.innerText = 'KICKBACK: READY';
+            } else {
+                el.className = 'kickback-indicator offline';
+                el.innerText = 'KICKBACK: OFFLINE';
+            }
+        }
+
+        // === TASK_005: Colisão e Impulso dos Slingshots ===
+        function checkSlingshotCollisions() {
+            if (tiltSystem.isTilted) return;
+            slingshots.forEach(sl => {
+                if (sl.hitFlash > 0) sl.hitFlash -= 0.016;
+
+                // Testar a face elástica hipotenusa (faceP1 até faceP2)
+                const { x: closestX, y: closestY } = closestPointOnSegment(ball.x, ball.y, sl.faceP1.x, sl.faceP1.y, sl.faceP2.x, sl.faceP2.y);
+                const distanceSquared = distSq(ball.x, ball.y, closestX, closestY);
+
+                if (distanceSquared < ball.radius * ball.radius) {
+                    const dist = Math.sqrt(distanceSquared);
+                    const overlap = ball.radius - dist;
+
+                    // Normal apontando para o centro da mesa
+                    let edgeDx = sl.faceP2.x - sl.faceP1.x;
+                    let edgeDy = sl.faceP2.y - sl.faceP1.y;
+                    let normalX = -edgeDy;
+                    let normalY = edgeDx;
+                    if (sl.isLeft && normalX < 0) { normalX *= -1; normalY *= -1; }
+                    if (!sl.isLeft && normalX > 0) { normalX *= -1; normalY *= -1; }
+                    const nLen = Math.hypot(normalX, normalY) || 1;
+                    normalX /= nLen;
+                    normalY /= nLen;
+
+                    ball.x += normalX * (overlap + 1.0);
+                    ball.y += normalY * (overlap + 1.0);
+
+                    // Impulso potente para o centro superior
+                    ball.speedX = normalX * sl.kickPower;
+                    ball.speedY = normalY * sl.kickPower;
+
+                    sl.hitFlash = 0.25;
+                    addScore(150);
+                    updateScoreDisplay();
+                    soundSynth.playSlingshot();
+                    createParticles(closestX, closestY, 14, sl.color);
+
+                    // 10% chance de acionar minigame DMD
+                    if (Math.random() < 0.12 && dmdSystem.activeMode === 'DEFAULT') {
+                        triggerDmdMinigame('CYBER_LOCKPICK');
+                    }
+                }
+            });
+        }
+
+        // === TASK_005: Resgate por Kickback nos Outlanes ===
+        function checkOutlaneKickback() {
+            if (tiltSystem.isTilted) return;
+
+            // Outlane Esquerdo
+            if (ball.x <= 48 && ball.y >= 450 && ball.y <= 540) {
+                if (kickbackState.leftActive) {
+                    ball.speedY = -16.5;
+                    ball.speedX = 1.6;
+                    kickbackState.leftActive = false;
+                    kickbackState.flashTimer = 0.4;
+                    soundSynth.playKickback();
+                    soundSynth.speak('Kickback saved!');
+                    createParticles(ball.x, ball.y, 22, '#39ff14');
+                    updateKickbackIndicator();
+                    addScore(1000);
+                    updateScoreDisplay();
+                }
+            }
+
+            // Outlane Direito
+            if (ball.x >= 320 && ball.x <= 350 && ball.y >= 450 && ball.y <= 540) {
+                if (kickbackState.rightActive) {
+                    ball.speedY = -16.5;
+                    ball.speedX = -1.6;
+                    kickbackState.rightActive = false;
+                    kickbackState.flashTimer = 0.4;
+                    soundSynth.playKickback();
+                    soundSynth.speak('Kickback saved!');
+                    createParticles(ball.x, ball.y, 22, '#39ff14');
+                    updateKickbackIndicator();
+                    addScore(1000);
+                    updateScoreDisplay();
+                }
+            }
+        }
+
+        // === TASK_005: Minigames e Display DMD ===
+        function triggerDmdMinigame(mode) {
+            dmdSystem.activeMode = mode;
+            dmdSystem.timer = 8.0; // 8 segundos para resolver
+            if (mode === 'CYBER_LOCKPICK') {
+                dmdSystem.lockTargetBit = Math.random() < 0.5 ? 0 : 1;
+                dmdSystem.lockProgress = 0;
+                dmdSystem.message = `HACK: PRESS ${dmdSystem.lockTargetBit === 0 ? 'LEFT [Z]' : 'RIGHT [X]'}`;
+                soundSynth.playDmdBeep(900);
+                soundSynth.speak('Hack in progress!');
+            }
+        }
+
+        function handleDmdLockpickInput(bit) {
+            if (dmdSystem.activeMode !== 'CYBER_LOCKPICK') return;
+            if (bit === dmdSystem.lockTargetBit) {
+                dmdSystem.lockProgress++;
+                soundSynth.playDmdBeep(600 + dmdSystem.lockProgress * 200);
+                if (dmdSystem.lockProgress >= 3) {
+                    // Vitória no Minigame!
+                    addScore(10000);
+                    currentMultiplier = Math.max(5, currentMultiplier * 2);
+                    updateScoreDisplay();
+                    dmdSystem.message = 'JACKPOT 10000 PTS + 5X!';
+                    dmdSystem.lockSuccessTimer = 3.0;
+                    dmdSystem.activeMode = 'DEFAULT';
+                    kickbackState.leftActive = true;
+                    kickbackState.rightActive = true;
+                    updateKickbackIndicator();
+                    soundSynth.playBossDefeat();
+                    soundSynth.speak('Jackpot overload! Kickback ready!');
+                    createParticles(canvasWidth / 2, 80, 30, '#ffd700');
+                } else {
+                    dmdSystem.lockTargetBit = Math.random() < 0.5 ? 0 : 1;
+                    dmdSystem.message = `LOCK ${dmdSystem.lockProgress}/3: ${dmdSystem.lockTargetBit === 0 ? 'LEFT [Z]' : 'RIGHT [X]'}`;
+                }
+            } else {
+                soundSynth.playTiltWarning();
+                dmdSystem.message = 'BIT ERROR! RETRY';
+            }
+        }
+
+        function updateDmdSystem(dt) {
+            dmdSystem.scrollOffset += dt * 30;
+            if (dmdSystem.activeMode !== 'DEFAULT') {
+                dmdSystem.timer -= dt;
+                if (dmdSystem.timer <= 0) {
+                    dmdSystem.activeMode = 'DEFAULT';
+                    dmdSystem.message = 'TIME EXPIRED';
+                }
+            }
+            if (dmdSystem.lockSuccessTimer > 0) {
+                dmdSystem.lockSuccessTimer -= dt;
+            }
+        }
+
         function resetBallPosition() {
             ball.x = ball.xInitial;
             ball.y = ball.yInitial;
@@ -570,9 +1251,62 @@
             createParticles(ball.x, ball.y, 5, '#8888FF');
         }
 
+        function checkBoundaries(b) {
+            const minX = 10 + b.radius;
+            const maxX = canvasWidth - 10 - b.radius;
+            const minY = 8 + b.radius;
+
+            // Parede esquerda
+            if (b.x < minX) {
+                b.x = minX;
+                b.speedX = Math.abs(b.speedX) * 0.65;
+            }
+
+            // Parede do topo
+            if (b.y < minY) {
+                b.y = minY;
+                b.speedY = Math.abs(b.speedY) * 0.65;
+            }
+
+            // Parede direita externa
+            if (b.x > maxX) {
+                b.x = maxX;
+                b.speedX = -Math.abs(b.speedX) * 0.65;
+            }
+
+            // Canaleta do Lançador e Parede Divisória
+            const laneWallX = canvasWidth - 45; // 355
+            const laneTopY = 90;
+            const laneBottomY = 440;
+
+            // Curva no topo do lançador (conduz a bola com impulso para a esquerda ao atingir o topo)
+            if (b.x > laneWallX - 10 && b.y < 65) {
+                if (b.speedY < 0) {
+                    b.speedX = -Math.max(6.5, Math.abs(b.speedY) * 0.7);
+                    b.speedY = 1.2;
+                    b.x = Math.min(b.x, laneWallX - 15);
+                }
+            }
+
+            // Parede divisória entre o campo jogável e o canal do lançador
+            if (b.y >= laneTopY && b.y <= laneBottomY) {
+                // Se está no campo principal, não entra na divisória
+                if (b.x > laneWallX - b.radius && b.speedX > 0 && b.x < laneWallX + 8) {
+                    b.x = laneWallX - b.radius;
+                    b.speedX = -Math.abs(b.speedX) * 0.65;
+                }
+                // Se está dentro da canaleta do lançador, não vaza para a esquerda no meio
+                else if (b.x < laneWallX + b.radius && b.speedX < 0 && b.x >= laneWallX - 8) {
+                    b.x = laneWallX + b.radius;
+                    b.speedX = Math.abs(b.speedX) * 0.65;
+                }
+            }
+        }
+
         function checkBallStuckOrOutOfBounds(deltaTime) {
             if (!ball.isLaunched || !gameActive) {
                 ball.stuckTimer = 0;
+                ball.oscillationTimer = 0;
                 return;
             }
 
@@ -583,46 +1317,68 @@
                 ball.stuckTimer = 0;
             }
 
-            if (ball.stuckTimer > MAX_STUCK_TIME_SECONDS) {
-                if (activeBalls.length > 1) {
-                    createParticles(ball.x, ball.y, 10, '#00f0ff');
-                    ball.x = 200; ball.y = 50;
-                    ball.speedX = (Math.random() - 0.5) * 2; ball.speedY = 2;
-                    ball.trail = [];
-                    ball.stuckTimer = 0;
-                    createParticles(ball.x, ball.y, 10, '#00f0ff');
-                } else {
-                    resetBallPosition();
+            // === Detecção de Oscilação / Ping-Pong Loop em Área Restrita ===
+            if (!ball.anchorPos) {
+                ball.anchorPos = { x: ball.x, y: ball.y, timer: 0 };
+            }
+            ball.anchorPos.timer += deltaTime;
+
+            const distFromAnchor = Math.hypot(ball.x - ball.anchorPos.x, ball.y - ball.anchorPos.y);
+            if (distFromAnchor < 45 && currentSpeedSq > 4.0) {
+                // A bola está se movendo com velocidade, mas presa em um raio minúsculo (<45px)
+                ball.oscillationTimer += deltaTime;
+                if (ball.oscillationTimer > 1.2) {
+                    // Aplica uma micro-deflexão suave e imperceptível que quebra o ciclo
+                    const nudgeAngle = (Math.random() - 0.5) * 0.5 + Math.PI / 4; // Desvio sutil
+                    const kickMag = 1.2;
+                    ball.speedX += Math.cos(nudgeAngle) * kickMag;
+                    ball.speedY += Math.abs(Math.sin(nudgeAngle)) * 0.8 + 0.4; // Adiciona leve impulso descendente
+                    ball.oscillationTimer = 0;
+                    ball.anchorPos = { x: ball.x, y: ball.y, timer: 0 };
+                    createParticles(ball.x, ball.y, 4, '#00f0ff');
                 }
+            } else if (ball.anchorPos.timer > 0.8) {
+                // Atualiza âncora a cada 0.8s se a bola estiver transitando normalmente
+                ball.anchorPos = { x: ball.x, y: ball.y, timer: 0 };
+                ball.oscillationTimer = Math.max(0, ball.oscillationTimer - deltaTime * 2);
+            }
+
+            if (ball.stuckTimer > MAX_STUCK_TIME_SECONDS) {
+                createParticles(ball.x, ball.y, 10, '#00f0ff');
+                ball.x = 200;
+                ball.y = 120;
+                ball.speedX = (Math.random() - 0.5) * 2;
+                ball.speedY = 2;
+                ball.trail = [];
+                ball.stuckTimer = 0;
+                ball.oscillationTimer = 0;
                 return;
             }
 
-            const safeMinX = 10 + ball.radius;
-            const safeMaxX = canvasWidth - 10 - ball.radius;
-            const safeMinY = 10 + ball.radius;
-            const safeMaxY = canvasHeight - 20;
-
-            if (ball.x < safeMinX || ball.x > safeMaxX || ball.y < safeMinY) {
-                const isInLauncherArea = ball.x > canvasWidth - 45 - ball.radius && ball.y > canvasHeight - launcher.height - 10 - ball.radius;
-                if (!isInLauncherArea && ball.y < safeMaxY) {
-                     resetBallPosition();
-                     return;
-                 }
+            // Recuperação de segurança apenas caso a bola saia totalmente da moldura
+            if (ball.x < -30 || ball.x > canvasWidth + 30 || ball.y < -30) {
+                ball.x = 200;
+                ball.y = 100;
+                ball.speedX = 0;
+                ball.speedY = 3;
+                ball.trail = [];
             }
         }
 
         function launchBall() {
             const b = activeBalls.find(x => !x.isLaunched);
-            if (b && launcher.pullDistance > 5) {
+            if (b) {
+                const pullRatio = Math.max(0.35, Math.min(1.0, launcher.pullDistance / launcher.maxPull));
                 b.isLaunched = true;
-                b.speedY = -(launcher.pullDistance * launcher.springStiffness * 1.4);
-                b.speedX = -1 - Math.random();
+                // Força suficiente para subir toda a canaleta até o topo e contornar a curva
+                b.speedY = -(14.5 + pullRatio * 4.0);
+                b.speedX = -0.2;
                 b.hasTriggeredSkillShot = false;
-                launcher.lastPlungerPull = launcher.pullDistance;
+                launcher.lastPlungerPull = launcher.pullDistance || 30;
                 launcher.launchTimestamp = performance.now();
                 launcher.pullDistance = 0;
                 if (!gameStarted) gameStarted = true;
-                createParticles(b.x, b.y + 10, 10, '#FFFF88');
+                createParticles(b.x, b.y + 10, 12, '#FFFF88');
             }
             launcher.charging = false;
         }
@@ -663,6 +1419,7 @@
         function spawnMultiball() {
             const spawns = [{ x: 150, y: 60 }, { x: 250, y: 60 }];
             spawns.forEach(s => {
+                if (activeBalls.length >= MAX_ACTIVE_BALLS) return;
                 const nb = createBall(s.x, s.y, true);
                 nb.speedX = (Math.random() - 0.5) * 4;
                 nb.speedY = 2 + Math.random() * 2;
@@ -1155,30 +1912,50 @@
                 ctx.globalAlpha = 0.5;
             }
 
-            const drawX = flipper.isLeft ? -flipper.width : 0;
+            const rBase = flipper.height / 2 + 1; // ~7px
+            const rTip = flipper.height / 2 - 2;  // ~4px
+            const len = flipper.width;            // 65px
 
-            const gradient = ctx.createLinearGradient(drawX, -flipper.height / 2, drawX, flipper.height / 2);
+            // Gradiente vibrante Synthwave
+            const gradient = ctx.createLinearGradient(0, -rBase, 0, rBase);
             gradient.addColorStop(0, isEmp ? '#ffffaa' : '#ffffff');
-            gradient.addColorStop(0.5, isEmp ? '#ddcc66' : '#d8d8e6');
-            gradient.addColorStop(1, isEmp ? '#998833' : '#9aa0b8');
+            gradient.addColorStop(0.3, isEmp ? '#ffd700' : (flipper.isLeft ? '#ff2e97' : '#00f0ff'));
+            gradient.addColorStop(0.7, isEmp ? '#ddaa00' : (flipper.isLeft ? '#a00050' : '#007090'));
+            gradient.addColorStop(1, isEmp ? '#885500' : '#1a1030');
+
             ctx.fillStyle = gradient;
-            ctx.strokeStyle = isEmp ? '#ffd700' : '#00f0ff';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = isEmp ? '#ffd700' : (flipper.isLeft ? '#ff007f' : '#00f0ff');
+            ctx.lineWidth = 2;
+            ctx.shadowColor = isEmp ? 'rgba(255, 215, 0, 0.9)' : (flipper.isLeft ? 'rgba(255, 0, 127, 0.8)' : 'rgba(0, 240, 255, 0.8)');
+            ctx.shadowBlur = 10;
 
-            ctx.shadowColor = isEmp ? 'rgba(255, 215, 0, 0.8)' : 'rgba(0, 240, 255, 0.6)';
-            ctx.shadowBlur = 8;
-
+            // Formato cônico arredondado (flipper clássico de arcade)
             ctx.beginPath();
-            ctx.rect(drawX, -flipper.height / 2, flipper.width, flipper.height);
+            ctx.arc(0, 0, rBase, Math.PI / 2, -Math.PI / 2, false);
+            ctx.lineTo(len, -rTip);
+            ctx.arc(len, 0, rTip, -Math.PI / 2, Math.PI / 2, false);
+            ctx.lineTo(0, rBase);
+            ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            ctx.closePath();
 
-            ctx.shadowColor = 'transparent';
-            ctx.fillStyle = isEmp ? '#ffaa00' : '#444';
+            // Detalhe de borracha / grip central
             ctx.beginPath();
-            ctx.arc(0, 0, flipper.height/1.5, 0, Math.PI * 2);
+            ctx.moveTo(rBase + 4, 0);
+            ctx.lineTo(len - rTip - 4, 0);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Parafuso / Eixo do pivô central
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = isEmp ? '#ffaa00' : '#1a1d28';
+            ctx.beginPath();
+            ctx.arc(0, 0, rBase - 2, 0, Math.PI * 2);
             ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
 
             ctx.restore();
         }
@@ -1484,8 +2261,15 @@
                     }
 
                     const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
-                    ball.speedX = reflected.x * restitution;
-                    ball.speedY = reflected.y * restitution;
+                    
+                    // Micro-desvio angular natural para evitar loops ortogonais fechados
+                    const wallMicroAngle = (Math.random() - 0.5) * 0.06; // ~1.7 graus
+                    const wCos = Math.cos(wallMicroAngle), wSin = Math.sin(wallMicroAngle);
+                    const wRotX = reflected.x * wCos - reflected.y * wSin;
+                    const wRotY = reflected.x * wSin + reflected.y * wCos;
+
+                    ball.speedX = wRotX * restitution;
+                    ball.speedY = wRotY * restitution;
                     createParticles(closestX, closestY, 3, '#AAAAAA');
                 }
             });
@@ -1503,20 +2287,47 @@
                     const distance = Math.sqrt(distanceSquared);
                     const overlap = (ball.radius + bumper.radius) - distance;
 
-                    const normalX = (ball.x - bumper.x) / distance;
-                    const normalY = (ball.y - bumper.y) / distance;
+                    const normalX = (ball.x - bumper.x) / (distance || 1);
+                    const normalY = (ball.y - bumper.y) / (distance || 1);
 
-                    ball.x += normalX * overlap;
-                    ball.y += normalY * overlap;
+                    ball.x += normalX * (overlap + 0.5);
+                    ball.y += normalY * (overlap + 0.5);
 
                     const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
-                    const currentSpeed = Math.sqrt(ball.speedX**2 + ball.speedY**2);
-                    const minBounceSpeed = 5 * bounceBoost;
-                    const bounceSpeed = Math.max(minBounceSpeed, currentSpeed * BUMPER_BOUNCE);
-                    const speedFactor = bounceSpeed / Math.sqrt(reflected.x**2 + reflected.y**2);
+                    const currentSpeed = Math.hypot(ball.speedX, ball.speedY);
+                    const bounceSpeed = Math.min(MAX_BALL_SPEED * 0.85, Math.max(4.8, currentSpeed * 1.02)) * bounceBoost;
+                    const rLen = Math.hypot(reflected.x, reflected.y) || 1;
 
-                    ball.speedX = reflected.x * speedFactor;
-                    ball.speedY = reflected.y * speedFactor;
+                    // Micro-perturbação angular imperceptível (~3.5°) para quebrar trajetórias fechadas 1D
+                    const bMicroAngle = (Math.random() - 0.5) * 0.12;
+                    const bCos = Math.cos(bMicroAngle), bSin = Math.sin(bMicroAngle);
+                    const normRefVx = (reflected.x / rLen);
+                    const normRefVy = (reflected.y / rLen);
+                    let finalRefVx = normRefVx * bCos - normRefVy * bSin;
+                    let finalRefVy = normRefVx * bSin + normRefVy * bCos;
+
+                    // Detecção de rebotes consecutivos em curta distância (< 80px)
+                    if (ball.lastBouncePos) {
+                        const distLastBounce = Math.hypot(ball.x - ball.lastBouncePos.x, ball.y - ball.lastBouncePos.y);
+                        if (distLastBounce < 80) {
+                            ball.consecutiveBounces = (ball.consecutiveBounces || 0) + 1;
+                            if (ball.consecutiveBounces >= 2) {
+                                // Aplica leve quebra de eixo perpendicular para escapar do ping-pong
+                                const escapeJitterX = (Math.random() - 0.5) * 0.6;
+                                finalRefVx += escapeJitterX;
+                                finalRefVy += 0.35; // Tendência sutil de descida em direção às aletas
+                            }
+                        } else {
+                            ball.consecutiveBounces = 1;
+                        }
+                    } else {
+                        ball.consecutiveBounces = 1;
+                    }
+                    ball.lastBouncePos = { x: ball.x, y: ball.y };
+
+                    const fLen = Math.hypot(finalRefVx, finalRefVy) || 1;
+                    ball.speedX = (finalRefVx / fLen) * bounceSpeed;
+                    ball.speedY = (finalRefVy / fLen) * bounceSpeed;
 
                     if (!bumper.isHit) {
                          addScore(bumper.points);
@@ -1566,18 +2377,24 @@
             const angle = flipper.currentAngle;
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
-            const halfHeight = flipper.height / 2;
-            const drawX = flipper.isLeft ? -flipper.width : 0;
+            const rBase = flipper.height / 2 + 1;
+            const rTip = flipper.height / 2 - 2;
+            const len = flipper.width;
 
+            // Vértices do corpo cônico do flipper no espaço local
             const corners = [
-                { x: drawX, y: -halfHeight },
-                { x: drawX + flipper.width, y: -halfHeight },
-                { x: drawX + flipper.width, y: halfHeight },
-                { x: drawX, y: halfHeight }
+                { x: 0, y: -rBase },
+                { x: len, y: -rTip },
+                { x: len, y: rTip },
+                { x: 0, y: rBase }
             ].map(p => ({
                 x: flipper.pivotX + p.x * cos - p.y * sin,
                 y: flipper.pivotY + p.x * sin + p.y * cos
             }));
+
+            // Centro local do flipper no espaço mundial
+            const centerLocalX = flipper.pivotX + (len / 2) * cos;
+            const centerLocalY = flipper.pivotY + (len / 2) * sin;
 
             for (let i = 0; i < 4; i++) {
                 const p1 = corners[i];
@@ -1586,48 +2403,58 @@
                 const distanceSquared = distSq(ball.x, ball.y, closestX, closestY);
 
                 if (distanceSquared < ballRadiusSq) {
-                     const overlap = ball.radius - Math.sqrt(distanceSquared);
+                     const dist = Math.sqrt(distanceSquared);
+                     const overlap = ball.radius - dist;
                      const dx = ball.x - closestX;
                      const dy = ball.y - closestY;
-                     const collisionDist = Math.sqrt(dx*dx + dy*dy);
+                     const collisionDist = dist;
                      const moveX = collisionDist < 0.01 ? 0 : (dx / collisionDist) * overlap;
                      const moveY = collisionDist < 0.01 ? 0 : (dy / collisionDist) * overlap;
-                     ball.x += moveX * 1.1;
-                     ball.y += moveY * 1.1;
+                     ball.x += moveX * 1.05;
+                     ball.y += moveY * 1.05;
 
                      let edgeDx = p2.x - p1.x;
                      let edgeDy = p2.y - p1.y;
                      let normalX = -edgeDy;
                      let normalY = edgeDx;
-                     if ((closestX - flipper.pivotX) * normalX + (closestY - flipper.pivotY) * normalY < 0) {
+                     if ((closestX - centerLocalX) * normalX + (closestY - centerLocalY) * normalY < 0) {
                          normalX *= -1;
                          normalY *= -1;
                      }
                      const normalLen = Math.sqrt(normalX*normalX + normalY*normalY);
-                      if (normalLen > 0.01) {
+                     if (normalLen > 0.01) {
                          normalX /= normalLen;
                          normalY /= normalLen;
-                      }
+                     }
 
                      const reflected = reflectVelocity(ball.speedX, ball.speedY, normalX, normalY);
-                      let impulseX = 0;
-                      let impulseY = -FLIPPER_STRENGTH * bounceBoost;
-                      impulseX += (flipper.isLeft ? FLIPPER_SIDE_STRENGTH : -FLIPPER_SIDE_STRENGTH) * bounceBoost;
-                      if (flipper.angularVelocity !== 0) {
-                           const r = Math.hypot(closestX - flipper.pivotX, closestY - flipper.pivotY);
-                           const rFactor = Math.min(1.4, r / flipper.width);
-                           impulseY -= Math.abs(flipper.angularVelocity) * 40 * rFactor * bounceBoost;
-                       }
+                     let impulseX = (flipper.isLeft ? FLIPPER_SIDE_STRENGTH : -FLIPPER_SIDE_STRENGTH) * 0.7 * bounceBoost;
+                     let impulseY = -FLIPPER_STRENGTH * 0.75 * bounceBoost;
 
-                     ball.speedX = reflected.x * 0.5 + impulseX;
-                     ball.speedY = reflected.y * 0.5 + impulseY;
+                     // Impulso extra quando o flipper está sendo acionado
+                     if (flipper.isActivating || Math.abs(flipper.angularVelocity) > 0.05) {
+                          const r = Math.hypot(closestX - flipper.pivotX, closestY - flipper.pivotY);
+                          const rFactor = Math.min(1.3, Math.max(0.3, r / flipper.width));
+                          impulseY -= 4.0 * rFactor * bounceBoost;
+                          impulseX += (flipper.isLeft ? 2.5 : -2.5) * rFactor * bounceBoost;
+                     }
+
+                     ball.speedX = reflected.x * 0.35 + impulseX;
+                     ball.speedY = reflected.y * 0.35 + impulseY;
+
+                     // Limitar velocidade máxima para controle perfeito
+                     const speed = Math.hypot(ball.speedX, ball.speedY);
+                     if (speed > MAX_BALL_SPEED) {
+                         ball.speedX = (ball.speedX / speed) * MAX_BALL_SPEED;
+                         ball.speedY = (ball.speedY / speed) * MAX_BALL_SPEED;
+                     }
 
                      addScore(1);
                      updateScoreDisplay();
-                     createParticles(closestX, closestY, 8, '#FFFFFF');
+                     createParticles(closestX, closestY, 6, flipper.isLeft ? '#ff007f' : '#00f0ff');
                      return;
-                 }
-             }
+                }
+            }
         }
 
         function updateFlippers(deltaTime) {
@@ -1640,11 +2467,11 @@
              leftFlipper.angularVelocity = Math.sign(leftAngleDiff) * Math.min(Math.abs(leftAngleDiff), FLIPPER_ROTATE_SPEED);
              if (Math.abs(leftAngleDiff) > 0.01) {
                   leftFlipper.currentAngle += leftFlipper.angularVelocity;
-              } else {
+             } else {
                   leftFlipper.currentAngle = leftTargetAngle;
                   leftFlipper.angularVelocity = 0;
-              }
-             leftFlipper.isUp = leftFlipper.currentAngle === leftFlipper.activeAngle;
+             }
+             leftFlipper.isUp = Math.abs(leftFlipper.currentAngle - leftFlipper.activeAngle) < 0.05;
 
              // Flipper direito
              if (bossState.activeEmpFlipper === 'right') {
@@ -1654,12 +2481,12 @@
              const rightAngleDiff = rightTargetAngle - rightFlipper.currentAngle;
              rightFlipper.angularVelocity = Math.sign(rightAngleDiff) * Math.min(Math.abs(rightAngleDiff), FLIPPER_ROTATE_SPEED);
              if (Math.abs(rightAngleDiff) > 0.01) {
-                 rightFlipper.currentAngle += rightFlipper.angularVelocity;
+                  rightFlipper.currentAngle += rightFlipper.angularVelocity;
              } else {
-                 rightFlipper.currentAngle = rightTargetAngle;
-                 rightFlipper.angularVelocity = 0;
+                  rightFlipper.currentAngle = rightTargetAngle;
+                  rightFlipper.angularVelocity = 0;
              }
-             rightFlipper.isUp = rightFlipper.currentAngle === rightFlipper.activeAngle;
+             rightFlipper.isUp = Math.abs(rightFlipper.currentAngle - rightFlipper.activeAngle) < 0.05;
         }
 
         function update(timestamp) {
@@ -1669,15 +2496,17 @@
             }
 
             if (!lastTimestamp) lastTimestamp = timestamp;
-            const deltaTime = Math.min(0.1, (timestamp - lastTimestamp) / 1000);
+            const deltaTime = Math.min(0.06, (timestamp - lastTimestamp) / 1000);
             lastTimestamp = timestamp;
 
             const launchReady = activeBalls.find(b => !b.isLaunched);
-            if (launcher.charging && launchReady) {
+            if (launcher.charging && launchReady && !tiltSystem.isTilted) {
                 launcher.pullDistance += 90 * deltaTime;
                 if (launcher.pullDistance > launcher.maxPull) launcher.pullDistance = launcher.maxPull;
             }
 
+            updateTiltSystem(deltaTime);
+            updateDmdSystem(deltaTime);
             updateFlippers(deltaTime);
             updatePhysicsMode(deltaTime);
             updateMissions(deltaTime);
@@ -1687,17 +2516,40 @@
 
             if (bossState.goldSkinTimer > 0) bossState.goldSkinTimer -= deltaTime;
             if (frameFlashTimer > 0) frameFlashTimer -= deltaTime;
+            if (kickbackState.flashTimer > 0) kickbackState.flashTimer -= deltaTime;
 
             let maxBallSpeed = 0;
+            const SUB_STEPS = 4;
 
             for (let i = activeBalls.length - 1; i >= 0; i--) {
                 ball = activeBalls[i];
                 if (ball.isLaunched) {
-                    ball.speedY += currentGravity;
-                    ball.x += ball.speedX;
-                    ball.y += ball.speedY;
-                    ball.speedX *= currentFriction;
-                    ball.speedY *= currentFriction;
+                    for (let step = 0; step < SUB_STEPS; step++) {
+                        ball.speedY += (currentGravity / SUB_STEPS);
+                        ball.speedX *= Math.pow(currentFriction, 1 / SUB_STEPS);
+                        ball.speedY *= Math.pow(currentFriction, 1 / SUB_STEPS);
+
+                        const spd = Math.hypot(ball.speedX, ball.speedY);
+                        const inLauncherLane = (ball.x > 340 && ball.speedY < 0);
+                        const maxSpd = inLauncherLane ? 19.0 : MAX_BALL_SPEED;
+                        if (spd > maxSpd) {
+                            ball.speedX = (ball.speedX / spd) * maxSpd;
+                            ball.speedY = (ball.speedY / spd) * maxSpd;
+                        }
+
+                        ball.x += ball.speedX / SUB_STEPS;
+                        ball.y += ball.speedY / SUB_STEPS;
+
+                        checkBoundaries(ball);
+                        checkWallCollisions();
+                        checkSlingshotCollisions();
+                        checkOutlaneKickback();
+                        checkBumperCollisions();
+                        checkMultiplierZoneCollisions(deltaTime / SUB_STEPS);
+                        checkFlipperCollisions();
+                        checkFirewallTargets();
+                        checkSkillShotSensor(ball);
+                    }
 
                     const curSpeed = Math.hypot(ball.speedX, ball.speedY);
                     if (curSpeed > maxBallSpeed) maxBallSpeed = curSpeed;
@@ -1706,12 +2558,6 @@
                     if (ball.trail.length > ball.maxTrailLength) ball.trail.shift();
 
                     checkBallStuckOrOutOfBounds(deltaTime);
-                    checkWallCollisions();
-                    checkBumperCollisions();
-                    checkMultiplierZoneCollisions(deltaTime);
-                    checkFlipperCollisions();
-                    checkFirewallTargets();
-                    checkSkillShotSensor(ball);
                 }
                 handleDrainCheck(ball, i);
             }
@@ -1769,34 +2615,36 @@
                 const t = performance.now();
                 const glow = 12 + Math.sin(t / 200) * 8;
                 ctx.fillStyle = '#ff2e97';
-                ctx.font = '30px "Press Start 2P", monospace';
+                ctx.font = '28px "Press Start 2P", monospace';
                 ctx.shadowColor = '#ff007f';
                 ctx.shadowBlur = glow;
-                ctx.fillText('PIMBAL', canvasWidth / 2, canvasHeight / 2 - 150);
+                ctx.fillText('PIMBAL 2.0', canvasWidth / 2, canvasHeight / 2 - 160);
 
                 ctx.shadowBlur = 6;
                 ctx.shadowColor = '#00f0ff';
                 ctx.fillStyle = '#00f0ff';
                 ctx.font = '11px "Press Start 2P", monospace';
-                ctx.fillText('CONTROLS', canvasWidth / 2, canvasHeight / 2 - 80);
+                ctx.fillText('ARCADE CONTROLS', canvasWidth / 2, canvasHeight / 2 - 100);
 
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#cdd6f4';
-                ctx.font = '13px "Orbitron", sans-serif';
-                ctx.fillText('SPACE  ·  Charge & Launch', canvasWidth / 2, canvasHeight / 2 - 40);
-                ctx.fillText('< / Z  ·  Left Flipper', canvasWidth / 2, canvasHeight / 2 - 14);
-                ctx.fillText('> / /  ·  Right Flipper', canvasWidth / 2, canvasHeight / 2 + 12);
+                ctx.font = '12px "Orbitron", sans-serif';
+                ctx.fillText('SPACE / Toque  ·  Carregar Plunger', canvasWidth / 2, canvasHeight / 2 - 60);
+                ctx.fillText('Z / A / ←  ·  Aleta Esquerda', canvasWidth / 2, canvasHeight / 2 - 34);
+                ctx.fillText('X / D / → / /  ·  Aleta Direita', canvasWidth / 2, canvasHeight / 2 - 8);
+                ctx.fillText('Q / W / E  ·  Nudge / Empurrão da Mesa', canvasWidth / 2, canvasHeight / 2 + 18);
+                ctx.fillText('T  ·  Trocar Tema (Synthwave/Vapor/Matrix)', canvasWidth / 2, canvasHeight / 2 + 44);
 
                 ctx.fillStyle = '#39ff14';
                 ctx.shadowColor = '#39ff14';
                 ctx.shadowBlur = 8;
-                ctx.font = '700 14px "Orbitron", sans-serif';
-                ctx.fillText('Defeat Rogue AI Core & Skill Shots!', canvasWidth / 2, canvasHeight / 2 + 60);
+                ctx.font = '700 13px "Orbitron", sans-serif';
+                ctx.fillText('Slingshots · Kickback Savers · Minigame DMD', canvasWidth / 2, canvasHeight / 2 + 84);
 
                 ctx.fillStyle = '#ffd700';
                 ctx.shadowColor = '#ffaa00';
                 ctx.font = '900 15px "Orbitron", sans-serif';
-                ctx.fillText('HOLD SPACE → RELEASE TO LAUNCH', canvasWidth / 2, canvasHeight / 2 + 120);
+                ctx.fillText('HOLD SPACE → RELEASE TO PLAY', canvasWidth / 2, canvasHeight / 2 + 130);
                 ctx.restore();
             }
         }
@@ -1804,11 +2652,44 @@
         function draw() {
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
+            // Aplica offset de Nudge na mesa
+            ctx.save();
+            ctx.translate(tiltSystem.tableOffset.x, tiltSystem.tableOffset.y);
+
+            // Fundo do tema
+            const theme = THEMES[currentThemeKey];
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+            bgGrad.addColorStop(0, theme.canvasBg1);
+            bgGrad.addColorStop(1, theme.canvasBg2);
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            // Imagem de Fundo Vaporwave integrada diretamente na mesa de pinball
+            if (bgPinballImage.complete && bgPinballImage.naturalWidth > 0 && theme.bgAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = theme.bgAlpha;
+                ctx.drawImage(bgPinballImage, 0, 0, canvasWidth, canvasHeight);
+
+                // Vinheta sutil para preservar o contraste dos bumpers e luzes neon
+                const vignette = ctx.createRadialGradient(canvasWidth / 2, canvasHeight / 2, 80, canvasWidth / 2, canvasHeight / 2, 290);
+                vignette.addColorStop(0, 'rgba(5, 6, 12, 0.05)');
+                vignette.addColorStop(1, 'rgba(5, 6, 12, 0.55)');
+                ctx.fillStyle = vignette;
+                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                ctx.restore();
+            }
+
+            if (theme.matrixRain) {
+                drawMatrixRain();
+            }
+
             drawTableGrid();
             drawMultiplierZones();
             drawSkillShotSensor();
             drawFirewallTargets();
             drawWalls();
+            drawSlingshots();
+            drawKickbackLamps();
             drawBumpers();
             drawBoss();
             drawLauncher();
@@ -1817,15 +2698,161 @@
             drawFlipper(rightFlipper);
             activeBalls.forEach(b => { ball = b; drawBall(); });
 
+            drawDmdPanel();
             drawMissionsHUD();
             drawFloatingTexts();
             if (frameFlashTimer > 0) drawFrameFlash();
+            drawTiltOverlay();
+
+            ctx.restore(); // Fecha o translate do Nudge
 
             if (!gameActive) {
                 drawGameOver();
             }
 
             drawInstructions();
+        }
+
+        function drawMatrixRain() {
+            ctx.save();
+            ctx.font = '10px monospace';
+            ctx.fillStyle = 'rgba(57, 255, 20, 0.4)';
+            matrixDrops.forEach(drop => {
+                const char = drop.chars[Math.floor(Math.random() * drop.chars.length)];
+                ctx.fillText(char, drop.x, drop.y);
+                drop.y += drop.speed;
+                if (drop.y > canvasHeight) {
+                    drop.y = 0;
+                    drop.x = Math.random() * canvasWidth;
+                }
+            });
+            ctx.restore();
+        }
+
+        function drawSlingshots() {
+            slingshots.forEach(sl => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(sl.p1.x, sl.p1.y);
+                ctx.lineTo(sl.p2.x, sl.p2.y);
+                ctx.lineTo(sl.p3.x, sl.p3.y);
+                ctx.closePath();
+
+                const isFlash = sl.hitFlash > 0;
+                ctx.fillStyle = isFlash ? '#ffffff' : 'rgba(15, 25, 45, 0.85)';
+                ctx.fill();
+
+                ctx.strokeStyle = isFlash ? '#ffffff' : sl.color;
+                ctx.lineWidth = isFlash ? 3 : 2;
+                ctx.shadowColor = sl.color;
+                ctx.shadowBlur = isFlash ? 16 : 8;
+                ctx.stroke();
+
+                // Face ativa estroboscópica (hipotenusa)
+                ctx.beginPath();
+                ctx.moveTo(sl.faceP1.x, sl.faceP1.y);
+                ctx.lineTo(sl.faceP2.x, sl.faceP2.y);
+                ctx.strokeStyle = isFlash ? '#ffffff' : (sl.isLeft ? '#ff007f' : '#00f0ff');
+                ctx.lineWidth = 3.5;
+                ctx.stroke();
+
+                // Bobinas metálicas nos vértices
+                [sl.p1, sl.p2, sl.p3].forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#cdd6f4';
+                    ctx.fill();
+                });
+
+                ctx.restore();
+            });
+        }
+
+        function drawKickbackLamps() {
+            ctx.save();
+            // Lâmpada Outlane Esquerdo
+            const leftOn = kickbackState.leftActive;
+            ctx.beginPath();
+            ctx.arc(28, 480, 7, 0, Math.PI * 2);
+            ctx.fillStyle = leftOn ? '#39ff14' : 'rgba(60,60,70,0.6)';
+            ctx.shadowColor = leftOn ? '#39ff14' : 'transparent';
+            ctx.shadowBlur = leftOn ? 10 : 0;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Lâmpada Outlane Direito
+            const rightOn = kickbackState.rightActive;
+            ctx.beginPath();
+            ctx.arc(335, 480, 7, 0, Math.PI * 2);
+            ctx.fillStyle = rightOn ? '#39ff14' : 'rgba(60,60,70,0.6)';
+            ctx.shadowColor = rightOn ? '#39ff14' : 'transparent';
+            ctx.shadowBlur = rightOn ? 10 : 0;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawDmdPanel() {
+            if (!gameStarted || !gameActive) return;
+            ctx.save();
+            const dmdX = 110, dmdY = 12, dmdW = 180, dmdH = 26;
+
+            // Caixa do DMD estilo vidro fumê com LEDs
+            ctx.fillStyle = '#06060c';
+            ctx.strokeStyle = 'rgba(255, 180, 0, 0.4)';
+            ctx.lineWidth = 1.5;
+            if (ctx.roundRect) ctx.roundRect(dmdX, dmdY, dmdW, dmdH, 6); else ctx.rect(dmdX, dmdY, dmdW, dmdH);
+            ctx.fill();
+            ctx.stroke();
+
+            // Grid de micropontos LED
+            ctx.fillStyle = 'rgba(255, 170, 0, 0.08)';
+            for (let px = dmdX + 4; px < dmdX + dmdW - 4; px += 4) {
+                for (let py = dmdY + 4; py < dmdY + dmdH - 4; py += 4) {
+                    ctx.fillRect(px, py, 2, 2);
+                }
+            }
+
+            // Conteúdo do DMD
+            ctx.textAlign = 'center';
+            ctx.font = '800 9px "Press Start 2P", monospace';
+            if (dmdSystem.activeMode === 'CYBER_LOCKPICK') {
+                ctx.fillStyle = '#39ff14';
+                ctx.shadowColor = '#39ff14';
+                ctx.shadowBlur = 6;
+                ctx.fillText(dmdSystem.message, dmdX + dmdW / 2, dmdY + 17);
+            } else if (dmdSystem.lockSuccessTimer > 0) {
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 8;
+                ctx.fillText(dmdSystem.message, dmdX + dmdW / 2, dmdY + 17);
+            } else {
+                ctx.fillStyle = '#ffaa00';
+                ctx.shadowColor = '#ff8800';
+                ctx.shadowBlur = 4;
+                const dmdText = `SCORE ${score} · MULTI ${currentMultiplier}X`;
+                ctx.fillText(dmdText, dmdX + dmdW / 2, dmdY + 17);
+            }
+            ctx.restore();
+        }
+
+        function drawTiltOverlay() {
+            if (tiltSystem.warningTimer > 0 || tiltSystem.isTilted) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                const alpha = Math.min(1.0, tiltSystem.warningTimer);
+                ctx.fillStyle = tiltSystem.isTilted ? 'rgba(255, 0, 60, 0.9)' : 'rgba(255, 170, 0, 0.9)';
+                ctx.shadowColor = tiltSystem.isTilted ? '#ff003c' : '#ffaa00';
+                ctx.shadowBlur = 15;
+                ctx.font = '900 16px "Press Start 2P", monospace';
+                ctx.fillText(tiltSystem.warningText || 'TILT!', canvasWidth / 2, canvasHeight / 2);
+                ctx.restore();
+            }
         }
 
         function drawTableGrid() {
@@ -1864,30 +2891,30 @@
 
         function drawMissionsHUD() {
             if (!gameStarted || !gameActive) return;
-            const x = 12, y = 12, w = 168, h = 46;
+            const x = 12, y = 12, w = 90, h = 42;
             ctx.save();
-            ctx.fillStyle = 'rgba(18, 19, 32, 0.6)';
+            ctx.fillStyle = 'rgba(18, 19, 32, 0.7)';
             ctx.strokeStyle = 'rgba(255,255,255,0.08)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(x, y, w, h, 8); else ctx.rect(x, y, w, h);
+            if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6); else ctx.rect(x, y, w, h);
             ctx.fill(); ctx.stroke();
 
             ctx.fillStyle = missionsState.accent;
-            ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 6;
-            ctx.font = '700 11px "Orbitron", sans-serif';
+            ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 5;
+            ctx.font = '700 9px "Orbitron", sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText(missionsState.label, x + 10, y + 18);
+            ctx.fillText(missionsState.label || 'MISSION', x + 6, y + 16);
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#cdd6f4';
-            ctx.font = '10px "Orbitron", sans-serif';
-            ctx.fillText(missionsState.detail, x + 10, y + 32);
+            ctx.font = '8px "Orbitron", sans-serif';
+            ctx.fillText(missionsState.detail || 'ACTIVE', x + 6, y + 28);
 
-            const barX = x + 10, barY = y + 37, barW = w - 20, barH = 4;
+            const barX = x + 6, barY = y + 33, barW = w - 12, barH = 3;
             ctx.fillStyle = 'rgba(255,255,255,0.12)';
             ctx.fillRect(barX, barY, barW, barH);
             ctx.fillStyle = missionsState.accent;
-            ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 6;
+            ctx.shadowColor = missionsState.accent; ctx.shadowBlur = 4;
             ctx.fillRect(barX, barY, barW * Math.max(0, Math.min(1, missionsState.barRatio)), barH);
             ctx.restore();
         }
@@ -1962,7 +2989,18 @@
             getBall: () => ball,
             getBalls: () => typeof activeBalls !== 'undefined' ? activeBalls : (typeof balls !== 'undefined' ? balls : [ball]),
             getActiveBalls: () => typeof activeBalls !== 'undefined' ? activeBalls : [ball],
+            getLeftFlipper: () => leftFlipper,
+            getRightFlipper: () => rightFlipper,
             getBumpers: () => bumpers,
+            getSlingshots: () => slingshots,
+            getKickbackState: () => kickbackState,
+            getTiltSystem: () => tiltSystem,
+            getDmdSystem: () => dmdSystem,
+            getTheme: () => currentThemeKey,
+            setTheme: (k) => setTheme(k),
+            triggerNudge: (dx, dy) => performNudge(dx, dy),
+            triggerDmdMinigame: (m) => triggerDmdMinigame(m),
+            handleDmdInput: (b) => handleDmdLockpickInput(b),
             getMultiplierZones: () => multiplierZones,
             getParticles: () => particles,
             getScore: () => score,
