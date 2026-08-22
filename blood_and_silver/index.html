@@ -1177,6 +1177,60 @@
 
         const MAX_ENEMY_RADIUS = Math.max(ENEMY_TYPES.v3.radius, CONFIG.boss.radius);
 
+        const CHEST_TIERS = {
+            common: {
+                id: 'common',
+                name: 'Baú Comum',
+                w: 26,
+                h: 20,
+                radius: 14,
+                bodyDark: '#362112',
+                bodyMid: '#54331c',
+                bodyLight: '#734626',
+                bandColor: '#635d56',
+                bandHighlight: '#8a837a',
+                lockColor: '#7d746a',
+                gemColor: null,
+                glowColor: 'rgba(160, 110, 60, 0.4)',
+                glowBlur: 8,
+                titleStyle: 'color: #d2b48c; text-shadow: 0 0 12px rgba(210, 180, 140, 0.6);'
+            },
+            rare: {
+                id: 'rare',
+                name: 'Baú Raro',
+                w: 34,
+                h: 26,
+                radius: 18,
+                bodyDark: '#1b1f2e',
+                bodyMid: '#2c344a',
+                bodyLight: '#3f4b6a',
+                bandColor: '#9bb0c9',
+                bandHighlight: '#e4effa',
+                lockColor: '#c8d7e6',
+                gemColor: '#2b95ff',
+                glowColor: 'rgba(70, 150, 255, 0.65)',
+                glowBlur: 15,
+                titleStyle: 'color: #8ab4d8; text-shadow: 0 0 16px rgba(138, 180, 216, 0.85);'
+            },
+            legendary: {
+                id: 'legendary',
+                name: 'Baú Lendário',
+                w: 44,
+                h: 34,
+                radius: 24,
+                bodyDark: '#6b4a0d',
+                bodyMid: '#aa7816',
+                bodyLight: '#db9d23',
+                bandColor: '#ffd700',
+                bandHighlight: '#fff8b8',
+                lockColor: '#ffe666',
+                gemColor: '#ff2048',
+                glowColor: 'rgba(255, 215, 0, 0.9)',
+                glowBlur: 22,
+                titleStyle: 'color: #ffd700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.95), 0 0 35px rgba(255, 80, 80, 0.5);'
+            }
+        };
+
         const WEAPONS = {
             sword: { name: 'Espada', desc: 'Golpeia em cone à sua frente (45°).', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI / 8, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
             axe: { name: 'Machado', desc: 'Golpe pesado e lento, com grande dano e empurrão.', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI / 4, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
@@ -2793,9 +2847,10 @@
         function spawnChest(x, y, rarity) {
             const c = chests.find(function (ch) { return !ch.alive; });
             if (!c) return;
+            const tier = CHEST_TIERS[rarity] || CHEST_TIERS.common;
             c.x = x;
             c.y = y;
-            c.radius = CONFIG.chestRadius;
+            c.radius = tier.radius;
             c.rarity = rarity;
             c.alive = true;
         }
@@ -2898,9 +2953,19 @@
         }
 
         function renderChestPopup(rarity, infos, evoInfo) {
-            if (rarity === 'legendary') chestTitle.textContent = 'BAÚ LENDÁRIO';
-            else if (rarity === 'rare') chestTitle.textContent = 'BAÚ RARO';
-            else chestTitle.textContent = 'BAÚ COMUM';
+            if (rarity === 'legendary') {
+                chestTitle.innerHTML = '👑 BAÚ LENDÁRIO DE OURO';
+                chestTitle.style.color = '#ffd700';
+                chestTitle.style.textShadow = '0 0 20px rgba(255, 215, 0, 0.9), 0 0 35px rgba(255, 80, 80, 0.5)';
+            } else if (rarity === 'rare') {
+                chestTitle.innerHTML = '🥈 BAÚ RARO DE PRATA';
+                chestTitle.style.color = '#a6c8e8';
+                chestTitle.style.textShadow = '0 0 16px rgba(138, 180, 216, 0.85)';
+            } else {
+                chestTitle.innerHTML = '🪵 BAÚ COMUM DE MADEIRA';
+                chestTitle.style.color = '#d2b48c';
+                chestTitle.style.textShadow = '0 0 12px rgba(210, 180, 140, 0.6)';
+            }
             chestSubtitle.textContent = 'Roleta de Recompensa';
             chestCards.innerHTML = '';
             if (evoInfo) {
@@ -3156,23 +3221,213 @@
                 if (!c.alive) continue;
                 const sx = c.x - camera.x;
                 const sy = c.y - camera.y;
-                let base, glow;
-                if (c.rarity === 'legendary') { base = '#e0b040'; glow = 'rgba(224, 176, 64, 0.8)'; }
-                else if (c.rarity === 'rare') { base = '#8ab4d8'; glow = 'rgba(138, 180, 216, 0.6)'; }
-                else { base = '#a08060'; glow = 'rgba(160, 128, 96, 0.4)'; }
-                const pulse = 1 + Math.sin(game.time * 5) * 0.08;
-                const w = c.radius * 2 * pulse;
-                const h = c.radius * 1.5 * pulse;
+                if (sx < -60 || sx > VIEW_W + 60 || sy < -60 || sy > VIEW_H + 60) continue;
+
+                const tier = CHEST_TIERS[c.rarity] || CHEST_TIERS.common;
+                const isLegendary = c.rarity === 'legendary';
+                const isRare = c.rarity === 'rare';
+                const isCommon = !isLegendary && !isRare;
+
+                const pulse = 1 + Math.sin(game.time * (isLegendary ? 5.5 : 4)) * (isLegendary ? 0.05 : 0.035);
+                const w = tier.w * pulse;
+                const h = tier.h * pulse;
+                const halfW = w / 2;
+                const halfH = h / 2;
+
                 ctx.save();
-                ctx.shadowColor = glow;
-                ctx.shadowBlur = 12;
-                ctx.fillStyle = base;
-                ctx.fillRect(sx - w / 2, sy - h / 2, w, h);
-                ctx.fillStyle = 'rgba(0,0,0,0.25)';
-                ctx.fillRect(sx - w / 2, sy - h / 4, w, 3);
-                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-                ctx.lineWidth = 1.5;
-                ctx.strokeRect(sx - w / 2, sy - h / 2, w, h);
+
+                // 1. Sombra de chão em elipse
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.beginPath();
+                ctx.ellipse(sx, sy + halfH + 2, halfW * 1.1, halfH * 0.4, 0, 0, TWO_PI);
+                ctx.fill();
+
+                // 2. Aura mágica / Brilho radiante
+                ctx.shadowColor = tier.glowColor;
+                ctx.shadowBlur = tier.glowBlur;
+
+                // Efeito especial de faíscas para baú de ouro
+                if (isLegendary) {
+                    for (let i = 0; i < 4; i++) {
+                        const ang = game.time * 1.2 + (i * Math.PI / 2);
+                        const dist = halfW * 1.15 + Math.sin(game.time * 5 + i) * 3;
+                        const px = sx + Math.cos(ang) * dist;
+                        const py = sy + Math.sin(ang) * (dist * 0.65);
+                        ctx.fillStyle = 'rgba(255, 245, 160, 0.85)';
+                        ctx.beginPath();
+                        ctx.arc(px, py, 1.8, 0, TWO_PI);
+                        ctx.fill();
+                    }
+                }
+
+                // 3. Corpo principal inferior do Baú (Base)
+                const bodyY = sy - halfH * 0.1;
+                const bodyH = halfH * 1.1;
+
+                const bodyGrad = ctx.createLinearGradient(sx, bodyY, sx, bodyY + bodyH);
+                bodyGrad.addColorStop(0, tier.bodyLight);
+                bodyGrad.addColorStop(0.5, tier.bodyMid);
+                bodyGrad.addColorStop(1, tier.bodyDark);
+
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.roundRect(sx - halfW, bodyY, w, bodyH, [0, 0, 4, 4]);
+                ctx.fill();
+
+                // Textura / Painéis de madeira ou ouro
+                if (isCommon || isRare) {
+                    // Linhas de tábuas de madeira
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(sx - halfW + 3, bodyY + bodyH * 0.5);
+                    ctx.lineTo(sx + halfW - 3, bodyY + bodyH * 0.5);
+                    ctx.stroke();
+                } else {
+                    // Painéis chanfrados de ouro em relevo
+                    ctx.strokeStyle = 'rgba(255, 240, 150, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(sx - halfW + 4, bodyY + 3, w - 8, bodyH - 6);
+                }
+
+                // 4. Tampa arqueada / domo do Baú (Lid)
+                const lidH = halfH * 0.9;
+                const lidY = sy - halfH;
+
+                const lidGrad = ctx.createLinearGradient(sx, lidY, sx, lidY + lidH);
+                lidGrad.addColorStop(0, isLegendary ? '#ffe27a' : (isRare ? '#5a6b8c' : '#945b34'));
+                lidGrad.addColorStop(0.4, tier.bodyLight);
+                lidGrad.addColorStop(1, tier.bodyDark);
+
+                ctx.fillStyle = lidGrad;
+                ctx.beginPath();
+                ctx.roundRect(sx - halfW, lidY, w, lidH, [5, 5, 0, 0]);
+                ctx.fill();
+
+                // Linha de junta escura entre a tampa e a base
+                ctx.fillStyle = 'rgba(10, 5, 8, 0.7)';
+                ctx.fillRect(sx - halfW, bodyY - 1, w, 2);
+
+                // 5. Cintas Metálicas (Strap bands) e Cantoneiras
+                const bandW = Math.max(3, Math.round(w * 0.12));
+                const bandOffset = halfW * 0.55;
+
+                const drawMetalBand = function (bx) {
+                    const bGrad = ctx.createLinearGradient(bx - bandW / 2, lidY, bx + bandW / 2, bodyY + bodyH);
+                    bGrad.addColorStop(0, tier.bandHighlight);
+                    bGrad.addColorStop(0.5, tier.bandColor);
+                    bGrad.addColorStop(1, '#2a2420');
+
+                    ctx.fillStyle = bGrad;
+                    ctx.fillRect(bx - bandW / 2, lidY, bandW, h);
+
+                    // Rebites metálicos
+                    ctx.fillStyle = tier.bandHighlight;
+                    ctx.beginPath();
+                    ctx.arc(bx, lidY + 3, 1.2, 0, TWO_PI);
+                    ctx.arc(bx, bodyY + bodyH - 3, 1.2, 0, TWO_PI);
+                    if (isRare || isLegendary) {
+                        ctx.arc(bx, bodyY + 4, 1.2, 0, TWO_PI);
+                    }
+                    ctx.fill();
+                };
+
+                drawMetalBand(sx - bandOffset);
+                drawMetalBand(sx + bandOffset);
+
+                // Cintas de borda / cantoneiras para Raro e Lendário
+                if (isRare || isLegendary) {
+                    ctx.strokeStyle = tier.bandHighlight;
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(sx - halfW + 1, lidY + 1, w - 2, h - 2);
+                }
+
+                // Cantoneiras douradas ornamentais para o Baú Lendário
+                if (isLegendary) {
+                    ctx.fillStyle = '#fff4a3';
+                    // Cantos superiores
+                    ctx.fillRect(sx - halfW, lidY, 4, 2);
+                    ctx.fillRect(sx - halfW, lidY, 2, 4);
+                    ctx.fillRect(sx + halfW - 4, lidY, 4, 2);
+                    ctx.fillRect(sx + halfW - 2, lidY, 2, 4);
+                    // Cantos inferiores
+                    ctx.fillRect(sx - halfW, bodyY + bodyH - 2, 4, 2);
+                    ctx.fillRect(sx - halfW, bodyY + bodyH - 4, 2, 4);
+                    ctx.fillRect(sx + halfW - 4, bodyY + bodyH - 2, 4, 2);
+                    ctx.fillRect(sx + halfW - 2, bodyY + bodyH - 4, 2, 4);
+                }
+
+                // 6. Fechadura Central & Gemas
+                const lockW = Math.max(6, Math.round(w * 0.22));
+                const lockH = Math.max(7, Math.round(h * 0.28));
+                const lockY = bodyY - lockH * 0.4;
+
+                const lockGrad = ctx.createLinearGradient(sx - lockW / 2, lockY, sx + lockW / 2, lockY + lockH);
+                lockGrad.addColorStop(0, tier.bandHighlight);
+                lockGrad.addColorStop(0.6, tier.lockColor);
+                lockGrad.addColorStop(1, '#201a14');
+
+                ctx.fillStyle = lockGrad;
+                ctx.beginPath();
+                ctx.roundRect(sx - lockW / 2, lockY, lockW, lockH, [2, 2, 3, 3]);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(sx - lockW / 2, lockY, lockW, lockH);
+
+                if (isCommon) {
+                    // Buraco de fechadura rústico
+                    ctx.fillStyle = '#100a06';
+                    ctx.beginPath();
+                    ctx.arc(sx, lockY + lockH * 0.4, 1.4, 0, TWO_PI);
+                    ctx.fillRect(sx - 0.7, lockY + lockH * 0.4, 1.4, lockH * 0.35);
+                    ctx.fill();
+                } else if (isRare) {
+                    // Gema de Safira Azul
+                    const gemR = Math.max(2.2, lockW * 0.28);
+                    ctx.fillStyle = '#1b74e0';
+                    ctx.beginPath();
+                    ctx.arc(sx, lockY + lockH * 0.45, gemR, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Brilho da safira
+                    ctx.fillStyle = '#a6e0ff';
+                    ctx.beginPath();
+                    ctx.arc(sx - 0.7, lockY + lockH * 0.45 - 0.7, gemR * 0.4, 0, TWO_PI);
+                    ctx.fill();
+                } else if (isLegendary) {
+                    // Grande Rubi Carmesim Pulsante
+                    const gemR = Math.max(3.2, lockW * 0.32);
+                    const gemPulse = 1 + Math.sin(game.time * 8) * 0.12;
+
+                    // Brilho radial do rubi
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(255, 30, 70, 0.95)';
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = '#ff1744';
+                    ctx.beginPath();
+                    ctx.arc(sx, lockY + lockH * 0.48, gemR * gemPulse, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Facetas do rubi
+                    ctx.strokeStyle = '#ff8099';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Ponto de luz cintilante
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(sx - 1, lockY + lockH * 0.48 - 1, gemR * 0.35, 0, TWO_PI);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Contorno externo sutil para contraste gótico
+                ctx.strokeStyle = 'rgba(10, 4, 6, 0.75)';
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(sx - halfW, lidY, w, h);
+
                 ctx.restore();
             }
         }
@@ -3576,7 +3831,7 @@
         audio = initAudio();
         loadBest();
         setStatus('menu');
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS };
         requestAnimationFrame(gameLoop);
     })();
     </script>

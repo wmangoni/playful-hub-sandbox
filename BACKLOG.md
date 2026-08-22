@@ -91,6 +91,7 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_012.md` | Sangue & Prata | Variabilidade de Monstros (Vampires 1, 2 e 3) com Padrões Únicos de Movimentação e Balanceamento Matemático | 🚀 Dev Complete | | Alta | [TASK_012.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_012.md) |
 | `TASK_013.md` | Sangue & Prata | Sistema de Progresso Permanente e Conquistas (Achievements) via localStorage | 🚀 Dev Complete | | Muito Alta | [TASK_013.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_013.md) |
 | `TASK_014.md` | Sangue & Prata | Suporte Mobile, Joystick Virtual Touch e Otimização Responsiva de Telas | 🚀 Dev Complete | | Alta | [TASK_014.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_014.md) |
+| `TASK_015.md` | Sangue & Prata | Redesign Visual e Sistema de Tiers dos Baús com Escalonamento de Tamanhos e Detalhes | 🚀 Dev Complete | | Alta | [TASK_015.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_015.md) |
 
 
 
