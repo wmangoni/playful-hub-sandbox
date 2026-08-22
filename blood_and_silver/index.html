@@ -623,9 +623,8 @@
         }
 
         const CONFIG = {
-            player: { radius: 16, maxHp: 100, speed: 220, hitCooldown: 0.7, collectRadius: 90 },
-            skeleton: { radius: 14, hp: 20, speed: 62, damage: 6 },
-            boss: { baseHp: 800, radius: 64, speed: 40, damage: 25, interval: 120 },
+            player: { radius: 16, maxHp: 100, speed: 110, hitCooldown: 0.7, collectRadius: 90 },
+            boss: { baseHp: 800, radius: 64, speed: 20, damage: 25, interval: 120, knockbackResist: 0.99 },
             maxEnemies: 320,
             maxProjectiles: 200,
             maxOrbs: 400,
@@ -640,19 +639,57 @@
             chestRadius: 16
         };
 
-        const MAX_ENEMY_RADIUS = Math.max(CONFIG.skeleton.radius, CONFIG.boss.radius);
+        const ENEMY_TYPES = {
+            v1: {
+                id: 'v1',
+                name: 'Vampiro Espreitador',
+                sprite: 'vampire1Walk',
+                hp: 20,
+                speed: 32,
+                damage: 6,
+                radius: 14,
+                behavior: 'direct',
+                knockbackResist: 0.10
+            },
+            v2: {
+                id: 'v2',
+                name: 'Vampiro Assassino',
+                sprite: 'vampire2Walk',
+                hp: 16,
+                speed: 43,
+                damage: 12,
+                radius: 14,
+                behavior: 'zigzag',
+                frequency: 2.6,
+                amplitude: 0.95,
+                knockbackResist: 0.20
+            },
+            v3: {
+                id: 'v3',
+                name: 'Vampiro Blindado',
+                sprite: 'vampire3Walk',
+                hp: 48,
+                speed: 38,
+                damage: 9,
+                radius: 16,
+                behavior: 'spiral',
+                knockbackResist: 0.40
+            }
+        };
+
+        const MAX_ENEMY_RADIUS = Math.max(ENEMY_TYPES.v3.radius, CONFIG.boss.radius);
 
         const WEAPONS = {
-            sword: { name: 'Espada', desc: 'Golpeia em arco à sua volta.', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
-            axe: { name: 'Machado', desc: 'Golpe pesado e lento, com grande dano e empurrão.', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
+            sword: { name: 'Espada', desc: 'Golpeia em cone à sua frente (45°).', behavior: 'melee-horizontal', damage: 20, interval: 0.9, count: 1, range: 96, arcHalf: Math.PI / 8, knockback: 30, maxLevel: 8, synergyPassive: 'pyrope', icon: '⚔️', color: '#ffcf82' },
+            axe: { name: 'Machado', desc: 'Golpe pesado e lento, com grande dano e empurrão.', behavior: 'melee-horizontal', damage: 34, interval: 1.6, count: 1, range: 72, arcHalf: Math.PI / 4, knockback: 44, maxLevel: 8, synergyPassive: 'mechanism', icon: '🪓', color: '#ff8a72' },
             bow: { name: 'Arco', desc: 'Dispara flechas no inimigo mais próximo.', behavior: 'nearest-projectile', damage: 12, interval: 0.9, count: 1, projectileSpeed: 380, maxLevel: 8, synergyPassive: 'feather', icon: '🏹', color: '#bfe6ff' },
             crossbow: { name: 'Besta', desc: 'Dispara virotes que atravessam vários inimigos.', behavior: 'nearest-projectile', damage: 10, interval: 1.2, count: 1, projectileSpeed: 460, pierce: true, maxLevel: 8, synergyPassive: 'amulet', icon: '🎯', color: '#7df0ff' },
             holy_water: { name: 'Água Benta', desc: 'Derrama água benta que queima uma área por alguns segundos.', behavior: 'random-area', damage: 10, interval: 2.0, count: 1, area: 70, duration: 3.0, maxLevel: 8, synergyPassive: 'mushroom', icon: '🧪', color: '#b78aff' }
         };
 
         const EVOLVED_WEAPONS = {
-            sword: { name: 'Espada Rubra', damage: 55, count: 3, range: 120 },
-            axe: { name: 'Machado Tempestade', damage: 90, count: 2, interval: 1.1 },
+            sword: { name: 'Espada Rubra', damage: 55, count: 3, range: 120, arcHalf: Math.PI / 2 },
+            axe: { name: 'Machado Tempestade', damage: 90, count: 2, interval: 1.1, arcHalf: Math.PI / 2 },
             bow: { name: 'Arco Celeste', damage: 30, count: 3, projectileSpeed: 520 },
             crossbow: { name: 'Besta Espalhada', damage: 24, count: 5, pierce: true },
             holy_water: { name: 'Água Sagrada', damage: 26, area: 130, duration: 4.5 }
@@ -712,6 +749,9 @@
             playerWalk: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_Walk_with_shadow.png',
             playerIdle: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_Idle_with_shadow.png',
             playerAttack: '../assets/swordsman-1-3-level-pixel-top-down-sprite-character/PNG/Swordsman_lvl1/With_shadow/Swordsman_lvl1_attack_with_shadow.png',
+            vampire1Walk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires1/With_shadow/Vampires1_Walk_with_shadow.png',
+            vampire2Walk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires2/With_shadow/Vampires2_Walk_with_shadow.png',
+            vampire3Walk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires3/With_shadow/Vampires3_Walk_with_shadow.png',
             enemyWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires1/With_shadow/Vampires1_Walk_with_shadow.png',
             bossWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires3/With_shadow/Vampires3_Walk_with_shadow.png',
             ground: '../assets/skeleton-top-down-pixel-art/PNG/Ground_rocks.png',
@@ -863,16 +903,17 @@
         function initEnemyPool() {
             for (let i = 0; i < CONFIG.maxEnemies; i++) {
                 enemies.push({
-                    x: 0, y: 0, radius: CONFIG.skeleton.radius,
-                    hp: 0, maxHp: 0, speed: 0, damage: CONFIG.skeleton.damage,
-                    alive: false, isBoss: false, jitter: 0, jitterTimer: 0, animTime: 0
+                    x: 0, y: 0, radius: 14,
+                    hp: 0, maxHp: 0, speed: 0, damage: 6,
+                    alive: false, isBoss: false, jitter: 0, jitterTimer: 0, animTime: 0,
+                    type: 'v1', patternTime: 0, phase: 0, spiralDir: 1
                 });
             }
         }
 
         function initProjectilePool() {
             for (let i = 0; i < CONFIG.maxProjectiles; i++) {
-                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', pierce: false, evolved: false, hits: null, alive: false });
+                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', weaponId: 'bow', pierce: false, evolved: false, hits: null, alive: false });
             }
         }
 
@@ -899,7 +940,7 @@
             return {
                 id: id, level: 1, maxLevel: c.maxLevel,
                 damage: c.damage, interval: c.interval, count: c.count,
-                range: c.range || 0, area: c.area || 0, duration: c.duration || 0,
+                range: c.range || 0, arcHalf: c.arcHalf || 0, area: c.area || 0, duration: c.duration || 0,
                 projectileSpeed: c.projectileSpeed || 0, pierce: !!c.pierce,
                 evolved: false, evolvedName: '',
                 timer: 0, animTimer: 0
@@ -929,6 +970,7 @@
             if (evo.damage) w.damage = evo.damage;
             if (evo.count) w.count = evo.count;
             if (evo.range) w.range = evo.range;
+            if (evo.arcHalf) w.arcHalf = evo.arcHalf;
             if (evo.interval) w.interval = evo.interval;
             if (evo.projectileSpeed) w.projectileSpeed = evo.projectileSpeed;
             if (evo.area) w.area = evo.area;
@@ -1261,7 +1303,17 @@
                 player.x += dx * player.speed * dt;
                 player.y += dy * player.speed * dt;
                 player.facing = Math.atan2(dy, dx);
-                player.row = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
+
+                const ang = player.facing;
+                if (ang > -Math.PI / 4 && ang <= Math.PI / 4) {
+                    player.row = 2; // Direita (D / East)
+                } else if (ang > Math.PI / 4 && ang <= 3 * Math.PI / 4) {
+                    player.row = 0; // Frente / Baixo (S / South)
+                } else if (ang > -3 * Math.PI / 4 && ang <= -Math.PI / 4) {
+                    player.row = 3; // Costas / Cima (W / North)
+                } else {
+                    player.row = 1; // Esquerda (A / West)
+                }
                 player.moving = true;
             } else {
                 player.moving = false;
@@ -1296,7 +1348,7 @@
                 w.animTimer = 0.22;
                 const range = w.range * player.stats.area;
                 const dmg = w.damage * player.stats.might;
-                const arcHalf = c.arcHalf;
+                const arcHalf = (w.arcHalf || c.arcHalf || (Math.PI / 8)) * player.stats.area;
                 const knockback = c.knockback;
                 const r2 = range * range;
                 const queryR = range + MAX_ENEMY_RADIUS;
@@ -1396,6 +1448,7 @@
                 p.radius = 5;
                 p.life = 1.4;
                 p.pierce = w.pierce;
+                p.weaponId = w.id;
                 p.color = WEAPONS[w.id].color;
                 p.evolved = w.evolved;
                 p.hits = [];
@@ -1406,19 +1459,55 @@
         function updateEnemies(dt) {
             for (const e of enemies) {
                 if (!e.alive) continue;
-                const dx = player.x - e.x;
-                const dy = player.y - e.y;
-                const d = Math.hypot(dx, dy) || 1;
-                let ang = Math.atan2(dy, dx);
-                if (e.jitterTimer <= 0) {
-                    e.jitter = (Math.random() - 0.5) * 0.7;
-                    e.jitterTimer = 0.6 + Math.random() * 0.6;
+                if (e.isBoss) {
+                    const dx = player.x - e.x;
+                    const dy = player.y - e.y;
+                    const ang = Math.atan2(dy, dx);
+                    e.x += Math.cos(ang) * e.speed * dt;
+                    e.y += Math.sin(ang) * e.speed * dt;
+                } else if (e.type === 'v2') {
+                    // Padrão Zig-Zag: avança em direção ao jogador oscilando lateralmente
+                    e.patternTime += dt;
+                    const dx = player.x - e.x;
+                    const dy = player.y - e.y;
+                    const baseAng = Math.atan2(dy, dx);
+                    const zigzagOffset = Math.sin(e.patternTime * ENEMY_TYPES.v2.frequency + e.phase) * ENEMY_TYPES.v2.amplitude;
+                    const moveAng = baseAng + zigzagOffset;
+                    e.x += Math.cos(moveAng) * e.speed * dt;
+                    e.y += Math.sin(moveAng) * e.speed * dt;
+                } else if (e.type === 'v3') {
+                    // Padrão Espiral / Vórtice: orbita o jogador fechando o raio gradativamente
+                    e.patternTime += dt;
+                    const dx = e.x - player.x;
+                    const dy = e.y - player.y;
+                    let currentR = Math.hypot(dx, dy);
+                    let currentAng = Math.atan2(dy, dx);
+                    
+                    const angularSpeed = (e.speed * 1.35) / Math.max(40, currentR);
+                    currentAng += e.spiralDir * angularSpeed * dt;
+                    
+                    const minR = player.radius + e.radius + 2;
+                    currentR = Math.max(minR, currentR - e.speed * 0.75 * dt);
+                    
+                    e.x = player.x + Math.cos(currentAng) * currentR;
+                    e.y = player.y + Math.sin(currentAng) * currentR;
                 } else {
-                    e.jitterTimer -= dt;
+                    // Padrão Vampiro 1: perseguição direta com micro-jitter orgânico
+                    const dx = player.x - e.x;
+                    const dy = player.y - e.y;
+                    let ang = Math.atan2(dy, dx);
+                    if (e.jitterTimer <= 0) {
+                        e.jitter = (Math.random() - 0.5) * 0.6;
+                        e.jitterTimer = 0.6 + Math.random() * 0.6;
+                    } else {
+                        e.jitterTimer -= dt;
+                    }
+                    ang += e.jitter;
+                    e.x += Math.cos(ang) * e.speed * dt;
+                    e.y += Math.sin(ang) * e.speed * dt;
                 }
-                ang += e.jitter;
-                e.x += Math.cos(ang) * e.speed * dt;
-                e.y += Math.sin(ang) * e.speed * dt;
+                e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
+                e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
                 e.animTime += dt;
             }
         }
@@ -1604,9 +1693,27 @@
             }
         }
 
+        function pickEnemyType(time) {
+            let w1, w2, w3;
+            if (time < 40) {
+                w1 = 0.85; w2 = 0.15; w3 = 0.00;
+            } else if (time < 80) {
+                w1 = 0.50; w2 = 0.30; w3 = 0.20;
+            } else if (time < 140) {
+                w1 = 0.30; w2 = 0.40; w3 = 0.30;
+            } else {
+                // 140s+ (aproximando e ultrapassando a marca dos 3 minutos)
+                w1 = 0.20; w2 = 0.45; w3 = 0.35;
+            }
+            const r = Math.random();
+            if (r < w1) return 'v1';
+            if (r < w1 + w2) return 'v2';
+            return 'v3';
+        }
+
         function updateSpawns(dt) {
             game.spawnTimer -= dt;
-            const interval = Math.max(CONFIG.spawnMin, CONFIG.spawnBase - game.time * 0.02);
+            const interval = Math.max(CONFIG.spawnMin, CONFIG.spawnBase - game.time * 0.018);
             if (game.spawnTimer <= 0) {
                 game.spawnTimer = interval;
                 spawnEnemy();
@@ -1621,16 +1728,23 @@
             const d = (Math.max(VIEW_W, VIEW_H) / 2) + 70;
             e.x = player.x + Math.cos(angle) * d;
             e.y = player.y + Math.sin(angle) * d;
-            e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
-            e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
+            
+            const typeKey = pickEnemyType(game.time);
+            const typeDef = ENEMY_TYPES[typeKey];
+            e.type = typeKey;
             e.isBoss = false;
-            e.radius = CONFIG.skeleton.radius;
-            e.hp = e.maxHp = CONFIG.skeleton.hp * (1 + game.time * 0.03);
-            e.speed = CONFIG.skeleton.speed * (1 + game.time * 0.008);
-            e.damage = CONFIG.skeleton.damage;
+            e.radius = typeDef.radius;
+            e.hp = e.maxHp = typeDef.hp * (1 + game.time * 0.032);
+            e.speed = typeDef.speed * (1 + game.time * 0.008);
+            e.damage = typeDef.damage;
+            e.patternTime = 0;
+            e.phase = Math.random() * TWO_PI;
+            e.spiralDir = Math.random() < 0.5 ? 1 : -1;
             e.jitter = 0;
             e.jitterTimer = 0;
             e.animTime = Math.random() * 10;
+            e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
+            e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
             e.alive = true;
         }
 
@@ -1678,9 +1792,19 @@
 
         function hitEnemy(e, dmg, kbx, kby) {
             e.hp -= dmg;
-            if (kbx !== undefined) {
-                e.x += kbx;
-                e.y += kby;
+            if (kbx !== undefined && (kbx !== 0 || kby !== 0)) {
+                let resist = 0;
+                if (e.isBoss) {
+                    resist = CONFIG.boss.knockbackResist !== undefined ? CONFIG.boss.knockbackResist : 0.99;
+                } else if (e.type && ENEMY_TYPES[e.type]) {
+                    resist = ENEMY_TYPES[e.type].knockbackResist || 0;
+                }
+                if (Math.random() >= resist) {
+                    e.x += kbx;
+                    e.y += kby;
+                    e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
+                    e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
+                }
             }
             if (audio) audio.play('hit');
             spawnDamageText(e.x, e.y - e.radius - 4, String(Math.round(dmg)), '#ffb3c1');
@@ -2038,7 +2162,7 @@
                 if (c.behavior !== 'melee-horizontal' || w.animTimer <= 0) continue;
                 const t = 1 - w.animTimer / 0.22;
                 const range = w.range * player.stats.area;
-                const arcHalf = c.arcHalf;
+                const arcHalf = (w.arcHalf || c.arcHalf || (Math.PI / 8)) * player.stats.area;
                 const sx = player.x - camera.x;
                 const sy = player.y - camera.y;
                 const alpha = (1 - t) * 0.16;
@@ -2121,26 +2245,103 @@
         }
 
         function drawProjectiles() {
-            ctx.save();
             for (const p of projectiles) {
                 if (!p.alive) continue;
                 const sx = p.x - camera.x;
                 const sy = p.y - camera.y;
+                if (sx < -40 || sx > VIEW_W + 40 || sy < -40 || sy > VIEW_H + 40) continue;
                 const ang = Math.atan2(p.vy, p.vx);
-                ctx.shadowColor = rgba(p.color, 0.7);
-                ctx.shadowBlur = p.evolved ? 12 : 6;
-                ctx.fillStyle = p.color;
-                ctx.beginPath();
-                ctx.arc(sx, sy, p.radius, 0, TWO_PI);
-                ctx.fill();
-                ctx.strokeStyle = rgba(p.color, 0.6);
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(sx - Math.cos(ang) * 10, sy - Math.sin(ang) * 10);
-                ctx.lineTo(sx, sy);
-                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(ang);
+                ctx.shadowColor = rgba(p.color, p.evolved ? 0.9 : 0.6);
+                ctx.shadowBlur = p.evolved ? 12 : 5;
+
+                if (p.weaponId === 'crossbow') {
+                    // VIROTE DE BESTA (Quarrel: haste metálica reforçada, ponta perfurante e aletas compactas)
+                    const len = p.evolved ? 20 : 16;
+                    const halfLen = len / 2;
+
+                    // Rastro de velocidade
+                    ctx.strokeStyle = rgba(p.color, 0.45);
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(-halfLen - 8, 0);
+                    ctx.lineTo(-halfLen, 0);
+                    ctx.stroke();
+
+                    // Haste do virote (metal)
+                    ctx.strokeStyle = '#d8e4f2';
+                    ctx.lineWidth = 2.4;
+                    ctx.beginPath();
+                    ctx.moveTo(-halfLen, 0);
+                    ctx.lineTo(halfLen - 4, 0);
+                    ctx.stroke();
+
+                    // Ponta perfurante reforçada (losango/triângulo penetrante)
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.moveTo(halfLen + 3, 0);
+                    ctx.lineTo(halfLen - 4, -3.5);
+                    ctx.lineTo(halfLen - 2, 0);
+                    ctx.lineTo(halfLen - 4, 3.5);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Aletas traseiras compactas (fletching)
+                    ctx.fillStyle = '#8aa2c8';
+                    ctx.beginPath();
+                    ctx.moveTo(-halfLen, 0);
+                    ctx.lineTo(-halfLen + 4, -2.5);
+                    ctx.lineTo(-halfLen + 1, 0);
+                    ctx.lineTo(-halfLen + 4, 2.5);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // FLECHA DE ARCO (Haste de madeira/prata, ponta afiada e penas abertas)
+                    const len = p.evolved ? 22 : 18;
+                    const halfLen = len / 2;
+
+                    // Rastro sutil
+                    ctx.strokeStyle = rgba(p.color, 0.4);
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(-halfLen - 10, 0);
+                    ctx.lineTo(-halfLen, 0);
+                    ctx.stroke();
+
+                    // Haste de madeira/prata
+                    ctx.strokeStyle = '#c8a870';
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.moveTo(-halfLen, 0);
+                    ctx.lineTo(halfLen - 3, 0);
+                    ctx.stroke();
+
+                    // Ponta afiada de flecha (Arrowhead)
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.moveTo(halfLen + 3, 0);
+                    ctx.lineTo(halfLen - 4, -3.5);
+                    ctx.lineTo(halfLen - 1, 0);
+                    ctx.lineTo(halfLen - 4, 3.5);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Penas da cauda (Fletching)
+                    ctx.fillStyle = '#f0f4ff';
+                    ctx.beginPath();
+                    ctx.moveTo(-halfLen, 0);
+                    ctx.lineTo(-halfLen + 5, -3);
+                    ctx.lineTo(-halfLen + 2, 0);
+                    ctx.lineTo(-halfLen + 5, 3);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.restore();
             }
-            ctx.restore();
         }
 
         function drawSprite(img, row, frameIndex, frameCount, x, y, drawW, drawH, flip) {
@@ -2168,46 +2369,62 @@
             const sx = player.x - camera.x;
             const sy = player.y - camera.y;
             const size = 64;
-            let img, anim;
-            const meleeActive = player.weapons.some(function (w) { return WEAPONS[w.id].behavior === 'melee-horizontal' && w.animTimer > 0; });
-            if (meleeActive) {
+            let img, anim, frame;
+            const activeMelee = player.weapons.find(function (w) { return WEAPONS[w.id].behavior === 'melee-horizontal' && w.animTimer > 0; });
+            if (activeMelee) {
                 img = images[ASSETS.playerAttack];
                 anim = ANIMS.attack;
+                const progress = Math.max(0, Math.min(1, 1 - activeMelee.animTimer / 0.22));
+                frame = Math.min(anim.frames - 1, Math.floor(progress * anim.frames));
             } else if (player.moving) {
                 img = images[ASSETS.playerWalk];
                 anim = ANIMS.walk;
+                frame = Math.floor(player.animTime * anim.fps) % anim.frames;
             } else {
                 img = images[ASSETS.playerIdle];
                 anim = ANIMS.idle;
+                // No spritesheet de Idle, Row 1 (costas) e Row 3 (direita) contêm 4 frames válidos, enquanto Row 0 e 2 contêm 12
+                const maxFrames = (player.row === 1 || player.row === 3) ? 4 : anim.frames;
+                frame = Math.floor(player.animTime * anim.fps) % maxFrames;
             }
-            const frame = Math.floor(player.animTime * anim.fps) % anim.frames;
             drawSprite(img, player.row, frame, anim.frames, sx, sy, size, size, false);
         }
 
         function drawEnemies() {
-            const enemyImg = images[ASSETS.enemyWalk];
             const bossImg = images[ASSETS.bossWalk];
             for (const e of enemies) {
                 if (!e.alive) continue;
                 const sx = e.x - camera.x;
                 const sy = e.y - camera.y;
+                if (sx < -80 || sx > VIEW_W + 80 || sy < -80 || sy > VIEW_H + 80) continue;
+
                 const dx = player.x - e.x;
                 const dy = player.y - e.y;
                 let row;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    row = dx > 0 ? 3 : 2;
+                const ang = Math.atan2(dy, dx);
+                if (ang > -Math.PI / 4 && ang <= Math.PI / 4) {
+                    row = 3; // Direita
+                } else if (ang > Math.PI / 4 && ang <= 3 * Math.PI / 4) {
+                    row = 0; // Frente / Baixo
+                } else if (ang > -3 * Math.PI / 4 && ang <= -Math.PI / 4) {
+                    row = 1; // Costas / Cima
                 } else {
-                    row = dy > 0 ? 0 : 1;
+                    row = 2; // Esquerda
                 }
-                const anim = e.isBoss ? ANIMS.bossWalk : ANIMS.enemyWalk;
-                const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
+
                 if (e.isBoss) {
+                    const anim = ANIMS.bossWalk;
+                    const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
                     ctx.save();
                     ctx.shadowColor = 'rgba(255, 40, 70, 0.9)';
                     ctx.shadowBlur = 22;
                     drawSprite(bossImg, row, frame, anim.frames, sx, sy, 128, 128, false);
                     ctx.restore();
                 } else {
+                    const typeDef = ENEMY_TYPES[e.type] || ENEMY_TYPES.v1;
+                    const enemyImg = images[ASSETS[typeDef.sprite]] || images[ASSETS.vampire1Walk];
+                    const anim = ANIMS.enemyWalk;
+                    const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
                     drawSprite(enemyImg, row, frame, anim.frames, sx, sy, 64, 64, false);
                 }
             }
