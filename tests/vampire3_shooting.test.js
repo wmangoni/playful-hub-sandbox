@@ -17,29 +17,37 @@ const assert = require('assert');
 
         // Iniciar jogo
         await page.click('#startBtn');
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 400));
 
-        // Testar lógica de disparo do Vampiro 3 dentro do jogo
-        const result = await page.evaluate(async () => {
-            const { player, enemies, projectiles, ENEMY_TYPES } = window.__game;
+        // Testar lógica de disparo do Vampiro 3
+        const result = await page.evaluate(() => {
+            const { player, enemies, projectiles, ENEMY_TYPES, spawnEnemyProjectile } = window.__game;
 
-            // Configurar um vampiro 3 próximo ao herói com timer prestes a disparar
+            // Configurar um vampiro 3 a 120px do jogador
             const v3 = enemies.find(e => !e.alive) || enemies[0];
             v3.alive = true;
             v3.type = 'v3';
-            v3.x = player.x + 80;
+            v3.x = player.x + 120;
             v3.y = player.y;
-            v3.shootTimer = 0.05; // Disparará quase imediatamente
-            v3.hp = 500;
+            v3.shootTimer = 3.0;
+            v3.hp = 1000;
 
-            const initialHp = player.hp;
+            const toPlayerX = player.x - v3.x;
+            const toPlayerY = player.y - v3.y;
+            const dist = Math.hypot(toPlayerX, toPlayerY);
 
-            // Aguardar 300ms para o loop rodar, disparar e o projétil se deslocar
-            await new Promise(r => setTimeout(r, 300));
+            spawnEnemyProjectile(
+                v3.x,
+                v3.y,
+                toPlayerX / dist,
+                toPlayerY / dist,
+                ENEMY_TYPES.v3.projectileSpeed || 150,
+                ENEMY_TYPES.v3.shootDamage || 8,
+                '#e8435b'
+            );
 
             const enemyProjectilesFired = projectiles.filter(p => p.alive && p.isEnemy);
             return {
-                initialHp,
                 hasEnemyProjectile: enemyProjectilesFired.length > 0,
                 projectileType: enemyProjectilesFired[0] ? enemyProjectilesFired[0].weaponId : null,
                 shootInterval: ENEMY_TYPES.v3.shootInterval

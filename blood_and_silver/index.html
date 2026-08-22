@@ -1420,7 +1420,13 @@
             enemyWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires1/With_shadow/Vampires1_Walk_with_shadow.png',
             bossWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires3/With_shadow/Vampires3_Walk_with_shadow.png',
             ground: '../assets/skeleton-top-down-pixel-art/PNG/Ground_rocks.png',
-            water: '../assets/skeleton-top-down-pixel-art/PNG/Water_coasts.png'
+            water: '../assets/skeleton-top-down-pixel-art/PNG/Water_coasts.png',
+            dungeonWallsFloor: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/walls_floor.png',
+            dungeonCracks: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/decorative_cracks_floor.png',
+            dungeonObjects: '../assets/2d-top-down-pixel-dungeon-asset-pack/Tiled_files/Objects.png',
+            dungeonFire: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/fire_animation.png',
+            dungeonFire2: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/fire_animation2.png',
+            dungeonDoorsChest: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/doors_lever_chest_animation.png'
         };
 
         const FRAME = 64;
@@ -1481,6 +1487,8 @@
             radius: CONFIG.player.radius,
             hp: CONFIG.player.maxHp,
             maxHp: CONFIG.player.maxHp,
+            shield: 0,
+            maxShield: 100,
             speed: CONFIG.player.speed,
             level: 1,
             xp: 0,
@@ -1505,6 +1513,7 @@
         const xpOrbs = [];
         const damageZones = [];
         const chests = [];
+        const pickups = [];
         const grid = new Map();
         let levelupOptions = [];
 
@@ -1546,23 +1555,275 @@
             };
         }
 
-        function generateScenery() {
-            scenery = [];
-            const rng = mulberry32(20260816);
-            const totalWeight = OBJECT_CATALOG.reduce(function (s, o) { return s + o.weight; }, 0);
-            for (let i = 0; i < 130; i++) {
-                const r = rng() * totalWeight;
-                let acc = 0;
-                let pick = OBJECT_CATALOG[0];
-                for (const o of OBJECT_CATALOG) {
-                    acc += o.weight;
-                    if (r < acc) { pick = o; break; }
-                }
-                const x = 110 + rng() * (WORLD_W - 220);
-                const y = 110 + rng() * (WORLD_H - 220);
-                if (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < 220) continue;
-                scenery.push({ file: OBJ_DIR + pick.file, w: pick.w, h: pick.h, x: x, y: y });
+        // Mapeamento completo e preciso dos Prefabs e Conjuntos de Tiles de Dungeon1.tmx
+        const DUNGEON_PREFABS = {
+            /*
+            // 1. Altar / Mesa Arcana de Estudos (3x4 tiles, 48x64px) - Desativado temporariamente
+            shrineAltar: {
+                w: 48, h: 64, shadowW: 46, shadowH: 8, category: 'shrine',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 64, sy: 16, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 80, sy: 16, dx: 16, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 96, sy: 16, dx: 32, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 64, sy: 32, dx: 0, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 80, sy: 32, dx: 16, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 96, sy: 32, dx: 32, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 64, sy: 48, dx: 0, dy: 32 },
+                    { asset: 'dungeonObjects', sx: 80, sy: 48, dx: 16, dy: 32 },
+                    { asset: 'dungeonObjects', sx: 96, sy: 48, dx: 32, dy: 32 },
+                    { asset: 'dungeonObjects', sx: 64, sy: 64, dx: 0, dy: 48 },
+                    { asset: 'dungeonObjects', sx: 80, sy: 64, dx: 16, dy: 48 },
+                    { asset: 'dungeonObjects', sx: 96, sy: 64, dx: 32, dy: 48 }
+                ]
+            },
+            */
+
+            // 2. Pilar de Arenito / Pedestal Régio (1x4 tiles, 16x64px)
+            pillar: {
+                w: 16, h: 64, shadowW: 16, shadowH: 6, category: 'shrine',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 112, sy: 16, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 112, sy: 32, dx: 0, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 112, sy: 48, dx: 0, dy: 32 },
+                    { asset: 'dungeonObjects', sx: 112, sy: 64, dx: 0, dy: 48 }
+                ]
+            },
+
+            // 3. Sarcófago Nobre / Tumba Real do Deserto (2x3 tiles, 32x48px)
+            sarcophagus: {
+                w: 32, h: 48, shadowW: 32, shadowH: 8, category: 'graveyard',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 304, sy: 16, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 320, sy: 16, dx: 16, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 304, sy: 32, dx: 0, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 320, sy: 32, dx: 16, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 304, sy: 48, dx: 0, dy: 32 },
+                    { asset: 'dungeonObjects', sx: 320, sy: 48, dx: 16, dy: 32 }
+                ]
+            },
+
+            // 4. Lápide / Cruz Sepulcral de Pedra (1x2 tiles, 16x32px)
+            tombstone: {
+                w: 16, h: 32, shadowW: 16, shadowH: 5, category: 'graveyard',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 256, sy: 16, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 256, sy: 32, dx: 0, dy: 16 }
+                ]
+            },
+
+            // 5. Ossadas e Crânios no Deserto (2x2 tiles, 32x32px - plano no solo)
+            bones: {
+                w: 32, h: 32, isGroundFlat: true, category: 'graveyard',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 336, sy: 80, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 352, sy: 80, dx: 16, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 336, sy: 96, dx: 0, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 352, sy: 96, dx: 16, dy: 16 }
+                ]
+            },
+
+            // 6. Caixotes de Madeira e Suprimentos (2x2 tiles, 32x32px)
+            crates: {
+                w: 32, h: 32, shadowW: 30, shadowH: 0, category: 'outpost',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 176, sy: 64, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 192, sy: 64, dx: 16, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 176, sy: 80, dx: 0, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 176, sy: 96, dx: 16, dy: 16 }
+                ]
+            },
+
+            // 7. Barris de Madeira (1x2 tiles, 16x32px)
+            barrels: {
+                w: 16, h: 32, shadowW: 16, shadowH: 0, category: 'outpost',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 192, sy: 80, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 192, sy: 96, dx: 0, dy: 16 }
+                ]
+            },
+
+            // 8. Urnas de Barro e Ânforas (2x2 tiles, 32x32px)
+            urns: {
+                w: 32, h: 32, shadowW: 28, shadowH: 0, category: 'relic',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 16, sy: 112, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 32, sy: 112, dx: 16, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 16, sy: 128, dx: 0, dy: 16 },
+                    { asset: 'dungeonObjects', sx: 32, sy: 128, dx: 16, dy: 16 }
+                ]
+            },
+
+            // 9. Candelabro / Pedestal de Tochas (1x2 tiles, 16x32px)
+            candelabra: {
+                w: 16, h: 32, shadowW: 16, shadowH: 0, category: 'relic',
+                tiles: [
+                    { asset: 'dungeonObjects', sx: 96, sy: 112, dx: 0, dy: 0 },
+                    { asset: 'dungeonObjects', sx: 96, sy: 128, dx: 0, dy: 16 }
+                ]
+            },
+
+            // 10. Braseiro de Fogo Grande (2x3 tiles animado de fire_animation.png)
+            brazierLarge: {
+                w: 32, h: 48, shadowW: 28, shadowH: 7, isFire: true, hasLight: true, fireType: 'fire1', category: 'shrine',
+                tiles: [
+                    { asset: 'dungeonFire', col: 0, row: 0, dx: 0, dy: 0 },
+                    { asset: 'dungeonFire', col: 1, row: 0, dx: 16, dy: 0 },
+                    { asset: 'dungeonFire', col: 0, row: 1, dx: 0, dy: 16 },
+                    { asset: 'dungeonFire', col: 1, row: 1, dx: 16, dy: 16 },
+                    { asset: 'dungeonFire', col: 0, row: 2, dx: 0, dy: 32 },
+                    { asset: 'dungeonFire', col: 1, row: 2, dx: 16, dy: 32 }
+                ]
+            },
+
+            // 11. Tocha de Parede / Chão (2x2 tiles animado de fire_animation2.png)
+            torchStand: {
+                w: 32, h: 32, shadowW: 16, shadowH: 5, isFire: true, hasLight: true, fireType: 'fire2', category: 'outpost',
+                tiles: [
+                    { asset: 'dungeonFire2', col: 2, row: 0, dx: 0, dy: 0 },
+                    { asset: 'dungeonFire2', col: 3, row: 0, dx: 16, dy: 0 },
+                    { asset: 'dungeonFire2', col: 2, row: 1, dx: 0, dy: 16 },
+                    { asset: 'dungeonFire2', col: 3, row: 1, dx: 16, dy: 16 }
+                ]
+            },
+
+            // 12. Fissura no Solo A (2x2 tiles de decorative_cracks_floor.png)
+            cracksA: {
+                w: 32, h: 32, isGroundCrack: true, isGroundFlat: true,
+                tiles: [
+                    { asset: 'dungeonCracks', sx: 80, sy: 0, dx: 0, dy: 0 },
+                    { asset: 'dungeonCracks', sx: 96, sy: 0, dx: 16, dy: 0 },
+                    { asset: 'dungeonCracks', sx: 80, sy: 16, dx: 0, dy: 16 },
+                    { asset: 'dungeonCracks', sx: 96, sy: 16, dx: 16, dy: 16 }
+                ]
+            },
+
+            // 13. Fissura no Solo B (2x2 tiles de decorative_cracks_floor.png)
+            cracksB: {
+                w: 32, h: 32, isGroundCrack: true, isGroundFlat: true,
+                tiles: [
+                    { asset: 'dungeonCracks', sx: 32, sy: 160, dx: 0, dy: 0 },
+                    { asset: 'dungeonCracks', sx: 48, sy: 160, dx: 16, dy: 0 },
+                    { asset: 'dungeonCracks', sx: 32, sy: 176, dx: 0, dy: 16 },
+                    { asset: 'dungeonCracks', sx: 48, sy: 176, dx: 16, dy: 16 }
+                ]
             }
+        };
+
+        function generateScenery() {
+            scenery.length = 0;
+            const rng = mulberry32(20260816);
+
+            function addPrefab(prefabKey, x, y) {
+                const p = DUNGEON_PREFABS[prefabKey];
+                if (!p) return;
+                if (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < 240) return;
+                x = Math.max(70, Math.min(WORLD_W - 70, x));
+                y = Math.max(70, Math.min(WORLD_H - 70, y));
+                scenery.push({
+                    prefabKey: prefabKey,
+                    prefab: p,
+                    w: p.w,
+                    h: p.h,
+                    shadowW: p.shadowW,
+                    shadowH: p.shadowH,
+                    x: x,
+                    y: y,
+                    isFire: !!p.isFire,
+                    hasLight: !!p.hasLight,
+                    category: p.category,
+                    isGroundCrack: !!p.isGroundCrack
+                });
+            }
+
+            // 1. RUÍNAS ARCANAS & PILARES DO DESERTO (6 Dioramas com Pilares e Braseiros)
+            for (let i = 0; i < 6; i++) {
+                const cx = 250 + rng() * (WORLD_W - 500);
+                const cy = 250 + rng() * (WORLD_H - 500);
+                if (Math.hypot(cx - WORLD_W / 2, cy - WORLD_H / 2) < 260) continue;
+
+                // Altar desativado temporariamente
+                // addPrefab('shrineAltar', cx, cy);
+                // 2 Pilares flanqueando
+                addPrefab('pillar', cx - 36, cy);
+                addPrefab('pillar', cx + 36, cy);
+                // 2 Braseiros com chamas animadas
+                addPrefab('brazierLarge', cx - 20, cy + 24);
+                addPrefab('brazierLarge', cx + 20, cy + 24);
+            }
+
+            // 2. CEMITÉRIOS & CATACUMBAS DO DESERTO (10 Dioramas com Sarcófago, Lápides e Ossadas)
+            for (let i = 0; i < 10; i++) {
+                const cx = 200 + rng() * (WORLD_W - 400);
+                const cy = 200 + rng() * (WORLD_H - 400);
+                if (Math.hypot(cx - WORLD_W / 2, cy - WORLD_H / 2) < 260) continue;
+
+                // Sarcófago Real central
+                addPrefab('sarcophagus', cx, cy);
+                // 3 a 5 Lápides ao redor
+                const count = 3 + Math.floor(rng() * 3);
+                for (let k = 0; k < count; k++) {
+                    const gx = cx + (rng() - 0.5) * 90;
+                    const gy = cy + (rng() - 0.5) * 70;
+                    addPrefab('tombstone', gx, gy);
+                }
+                // Ossadas no chão
+                addPrefab('bones', cx + (rng() - 0.5) * 50, cy + 24);
+            }
+
+            // 3. ACAMPAMENTOS & CARAVANAS ABANDONADAS (10 Dioramas com Caixotes, Barris e Tochas)
+            for (let i = 0; i < 10; i++) {
+                const cx = 200 + rng() * (WORLD_W - 400);
+                const cy = 200 + rng() * (WORLD_H - 400);
+                if (Math.hypot(cx - WORLD_W / 2, cy - WORLD_H / 2) < 260) continue;
+
+                // Pilha de caixotes
+                addPrefab('crates', cx, cy);
+                // Barris de água/provisões
+                addPrefab('barrels', cx - 28, cy + 6);
+                addPrefab('barrels', cx + 28, cy + 6);
+                // Tocha acesa
+                if (rng() < 0.8) {
+                    addPrefab('torchStand', cx + 32, cy - 14);
+                }
+            }
+
+            // 4. CRIPTAS E NICHOS DE RELÍQUIAS / URNAS (14 Dioramas)
+            for (let i = 0; i < 14; i++) {
+                const cx = 180 + rng() * (WORLD_W - 360);
+                const cy = 180 + rng() * (WORLD_H - 360);
+                if (Math.hypot(cx - WORLD_W / 2, cy - WORLD_H / 2) < 260) continue;
+
+                // Urnas e Candelabro
+                addPrefab('urns', cx, cy);
+                addPrefab('candelabra', cx - 24, cy + 8);
+                if (rng() < 0.5) {
+                    addPrefab('urns', cx + 28, cy + 8);
+                }
+            }
+
+            // 5. RACHADURAS E FISSURAS NO SOLO ARENOSO (40 Fissuras)
+            for (let i = 0; i < 40; i++) {
+                const fx = 150 + rng() * (WORLD_W - 300);
+                const fy = 150 + rng() * (WORLD_H - 300);
+                const crackKey = (rng() < 0.5) ? 'cracksA' : 'cracksB';
+                addPrefab(crackKey, fx, fy);
+            }
+
+            // 6. ÁRVORES SECAS E ROCHAS PERIFÉRICAS
+            for (let i = 0; i < 35; i++) {
+                const rx = 100 + rng() * (WORLD_W - 200);
+                const ry = 100 + rng() * (WORLD_H - 200);
+                if (Math.hypot(rx - WORLD_W / 2, ry - WORLD_H / 2) < 240) continue;
+                const pick = (rng() < 0.5) ? { file: 'Dead_tree_shadow1_1.png', w: 96, h: 96 } : { file: 'Rock_shadow1_1.png', w: 48, h: 48 };
+                scenery.push({ file: OBJ_DIR + pick.file, w: pick.w, h: pick.h, x: rx, y: ry });
+            }
+
+            // Ordenar por coordenada Y para correta profundidade visual 2.5D
+            scenery.sort(function (a, b) {
+                if (a.isGroundCrack && !b.isGroundCrack) return -1;
+                if (!a.isGroundCrack && b.isGroundCrack) return 1;
+                return a.y - b.y;
+            });
         }
 
         function initEnemyPool() {
@@ -1898,6 +2159,7 @@
             player.passives = [];
             recomputeStats();
             player.hp = player.maxHp;
+            player.shield = 0;
             player.facing = Math.PI / 2;
             player.row = 0;
             player.moving = false;
@@ -1920,6 +2182,7 @@
             levelupOptions = [];
             shake = 0;
             generateScenery();
+            initMapPickups();
             spawnEnemy();
             spawnEnemy();
             spawnEnemy();
@@ -1997,7 +2260,7 @@
         function updateHud() {
             const pct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
             hpFill.style.width = pct + '%';
-            hpText.textContent = Math.ceil(player.hp) + ' / ' + player.maxHp;
+            hpText.textContent = Math.ceil(player.hp) + ' / ' + player.maxHp + (player.shield > 0 ? ' (+' + Math.ceil(player.shield) + ' 🛡️)' : '');
             killText.textContent = 'Abates: ' + game.kills;
             timeText.textContent = formatTime(game.time);
             levelText.textContent = 'Nv ' + player.level;
@@ -2554,9 +2817,9 @@
                 let dx = player.x - o.x;
                 let dy = player.y - o.y;
                 const d2 = dx * dx + dy * dy;
-                if (d2 < cr * cr) {
+                if (o.vacuumed || d2 < cr * cr) {
                     const d = Math.sqrt(d2) || 1;
-                    const pull = 420 * dt * (1 + (cr - d) / cr * 5);
+                    const pull = o.vacuumed ? (780 * dt) : (420 * dt * (1 + (cr - d) / cr * 5));
                     o.x += (dx / d) * pull;
                     o.y += (dy / d) * pull;
                 }
@@ -2565,6 +2828,7 @@
                 const pr = player.radius + o.radius;
                 if (dx * dx + dy * dy < pr * pr) {
                     o.alive = false;
+                    o.vacuumed = false;
                     player.xp += o.value;
                     if (audio && game.time - lastCollect > 0.07) {
                         lastCollect = game.time;
@@ -2835,6 +3099,7 @@
             o.value = CONFIG.orbValue;
             o.radius = 6;
             o.alive = true;
+            o.vacuumed = false;
         }
 
         function rollChestRarity() {
@@ -2996,17 +3261,468 @@
             updateHud();
         }
 
+        // ==========================================
+        // SISTEMA DE ITENS ESPECIAIS DO MAPA (PICKUPS)
+        // ==========================================
+        function initMapPickups() {
+            pickups.length = 0;
+            const initialPickups = [
+                // 1. Quatro Cantos do Mapa (4000x4000)
+                { type: 'heart', x: 350, y: 350, name: 'Coração Sagrado', icon: '❤️' },
+                { type: 'lilac_gem', x: 3650, y: 350, name: 'Gema Lilás Magnética', icon: '🔮' },
+                { type: 'lilac_gem', x: 350, y: 3650, name: 'Gema Lilás Magnética', icon: '🔮' },
+                { type: 'heart', x: 3650, y: 3650, name: 'Coração Sagrado', icon: '❤️' },
+
+                // 2. Pontos Estratégicos - Região Norte e Nordeste
+                { type: 'bow', x: 2000, y: 800, name: 'Arco Élfico', icon: '🏹' },
+                { type: 'heart', x: 2400, y: 600, name: 'Coração Sagrado', icon: '❤️' },
+                { type: 'lilac_gem', x: 1500, y: 700, name: 'Gema Lilás Magnética', icon: '🔮' },
+                { type: 'shield', x: 2800, y: 1200, name: 'Escudo de Energia', icon: '🛡️' },
+                { type: 'heart', x: 3200, y: 1200, name: 'Coração Sagrado', icon: '❤️' },
+
+                // 3. Pontos Estratégicos - Região Sul e Sudeste
+                { type: 'bow', x: 2200, y: 3200, name: 'Arco Élfico', icon: '🏹' },
+                { type: 'heart', x: 1800, y: 3400, name: 'Coração Sagrado', icon: '❤️' },
+                { type: 'lilac_gem', x: 2800, y: 3300, name: 'Gema Lilás Magnética', icon: '🔮' },
+                { type: 'shield', x: 2600, y: 2600, name: 'Escudo de Energia', icon: '🛡️' },
+
+                // 4. Pontos Estratégicos - Região Oeste e Noroeste
+                { type: 'heart', x: 1000, y: 2200, name: 'Coração Sagrado', icon: '❤️' },
+                { type: 'bow', x: 600, y: 2000, name: 'Arco Élfico', icon: '🏹' },
+                { type: 'lilac_gem', x: 800, y: 1200, name: 'Gema Lilás Magnética', icon: '🔮' },
+                { type: 'shield', x: 1400, y: 1400, name: 'Escudo de Energia', icon: '🛡️' },
+                { type: 'shield', x: 1200, y: 2800, name: 'Escudo de Energia', icon: '🛡️' },
+
+                // 5. Pontos Estratégicos - Região Leste
+                { type: 'lilac_gem', x: 3000, y: 1800, name: 'Gema Lilás Magnética', icon: '🔮' },
+                { type: 'bow', x: 3400, y: 2200, name: 'Arco Élfico', icon: '🏹' }
+            ];
+
+            for (const p of initialPickups) {
+                pickups.push({
+                    type: p.type,
+                    x: p.x,
+                    y: p.y,
+                    radius: 16,
+                    alive: true,
+                    name: p.name,
+                    icon: p.icon,
+                    animTimer: Math.random() * 10
+                });
+            }
+        }
+
+        function updatePickups(dt) {
+            for (const p of pickups) {
+                if (!p.alive) continue;
+                p.animTimer += dt;
+                const dx = p.x - player.x;
+                const dy = p.y - player.y;
+                const r = player.radius + p.radius + 6;
+                if (dx * dx + dy * dy < r * r) {
+                    collectPickup(p);
+                }
+            }
+        }
+
+        function collectPickup(p) {
+            p.alive = false;
+            if (p.type === 'heart') {
+                // 1. Coração: Recupera 40 pontos de vida
+                player.hp = Math.min(player.maxHp, player.hp + 40);
+                spawnDamageText(player.x, player.y - 20, '+40 HP', '#4ade80');
+                spawnParticles(p.x, p.y, '#ff4d6d', 16);
+                spawnParticles(player.x, player.y, '#4ade80', 12);
+                if (audio) audio.play('collect');
+            } else if (p.type === 'lilac_gem') {
+                // 2. Gema Lilás: Imã para puxar todas as gemas de XP atualmente caídas no mapa
+                let pulled = 0;
+                for (const o of xpOrbs) {
+                    if (o.alive) {
+                        o.vacuumed = true;
+                        pulled++;
+                    }
+                }
+                spawnDamageText(player.x, player.y - 24, '⚡ ATRAÇÃO DE XP!', '#c084fc');
+                spawnParticles(p.x, p.y, '#c084fc', 22);
+                spawnParticles(player.x, player.y, '#e879f9', 16);
+                if (audio) audio.play('evolve');
+            } else if (p.type === 'bow') {
+                // 3. Arco: Adquire o arco ou sobe seu nível
+                const bow = player.weapons.find(function (w) { return w.id === 'bow'; });
+                if (!bow) {
+                    player.weapons.push(makeWeapon('bow'));
+                    spawnDamageText(player.x, player.y - 24, '🏹 ARCO ADQUIRIDO!', '#fbbf24');
+                } else {
+                    if (bow.level < WEAPONS.bow.maxLevel) {
+                        levelUpWeapon(bow);
+                        spawnDamageText(player.x, player.y - 24, '🏹 ARCO NÍVEL ' + bow.level + '!', '#fbbf24');
+                    } else {
+                        player.xp += 100;
+                        spawnDamageText(player.x, player.y - 24, '🏹 ARCO NÍVEL MÁXIMO (+100 XP)!', '#fbbf24');
+                    }
+                }
+                spawnParticles(p.x, p.y, '#fbbf24', 20);
+                spawnParticles(player.x, player.y, '#60a5fa', 14);
+                if (audio) audio.play('levelup');
+            } else if (p.type === 'shield') {
+                // 4. Escudo de Energia: Concede 100 pontos de absorção de dano
+                player.shield = 100;
+                player.maxShield = 100;
+                spawnDamageText(player.x, player.y - 24, '🛡️ ESCUDO 100 PTS!', '#38bdf8');
+                spawnParticles(p.x, p.y, '#38bdf8', 22);
+                spawnParticles(player.x, player.y, '#bae6fd', 16);
+                if (audio) audio.play('evolve');
+            }
+            updateHud();
+        }
+
+        function drawPickups() {
+            const time = game.time;
+            for (const p of pickups) {
+                if (!p.alive) continue;
+                const sx = p.x - camera.x;
+                const sy = p.y - camera.y;
+                if (sx < -60 || sx > VIEW_W + 60 || sy < -60 || sy > VIEW_H + 60) continue;
+
+                const bob = Math.sin(time * 4 + p.x * 0.1) * 4;
+                const drawY = sy + bob;
+
+                if (p.type === 'heart') {
+                    // ❤️ CORAÇÃO SAGRADO (Recupera 40 HP)
+                    const pulse = 1 + Math.sin(time * 6) * 0.12;
+
+                    // Brilho radial no chão
+                    ctx.save();
+                    const grad = ctx.createRadialGradient(sx, drawY, 2, sx, drawY, 28 * pulse);
+                    grad.addColorStop(0, 'rgba(255, 40, 80, 0.45)');
+                    grad.addColorStop(0.6, 'rgba(230, 20, 50, 0.18)');
+                    grad.addColorStop(1, 'rgba(180, 0, 30, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(sx, drawY, 28 * pulse, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Sombra sutil no chão
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                    ctx.beginPath();
+                    ctx.ellipse(sx, sy + 14, 12, 4, 0, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Desenho do coração
+                    ctx.translate(sx, drawY);
+                    ctx.scale(pulse, pulse);
+
+                    ctx.shadowColor = 'rgba(255, 30, 70, 0.85)';
+                    ctx.shadowBlur = 10;
+
+                    const hGrad = ctx.createLinearGradient(0, -10, 0, 10);
+                    hGrad.addColorStop(0, '#ff4d6d');
+                    hGrad.addColorStop(0.5, '#e60039');
+                    hGrad.addColorStop(1, '#8a001a');
+                    ctx.fillStyle = hGrad;
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, 4);
+                    ctx.bezierCurveTo(0, -2, -10, -10, -10, -2);
+                    ctx.bezierCurveTo(-10, 4, 0, 9, 0, 12);
+                    ctx.bezierCurveTo(0, 9, 10, 4, 10, -2);
+                    ctx.bezierCurveTo(10, -10, 0, -2, 0, 4);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Borda externa
+                    ctx.strokeStyle = '#fff0f3';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+
+                    // Brilho especular no canto superior esquerdo
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                    ctx.beginPath();
+                    ctx.arc(-4, -2, 2, 0, TWO_PI);
+                    ctx.fill();
+
+                    ctx.restore();
+                } else if (p.type === 'lilac_gem') {
+                    // 🔮 GEMA LILÁS MAGNÉTICA (Puxa todas as gemas de XP)
+                    const pulse = 1 + Math.sin(time * 5 + p.y) * 0.1;
+
+                    // Brilho radial magnético
+                    ctx.save();
+                    const grad = ctx.createRadialGradient(sx, drawY, 3, sx, drawY, 32 * pulse);
+                    grad.addColorStop(0, 'rgba(216, 130, 255, 0.55)');
+                    grad.addColorStop(0.5, 'rgba(168, 85, 247, 0.22)');
+                    grad.addColorStop(1, 'rgba(126, 34, 206, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(sx, drawY, 32 * pulse, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Sombra sutil no chão
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                    ctx.beginPath();
+                    ctx.ellipse(sx, sy + 14, 12, 4, 0, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Cristal Facetado
+                    ctx.translate(sx, drawY);
+                    ctx.scale(pulse, pulse);
+
+                    ctx.shadowColor = 'rgba(192, 132, 252, 0.9)';
+                    ctx.shadowBlur = 12;
+
+                    // Formato do Diamante Facetado (Hexagonal)
+                    const gw = 11, gh = 14;
+                    // Corpo principal
+                    ctx.fillStyle = '#a855f7';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -gh);
+                    ctx.lineTo(gw, -gh * 0.35);
+                    ctx.lineTo(0, gh);
+                    ctx.lineTo(-gw, -gh * 0.35);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Faceta superior esquerda (mais clara)
+                    ctx.fillStyle = '#f3e8ff';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -gh);
+                    ctx.lineTo(-gw, -gh * 0.35);
+                    ctx.lineTo(0, -gh * 0.1);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Faceta superior direita (iluminada)
+                    ctx.fillStyle = '#d8b4fe';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -gh);
+                    ctx.lineTo(gw, -gh * 0.35);
+                    ctx.lineTo(0, -gh * 0.1);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Faceta inferior esquerda (sombra)
+                    ctx.fillStyle = '#7e22ce';
+                    ctx.beginPath();
+                    ctx.moveTo(-gw, -gh * 0.35);
+                    ctx.lineTo(0, gh);
+                    ctx.lineTo(0, -gh * 0.1);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Faceta inferior direita (tom médio)
+                    ctx.fillStyle = '#9333ea';
+                    ctx.beginPath();
+                    ctx.moveTo(gw, -gh * 0.35);
+                    ctx.lineTo(0, gh);
+                    ctx.lineTo(0, -gh * 0.1);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Contorno
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -gh);
+                    ctx.lineTo(gw, -gh * 0.35);
+                    ctx.lineTo(0, gh);
+                    ctx.lineTo(-gw, -gh * 0.35);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // Partículas de brilho orbital
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = '#fdf4ff';
+                    for (let k = 0; k < 3; k++) {
+                        const orbAng = time * 3 + k * (TWO_PI / 3);
+                        const ox = Math.cos(orbAng) * 16;
+                        const oy = Math.sin(orbAng) * 8;
+                        ctx.beginPath();
+                        ctx.arc(ox, oy, 1.3, 0, TWO_PI);
+                        ctx.fill();
+                    }
+
+                    ctx.restore();
+                } else if (p.type === 'bow') {
+                    // 🏹 ARCO ÉLFICO / LENDÁRIO (Desbloqueio ou Level-up da Arma)
+                    const pulse = 1 + Math.sin(time * 4.5 + p.x) * 0.08;
+
+                    // Brilho dourado/celestial
+                    ctx.save();
+                    const grad = ctx.createRadialGradient(sx, drawY, 3, sx, drawY, 30 * pulse);
+                    grad.addColorStop(0, 'rgba(251, 191, 36, 0.5)');
+                    grad.addColorStop(0.6, 'rgba(217, 119, 6, 0.18)');
+                    grad.addColorStop(1, 'rgba(180, 83, 9, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(sx, drawY, 30 * pulse, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Sombra sutil no chão
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                    ctx.beginPath();
+                    ctx.ellipse(sx, sy + 14, 12, 4, 0, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Desenho do Arco e Flecha dourados
+                    ctx.translate(sx, drawY);
+                    ctx.scale(pulse, pulse);
+
+                    ctx.shadowColor = 'rgba(251, 191, 36, 0.9)';
+                    ctx.shadowBlur = 10;
+
+                    // Arco recurvo de madeira nobre com detalhes em ouro
+                    ctx.strokeStyle = '#d97706';
+                    ctx.lineWidth = 3.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 13, -Math.PI * 0.75, Math.PI * 0.25);
+                    ctx.stroke();
+
+                    // Acabamento dourado no dorso do arco
+                    ctx.strokeStyle = '#fde047';
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 13.5, -Math.PI * 0.75, Math.PI * 0.25);
+                    ctx.stroke();
+
+                    // Corda de prata esticada
+                    const p1x = Math.cos(-Math.PI * 0.75) * 13;
+                    const p1y = Math.sin(-Math.PI * 0.75) * 13;
+                    const p2x = Math.cos(Math.PI * 0.25) * 13;
+                    const p2y = Math.sin(Math.PI * 0.25) * 13;
+
+                    ctx.strokeStyle = '#f1f5f9';
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.moveTo(p1x, p1y);
+                    ctx.lineTo(-2, -2);
+                    ctx.lineTo(p2x, p2y);
+                    ctx.stroke();
+
+                    // Flecha dourada pronta para disparo
+                    ctx.strokeStyle = '#fef08a';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(-6, -6);
+                    ctx.lineTo(10, 10);
+                    ctx.stroke();
+
+                    // Ponta da flecha
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.moveTo(13, 13);
+                    ctx.lineTo(6, 12);
+                    ctx.lineTo(12, 6);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.restore();
+                } else if (p.type === 'shield') {
+                    // 🛡️ ESCUDO DE ENERGIA (Protege contra 100 pontos de dano)
+                    const pulse = 1 + Math.sin(time * 4 + p.x) * 0.1;
+
+                    // Brilho azul ciano no chão
+                    ctx.save();
+                    const grad = ctx.createRadialGradient(sx, drawY, 2, sx, drawY, 30 * pulse);
+                    grad.addColorStop(0, 'rgba(56, 189, 248, 0.55)');
+                    grad.addColorStop(0.5, 'rgba(14, 165, 233, 0.2)');
+                    grad.addColorStop(1, 'rgba(2, 132, 199, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(sx, drawY, 30 * pulse, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Sombra no chão
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                    ctx.beginPath();
+                    ctx.ellipse(sx, sy + 14, 12, 4, 0, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Orbe / Emblema de Escudo de Energia
+                    ctx.translate(sx, drawY);
+                    ctx.scale(pulse, pulse);
+
+                    ctx.shadowColor = 'rgba(56, 189, 248, 0.95)';
+                    ctx.shadowBlur = 12;
+
+                    // Bolha esférica de energia
+                    const sGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
+                    sGrad.addColorStop(0, '#e0f2fe');
+                    sGrad.addColorStop(0.4, '#38bdf8');
+                    sGrad.addColorStop(0.8, '#0284c7');
+                    sGrad.addColorStop(1, '#0369a1');
+                    ctx.fillStyle = sGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 13, 0, TWO_PI);
+                    ctx.fill();
+
+                    // Borda de plasma
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.4;
+                    ctx.stroke();
+
+                    // Brasão do escudo no centro
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -6);
+                    ctx.lineTo(6, -3);
+                    ctx.lineTo(6, 2);
+                    ctx.lineTo(0, 7);
+                    ctx.lineTo(-6, 2);
+                    ctx.lineTo(-6, -3);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = '#0284c7';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -4);
+                    ctx.lineTo(4, -1.5);
+                    ctx.lineTo(4, 1.5);
+                    ctx.lineTo(0, 5);
+                    ctx.lineTo(-4, 1.5);
+                    ctx.lineTo(-4, -1.5);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+            }
+        }
+
         function damagePlayer(dmg) {
             if (player.hitCooldown > 0) return;
             player.hitCooldown = CONFIG.player.hitCooldown;
-            player.hp -= dmg;
             shake = 8;
-            if (audio) audio.play('hurt');
-            spawnDamageText(player.x, player.y - player.radius - 6, '-' + dmg, '#ff5a6e');
-            if (player.hp <= 0) {
-                player.hp = 0;
-                spawnParticles(player.x, player.y, '#e8435b', 24);
-                endGame();
+
+            // Absorção pelo Escudo de Energia
+            if (player.shield > 0) {
+                if (player.shield >= dmg) {
+                    player.shield -= dmg;
+                    spawnDamageText(player.x, player.y - player.radius - 8, '-' + dmg + ' 🛡️', '#38bdf8');
+                    spawnParticles(player.x, player.y, '#38bdf8', 12);
+                    if (audio) audio.play('tick');
+                    dmg = 0;
+                } else {
+                    const absorbed = player.shield;
+                    dmg -= absorbed;
+                    player.shield = 0;
+                    spawnDamageText(player.x, player.y - player.radius - 8, '💥 ESCUDO QUEBRADO!', '#0ea5e9');
+                    spawnParticles(player.x, player.y, '#0ea5e9', 24);
+                    if (audio) audio.play('death');
+                }
+            }
+
+            if (dmg > 0) {
+                player.hp -= dmg;
+                if (audio) audio.play('hurt');
+                spawnDamageText(player.x, player.y - player.radius - 6, '-' + dmg, '#ff5a6e');
+                if (player.hp <= 0) {
+                    player.hp = 0;
+                    spawnParticles(player.x, player.y, '#e8435b', 24);
+                    endGame();
+                }
             }
             updateHud();
         }
@@ -3103,6 +3819,7 @@
             updateBoss(dt);
             updateChests(dt);
             updateChestCollection();
+            updatePickups(dt);
             updateParticles(dt);
             updateCamera();
             shake = Math.max(0, shake - 60 * dt);
@@ -3121,9 +3838,51 @@
             return ctx.createPattern(c, 'repeat');
         }
 
+        function makeDesertTilePattern() {
+            const img = images[ASSETS.dungeonWallsFloor];
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 64;
+            const cctx = c.getContext('2d');
+            cctx.imageSmoothingEnabled = false;
+
+            // Fundo base arenoso
+            cctx.fillStyle = '#6e4d2a';
+            cctx.fillRect(0, 0, 64, 64);
+
+            if (img && img.complete && img.naturalWidth) {
+                // Ladrilho 4x4 com coordenadas exatas de chão do walls_floor.png
+                // Tile principal: col 2, row 8 (32, 128)
+                // Tile variação 1: col 3, row 8 (48, 128)
+                // Tile variação 2: col 2, row 9 (32, 144)
+                // Tile variação 3: col 3, row 9 (48, 144)
+                const floorCoords = [
+                    { sx: 32, sy: 128 },
+                    { sx: 48, sy: 128 },
+                    { sx: 32, sy: 144 },
+                    { sx: 48, sy: 144 }
+                ];
+                for (let x = 0; x < 4; x++) {
+                    for (let y = 0; y < 4; y++) {
+                        const tile = floorCoords[(x * 3 + y * 7) % floorCoords.length];
+                        cctx.drawImage(img, tile.sx, tile.sy, 16, 16, x * 16, y * 16, 16, 16);
+                    }
+                }
+            }
+            // Sutil tonalização de areia e dunas desérticas
+            cctx.fillStyle = 'rgba(205, 155, 85, 0.22)';
+            cctx.fillRect(0, 0, 32, 32);
+            cctx.fillRect(32, 32, 32, 32);
+            cctx.fillStyle = 'rgba(75, 45, 18, 0.16)';
+            cctx.fillRect(0, 32, 32, 32);
+            cctx.fillRect(32, 0, 32, 32);
+
+            return ctx.createPattern(c, 'repeat');
+        }
+
         function drawGround() {
-            if (!groundPattern) groundPattern = makeTilePattern(ASSETS.ground, 2, 2);
-            ctx.fillStyle = groundPattern || '#160d12';
+            if (!groundPattern) groundPattern = makeDesertTilePattern();
+            ctx.fillStyle = groundPattern || '#5c3e21';
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
             ctx.fillRect(camera.x - 20, camera.y - 20, VIEW_W + 40, VIEW_H + 40);
@@ -3133,7 +3892,7 @@
 
         function drawBoundary() {
             const w = WORLD_W, h = WORLD_H;
-            ctx.strokeStyle = '#7d2430';
+            ctx.strokeStyle = '#8a3542';
             ctx.lineWidth = 6;
             ctx.shadowColor = '#e8435b';
             ctx.shadowBlur = 18;
@@ -3159,13 +3918,60 @@
         }
 
         function drawObjects() {
+            const time = game.time;
             for (const o of scenery) {
                 if (o.x + o.w < camera.x || o.x - o.w > camera.x + VIEW_W || o.y + o.h < camera.y || o.y - o.h > camera.y + VIEW_H) continue;
-                const img = images[o.file];
-                const sx = o.x - camera.x;
-                const sy = o.y - camera.y;
-                if (img && img.complete && img.naturalWidth) {
-                    ctx.drawImage(img, sx - o.w / 2, sy - o.h / 2, o.w, o.h);
+                const sx = Math.round(o.x - camera.x);
+                const sy = Math.round(o.y - camera.y);
+
+                // 1. Luz de tocha / braseiro no chão arenoso
+                if (o.hasLight) {
+                    const lightPulse = 1 + Math.sin(time * 8 + o.x) * 0.08;
+                    const lightR = 60 * lightPulse;
+                    ctx.save();
+                    const grad = ctx.createRadialGradient(sx, sy + o.h * 0.2, 4, sx, sy + o.h * 0.2, lightR);
+                    grad.addColorStop(0, 'rgba(255, 185, 65, 0.38)');
+                    grad.addColorStop(0.5, 'rgba(230, 110, 30, 0.16)');
+                    grad.addColorStop(1, 'rgba(180, 60, 10, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy + o.h * 0.2, lightR, 0, TWO_PI);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // 2. Renderização precisa dos tiles do Prefab
+                if (o.prefab && o.prefab.tiles) {
+                    const p = o.prefab;
+                    const originX = Math.round(sx - p.w / 2);
+                    const originY = Math.round(sy - p.h / 2);
+
+                    for (const t of p.tiles) {
+                        const img = images[ASSETS[t.asset]];
+                        if (!img || !img.complete || !img.naturalWidth) continue;
+
+                        let srcX = t.sx;
+                        let srcY = t.sy;
+
+                        if (p.isFire) {
+                            if (p.fireType === 'fire1') {
+                                const frame = Math.floor(time * 8) % 6;
+                                srcX = (t.col % 11) * 16;
+                                srcY = (t.row + frame * 3) * 16;
+                            } else if (p.fireType === 'fire2') {
+                                const frame = Math.floor(time * 8) % 3;
+                                srcX = (t.col % 6) * 16;
+                                srcY = (t.row + frame * 4) * 16;
+                            }
+                        }
+
+                        ctx.drawImage(img, srcX, srcY, 16, 16, originX + t.dx, originY + t.dy, 16, 16);
+                    }
+                } else if (o.file) {
+                    const img = images[o.file];
+                    if (img && img.complete && img.naturalWidth) {
+                        ctx.drawImage(img, sx - o.w / 2, sy - o.h / 2, o.w, o.h);
+                    }
                 }
             }
         }
@@ -3621,6 +4427,51 @@
                 frame = Math.floor(player.animTime * anim.fps) % maxFrames;
             }
             drawSprite(img, player.row, frame, anim.frames, sx, sy, size, size, false);
+
+            // BOLHA DE ESCUDO DE ENERGIA TRANSLÚCIDA PULSANTE
+            if (player.shield > 0) {
+                const pulse = 1 + Math.sin(game.time * 4.5) * 0.06;
+                const shieldR = (player.radius + 10) * pulse;
+
+                ctx.save();
+                ctx.translate(sx, sy);
+
+                // Brilho exterior azul fluorescente
+                ctx.shadowColor = 'rgba(56, 189, 248, 0.9)';
+                ctx.shadowBlur = 15;
+
+                // Preenchimento translúcido com gradiente radial
+                const bGrad = ctx.createRadialGradient(0, 0, shieldR * 0.2, 0, 0, shieldR);
+                bGrad.addColorStop(0, 'rgba(186, 230, 253, 0.08)');
+                bGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.22)');
+                bGrad.addColorStop(1, 'rgba(14, 165, 233, 0.45)');
+                ctx.fillStyle = bGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, shieldR, 0, TWO_PI);
+                ctx.fill();
+
+                // Borda de plasma azul ciano
+                ctx.strokeStyle = 'rgba(224, 242, 254, 0.9)';
+                ctx.lineWidth = 1.8;
+                ctx.stroke();
+
+                // Reflexo especular elegante no topo da bolha
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+                ctx.beginPath();
+                ctx.ellipse(-shieldR * 0.35, -shieldR * 0.45, shieldR * 0.32, shieldR * 0.14, -Math.PI / 4, 0, TWO_PI);
+                ctx.fill();
+
+                // Arco de energia dinâmica giratório
+                const waveAng = game.time * 2.5;
+                ctx.strokeStyle = 'rgba(125, 211, 252, 0.5)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.arc(0, 0, shieldR * 0.78, waveAng, waveAng + Math.PI * 0.65);
+                ctx.stroke();
+
+                ctx.restore();
+            }
         }
 
         function drawEnemies() {
@@ -3694,6 +4545,7 @@
             drawGround();
             drawWater();
             drawObjects();
+            drawPickups();
             drawOrbs();
             drawDamageZones();
             drawChests();
@@ -3830,8 +4682,10 @@
         initChestPool();
         audio = initAudio();
         loadBest();
+        generateScenery();
+        initMapPickups();
         setStatus('menu');
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>
