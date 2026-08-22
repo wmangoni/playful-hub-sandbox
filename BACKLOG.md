@@ -87,13 +87,15 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_007.md` | Sangue & Prata | Etapa 6 — Evoluções (Synergies) | ✅ Done | | Alta | [TASK_007.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_007.md) |
 | `TASK_008.md` | Sangue & Prata | Etapa 7 — Chefes (Boss Fight) com HP Escalado | ✅ Done | | Alta | [TASK_008.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_008.md) |
 | `TASK_009.md` | Sangue & Prata | Etapa 8 — Polish, SFX Procedural e Publicação no Hub | ✅ Done | | Alta | [TASK_009.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_009.md) |
+| `TASK_010.md` | Sangue & Prata | Melhorias Gráficas — Sprites (vampiros) e Cenário (chão, água e objetos) | ✅ Done | | Alta | [TASK_010.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_010.md) |
 | `TASK_011.md` | Sangue & Prata | Melhorias de UI — Tooltips, Descrições de Itens e Tela de Pause | ✅ Done | | Alta | [TASK_011.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_011.md) |
 | `TASK_012.md` | Sangue & Prata | Variabilidade de Monstros (Vampires 1, 2 e 3) com Padrões Únicos de Movimentação e Balanceamento Matemático | 🚀 Dev Complete | | Alta | [TASK_012.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_012.md) |
 | `TASK_013.md` | Sangue & Prata | Sistema de Progresso Permanente e Conquistas (Achievements) via localStorage | 🚀 Dev Complete | | Muito Alta | [TASK_013.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_013.md) |
 | `TASK_014.md` | Sangue & Prata | Suporte Mobile, Joystick Virtual Touch e Otimização Responsiva de Telas | 🚀 Dev Complete | | Alta | [TASK_014.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_014.md) |
 | `TASK_015.md` | Sangue & Prata | Redesign Visual e Sistema de Tiers dos Baús com Escalonamento de Tamanhos e Detalhes | 🚀 Dev Complete | | Alta | [TASK_015.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_015.md) |
 | `TASK_016.md` | Sangue & Prata | Textura de Solo Arenoso/Desértico e Sistema de Cenografia Inteligente com POIs | 🚀 Dev Complete | | Alta | [TASK_016.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_016.md) |
-| `TASK_017.md` | Sangue & Prata | Novos Itens Especiais Espalhados pelo Mapa (Coração, Gema Lilás e Arco) | 🚀 Dev Complete | | Alta | [TASK_017.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_017.md) |
+| `TASK_017.md` | Sangue & Prata | Novos Itens Especiais Espalhados pelo Mapa (Coração, Gema Lilás, Arco e Escudo) | 🚀 Dev Complete | | Alta | [TASK_017.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_017.md) |
+
 
 
 
