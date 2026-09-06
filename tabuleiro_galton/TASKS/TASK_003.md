@@ -360,3 +360,54 @@ function playAudio(type) {
 * **Ação**: Resolução das dúvidas táticas do desenvolvedor.
 * **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
 
+---
+
+## 🧪 Evidencias de Testes
+
+### 📋 Resumo da Avaliação de QA
+* **Data da Execução**: 30/08/2026
+* **Ambiente**: Navegador Headless via Puppeteer + Node.js HTTP Server (`http://127.0.0.1:3097/tabuleiro_galton/index.html`)
+* **Suite de Testes**: [`tests/qa_galton_board_task003.test.js`](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tests/qa_galton_board_task003.test.js)
+* **Resultado Global**: **100% Aprovado (6/6 Suites de Teste Passaram com Sucesso)**
+
+---
+
+### 🔍 Detalhamento dos Testes Realizados
+
+#### 1. Interface & Componentes DOM (Modo Desafio)
+* `[PASS]` Presença do Canvas 2D (`#galtonCanvas`), seletor de desafios (`#challengeSelector`), botões de ação (`#startChallengeBtn`, `#cancelChallengeBtn`), caixas de status (`#challengeStatusBox`, `#challengeInfoBox`) e mostrador de acurácia (`#matchPercentDisplay`).
+* `[PASS]` Controles de simulação (`#addBallBtn`, `#add10BallsBtn`, `#resetBtn`, `#layoutSelector`, sliders físicos e checkboxes visuais).
+
+#### 2. Pinos Especiais (Interactive Peg Modifiers)
+* `[PASS]` **Portal In (`#00d2ff`) & Portal Out (`#ff9f43`)**: Gerados dinamicamente no grid. Bolinhas que colidem com a entrada são teletransportadas instantaneamente para a saída mantendo impulso físico vertical descendente e tocando efeito sonoro de sweep senoidal.
+* `[PASS]` **Splitter Peg (`#b833ff`)**: Desintegra a bolinha de impacto e ejeta proceduralmente duas novas bolinhas verdes neon (`#39ff14`) em trajetórias divergentes de 45° respeitando o teto de segurança (`MAX_BALLS = 150`).
+* `[PASS]` **Vortex Peg (`#00ffcc`)**: Exerce atração gravitacional radial proporcional ao inverso do cubo da distância ($r < 40\text{px}$) com limite $d_{\min} = pegRadius + ballRadius + 2\text{px}$ para prevenir efeito de estilingada instável.
+
+#### 3. Modo Desafio (Target Fitting / 3 Níveis Estatísticos)
+* `[PASS]` **Desafio 1 (Curva Inclinada - Skewed Right)**: Configura probabilidade para $p = 0.7$, calcula o Erro Quadrático Médio (MSE) e exibe a curva teórica amarela neon tracejada (`#ffeb3b`). Validação com 100 bolinhas atingiu $\text{MSE} < 0.015$ e Match de 100%.
+* `[PASS]` **Desafio 2 (Twin Peaks / Bimodal)**: Alterna para o layout bimodal e valida acúmulo $\ge 25$ bolinhas nas colunas 3 e 12 com colunas centrais (6 a 9) contendo $\le 10$ bolinhas.
+* `[PASS]` **Desafio 3 (Grade Uniforme)**: Alterna para o layout uniforme regular, bloqueia novos disparos após 120 esferas acumuladas e valida dispersão uniforme com $\text{diferença máxima} \le 15$ bolinhas entre todas as 16 colunas receptoras.
+
+#### 4. Síntese de Áudio Procedural (Web Audio API)
+* `[PASS]` **Tons de Colisão Dinâmicos**: Mapeamento linear da coordenada X de impacto para 16 notas da escala pentatônica maior (C3 a C6: 130.81Hz a 1046.50Hz) em osciladores `triangle` com decaimento exponencial de ganho.
+* `[PASS]` **Efeitos Especiais Sintetizados**: Sweep ascendente para teletransporte (`sine`), arpejo rápido descendo para divisão (`sawtooth`) e fanfarra harmônica alegre de 4 notas para vitória do desafio.
+* `[PASS]` **Zero Assets Externos & Interceptação de Áudio**: Ativação transparente via `pointerdown`/`keydown` em conformidade com políticas de autoplay dos navegadores.
+
+#### 5. Execução em Tempo Real e Estabilidade
+* `[PASS]` Disparo de esferas contínuas, integração do loop `requestAnimationFrame` a 60 FPS, detecção de colisão sem vazamento de memória e **0 erros** no console do navegador.
+* `[PASS]` Suíte de fumaça global (`npm run test:ci`) executada com sucesso.
+
+---
+
+### 📸 Evidência Visual Capturada
+* **Arquivo da Screenshot**: [`tests/galton_board_task003_qa_evidence.png`](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tests/galton_board_task003_qa_evidence.png)
+
+---
+
+### 🏁 Parecer Final de QA
+* **Status Recomendado**: `🎉 Ready for Deploy`
+* **Conclusão**: Todos os critérios de aceitação foram cumpridos integralmente com alta qualidade de código, estabilidade matemática e fidelidade visual.
+
+*Assinado: Antigravity - Senior QA Engineer*
+
+

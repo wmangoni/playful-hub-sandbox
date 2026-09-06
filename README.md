@@ -10,7 +10,7 @@ Criado e mantido por **[William Mangoni](https://www.linkedin.com/in/william-man
 
 O projeto conta com duas experiências distintas para exploração do catálogo:
 
-1.  **Hub Moderno (`index.html`)**: Uma interface web de estética futurista com temas de jogos, efeitos de iluminação dinâmica (spots coloridos gerados via JS) e transições neon. Conta com um efeito imersivo de carregamento falso (*fake load*) de 7 segundos ao selecionar um jogo, aumentando o suspense e engajamento.
+1.  **Hub Moderno (`index.html`)**: Uma interface web de estética futurista com temas de jogos, efeitos de iluminação dinâmica (spots coloridos gerados via JS) e transições neon. Ao selecionar um jogo, a navegação é imediata.
 2.  **Modo Museu Interativo (`index2.html`)**: Uma galeria virtual retrô estilo 8-bit / pixel-art rodando em `<canvas>`, onde o usuário controla um personagem em visão superior (*top-down*) e interage com totens físicos de exposição para abrir os minijogos.
 
 ---
@@ -25,7 +25,7 @@ O hub centraliza 20 minijogos e simuladores diferentes, acessíveis por rotas am
 4.  **Strategy Empire (`/jogos/strategy_game`)**: Jogo de estratégia de conquista de reinos e expansão de impérios.
 5.  **Company Simulator (`/jogos/it_simulator`)**: Simulador satírico e divertido sobre o cotidiano de trabalhar na área de TI.
 6.  **The Archer (`/jogos/archer`)**: Teste de mira de arco e flecha para estourar balões vermelhos dinâmicos.
-7.  **Tetris (`/jogos/tetris`)**: O clássico e viciante jogo de encaixe de blocos geométricos dos anos 80.
+7.  **Block Stacker (`/jogos/block_stacker`)**: O clássico e viciante jogo de encaixe de blocos geométricos estilo arcade.
 8.  **Poker Texas Hold'em (`/jogos/poker`)**: Jogue Poker Texas Hold'em contra Inteligência Artificial.
 9.  **String Catcher (`/jogos/visual_effects`)**: Jogo rítmico arcade de capturar notas em cordas vibrantes com lindos efeitos ondulatórios.
 10. **Snake Game (`/jogos/snake`)**: O tradicional jogo da cobrinha com mecânica fiel e um visual neon modernizado.
