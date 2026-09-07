@@ -674,6 +674,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
         const CITY_SIZE = 15; // Blocks
         const BLOCK_SIZE = 20; // Units per block (Wider)
         const TOTAL_TIME = 300;
+        const SEA_LEVEL = -1.0; // World ocean height (island ground dips below it at the coast)
+        const TERRAIN_STEP = 20; // Height-map control lattice spacing (aligns with roads)
+        const TERRAIN_START = -160;
+        const TERRAIN_N = 17;
 
         // --- Game State ---
         const state = {
@@ -721,6 +725,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
             skidmarks: [],
             sparkParticles: [],
             ramps: [],
+            lombas: [],
+            inWater: false,
 
             // TASK_004: Weather (sunny/rainy)
             weather: 'sunny',
@@ -898,7 +904,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     const targetCutoff = 200 + speedRatio * 750;
                     this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.05);
                     this.engineFilter.frequency.setTargetAtTime(targetCutoff, now, 0.05);
-                    this.engineGain.gain.setTargetAtTime(0.12, now, 0.05);
+                    this.engineGain.gain.setTargetAtTime(0.02, now, 0.05);
                 } else {
                     this.engineGain.gain.setTargetAtTime(0, now, 0.1);
                 }
@@ -995,6 +1001,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 this.angularVelocity = new THREE.Vector3(0, 0, 0);
                 this.isHit = false;
                 this.isDestroyed = false;
+                this.baseY = position.y; // ground (terrain) height where the prop spawned
                 this.box = new THREE.Box3().setFromObject(mesh);
             }
 
@@ -1007,8 +1014,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     this.mesh.rotation.y += this.angularVelocity.y * dt;
                     this.mesh.rotation.z += this.angularVelocity.z * dt;
 
-                    if (this.mesh.position.y <= 0.3) {
-                        this.mesh.position.y = 0.3;
+                    if (this.mesh.position.y <= this.baseY + 0.3) {
+                        this.mesh.position.y = this.baseY + 0.3;
                         this.velocity.y = -this.velocity.y * 0.4; // Elastic bounce
                         this.velocity.x *= 0.82; // Ground friction
                         this.velocity.z *= 0.82;
@@ -1664,27 +1671,215 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 // Distance culling: buildings further than this radius are hidden (visible=false).
                 this.renderRadius = 120;
 
+                this._buildTerrain();
+                this.garageHeight = this.getGroundY(0, 0);
+
                 this.generateCity();
             }
 
+            // --- Terrain height field (deterministic, allocation-free getGroundY) ---
+            // A coarse lattice of control heights (spaced 20 units, aligned with the road grid)
+            // is bilinearly sampled and then "flattened" inside each block (building pad), so
+            // the roads become smooth ramps between flat block plateaus. Slope is capped so
+            // every street stays drivable and traffic never clips.
+            _latticeRaw(ix, iz) {
+                const gx = ix * TERRAIN_STEP + TERRAIN_START;
+                const gz = iz * TERRAIN_STEP + TERRAIN_START;
+                const r2 = gx * gx + gz * gz;
+                // Island dome: higher toward the centre, dipping below sea level at the coast.
+                const dome = 9.0 * Math.exp(-r2 / (2 * 110 * 110));
+                // Subtle rolling undulation over the whole island.
+                const roll = 2.2 * Math.sin(gx * 0.045) * Math.cos(gz * 0.04);
+                // Two curated hills.
+                const hill1 = 5.5 * Math.exp(-((gx - 55) * (gx - 55) + (gz - 35) * (gz - 35)) / (2 * 48 * 48));
+                const hill2 = 5.0 * Math.exp(-((gx + 75) * (gx + 75) + (gz - 115) * (gz - 115)) / (2 * 42 * 42));
+                // Two curated valleys (depressions).
+                const val1 = -6.5 * Math.exp(-((gx + 70) * (gx + 70) + (gz + 60) * (gz + 60)) / (2 * 45 * 45));
+                const val2 = -5.0 * Math.exp(-((gx - 25) * (gx - 25) + (gz + 95) * (gz + 95)) / (2 * 38 * 38));
+                return dome + roll + hill1 + hill2 + val1 + val2;
+            }
+
+            _buildTerrain() {
+                const N = TERRAIN_N;
+                const lat = new Float64Array(N * N);
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        lat[i * N + j] = this._latticeRaw(i, j);
+                    }
+                }
+                // Cap neighbouring differences so the maximum road slope stays drivable (~10 deg).
+                const MAXD = 5.0;
+                for (let pass = 0; pass < 32; pass++) {
+                    let changed = false;
+                    for (let i = 0; i < N; i++) {
+                        for (let j = 0; j < N; j++) {
+                            const v = lat[i * N + j];
+                            for (let d = 0; d < 4; d++) {
+                                const ni = i + ((d === 0) ? -1 : (d === 1) ? 1 : 0);
+                                const nj = j + ((d === 2) ? -1 : (d === 3) ? 1 : 0);
+                                if (ni < 0 || ni >= N || nj < 0 || nj >= N) continue;
+                                const n = lat[ni * N + nj];
+                                if (v - n > MAXD) { lat[i * N + j] = n + MAXD; changed = true; }
+                                else if (n - v > MAXD) { lat[i * N + j] = n - MAXD; changed = true; }
+                            }
+                        }
+                    }
+                    if (!changed) break;
+                }
+                this._lattice = lat;
+
+                // Pre-compute the flat building-pad height of every block (sampled at its centre).
+                this._blockPads = new Float64Array(CITY_SIZE * CITY_SIZE);
+                for (let bx = 0; bx < CITY_SIZE; bx++) {
+                    for (let bz = 0; bz < CITY_SIZE; bz++) {
+                        this._blockPads[bx * CITY_SIZE + bz] = this._sampleLattice(bx * BLOCK_SIZE - (CITY_SIZE - 1) * BLOCK_SIZE / 2, bz * BLOCK_SIZE - (CITY_SIZE - 1) * BLOCK_SIZE / 2);
+                    }
+                }
+                // Curated depressions on top of the natural valleys: an inland lagoon (SE district)
+                // and two sunken plazas. Offsets keep the pad-to-neighbour blends gradual/driveable.
+                this._padDepressions = {
+                    '1_2': -1.5, '2_2': -1.8, '1_3': -1.5, '2_3': -2.4, // lagoon basin
+                    '8_2': -0.9, '2_1': -0.85                            // sunken plazas
+                };
+                for (const key in this._padDepressions) {
+                    const idx = key.indexOf('_');
+                    const bx = parseInt(key.slice(0, idx), 10);
+                    const bz = parseInt(key.slice(idx + 1), 10);
+                    this._blockPads[bx * CITY_SIZE + bz] = this._padDepressions[key];
+                }
+            }
+
+            _sampleLattice(x, z) {
+                const N = TERRAIN_N;
+                const fx = (x - TERRAIN_START) / TERRAIN_STEP;
+                const fz = (z - TERRAIN_START) / TERRAIN_STEP;
+                let ix = Math.floor(fx);
+                let iz = Math.floor(fz);
+                if (ix < 0) ix = 0; else if (ix > N - 2) ix = N - 2;
+                if (iz < 0) iz = 0; else if (iz > N - 2) iz = N - 2;
+                const tx = fx - ix;
+                const tz = fz - iz;
+                const lat = this._lattice;
+                const h00 = lat[ix * N + iz];
+                const h10 = lat[(ix + 1) * N + iz];
+                const h01 = lat[ix * N + iz + 1];
+                const h11 = lat[(ix + 1) * N + iz + 1];
+                return h00 * (1 - tx) * (1 - tz) + h10 * tx * (1 - tz) + h01 * (1 - tx) * tz + h11 * tx * tz;
+            }
+
+            // 0 on a road centre line, 1 fully inside a block (flat pad zone).
+            _padWeight(v) {
+                const r = Math.round(v / BLOCK_SIZE) * BLOCK_SIZE;
+                let d = v - r;
+                if (d < 0) d = -d;
+                if (d >= 7) return 1;
+                if (d <= 0) return 0;
+                const t = d / 7;
+                return t * t * (3 - 2 * t); // smoothstep
+            }
+
+            // Single source of truth for ground elevation. Pure arithmetic, no allocations,
+            // so it is safe to call every frame from the player, traffic, pedestrians and props.
+            getGroundY(x, z) {
+                const h = this._sampleLattice(x, z);
+                const half = (CITY_SIZE - 1) * BLOCK_SIZE / 2; // 140
+                let bx = Math.floor((x + half) / BLOCK_SIZE);
+                let bz = Math.floor((z + half) / BLOCK_SIZE);
+                if (bx < 0) bx = 0; else if (bx >= CITY_SIZE) bx = CITY_SIZE - 1;
+                if (bz < 0) bz = 0; else if (bz >= CITY_SIZE) bz = CITY_SIZE - 1;
+                const pad = this._blockPads[bx * CITY_SIZE + bz];
+                const w = this._padWeight(x) * this._padWeight(z);
+                return h + (pad - h) * w;
+            }
+
+            _createTerrainMesh() {
+                const size = this.citySize * this.blockSize + 40; // 340: city + surrounding beach
+                const segments = 60;
+                const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+                geo.rotateX(-Math.PI / 2);
+                const pos = geo.attributes.position;
+                const count = pos.count;
+                const colors = new Float32Array(count * 3);
+                const cBeach = new THREE.Color(0xd6c297); // wet sand
+                const cCity = new THREE.Color(0x2a2a2a);  // asphalt
+                const tmp = new THREE.Color();
+                for (let i = 0; i < count; i++) {
+                    const x = pos.getX(i);
+                    const z = pos.getZ(i);
+                    const y = this.getGroundY(x, z);
+                    pos.setY(i, y);
+                    // Coast band: blend from sand (near/under sea level) to city asphalt.
+                    const t = THREE.MathUtils.clamp((y - (SEA_LEVEL + 0.6)) / 2.5, 0, 1);
+                    tmp.copy(cBeach).lerp(cCity, t);
+                    colors[i * 3] = tmp.r;
+                    colors[i * 3 + 1] = tmp.g;
+                    colors[i * 3 + 2] = tmp.b;
+                }
+                geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geo.computeVertexNormals();
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, vertexColors: true });
+                this.groundMesh = new THREE.Mesh(geo, mat);
+                this.groundMesh.receiveShadow = true;
+                this.scene.add(this.groundMesh);
+            }
+
+            _createWaterMesh() {
+                // A single large animated plane around the island, hidden below the coast line
+                // by the terrain. The beach strip (ground below ~sea level) visually ends at the water.
+                const size = 420;
+                const segments = 44;
+                const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+                geo.rotateX(-Math.PI / 2);
+                const pos = geo.attributes.position;
+                this._waterX = new Float32Array(pos.count);
+                this._waterZ = new Float32Array(pos.count);
+                for (let i = 0; i < pos.count; i++) {
+                    this._waterX[i] = pos.getX(i);
+                    this._waterZ[i] = pos.getZ(i);
+                }
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x1b6bb0,
+                    roughness: 0.2,
+                    metalness: 0.15,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide
+                });
+                this.waterMesh = new THREE.Mesh(geo, mat);
+                this.waterMesh.position.y = SEA_LEVEL;
+                this.waterMesh.receiveShadow = true;
+                this.scene.add(this.waterMesh);
+                this._waterTime = 0;
+            }
+
+            updateWater(dt) {
+                if (!this.waterMesh) return;
+                this._waterTime += dt;
+                const t = this._waterTime;
+                const pos = this.waterMesh.geometry.attributes.position;
+                const xs = this._waterX, zs = this._waterZ;
+                for (let i = 0; i < pos.count; i++) {
+                    const x = xs[i], z = zs[i];
+                    pos.setY(i, SEA_LEVEL
+                        + 0.18 * Math.sin(x * 0.10 + t * 1.3)
+                        + 0.12 * Math.cos(z * 0.13 + t * 0.9)
+                        + 0.08 * Math.sin((x + z) * 0.06 - t * 0.7));
+                }
+                pos.needsUpdate = true;
+            }
+
             generateCity() {
-                const groundGeo = new THREE.PlaneGeometry(this.citySize * this.blockSize, this.citySize * this.blockSize);
-                const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a });
-                const ground = new THREE.Mesh(groundGeo, groundMat);
-                ground.rotation.x = -Math.PI / 2;
-                ground.receiveShadow = true;
-                this.scene.add(ground);
+                this._createTerrainMesh();
+                this._createWaterMesh();
 
                 for (let x = -this.citySize / 2; x < this.citySize / 2; x++) {
                     for (let z = -this.citySize / 2; z < this.citySize / 2; z++) {
                         const px = x * this.blockSize + this.blockSize / 2;
                         const pz = z * this.blockSize + this.blockSize / 2;
 
-                        // Ensure we do not place a building at the center block (0, 0)
-                        if (x === 0 && z === 0) continue;
-                        if (x === -1 && z === 0) continue;
-                        if (x === 0 && z === -1) continue;
-                        if (x === -1 && z === -1) continue;
+                        // Skip the central 2x2 garage island, the lagoon basin (SE) and the sunken plazas.
+                        const noBuild = new Set(['0_0', '-1_0', '0_-1', '-1_-1', '-6_-5', '-5_-5', '-6_-4', '-5_-4', '1_-5', '-5_-6']);
+                        if (noBuild.has(x + '_' + z)) continue;
 
                         if (Math.random() > 0.2) {
                             this.createBuilding(px, pz);
@@ -1700,6 +1895,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 this.createGarageZone();
                 this.createRamps();
                 this.createDestructibleProps();
+                this.createLombas();
+                this.createPlazas();
             }
 
             createRamps() {
@@ -1759,15 +1956,19 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     return group;
                 };
 
-                const rampConfigs = [
-                    { pos: new THREE.Vector3(40, 0.8, 0), rotY: 0 },
-                    { pos: new THREE.Vector3(-40, 0.8, 0), rotY: Math.PI },
-                    { pos: new THREE.Vector3(0, 0.8, 40), rotY: Math.PI / 2 },
-                    { pos: new THREE.Vector3(0, 0.8, -40), rotY: -Math.PI / 2 }
-                ];
+// The four mega-ramps sit at the ends of the main avenues, launching traffic onto the
+                    // downhill runs toward the coast.
+                    const rampConfigs = [
+                        { pos: new THREE.Vector3(0, 0.8, 90), rotY: 0 },
+                        { pos: new THREE.Vector3(0, 0.8, -90), rotY: Math.PI },
+                        { pos: new THREE.Vector3(90, 0.8, 0), rotY: Math.PI / 2 },
+                        { pos: new THREE.Vector3(-90, 0.8, 0), rotY: -Math.PI / 2 }
+                    ];
 
                 rampConfigs.forEach(cfg => {
                     const mesh = createRampMesh();
+                    const gy = this.getGroundY(cfg.pos.x, cfg.pos.z);
+                    cfg.pos.y = gy + 0.8; // sit the ramp on the terrain (keeps Box3 Y correct)
                     mesh.position.copy(cfg.pos);
                     mesh.rotation.y = cfg.rotY;
                     this.scene.add(mesh);
@@ -1779,6 +1980,89 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                         rotationY: cfg.rotY,
                         box: box
                     });
+                });
+            }
+
+            createLombas() {
+                state.lombas = [];
+
+                const createLombaMesh = () => {
+                    const group = new THREE.Group();
+
+                    // Rounded hump: length 7 along travel, spans the full 13 m road width.
+                    const shape = new THREE.Shape();
+                    shape.moveTo(-3.5, 0);
+                    shape.quadraticCurveTo(0, 1.25, 3.5, 0);
+                    shape.closePath();
+                    const geo = new THREE.ExtrudeGeometry(shape, { depth: 13, bevelEnabled: false });
+                    geo.center();
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x20202c, roughness: 0.75 });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    group.add(mesh);
+
+                    // Glowing hazard stripes on top.
+                    const stripeMat = new THREE.MeshStandardMaterial({
+                        color: 0xffd500,
+                        emissive: 0xffd500,
+                        emissiveIntensity: 0.9
+                    });
+                    const stripeGeo = new THREE.BoxGeometry(0.55, 0.12, 13.2);
+                    const s1 = new THREE.Mesh(stripeGeo, stripeMat);
+                    s1.position.set(-1.65, 0.62, 0);
+                    const s2 = new THREE.Mesh(stripeGeo, stripeMat);
+                    s2.position.set(1.65, 0.62, 0);
+                    group.add(s1);
+                    group.add(s2);
+
+                    group.castShadow = true;
+                    return group;
+                };
+
+                const lombaConfigs = [
+                    { x: 20, z: 60, rotY: Math.PI / 2, axis: 'z' },
+                    { x: 20, z: -60, rotY: Math.PI / 2, axis: 'z' },
+                    { x: -20, z: 60, rotY: Math.PI / 2, axis: 'z' },
+                    { x: 60, z: -30, rotY: 0, axis: 'x' },
+                    { x: -60, z: 30, rotY: 0, axis: 'x' },
+                    { x: 30, z: 100, rotY: 0, axis: 'x' }
+                ];
+
+                lombaConfigs.forEach(cfg => {
+                    const mesh = createLombaMesh();
+                    const gy = this.getGroundY(cfg.x, cfg.z);
+                    mesh.position.set(cfg.x, gy + 0.62, cfg.z);
+                    mesh.rotation.y = cfg.rotY;
+                    this.scene.add(mesh);
+
+                    const box = new THREE.Box3().setFromObject(mesh);
+                    state.lombas.push({
+                        mesh: mesh,
+                        x: cfg.x,
+                        z: cfg.z,
+                        halfLen: 3.5,
+                        height: 1.25,
+                        axis: cfg.axis,
+                        box: box
+                    });
+                });
+            }
+
+            createPlazas() {
+                // Neon rings marking the two sunken plazas (built on the flat, lowered pads).
+                const ringGeo = new THREE.TorusGeometry(6, 0.18, 8, 40);
+                const ringMat = new THREE.MeshStandardMaterial({
+                    color: 0x00f0ff,
+                    emissive: 0x00f0ff,
+                    emissiveIntensity: 1.6
+                });
+                const plazaBlocks = [{ bx: 8, bz: 2 }, { bx: 2, bz: 1 }];
+                plazaBlocks.forEach(p => {
+                    const cx = p.bx * this.blockSize - (this.citySize - 1) * this.blockSize / 2;
+                    const cz = p.bz * this.blockSize - (this.citySize - 1) * this.blockSize / 2;
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.rotation.x = Math.PI / 2;
+                    ring.position.set(cx, this.getGroundY(cx, cz) + 0.35, cz);
+                    this.scene.add(ring);
                 });
             }
 
@@ -1844,10 +2128,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     new THREE.Vector3(-34, 0.1, -34)
                 ];
 
-                conePositions.forEach(pos => {
+                conePositions.forEach(cfg => {
                     const mesh = createConeMesh();
+                    cfg.y = this.getGroundY(cfg.x, cfg.z) + 0.1;
                     this.scene.add(mesh);
-                    state.destructibleProps.push(new DestructibleProp('cone', mesh, pos));
+                    state.destructibleProps.push(new DestructibleProp('cone', mesh, cfg));
                 });
 
                 const hydrantPositions = [
@@ -1859,10 +2144,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     new THREE.Vector3(-49, 0, -11)
                 ];
 
-                hydrantPositions.forEach(pos => {
+                hydrantPositions.forEach(cfg => {
                     const mesh = createHydrantMesh();
+                    cfg.y = this.getGroundY(cfg.x, cfg.z);
                     this.scene.add(mesh);
-                    state.destructibleProps.push(new DestructibleProp('hydrant', mesh, pos));
+                    state.destructibleProps.push(new DestructibleProp('hydrant', mesh, cfg));
                 });
             }
 
@@ -1876,8 +2162,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     side: THREE.DoubleSide
                 });
                 const garageZone = new THREE.Mesh(garageGeo, garageMat);
-                // Center block intersection
-                garageZone.position.set(0, 0.1, 0);
+                // Center block intersection (on the terrain's central pad)
+                garageZone.position.set(0, this.garageHeight + 0.1, 0);
                 this.scene.add(garageZone);
 
                 // 3D Procedural wrench icon floating above
@@ -1893,7 +2179,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
                 iconGroup.add(handle);
                 iconGroup.add(head);
-                iconGroup.position.set(0, 3.0, 0);
+                iconGroup.position.set(0, this.garageHeight + 3.0, 0);
                 iconGroup.name = "garageIcon";
                 this.scene.add(iconGroup);
                 this.garageIcon = iconGroup;
@@ -1945,7 +2231,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 });
 
                 const building = new THREE.Mesh(geometry, material);
-                building.position.set(x, 0, z);
+                const gy = this.getGroundY(x, z); // building sits on its (flat) block pad
+                building.position.set(x, gy, z);
                 building.castShadow = true;
                 building.receiveShadow = true;
                 this.scene.add(building);
@@ -1957,7 +2244,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 const stripeHeight = Math.max(2, baseH - 2);
                 const stripeColor = new THREE.Color(neonColor);
                 state.neonMaterials.push(this.neonMat); // shared instanced neon material
-                const halfW = maxW / 2, halfD = maxD / 2, midY = baseH / 2;
+                const halfW = maxW / 2, halfD = maxD / 2, midY = gy + baseH / 2;
                 const sides = [
                     new THREE.Vector3(x, midY, z + halfD - 0.3),
                     new THREE.Vector3(x, midY, z - halfD + 0.3),
@@ -2042,7 +2329,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
                     for (let z = -this.citySize / 2; z <= this.citySize / 2; z++) {
                         const roadZ = z * this.blockSize;
-                        const inter = { position: new THREE.Vector3(roadX, 0, roadZ), state: 'green' };
+                        const inter = { position: new THREE.Vector3(roadX, this.getGroundY(roadX, roadZ), roadZ), state: 'green' };
                         interMap.set(idx(x) + '_' + idx(z), inter);
                         this.intersections.push(inter);
                         road.interObjs.push(inter);
@@ -2088,18 +2375,19 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     if ((Math.abs(gridX) + Math.abs(gridZ)) % 3 !== 0) return;
 
                     const basePos = intersection.position.clone().add(new THREE.Vector3(offset, 0, offset));
+                    const gy = this.getGroundY(basePos.x, basePos.z);
 
                     const pole = new THREE.Mesh(poleGeo, poleMat);
-                    pole.position.set(basePos.x, 4, basePos.z);
+                    pole.position.set(basePos.x, gy + 4, basePos.z);
                     pole.castShadow = false;
                     this.scene.add(pole);
 
                     const lamp = new THREE.Mesh(lampGeo, this.streetLampMaterial);
-                    lamp.position.set(basePos.x, 8, basePos.z);
+                    lamp.position.set(basePos.x, gy + 8, basePos.z);
                     this.scene.add(lamp);
 
                     const light = new THREE.PointLight(0xfff6d0, 0, 70, 1.5);
-                    light.position.set(basePos.x, 8.2, basePos.z);
+                    light.position.set(basePos.x, gy + 8.2, basePos.z);
                     light.castShadow = false;
                     light.visible = false;
                     light.userData.baseIntensity = 2.5;
@@ -2210,7 +2498,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 const offset = new THREE.Vector3(road.dir.z, 0, -road.dir.x).multiplyScalar(laneOffset);
                 this.mesh.position.add(offset);
 
-                this.mesh.lookAt(this.mesh.position.clone().add(road.dir));
+                // Set the car's heading via rotation.y (Euler) so BOTH the visual body (local -Z)
+                // and the player's forward vector (car.mesh.rotation.y) stay in sync, pointing
+                // along road.dir. (Object3D.lookAt() would set the quaternion but leave
+                // rotation.y stale, which flipped the player car when it was picked up.)
+                this.mesh.rotation.y = Math.atan2(road.dir.x, road.dir.z) + Math.PI;
                 this.scene.add(this.mesh);
 
                 this.stopped = false;
@@ -2335,14 +2627,27 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
                 const moveDist = this.speed * dt;
                 const nextPos = this.mesh.position.clone().add(this.road.dir.clone().multiplyScalar(moveDist));
+                nextPos.y = world.getGroundY(nextPos.x, nextPos.z);
+
+                // Roll over lombas instead of clipping through them.
+                for (const lomba of state.lombas) {
+                    if (lomba.box.containsPoint(nextPos)) {
+                        const d = lomba.axis === 'z' ? Math.abs(nextPos.z - lomba.z) : Math.abs(nextPos.x - lomba.x);
+                        const f = Math.max(0, 1 - (d / lomba.halfLen) * (d / lomba.halfLen));
+                        nextPos.y += lomba.height * f;
+                        break;
+                    }
+                }
 
                 // Loop at edges
                 if (this.road.axis === 'z' && nextPos.z > this.road.end.z) {
                     this.mesh.position.z = this.road.start.z;
+                    this.mesh.position.y = world.getGroundY(this.mesh.position.x, this.mesh.position.z);
                     return;
                 }
                 if (this.road.axis === 'x' && nextPos.x > this.road.end.x) {
                     this.mesh.position.x = this.road.start.x;
+                    this.mesh.position.y = world.getGroundY(this.mesh.position.x, this.mesh.position.z);
                     return;
                 }
 
@@ -2409,6 +2714,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     const car = new Car(this.scene, road);
                     const randDist = Math.random() * (this.world.citySize * this.world.blockSize);
                     car.mesh.position.add(road.dir.clone().multiplyScalar(randDist));
+                    car.mesh.position.y = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
                     this.cars.push(car);
                     car.setLightPower(0, 0);
                 }
@@ -2517,21 +2823,23 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
             }
 
             getRandomPoint() {
+                const lim = (this.world.citySize * this.world.blockSize) / 2 - 13; // keep off the beach
                 let x, z;
                 let valid = false;
                 let attempts = 0;
                 while (!valid && attempts < 100) {
                     attempts++;
-                    x = (Math.random() - 0.5) * this.world.citySize * this.world.blockSize;
-                    z = (Math.random() - 0.5) * this.world.citySize * this.world.blockSize;
+                    x = (Math.random() - 0.5) * 2 * lim;
+                    z = (Math.random() - 0.5) * 2 * lim;
 
-                    // Check collision
-                    const pos = new THREE.Vector3(x, 0, z);
+                    // Check collision at the real ground height (buildings sit on elevated pads)
+                    const gy = this.world.getGroundY(x, z);
+                    const pos = new THREE.Vector3(x, gy, z);
                     if (!this.world.checkCollision(pos)) {
                         valid = true;
                     }
                 }
-                return new THREE.Vector3(x, 0.85, z);
+                return new THREE.Vector3(x, this.world.getGroundY(x, z) + 0.85, z);
             }
 
             update(dt) {
@@ -2543,6 +2851,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 } else {
                     dir.normalize();
                     const nextPos = this.mesh.position.clone().add(dir.multiplyScalar(this.speed * dt));
+                    nextPos.y = this.world.getGroundY(nextPos.x, nextPos.z) + 0.85;
 
                     if (!this.world.checkCollision(nextPos)) {
                         this.mesh.position.copy(nextPos);
@@ -2707,6 +3016,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     const spawnIndex = Math.floor(Math.random() * this.world.intersections.length);
                     const spawnPos = this.world.intersections[spawnIndex].position.clone();
                     this.mesh.position.copy(spawnPos);
+                    this.mesh.position.y += 0.85; // head-height above the terrain
                 }
 
                 this.scene.add(this.mesh);
@@ -2732,7 +3042,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                         window.game.taxiSystem.tryPickupPassenger(state.currentCar);
                     }
                     if (e.code === 'KeyG') {
-                        const garagePos = new THREE.Vector3(0, 0.1, 0);
+                        const garagePos = new THREE.Vector3(0, window.game.world.garageHeight + 0.1, 0);
                         if (state.inCar && state.currentCar && state.currentCar.mesh.position.distanceTo(garagePos) < 6.0) {
                             if (state.inGarage) {
                                 closeGarage();
@@ -2844,6 +3154,35 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                         accel *= 0.75;
                     }
 
+                    // Water regions (lagoon/ocean): heavy drag, splash and speed cap.
+                    const inWaterNow = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z) < SEA_LEVEL;
+                    if (inWaterNow) {
+                        accel *= 0.4;
+                        maxSpeed = Math.min(maxSpeed, 9);
+                        if (!state.inWater) {
+                            state.inWater = true;
+                            playSound('splash');
+                        }
+                        if (window.waterPool && Math.abs(car.currentSpeed) > 4 && Math.random() < 0.4) {
+                            window.waterPool.spawn(car.mesh.position);
+                        }
+                    } else {
+                        if (state.inWater) state.inWater = false;
+                        if (Math.abs(car.currentSpeed) > 4 && Math.random() < 0.06) {
+                            // Gentle wake particles while wading through the shallow coast.
+                            const coastH = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
+                            if (coastH < SEA_LEVEL + 0.6 && window.waterPool) window.waterPool.spawn(car.mesh.position);
+                        }
+                    }
+
+                    // Keep the player inside the playable island (soft wall past the terrain).
+                    const playLimit = 168;
+                    if (Math.abs(car.mesh.position.x) > playLimit || Math.abs(car.mesh.position.z) > playLimit) {
+                        car.mesh.position.x = THREE.MathUtils.clamp(car.mesh.position.x, -playLimit, playLimit);
+                        car.mesh.position.z = THREE.MathUtils.clamp(car.mesh.position.z, -playLimit, playLimit);
+                        car.currentSpeed *= 0.6;
+                    }
+
                     // Nitro Boost input check (Shift key)
                     const shiftPressed = this.input.keys['ShiftLeft'] || this.input.keys['ShiftRight'] || this.input.keys['KeyShift'];
                     if (shiftPressed && state.nitroCharge >= 100 && !state.nitroActive) {
@@ -2942,8 +3281,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                         car.mesh.position.y += state.stuntCarVy * effectiveDt;
                         state.stuntCarVy -= 18.0 * effectiveDt; // Gravity
 
-                        if (car.mesh.position.y <= 0) {
-                            car.mesh.position.y = 0;
+                        const landingY = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
+                        if (car.mesh.position.y <= landingY) {
+                            car.mesh.position.y = landingY;
                             state.stuntJumpActive = false;
                             state.stuntCarVy = 0;
 
@@ -2962,6 +3302,27 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                                 }
                             }
                         }
+                    } else {
+                        // Terrain ground-follow (no allocation): track the heightfield while grounded,
+                        // rolling smoothly over lombas instead of clipping through them.
+                        let targetY = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
+                        for (const lomba of state.lombas) {
+                            if (lomba.box.containsPoint(car.mesh.position)) {
+                                const d = lomba.axis === 'z'
+                                    ? Math.abs(car.mesh.position.z - lomba.z)
+                                    : Math.abs(car.mesh.position.x - lomba.x);
+                                const f = Math.max(0, 1 - (d / lomba.halfLen) * (d / lomba.halfLen));
+                                targetY += lomba.height * f;
+                                if (Math.abs(car.currentSpeed) > 22.0) {
+                                    // Fast enough: pop a low hop over the bump instead.
+                                    state.stuntJumpActive = true;
+                                    state.stuntCarVy = 4.0 + (Math.abs(car.currentSpeed) - 22.0) * 0.15;
+                                    playSound('collision');
+                                }
+                                break;
+                            }
+                        }
+                        car.mesh.position.y = THREE.MathUtils.lerp(car.mesh.position.y, targetY, Math.min(1, 14 * effectiveDt));
                     }
 
                     // --- Destructible Prop Collisions ---
@@ -3064,7 +3425,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                         const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
                         const camY = car.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
                         const camZ = car.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
-                        this.camera.position.set(camX, camY, camZ);
+                        this.camera.position.set(camX, Math.max(camY, this.world.getGroundY(camX, camZ) + 2.5), camZ);
                         this.camera.lookAt(car.mesh.position);
                     }
                     return;
@@ -3091,11 +3452,14 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     this.mesh.rotation.y = Math.atan2(moveDir.x, moveDir.z) + Math.PI;
                 }
 
+                // Snap the on-foot character to the terrain
+                this.mesh.position.y = this.world.getGroundY(this.mesh.position.x, this.mesh.position.z) + 0.85;
+
                 const camX = this.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
                 const camY = this.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
                 const camZ = this.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
 
-                this.camera.position.set(camX, camY, camZ);
+                this.camera.position.set(camX, Math.max(camY, this.world.getGroundY(camX, camZ) + 1.8), camZ);
                 this.camera.lookAt(this.mesh.position.clone().add(new THREE.Vector3(0, 1, 0)));
 
                 const prompt = document.getElementById('interaction-prompt');
@@ -3142,6 +3506,29 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 ctx.rotate(this.player.yaw);
                 ctx.scale(mapScale, mapScale);
                 ctx.translate(-px, -pz);
+
+                // Deep ocean behind everything (terrain/island stays on top).
+                ctx.fillStyle = "#2a7fd0";
+                ctx.fillRect(-360, -360, 720, 720);
+
+                // Terrain elevation shading + inland water (coarse 20 m cells around the player).
+                const cell = 20;
+                const gx0 = Math.floor(px / cell) - 9;
+                const gz0 = Math.floor(pz / cell) - 9;
+                for (let i = 0; i < 18; i++) {
+                    for (let j = 0; j < 18; j++) {
+                        const wx = (gx0 + i) * cell;
+                        const wz = (gz0 + j) * cell;
+                        const hgt = this.world.getGroundY(wx, wz);
+                        if (hgt < SEA_LEVEL) {
+                            ctx.fillStyle = "rgba(52,140,220,0.9)";
+                        } else {
+                            const t = THREE.MathUtils.clamp((hgt + 1) / 16, 0, 1);
+                            ctx.fillStyle = `rgb(${Math.round(44 + t * 150)},${Math.round(48 + t * 110)},${Math.round(46 + t * 64)})`;
+                        }
+                        ctx.fillRect(wx, wz, cell + 0.5, cell + 0.5);
+                    }
+                }
 
                 // Draw Roads
                 ctx.fillStyle = "#555";
@@ -3232,6 +3619,14 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'splash') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(640, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.28);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.28);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.28);
                 } else if (type === 'hit') {
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(300, audioCtx.currentTime);
@@ -3391,10 +3786,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 if (nearest) {
                     if (state.inCar && state.currentCar) {
                         state.currentCar.mesh.position.copy(nearest.position);
-                        state.currentCar.mesh.position.y = 0;
+                        state.currentCar.mesh.position.y = nearest.position.y;
                     } else {
                         window.game.player.mesh.position.copy(nearest.position);
-                        window.game.player.mesh.position.y = 0.85;
+                        window.game.player.mesh.position.y = nearest.position.y + 0.85;
                     }
                 }
             }, 3000);
@@ -3484,7 +3879,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 this.scene = scene;
                 this.mesh = this.createMesh();
                 this.mesh.position.copy(position);
-                this.mesh.position.y = 1.0;
+                this.baseY = position.y; // ground height at spawn (terrain-safe hover)
+                this.mesh.position.y = this.baseY + 1.0;
                 this.scene.add(this.mesh);
                 this.active = true;
             }
@@ -3507,7 +3903,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
             update(dt) {
                 this.mesh.rotation.y += 2.0 * dt;
-                this.mesh.position.y = 1.0 + Math.sin(Date.now() * 0.005) * 0.15;
+                this.mesh.position.y = this.baseY + 1.0 + Math.sin(Date.now() * 0.005) * 0.15;
             }
         }
 
@@ -3633,29 +4029,34 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 if (dist > 1.5) {
                     dir.normalize();
 
-                    const targetRotation = Math.atan2(dir.x, dir.z);
+                    // The game convention is -Z = forward; atan2(-dir.x, -dir.z) makes local -Z face `dir`.
+                    const targetRotation = Math.atan2(-dir.x, -dir.z);
                     let diff = targetRotation - this.mesh.rotation.y;
                     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                     this.mesh.rotation.y += diff * 5 * dt;
 
                     const moveStep = dir.clone().multiplyScalar(this.speed * dt);
-                    const nextPos = this.mesh.position.clone().add(moveStep);
+                moveStep.y = 0;
+                const nextPos = this.mesh.position.clone().add(moveStep);
+                nextPos.y = this.world.getGroundY(nextPos.x, nextPos.z);
 
-                    if (!this.world.checkCollision(nextPos)) {
-                        this.mesh.position.copy(nextPos);
+                if (!this.world.checkCollision(nextPos)) {
+                    this.mesh.position.copy(nextPos);
+                } else {
+                    const slideDir = new THREE.Vector3(-dir.z, 0, dir.x);
+                    const nextPosSlide = this.mesh.position.clone().add(slideDir.multiplyScalar(this.speed * dt * 0.8));
+                    nextPosSlide.y = this.world.getGroundY(nextPosSlide.x, nextPosSlide.z);
+                    if (!this.world.checkCollision(nextPosSlide)) {
+                        this.mesh.position.copy(nextPosSlide);
                     } else {
-                        const slideDir = new THREE.Vector3(-dir.z, 0, dir.x);
-                        const nextPosSlide = this.mesh.position.clone().add(slideDir.multiplyScalar(this.speed * dt * 0.8));
-                        if (!this.world.checkCollision(nextPosSlide)) {
-                            this.mesh.position.copy(nextPosSlide);
-                        } else {
-                            const slideDir2 = new THREE.Vector3(dir.z, 0, -dir.x);
-                            const nextPosSlide2 = this.mesh.position.clone().add(slideDir2.multiplyScalar(this.speed * dt * 0.8));
-                            if (!this.world.checkCollision(nextPosSlide2)) {
-                                this.mesh.position.copy(nextPosSlide2);
-                            }
+                        const slideDir2 = new THREE.Vector3(dir.z, 0, -dir.x);
+                        const nextPosSlide2 = this.mesh.position.clone().add(slideDir2.multiplyScalar(this.speed * dt * 0.8));
+                        nextPosSlide2.y = this.world.getGroundY(nextPosSlide2.x, nextPosSlide2.z);
+                        if (!this.world.checkCollision(nextPosSlide2)) {
+                            this.mesh.position.copy(nextPosSlide2);
                         }
                     }
+                }
                 }
             }
         }
@@ -3903,6 +4304,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 if (window.waterPool) window.waterPool.update(dt);
                 if (window.smokePool) window.smokePool.update(dt);
                 if (window.sparkPool) window.sparkPool.update(dt);
+                if (this.world.updateWater) this.world.updateWater(dt);
 
                 // Destructible props update
                 state.destructibleProps.forEach(prop => {
@@ -3962,7 +4364,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                 // Rotate Garage Wrench Icon
                 if (this.world.garageIcon) {
                     this.world.garageIcon.rotation.y += 1.0 * dt;
-                    this.world.garageIcon.position.y = 3.0 + Math.sin(Date.now() * 0.003) * 0.25;
+                    this.world.garageIcon.position.y = this.world.garageHeight + 3.0 + Math.sin(Date.now() * 0.003) * 0.25;
                 }
 
                 // Wanted Level degradation over time (every 12s without incident)
@@ -4068,7 +4470,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
                 // Tuning Garage Prompt & Auto-Exit Check
                 const garagePrompt = document.getElementById('garage-prompt');
-                const garagePos = new THREE.Vector3(0, 0.1, 0);
+                const garagePos = new THREE.Vector3(0, window.game.world.garageHeight + 0.1, 0);
                 if (state.inCar && state.currentCar && state.currentCar.mesh.position.distanceTo(garagePos) < 6.0) {
                     garagePrompt.style.display = 'block';
                 } else {
@@ -4121,16 +4523,25 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
                     this.sunLight.intensity = 0.1;
                     this.ambientLight.intensity = 0.5;
                     this.scene.fog.color.setHex(0x0a1428);
+                    if (this.world.waterMesh) {
+                        this.world.waterMesh.material.color.setHex(0x0d2038); // dark ocean at night
+                        this.world.waterMesh.material.opacity = 0.92;
+                    }
                 } else {
                     this.scene.background.setHex(0x87CEEB);
                     this.sunLight.intensity = 1;
                     this.ambientLight.intensity = 0.4;
                     this.scene.fog.color.setHex(0x87CEEB);
+                    if (this.world.waterMesh) {
+                        this.world.waterMesh.material.color.setHex(0x1b6bb0);
+                        this.world.waterMesh.material.opacity = 0.9;
+                    }
                 }
 
                 // TASK_004: Nébula noturna densa durante chuva
                 if (isRainy && sunY < 0) {
                     this.scene.fog.color.setHex(0x101030);
+                    if (this.world.waterMesh) this.world.waterMesh.material.color.setHex(0x0e1c30);
                 }
 
                 // TASK_004 performance: Neon emissive transition via a single shared instanced
