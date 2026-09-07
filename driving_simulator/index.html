@@ -359,7 +359,79 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="assets/js/GLTFLoader.js"></script>
     <script>
+        // === TASK_006: Modelos 3D voxel dos carros (mesmos .glb do Voxel City) ===
+        // R: o mesmo conjunto de veículos "Car Kit" (Kenney, CC0) usado pelo Voxel City.
+        const VOXEL_CAR_FILES = ['sedan', 'taxi', 'police', 'ambulance', 'van', 'truck', 'suv', 'hatchback-sports', 'race', 'firetruck'];
+        const VOXEL_TRAFFIC_FILES = ['sedan', 'taxi', 'suv', 'van', 'hatchback-sports', 'ambulance'];
+        const VOXEL_CAR_SCENES = {};   // name -> THREE.Group (modelo original, sem escala)
+        const VOXEL_CAR_INFO = {};     // name -> { minY, maxY, centerZ, heightY, lengthZ, widthX }
+        const VOXEL_CAR_SCALE = 2.6;   // mesmo fator de escala usado no Voxel City
+
+        function prepareVoxelModel(name, root) {
+            root.traverse(ch => { if (ch.isMesh) ch.castShadow = true; });
+            const box = new THREE.Box3().setFromObject(root);
+            VOXEL_CAR_INFO[name] = {
+                minY: box.min.y,
+                maxY: box.max.y,
+                centerZ: (box.min.z + box.max.z) / 2,
+                heightY: box.max.y - box.min.y,
+                lengthZ: box.max.z - box.min.z,
+                widthX: box.max.x - box.min.x
+            };
+            return root;
+        }
+
+        function loadVoxelCarModels() {
+            // Carrega os .glb dos carros antes do início do jogo; falhas viram fallback (carro de caixa).
+            if (typeof THREE.GLTFLoader === 'undefined') return Promise.resolve();
+            const loader = new THREE.GLTFLoader();
+            return Promise.all(VOXEL_CAR_FILES.map(n => new Promise(resolve => {
+                loader.load(`assets/models/cars/${n}.glb`, gltf => {
+                    VOXEL_CAR_SCENES[n] = prepareVoxelModel(n, gltf.scene);
+                    resolve();
+                }, undefined, () => resolve());
+            })));
+        }
+
+        function cloneVoxelModel(name) {
+            const src = VOXEL_CAR_SCENES[name];
+            if (!src) return null;
+            const info = VOXEL_CAR_INFO[name];
+            const g = src.clone(true);
+            g.traverse(ch => {
+                if (ch.isMesh) {
+                    ch.castShadow = true;
+                    if (ch.name === 'body') ch.name = 'car-body'; // mantém a lógica de repintura
+                    ch.geometry = ch.geometry.clone();
+                    if (ch.material) {
+                        ch.material = Array.isArray(ch.material) ? ch.material.map(m => m.clone()) : ch.material.clone();
+                    }
+                }
+            });
+            g.scale.setScalar(VOXEL_CAR_SCALE);
+            g.position.y = -info.minY * VOXEL_CAR_SCALE;        // assenta as rodas no chão (y=0)
+            g.position.z = -info.centerZ * VOXEL_CAR_SCALE;     // centraliza o modelo na origem do grupo
+            g.name = 'voxel-model';
+            return g;
+        }
+
+        function voxelNoseZ(name) {
+            const info = VOXEL_CAR_INFO[name];
+            return info ? info.lengthZ * 0.5 * VOXEL_CAR_SCALE : 1.6;
+        }
+        function voxelFasciaY(name) {
+            const info = VOXEL_CAR_INFO[name];
+            return info ? info.maxY * VOXEL_CAR_SCALE * 0.5 : 0.9;
+        }
+        function voxelRoofY(name) {
+            const info = VOXEL_CAR_INFO[name];
+            return info ? info.maxY * VOXEL_CAR_SCALE : 0;
+        }
+
+        (async function () {
+        await loadVoxelCarModels();
         // Game constants
         const MAX_SCORE = 30;
         const PLAYER_CAR_COLOR = 0x0000FF;
@@ -983,13 +1055,19 @@
         let trainAngle = 0;
 
         // Carros
-        function createCar(color) {
+        function createCar(color, modelKey) {
             const car = new THREE.Group();
+            const model = modelKey ? cloneVoxelModel(modelKey) : null;
+            if (model) {
+                car.add(model);
+                return car;
+            }
             const bodyGeometry = new THREE.BoxGeometry(2, 1, 3);
             const bodyMaterial = new THREE.MeshLambertMaterial({ color: color });
             const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
             body.position.y = 0.5;
             body.castShadow = true;
+            body.userData.isCarBody = true;
             car.add(body);
 
             const topGeometry = new THREE.BoxGeometry(1.5, 0.8, 1.5);
@@ -1018,17 +1096,20 @@
             return car;
         }
 
-        const playerCar = createCar(PLAYER_CAR_COLOR);
+        const playerCar = createCar(PLAYER_CAR_COLOR, 'sedan');
         playerCar.position.set(-5, 0, -50);
         scene.add(playerCar);
+        recolorPlayerCar(playerPhysics.color);
 
         // === TASK_002: Faróis do jogador (SpotLight + cone volumétrico) ===
         function setupHeadlights() {
+            const noseZ = voxelNoseZ('sedan');
+            const fasciaY = voxelFasciaY('sedan');
             headlight = new THREE.SpotLight(0xFFFFE0, 5.0, 60, Math.PI / 6, 0.8, 1);
             headlight.castShadow = true; // só o jogador projeta sombra (otimização do TL)
             headlight.shadow.mapSize.width = 1024;
             headlight.shadow.mapSize.height = 1024;
-            headlight.position.set(0, 0.9, 1.6);
+            headlight.position.set(0, fasciaY, noseZ);
             playerCar.add(headlight);
 
             const headlightTarget = new THREE.Object3D();
@@ -1045,7 +1126,7 @@
                 blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
             });
             lightCone = new THREE.Mesh(coneGeom, coneMat);
-            lightCone.position.set(0, 0.8, 1.6);
+            lightCone.position.set(0, fasciaY, noseZ);
             playerCar.add(lightCone);
 
             headlight.visible = false;
@@ -1061,7 +1142,7 @@
             if (btn) btn.classList.toggle('on', on);
         }
 
-        const aiCar = createCar(AI_CAR_COLOR);
+        const aiCar = createCar(AI_CAR_COLOR, 'race');
         aiCar.position.set(5, 0, -50);
         scene.add(aiCar);
 
@@ -1085,6 +1166,92 @@
 
         for (let i = 0; i < COIN_COUNT; i++) {
             createCoin();
+        }
+
+        // === TASK_008: Item especial no topo da ponte (Ímã de Moedas) ===
+        const BRIDGE_MAGNET_POS = { x: 0, y: 11.3, z: 60 }; // acima do tabuleiro (Y=10) da ponte estaiada
+        const BRIDGE_MAGNET_ABSORB = 10;                    // max de moedas ainda no mapa que absorve
+        const BRIDGE_MAGNET_RANGE = 2.8;
+        let bridgeMagnet = null;
+        let magnetOrbs = [];
+        function spawnBridgeMagnet() {
+            if (bridgeMagnet) return;
+            const g = new THREE.Group();
+            const core = new THREE.Mesh(new THREE.SphereGeometry(0.9, 20, 20), new THREE.MeshBasicMaterial({ color: 0xffd54a }));
+            core.name = 'magnet-core';
+            g.add(core);
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.12, 10, 36), new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending }));
+            ring.rotation.x = Math.PI / 2;
+            ring.name = 'magnet-ring';
+            g.add(ring);
+            const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 30, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+            beam.position.y = 15;
+            beam.name = 'magnet-beam';
+            g.add(beam);
+            const light = new THREE.PointLight(0xffd54a, 1.2, 20);
+            light.name = 'magnet-light';
+            g.add(light);
+            g.position.set(BRIDGE_MAGNET_POS.x, BRIDGE_MAGNET_POS.y, BRIDGE_MAGNET_POS.z);
+            scene.add(g);
+            bridgeMagnet = g;
+        }
+        function animateBridgeMagnet(dt) {
+            if (!bridgeMagnet) return;
+            const t = performance.now() * 0.004;
+            const core = bridgeMagnet.getObjectByName('magnet-core');
+            const ring = bridgeMagnet.getObjectByName('magnet-ring');
+            if (core) core.scale.setScalar(1 + 0.18 * Math.sin(t));
+            if (ring) {
+                ring.rotation.z += dt * 2.2;
+                ring.scale.setScalar(1 + 0.08 * Math.sin(t + 1.2));
+            }
+        }
+        function updateMagnetOrbs(dt) {
+            for (let i = magnetOrbs.length - 1; i >= 0; i--) {
+                const orb = magnetOrbs[i];
+                orb.life -= dt;
+                const delta = playerCar.position.clone().sub(orb.mesh.position);
+                const d = delta.length();
+                if (d > 0.3) orb.mesh.position.addScaledVector(delta.normalize(), 9 * dt);
+                else orb.mesh.position.copy(playerCar.position);
+                if (orb.life <= 0) {
+                    scene.remove(orb.mesh);
+                    magnetOrbs.splice(i, 1);
+                }
+            }
+        }
+        function collectBridgeMagnet() {
+            if (!bridgeMagnet || !gameState.started) return { absorbed: 0 };
+            const count = Math.min(BRIDGE_MAGNET_ABSORB, coins.length);
+            if (count === 0) return { absorbed: 0 };
+            const burstPos = [];
+            for (let i = 0; i < count; i++) {
+                const coin = coins.pop();
+                burstPos.push(coin.position.clone());
+                scene.remove(coin);
+            }
+            // moedas absorvidas voam até o jogador (feerico)
+            magnetOrbs.forEach(o => scene.remove(o.mesh));
+            magnetOrbs.length = 0;
+            burstPos.forEach(pos => {
+                const orb = new THREE.Mesh(sharedCoinGeometry, sharedCoinMaterial);
+                orb.position.copy(pos);
+                orb.scale.setScalar(0.8);
+                scene.add(orb);
+                magnetOrbs.push({ mesh: orb, life: 0.55 });
+            });
+            gameState.playerScore += count;
+            for (let i = 0; i < count; i++) createCoin(); // mantém COIN_COUNT moedas no mapa
+            updateUI();
+            bridgeMagnet.traverse(o => {
+                if (o.isMesh) {
+                    if (o.geometry) o.geometry.dispose();
+                    if (o.material) o.material.dispose();
+                }
+            });
+            scene.remove(bridgeMagnet);
+            bridgeMagnet = null;
+            return { absorbed: count };
         }
 
         // Estado do jogo
@@ -1124,6 +1291,7 @@
             };
             playerCar.position.set(-5, 0, -50);
             playerCar.rotation.set(0, 0, 0);
+            playerCar.visible = true; // TASK_007: reaparece após ser destruído
             aiCar.position.set(5, 0, -50);
             aiCar.rotation.set(0, 0, 0);
 
@@ -1149,6 +1317,18 @@
             // Modo de corrida
             coins.forEach(coin => scene.remove(coin));
             coins.length = 0;
+            magnetOrbs.forEach(o => scene.remove(o.mesh));
+            magnetOrbs.length = 0;
+            if (bridgeMagnet) {
+                bridgeMagnet.traverse(o => {
+                    if (o.isMesh) {
+                        if (o.geometry) o.geometry.dispose();
+                        if (o.material) o.material.dispose();
+                    }
+                });
+                scene.remove(bridgeMagnet);
+                bridgeMagnet = null;
+            }
             const lapHud = document.getElementById('lapHud');
             if (raceMode === 'time_trial') {
                 aiCar.visible = false;
@@ -1161,6 +1341,7 @@
                 aiCar.visible = true;
                 for (let i = 0; i < COIN_COUNT; i++) createCoin();
                 spawnGravelCoins(); // TASK_004: moedas bônus do atalho off-road
+                spawnBridgeMagnet(); // TASK_008: ímã no topo da ponte
                 if (lapHud) lapHud.style.display = 'none';
                 if (ghostMesh) ghostMesh.visible = false;
             }
@@ -1489,7 +1670,8 @@
         // === TASK_002: Tráfego de IA ===
         const TRAFFIC_COLORS = [0xffa500, 0x9b59b6, 0x1abc9c, 0xecf0f1, 0xe67e22, 0x34495e];
         function createTrafficCar() {
-            const mesh = createCar(TRAFFIC_COLORS[Math.floor(Math.random() * TRAFFIC_COLORS.length)]);
+            const modelKey = VOXEL_TRAFFIC_FILES[Math.floor(Math.random() * VOXEL_TRAFFIC_FILES.length)];
+            const mesh = createCar(TRAFFIC_COLORS[Math.floor(Math.random() * TRAFFIC_COLORS.length)], modelKey);
             scene.add(mesh);
             return { mesh, speed: 0, direction: 1, lane: 'right', isOvertaking: false, overtakeTimer: 0, targetX: 0 };
         }
@@ -1677,8 +1859,11 @@
             });
         }
         function recolorPlayerCar(color) {
-            const body = playerCar.children[0]; // body e top compartilham material
-            if (body && body.material) body.material.color.setHex(color);
+            playerCar.traverse(child => {
+                if (child.isMesh && (child.name === 'car-body' || child.userData.isCarBody)) {
+                    child.material.color.setHex(color);
+                }
+            });
         }
         function startFromGarage() {
             initAudioEngine();
@@ -1968,7 +2153,7 @@
                 scene.remove(ghostMesh);
                 ghostMesh = null;
             }
-            ghostMesh = createCar(0x00FFFF);
+            ghostMesh = createCar(0x00FFFF, 'hatchback-sports');
             ghostMesh.traverse(child => {
                 if (child.isMesh) {
                     if (child.material) child.material.dispose();
@@ -2119,19 +2304,23 @@
         }
 
         // --- Perseguição Policial ---
+        // TASK_007: constantes do abalroamento policial
+        const COP_RAM_RANGE = 4.2;          // distância na qual o policial "alcançou" e passa a bater
+        const COP_RAM_DPS = 16;             // dano contínuo por segundo enquanto abalroa
+        const COP_RAM_PUNCH_INTERVAL = 0.9; // intervalo entre as batidas visíveis (rajadas)
         function createCopCar() {
-            const cop = createCar(0x0a0a0a);
-            cop.children.forEach(c => { if (c.material && c.material.color) c.material.color.setHex(0x0a0a0a); });
+            const cop = createCar(0x0a0a0a, 'police');
+            const roofY = voxelRoofY('police');
             const lightBar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.35), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-            lightBar.position.set(0, 1.25, 0);
+            lightBar.position.set(0, roofY + 0.15, 0);
             cop.add(lightBar);
             const redLight = new THREE.PointLight(0xff0000, 0, 14);
-            redLight.position.set(-0.3, 1.45, 0);
+            redLight.position.set(-0.3, roofY + 0.4, 0);
             cop.add(redLight);
             const blueLight = new THREE.PointLight(0x0000ff, 0, 14);
-            blueLight.position.set(0.3, 1.45, 0);
+            blueLight.position.set(0.3, roofY + 0.4, 0);
             cop.add(blueLight);
-            return { mesh: cop, redLight, blueLight, speed: 0.24 + Math.random() * 0.06, nearMissCooldown: 0 };
+            return { mesh: cop, redLight, blueLight, speed: 0.24 + Math.random() * 0.06, nearMissCooldown: 0, ramCooldown: 0 };
         }
         function syncCopCount() {
             const desired = (raceMode === 'time_trial') ? 0 : policePursuit.heatLevel;
@@ -2169,7 +2358,7 @@
             let sirenNear = false;
             policePursuit.copCars.forEach(cop => {
                 if (!gameState.started) return;
-                const target = playerCar.position.clone().add(new THREE.Vector3(Math.sin(playerCar.rotation.y) * 8, 0, Math.cos(playerCar.rotation.y) * 8));
+                const target = playerCar.position.clone();
                 const dir = target.sub(cop.mesh.position).normalize();
                 cop.mesh.position.addScaledVector(dir, cop.speed);
                 cop.mesh.lookAt(playerCar.position);
@@ -2187,16 +2376,55 @@
                     cop.nearMissCooldown = 3;
                     increaseHeat(1);
                 }
-                // colisão (PIT)
-                if (distToPlayer < 2.8) {
-                    gameState.playerSpeed *= 0.4;
-                    applyDamage('player', 10);
-                    increaseHeat(1);
-                    flashCollision();
-                    shakeIntensity = 0.35;
+                // TASK_007: policial alcançou o jogador -> abalroa até a integridade zerar
+                if (distToPlayer < COP_RAM_RANGE) {
+                    applyDamage('player', COP_RAM_DPS * dt);
+                    cop.ramCooldown -= dt;
+                    if (cop.ramCooldown <= 0) {
+                        cop.ramCooldown = COP_RAM_PUNCH_INTERVAL;
+                        gameState.playerSpeed *= 0.35;
+                        flashCollision();
+                        shakeIntensity = 0.5;
+                        // golpe de encontro: empurra o jogador e recua o policial (nova investida)
+                        const pushDir = cop.mesh.position.clone().sub(playerCar.position).normalize();
+                        playerCar.position.addScaledVector(pushDir, 0.35);
+                        cop.mesh.position.addScaledVector(pushDir, -0.5);
+                    }
                 }
             });
             if (sirenNear) playPoliceSiren(); else stopPoliceSiren();
+        }
+
+        // TASK_007: integridade do carro zerada (qualquer causa) encerra a partida
+        function bustPlayer() {
+            if (!gameState.started) return;
+            gameState.started = false;
+            gameState.playerSpeed = 0;
+            stopPoliceSiren();
+            policePursuit.copCars.forEach(c => {
+                c.redLight.intensity = 0;
+                c.blueLight.intensity = 0;
+            });
+            playerCar.visible = false;
+            // explosão local (sem teleportar o carro)
+            const pGeom = new THREE.SphereGeometry(0.2, 5, 5);
+            const pList = [];
+            for (let i = 0; i < 24; i++) {
+                const p = new THREE.Mesh(pGeom, new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xFF6600 : 0xFFAA33 }));
+                p.position.copy(playerCar.position);
+                p.velocity = new THREE.Vector3((Math.random() - 0.5) * 3, 1 + Math.random() * 2, (Math.random() - 0.5) * 3);
+                scene.add(p);
+                pList.push(p);
+            }
+            setTimeout(() => {
+                pList.forEach(p => { scene.remove(p); if (p.material) p.material.dispose(); });
+                pGeom.dispose();
+            }, 500);
+            flashCollision();
+            shakeIntensity = 1.0;
+            document.getElementById('message').textContent = 'SEU CARRO FOI DESTRUÍDO! Pressione ESPAÇO para tentar novamente';
+            document.getElementById('message').style.display = 'block';
+            updateTask3HUD();
         }
         function spawnSpikeStrip() {
             const strip = new THREE.Group();
@@ -2776,6 +3004,13 @@
                     }
                 });
 
+                // TASK_008: item especial no topo da ponte
+                animateBridgeMagnet(dt);
+                updateMagnetOrbs(dt);
+                if (bridgeMagnet && checkCollision(playerCar, bridgeMagnet, BRIDGE_MAGNET_RANGE)) {
+                    collectBridgeMagnet();
+                }
+
                 // TASK_003: pit stop, fumaça de dano, cura, fantasma, cronômetro de volta
                 updatePitStop(dt);
                 if (Math.random() < 0.3) spawnSmoke();
@@ -2784,6 +3019,9 @@
                 updateGhostCar();
                 updateLapTimer(dt * 1000);
                 updateTask3HUD();
+
+                // TASK_007: integridade zerada (qualquer causa) encerra a partida
+                if (gameState.playerHealth <= 0) bustPlayer();
 
                 // Verificar vitória (modo Coleta de Moedas)
                 if (raceMode === 'coins' && gameState.playerScore >= MAX_SCORE) {
@@ -2885,7 +3123,7 @@
             isHeadlightsOn: () => headlightsOn, headlightsAutoRef: () => headlightsAuto,
             startFromGarage, selectCar: (id) => { selectedCarId = id; },
             initTraffic, updateTraffic, updateDayNight, toggleHeadlightsManual, setHeadlights,
-            playerCar,
+            playerCar, aiCar,
             // TASK_003
             activeCones, oilPuddles, ramps, repairPad, smokeParticles,
             applyDamage, checkOilCollisions, handlePlayerSpin, checkRampCollision,
@@ -2902,9 +3140,15 @@
             hasPoppedTires: () => hasPoppedTires, isInTunnel: () => isInTunnel,
             updateNitroSystem, updatePoliceAI, updateWeather, updateHeatLevel, checkSpikeStripCollisions,
             spawnSpikeStrip, syncCopCount, playPoliceSiren, stopPoliceSiren,
+            bustPlayer, getHealth: () => gameState.playerHealth,
+            // TASK_008
+            bridgeMagnet, magnetOrbs, spawnBridgeMagnet, collectBridgeMagnet,
+            getBridgeState: () => ({ exists: !!bridgeMagnet, pos: bridgeMagnet ? bridgeMagnet.position.toArray() : null, absorb: BRIDGE_MAGNET_ABSORB, range: BRIDGE_MAGNET_RANGE, coinsOnMap: coins.length }),
             initAudioEngine, updateEngineSound, playTurboBlowOffSound, playNitroActivateSound,
-            routeZones, isInZone, spawnGravelCoins
+            routeZones, isInZone, spawnGravelCoins,
+            voxel: { files: VOXEL_CAR_FILES, scenes: VOXEL_CAR_SCENES, info: VOXEL_CAR_INFO, scale: VOXEL_CAR_SCALE }
         };
+        })();
     </script>
 </body>
 </html>

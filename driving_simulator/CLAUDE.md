@@ -20,7 +20,7 @@ O jogo é implementado inteiramente em um arquivo monolítico de controle:
 - **State Pattern (Padrão Estado)**: A variável global `gameState` gerencia as transições lógicas da aplicação:
   - **Não Iniciado / Pausado**: Mostra overlay com mensagem `#message` e congela movimentos.
   - **Jogando**: Oculta mensagens, processa físicas e inputs de corrida.
-  - **Fim de Jogo**: Detecta se algum competidor alcançou a constante `MAX_SCORE = 30`, congela as físicas e exibe a mensagem de vencedor.
+  - **Fim de Jogo**: Detecta se algum competidor alcançou a constante `MAX_SCORE = 30`, congela as físicas e exibe a mensagem de vencedor. From TASK_007, a partida também termina com derrota quando a integridade do carro do jogador chega a zero (`bustPlayer()`), independentemente da causa (abalroamento policial, trem, pneus furados, etc.).
 - **Steering Behavior / Inteligência Artificial Baseada em Alvos**: O carro controlado pela IA calcula a distância euclidiana para todas as moedas ativas na tela, define a moeda mais próxima como alvo (`gameState.aiTarget`) e rotaciona sua direção gradativamente em direção ao vetor da moeda usando cálculos trigonométricos (`Math.atan2`).
 - **Física de Movimento e Colisões (Distância Euclidiana)**:
   - **Cinemática**: Aceleração linear com atrito simplificado (decaimento de velocidade multiplicando por `0.95` ao soltar aceleradores). O deslocamento é calculado decompondo vetores angulares: `position.x += Math.sin(rotation.y) * speed`.
@@ -30,12 +30,13 @@ O jogo é implementado inteiramente em um arquivo monolítico de controle:
 ## 🛠️ Tecnologias e Bibliotecas Utilizadas
 
 - **Three.js (r128)**: Biblioteca JavaScript de alto nível para renderização WebGL 3D, sombras, neblina, câmeras e malhas geométricas (`BoxGeometry`, `CylinderGeometry`, `TorusGeometry`, etc.).
+- **GLTFLoader (Three.js)**: Carrega os modelos 3D voxel `.glb` dos carros (`assets/models/cars/`) — o mesmo "Car Kit" (Kenney, CC0) usado pelo Voxel City — aplicados ao carro do jogador, rival, tráfego, polícia e fantasma, com fallback procedural caso a carga falhe.
 - **HTML5 Canvas 2D API**: Utilizado em um canvas separado para desenhar em tempo real os ponteiros, marcas, textos e a moldura circular do velocímetro (`#speedometer`).
 
 ## 🔑 Funções e Estruturas Principais
 
 - `animate()`: Core do Game Loop que processa física do jogador, lógica de perseguição de moedas da IA, translação do trem, movimento de câmera orbital traseira (`camera.lookAt`) e invoca o renderer.
-- `createCar(color)`: Construtor que agrupa a malha 3D composta do chassis, capota e rodas do carro em um grupo de transformação (`THREE.Group`).
+- `createCar(color, modelKey)`: Construtor que agrupa a malha 3D do carro em `THREE.Group`. Se `modelKey` (ex.: `'sedan'`, `'race'`, `'police'`) corresponder a um modelo voxel carregado de `assets/models/cars/`, instancia um clone escalado e assente no chão; caso contrário, monta o carro procedural de caixas (chassis, capota e rodas).
 - `checkCollision(obj1, obj2, distance)`: Retorna um booleano validando a proximidade linear entre dois objetos com base no limite estipulado.
 - `drawSpeedometer(speed)`: Limpa e desenha o velocímetro na tela do jogador com ponteiro vermelho e marcador em km/h baseado no canvas 2D.
 - `resetGame()`: Reinicializa as variáveis de controle, reposiciona os carros em seus spawns iniciais, remove moedas antigas do cenário e distribui novas de forma espalhada pelo mapa.
