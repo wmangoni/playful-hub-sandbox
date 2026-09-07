@@ -243,7 +243,43 @@ function updateTaxiMission(dt) {
 ---
 
 ## 💻 Notas de Desenvolvimento (Dev complete)
-*(Seção a ser preenchida pelo Programador ao concluir a tarefa)*
+
+**Responsável**: opencode · **Data**: 27/08/2026 · **Status**: `🚀 Dev Complete`
+
+### Implementação resumida
+Todos os 5 critérios de aceitação foram implementados em `voxel_city/index.html` (script module integral):
+
+1. **Clima Dinâmico & Física de Tração**
+   * Ciclo `sunny` ↔ `rainy` a cada 90s via `state.weather` / `state.weatherTimer`.
+   * `RainSystem` (600 partículas `THREE.Points` com reposicionamento relativo ao jogador) + 12 `Puddle` reflexivos nos cruzamentos (toggle visível na chuva).
+   * Física: aceleração ×0.75, estabilidade de direção ×0.7 (`weatherGrip`) e carga de Nitro −15% quando chovendo.
+   * HUD indicador `#weather-hud` (☀️/🌧️).
+
+2. **Sistema de Táxi (Crazy Taxi Mode)**
+   * `TaxiSystem` marca até **2 passageiros** (limite aprovado pelo TL) com sprite `🚖` flutuante (`activeTaxiPassengers`).
+   * Embarque com **tecla T** a < 3u (`tryPickupPassenger`), pedestre some e toast "PASSENGER ON BOARD!".
+   * Destino em cruzamento distante com coluna de luz magenta 3D (`spawnDestinationMarker`) + estrela no minimapa.
+   * Cronômetro por distância de Chebyshev (`d/12 + 15s`).
+   * Gorjetas de manobra (+$25) por drift, salto em rampa e desvio (near-miss) com textos flutuantes "WILD!/SPEEDY!/OH MY GOD!".
+   * Desembarque em baixa velocidade → tarifa base ($150–$300) + gorjetas; tempo zerado → corrida perdida.
+
+3. **Iluminação Neon Noturna e Faróis**
+   * `state.neonMaterials` com faixas neon (ciano/magenta/amarelo) nas fachadas; `emissiveIntensity` sobe 0.0 → 1.8 à noite.
+   * Faróis do veículo do jogador funcionais à noite (já existentes via `Car.headLights`/`setLightPower`, sem castShadow conforme decisão do TL).
+   * Névoa noturna densa (`0x101030`) durante chuva + noite.
+
+4. **Perfil de Condução (Driver Profile)**
+   * Botão HUD `👤 Perfil` abre painel com 5 recordes: Drift King, Sky High, Taxi Master, Rich Driver e Most Wanted (persistidos em `state.records`).
+
+5. **Áudio Procedural via Web Audio API**
+   * `PlayRainSymphonia` — ruído branco em `Bandpass` (1200Hz/ganho 0.12 dentro do carro; 3500Hz/0.14 a pé).
+   * `playTaxiChime()` — bipe 1600→2400Hz (gorjeta).
+   * `playPassengerScream()` — FM triangular 600→1100Hz (manobras com passageiro).
+
+### Validação local
+- `node --check` do script module: **OK** (sintaxe válida).
+- `tests/qa_voxel_city_task004.test.js` (Puppeteer headless): **6/6 testes passando, 0 erros de console/WebGL** — cobre clima/partículas/piscinas/ciclo, neon emissivo, embarque→destino→pagamento do táxi, perfil e áudio.
+- `npm run test:ci` (smoke): **passou**.
 
 ---
 

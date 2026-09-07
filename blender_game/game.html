@@ -1,0 +1,503 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reino Celestial 3D - Ilhas Flutuantes e Ponte Cósmica</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(180deg, #110826 0%, #a82e5b 45%, #ff8c2b 75%, #ffc066 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            cursor: grab;
+        }
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #ffffff;
+            background: rgba(18, 12, 38, 0.82);
+            padding: 16px 22px;
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+            color: #ffd166;
+            text-shadow: 0 2px 10px rgba(255, 170, 0, 0.5);
+        }
+        .controls-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            font-size: 14px;
+            line-height: 2.0;
+            color: #f1f1f1;
+        }
+        .key-badge {
+            background: rgba(255, 255, 255, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #00f2fe;
+            margin-right: 6px;
+        }
+        #warp-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease-out;
+            z-index: 100;
+        }
+        #portal-message {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00f2fe;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #00f2fe, 0 0 40px #8a2be2;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            text-align: center;
+            background: rgba(18, 12, 38, 0.85);
+            padding: 18px 36px;
+            border-radius: 20px;
+            border: 2px solid #00f2fe;
+            z-index: 101;
+        }
+        #location-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(18, 12, 38, 0.82);
+            color: #00f2fe;
+            border: 1px solid #00f2fe;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(8px);
+        }
+        #hint-banner {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #ffd166;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            border: 1px solid rgba(255, 209, 102, 0.3);
+        }
+    </style>
+    <!-- Three.js e GLTFLoader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+    <div id="warp-flash"></div>
+    <div id="location-badge">📍 Ilha Inicial</div>
+    <div id="ui-overlay">
+        <h1>🌌 Reino Celestial 3D</h1>
+        <ul class="controls-list">
+            <li><span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span class="key-badge">D</span> Mover Personagem</li>
+            <li><span class="key-badge">ESPAÇO</span> Pular</li>
+            <li><span class="key-badge">MOUSE</span> Clique e arraste para girar a câmera 360°</li>
+            <li><span class="key-badge">SCROLL</span> Zoom In / Out</li>
+            <li><span class="key-badge">PORTAL</span> Entre no portal para viajar à Ponte Celestial!</li>
+        </ul>
+    </div>
+    <div id="hint-banner">✨ Atravesse o Portal Místico para alcançar a Ponte Celestial!</div>
+    <div id="portal-message">✨ BEM-VINDO À PONTE CELESTIAL! ✨</div>
+    <div id="canvas-container"></div>
+
+    <script>
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0xd65d38, 0.008);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Iluminação
+        const ambientLight = new THREE.AmbientLight(0x734d7d, 0.9);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xff9944, 2.8);
+        sunLight.position.set(25, 45, -80);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 300;
+        sunLight.shadow.camera.left = -60;
+        sunLight.shadow.camera.right = 60;
+        sunLight.shadow.camera.top = 60;
+        sunLight.shadow.camera.bottom = -60;
+        scene.add(sunLight);
+
+        // Luzes Pontuais dos Portais
+        const pLight1 = new THREE.PointLight(0x00f2fe, 3.5, 20);
+        pLight1.position.set(0, 4.5, -3.2);
+        scene.add(pLight1);
+
+        const pLight2 = new THREE.PointLight(0x00f2fe, 3.5, 20);
+        pLight2.position.set(0, 9.5, -52.0);
+        scene.add(pLight2);
+
+        // Personagem do Jogador
+        const playerGroup = new THREE.Group();
+        playerGroup.position.set(-2.8, 2.15, 4.2);
+
+        const bodyGeo = new THREE.CylinderGeometry(0.35, 0.4, 0.85, 12);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f4e9e, roughness: 0.4, metalness: 0.2 });
+        const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+        bodyMesh.position.y = 0.75;
+        bodyMesh.castShadow = true;
+        playerGroup.add(bodyMesh);
+
+        const headGeo = new THREE.SphereGeometry(0.34, 16, 16);
+        const headMesh = new THREE.Mesh(headGeo, bodyMat);
+        headMesh.position.y = 1.35;
+        headMesh.castShadow = true;
+        playerGroup.add(headMesh);
+
+        const visorGeo = new THREE.BoxGeometry(0.36, 0.15, 0.16);
+        const visorMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+        const visorMesh = new THREE.Mesh(visorGeo, visorMat);
+        visorMesh.position.set(0, 1.35, -0.28);
+        playerGroup.add(visorMesh);
+
+        const packGeo = new THREE.BoxGeometry(0.42, 0.55, 0.22);
+        const packMat = new THREE.MeshStandardMaterial({ color: 0xf39c12, roughness: 0.5 });
+        const packMesh = new THREE.Mesh(packGeo, packMat);
+        packMesh.position.set(0, 0.8, 0.32);
+        playerGroup.add(packMesh);
+
+        scene.add(playerGroup);
+
+        // Carregar Modelo do Mundo (.glb)
+        const loader = new THREE.GLTFLoader();
+        loader.load('models/floating_island.glb', function (gltf) {
+            const island = gltf.scene;
+            island.traverse((node) => {
+                if (node.name.startsWith("Player_")) {
+                    node.visible = false;
+                }
+                if (node.isMesh) {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                }
+            });
+            scene.add(island);
+        }, undefined, function (error) {
+            console.log("Nota: Modelo GLB.");
+        });
+
+        // Câmera Orbital com Mouse
+        let camDistance = 8.5;
+        let camYaw = Math.PI * 0.95;
+        let camPitch = 0.35;
+        let isMouseDown = false;
+        let prevMouseX = 0;
+        let prevMouseY = 0;
+
+        window.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            prevMouseX = e.clientX;
+            prevMouseY = e.clientY;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const deltaX = e.clientX - prevMouseX;
+            const deltaY = e.clientY - prevMouseY;
+            prevMouseX = e.clientX;
+            prevMouseY = e.clientY;
+
+            const sensitivity = 0.005;
+            camYaw -= deltaX * sensitivity;
+            camPitch = Math.max(0.05, Math.min(Math.PI / 2.2, camPitch + deltaY * sensitivity));
+        });
+
+        window.addEventListener('wheel', (e) => {
+            camDistance = Math.max(3.5, Math.min(22.0, camDistance + e.deltaY * 0.008));
+        });
+
+        // Controles de Teclado
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space') e.preventDefault();
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Obstáculos de Colisão na Ilha 1 (Coordenadas Three.js: Z = -Y_blender)
+        const trees = [
+            { x: -5.2, z: 1.5, r: 0.65 },
+            { x: 5.0,  z: 0.0, r: 0.65 },
+            { x: -4.5, z: -4.2, r: 0.65 },
+            { x: 4.5,  z: -4.2, r: 0.65 },
+            { x: -2.0, z: 5.5, r: 0.65 }
+        ];
+
+        const pillars = [
+            { x: -2.2, z: -3.2, r: 0.55 },
+            { x: 2.2,  z: -3.2, r: 0.55 },
+            { x: -2.2, z: -52.0, r: 0.55 },
+            { x: 2.2,  z: -52.0, r: 0.55 }
+        ];
+
+        // Física e Movimentação
+        let velY = 0;
+        let isGrounded = true;
+        const moveSpeed = 8.0;
+        const jumpForce = 9.5;
+        const gravity = 24.0;
+        let warpCooldown = 0;
+
+        let prevTime = performance.now();
+
+        function triggerFlash(msg, locName) {
+            const flash = document.getElementById('warp-flash');
+            flash.style.opacity = '1';
+            setTimeout(() => { flash.style.opacity = '0'; }, 300);
+
+            const msgElem = document.getElementById('portal-message');
+            msgElem.innerText = msg;
+            msgElem.style.opacity = '1';
+            setTimeout(() => { msgElem.style.opacity = '0'; }, 2500);
+
+            document.getElementById('location-badge').innerText = "📍 " + locName;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const dt = Math.min((now - prevTime) / 1000, 0.05);
+            prevTime = now;
+
+            if (warpCooldown > 0) warpCooldown -= dt;
+
+            // Movimento relativo à câmera
+            const forwardX = -Math.sin(camYaw);
+            const forwardZ = -Math.cos(camYaw);
+            const rightX = -forwardZ;
+            const rightZ = forwardX;
+
+            let inputX = 0;
+            let inputZ = 0;
+
+            if (keys['KeyW'] || keys['ArrowUp']) { inputX += forwardX; inputZ += forwardZ; }
+            if (keys['KeyS'] || keys['ArrowDown']) { inputX -= forwardX; inputZ -= forwardZ; }
+            if (keys['KeyA'] || keys['ArrowLeft']) { inputX -= rightX; inputZ -= rightZ; }
+            if (keys['KeyD'] || keys['ArrowRight']) { inputX += rightX; inputZ += rightZ; }
+
+            const inputLen = Math.hypot(inputX, inputZ);
+            if (inputLen > 0) {
+                let nextX = playerGroup.position.x + (inputX / inputLen) * moveSpeed * dt;
+                let nextZ = playerGroup.position.z + (inputZ / inputLen) * moveSpeed * dt;
+
+                // Colisão com Árvores
+                const playerR = 0.38;
+                for (const t of trees) {
+                    const d = Math.hypot(nextX - t.x, nextZ - t.z);
+                    if (d < playerR + t.r && d > 0.001) {
+                        const overlap = (playerR + t.r) - d;
+                        nextX += ((nextX - t.x) / d) * overlap;
+                        nextZ += ((nextZ - t.z) / d) * overlap;
+                    }
+                }
+
+                // Colisão com Pilares do Portal
+                for (const p of pillars) {
+                    const d = Math.hypot(nextX - p.x, nextZ - p.z);
+                    if (d < playerR + p.r && d > 0.001) {
+                        const overlap = (playerR + p.r) - d;
+                        nextX += ((nextX - p.x) / d) * overlap;
+                        nextZ += ((nextZ - p.z) / d) * overlap;
+                    }
+                }
+
+                playerGroup.position.x = nextX;
+                playerGroup.position.z = nextZ;
+
+                const targetRotation = Math.atan2(inputX, inputZ) + Math.PI;
+                playerGroup.rotation.y = targetRotation;
+            }
+
+            // ==========================================
+            // EVENTO DE TELETRANSPORTE DO PORTAL
+            // ==========================================
+            if (warpCooldown <= 0) {
+                // Portal 1 (Ilha 1 -> Ilha Celestial 2)
+                if (Math.abs(playerGroup.position.x) < 1.4 && playerGroup.position.z <= -2.9 && playerGroup.position.z >= -3.8 && playerGroup.position.y >= 2.4) {
+                    playerGroup.position.x = 0;
+                    playerGroup.position.z = -56.0;
+                    playerGroup.position.y = 7.2;
+                    velY = 0;
+                    camYaw = Math.PI; // Olhando para a Ponte Celestial
+                    warpCooldown = 2.5;
+                    triggerFlash("✨ VOCÊ ATRAVESSOU O PORTAL! BEM-VINDO À PONTE CELESTIAL! ✨", "Ponte Celestial");
+                }
+                // Portal 2 (Ilha Celestial 2 -> Ilha 1)
+                else if (Math.abs(playerGroup.position.x) < 1.4 && playerGroup.position.z <= -51.2 && playerGroup.position.z >= -52.8 && playerGroup.position.y >= 6.8) {
+                    playerGroup.position.x = 0;
+                    playerGroup.position.z = -1.8;
+                    playerGroup.position.y = 2.15;
+                    velY = 0;
+                    camYaw = 0;
+                    warpCooldown = 2.5;
+                    triggerFlash("🌀 RETORNANDO À ILHA INICIAL! 🌀", "Ilha Inicial");
+                }
+            }
+
+            // ==========================================
+            // DETECÇÃO DE SOLO E PLATAFORMAS (GROUND Y)
+            // ==========================================
+            let groundY = -999;
+            let onSolidGround = false;
+
+            const px = playerGroup.position.x;
+            const pz = playerGroup.position.z;
+
+            // 1. Ilha 1 (Centro: 0, 0)
+            const distI1 = Math.hypot(px, pz);
+            if (distI1 <= 7.8) {
+                groundY = 2.15;
+                onSolidGround = true;
+                const dDais = Math.hypot(px, pz - (-3.2));
+                if (dDais <= 2.0) groundY = 2.96;
+                else if (dDais <= 2.7) groundY = 2.71;
+                else if (dDais <= 3.4) groundY = 2.43;
+            }
+
+            // 2. Ilha 2 (Centro: 0, -60.0)
+            const distI2 = Math.hypot(px, pz - (-60.0));
+            if (distI2 <= 7.8) {
+                groundY = 7.2;
+                onSolidGround = true;
+                const dDais2 = Math.hypot(px, pz - (-52.0));
+                if (dDais2 <= 2.0) groundY = 7.96;
+                else if (dDais2 <= 2.7) groundY = 7.71;
+                else if (dDais2 <= 3.4) groundY = 7.43;
+            }
+
+            // 3. Ponte Celestial (-67.0 a -97.0)
+            if (pz <= -67.0 && pz >= -97.0 && Math.abs(px) <= 1.85) {
+                const archNorm = Math.sin(((Math.abs(pz) - 67.0) / 30.0) * Math.PI);
+                groundY = 7.2 + archNorm * 1.5 + 0.2;
+                onSolidGround = true;
+            }
+
+            // 4. Ilha 3 - Santuário (Centro: 0, -105.0)
+            const distI3 = Math.hypot(px, pz - (-105.0));
+            if (distI3 <= 8.5) {
+                groundY = 7.2;
+                onSolidGround = true;
+                if (distI3 <= 1.4) groundY = 8.4;
+                else if (distI3 <= 2.2) groundY = 8.0;
+                else if (distI3 <= 3.2) groundY = 7.6;
+            }
+
+            // Pulo
+            if (keys['Space'] && isGrounded) {
+                velY = jumpForce;
+                isGrounded = false;
+            }
+
+            // Gravidade
+            if (!isGrounded || playerGroup.position.y > groundY) {
+                velY -= gravity * dt;
+                playerGroup.position.y += velY * dt;
+            }
+
+            // Aterrissagem
+            if (onSolidGround && playerGroup.position.y <= groundY) {
+                playerGroup.position.y = groundY;
+                velY = 0;
+                isGrounded = true;
+            } else if (!onSolidGround && playerGroup.position.y <= groundY) {
+                isGrounded = false;
+            }
+
+            // Queda no Vazio / Respawn
+            if (playerGroup.position.y < -14) {
+                if (pz < -40.0) {
+                    playerGroup.position.set(0, 7.2, -56.0);
+                } else {
+                    playerGroup.position.set(-2.8, 2.15, 4.2);
+                }
+                velY = 0;
+                isGrounded = true;
+            }
+
+            // Câmera em 3ª pessoa suave
+            const targetX = playerGroup.position.x;
+            const targetY = playerGroup.position.y + 1.2;
+            const targetZ = playerGroup.position.z;
+
+            const camX = targetX + camDistance * Math.sin(camYaw) * Math.cos(camPitch);
+            const camY = targetY + camDistance * Math.sin(camPitch);
+            const camZ = targetZ + camDistance * Math.cos(camYaw) * Math.cos(camPitch);
+
+            camera.position.x += (camX - camera.position.x) * 0.2;
+            camera.position.y += (camY - camera.position.y) * 0.2;
+            camera.position.z += (camZ - camera.position.z) * 0.2;
+
+            camera.lookAt(targetX, targetY, targetZ);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

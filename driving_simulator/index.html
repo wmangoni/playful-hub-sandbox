@@ -359,7 +359,79 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="assets/js/GLTFLoader.js"></script>
     <script>
+        // === TASK_006: Modelos 3D voxel dos carros (mesmos .glb do Voxel City) ===
+        // R: o mesmo conjunto de veículos "Car Kit" (Kenney, CC0) usado pelo Voxel City.
+        const VOXEL_CAR_FILES = ['sedan', 'taxi', 'police', 'ambulance', 'van', 'truck', 'suv', 'hatchback-sports', 'race', 'firetruck'];
+        const VOXEL_TRAFFIC_FILES = ['sedan', 'taxi', 'suv', 'van', 'hatchback-sports', 'ambulance'];
+        const VOXEL_CAR_SCENES = {};   // name -> THREE.Group (modelo original, sem escala)
+        const VOXEL_CAR_INFO = {};     // name -> { minY, maxY, centerZ, heightY, lengthZ, widthX }
+        const VOXEL_CAR_SCALE = 2.6;   // mesmo fator de escala usado no Voxel City
+
+        function prepareVoxelModel(name, root) {
+            root.traverse(ch => { if (ch.isMesh) ch.castShadow = true; });
+            const box = new THREE.Box3().setFromObject(root);
+            VOXEL_CAR_INFO[name] = {
+                minY: box.min.y,
+                maxY: box.max.y,
+                centerZ: (box.min.z + box.max.z) / 2,
+                heightY: box.max.y - box.min.y,
+                lengthZ: box.max.z - box.min.z,
+                widthX: box.max.x - box.min.x
+            };
+            return root;
+        }
+
+        function loadVoxelCarModels() {
+            // Carrega os .glb dos carros antes do início do jogo; falhas viram fallback (carro de caixa).
+            if (typeof THREE.GLTFLoader === 'undefined') return Promise.resolve();
+            const loader = new THREE.GLTFLoader();
+            return Promise.all(VOXEL_CAR_FILES.map(n => new Promise(resolve => {
+                loader.load(`assets/models/cars/${n}.glb`, gltf => {
+                    VOXEL_CAR_SCENES[n] = prepareVoxelModel(n, gltf.scene);
+                    resolve();
+                }, undefined, () => resolve());
+            })));
+        }
+
+        function cloneVoxelModel(name) {
+            const src = VOXEL_CAR_SCENES[name];
+            if (!src) return null;
+            const info = VOXEL_CAR_INFO[name];
+            const g = src.clone(true);
+            g.traverse(ch => {
+                if (ch.isMesh) {
+                    ch.castShadow = true;
+                    if (ch.name === 'body') ch.name = 'car-body'; // mantém a lógica de repintura
+                    ch.geometry = ch.geometry.clone();
+                    if (ch.material) {
+                        ch.material = Array.isArray(ch.material) ? ch.material.map(m => m.clone()) : ch.material.clone();
+                    }
+                }
+            });
+            g.scale.setScalar(VOXEL_CAR_SCALE);
+            g.position.y = -info.minY * VOXEL_CAR_SCALE;        // assenta as rodas no chão (y=0)
+            g.position.z = -info.centerZ * VOXEL_CAR_SCALE;     // centraliza o modelo na origem do grupo
+            g.name = 'voxel-model';
+            return g;
+        }
+
+        function voxelNoseZ(name) {
+            const info = VOXEL_CAR_INFO[name];
+            return info ? info.lengthZ * 0.5 * VOXEL_CAR_SCALE : 1.6;
+        }
+        function voxelFasciaY(name) {
+            const info = VOXEL_CAR_INFO[name];
+            return info ? info.maxY * VOXEL_CAR_SCALE * 0.5 : 0.9;
+        }
+        function voxelRoofY(name) {
+            const info = VOXEL_CAR_INFO[name];
+            return info ? info.maxY * VOXEL_CAR_SCALE : 0;
+        }
+
+        (async function () {
+        await loadVoxelCarModels();
         // Game constants
         const MAX_SCORE = 30;
         const PLAYER_CAR_COLOR = 0x0000FF;
@@ -506,20 +578,123 @@
             return texture;
         }
 
-        // Chão com textura de grama
+        // === Sistema de Topografia & Relevo 3D (Colinas, Viadutos e Ilha) ===
+        function getHillHeight(x, z) {
+            // Uptown Hill centrada em X = 130, Z = -180 com raio 120 e altura de 16.0
+            const dx = x - 130;
+            const dz = z - (-180);
+            const dist = Math.hypot(dx, dz);
+            if (dist < 120) {
+                const factor = (1 + Math.cos((dist / 120) * Math.PI)) / 2;
+                return factor * 16.0;
+            }
+            return 0.0;
+        }
+
+        function getViaductElevation(x, z) {
+            // Viaduto Elevado na coordenada Z = 60, extensão X de -190 a 190, deck a Y = 10.0
+            if (Math.abs(z - 60) <= 7.5) {
+                if (x >= -190 && x < -120) {
+                    return ((x - (-190)) / 70.0) * 10.0;
+                } else if (x >= -120 && x <= 120) {
+                    return 10.0;
+                } else if (x > 120 && x <= 190) {
+                    return ((190 - x) / 70.0) * 10.0;
+                }
+            }
+            return 0.0;
+        }
+
+        function getGroundElevation(x, z, currentY = 0) {
+            // 1. Viaduto Elevado (Deck a Y = 10.0 e rampas de acesso)
+            if (Math.abs(z - 60) <= 7.5 && x >= -190 && x <= 190) {
+                const vElev = getViaductElevation(x, z);
+                if (currentY > 3.0 || (x >= -190 && x <= -120) || (x >= 120 && x <= 190)) {
+                    return vElev;
+                }
+            }
+
+            // 2. Rampas de Salto
+            if (typeof ramps !== 'undefined' && ramps.length > 0) {
+                for (const ramp of ramps) {
+                    const dx = x - ramp.position.x;
+                    const dz = z - ramp.position.z;
+                    if (Math.abs(dx) < 3.8 && Math.abs(dz) < 7.5) {
+                        const relativeZ = (dz + 7.5) / 15.0;
+                        if (relativeZ >= 0 && relativeZ <= 1) {
+                            const rampBase = getHillHeight(ramp.position.x, ramp.position.z);
+                            return rampBase + relativeZ * 4.5;
+                        }
+                    }
+                }
+            }
+
+            // 3. Colina Urbana (Uptown Hills)
+            const hillY = getHillHeight(x, z);
+
+            // 4. Oceano (fora do perímetro da ilha)
+            const dMax = Math.max(Math.abs(x), Math.abs(z));
+            if (dMax > 385) {
+                return -2.0;
+            }
+
+            return hillY;
+        }
+
+        // === Oceano Dinâmico & Litoral da Ilha ===
+        const oceanGeometry = new THREE.PlaneGeometry(3200, 3200, 48, 48);
+        const oceanMaterial = new THREE.MeshStandardMaterial({
+            color: 0x0077be,
+            roughness: 0.1,
+            metalness: 0.7,
+            transparent: true,
+            opacity: 0.88
+        });
+        const oceanMesh = new THREE.Mesh(oceanGeometry, oceanMaterial);
+        oceanMesh.rotation.x = -Math.PI / 2;
+        oceanMesh.position.y = -1.8;
+        oceanMesh.receiveShadow = true;
+        scene.add(oceanMesh);
+
+        // Praias / Orla de Areia ao redor da Ilha
+        const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xd4b26f, roughness: 0.9 });
+        const beachStrips = [
+            { x: 0, z: 395, w: 820, d: 35 },
+            { x: 0, z: -395, w: 820, d: 35 },
+            { x: 395, z: 0, w: 35, d: 820 },
+            { x: -395, z: 0, w: 35, d: 820 }
+        ];
+        beachStrips.forEach(b => {
+            const beach = new THREE.Mesh(new THREE.BoxGeometry(b.w, 1.4, b.d), sandMaterial);
+            beach.position.set(b.x, -0.7, b.z);
+            beach.receiveShadow = true;
+            scene.add(beach);
+        });
+
+        // Chão com textura de grama e relevo 3D da colina
         const grassTexture = createGrassTexture();
-        const groundGeometry = new THREE.PlaneGeometry(800, 800);
+        const groundGeometry = new THREE.PlaneGeometry(800, 800, 80, 80);
+        const gPos = groundGeometry.attributes.position;
+        for (let i = 0; i < gPos.count; i++) {
+            const vx = gPos.getX(i);
+            const vy = gPos.getY(i);
+            const hillH = getHillHeight(vx, -vy);
+            gPos.setZ(i, hillH);
+        }
+        groundGeometry.computeVertexNormals();
+
         const groundMaterial = new THREE.MeshStandardMaterial({ map: grassTexture, roughness: 0.8, metalness: 0.1 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // === Sistema de Estradas da Cidade (City Grid) ===
+        // === Sistema de Estradas da Cidade (City Grid & Viaduto) ===
         function isOnRoad(x, z) {
             if (Math.abs(x) <= 10) return true;                                // Avenida Principal (N-S)
             if (Math.abs(x - 130) <= 8 || Math.abs(x + 130) <= 8) return true; // Ruas Paralelas (N-S)
             if (Math.abs(z - 180) <= 8 || Math.abs(z - 60) <= 8 || Math.abs(z + 60) <= 8 || Math.abs(z + 180) <= 8) return true; // Transversais (L-O)
+            if (Math.abs(z - 60) <= 7.5 && x >= -190 && x <= 190) return true; // Viaduto Elevado
             return false;
         }
 
@@ -528,11 +703,30 @@
         const lineYellowMaterial = new THREE.MeshBasicMaterial({ color: 0xffd54a });
 
         function createRoadSegment(width, length, x, z, isRotated = false) {
-            const geom = new THREE.PlaneGeometry(width, length);
+            const distToHill = Math.hypot(x - 130, z - (-180));
+            const geom = new THREE.PlaneGeometry(width, length, 1, distToHill < 220 ? 50 : 1);
+            if (distToHill < 220) {
+                const pos = geom.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const localX = pos.getX(i);
+                    const localY = pos.getY(i);
+                    let wx, wz;
+                    if (isRotated) {
+                        wx = x - localY;
+                        wz = z + localX;
+                    } else {
+                        wx = x + localX;
+                        wz = z - localY;
+                    }
+                    const h = getHillHeight(wx, wz);
+                    pos.setZ(i, h + 0.03);
+                }
+                geom.computeVertexNormals();
+            }
             const mesh = new THREE.Mesh(geom, roadMaterial);
             mesh.rotation.x = -Math.PI / 2;
             if (isRotated) mesh.rotation.z = Math.PI / 2;
-            mesh.position.set(x, 0.01, z);
+            mesh.position.set(x, distToHill < 220 ? 0 : 0.01, z);
             mesh.receiveShadow = true;
             scene.add(mesh);
         }
@@ -547,7 +741,8 @@
                 const posFactor = (i / count);
                 const x = THREE.MathUtils.lerp(startX, endX, posFactor);
                 const z = THREE.MathUtils.lerp(startZ, endZ, posFactor);
-                line.position.set(x, 0.02, z);
+                const elev = getHillHeight(x, z);
+                line.position.set(x, elev + 0.04, z);
                 scene.add(line);
             }
         }
@@ -570,17 +765,111 @@
 
             // Faixas de pedestre nos cruzamentos
             [-130, 0, 130].forEach(x => {
+                const baseH = getHillHeight(x, z);
                 for (let k = -6; k <= 6; k += 2.5) {
                     const stripe = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 6), lineMaterial);
                     stripe.rotation.x = -Math.PI / 2;
-                    stripe.position.set(x + k, 0.03, z + 9);
+                    stripe.position.set(x + k, baseH + 0.04, z + 9);
                     scene.add(stripe);
                     const stripe2 = stripe.clone();
-                    stripe2.position.set(x + k, 0.03, z - 9);
+                    stripe2.position.set(x + k, baseH + 0.04, z - 9);
                     scene.add(stripe2);
                 }
             });
         });
+
+        // === Viaduto Elevado / Ponte Suspensa (Multi-Level Overpass) ===
+        function createViaduct() {
+            const viaductGroup = new THREE.Group();
+            const deckMaterial = new THREE.MeshStandardMaterial({ color: 0x24272c, roughness: 0.5, metalness: 0.3 });
+            const concretePillarMaterial = new THREE.MeshStandardMaterial({ color: 0x607d8b, roughness: 0.7, metalness: 0.2 });
+            const railMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.6 });
+            const pylonMaterial = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x003344, metalness: 0.8, roughness: 0.2 });
+            const cableMaterial = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+
+            // 1. Deck Central Elevado (X: -120 até 120, Z: 60, Y: 10.0, largura 14)
+            const deckGeom = new THREE.BoxGeometry(240, 1.0, 14);
+            const deck = new THREE.Mesh(deckGeom, deckMaterial);
+            deck.position.set(0, 9.5, 60);
+            deck.receiveShadow = true;
+            deck.castShadow = true;
+            viaductGroup.add(deck);
+
+            // 2. Rampa Oeste (X: -190 até -120) subindo de Y=0 até Y=10.0
+            const rampGeom = new THREE.BoxGeometry(Math.hypot(70, 10), 1.0, 14);
+            const westRamp = new THREE.Mesh(rampGeom, deckMaterial);
+            westRamp.position.set(-155, 4.75, 60);
+            westRamp.rotation.z = Math.atan2(10, 70);
+            westRamp.receiveShadow = true;
+            viaductGroup.add(westRamp);
+
+            // 3. Rampa Leste (X: 120 até 190) descendo de Y=10.0 até Y=0
+            const eastRamp = new THREE.Mesh(rampGeom, deckMaterial);
+            eastRamp.position.set(155, 4.75, 60);
+            eastRamp.rotation.z = -Math.atan2(10, 70);
+            eastRamp.receiveShadow = true;
+            viaductGroup.add(eastRamp);
+
+            // 4. Pilares de sustentação sob o deck e rampas
+            [-160, -120, -70, 70, 120, 160].forEach(px => {
+                const pillarH = px < -120 ? ((px - (-190)) / 70) * 10 : (px > 120 ? ((190 - px) / 70) * 10 : 9.5);
+                if (pillarH > 1.5) {
+                    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.7, pillarH, 12), concretePillarMaterial);
+                    pillar.position.set(px, pillarH / 2, 60);
+                    pillar.castShadow = true;
+                    viaductGroup.add(pillar);
+                }
+            });
+
+            // 5. Guardrails / Muretas laterais com faixas refletivas
+            [-1, 1].forEach(side => {
+                const railZ = 60 + side * 6.6;
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(240, 1.2, 0.5), railMaterial);
+                rail.position.set(0, 10.6, railZ);
+                viaductGroup.add(rail);
+
+                const railW = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(70, 10), 1.2, 0.5), railMaterial);
+                railW.position.set(-155, 5.85, railZ);
+                railW.rotation.z = Math.atan2(10, 70);
+                viaductGroup.add(railW);
+
+                const railE = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(70, 10), 1.2, 0.5), railMaterial);
+                railE.position.set(155, 5.85, railZ);
+                railE.rotation.z = -Math.atan2(10, 70);
+                viaductGroup.add(railE);
+            });
+
+            // 6. Pilone Central da Ponte Estaiada sobre a Avenida Principal (X = 0, Z = 60)
+            [-1, 1].forEach(side => {
+                const pylonZ = 60 + side * 7.5;
+                const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.5, 26, 8), pylonMaterial);
+                pylon.position.set(0, 22.0, pylonZ);
+                pylon.castShadow = true;
+                viaductGroup.add(pylon);
+
+                [-60, -30, 30, 60].forEach(cableX => {
+                    const cableGeom = new THREE.CylinderGeometry(0.08, 0.08, Math.hypot(cableX, 16), 4);
+                    const cable = new THREE.Mesh(cableGeom, cableMaterial);
+                    cable.position.set(cableX / 2, 18, pylonZ);
+                    cable.rotation.z = Math.atan2(cableX, 16);
+                    viaductGroup.add(cable);
+                });
+            });
+
+            // 7. Faixa amarela central no viaduto
+            for (let x = -180; x <= 180; x += 15) {
+                const dashH = x < -120 ? ((x - (-190)) / 70) * 10 : (x > 120 ? ((190 - x) / 70) * 10 : 10.0);
+                const dash = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.8), lineYellowMaterial);
+                dash.rotation.x = -Math.PI / 2;
+                if (x < -120) dash.rotation.y = -Math.atan2(10, 70);
+                else if (x > 120) dash.rotation.y = Math.atan2(10, 70);
+                dash.position.set(x, dashH + 0.05, 60);
+                viaductGroup.add(dash);
+            }
+
+            scene.add(viaductGroup);
+        }
+        createViaduct();
 
         // Nuvens
         function createCloud(x, y, z) {
@@ -663,7 +952,7 @@
                 }
             }
 
-            building.position.set(x, 0, z);
+            building.position.set(x, getHillHeight(x, z), z);
             return building;
         }
 
@@ -726,7 +1015,7 @@
             leaves.castShadow = true;
             tree.add(leaves);
 
-            tree.position.set(x, 0, z);
+            tree.position.set(x, getHillHeight(x, z), z);
             return tree;
         }
 
@@ -766,13 +1055,19 @@
         let trainAngle = 0;
 
         // Carros
-        function createCar(color) {
+        function createCar(color, modelKey) {
             const car = new THREE.Group();
+            const model = modelKey ? cloneVoxelModel(modelKey) : null;
+            if (model) {
+                car.add(model);
+                return car;
+            }
             const bodyGeometry = new THREE.BoxGeometry(2, 1, 3);
             const bodyMaterial = new THREE.MeshLambertMaterial({ color: color });
             const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
             body.position.y = 0.5;
             body.castShadow = true;
+            body.userData.isCarBody = true;
             car.add(body);
 
             const topGeometry = new THREE.BoxGeometry(1.5, 0.8, 1.5);
@@ -801,17 +1096,20 @@
             return car;
         }
 
-        const playerCar = createCar(PLAYER_CAR_COLOR);
+        const playerCar = createCar(PLAYER_CAR_COLOR, 'sedan');
         playerCar.position.set(-5, 0, -50);
         scene.add(playerCar);
+        recolorPlayerCar(playerPhysics.color);
 
         // === TASK_002: Faróis do jogador (SpotLight + cone volumétrico) ===
         function setupHeadlights() {
+            const noseZ = voxelNoseZ('sedan');
+            const fasciaY = voxelFasciaY('sedan');
             headlight = new THREE.SpotLight(0xFFFFE0, 5.0, 60, Math.PI / 6, 0.8, 1);
             headlight.castShadow = true; // só o jogador projeta sombra (otimização do TL)
             headlight.shadow.mapSize.width = 1024;
             headlight.shadow.mapSize.height = 1024;
-            headlight.position.set(0, 0.9, 1.6);
+            headlight.position.set(0, fasciaY, noseZ);
             playerCar.add(headlight);
 
             const headlightTarget = new THREE.Object3D();
@@ -828,7 +1126,7 @@
                 blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
             });
             lightCone = new THREE.Mesh(coneGeom, coneMat);
-            lightCone.position.set(0, 0.8, 1.6);
+            lightCone.position.set(0, fasciaY, noseZ);
             playerCar.add(lightCone);
 
             headlight.visible = false;
@@ -844,7 +1142,7 @@
             if (btn) btn.classList.toggle('on', on);
         }
 
-        const aiCar = createCar(AI_CAR_COLOR);
+        const aiCar = createCar(AI_CAR_COLOR, 'race');
         aiCar.position.set(5, 0, -50);
         scene.add(aiCar);
 
@@ -859,7 +1157,8 @@
                 z = Math.random() * 200 - 100;
             } while (Math.sqrt(x * x + z * z) < 25 || Math.abs(x) < 12);
             
-            coin.position.set(x, 1, z);
+            const baseElev = getGroundElevation(x, z, 0);
+            coin.position.set(x, baseElev + 1.2, z);
             coin.castShadow = true;
             scene.add(coin);
             coins.push(coin);
@@ -867,6 +1166,92 @@
 
         for (let i = 0; i < COIN_COUNT; i++) {
             createCoin();
+        }
+
+        // === TASK_008: Item especial no topo da ponte (Ímã de Moedas) ===
+        const BRIDGE_MAGNET_POS = { x: 0, y: 11.3, z: 60 }; // acima do tabuleiro (Y=10) da ponte estaiada
+        const BRIDGE_MAGNET_ABSORB = 10;                    // max de moedas ainda no mapa que absorve
+        const BRIDGE_MAGNET_RANGE = 2.8;
+        let bridgeMagnet = null;
+        let magnetOrbs = [];
+        function spawnBridgeMagnet() {
+            if (bridgeMagnet) return;
+            const g = new THREE.Group();
+            const core = new THREE.Mesh(new THREE.SphereGeometry(0.9, 20, 20), new THREE.MeshBasicMaterial({ color: 0xffd54a }));
+            core.name = 'magnet-core';
+            g.add(core);
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.12, 10, 36), new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending }));
+            ring.rotation.x = Math.PI / 2;
+            ring.name = 'magnet-ring';
+            g.add(ring);
+            const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 30, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+            beam.position.y = 15;
+            beam.name = 'magnet-beam';
+            g.add(beam);
+            const light = new THREE.PointLight(0xffd54a, 1.2, 20);
+            light.name = 'magnet-light';
+            g.add(light);
+            g.position.set(BRIDGE_MAGNET_POS.x, BRIDGE_MAGNET_POS.y, BRIDGE_MAGNET_POS.z);
+            scene.add(g);
+            bridgeMagnet = g;
+        }
+        function animateBridgeMagnet(dt) {
+            if (!bridgeMagnet) return;
+            const t = performance.now() * 0.004;
+            const core = bridgeMagnet.getObjectByName('magnet-core');
+            const ring = bridgeMagnet.getObjectByName('magnet-ring');
+            if (core) core.scale.setScalar(1 + 0.18 * Math.sin(t));
+            if (ring) {
+                ring.rotation.z += dt * 2.2;
+                ring.scale.setScalar(1 + 0.08 * Math.sin(t + 1.2));
+            }
+        }
+        function updateMagnetOrbs(dt) {
+            for (let i = magnetOrbs.length - 1; i >= 0; i--) {
+                const orb = magnetOrbs[i];
+                orb.life -= dt;
+                const delta = playerCar.position.clone().sub(orb.mesh.position);
+                const d = delta.length();
+                if (d > 0.3) orb.mesh.position.addScaledVector(delta.normalize(), 9 * dt);
+                else orb.mesh.position.copy(playerCar.position);
+                if (orb.life <= 0) {
+                    scene.remove(orb.mesh);
+                    magnetOrbs.splice(i, 1);
+                }
+            }
+        }
+        function collectBridgeMagnet() {
+            if (!bridgeMagnet || !gameState.started) return { absorbed: 0 };
+            const count = Math.min(BRIDGE_MAGNET_ABSORB, coins.length);
+            if (count === 0) return { absorbed: 0 };
+            const burstPos = [];
+            for (let i = 0; i < count; i++) {
+                const coin = coins.pop();
+                burstPos.push(coin.position.clone());
+                scene.remove(coin);
+            }
+            // moedas absorvidas voam até o jogador (feerico)
+            magnetOrbs.forEach(o => scene.remove(o.mesh));
+            magnetOrbs.length = 0;
+            burstPos.forEach(pos => {
+                const orb = new THREE.Mesh(sharedCoinGeometry, sharedCoinMaterial);
+                orb.position.copy(pos);
+                orb.scale.setScalar(0.8);
+                scene.add(orb);
+                magnetOrbs.push({ mesh: orb, life: 0.55 });
+            });
+            gameState.playerScore += count;
+            for (let i = 0; i < count; i++) createCoin(); // mantém COIN_COUNT moedas no mapa
+            updateUI();
+            bridgeMagnet.traverse(o => {
+                if (o.isMesh) {
+                    if (o.geometry) o.geometry.dispose();
+                    if (o.material) o.material.dispose();
+                }
+            });
+            scene.remove(bridgeMagnet);
+            bridgeMagnet = null;
+            return { absorbed: count };
         }
 
         // Estado do jogo
@@ -906,6 +1291,7 @@
             };
             playerCar.position.set(-5, 0, -50);
             playerCar.rotation.set(0, 0, 0);
+            playerCar.visible = true; // TASK_007: reaparece após ser destruído
             aiCar.position.set(5, 0, -50);
             aiCar.rotation.set(0, 0, 0);
 
@@ -931,6 +1317,18 @@
             // Modo de corrida
             coins.forEach(coin => scene.remove(coin));
             coins.length = 0;
+            magnetOrbs.forEach(o => scene.remove(o.mesh));
+            magnetOrbs.length = 0;
+            if (bridgeMagnet) {
+                bridgeMagnet.traverse(o => {
+                    if (o.isMesh) {
+                        if (o.geometry) o.geometry.dispose();
+                        if (o.material) o.material.dispose();
+                    }
+                });
+                scene.remove(bridgeMagnet);
+                bridgeMagnet = null;
+            }
             const lapHud = document.getElementById('lapHud');
             if (raceMode === 'time_trial') {
                 aiCar.visible = false;
@@ -943,6 +1341,7 @@
                 aiCar.visible = true;
                 for (let i = 0; i < COIN_COUNT; i++) createCoin();
                 spawnGravelCoins(); // TASK_004: moedas bônus do atalho off-road
+                spawnBridgeMagnet(); // TASK_008: ímã no topo da ponte
                 if (lapHud) lapHud.style.display = 'none';
                 if (ghostMesh) ghostMesh.visible = false;
             }
@@ -1161,6 +1560,43 @@
                 minimapCtx.stroke();
             });
 
+            // 1b. Destaque da Colina Uptown no radar
+            const hillCenterMap = worldToMinimap(130, -180);
+            const hillRad = 120 * radarZoom;
+            minimapCtx.beginPath();
+            minimapCtx.arc(hillCenterMap.x, hillCenterMap.y, hillRad, 0, Math.PI * 2);
+            minimapCtx.fillStyle = 'rgba(46, 125, 50, 0.16)';
+            minimapCtx.fill();
+            minimapCtx.strokeStyle = 'rgba(129, 199, 132, 0.4)';
+            minimapCtx.lineWidth = 1.5;
+            minimapCtx.stroke();
+
+            // 1c. Viaduto Elevado (linha ciano brilhante sobreposta)
+            const vp1 = worldToMinimap(-190, 60);
+            const vp2 = worldToMinimap(190, 60);
+            minimapCtx.beginPath();
+            minimapCtx.moveTo(vp1.x, vp1.y);
+            minimapCtx.lineTo(vp2.x, vp2.y);
+            minimapCtx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+            minimapCtx.lineWidth = 4;
+            minimapCtx.stroke();
+
+            // 1d. Marcadores de Rampas (triângulos ciano)
+            if (typeof ramps !== 'undefined') {
+                ramps.forEach(ramp => {
+                    const rp = worldToMinimap(ramp.position.x, ramp.position.z);
+                    if (Math.hypot(rp.x - cx, rp.y - cy) <= radius - 4) {
+                        minimapCtx.beginPath();
+                        minimapCtx.moveTo(rp.x, rp.y - 4);
+                        minimapCtx.lineTo(rp.x - 3, rp.y + 3);
+                        minimapCtx.lineTo(rp.x + 3, rp.y + 3);
+                        minimapCtx.closePath();
+                        minimapCtx.fillStyle = '#00e5ff';
+                        minimapCtx.fill();
+                    }
+                });
+            }
+
             // 2. Moedas (Pontos Dourados Brilhantes)
             coins.forEach(coin => {
                 const mp = worldToMinimap(coin.position.x, coin.position.z);
@@ -1234,7 +1670,8 @@
         // === TASK_002: Tráfego de IA ===
         const TRAFFIC_COLORS = [0xffa500, 0x9b59b6, 0x1abc9c, 0xecf0f1, 0xe67e22, 0x34495e];
         function createTrafficCar() {
-            const mesh = createCar(TRAFFIC_COLORS[Math.floor(Math.random() * TRAFFIC_COLORS.length)]);
+            const modelKey = VOXEL_TRAFFIC_FILES[Math.floor(Math.random() * VOXEL_TRAFFIC_FILES.length)];
+            const mesh = createCar(TRAFFIC_COLORS[Math.floor(Math.random() * TRAFFIC_COLORS.length)], modelKey);
             scene.add(mesh);
             return { mesh, speed: 0, direction: 1, lane: 'right', isOvertaking: false, overtakeTimer: 0, targetX: 0 };
         }
@@ -1422,10 +1859,14 @@
             });
         }
         function recolorPlayerCar(color) {
-            const body = playerCar.children[0]; // body e top compartilham material
-            if (body && body.material) body.material.color.setHex(color);
+            playerCar.traverse(child => {
+                if (child.isMesh && (child.name === 'car-body' || child.userData.isCarBody)) {
+                    child.material.color.setHex(color);
+                }
+            });
         }
         function startFromGarage() {
+            initAudioEngine();
             playerPhysics = CAR_MODELS[selectedCarId];
             recolorPlayerCar(playerPhysics.color);
             raceMode = selectedMode; // TASK_003
@@ -1566,14 +2007,25 @@
 
         // --- Rampas + voo parabólico + bullet-time ---
         function createRamps() {
-            const positions = [{ x: 0, z: 30 }, { x: -6, z: -40 }, { x: 6, z: 90 }];
+            const positions = [
+                { x: 0, z: 30, rx: -Math.PI / 12, w: 6, l: 12 },
+                { x: -6, z: -40, rx: -Math.PI / 12, w: 6, l: 12 },
+                { x: 6, z: 90, rx: -Math.PI / 12, w: 6, l: 12 },
+                // Mega-Rampa Costeira (apontada para o oceano sul)
+                { x: 0, z: 330, rx: -Math.PI / 9, w: 8, l: 16 },
+                // Mega-Rampa da Colina Uptown (no topo da ladeira para salto gigante)
+                { x: 130, z: -170, rx: -Math.PI / 9, w: 7, l: 14 },
+                // Rampa do Viaduto Elevado
+                { x: -20, z: 60, rx: -Math.PI / 12, w: 6, l: 12 }
+            ];
             positions.forEach(pos => {
                 const ramp = new THREE.Mesh(
-                    new THREE.BoxGeometry(6, 0.5, 12),
-                    new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x004055, metalness: 0.4, roughness: 0.3 })
+                    new THREE.BoxGeometry(pos.w, 0.6, pos.l),
+                    new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x004055, metalness: 0.5, roughness: 0.25 })
                 );
-                ramp.position.set(pos.x, 1.0, pos.z);
-                ramp.rotation.x = -Math.PI / 12; // leve inclinação
+                const baseY = getGroundElevation(pos.x, pos.z, 0);
+                ramp.position.set(pos.x, baseY + 1.2, pos.z);
+                ramp.rotation.x = pos.rx;
                 scene.add(ramp);
                 ramps.push(ramp);
             });
@@ -1589,41 +2041,37 @@
         }
         function checkRampCollision() {
             if (isAirborne) return;
-            let onAnyRamp = false;
             for (const ramp of ramps) {
                 const dx = playerCar.position.x - ramp.position.x;
                 const dz = playerCar.position.z - ramp.position.z;
-                if (Math.abs(dx) < 3 && Math.abs(dz) < 6) {
-                    const relativeZ = (dz + 6) / 12;
+                if (Math.abs(dx) < 3.8 && Math.abs(dz) < 7.5) {
+                    const relativeZ = (dz + 7.5) / 15.0;
                     if (relativeZ >= 0 && relativeZ <= 1) {
-                        onAnyRamp = true;
-                        playerCar.position.y = THREE.MathUtils.lerp(0, 3.5, relativeZ);
-                        if (relativeZ > 0.9 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.7 && !isAirborne) {
+                        const rampBaseY = getHillHeight(ramp.position.x, ramp.position.z);
+                        playerCar.position.y = rampBaseY + relativeZ * 4.5;
+                        if (relativeZ > 0.85 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.65 && !isAirborne) {
                             isAirborne = true;
-                            verticalVelocity = Math.abs(gameState.playerSpeed) * 0.45;
+                            verticalVelocity = Math.abs(gameState.playerSpeed) * 0.55 + 0.12;
                             triggerBulletTime();
-                            nitroSystem.charge = Math.min(100, nitroSystem.charge + 20); // TASK_004: stunt +20%
+                            nitroSystem.charge = Math.min(100, nitroSystem.charge + 25);
                         }
                         break;
                     }
                 }
-            }
-            if (!onAnyRamp && !isAirborne && playerCar.position.y > 0) {
-                isAirborne = true;
-                verticalVelocity = Math.max(0, verticalVelocity);
             }
         }
         function updateAirbornePhysics(ts) {
             if (!isAirborne) return;
             playerCar.position.y += verticalVelocity;
             verticalVelocity -= GRAVITY_AIR;
-            playerCar.rotation.x = -verticalVelocity * 2.0;
-            if (playerCar.position.y <= 0) {
-                playerCar.position.y = 0;
-                playerCar.rotation.x = 0;
+            playerCar.rotation.x = -verticalVelocity * 1.8;
+
+            const groundY = getGroundElevation(playerCar.position.x, playerCar.position.z, playerCar.position.y);
+            if (playerCar.position.y <= groundY) {
+                playerCar.position.y = groundY;
                 isAirborne = false;
+                verticalVelocity = 0;
                 resetBulletTime();
-                // (TL) faíscas amarelas + marcas ao pousar
                 for (let i = 0; i < 8; i++) addSkidMark();
                 createLandingParticles();
             }
@@ -1705,7 +2153,7 @@
                 scene.remove(ghostMesh);
                 ghostMesh = null;
             }
-            ghostMesh = createCar(0x00FFFF);
+            ghostMesh = createCar(0x00FFFF, 'hatchback-sports');
             ghostMesh.traverse(child => {
                 if (child.isMesh) {
                     if (child.material) child.material.dispose();
@@ -1773,7 +2221,7 @@
         const nitroSystem = { charge: 0, isActive: false, duration: 0 };
         const policePursuit = { heatLevel: 0, copCars: [], spikeStrips: [], infractionTimer: 0, spikeTimer: 0 };
         const weatherManager = { current: 'sunny', rainParticles: [], fogDensity: 0.005, timer: 0 };
-        const proceduralAudioEngine = { audioCtx: null, engineOsc: null, engineGain: null, sirenOsc: null, sirenGain: null, sirenLfo: null };
+        const proceduralAudioEngine = { audioCtx: null, engineOsc: null, engineOscSub: null, engineFilter: null, engineGain: null, sirenOsc: null, sirenGain: null, sirenLfo: null, currentGear: 1 };
         const NITRO_BASE_FOV = 75;
         const NITRO_FOV = 85;
         const nitroFlames = [];
@@ -1856,19 +2304,23 @@
         }
 
         // --- Perseguição Policial ---
+        // TASK_007: constantes do abalroamento policial
+        const COP_RAM_RANGE = 4.2;          // distância na qual o policial "alcançou" e passa a bater
+        const COP_RAM_DPS = 16;             // dano contínuo por segundo enquanto abalroa
+        const COP_RAM_PUNCH_INTERVAL = 0.9; // intervalo entre as batidas visíveis (rajadas)
         function createCopCar() {
-            const cop = createCar(0x0a0a0a);
-            cop.children.forEach(c => { if (c.material && c.material.color) c.material.color.setHex(0x0a0a0a); });
+            const cop = createCar(0x0a0a0a, 'police');
+            const roofY = voxelRoofY('police');
             const lightBar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.35), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-            lightBar.position.set(0, 1.25, 0);
+            lightBar.position.set(0, roofY + 0.15, 0);
             cop.add(lightBar);
             const redLight = new THREE.PointLight(0xff0000, 0, 14);
-            redLight.position.set(-0.3, 1.45, 0);
+            redLight.position.set(-0.3, roofY + 0.4, 0);
             cop.add(redLight);
             const blueLight = new THREE.PointLight(0x0000ff, 0, 14);
-            blueLight.position.set(0.3, 1.45, 0);
+            blueLight.position.set(0.3, roofY + 0.4, 0);
             cop.add(blueLight);
-            return { mesh: cop, redLight, blueLight, speed: 0.24 + Math.random() * 0.06, nearMissCooldown: 0 };
+            return { mesh: cop, redLight, blueLight, speed: 0.24 + Math.random() * 0.06, nearMissCooldown: 0, ramCooldown: 0 };
         }
         function syncCopCount() {
             const desired = (raceMode === 'time_trial') ? 0 : policePursuit.heatLevel;
@@ -1906,7 +2358,7 @@
             let sirenNear = false;
             policePursuit.copCars.forEach(cop => {
                 if (!gameState.started) return;
-                const target = playerCar.position.clone().add(new THREE.Vector3(Math.sin(playerCar.rotation.y) * 8, 0, Math.cos(playerCar.rotation.y) * 8));
+                const target = playerCar.position.clone();
                 const dir = target.sub(cop.mesh.position).normalize();
                 cop.mesh.position.addScaledVector(dir, cop.speed);
                 cop.mesh.lookAt(playerCar.position);
@@ -1924,16 +2376,55 @@
                     cop.nearMissCooldown = 3;
                     increaseHeat(1);
                 }
-                // colisão (PIT)
-                if (distToPlayer < 2.8) {
-                    gameState.playerSpeed *= 0.4;
-                    applyDamage('player', 10);
-                    increaseHeat(1);
-                    flashCollision();
-                    shakeIntensity = 0.35;
+                // TASK_007: policial alcançou o jogador -> abalroa até a integridade zerar
+                if (distToPlayer < COP_RAM_RANGE) {
+                    applyDamage('player', COP_RAM_DPS * dt);
+                    cop.ramCooldown -= dt;
+                    if (cop.ramCooldown <= 0) {
+                        cop.ramCooldown = COP_RAM_PUNCH_INTERVAL;
+                        gameState.playerSpeed *= 0.35;
+                        flashCollision();
+                        shakeIntensity = 0.5;
+                        // golpe de encontro: empurra o jogador e recua o policial (nova investida)
+                        const pushDir = cop.mesh.position.clone().sub(playerCar.position).normalize();
+                        playerCar.position.addScaledVector(pushDir, 0.35);
+                        cop.mesh.position.addScaledVector(pushDir, -0.5);
+                    }
                 }
             });
             if (sirenNear) playPoliceSiren(); else stopPoliceSiren();
+        }
+
+        // TASK_007: integridade do carro zerada (qualquer causa) encerra a partida
+        function bustPlayer() {
+            if (!gameState.started) return;
+            gameState.started = false;
+            gameState.playerSpeed = 0;
+            stopPoliceSiren();
+            policePursuit.copCars.forEach(c => {
+                c.redLight.intensity = 0;
+                c.blueLight.intensity = 0;
+            });
+            playerCar.visible = false;
+            // explosão local (sem teleportar o carro)
+            const pGeom = new THREE.SphereGeometry(0.2, 5, 5);
+            const pList = [];
+            for (let i = 0; i < 24; i++) {
+                const p = new THREE.Mesh(pGeom, new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xFF6600 : 0xFFAA33 }));
+                p.position.copy(playerCar.position);
+                p.velocity = new THREE.Vector3((Math.random() - 0.5) * 3, 1 + Math.random() * 2, (Math.random() - 0.5) * 3);
+                scene.add(p);
+                pList.push(p);
+            }
+            setTimeout(() => {
+                pList.forEach(p => { scene.remove(p); if (p.material) p.material.dispose(); });
+                pGeom.dispose();
+            }, 500);
+            flashCollision();
+            shakeIntensity = 1.0;
+            document.getElementById('message').textContent = 'SEU CARRO FOI DESTRUÍDO! Pressione ESPAÇO para tentar novamente';
+            document.getElementById('message').style.display = 'block';
+            updateTask3HUD();
         }
         function spawnSpikeStrip() {
             const strip = new THREE.Group();
@@ -2109,23 +2600,103 @@
             const ctx = new AC();
             proceduralAudioEngine.audioCtx = ctx;
 
-            const osc = ctx.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(80, ctx.currentTime);
-            const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.06, ctx.currentTime);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            proceduralAudioEngine.engineOsc = osc;
-            proceduralAudioEngine.engineGain = gain;
+            // 1. Oscilador 1: Sub-Grave / Ronco de Escape (Triangle)
+            const oscSub = ctx.createOscillator();
+            oscSub.type = 'triangle';
+            oscSub.frequency.setValueAtTime(36, ctx.currentTime);
+
+            // 2. Oscilador 2: Pulso dos Cilindros / Corpo do Motor (Sawtooth suave filtrado)
+            const oscBody = ctx.createOscillator();
+            oscBody.type = 'sawtooth';
+            oscBody.frequency.setValueAtTime(72, ctx.currentTime);
+
+            // Ganhos individuais dos osciladores para equilíbrio tonal
+            const subGain = ctx.createGain();
+            subGain.gain.setValueAtTime(0.75, ctx.currentTime);
+            oscSub.connect(subGain);
+
+            const bodyGain = ctx.createGain();
+            bodyGain.gain.setValueAtTime(0.35, ctx.currentTime);
+            oscBody.connect(bodyGain);
+
+            // 3. Filtro Passa-Baixas Ressonante (O "Silencioso / Bloco do Motor")
+            // Corta todos os agudos estridentes (>750Hz), conferindo som abafado e encorpado
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(220, ctx.currentTime);
+            filter.Q.setValueAtTime(2.2, ctx.currentTime);
+
+            subGain.connect(filter);
+            bodyGain.connect(filter);
+
+            // 4. Ganho Mestre Balanceado e Suave (0.032..0.048 - volume confortável sem estridência)
+            const masterGain = ctx.createGain();
+            masterGain.gain.setValueAtTime(0.032, ctx.currentTime);
+
+            filter.connect(masterGain);
+            masterGain.connect(ctx.destination);
+
+            oscSub.start();
+            oscBody.start();
+
+            proceduralAudioEngine.engineOscSub = oscSub;
+            proceduralAudioEngine.engineOsc = oscBody;
+            proceduralAudioEngine.engineFilter = filter;
+            proceduralAudioEngine.engineGain = masterGain;
         }
+
         function updateEngineSound(speedRatio) {
-            if (!proceduralAudioEngine.engineOsc) return;
-            const targetFreq = 80 + speedRatio * 570;
-            proceduralAudioEngine.engineOsc.frequency.setTargetAtTime(targetFreq, proceduralAudioEngine.audioCtx.currentTime, 0.05);
-            const baseGain = isInTunnel ? 0.14 : 0.06;
-            proceduralAudioEngine.engineGain.gain.setTargetAtTime(gameState.started ? baseGain : 0.02, proceduralAudioEngine.audioCtx.currentTime, 0.1);
+            if (!proceduralAudioEngine.engineOsc || !proceduralAudioEngine.audioCtx) return;
+            const ctx = proceduralAudioEngine.audioCtx;
+            const t = ctx.currentTime;
+
+            // 1. Simulação de Transmissão / Câmbio (4 Marchas)
+            // Troca de marchas realista: o RPM sobe e desce a cada marcha em vez de subir em linha reta
+            let gear = 1;
+            let gearProgress = 0;
+
+            if (speedRatio < 0.24) {
+                gear = 1;
+                gearProgress = speedRatio / 0.24;
+            } else if (speedRatio < 0.48) {
+                gear = 2;
+                gearProgress = (speedRatio - 0.24) / 0.24;
+            } else if (speedRatio < 0.74) {
+                gear = 3;
+                gearProgress = (speedRatio - 0.48) / 0.26;
+            } else {
+                gear = 4;
+                gearProgress = Math.min(1.0, (speedRatio - 0.74) / 0.26);
+            }
+            proceduralAudioEngine.currentGear = gear;
+
+            // Curva de RPM: 900 RPM (marcha lenta) até 5200 RPM
+            const idleRPM = 900;
+            const baseGearRPM = gear === 1 ? idleRPM : 2000 + (gear - 2) * 400;
+            const maxGearRPM = 4400 + (gear - 1) * 320;
+            const currentRPM = baseGearRPM + gearProgress * (maxGearRPM - baseGearRPM);
+
+            // Frequência de combustão realista (faixa grave: 32 Hz a 135 Hz)
+            const baseFreq = THREE.MathUtils.clamp((currentRPM / 60) * 1.5, 32, 135);
+            proceduralAudioEngine.engineOscSub.frequency.setTargetAtTime(baseFreq, t, 0.06);
+            proceduralAudioEngine.engineOsc.frequency.setTargetAtTime(baseFreq * 2.0, t, 0.06);
+
+            // 2. Abertura do Filtro Passa-Baixas conforme o esforço do motor
+            // Mantém sempre abaixo de 750 Hz (zero agudos estridentes)
+            const isAccelerating = (keys['arrowup'] || keys['w']) && gameState.started;
+            const filterCutoff = 220 + gearProgress * 400 + (isAccelerating ? 80 : 0);
+            proceduralAudioEngine.engineFilter.frequency.setTargetAtTime(filterCutoff, t, 0.08);
+
+            // 3. Volume Confortável e Balanceado (discreto e suave, sem cansar)
+            let targetGain = 0.030;
+            if (gameState.started) {
+                targetGain = isAccelerating ? (0.038 + speedRatio * 0.008) : (0.028 + speedRatio * 0.005);
+                if (isInTunnel) targetGain *= 1.3;
+            } else {
+                targetGain = 0.012; // quase inaudível antes da largada
+            }
+
+            proceduralAudioEngine.engineGain.gain.setTargetAtTime(targetGain, t, 0.1);
         }
         function playNitroActivateSound() {
             if (!proceduralAudioEngine.audioCtx) return;
@@ -2294,11 +2865,53 @@
                 playerCar.position.x += Math.sin(playerCar.rotation.y) * gameState.playerSpeed * ts;
                 playerCar.position.z += Math.cos(playerCar.rotation.y) * gameState.playerSpeed * ts;
 
+                // Dinâmica de solo, ladeiras e física vertical
+                if (!isAirborne) {
+                    const groundY = getGroundElevation(playerCar.position.x, playerCar.position.z, playerCar.position.y);
+                    if (playerCar.position.y > groundY + 0.8 && Math.abs(gameState.playerSpeed) > playerPhysics.maxSpd * 0.6) {
+                        isAirborne = true;
+                        verticalVelocity = Math.abs(gameState.playerSpeed) * 0.35 + 0.08;
+                        triggerBulletTime();
+                    } else {
+                        playerCar.position.y = THREE.MathUtils.lerp(playerCar.position.y, groundY, 0.4);
+
+                        // Inclinação realista (Pitch & Roll) na ladeira/rampa
+                        const delta = 1.2;
+                        const fwdX = Math.sin(playerCar.rotation.y);
+                        const fwdZ = Math.cos(playerCar.rotation.y);
+                        const rightX = Math.cos(playerCar.rotation.y);
+                        const rightZ = -Math.sin(playerCar.rotation.y);
+
+                        const yFwd = getGroundElevation(playerCar.position.x + fwdX * delta, playerCar.position.z + fwdZ * delta, playerCar.position.y);
+                        const yBwd = getGroundElevation(playerCar.position.x - fwdX * delta, playerCar.position.z - fwdZ * delta, playerCar.position.y);
+                        const yRgt = getGroundElevation(playerCar.position.x + rightX * delta, playerCar.position.z + rightZ * delta, playerCar.position.y);
+                        const yLft = getGroundElevation(playerCar.position.x - rightX * delta, playerCar.position.z - rightZ * delta, playerCar.position.y);
+
+                        const targetPitch = Math.atan2(yFwd - yBwd, delta * 2);
+                        const targetRoll  = Math.atan2(yRgt - yLft, delta * 2);
+
+                        playerCar.rotation.x = THREE.MathUtils.lerp(playerCar.rotation.x, targetPitch, 0.25);
+                        playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, -targetRoll, 0.25);
+                    }
+                }
+
                 // TASK_003: obstáculos interativos e física aérea
                 checkOilCollisions();
                 checkRampCollision();
                 updateAirbornePhysics(ts);
                 updateCones(ts);
+
+                // Detecção de queda no oceano (ilha)
+                const dOcean = Math.max(Math.abs(playerCar.position.x), Math.abs(playerCar.position.z));
+                if (dOcean > 385 && playerCar.position.y <= -0.8) {
+                    createLandingParticles();
+                    gameState.playerSpeed *= 0.2;
+                    playerCar.position.x = THREE.MathUtils.clamp(playerCar.position.x, -360, 360);
+                    playerCar.position.z = THREE.MathUtils.clamp(playerCar.position.z, -360, 360);
+                    playerCar.position.y = 0.5;
+                    verticalVelocity = 0;
+                    isAirborne = false;
+                }
 
                 // Tráfego e marcas
                 updateTraffic(dt);
@@ -2341,6 +2954,7 @@
 
                     aiCar.position.x += Math.sin(aiCar.rotation.y) * AI_SPEED * ts;
                     aiCar.position.z += Math.cos(aiCar.rotation.y) * AI_SPEED * ts;
+                    aiCar.position.y = THREE.MathUtils.lerp(aiCar.position.y, getGroundElevation(aiCar.position.x, aiCar.position.z, aiCar.position.y), 0.3);
 
                     // (TL) IA evita o tráfego: repulsão lateral se houver carro a < 12 unidades
                     for (const t of traffic) {
@@ -2390,6 +3004,13 @@
                     }
                 });
 
+                // TASK_008: item especial no topo da ponte
+                animateBridgeMagnet(dt);
+                updateMagnetOrbs(dt);
+                if (bridgeMagnet && checkCollision(playerCar, bridgeMagnet, BRIDGE_MAGNET_RANGE)) {
+                    collectBridgeMagnet();
+                }
+
                 // TASK_003: pit stop, fumaça de dano, cura, fantasma, cronômetro de volta
                 updatePitStop(dt);
                 if (Math.random() < 0.3) spawnSmoke();
@@ -2398,6 +3019,9 @@
                 updateGhostCar();
                 updateLapTimer(dt * 1000);
                 updateTask3HUD();
+
+                // TASK_007: integridade zerada (qualquer causa) encerra a partida
+                if (gameState.playerHealth <= 0) bustPlayer();
 
                 // Verificar vitória (modo Coleta de Moedas)
                 if (raceMode === 'coins' && gameState.playerScore >= MAX_SCORE) {
@@ -2415,6 +3039,19 @@
             trainGroup.position.x = Math.cos(trainAngle) * TRACK_RADIUS;
             trainGroup.position.z = Math.sin(trainAngle) * TRACK_RADIUS;
             trainGroup.rotation.y = -trainAngle + Math.PI / 2;
+
+            // Animação das ondas do oceano
+            if (typeof oceanGeometry !== 'undefined' && oceanGeometry.attributes && oceanGeometry.attributes.position) {
+                const oceanTime = performance.now() * 0.0018;
+                const pos = oceanGeometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const ox = pos.getX(i);
+                    const oy = pos.getY(i);
+                    const wave = Math.sin(ox * 0.012 + oceanTime) * Math.cos(oy * 0.012 + oceanTime) * 0.6;
+                    pos.setZ(i, wave);
+                }
+                pos.needsUpdate = true;
+            }
 
             // Câmera seguindo o jogador
             camera.position.x = playerCar.position.x - Math.sin(playerCar.rotation.y) * CAMERA_DISTANCE;
@@ -2486,7 +3123,7 @@
             isHeadlightsOn: () => headlightsOn, headlightsAutoRef: () => headlightsAuto,
             startFromGarage, selectCar: (id) => { selectedCarId = id; },
             initTraffic, updateTraffic, updateDayNight, toggleHeadlightsManual, setHeadlights,
-            playerCar,
+            playerCar, aiCar,
             // TASK_003
             activeCones, oilPuddles, ramps, repairPad, smokeParticles,
             applyDamage, checkOilCollisions, handlePlayerSpin, checkRampCollision,
@@ -2503,9 +3140,15 @@
             hasPoppedTires: () => hasPoppedTires, isInTunnel: () => isInTunnel,
             updateNitroSystem, updatePoliceAI, updateWeather, updateHeatLevel, checkSpikeStripCollisions,
             spawnSpikeStrip, syncCopCount, playPoliceSiren, stopPoliceSiren,
+            bustPlayer, getHealth: () => gameState.playerHealth,
+            // TASK_008
+            bridgeMagnet, magnetOrbs, spawnBridgeMagnet, collectBridgeMagnet,
+            getBridgeState: () => ({ exists: !!bridgeMagnet, pos: bridgeMagnet ? bridgeMagnet.position.toArray() : null, absorb: BRIDGE_MAGNET_ABSORB, range: BRIDGE_MAGNET_RANGE, coinsOnMap: coins.length }),
             initAudioEngine, updateEngineSound, playTurboBlowOffSound, playNitroActivateSound,
-            routeZones, isInZone, spawnGravelCoins
+            routeZones, isInZone, spawnGravelCoins,
+            voxel: { files: VOXEL_CAR_FILES, scenes: VOXEL_CAR_SCENES, info: VOXEL_CAR_INFO, scale: VOXEL_CAR_SCALE }
         };
+        })();
     </script>
 </body>
 </html>

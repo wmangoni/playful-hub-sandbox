@@ -484,3 +484,66 @@ function playExplosionSound() {
 
 * **Identificação do Jogo**: `3d_shooter`
 * **Status do Backlog**: Transicionado para `✅ Refined` em `BACKLOG.md`.
+
+---
+
+## 🧪 Evidencias de Testes
+
+### 📋 Resumo da Avaliação de QA
+* **Data da Execução**: 06/09/2026
+* **Ambiente**: Navegador Headless via Puppeteer + Node.js HTTP Server (`http://127.0.0.1:3057/3d_shooter`)
+* **Suite de Testes**: [`tests/qa_3d_shooter_task003.test.js`](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tests/qa_3d_shooter_task003.test.js)
+* **Resultado Global**: **100% Aprovado (62/62 Asserções Passaram com Sucesso)**
+
+---
+
+### 🔍 Detalhamento dos Testes Realizados
+
+#### 1. Arsenal de Armas Avançado — Rifle de Plasma (Arma 3)
+* `[PASS]` `switchWeapon(3)` seleciona o Plasma Rifle; cadência de tiro de `fireRate 0.1s`, dano de 10 por impacto direto.
+* `[PASS]` Disparo cria **projétil físico** (não-hitscan) `owner='player'`, `type='plasma'`, cor neon ciano `#00f3ff`, velocidade de exatamente **12 unidades/s**, raio físico 0.15.
+* `[PASS]` Translado verificado no loop `updateProjectiles(0.1)` (1.20u movidas); impacto direto reduz exatamente **10 HP** do inimigo e destrói o projétil.
+
+#### 2. Arsenal de Armas Avançado — Lançador de Mísseis (Arma 4)
+* `[PASS]` `switchWeapon(4)` seleciona o Lançador; `fireRate 1.2s`, dano central de 100. Míssil físico `type='rocket'` cor `#ff3300` a **8 unidades/s**.
+* `[PASS]` **Splash Damage linear**: inimigo a `d=0.5` recebe 72 HP; a `d=1.5` recebe 17 HP ($100 \times (1-d/1.8)$, decaimento até 0 na borda de 1.8u).
+* `[PASS]` Explosão ejeta **20 partículas** de fogo/fumaça (dentro do intervalo 15–25), dispara Screen Shake de **15px por 0.5s** e **fogo amigo atenuado 50%**: jogador a `d=0.4` sofre 39 HP.
+* `[PASS]` Caminho completo: míssil colide com inimigo → detona → projétil removido, dano aplicado e Screen Shake ativado.
+
+#### 3. Inimigo Conjurador à Distância (Cyber-Imp)
+* `[PASS]` Novo enemy type `cyber_imp` com HP 80, velocidade 1.2, cor `#ff00ff`; **2 unidades spawnam** no mapa inicial.
+* `[PASS]` **IA Tática 4.0–6.0u**: recua quando o jogador chega a 1.00u (afastou para 1.12u) e se aproxima quando o jogador está a 7.00u (fechou para 6.88u).
+* `[PASS]` Ataque à distância conjura projétil `imp-ball` (`owner='enemy'`, cor `#ff00ff`, dano 15, velocidade **5 unidades/s**).
+* `[PASS]` Projétil inimigo inflige exatamente **15 HP** se não esquivado; **esquiva lateral (strafe)** desvia o projétil sem dano — verificado com tracking em 60FPS.
+
+#### 4. Minimapa Tático Neon (HUD)
+* `[PASS]` Minimapa inicia em modo **compacto** (`showMinimap = 1`); tecla `M` cicla corretamente `1 → 2 → 0 → 1`.
+* `[PASS]` **Pixel-sampling no canvas**: modo expandido (200px) desenha o Cyber-Imp como ponto **magenta `#ff00ff`** em `(710,65)` e o jogador como triângulo **amarelo `#ffeb3b`** em `(620,53)` — coordenadas exatas do renderer.
+* `[PASS]` Modo compacto desenha entidades no radar (8 chamadas `arc`); modo desligado **não desenha nada** (0 calls) e faz early-return.
+* `[PASS]` Renderização integrada `render()` estável nos modos compacto, expandido e desligado.
+
+#### 5. Síntese de Áudio via Web Audio API
+* `[PASS]` `playPlasmaLaserSound()` (sawtooth descendente), `playRocketLaunchSound()` (triangle) e `playImpCastSound()` (sine ascendente) sintetizam **3 osciladores** — interceptados por monkey-patch de `createOscillator`.
+* `[PASS]` `playExplosionSound()` gera estrondo de **ruído branco** (`createBuffer(1, 0.6s)`) com **filtro passa-baixa** (`createBiquadFilter`) e decaimento exponencial de ganho.
+
+#### 6. Munições de Plasma e Mísseis (Pickups)
+* `[PASS]` Pickups `ammo_plasma` (cor `#00f3ff`) e `ammo_rocket` (cor `#ff3300`) presentes no mapa via `scanMapForPickups`.
+* `[PASS]` Coleta adiciona **30 cartuchos** e remove apenas o pickup coletado (demais permanecem).
+
+#### 7. Execução em Tempo Real e Estabilidade
+* `[PASS]` **0 erros fatais** (`pageerror`) no console do navegador durante toda a execução.
+* `[PASS]` Suíte de fumaça global (`npm run test:ci`) executada com sucesso.
+
+---
+
+### 📸 Evidência Visual Capturada
+* **Screenshot 1 (Missile Launcher + Minimapa Expandido)**: [`tests/3d_shooter_task003_qa_evidence.png`](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tests/3d_shooter_task003_qa_evidence.png)
+* **Screenshot 2 (Plasma Rifle + Minimapa Compacto)**: [`tests/3d_shooter_task003_qa_evidence_rocket.png`](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/tests/3d_shooter_task003_qa_evidence_rocket.png)
+
+---
+
+### 🏁 Parecer Final de QA
+* **Status Recomendado**: `🎉 Ready for Deploy`
+* **Conclusão**: Todos os critérios de aceitação (Arsenal de Armas Avançado, IA do Cyber-Imp, Minimapa Tático Neon e Síntese de Áudio Web Audio API) foram cumpridos integralmente, com projéteis físicos determinísticos, splash damage linear exato, IA tática funcional e minimapa com renderização pixel-perfect.
+
+*Assinado: opencode (QA) - Senior QA Engineer*

@@ -114,13 +114,13 @@ const gamesData = {
         tags: ['Xadrez', 'Estratégia', 'IA', 'Tabuleiro', 'Clássico'],
         relatedGames: ['strategy_game', 'puzzle', 'ded']
     },
-    'tetris': {
-        title: 'Tetris',
-        description: 'O clássico dos anos 80 que nunca sai de moda! Organize as peças que caem e complete linhas para ganhar pontos neste jogo atemporal.',
-        keywords: 'tetris, clássico, anos 80, puzzle, blocos, arcade, PlayfulHub',
+    'block_stacker': {
+        title: 'Block Stacker',
+        description: 'Organize as peças que caem e complete linhas para ganhar pontos neste clássico e viciante jogo de puzzle arcade.',
+        keywords: 'block stacker, blocos, puzzle, arcade, empilhar, encaixe, peças, PlayfulHub',
         genre: 'Puzzle / Arcade',
         developer: 'PlayfulHub',
-        features: 'Velocidade crescente, sistema de pontuação, efeitos visuais clássicos',
+        features: 'Velocidade crescente, sistema de pontuação, modo duelo vs CPU, detecção de T-Spin e efeitos visuais',
         objective: 'Complete linhas horizontais organizando as peças que caem.',
         controls: [
             { key: '⬅️➡️', action: 'Mover peça' },
@@ -134,7 +134,7 @@ const gamesData = {
             'Planeje alguns movimentos à frente',
             'Não tenha pressa - é melhor fazer movimentos corretos'
         ],
-        tags: ['Tetris', 'Clássico', 'Puzzle', 'Arcade', 'Anos 80'],
+        tags: ['Block Stacker', 'Blocos', 'Puzzle', 'Arcade', 'Estratégia'],
         relatedGames: ['puzzle', 'snake', 'space_shooter']
     },
     'snake': {
@@ -157,7 +157,7 @@ const gamesData = {
             'Mantenha a calma quando a cobra ficar longa'
         ],
         tags: ['Snake', 'Cobrinha', 'Arcade', 'Retro', 'Clássico'],
-        relatedGames: ['tetris', 'space_shooter', 'puzzle']
+        relatedGames: ['block_stacker', 'space_shooter', 'puzzle']
     },
     'strategy_game': {
         title: 'Strategy Empire',
@@ -400,7 +400,7 @@ const gamesData = {
             'Foque em objetivos específicos para maximizar pontos'
         ],
         tags: ['Pinball', 'Fliperama', 'Física', 'Arcade', 'Clássico'],
-        relatedGames: ['space_shooter', 'snake', 'tetris']
+        relatedGames: ['space_shooter', 'snake', 'block_stacker']
     },
     'voxel_city': {
         title: 'Voxel City Delivery',
@@ -534,7 +534,7 @@ function generateRelatedGamesHTML(relatedGames) {
             'ded': '🎲',
             '3d_shooter': '🔫',
             'chess': '♟️',
-            'tetris': '🎮',
+            'block_stacker': '🧱',
             'snake': '🐍',
             'strategy_game': '🏰',
             'rubiks_cube': '🎲',

@@ -389,6 +389,111 @@
             from { background: rgba(255, 0, 0, 0.3); }
             to { background: rgba(255, 0, 0, 0.5); }
         }
+
+        /* TASK_004: Weather HUD indicator */
+        #weather-hud {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            margin-top: 60px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffcc00;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* TASK_004: Taxi toast */
+        #taxi-toast {
+            position: absolute;
+            top: 16%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 3px black;
+            display: none;
+            pointer-events: none;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 18px;
+            border-radius: 8px;
+        }
+
+        /* TASK_004: Taxi boarding prompt */
+        #taxi-prompt {
+            position: absolute;
+            top: 65%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffcc00;
+            font-size: 22px;
+            display: none;
+            text-shadow: 1px 1px 2px black;
+            font-weight: bold;
+            animation: blinkRed 1s infinite alternate;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* TASK_004: Driver Profile button */
+        #profile-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 240px;
+            background: linear-gradient(135deg, #00f0ff, #0077ff);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            z-index: 30;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+
+        /* TASK_004: Driver Profile panel */
+        #profile-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 460px;
+            padding: 25px;
+            border-radius: 16px;
+            backdrop-filter: blur(15px);
+            background: rgba(10, 15, 30, 0.94);
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.5);
+            color: white;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 110;
+        }
+
+        .profile-header {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff00ff;
+            text-align: center;
+            border-bottom: 2px solid rgba(255, 0, 255, 0.3);
+            padding-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+        .profile-record {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .profile-record .label { font-weight: bold; font-size: 15px; }
+        .profile-record .value { color: #00f0ff; font-size: 18px; }
     </style>
     <!-- Import Map for Three.js -->
     <script type="importmap">
@@ -439,6 +544,9 @@
         <span class="star">★</span>
         <span class="star">★</span>
     </div>
+
+    <!-- TASK_004: Weather HUD indicator -->
+    <div id="weather-hud">☀️ ENSOLARADO</div>
 
     <!-- Busted Warning HUD -->
     <div id="busted-warning-hud">
@@ -522,6 +630,16 @@
         <button id="close-garage-btn" onclick="closeGarage()">Exit Garage</button>
     </div>
 
+    <!-- TASK_004: Taxi toast & Driver Profile -->
+    <div id="taxi-toast"></div>
+    <div id="taxi-prompt">Press T to pick up passenger 🚖</div>
+    <button id="profile-btn" onclick="toggleProfilePanel()">👤 Perfil</button>
+    <div id="profile-panel">
+        <div class="profile-header">👤 DRIVER PROFILE</div>
+        <div id="profile-records"></div>
+        <button id="close-garage-btn" onclick="toggleProfilePanel()">Close</button>
+    </div>
+
     <div id="game-over">
         <div>GAME OVER</div>
         <div style="font-size: 32px">Final Score: <span id="final-score">0</span></div>
@@ -530,11 +648,36 @@
 
     <script type="module">
         import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+        // --- Car 3D Models (Kenney "Car Kit", CC0) ---
+        // Loaded once and shared across all traffic cars via GLTFLoader.
+        const CAR_MODEL_FILES = ['sedan', 'taxi', 'police', 'ambulance', 'van', 'truck', 'suv', 'hatchback-sports', 'race', 'firetruck'];
+        const CAR_MODEL_POOL = [];
+        const CAR_MODEL_SCENES = {}; // named lookup (e.g. CAR_MODEL_SCENES['police']) for classes like PoliceCar
+        const CAR_MODEL_SCALE = 2.6; // Kenney GLBs are ~1.5 units long; scale up to match game roads (~4).
+        function loadCarModels() {
+            const loader = new GLTFLoader();
+            const paths = CAR_MODEL_FILES.map(n => `assets/models/cars/${n}.glb`);
+            return Promise.all(paths.map((p, i) => new Promise(resolve => {
+                const name = CAR_MODEL_FILES[i];
+                loader.load(p, gltf => {
+                    CAR_MODEL_POOL.push(gltf.scene);
+                    CAR_MODEL_SCENES[name] = gltf.scene;
+                    resolve();
+                }, undefined, () => resolve()); // ignore load errors gracefully
+            })));
+        }
 
         // --- Constants ---
         const CITY_SIZE = 15; // Blocks
         const BLOCK_SIZE = 20; // Units per block (Wider)
         const TOTAL_TIME = 300;
+        const SEA_LEVEL = -1.0; // World ocean height (island ground dips below it at the coast)
+        const TERRAIN_STEP = 20; // Height-map control lattice spacing (aligns with roads)
+        const TERRAIN_START = -160;
+        const TERRAIN_N = 17;
 
         // --- Game State ---
         const state = {
@@ -581,7 +724,40 @@
             smokeParticles: [],
             skidmarks: [],
             sparkParticles: [],
-            ramps: []
+            ramps: [],
+            lombas: [],
+            inWater: false,
+
+            // TASK_004: Weather (sunny/rainy)
+            weather: 'sunny',
+            weatherTimer: 90,
+
+            // TASK_004: Taxi (Crazy Taxi Mode)
+            taxiMode: false,
+            passengerActive: false,
+            passengerTargetPos: null,
+            passengerTimer: 0,
+            passengerTips: 0,
+            activeTaxiPassengers: [],
+            currentDriftTime: 0,
+            currentAirTime: 0,
+
+            // TASK_004: Driver Profile records
+            records: {
+                maxDriftTime: 0,
+                maxAirTime: 0,
+                passengersDelivered: 0,
+                totalMoney: 0,
+                maxWanted: 0
+            },
+
+            // TASK_004: Rain puddles
+            puddles: [],
+
+            // TASK_004: Neon buildings materials (tracked for emissive transitions)
+            neonMaterials: [],
+            // TASK_004 performance: shared neon intensity state (0 day -> 1 night) for the instanced neon
+            neonIntensity: 0
         };
         window.state = state;
 
@@ -603,6 +779,9 @@
                 this.nitroNoiseNode = null;
                 this.nitroGain = null;
                 this.nitroFilter = null;
+                this.rainNoiseNode = null;
+                this.rainGain = null;
+                this.rainFilter = null;
                 this.initialized = false;
             }
 
@@ -689,6 +868,21 @@
                     this.nitroGain.connect(this.ctx.destination);
                     this.nitroNoiseNode.start();
 
+                    // TASK_004: Rain symphonia (white noise through oscillating bandpass)
+                    this.rainNoiseNode = this.ctx.createBufferSource();
+                    this.rainNoiseNode.buffer = noiseBuffer;
+                    this.rainNoiseNode.loop = true;
+                    this.rainFilter = this.ctx.createBiquadFilter();
+                    this.rainFilter.type = 'bandpass';
+                    this.rainFilter.frequency.value = 1000;
+                    this.rainFilter.Q.value = 0.6;
+                    this.rainGain = this.ctx.createGain();
+                    this.rainGain.gain.value = 0;
+                    this.rainNoiseNode.connect(this.rainFilter);
+                    this.rainFilter.connect(this.rainGain);
+                    this.rainGain.connect(this.ctx.destination);
+                    this.rainNoiseNode.start();
+
                     this.initialized = true;
                 } catch (e) {
                     console.error("Audio init error:", e);
@@ -710,7 +904,7 @@
                     const targetCutoff = 200 + speedRatio * 750;
                     this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.05);
                     this.engineFilter.frequency.setTargetAtTime(targetCutoff, now, 0.05);
-                    this.engineGain.gain.setTargetAtTime(0.12, now, 0.05);
+                    this.engineGain.gain.setTargetAtTime(0.02, now, 0.05);
                 } else {
                     this.engineGain.gain.setTargetAtTime(0, now, 0.1);
                 }
@@ -747,6 +941,50 @@
                 } else {
                     this.nitroGain.gain.setTargetAtTime(0, now, 0.05);
                 }
+
+                // TASK_004: Rain symphonia (in-car muffled lowpass, on-foot bright highpass)
+                if (state.weather === 'rainy') {
+                    const inCar = state.inCar;
+                    this.rainGain.gain.setTargetAtTime(inCar ? 0.12 : 0.14, now, 0.2);
+                    if (this.rainFilter.type !== 'bandpass') this.rainFilter.type = 'bandpass';
+                    this.rainFilter.frequency.setTargetAtTime(inCar ? 1200 : 3500, now, 0.2);
+                } else {
+                    this.rainGain.gain.setTargetAtTime(0, now, 0.3);
+                }
+            }
+
+            // TASK_004: Taxi coin collection chime (1600Hz -> 2400Hz sine)
+            playTaxiChime() {
+                if (!this.initialized || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sine';
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.frequency.setValueAtTime(1600, now);
+                osc.frequency.exponentialRampToValueAtTime(2400, now + 0.06);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            // TASK_004: Passenger scream (FM triangular 600 -> 1100Hz during stunts)
+            playPassengerScream() {
+                if (!this.initialized || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                osc.type = 'triangle';
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1100, now + 0.4);
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.55);
             }
         }
 
@@ -763,6 +1001,7 @@
                 this.angularVelocity = new THREE.Vector3(0, 0, 0);
                 this.isHit = false;
                 this.isDestroyed = false;
+                this.baseY = position.y; // ground (terrain) height where the prop spawned
                 this.box = new THREE.Box3().setFromObject(mesh);
             }
 
@@ -775,8 +1014,8 @@
                     this.mesh.rotation.y += this.angularVelocity.y * dt;
                     this.mesh.rotation.z += this.angularVelocity.z * dt;
 
-                    if (this.mesh.position.y <= 0.3) {
-                        this.mesh.position.y = 0.3;
+                    if (this.mesh.position.y <= this.baseY + 0.3) {
+                        this.mesh.position.y = this.baseY + 0.3;
                         this.velocity.y = -this.velocity.y * 0.4; // Elastic bounce
                         this.velocity.x *= 0.82; // Ground friction
                         this.velocity.z *= 0.82;
@@ -991,6 +1230,391 @@
             }
         }
 
+        // --- TASK_004: Rain System ---
+        class RainSystem {
+            constructor(scene) {
+                this.scene = scene;
+                this.particleCount = 600;
+                this.geometry = new THREE.BufferGeometry();
+                this.positions = new Float32Array(this.particleCount * 3);
+
+                for (let i = 0; i < this.particleCount; i++) {
+                    this.positions[i * 3] = (Math.random() - 0.5) * 50;
+                    this.positions[i * 3 + 1] = Math.random() * 30;
+                    this.positions[i * 3 + 2] = (Math.random() - 0.5) * 50;
+                }
+
+                this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+
+                this.material = new THREE.PointsMaterial({
+                    color: 0x88ccff,
+                    size: 0.15,
+                    transparent: true,
+                    opacity: 0.6,
+                    depthWrite: false
+                });
+
+                this.points = new THREE.Points(this.geometry, this.material);
+                this.points.visible = false;
+                this.scene.add(this.points);
+            }
+
+            setVisible(v) {
+                this.points.visible = v;
+            }
+
+            update(dt, playerPos) {
+                if (!this.points.visible) return;
+                if (!playerPos) return;
+
+                this.points.position.set(playerPos.x, 0, playerPos.z);
+
+                const posArr = this.geometry.attributes.position.array;
+                for (let i = 0; i < this.particleCount; i++) {
+                    posArr[i * 3 + 1] -= 25 * dt;
+                    posArr[i * 3] -= 5 * dt;
+
+                    if (posArr[i * 3 + 1] < 0) {
+                        posArr[i * 3 + 1] = 30 + Math.random() * 5;
+                        posArr[i * 3] = (Math.random() - 0.5) * 50;
+                        posArr[i * 3 + 2] = (Math.random() - 0.5) * 50;
+                    }
+                }
+                this.geometry.attributes.position.needsUpdate = true;
+            }
+        }
+
+        // --- TASK_004: Puddle (reflective wet spot on roads) ---
+        class Puddle {
+            constructor(scene, position) {
+                this.scene = scene;
+                const geo = new THREE.CircleGeometry(3, 16);
+                const mat = new THREE.MeshBasicMaterial({
+                    color: 0x88bbff,
+                    transparent: true,
+                    opacity: 0.35,
+                    depthWrite: false
+                });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.rotation.x = -Math.PI / 2;
+                this.mesh.position.copy(position);
+                this.mesh.position.y = 0.02;
+                this.scene.add(this.mesh);
+                this.mesh.visible = false;
+            }
+
+            setVisible(v) {
+                this.mesh.visible = v;
+            }
+
+            dispose() {
+                this.scene.remove(this.mesh);
+                this.mesh.geometry.dispose();
+                this.mesh.material.dispose();
+            }
+        }
+
+        // --- TASK_004: Floating text/sprite helper ---
+        function makeTextSprite(text, opts) {
+            opts = opts || {};
+            const canvas = document.createElement('canvas');
+            const fontSize = opts.size || 96;
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.font = `${fontSize}px 'Segoe UI', Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = opts.shadow || '#000000';
+            ctx.shadowBlur = 16;
+            if (opts.backgroundColor) {
+                ctx.fillStyle = opts.backgroundColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            ctx.fillStyle = opts.color || '#ffffff';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                depthTest: false
+            });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(opts.scale || 6, (opts.scale || 6) * 0.5, 1);
+            return sprite;
+        }
+
+        // --- TASK_004: Taxi System (Crazy Taxi Mode) ---
+        class TaxiSystem {
+            constructor(scene, world, pedestrians) {
+                this.scene = scene;
+                this.world = world;
+                this.pedestrians = pedestrians;
+                this.passengers = []; // {pedestrian, icon}
+                this.destinationMarker = null;
+                this.spawnTimer = 0;
+                this.soundCooldown = 0;
+            }
+
+            setTrafficSystem(trafficSystem) {
+                this.trafficSystemRef = trafficSystem;
+            }
+
+            update(dt, playerPos, playerInCar, currentCar) {
+                // Spawn taxi passengers periodically (limit 2 active)
+                this.spawnTimer += dt;
+                if (this.spawnTimer > 8 && this.passengers.length < 2) {
+                    this.spawnTimer = 0;
+                    this.trySpawnPassenger();
+                }
+
+                // Update icons + passenger pickup proximity
+                for (const p of this.passengers) {
+                    const ped = p.pedestrian;
+                    // float icon above head
+                    p.icon.position.copy(ped.mesh.position);
+                    p.icon.position.y += 3.2 + Math.sin(Date.now() * 0.004) * 0.15;
+                    p.icon.material.rotation += dt * 0.5;
+
+                    // Embarque: player in car, close, press T handled in Player keydown
+                    if (state.passengerActive) continue;
+                    const dist = playerPos.distanceTo(ped.mesh.position);
+                    if (state.inCar && currentCar && dist < 3.0) {
+                        p.nearby = true;
+                    } else {
+                        p.nearby = false;
+                    }
+                }
+
+                // Remove passengers that were picked up
+                this.passengers = this.passengers.filter(p => !p.pickedUp);
+
+                // Show boarding prompt if near a passenger (on foot or in car)
+                const promptEl = document.getElementById('taxi-prompt');
+                const nearAny = this.passengers.some(p => p.nearby);
+                if (promptEl) {
+                    promptEl.style.display = (nearAny && !state.passengerActive) ? 'block' : 'none';
+                }
+
+                // Floating reaction texts
+                if (state.tipTexts) {
+                    state.tipTexts = state.tipTexts.filter(t => {
+                        t.life -= dt;
+                        t.sprite.position.y += 2.5 * dt;
+                        if (t.life <= 0) {
+                            this.scene.remove(t.sprite);
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+
+                // Update taxi mission timer & destination marker
+                this.soundCooldown -= dt;
+                this.updateMission(dt, playerPos, currentCar);
+            }
+
+            trySpawnPassenger() {
+                if (this.passengers.length >= 2) return;
+                // pick a random pedestrian not already a taxi passenger
+                for (let i = 0; i < 40; i++) {
+                    const ped = this.pedestrians[Math.floor(Math.random() * this.pedestrians.length)];
+                    if (this.passengers.some(p => p.pedestrian === ped)) continue;
+                    const icon = makeTextSprite('🚖', { size: 120, scale: 3.5 });
+                    this.scene.add(icon);
+                    this.passengers.push({ pedestrian: ped, icon: icon, pickedUp: false, nearby: false });
+                    break;
+                }
+            }
+
+            tryPickupPassenger(currentCar) {
+                // called when T pressed near a passenger
+                if (state.passengerActive) return;
+                for (const p of this.passengers) {
+                    if (!p.nearby) continue;
+                    // Embark passenger
+                    p.icon.visible = false;
+                    this.scene.remove(p.icon);
+                    p.pickedUp = true;
+                    p.pedestrian.mesh.visible = false;
+                    state.passengerActive = true;
+                    state.passengerTips = 0;
+                    this.showToast('🚖 PASSENGER ON BOARD!', '#ffcc00');
+
+                    // Generate destination at a far intersection
+                    const target = this.chooseDestination(currentCar.mesh.position);
+                    state.passengerTargetPos = target.clone();
+                    const chebDist = Math.max(
+                        Math.abs(target.x - currentCar.mesh.position.x),
+                        Math.abs(target.z - currentCar.mesh.position.z)
+                    );
+                    state.passengerTimer = chebDist / 12 + 15;
+                    this.spawnDestinationMarker(target);
+                    if (window.audioEngine && window.audioEngine.playTaxiChime) window.audioEngine.playTaxiChime();
+                    return;
+                }
+            }
+
+            chooseDestination(playerPos) {
+                const candidates = this.world.intersections.filter(inter => {
+                    const d = inter.position.distanceTo(playerPos);
+                    return d > 40;
+                });
+                if (candidates.length === 0) return this.world.intersections[0].position;
+                return candidates[Math.floor(Math.random() * candidates.length)].position;
+            }
+
+            spawnDestinationMarker(pos) {
+                if (this.destinationMarker) {
+                    this.scene.remove(this.destinationMarker.group);
+                }
+                const group = new THREE.Group();
+                const pillarGeo = new THREE.CylinderGeometry(0.8, 0.8, 20, 12, 1, true);
+                const pillarMat = new THREE.MeshBasicMaterial({
+                    color: 0xff00ff,
+                    transparent: true,
+                    opacity: 0.35,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+                const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                pillar.position.y = 10;
+                group.add(pillar);
+
+                const ringGeo = new THREE.TorusGeometry(1.5, 0.3, 8, 24);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.9 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 2;
+                ring.position.y = 1.5;
+                group.add(ring);
+                group.ring = ring;
+
+                group.position.copy(pos);
+                this.scene.add(group);
+                this.destinationMarker = { group: group, position: pos };
+            }
+
+            updateMission(dt, playerPos, currentCar) {
+                if (this.destinationMarker && this.destinationMarker.group.ring) {
+                    this.destinationMarker.group.ring.rotation.z += dt * 2;
+                    this.destinationMarker.group.ring.position.y = 1.5 + Math.sin(Date.now() * 0.006) * 0.3;
+                }
+                if (!state.passengerActive) return;
+                if (!currentCar) return;
+
+                state.passengerTimer -= dt;
+
+                const distToTarget = playerPos.distanceTo(state.passengerTargetPos);
+
+                // Success: reached destination, near-zero speed
+                if (distToTarget < 5.0 && Math.abs(currentCar.currentSpeed || 0) < 1.0) {
+                    this.completeMission(currentCar);
+                } else if (state.passengerTimer <= 0) {
+                    this.failMission(currentCar);
+                }
+
+                // Stunt tips while passenger on board
+                this.checkStuntTips(dt, currentCar);
+            }
+
+            checkStuntTips(dt, currentCar) {
+                // Drift tip
+                if (state.driftActive && state.passengerActive) {
+                    if (!this.lastDriftTip) this.lastDriftTip = 0;
+                    this.lastDriftTip += dt;
+                    if (this.lastDriftTip > 1.2) {
+                        this.lastDriftTip = 0;
+                        this.addTip(currentCar.mesh.position, "WILD!");
+                    }
+                } else {
+                    this.lastDriftTip = 0;
+                }
+
+                // Ramp / air tip
+                if (state.stuntJumpActive && state.passengerActive) {
+                    if (!this.lastAirTip) this.lastAirTip = 0;
+                    this.lastAirTip += dt;
+                    if (this.lastAirTip > 1.5) {
+                        this.lastAirTip = 0;
+                        this.addTip(currentCar.mesh.position, "SPEEDY!");
+                    }
+                } else {
+                    this.lastAirTip = 0;
+                }
+
+                // Near-miss tip (collision with traffic car avoided at high speed)
+                if (state.passengerActive && this.soundCooldown <= 0) {
+                    const speed = Math.abs(currentCar.currentSpeed || 0);
+                    for (const other of this.trafficSystemRef && this.trafficSystemRef.cars || []) {
+                        if (other === currentCar) continue;
+                        const d = currentCar.mesh.position.distanceTo(other.mesh.position);
+                        if (d < 4.0 && d > 1.5 && speed > 18) {
+                            this.addTip(currentCar.mesh.position, "OH MY GOD!");
+                            this.soundCooldown = 2.0;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            addTip(position, label) {
+                state.passengerTips += 25;
+                const sprite = makeTextSprite(`+$25 STUNT TIP!`, { size: 72, color: '#00ff88', scale: 5 });
+                sprite.position.copy(position);
+                sprite.position.y += 3;
+                this.scene.add(sprite);
+                if (!state.tipTexts) state.tipTexts = [];
+                state.tipTexts.push({ sprite: sprite, life: 1.5 });
+
+                const react = makeTextSprite(label, { size: 96, color: '#ff00ff', scale: 6 });
+                react.position.copy(position);
+                react.position.y += 5;
+                this.scene.add(react);
+                state.tipTexts.push({ sprite: react, life: 1.5 });
+
+                playSound('bribe');
+                if (window.audioEngine && window.audioEngine.playPassengerScream && window.audioEngine.initialized) {
+                    window.audioEngine.playPassengerScream();
+                }
+            }
+
+            completeMission(currentCar) {
+                const base = Math.floor(Math.random() * 151) + 150; // $150 to $300
+                const total = base + state.passengerTips;
+                state.money += total;
+                state.records.passengersDelivered += 1;
+                updateMoneyHUD(); // tracka totalMoney via delta
+                this.showToast(`💰 TARIFA +$${total} (base $${base} + gorjetas $${state.passengerTips})`, '#2ecc71');
+                playSound('upgrade');
+                this.endMission(true);
+            }
+
+            failMission(currentCar) {
+                this.showToast('❌ TEMPO ESGOTADO! Passageiro pulou do carro.', '#ff4444');
+                playSound('vip_fail');
+                this.endMission(false);
+            }
+
+            endMission(success) {
+                state.passengerActive = false;
+                state.passengerTargetPos = null;
+                state.passengerTips = 0;
+                if (this.destinationMarker) {
+                    this.scene.remove(this.destinationMarker.group);
+                    this.destinationMarker = null;
+                }
+            }
+
+            showToast(text, color) {
+                const el = document.getElementById('taxi-toast');
+                if (!el) return;
+                el.innerText = text;
+                el.style.color = color || '#ffffff';
+                el.style.display = 'block';
+                setTimeout(() => { el.style.display = 'none'; }, 3500);
+            }
+        }
+
         // --- Input Handling ---
         class Input {
             constructor() {
@@ -1009,34 +1633,253 @@
                 this.scene = scene;
                 this.citySize = CITY_SIZE;
                 this.blockSize = BLOCK_SIZE;
-                this.roadWidth = 10; // Wider roads
+                this.roadWidth = 13; // Wider roads (extra lane space, keeps buildings procedural)
                 this.buildings = []; // Array of Box3 for collision
                 this.roads = [];
                 this.intersections = [];
                 this.streetLights = [];
                 this.streetLampMaterial = null;
+                // TASK_004 performance: reusable buffers for nearest-light selection (no alloc per frame)
+                // 3 (down from 5): fewer dynamic lights on at night = smaller shader-program compile
+                // at the day/night boundary and cheaper per-fragment lighting all night long.
+                this._maxStreetLights = 3;
+                this._nearestIdx = new Array(this._maxStreetLights).fill(-1);
+                this._nearestDist = new Array(this._maxStreetLights).fill(Infinity);
+
+                // TASK_004 performance: spatial hash (uniform grid) for O(1) collision queries
+                this.cellSize = 64;
+                this.mapHalf = (this.citySize * this.blockSize) / 2; // 150
+                this.cellDim = Math.ceil((this.citySize * this.blockSize) / this.cellSize); // ~5
+                this.buildingCells = [];
+                for (let cx = 0; cx < this.cellDim; cx++) {
+                    this.buildingCells.push(new Array(this.cellDim));
+                    for (let cz = 0; cz < this.cellDim; cz++) {
+                        this.buildingCells[cx][cz] = [];
+                    }
+                }
+                this._tmpBox = new THREE.Box3(); // reusable temp for collision expansion (no alloc per call)
+
+                // TASK_004 performance: neon stripes are collected and rendered via a single
+                // InstancedMesh + shared MeshBasicMaterial (1 material, 1 draw call, per-instance color).
+                this.neonStripeGeo = new THREE.BoxGeometry(0.4, 1, 0.4);
+                this.neonMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                this.neonMat.userData = { isNeon: true };
+                this.neonStripes = []; // {x,y,z,scaleY,color}
+                this.neonInstanceMesh = null;
+                this.buildingMeshes = []; // for distance culling
+
+                // Distance culling: buildings further than this radius are hidden (visible=false).
+                this.renderRadius = 120;
+
+                this._buildTerrain();
+                this.garageHeight = this.getGroundY(0, 0);
 
                 this.generateCity();
             }
 
+            // --- Terrain height field (deterministic, allocation-free getGroundY) ---
+            // A coarse lattice of control heights (spaced 20 units, aligned with the road grid)
+            // is bilinearly sampled and then "flattened" inside each block (building pad), so
+            // the roads become smooth ramps between flat block plateaus. Slope is capped so
+            // every street stays drivable and traffic never clips.
+            _latticeRaw(ix, iz) {
+                const gx = ix * TERRAIN_STEP + TERRAIN_START;
+                const gz = iz * TERRAIN_STEP + TERRAIN_START;
+                const r2 = gx * gx + gz * gz;
+                // Island dome: higher toward the centre, dipping below sea level at the coast.
+                const dome = 9.0 * Math.exp(-r2 / (2 * 110 * 110));
+                // Subtle rolling undulation over the whole island.
+                const roll = 2.2 * Math.sin(gx * 0.045) * Math.cos(gz * 0.04);
+                // Two curated hills.
+                const hill1 = 5.5 * Math.exp(-((gx - 55) * (gx - 55) + (gz - 35) * (gz - 35)) / (2 * 48 * 48));
+                const hill2 = 5.0 * Math.exp(-((gx + 75) * (gx + 75) + (gz - 115) * (gz - 115)) / (2 * 42 * 42));
+                // Two curated valleys (depressions).
+                const val1 = -6.5 * Math.exp(-((gx + 70) * (gx + 70) + (gz + 60) * (gz + 60)) / (2 * 45 * 45));
+                const val2 = -5.0 * Math.exp(-((gx - 25) * (gx - 25) + (gz + 95) * (gz + 95)) / (2 * 38 * 38));
+                return dome + roll + hill1 + hill2 + val1 + val2;
+            }
+
+            _buildTerrain() {
+                const N = TERRAIN_N;
+                const lat = new Float64Array(N * N);
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        lat[i * N + j] = this._latticeRaw(i, j);
+                    }
+                }
+                // Cap neighbouring differences so the maximum road slope stays drivable (~10 deg).
+                const MAXD = 5.0;
+                for (let pass = 0; pass < 32; pass++) {
+                    let changed = false;
+                    for (let i = 0; i < N; i++) {
+                        for (let j = 0; j < N; j++) {
+                            const v = lat[i * N + j];
+                            for (let d = 0; d < 4; d++) {
+                                const ni = i + ((d === 0) ? -1 : (d === 1) ? 1 : 0);
+                                const nj = j + ((d === 2) ? -1 : (d === 3) ? 1 : 0);
+                                if (ni < 0 || ni >= N || nj < 0 || nj >= N) continue;
+                                const n = lat[ni * N + nj];
+                                if (v - n > MAXD) { lat[i * N + j] = n + MAXD; changed = true; }
+                                else if (n - v > MAXD) { lat[i * N + j] = n - MAXD; changed = true; }
+                            }
+                        }
+                    }
+                    if (!changed) break;
+                }
+                this._lattice = lat;
+
+                // Pre-compute the flat building-pad height of every block (sampled at its centre).
+                this._blockPads = new Float64Array(CITY_SIZE * CITY_SIZE);
+                for (let bx = 0; bx < CITY_SIZE; bx++) {
+                    for (let bz = 0; bz < CITY_SIZE; bz++) {
+                        this._blockPads[bx * CITY_SIZE + bz] = this._sampleLattice(bx * BLOCK_SIZE - (CITY_SIZE - 1) * BLOCK_SIZE / 2, bz * BLOCK_SIZE - (CITY_SIZE - 1) * BLOCK_SIZE / 2);
+                    }
+                }
+                // Curated depressions on top of the natural valleys: an inland lagoon (SE district)
+                // and two sunken plazas. Offsets keep the pad-to-neighbour blends gradual/driveable.
+                this._padDepressions = {
+                    '1_2': -1.5, '2_2': -1.8, '1_3': -1.5, '2_3': -2.4, // lagoon basin
+                    '8_2': -0.9, '2_1': -0.85                            // sunken plazas
+                };
+                for (const key in this._padDepressions) {
+                    const idx = key.indexOf('_');
+                    const bx = parseInt(key.slice(0, idx), 10);
+                    const bz = parseInt(key.slice(idx + 1), 10);
+                    this._blockPads[bx * CITY_SIZE + bz] = this._padDepressions[key];
+                }
+            }
+
+            _sampleLattice(x, z) {
+                const N = TERRAIN_N;
+                const fx = (x - TERRAIN_START) / TERRAIN_STEP;
+                const fz = (z - TERRAIN_START) / TERRAIN_STEP;
+                let ix = Math.floor(fx);
+                let iz = Math.floor(fz);
+                if (ix < 0) ix = 0; else if (ix > N - 2) ix = N - 2;
+                if (iz < 0) iz = 0; else if (iz > N - 2) iz = N - 2;
+                const tx = fx - ix;
+                const tz = fz - iz;
+                const lat = this._lattice;
+                const h00 = lat[ix * N + iz];
+                const h10 = lat[(ix + 1) * N + iz];
+                const h01 = lat[ix * N + iz + 1];
+                const h11 = lat[(ix + 1) * N + iz + 1];
+                return h00 * (1 - tx) * (1 - tz) + h10 * tx * (1 - tz) + h01 * (1 - tx) * tz + h11 * tx * tz;
+            }
+
+            // 0 on a road centre line, 1 fully inside a block (flat pad zone).
+            _padWeight(v) {
+                const r = Math.round(v / BLOCK_SIZE) * BLOCK_SIZE;
+                let d = v - r;
+                if (d < 0) d = -d;
+                if (d >= 7) return 1;
+                if (d <= 0) return 0;
+                const t = d / 7;
+                return t * t * (3 - 2 * t); // smoothstep
+            }
+
+            // Single source of truth for ground elevation. Pure arithmetic, no allocations,
+            // so it is safe to call every frame from the player, traffic, pedestrians and props.
+            getGroundY(x, z) {
+                const h = this._sampleLattice(x, z);
+                const half = (CITY_SIZE - 1) * BLOCK_SIZE / 2; // 140
+                let bx = Math.floor((x + half) / BLOCK_SIZE);
+                let bz = Math.floor((z + half) / BLOCK_SIZE);
+                if (bx < 0) bx = 0; else if (bx >= CITY_SIZE) bx = CITY_SIZE - 1;
+                if (bz < 0) bz = 0; else if (bz >= CITY_SIZE) bz = CITY_SIZE - 1;
+                const pad = this._blockPads[bx * CITY_SIZE + bz];
+                const w = this._padWeight(x) * this._padWeight(z);
+                return h + (pad - h) * w;
+            }
+
+            _createTerrainMesh() {
+                const size = this.citySize * this.blockSize + 40; // 340: city + surrounding beach
+                const segments = 60;
+                const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+                geo.rotateX(-Math.PI / 2);
+                const pos = geo.attributes.position;
+                const count = pos.count;
+                const colors = new Float32Array(count * 3);
+                const cBeach = new THREE.Color(0xd6c297); // wet sand
+                const cCity = new THREE.Color(0x2a2a2a);  // asphalt
+                const tmp = new THREE.Color();
+                for (let i = 0; i < count; i++) {
+                    const x = pos.getX(i);
+                    const z = pos.getZ(i);
+                    const y = this.getGroundY(x, z);
+                    pos.setY(i, y);
+                    // Coast band: blend from sand (near/under sea level) to city asphalt.
+                    const t = THREE.MathUtils.clamp((y - (SEA_LEVEL + 0.6)) / 2.5, 0, 1);
+                    tmp.copy(cBeach).lerp(cCity, t);
+                    colors[i * 3] = tmp.r;
+                    colors[i * 3 + 1] = tmp.g;
+                    colors[i * 3 + 2] = tmp.b;
+                }
+                geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geo.computeVertexNormals();
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, vertexColors: true });
+                this.groundMesh = new THREE.Mesh(geo, mat);
+                this.groundMesh.receiveShadow = true;
+                this.scene.add(this.groundMesh);
+            }
+
+            _createWaterMesh() {
+                // A single large animated plane around the island, hidden below the coast line
+                // by the terrain. The beach strip (ground below ~sea level) visually ends at the water.
+                const size = 420;
+                const segments = 44;
+                const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+                geo.rotateX(-Math.PI / 2);
+                const pos = geo.attributes.position;
+                this._waterX = new Float32Array(pos.count);
+                this._waterZ = new Float32Array(pos.count);
+                for (let i = 0; i < pos.count; i++) {
+                    this._waterX[i] = pos.getX(i);
+                    this._waterZ[i] = pos.getZ(i);
+                }
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x1b6bb0,
+                    roughness: 0.2,
+                    metalness: 0.15,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide
+                });
+                this.waterMesh = new THREE.Mesh(geo, mat);
+                this.waterMesh.position.y = SEA_LEVEL;
+                this.waterMesh.receiveShadow = true;
+                this.scene.add(this.waterMesh);
+                this._waterTime = 0;
+            }
+
+            updateWater(dt) {
+                if (!this.waterMesh) return;
+                this._waterTime += dt;
+                const t = this._waterTime;
+                const pos = this.waterMesh.geometry.attributes.position;
+                const xs = this._waterX, zs = this._waterZ;
+                for (let i = 0; i < pos.count; i++) {
+                    const x = xs[i], z = zs[i];
+                    pos.setY(i, SEA_LEVEL
+                        + 0.18 * Math.sin(x * 0.10 + t * 1.3)
+                        + 0.12 * Math.cos(z * 0.13 + t * 0.9)
+                        + 0.08 * Math.sin((x + z) * 0.06 - t * 0.7));
+                }
+                pos.needsUpdate = true;
+            }
+
             generateCity() {
-                const groundGeo = new THREE.PlaneGeometry(this.citySize * this.blockSize, this.citySize * this.blockSize);
-                const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a });
-                const ground = new THREE.Mesh(groundGeo, groundMat);
-                ground.rotation.x = -Math.PI / 2;
-                ground.receiveShadow = true;
-                this.scene.add(ground);
+                this._createTerrainMesh();
+                this._createWaterMesh();
 
                 for (let x = -this.citySize / 2; x < this.citySize / 2; x++) {
                     for (let z = -this.citySize / 2; z < this.citySize / 2; z++) {
                         const px = x * this.blockSize + this.blockSize / 2;
                         const pz = z * this.blockSize + this.blockSize / 2;
 
-                        // Ensure we do not place a building at the center block (0, 0)
-                        if (x === 0 && z === 0) continue;
-                        if (x === -1 && z === 0) continue;
-                        if (x === 0 && z === -1) continue;
-                        if (x === -1 && z === -1) continue;
+                        // Skip the central 2x2 garage island, the lagoon basin (SE) and the sunken plazas.
+                        const noBuild = new Set(['0_0', '-1_0', '0_-1', '-1_-1', '-6_-5', '-5_-5', '-6_-4', '-5_-4', '1_-5', '-5_-6']);
+                        if (noBuild.has(x + '_' + z)) continue;
 
                         if (Math.random() > 0.2) {
                             this.createBuilding(px, pz);
@@ -1044,11 +1887,16 @@
                     }
                 }
 
+                // Build all neon stripes as a single InstancedMesh (TASK_004 performance).
+                this._buildNeonInstances();
+
                 this.createRoadNetwork();
                 this.createStreetLights();
                 this.createGarageZone();
                 this.createRamps();
                 this.createDestructibleProps();
+                this.createLombas();
+                this.createPlazas();
             }
 
             createRamps() {
@@ -1108,15 +1956,19 @@
                     return group;
                 };
 
-                const rampConfigs = [
-                    { pos: new THREE.Vector3(40, 0.8, 0), rotY: 0 },
-                    { pos: new THREE.Vector3(-40, 0.8, 0), rotY: Math.PI },
-                    { pos: new THREE.Vector3(0, 0.8, 40), rotY: Math.PI / 2 },
-                    { pos: new THREE.Vector3(0, 0.8, -40), rotY: -Math.PI / 2 }
-                ];
+// The four mega-ramps sit at the ends of the main avenues, launching traffic onto the
+                    // downhill runs toward the coast.
+                    const rampConfigs = [
+                        { pos: new THREE.Vector3(0, 0.8, 90), rotY: 0 },
+                        { pos: new THREE.Vector3(0, 0.8, -90), rotY: Math.PI },
+                        { pos: new THREE.Vector3(90, 0.8, 0), rotY: Math.PI / 2 },
+                        { pos: new THREE.Vector3(-90, 0.8, 0), rotY: -Math.PI / 2 }
+                    ];
 
                 rampConfigs.forEach(cfg => {
                     const mesh = createRampMesh();
+                    const gy = this.getGroundY(cfg.pos.x, cfg.pos.z);
+                    cfg.pos.y = gy + 0.8; // sit the ramp on the terrain (keeps Box3 Y correct)
                     mesh.position.copy(cfg.pos);
                     mesh.rotation.y = cfg.rotY;
                     this.scene.add(mesh);
@@ -1128,6 +1980,89 @@
                         rotationY: cfg.rotY,
                         box: box
                     });
+                });
+            }
+
+            createLombas() {
+                state.lombas = [];
+
+                const createLombaMesh = () => {
+                    const group = new THREE.Group();
+
+                    // Rounded hump: length 7 along travel, spans the full 13 m road width.
+                    const shape = new THREE.Shape();
+                    shape.moveTo(-3.5, 0);
+                    shape.quadraticCurveTo(0, 1.25, 3.5, 0);
+                    shape.closePath();
+                    const geo = new THREE.ExtrudeGeometry(shape, { depth: 13, bevelEnabled: false });
+                    geo.center();
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x20202c, roughness: 0.75 });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    group.add(mesh);
+
+                    // Glowing hazard stripes on top.
+                    const stripeMat = new THREE.MeshStandardMaterial({
+                        color: 0xffd500,
+                        emissive: 0xffd500,
+                        emissiveIntensity: 0.9
+                    });
+                    const stripeGeo = new THREE.BoxGeometry(0.55, 0.12, 13.2);
+                    const s1 = new THREE.Mesh(stripeGeo, stripeMat);
+                    s1.position.set(-1.65, 0.62, 0);
+                    const s2 = new THREE.Mesh(stripeGeo, stripeMat);
+                    s2.position.set(1.65, 0.62, 0);
+                    group.add(s1);
+                    group.add(s2);
+
+                    group.castShadow = true;
+                    return group;
+                };
+
+                const lombaConfigs = [
+                    { x: 20, z: 60, rotY: Math.PI / 2, axis: 'z' },
+                    { x: 20, z: -60, rotY: Math.PI / 2, axis: 'z' },
+                    { x: -20, z: 60, rotY: Math.PI / 2, axis: 'z' },
+                    { x: 60, z: -30, rotY: 0, axis: 'x' },
+                    { x: -60, z: 30, rotY: 0, axis: 'x' },
+                    { x: 30, z: 100, rotY: 0, axis: 'x' }
+                ];
+
+                lombaConfigs.forEach(cfg => {
+                    const mesh = createLombaMesh();
+                    const gy = this.getGroundY(cfg.x, cfg.z);
+                    mesh.position.set(cfg.x, gy + 0.62, cfg.z);
+                    mesh.rotation.y = cfg.rotY;
+                    this.scene.add(mesh);
+
+                    const box = new THREE.Box3().setFromObject(mesh);
+                    state.lombas.push({
+                        mesh: mesh,
+                        x: cfg.x,
+                        z: cfg.z,
+                        halfLen: 3.5,
+                        height: 1.25,
+                        axis: cfg.axis,
+                        box: box
+                    });
+                });
+            }
+
+            createPlazas() {
+                // Neon rings marking the two sunken plazas (built on the flat, lowered pads).
+                const ringGeo = new THREE.TorusGeometry(6, 0.18, 8, 40);
+                const ringMat = new THREE.MeshStandardMaterial({
+                    color: 0x00f0ff,
+                    emissive: 0x00f0ff,
+                    emissiveIntensity: 1.6
+                });
+                const plazaBlocks = [{ bx: 8, bz: 2 }, { bx: 2, bz: 1 }];
+                plazaBlocks.forEach(p => {
+                    const cx = p.bx * this.blockSize - (this.citySize - 1) * this.blockSize / 2;
+                    const cz = p.bz * this.blockSize - (this.citySize - 1) * this.blockSize / 2;
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.rotation.x = Math.PI / 2;
+                    ring.position.set(cx, this.getGroundY(cx, cz) + 0.35, cz);
+                    this.scene.add(ring);
                 });
             }
 
@@ -1193,10 +2128,11 @@
                     new THREE.Vector3(-34, 0.1, -34)
                 ];
 
-                conePositions.forEach(pos => {
+                conePositions.forEach(cfg => {
                     const mesh = createConeMesh();
+                    cfg.y = this.getGroundY(cfg.x, cfg.z) + 0.1;
                     this.scene.add(mesh);
-                    state.destructibleProps.push(new DestructibleProp('cone', mesh, pos));
+                    state.destructibleProps.push(new DestructibleProp('cone', mesh, cfg));
                 });
 
                 const hydrantPositions = [
@@ -1208,10 +2144,11 @@
                     new THREE.Vector3(-49, 0, -11)
                 ];
 
-                hydrantPositions.forEach(pos => {
+                hydrantPositions.forEach(cfg => {
                     const mesh = createHydrantMesh();
+                    cfg.y = this.getGroundY(cfg.x, cfg.z);
                     this.scene.add(mesh);
-                    state.destructibleProps.push(new DestructibleProp('hydrant', mesh, pos));
+                    state.destructibleProps.push(new DestructibleProp('hydrant', mesh, cfg));
                 });
             }
 
@@ -1225,8 +2162,8 @@
                     side: THREE.DoubleSide
                 });
                 const garageZone = new THREE.Mesh(garageGeo, garageMat);
-                // Center block intersection
-                garageZone.position.set(0, 0.1, 0);
+                // Center block intersection (on the terrain's central pad)
+                garageZone.position.set(0, this.garageHeight + 0.1, 0);
                 this.scene.add(garageZone);
 
                 // 3D Procedural wrench icon floating above
@@ -1242,64 +2179,179 @@
 
                 iconGroup.add(handle);
                 iconGroup.add(head);
-                iconGroup.position.set(0, 3.0, 0);
+                iconGroup.position.set(0, this.garageHeight + 3.0, 0);
                 iconGroup.name = "garageIcon";
                 this.scene.add(iconGroup);
                 this.garageIcon = iconGroup;
             }
 
             createBuilding(x, z) {
-                const width = this.blockSize - this.roadWidth;
-                const depth = this.blockSize - this.roadWidth;
-                const height = Math.random() * 20 + 10;
+                const maxW = this.blockSize - this.roadWidth;
+                const maxD = this.blockSize - this.roadWidth;
+                const totalH = 10 + Math.random() * 22;
 
-                const geometry = new THREE.BoxGeometry(width, height, depth);
+                // Procedural "setback tower": several stacked boxes merged into ONE geometry so each
+                // building stays a single Mesh (1 draw call, as before) while looking much richer.
+                // Parts are built in local space with the building base at y=0; the mesh is then
+                // placed at (x, 0, z). A single material per building keeps the draw call low.
+                const geoPool = [];
+                let curW = maxW, curD = maxD;
+                let y = 0;
+                let baseH = 0;
+                const tiers = 2 + Math.floor(Math.random() * 3); // 2-4 stacked tiers
+                for (let i = 0; i < tiers; i++) {
+                    const remaining = tiers - i;
+                    const h = totalH / remaining * (0.75 + Math.random() * 0.45);
+                    const w = curW * (0.92 + Math.random() * 0.08);
+                    const d = curD * (0.92 + Math.random() * 0.08);
+                    const g = new THREE.BoxGeometry(w, h, d);
+                    // small random horizontal offset so stacked tiers read as distinct setbacks
+                    const offX = (i === 0) ? 0 : (Math.random() - 0.5) * 0.2;
+                    const offZ = (i === 0) ? 0 : (Math.random() - 0.5) * 0.2;
+                    g.translate(offX, y + h / 2, offZ);
+                    geoPool.push(g);
+                    if (i === 0) baseH = h;
+                    y += h;
+                    curW = w * 0.72;
+                    curD = d * 0.72;
+                }
+
+                // rooftop antenna
+                if (Math.random() < 0.55) {
+                    const ag = new THREE.BoxGeometry(0.7, 2 + Math.random() * 3, 0.7);
+                    ag.translate(0, y + ag.parameters.height / 2, 0);
+                    geoPool.push(ag);
+                }
+
+                const geometry = mergeGeometries(geoPool);
+                for (const g of geoPool) g.dispose();
                 const material = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color().setHSL(Math.random(), 0.5, 0.5),
-                    roughness: 0.7
+                    color: new THREE.Color().setHSL(Math.random(), 0.55, 0.5),
+                    roughness: 0.8
                 });
 
                 const building = new THREE.Mesh(geometry, material);
-                building.position.set(x, height / 2, z);
+                const gy = this.getGroundY(x, z); // building sits on its (flat) block pad
+                building.position.set(x, gy, z);
                 building.castShadow = true;
                 building.receiveShadow = true;
                 this.scene.add(building);
+                this.buildingMeshes.push(building);
+
+                // TASK_004 performance: record neon stripes (instanced later) instead of creating
+                // 4 separate meshes + 1 material per building. Per-building color is preserved.
+                const neonColor = [0x00ffff, 0xff00ff, 0xffff00][Math.floor(Math.random() * 3)];
+                const stripeHeight = Math.max(2, baseH - 2);
+                const stripeColor = new THREE.Color(neonColor);
+                state.neonMaterials.push(this.neonMat); // shared instanced neon material
+                const halfW = maxW / 2, halfD = maxD / 2, midY = gy + baseH / 2;
+                const sides = [
+                    new THREE.Vector3(x, midY, z + halfD - 0.3),
+                    new THREE.Vector3(x, midY, z - halfD + 0.3),
+                    new THREE.Vector3(x + halfW - 0.3, midY, z),
+                    new THREE.Vector3(x - halfW + 0.3, midY, z)
+                ];
+                for (let i = 0; i < sides.length; i++) {
+                    const p = sides[i];
+                    this.neonStripes.push({
+                        x: p.x, y: p.y, z: p.z,
+                        scaleY: stripeHeight,
+                        color: stripeColor
+                    });
+                }
 
                 // Add collision box
                 const box = new THREE.Box3().setFromObject(building);
                 // Shrink slightly to allow grazing
                 box.expandByScalar(-0.1);
                 this.buildings.push(box);
+
+                // TASK_004 performance: index the (raw) collision box into the spatial hash grid
+                // so checkCollision only tests buildings in the queried cell instead of all ~177.
+                this._insertIntoGrid(box);
+            }
+
+            _buildNeonInstances() {
+                if (this.neonStripes.length === 0) return;
+                const mesh = new THREE.InstancedMesh(this.neonStripeGeo, this.neonMat, this.neonStripes.length);
+                mesh.castShadow = false;
+                mesh.receiveShadow = false;
+                mesh.frustumCulled = true;
+                const dummy = new THREE.Object3D();
+                const count = this.neonStripes.length;
+                for (let i = 0; i < count; i++) {
+                    const s = this.neonStripes[i];
+                    dummy.position.set(s.x, s.y, s.z);
+                    dummy.scale.set(1, s.scaleY, 1);
+                    dummy.rotation.set(0, 0, 0);
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(i, dummy.matrix);
+                    mesh.setColorAt(i, s.color);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+                if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+                this.scene.add(mesh);
+                this.neonInstanceMesh = mesh;
+            }
+
+            _cellIndex(v) {
+                return Math.min(this.cellDim - 1, Math.max(0, Math.floor((v + this.mapHalf) / this.cellSize)));
+            }
+
+            _insertIntoGrid(collBox) {
+                const minX = this._cellIndex(collBox.min.x);
+                const maxX = this._cellIndex(collBox.max.x);
+                const minZ = this._cellIndex(collBox.min.z);
+                const maxZ = this._cellIndex(collBox.max.z);
+                for (let cx = minX; cx <= maxX; cx++) {
+                    for (let cz = minZ; cz <= maxZ; cz++) {
+                        this.buildingCells[cx][cz].push(collBox);
+                    }
+                }
             }
 
             createRoadNetwork() {
+                const half = this.citySize * this.blockSize / 2;
+                const idx = (v) => Math.round(v) + 8; // consistent grid key for both axis loops
+                const interMap = new Map();
+
                 for (let x = -this.citySize / 2; x <= this.citySize / 2; x++) {
                     const roadX = x * this.blockSize;
-                    this.roads.push({
-                        start: new THREE.Vector3(roadX, 0, -this.citySize * this.blockSize / 2),
-                        end: new THREE.Vector3(roadX, 0, this.citySize * this.blockSize / 2),
+                    const road = {
+                        start: new THREE.Vector3(roadX, 0, -half),
+                        end: new THREE.Vector3(roadX, 0, half),
                         dir: new THREE.Vector3(0, 0, 1),
                         axis: 'z',
-                        width: this.roadWidth
-                    });
+                        width: this.roadWidth,
+                        coord: roadX,      // fixed coordinate of this road
+                        interObjs: []      // its own intersections (TASK_004 opt)
+                    };
 
                     for (let z = -this.citySize / 2; z <= this.citySize / 2; z++) {
                         const roadZ = z * this.blockSize;
-                        this.intersections.push({
-                            position: new THREE.Vector3(roadX, 0, roadZ),
-                            state: 'green'
-                        });
+                        const inter = { position: new THREE.Vector3(roadX, this.getGroundY(roadX, roadZ), roadZ), state: 'green' };
+                        interMap.set(idx(x) + '_' + idx(z), inter);
+                        this.intersections.push(inter);
+                        road.interObjs.push(inter);
                     }
+                    this.roads.push(road);
                 }
                 for (let z = -this.citySize / 2; z <= this.citySize / 2; z++) {
                     const roadZ = z * this.blockSize;
-                    this.roads.push({
-                        start: new THREE.Vector3(-this.citySize * this.blockSize / 2, 0, roadZ),
-                        end: new THREE.Vector3(this.citySize * this.blockSize / 2, 0, roadZ),
+                    const road = {
+                        start: new THREE.Vector3(-half, 0, roadZ),
+                        end: new THREE.Vector3(half, 0, roadZ),
                         dir: new THREE.Vector3(1, 0, 0),
                         axis: 'x',
-                        width: this.roadWidth
-                    });
+                        width: this.roadWidth,
+                        coord: roadZ,
+                        interObjs: []
+                    };
+                    for (let x = -this.citySize / 2; x <= this.citySize / 2; x++) {
+                        const roadX = x * this.blockSize;
+                        road.interObjs.push(interMap.get(idx(x) + '_' + idx(z)));
+                    }
+                    this.roads.push(road);
                 }
             }
 
@@ -1323,18 +2375,19 @@
                     if ((Math.abs(gridX) + Math.abs(gridZ)) % 3 !== 0) return;
 
                     const basePos = intersection.position.clone().add(new THREE.Vector3(offset, 0, offset));
+                    const gy = this.getGroundY(basePos.x, basePos.z);
 
                     const pole = new THREE.Mesh(poleGeo, poleMat);
-                    pole.position.set(basePos.x, 4, basePos.z);
+                    pole.position.set(basePos.x, gy + 4, basePos.z);
                     pole.castShadow = false;
                     this.scene.add(pole);
 
                     const lamp = new THREE.Mesh(lampGeo, this.streetLampMaterial);
-                    lamp.position.set(basePos.x, 8, basePos.z);
+                    lamp.position.set(basePos.x, gy + 8, basePos.z);
                     this.scene.add(lamp);
 
                     const light = new THREE.PointLight(0xfff6d0, 0, 70, 1.5);
-                    light.position.set(basePos.x, 8.2, basePos.z);
+                    light.position.set(basePos.x, gy + 8.2, basePos.z);
                     light.castShadow = false;
                     light.visible = false;
                     light.userData.baseIntensity = 2.5;
@@ -1346,33 +2399,78 @@
             setNightFactor(amount, playerPosition) {
                 const factor = THREE.MathUtils.clamp(amount, 0, 1);
                 const playerPos = playerPosition || null;
-                this.streetLights.forEach(light => {
-                    let proximity = 1;
-                    if (playerPos) {
-                        const dist = playerPos.distanceTo(light.position);
-                        proximity = THREE.MathUtils.clamp(1 - dist / 120, 0, 1);
+                const lights = this.streetLights;
+                const count = lights.length;
+
+                // TASK_004 performance: only the nearest few PointLights are kept active at night.
+                // Visible PointLights cost per-fragment; hiding all but the ones around the camera
+                // (which alone meaningfully light the scene) dramatically cuts fragment cost.
+                for (let i = 0; i < count; i++) {
+                    lights[i].visible = false;
+                }
+
+                if (this.streetLampMaterial) {
+                    this.streetLampMaterial.emissiveIntensity = THREE.MathUtils.lerp(0.2, 1.5, factor);
+                }
+
+                if (!playerPos || factor <= 0) {
+                    return;
+                }
+
+                const max = this._maxStreetLights;
+                for (let k = 0; k < max; k++) {
+                    this._nearestIdx[k] = -1;
+                    this._nearestDist[k] = Infinity;
+                }
+
+                // O(n * max) scan keeping the nearest few (no full sort, no allocations).
+                for (let i = 0; i < count; i++) {
+                    const d = playerPos.distanceTo(lights[i].position);
+                    for (let k = 0; k < max; k++) {
+                        if (d < this._nearestDist[k]) {
+                            for (let m = max - 1; m > k; m--) {
+                                this._nearestDist[m] = this._nearestDist[m - 1];
+                                this._nearestIdx[m] = this._nearestIdx[m - 1];
+                            }
+                            this._nearestDist[k] = d;
+                            this._nearestIdx[k] = i;
+                            break;
+                        }
                     }
+                }
+
+                for (let k = 0; k < max; k++) {
+                    const idx = this._nearestIdx[k];
+                    if (idx < 0) break;
+                    const light = lights[idx];
+                    const proximity = THREE.MathUtils.clamp(1 - this._nearestDist[k] / 70, 0, 1);
                     const intensity = light.userData.baseIntensity * factor * proximity;
                     light.intensity = intensity;
                     light.visible = intensity > 0.05;
-                });
-                if (this.streetLampMaterial) {
-                    this.streetLampMaterial.emissiveIntensity = THREE.MathUtils.lerp(0.2, 1.5, factor);
                 }
             }
 
             checkCollision(position) {
-                // Simple point check against building boxes
-                // For better player collision, we should check a small radius or box around player
-                // But point check is often enough if we keep player center away
-                const playerRadius = 0.5;
-                const point = position.clone();
-
-                for (const box of this.buildings) {
-                    // Expand box by player radius for check
-                    const expandedBox = box.clone().expandByScalar(playerRadius);
-                    if (expandedBox.containsPoint(point)) {
-                        return true;
+                // Heuristic spatial lookup: only test building boxes that could contain the query
+                // point (within the 0.5 player radius), i.e. boxes in cells around the point.
+                // The radius is much smaller than cellSize, so this touches 1-4 cells max
+                // instead of iterating all ~177 buildings, with zero per-call allocations.
+                const r = 0.5;
+                const minCX = this._cellIndex(position.x - r);
+                const maxCX = this._cellIndex(position.x + r);
+                const minCZ = this._cellIndex(position.z - r);
+                const maxCZ = this._cellIndex(position.z + r);
+                for (let cx = minCX; cx <= maxCX; cx++) {
+                    const col = this.buildingCells[cx];
+                    for (let cz = minCZ; cz <= maxCZ; cz++) {
+                        const cells = col[cz];
+                        for (let i = 0; i < cells.length; i++) {
+                            this._tmpBox.copy(cells[i]);
+                            this._tmpBox.expandByScalar(r);
+                            if (this._tmpBox.containsPoint(position)) {
+                                return true;
+                            }
+                        }
                     }
                 }
                 return false;
@@ -1385,9 +2483,14 @@
                 this.scene = scene;
                 this.road = road;
                 this.speed = 8 + Math.random() * 5;
-                this.mesh = this.createCarMesh();
+
+                this.mesh = new THREE.Group();
                 this.headLights = [];
                 this.tailLights = [];
+                this.bodyGroup = new THREE.Group();
+                this.mesh.add(this.bodyGroup);
+                this.attachLights();
+                this.setBody(null); // procedural fallback; swapped to a GLB model once loaded
 
                 this.mesh.position.copy(road.start);
                 // Offset for 2-way traffic
@@ -1395,7 +2498,11 @@
                 const offset = new THREE.Vector3(road.dir.z, 0, -road.dir.x).multiplyScalar(laneOffset);
                 this.mesh.position.add(offset);
 
-                this.mesh.lookAt(this.mesh.position.clone().add(road.dir));
+                // Set the car's heading via rotation.y (Euler) so BOTH the visual body (local -Z)
+                // and the player's forward vector (car.mesh.rotation.y) stay in sync, pointing
+                // along road.dir. (Object3D.lookAt() would set the quaternion but leave
+                // rotation.y stale, which flipped the player car when it was picked up.)
+                this.mesh.rotation.y = Math.atan2(road.dir.x, road.dir.z) + Math.PI;
                 this.scene.add(this.mesh);
 
                 this.stopped = false;
@@ -1403,22 +2510,7 @@
                 this.baseTaillightIntensity = 0.5;
             }
 
-            createCarMesh() {
-                const group = new THREE.Group();
-                const color = new THREE.Color().setHSL(Math.random(), 0.8, 0.5);
-                const bodyGeo = new THREE.BoxGeometry(2, 1.2, 4);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: color });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.position.y = 0.6;
-                body.name = 'car-body';
-                group.add(body);
-
-                const cabinGeo = new THREE.BoxGeometry(1.8, 1, 2);
-                const cabinMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-                const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-                cabin.position.y = 1.6;
-                group.add(cabin);
-
+            attachLights() {
                 const headlightGlassMat = new THREE.MeshStandardMaterial({
                     color: 0xfffff0,
                     emissive: 0xfffff0,
@@ -1438,34 +2530,80 @@
                 headlightPositions.forEach(x => {
                     const glass = new THREE.Mesh(lightGeo, headlightGlassMat);
                     glass.position.set(x, 0.8, -2.05);
-                    group.add(glass);
+                    this.mesh.add(glass);
 
                     const spotlight = new THREE.SpotLight(0xfff7cf, 0, 30, Math.PI / 6, 0.5, 1.5);
                     spotlight.position.set(x, 0.8, -2.2);
                     spotlight.target.position.set(x, 0.5, -6);
                     spotlight.visible = false;
-                    group.add(spotlight);
-                    group.add(spotlight.target);
+                    this.mesh.add(spotlight);
+                    this.mesh.add(spotlight.target);
                     this.headLights.push(spotlight);
                 });
 
                 headlightPositions.forEach(x => {
                     const glass = new THREE.Mesh(lightGeo, tailLightGlassMat);
                     glass.position.set(x, 0.8, 2.05);
-                    group.add(glass);
+                    this.mesh.add(glass);
 
                     const point = new THREE.PointLight(0xff3300, 0, 10, 2);
                     point.position.set(x, 0.8, 2.2);
                     point.visible = false;
-                    group.add(point);
+                    this.mesh.add(point);
                     this.tailLights.push(point);
                 });
 
-                group.castShadow = true;
-                return group;
+                this.mesh.castShadow = true;
             }
 
-            setLightPower(nightFactor, proximity = 1) {
+            setBody(modelScene) {
+                // Replace the visual body (procedural box default, or a loaded Kenney GLB).
+                while (this.bodyGroup.children.length) {
+                    this.bodyGroup.remove(this.bodyGroup.children[0]);
+                }
+                if (modelScene) {
+                    const g = modelScene.clone();
+                    g.traverse(child => {
+                        if (child.isMesh) {
+                            if (child.name === 'body') child.name = 'car-body'; // keep recolor logic working
+                            // Optimization: cars do NOT cast shadows. Projecting every GLB car mesh
+                            // (~250 casters) into the sun's shadow map was a big perf hit under load
+                            // (rain/night). Keeping castShadow false matches the original box cars
+                            // and halves the shadow-map pass cost.
+                            child.castShadow = false;
+                        }
+                    });
+                    // Kenney GLBs have their front toward +Z; the game drives toward its own -Z.
+                    g.rotation.y = Math.PI;
+                    this.bodyGroup.add(g);
+                    this.bodyGroup.scale.setScalar(CAR_MODEL_SCALE);
+                } else {
+                    this.buildBoxBody();
+                    this.bodyGroup.scale.setScalar(1);
+                    this.bodyGroup.rotation.y = 0;
+                }
+            }
+
+            buildBoxBody() {
+                // Original procedural fallback (box car) used before models load.
+                const color = new THREE.Color().setHSL(Math.random(), 0.8, 0.5);
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(2, 1.2, 4),
+                    new THREE.MeshStandardMaterial({ color: color })
+                );
+                body.position.y = 0.6;
+                body.name = 'car-body';
+                this.bodyGroup.add(body);
+
+                const cabin = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.8, 1, 2),
+                    new THREE.MeshStandardMaterial({ color: 0x333333 })
+                );
+                cabin.position.y = 1.6;
+                this.bodyGroup.add(cabin);
+            }
+
+            setLightPower(nightFactor, proximity = 1, taillight = false) {
                 const factor = THREE.MathUtils.clamp(nightFactor, 0, 1) * THREE.MathUtils.clamp(proximity, 0, 1);
                 const headIntensity = this.baseHeadlightIntensity * factor;
                 const tailIntensity = this.baseTaillightIntensity * factor;
@@ -1474,45 +2612,79 @@
                     light.intensity = headIntensity;
                     light.visible = headIntensity > 0.05;
                 });
+                // Taillights are only lit on the car the player drives: reduces the number of
+                // active PointLights at night (fewer shader programs to compile at day/night and
+                // cheaper per-fragment lighting). Distant passing cars' red tails were barely visible.
                 this.tailLights.forEach(light => {
-                    light.intensity = tailIntensity;
-                    light.visible = tailIntensity > 0.05;
+                    const t = taillight ? tailIntensity : 0;
+                    light.intensity = t;
+                    light.visible = t > 0.05;
                 });
             }
 
-            update(dt, intersections, otherCars, world) {
+            update(dt, world) {
                 if (this.stopped && !state.inCar) return;
 
                 const moveDist = this.speed * dt;
                 const nextPos = this.mesh.position.clone().add(this.road.dir.clone().multiplyScalar(moveDist));
+                nextPos.y = world.getGroundY(nextPos.x, nextPos.z);
+
+                // Roll over lombas instead of clipping through them.
+                for (const lomba of state.lombas) {
+                    if (lomba.box.containsPoint(nextPos)) {
+                        const d = lomba.axis === 'z' ? Math.abs(nextPos.z - lomba.z) : Math.abs(nextPos.x - lomba.x);
+                        const f = Math.max(0, 1 - (d / lomba.halfLen) * (d / lomba.halfLen));
+                        nextPos.y += lomba.height * f;
+                        break;
+                    }
+                }
 
                 // Loop at edges
                 if (this.road.axis === 'z' && nextPos.z > this.road.end.z) {
                     this.mesh.position.z = this.road.start.z;
+                    this.mesh.position.y = world.getGroundY(this.mesh.position.x, this.mesh.position.z);
                     return;
                 }
                 if (this.road.axis === 'x' && nextPos.x > this.road.end.x) {
                     this.mesh.position.x = this.road.start.x;
+                    this.mesh.position.y = world.getGroundY(this.mesh.position.x, this.mesh.position.z);
                     return;
                 }
 
-                // Traffic Logic
+                // Traffic Logic — only the intersections on THIS car's own road, using cheap
+                // axis-coordinate distance instead of 3D distanceTo over all 256 intersections.
+                // TASK_004 optimization (16 checks max per car instead of 256).
                 let shouldStop = false;
-                for (const intersection of intersections) {
-                    const dist = this.mesh.position.distanceTo(intersection.position);
-                    if (dist < 15 && dist > 5) { // Adjusted for wider roads
-                        if (this.road.axis === 'z' && intersection.state !== 'green') shouldStop = true;
-                        if (this.road.axis === 'x' && intersection.state === 'green') shouldStop = true;
+                const isZ = this.road.axis === 'z';
+                const posCoord = isZ ? this.mesh.position.z : this.mesh.position.x;
+                const interObjs = this.road.interObjs;
+                for (let i = 0; i < interObjs.length; i++) {
+                    const interCoord = isZ ? interObjs[i].position.z : interObjs[i].position.x;
+                    const d = posCoord - interCoord;
+                    const ad = d < 0 ? -d : d;
+                    if (ad < 15 && ad > 5) { // Adjusted for wider roads
+                        if (isZ && interObjs[i].state !== 'green') shouldStop = true;
+                        if (!isZ && interObjs[i].state === 'green') shouldStop = true;
                     }
                 }
 
-                for (const other of otherCars) {
-                    if (other === this) continue;
-                    const dist = this.mesh.position.distanceTo(other.mesh.position);
-                    if (dist < 8) {
-                        const dirToOther = other.mesh.position.clone().sub(this.mesh.position).normalize();
-                        if (dirToOther.dot(this.road.dir) > 0.8) {
-                            shouldStop = true;
+                // Same-road car avoidance — cars only interact with others on their own street,
+                // avoiding the all-pairs 50x50 pass (TASK_004 optimization).
+                const sameCars = this.road.sameCars;
+                if (!shouldStop && sameCars) {
+                    for (let i = 0; i < sameCars.length; i++) {
+                        const other = sameCars[i];
+                        if (other === this) continue;
+                        const dx = this.mesh.position.x - other.mesh.position.x;
+                        const dz = this.mesh.position.z - other.mesh.position.z;
+                        if (dx * dx + dz * dz < 64) { // 8 units
+                            const dirToOtherX = other.mesh.position.x - this.mesh.position.x;
+                            const dirToOtherZ = other.mesh.position.z - this.mesh.position.z;
+                            const len = Math.sqrt(dirToOtherX * dirToOtherX + dirToOtherZ * dirToOtherZ) || 1;
+                            const dot = (dirToOtherX / len) * this.road.dir.x + (dirToOtherZ / len) * this.road.dir.z;
+                            if (dot > 0.8) {
+                                shouldStop = true;
+                            }
                         }
                     }
                 }
@@ -1532,12 +2704,17 @@
                 this.world = world;
                 this.cars = [];
                 this.timer = 0;
+                // Pre-allocated scratch buffers for the night-lighting nearest-car selection
+                // (no per-frame allocations).
+                this._nearestIdx = [-1, -1, -1, -1, -1, -1];
+                this._nearestDist = [Infinity, Infinity, Infinity, Infinity, Infinity, Infinity];
 
                 for (let i = 0; i < 50; i++) {
                     const road = this.world.roads[Math.floor(Math.random() * this.world.roads.length)];
                     const car = new Car(this.scene, road);
                     const randDist = Math.random() * (this.world.citySize * this.world.blockSize);
                     car.mesh.position.add(road.dir.clone().multiplyScalar(randDist));
+                    car.mesh.position.y = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
                     this.cars.push(car);
                     car.setLightPower(0, 0);
                 }
@@ -1552,22 +2729,74 @@
                     }
                 }
 
+                // TASK_004 optimization: group cars by their road once per frame (O(cars)) so
+                // each car only avoids cars on its own street, not the all-pairs 50x50 pass.
+                for (const road of this.world.roads) {
+                    road.sameCars = [];
+                }
+                for (const car of this.cars) {
+                    car.road.sameCars.push(car);
+                }
+
                 for (const car of this.cars) {
                     if (state.inCar && state.currentCar === car) continue;
-                    car.update(dt, this.world.intersections, this.cars, this.world);
+                    car.update(dt, this.world);
                 }
             }
 
             setNightFactor(factor, playerPosition) {
                 const playerPos = playerPosition || null;
-                this.cars.forEach(car => {
-                    let proximity = 1;
-                    if (playerPos) {
-                        const dist = playerPos.distanceTo(car.mesh.position);
-                        proximity = THREE.MathUtils.clamp(1 - dist / 80, 0, 1);
+                const cars = this.cars;
+                const count = cars.length;
+                const MAX_LIT = 3; // fewer lit cars = smaller day/night shader compile + cheaper night
+
+                // Optimization: cap dynamic lights. Every traffic car has 2 head SpotLights + 2
+                // tail PointLights; turning them all on at night (all 50 within reach) was heavy,
+                // especially combined with rain. Like the street lights, only the few cars nearest
+                // the camera (+ the one the player drives) get their lights lit — the rest stay off.
+                for (let i = 0; i < count; i++) cars[i].setLightPower(0, 0);
+                if (!playerPos || factor <= 0) return;
+
+                const idx = this._nearestIdx;
+                const dist = this._nearestDist;
+                for (let k = 0; k < MAX_LIT; k++) { idx[k] = -1; dist[k] = Infinity; }
+
+                for (let i = 0; i < count; i++) {
+                    const car = cars[i];
+                    if (state.inCar && state.currentCar === car) continue;
+                    const d = playerPos.distanceTo(car.mesh.position);
+                    for (let k = 0; k < MAX_LIT; k++) {
+                        if (d < dist[k]) {
+                            for (let m = MAX_LIT - 1; m > k; m--) {
+                                dist[m] = dist[m - 1];
+                                idx[m] = idx[m - 1];
+                            }
+                            dist[k] = d;
+                            idx[k] = i;
+                            break;
+                        }
                     }
-                    car.setLightPower(factor, proximity);
-                });
+                }
+
+                // The car the player is driving is always lit (and keeps its taillights on).
+                if (state.inCar && state.currentCar) {
+                    state.currentCar.setLightPower(factor, 1, true);
+                }
+                for (let k = 0; k < MAX_LIT; k++) {
+                    const i = idx[k];
+                    if (i < 0) continue;
+                    const proximity = THREE.MathUtils.clamp(1 - dist[k] / 80, 0, 1);
+                    if (proximity > 0) cars[i].setLightPower(factor, proximity);
+                }
+            }
+
+            // Swap all traffic cars onto the loaded Kenney GLB models once they arrive.
+            applyModelPool(pool) {
+                if (!pool || pool.length === 0) return;
+                for (const car of this.cars) {
+                    const model = pool[Math.floor(Math.random() * pool.length)];
+                    car.setBody(model);
+                }
             }
         }
 
@@ -1594,21 +2823,23 @@
             }
 
             getRandomPoint() {
+                const lim = (this.world.citySize * this.world.blockSize) / 2 - 13; // keep off the beach
                 let x, z;
                 let valid = false;
                 let attempts = 0;
                 while (!valid && attempts < 100) {
                     attempts++;
-                    x = (Math.random() - 0.5) * this.world.citySize * this.world.blockSize;
-                    z = (Math.random() - 0.5) * this.world.citySize * this.world.blockSize;
+                    x = (Math.random() - 0.5) * 2 * lim;
+                    z = (Math.random() - 0.5) * 2 * lim;
 
-                    // Check collision
-                    const pos = new THREE.Vector3(x, 0, z);
+                    // Check collision at the real ground height (buildings sit on elevated pads)
+                    const gy = this.world.getGroundY(x, z);
+                    const pos = new THREE.Vector3(x, gy, z);
                     if (!this.world.checkCollision(pos)) {
                         valid = true;
                     }
                 }
-                return new THREE.Vector3(x, 0.85, z);
+                return new THREE.Vector3(x, this.world.getGroundY(x, z) + 0.85, z);
             }
 
             update(dt) {
@@ -1620,6 +2851,7 @@
                 } else {
                     dir.normalize();
                     const nextPos = this.mesh.position.clone().add(dir.multiplyScalar(this.speed * dt));
+                    nextPos.y = this.world.getGroundY(nextPos.x, nextPos.z) + 0.85;
 
                     if (!this.world.checkCollision(nextPos)) {
                         this.mesh.position.copy(nextPos);
@@ -1784,6 +3016,7 @@
                     const spawnIndex = Math.floor(Math.random() * this.world.intersections.length);
                     const spawnPos = this.world.intersections[spawnIndex].position.clone();
                     this.mesh.position.copy(spawnPos);
+                    this.mesh.position.y += 0.85; // head-height above the terrain
                 }
 
                 this.scene.add(this.mesh);
@@ -1805,8 +3038,11 @@
 
                 window.addEventListener('keydown', (e) => {
                     if (e.code === 'Space') this.tryInteract();
+                    if (e.code === 'KeyT' && state.inCar && window.game && window.game.taxiSystem) {
+                        window.game.taxiSystem.tryPickupPassenger(state.currentCar);
+                    }
                     if (e.code === 'KeyG') {
-                        const garagePos = new THREE.Vector3(0, 0.1, 0);
+                        const garagePos = new THREE.Vector3(0, window.game.world.garageHeight + 0.1, 0);
                         if (state.inCar && state.currentCar && state.currentCar.mesh.position.distanceTo(garagePos) < 6.0) {
                             if (state.inGarage) {
                                 closeGarage();
@@ -1873,12 +3109,6 @@
                         state.inCar = true;
                         state.currentCar = closestCar;
                         this.mesh.visible = false;
-
-                        closestCar.mesh.traverse(child => {
-                            if (child.isMesh && child.name === 'car-body') {
-                                child.material.color.setHex(state.playerCarStats.color);
-                            }
-                        });
                     }
                 }
             }
@@ -1918,6 +3148,40 @@
                     let maxSpeed = baseMaxSpeed * (1 + (state.playerCarStats.speedLevel - 1) * 0.20);
                     let baseAccel = 15;
                     let accel = baseAccel * (1 + (state.playerCarStats.accelLevel - 1) * 0.30);
+
+                    // TASK_004: Rain reduces traction (acceleration * 0.75)
+                    if (state.weather === 'rainy') {
+                        accel *= 0.75;
+                    }
+
+                    // Water regions (lagoon/ocean): heavy drag, splash and speed cap.
+                    const inWaterNow = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z) < SEA_LEVEL;
+                    if (inWaterNow) {
+                        accel *= 0.4;
+                        maxSpeed = Math.min(maxSpeed, 9);
+                        if (!state.inWater) {
+                            state.inWater = true;
+                            playSound('splash');
+                        }
+                        if (window.waterPool && Math.abs(car.currentSpeed) > 4 && Math.random() < 0.4) {
+                            window.waterPool.spawn(car.mesh.position);
+                        }
+                    } else {
+                        if (state.inWater) state.inWater = false;
+                        if (Math.abs(car.currentSpeed) > 4 && Math.random() < 0.06) {
+                            // Gentle wake particles while wading through the shallow coast.
+                            const coastH = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
+                            if (coastH < SEA_LEVEL + 0.6 && window.waterPool) window.waterPool.spawn(car.mesh.position);
+                        }
+                    }
+
+                    // Keep the player inside the playable island (soft wall past the terrain).
+                    const playLimit = 168;
+                    if (Math.abs(car.mesh.position.x) > playLimit || Math.abs(car.mesh.position.z) > playLimit) {
+                        car.mesh.position.x = THREE.MathUtils.clamp(car.mesh.position.x, -playLimit, playLimit);
+                        car.mesh.position.z = THREE.MathUtils.clamp(car.mesh.position.z, -playLimit, playLimit);
+                        car.currentSpeed *= 0.6;
+                    }
 
                     // Nitro Boost input check (Shift key)
                     const shiftPressed = this.input.keys['ShiftLeft'] || this.input.keys['ShiftRight'] || this.input.keys['KeyShift'];
@@ -1974,7 +3238,8 @@
                     const spacePressed = this.input.keys['Space'];
                     if (spacePressed && Math.abs(car.currentSpeed) > 8.0) {
                         state.driftActive = true;
-                        state.nitroCharge = Math.min(100, state.nitroCharge + 35 * effectiveDt);
+                        const nitroFillRate = state.weather === 'rainy' ? 35 * 0.85 : 35;
+                        state.nitroCharge = Math.min(100, state.nitroCharge + nitroFillRate * effectiveDt);
                         if (window.smokePool && window.skidmarkMgr) {
                             const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
                             const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
@@ -1989,7 +3254,9 @@
                         state.driftActive = false;
                     }
 
-                    const steerSpeed = 3.5 * (1 + (state.playerCarStats.steerLevel - 1) * 0.25) * (state.driftActive ? 1.4 : 1.0) * gripFactor;
+                    // TASK_004: Slippery road reduces steering stability in rain
+                    const weatherGrip = state.weather === 'rainy' ? 0.7 : 1.0;
+                    const steerSpeed = 3.5 * (1 + (state.playerCarStats.steerLevel - 1) * 0.25) * (state.driftActive ? 1.4 : 1.0) * gripFactor * weatherGrip;
                     let angleDiff = this.yaw - car.mesh.rotation.y;
                     angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
                     car.mesh.rotation.y += angleDiff * steerSpeed * effectiveDt;
@@ -2014,8 +3281,9 @@
                         car.mesh.position.y += state.stuntCarVy * effectiveDt;
                         state.stuntCarVy -= 18.0 * effectiveDt; // Gravity
 
-                        if (car.mesh.position.y <= 0) {
-                            car.mesh.position.y = 0;
+                        const landingY = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
+                        if (car.mesh.position.y <= landingY) {
+                            car.mesh.position.y = landingY;
                             state.stuntJumpActive = false;
                             state.stuntCarVy = 0;
 
@@ -2034,6 +3302,27 @@
                                 }
                             }
                         }
+                    } else {
+                        // Terrain ground-follow (no allocation): track the heightfield while grounded,
+                        // rolling smoothly over lombas instead of clipping through them.
+                        let targetY = this.world.getGroundY(car.mesh.position.x, car.mesh.position.z);
+                        for (const lomba of state.lombas) {
+                            if (lomba.box.containsPoint(car.mesh.position)) {
+                                const d = lomba.axis === 'z'
+                                    ? Math.abs(car.mesh.position.z - lomba.z)
+                                    : Math.abs(car.mesh.position.x - lomba.x);
+                                const f = Math.max(0, 1 - (d / lomba.halfLen) * (d / lomba.halfLen));
+                                targetY += lomba.height * f;
+                                if (Math.abs(car.currentSpeed) > 22.0) {
+                                    // Fast enough: pop a low hop over the bump instead.
+                                    state.stuntJumpActive = true;
+                                    state.stuntCarVy = 4.0 + (Math.abs(car.currentSpeed) - 22.0) * 0.15;
+                                    playSound('collision');
+                                }
+                                break;
+                            }
+                        }
+                        car.mesh.position.y = THREE.MathUtils.lerp(car.mesh.position.y, targetY, Math.min(1, 14 * effectiveDt));
                     }
 
                     // --- Destructible Prop Collisions ---
@@ -2106,6 +3395,26 @@
 
                     this.mesh.position.copy(car.mesh.position);
 
+                    // TASK_004: Track drift time record
+                    if (state.driftActive) {
+                        state.currentDriftTime += effectiveDt;
+                    } else {
+                        if (state.currentDriftTime > state.records.maxDriftTime) {
+                            state.records.maxDriftTime = state.currentDriftTime;
+                        }
+                        state.currentDriftTime = 0;
+                    }
+                    // TASK_004: Track air time record (stunt jump)
+                    if (state.stuntJumpActive) {
+                        state.currentAirTime += effectiveDt;
+                    } else {
+                        if (state.currentAirTime > state.records.maxAirTime) {
+                            state.records.maxAirTime = state.currentAirTime;
+                        }
+                        state.currentAirTime = 0;
+                    }
+                    state.records.maxWanted = Math.max(state.records.maxWanted, state.wantedLevel);
+
                     // Camera position (Side orbital during Stunt Jump or standard chase)
                     if (state.stuntJumpActive) {
                         const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), car.mesh.rotation.y);
@@ -2116,7 +3425,7 @@
                         const camX = car.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
                         const camY = car.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
                         const camZ = car.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
-                        this.camera.position.set(camX, camY, camZ);
+                        this.camera.position.set(camX, Math.max(camY, this.world.getGroundY(camX, camZ) + 2.5), camZ);
                         this.camera.lookAt(car.mesh.position);
                     }
                     return;
@@ -2143,11 +3452,14 @@
                     this.mesh.rotation.y = Math.atan2(moveDir.x, moveDir.z) + Math.PI;
                 }
 
+                // Snap the on-foot character to the terrain
+                this.mesh.position.y = this.world.getGroundY(this.mesh.position.x, this.mesh.position.z) + 0.85;
+
                 const camX = this.mesh.position.x + this.currentZoom * Math.sin(this.yaw) * Math.cos(this.pitch);
                 const camY = this.mesh.position.y + this.currentZoom * Math.sin(Math.max(0.1, -this.pitch)) + 2;
                 const camZ = this.mesh.position.z + this.currentZoom * Math.cos(this.yaw) * Math.cos(this.pitch);
 
-                this.camera.position.set(camX, camY, camZ);
+                this.camera.position.set(camX, Math.max(camY, this.world.getGroundY(camX, camZ) + 1.8), camZ);
                 this.camera.lookAt(this.mesh.position.clone().add(new THREE.Vector3(0, 1, 0)));
 
                 const prompt = document.getElementById('interaction-prompt');
@@ -2195,6 +3507,29 @@
                 ctx.scale(mapScale, mapScale);
                 ctx.translate(-px, -pz);
 
+                // Deep ocean behind everything (terrain/island stays on top).
+                ctx.fillStyle = "#2a7fd0";
+                ctx.fillRect(-360, -360, 720, 720);
+
+                // Terrain elevation shading + inland water (coarse 20 m cells around the player).
+                const cell = 20;
+                const gx0 = Math.floor(px / cell) - 9;
+                const gz0 = Math.floor(pz / cell) - 9;
+                for (let i = 0; i < 18; i++) {
+                    for (let j = 0; j < 18; j++) {
+                        const wx = (gx0 + i) * cell;
+                        const wz = (gz0 + j) * cell;
+                        const hgt = this.world.getGroundY(wx, wz);
+                        if (hgt < SEA_LEVEL) {
+                            ctx.fillStyle = "rgba(52,140,220,0.9)";
+                        } else {
+                            const t = THREE.MathUtils.clamp((hgt + 1) / 16, 0, 1);
+                            ctx.fillStyle = `rgb(${Math.round(44 + t * 150)},${Math.round(48 + t * 110)},${Math.round(46 + t * 64)})`;
+                        }
+                        ctx.fillRect(wx, wz, cell + 0.5, cell + 0.5);
+                    }
+                }
+
                 // Draw Roads
                 ctx.fillStyle = "#555";
                 for (const road of this.world.roads) {
@@ -2220,6 +3555,19 @@
                     ctx.beginPath();
                     ctx.arc(target.mesh.position.x, target.mesh.position.z, 8, 0, Math.PI * 2);
                     ctx.fill();
+                }
+
+                // TASK_004: Draw Taxi Destination on Minimap (magenta star)
+                if (state.passengerActive && state.passengerTargetPos) {
+                    ctx.fillStyle = "#ff00ff";
+                    ctx.beginPath();
+                    ctx.arc(state.passengerTargetPos.x, state.passengerTargetPos.z, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = "#ff88ff";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(state.passengerTargetPos.x, state.passengerTargetPos.z, 12, 0, Math.PI * 2);
+                    ctx.stroke();
                 }
 
                 // Draw Bribes on Minimap (lime green)
@@ -2271,6 +3619,14 @@
                     gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'splash') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(640, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.28);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.28);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.28);
                 } else if (type === 'hit') {
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(300, audioCtx.currentTime);
@@ -2323,11 +3679,18 @@
             if (val) val.innerText = state.money;
             const gval = document.getElementById('garage-money-val');
             if (gval) gval.innerText = state.money;
+            // TASK_004: track total accumulated money
+            if (window._lastMoney === undefined) window._lastMoney = state.money;
+            if (state.money > window._lastMoney && window._lastMoney > 0) {
+                state.records.totalMoney += (state.money - window._lastMoney);
+            }
+            window._lastMoney = state.money;
         }
 
         function updateWantedHUD() {
             const hud = document.getElementById('wanted-level-hud');
             if (!hud) return;
+            state.records.maxWanted = Math.max(state.records.maxWanted, state.wantedLevel);
             const stars = hud.getElementsByClassName('star');
             for (let i = 0; i < stars.length; i++) {
                 if (i < state.wantedLevel) {
@@ -2423,10 +3786,10 @@
                 if (nearest) {
                     if (state.inCar && state.currentCar) {
                         state.currentCar.mesh.position.copy(nearest.position);
-                        state.currentCar.mesh.position.y = 0;
+                        state.currentCar.mesh.position.y = nearest.position.y;
                     } else {
                         window.game.player.mesh.position.copy(nearest.position);
-                        window.game.player.mesh.position.y = 0.85;
+                        window.game.player.mesh.position.y = nearest.position.y + 0.85;
                     }
                 }
             }, 3000);
@@ -2516,7 +3879,8 @@
                 this.scene = scene;
                 this.mesh = this.createMesh();
                 this.mesh.position.copy(position);
-                this.mesh.position.y = 1.0;
+                this.baseY = position.y; // ground height at spawn (terrain-safe hover)
+                this.mesh.position.y = this.baseY + 1.0;
                 this.scene.add(this.mesh);
                 this.active = true;
             }
@@ -2539,7 +3903,7 @@
 
             update(dt) {
                 this.mesh.rotation.y += 2.0 * dt;
-                this.mesh.position.y = 1.0 + Math.sin(Date.now() * 0.005) * 0.15;
+                this.mesh.position.y = this.baseY + 1.0 + Math.sin(Date.now() * 0.005) * 0.15;
             }
         }
 
@@ -2585,17 +3949,27 @@
 
             createPoliceMesh() {
                 const group = new THREE.Group();
-                const bodyGeo = new THREE.BoxGeometry(2, 1.2, 4);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.position.y = 0.6;
-                group.add(body);
 
-                const cabinGeo = new THREE.BoxGeometry(1.8, 1, 2);
-                const cabinMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-                cabin.position.y = 1.6;
-                group.add(cabin);
+                // Body: use the Kenney "police" GLB when loaded, falling back to the procedural
+                // box car (models load in the background after game start).
+                const bodyGroup = new THREE.Group();
+                bodyGroup.name = 'policeBody';
+
+                const modelScene = CAR_MODEL_SCENES['police'];
+                if (modelScene) {
+                    this._mountGLBBody(bodyGroup, modelScene);
+                } else {
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 4), bodyMat);
+                    body.position.y = 0.6;
+                    bodyGroup.add(body);
+
+                    const cabinMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1, 2), cabinMat);
+                    cabin.position.y = 1.6;
+                    bodyGroup.add(cabin);
+                }
+                group.add(bodyGroup);
 
                 const sirenBarGeo = new THREE.BoxGeometry(1.2, 0.2, 0.4);
                 const sirenBar = new THREE.Mesh(sirenBarGeo, new THREE.MeshStandardMaterial({ color: 0x333333 }));
@@ -2616,6 +3990,27 @@
                 return group;
             }
 
+            // Swap the procedural box body for the Kenney "police" GLB once it finishes loading.
+            applyPoliceModel() {
+                const modelScene = CAR_MODEL_SCENES['police'];
+                if (!modelScene) return;
+                const oldBody = this.mesh.getObjectByName('policeBody');
+                if (oldBody) this.mesh.remove(oldBody);
+                const bodyGroup = new THREE.Group();
+                bodyGroup.name = 'policeBody';
+                this._mountGLBBody(bodyGroup, modelScene);
+                this.mesh.add(bodyGroup);
+            }
+
+            _mountGLBBody(bodyGroup, modelScene) {
+                const g = modelScene.clone();
+                g.traverse(child => { if (child.isMesh) child.castShadow = false; });
+                // Kenney GLBs have their front toward +Z; police AI rotates toward -direction.
+                g.rotation.y = Math.PI;
+                g.scale.setScalar(CAR_MODEL_SCALE);
+                bodyGroup.add(g);
+            }
+
             update(dt, playerPos) {
                 if (!this.active) return;
 
@@ -2634,29 +4029,34 @@
                 if (dist > 1.5) {
                     dir.normalize();
 
-                    const targetRotation = Math.atan2(dir.x, dir.z);
+                    // The game convention is -Z = forward; atan2(-dir.x, -dir.z) makes local -Z face `dir`.
+                    const targetRotation = Math.atan2(-dir.x, -dir.z);
                     let diff = targetRotation - this.mesh.rotation.y;
                     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                     this.mesh.rotation.y += diff * 5 * dt;
 
                     const moveStep = dir.clone().multiplyScalar(this.speed * dt);
-                    const nextPos = this.mesh.position.clone().add(moveStep);
+                moveStep.y = 0;
+                const nextPos = this.mesh.position.clone().add(moveStep);
+                nextPos.y = this.world.getGroundY(nextPos.x, nextPos.z);
 
-                    if (!this.world.checkCollision(nextPos)) {
-                        this.mesh.position.copy(nextPos);
+                if (!this.world.checkCollision(nextPos)) {
+                    this.mesh.position.copy(nextPos);
+                } else {
+                    const slideDir = new THREE.Vector3(-dir.z, 0, dir.x);
+                    const nextPosSlide = this.mesh.position.clone().add(slideDir.multiplyScalar(this.speed * dt * 0.8));
+                    nextPosSlide.y = this.world.getGroundY(nextPosSlide.x, nextPosSlide.z);
+                    if (!this.world.checkCollision(nextPosSlide)) {
+                        this.mesh.position.copy(nextPosSlide);
                     } else {
-                        const slideDir = new THREE.Vector3(-dir.z, 0, dir.x);
-                        const nextPosSlide = this.mesh.position.clone().add(slideDir.multiplyScalar(this.speed * dt * 0.8));
-                        if (!this.world.checkCollision(nextPosSlide)) {
-                            this.mesh.position.copy(nextPosSlide);
-                        } else {
-                            const slideDir2 = new THREE.Vector3(dir.z, 0, -dir.x);
-                            const nextPosSlide2 = this.mesh.position.clone().add(slideDir2.multiplyScalar(this.speed * dt * 0.8));
-                            if (!this.world.checkCollision(nextPosSlide2)) {
-                                this.mesh.position.copy(nextPosSlide2);
-                            }
+                        const slideDir2 = new THREE.Vector3(dir.z, 0, -dir.x);
+                        const nextPosSlide2 = this.mesh.position.clone().add(slideDir2.multiplyScalar(this.speed * dt * 0.8));
+                        nextPosSlide2.y = this.world.getGroundY(nextPosSlide2.x, nextPosSlide2.z);
+                        if (!this.world.checkCollision(nextPosSlide2)) {
+                            this.mesh.position.copy(nextPosSlide2);
                         }
                     }
+                }
                 }
             }
         }
@@ -2752,6 +4152,41 @@
             updateGarageUI();
         };
 
+        // --- TASK_004: Driver Profile (achievements) ---
+        window.toggleProfilePanel = function() {
+            const panel = document.getElementById('profile-panel');
+            const isOpen = panel.style.display === 'flex';
+            panel.style.display = isOpen ? 'none' : 'flex';
+            if (!isOpen) {
+                updateProfilePanel();
+                if (gameInPointer()) document.exitPointerLock();
+            } else {
+                const canvas = document.querySelector('canvas');
+                if (canvas) canvas.requestPointerLock();
+            }
+        };
+
+        function gameInPointer() {
+            return document.pointerLockElement !== null;
+        }
+
+        function updateProfilePanel() {
+            const container = document.getElementById('profile-records');
+            if (!container) return;
+            const rec = state.records;
+            const rows = [
+                ['🏆 Drift King (recorde)', rec.maxDriftTime.toFixed(1) + 's'],
+                ['🚀 Sky High (recorde aéreo)', rec.maxAirTime.toFixed(1) + 's'],
+                ['🚖 Taxi Master (passageiros)', rec.passengersDelivered],
+                ['💰 Rich Driver (dinheiro acumulado)', '$' + rec.totalMoney],
+                ['⭐ Most Wanted (nível máx.)', rec.maxWanted + ' estrelas']
+            ];
+            container.innerHTML = rows.map(r =>
+                `<div class="profile-record"><span class="label">${r[0]}</span><span class="value">${r[1]}</span></div>`
+            ).join('');
+        }
+        window.updateProfilePanel = updateProfilePanel;
+
         // --- Main Game Class ---
         class Game {
             constructor() {
@@ -2773,8 +4208,8 @@
                 this.sunLight = new THREE.DirectionalLight(0xffffff, 1);
                 this.sunLight.position.set(50, 100, 50);
                 this.sunLight.castShadow = true;
-                this.sunLight.shadow.mapSize.width = 2048;
-                this.sunLight.shadow.mapSize.height = 2048;
+                this.sunLight.shadow.mapSize.width = 1024;
+                this.sunLight.shadow.mapSize.height = 1024;
                 this.sunLight.shadow.camera.near = 0.5;
                 this.sunLight.shadow.camera.far = 500;
                 this.sunLight.shadow.camera.left = -150;
@@ -2790,6 +4225,15 @@
                 this.input = new Input();
                 this.world = new World(this.scene);
                 this.trafficSystem = new TrafficSystem(this.scene, this.world);
+                // Voxel 3D vehicles: preload the Kenney (CC0) car models in the background,
+                // then swap the procedural box traffic cars onto the real low-poly models.
+                loadCarModels().then(() => {
+                    this.trafficSystem.applyModelPool(CAR_MODEL_POOL);
+                    // Police cars use the dedicated 'police' GLB; refresh any already-spawned ones.
+                    if (state.policeCars) {
+                        state.policeCars.forEach(pc => pc.applyPoliceModel && pc.applyPoliceModel());
+                    }
+                });
                 this.player = new Player(this.scene, this.camera, this.input, this.trafficSystem, this.world);
 
                 // Initialize TASK_003 Particle Pools & Audio Engine
@@ -2806,6 +4250,21 @@
 
                 this.missionManager = new MissionManager(this.scene, this.pedestrians);
                 this.hud = new HUD(this.missionManager, this.player, this.world);
+
+                // TASK_004: Rain system & puddles
+                window.rainSystem = new RainSystem(this.scene);
+                const puddlePositions = [];
+                for (const inter of this.world.intersections) {
+                    if (puddlePositions.length >= 12) break;
+                    if (Math.random() < 0.4) puddlePositions.push(inter.position.clone());
+                }
+                puddlePositions.forEach(p => {
+                    state.puddles.push(new Puddle(this.scene, p));
+                });
+
+                // TASK_004: Taxi system (Crazy Taxi Mode)
+                this.taxiSystem = new TaxiSystem(this.scene, this.world, this.pedestrians);
+                this.taxiSystem.setTrafficSystem(this.trafficSystem);
 
                 this.setupEventListeners();
                 this.clock = new THREE.Clock();
@@ -2845,6 +4304,7 @@
                 if (window.waterPool) window.waterPool.update(dt);
                 if (window.smokePool) window.smokePool.update(dt);
                 if (window.sparkPool) window.sparkPool.update(dt);
+                if (this.world.updateWater) this.world.updateWater(dt);
 
                 // Destructible props update
                 state.destructibleProps.forEach(prop => {
@@ -2904,7 +4364,7 @@
                 // Rotate Garage Wrench Icon
                 if (this.world.garageIcon) {
                     this.world.garageIcon.rotation.y += 1.0 * dt;
-                    this.world.garageIcon.position.y = 3.0 + Math.sin(Date.now() * 0.003) * 0.25;
+                    this.world.garageIcon.position.y = this.world.garageHeight + 3.0 + Math.sin(Date.now() * 0.003) * 0.25;
                 }
 
                 // Wanted Level degradation over time (every 12s without incident)
@@ -3010,7 +4470,7 @@
 
                 // Tuning Garage Prompt & Auto-Exit Check
                 const garagePrompt = document.getElementById('garage-prompt');
-                const garagePos = new THREE.Vector3(0, 0.1, 0);
+                const garagePos = new THREE.Vector3(0, window.game.world.garageHeight + 0.1, 0);
                 if (state.inCar && state.currentCar && state.currentCar.mesh.position.distanceTo(garagePos) < 6.0) {
                     garagePrompt.style.display = 'block';
                 } else {
@@ -3024,6 +4484,33 @@
                 updateCargoHUD();
                 updateMoneyHUD();
 
+                // TASK_004: Weather Cycle (sunny <-> rainy every 90s)
+                state.weatherTimer -= dt;
+                if (state.weatherTimer <= 0) {
+                    state.weatherTimer = 90;
+                    state.weather = state.weather === 'sunny' ? 'rainy' : 'sunny';
+                }
+                const isRainy = state.weather === 'rainy';
+
+                // Rain particles + puddles
+                if (window.rainSystem) {
+                    window.rainSystem.setVisible(isRainy);
+                    window.rainSystem.update(dt, this.player.mesh.position);
+                }
+                state.puddles.forEach(pd => pd.setVisible(isRainy));
+
+                // TASK_004: Taxi system update (Crazy Taxi Mode)
+                if (this.taxiSystem) {
+                    this.taxiSystem.update(dt, this.player.mesh.position, state.inCar, state.currentCar);
+                }
+
+                // TASK_004: Weather HUD indicator
+                const weatherEl = document.getElementById('weather-hud');
+                if (weatherEl) {
+                    weatherEl.innerText = isRainy ? '🌧️ CHUVA' : '☀️ ENSOLARADO';
+                    weatherEl.style.color = isRainy ? '#88ccff' : '#ffcc00';
+                }
+
                 // Day/Night Cycle
                 state.dayTime += dt * 0.05;
                 const sunX = Math.cos(state.dayTime) * 100;
@@ -3036,11 +4523,66 @@
                     this.sunLight.intensity = 0.1;
                     this.ambientLight.intensity = 0.5;
                     this.scene.fog.color.setHex(0x0a1428);
+                    if (this.world.waterMesh) {
+                        this.world.waterMesh.material.color.setHex(0x0d2038); // dark ocean at night
+                        this.world.waterMesh.material.opacity = 0.92;
+                    }
                 } else {
                     this.scene.background.setHex(0x87CEEB);
                     this.sunLight.intensity = 1;
                     this.ambientLight.intensity = 0.4;
                     this.scene.fog.color.setHex(0x87CEEB);
+                    if (this.world.waterMesh) {
+                        this.world.waterMesh.material.color.setHex(0x1b6bb0);
+                        this.world.waterMesh.material.opacity = 0.9;
+                    }
+                }
+
+                // TASK_004: Nébula noturna densa durante chuva
+                if (isRainy && sunY < 0) {
+                    this.scene.fog.color.setHex(0x101030);
+                    if (this.world.waterMesh) this.world.waterMesh.material.color.setHex(0x0e1c30);
+                }
+
+                // TASK_004 performance: Neon emissive transition via a single shared instanced
+                // material (1 material + 1 update per frame instead of ~186).
+                const neonTarget = nightFactor > 0 ? 1 : 0;
+                state.neonIntensity = THREE.MathUtils.lerp(state.neonIntensity, neonTarget, 0.05);
+                if (this.world.neonInstanceMesh) {
+                    const i = state.neonIntensity;
+                    this.world.neonInstanceMesh.material.color.setRGB(i, i, i);
+                }
+
+                // TASK_004 performance: distance culling — hide building meshes beyond a radius to
+                // save GPU fill/passes for far objects (masked by fog so pops are not noticeable).
+                const px = this.player.mesh.position.x;
+                const pz = this.player.mesh.position.z;
+                const rr2 = this.world.renderRadius * this.world.renderRadius;
+                const meshes = this.world.buildingMeshes;
+                for (let i = 0; i < meshes.length; i++) {
+                    const m = meshes[i];
+                    const dx = m.position.x - px;
+                    const dz = m.position.z - pz;
+                    const inRadius = (dx * dx + dz * dz) < rr2;
+                    m.visible = inRadius;
+                    // TASK_004 performance: only near buildings cast shadows (halves the shadow
+                    // pass cost; distant buildings are hidden by fog/culling anyway).
+                    m.castShadow = inRadius;
+                }
+
+                // Optimization: distance-cull traffic cars like the buildings. Each GLB car is
+                // ~5 meshes, so skipping far ones (masked by fog) removes up to ~250 draws.
+                // The car the player is driving must always stay visible.
+                {
+                    const tc = this.trafficSystem.cars;
+                    for (let i = 0; i < tc.length; i++) {
+                        const carMesh = tc[i].mesh;
+                        const cdx = carMesh.position.x - px;
+                        const cdz = carMesh.position.z - pz;
+                        const keep = (cdx * cdx + cdz * cdz) < rr2 ||
+                            (state.inCar && state.currentCar === tc[i]);
+                        carMesh.visible = keep;
+                    }
                 }
 
                 this.world.setNightFactor(nightFactor, this.player.mesh.position);
