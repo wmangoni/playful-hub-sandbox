@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Planning Poker online grátis para times de desenvolvimento estimarem tarefas juntos em tempo real. Crie uma sala, compartilhe o link e vote na escala Fibonacci.">
+    <meta name="keywords" content="planning poker, pôquer de planejamento, estimativa de tarefas, scrum, fibonacci, agile, PlayfulHub">
+    <meta property="og:title" content="Planning Poker - Estime Tarefas em Equipe Online">
+    <meta property="og:description" content="Planning Poker online grátis para times de desenvolvimento. Sala em tempo real via WebSocket, escala Fibonacci e votação secreta.">
+    <meta property="og:url" content="https://playfulhub.com.br/jogos/planning_poker">
+    <meta property="og:type" content="website">
+
+    <title>Planning Poker Online Grátis - Estime Tarefas com seu Time</title>
+
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+
+    <style>
+        :root {
+            --primary-color: #1a1a2e;
+            --secondary-color: #16213e;
+            --accent-color: #0f3460;
+            --highlight-color: #e94560;
+            --text-light: #ffffff;
+            --text-muted: #cccccc;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: var(--text-light);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content { display: flex; justify-content: space-between; align-items: center; }
+
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--highlight-color); text-decoration: none; }
+
+        .breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-light); text-decoration: none; transition: color 0.3s ease; }
+        .breadcrumb a:hover { color: var(--highlight-color); }
+
+        .main-content { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; margin: 2rem 0; }
+
+        .game-content {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+        }
+
+        .game-title {
+            font-size: 2.2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, var(--highlight-color), #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+        }
+
+        .game-description { font-size: 1.15rem; color: var(--text-muted); max-width: 640px; margin: 0 auto 2rem; text-align: center; }
+
+        .game-container {
+            background: #000;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 2rem 0;
+            text-align: center;
+            border: 2px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-preview {
+            display: block;
+            padding: 2.5rem 1rem;
+            text-decoration: none;
+            color: var(--text-light);
+        }
+
+        .deck-preview {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 1.2rem 0;
+        }
+
+        .p-card {
+            width: 52px;
+            height: 68px;
+            border-radius: 8px;
+            background: linear-gradient(160deg, #1c1f38, #2a2e52);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-light);
+            font-family: Consolas, 'Courier New', monospace;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            transition: background 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .game-overlay-text {
+            color: #FFD700;
+            font-weight: 800;
+            letter-spacing: 0.2rem;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            font-size: 2rem;
+        }
+
+        .game-container:hover .game-overlay { background: rgba(0, 0, 0, 0.5); }
+
+        .play-button {
+            display: inline-block;
+            background: linear-gradient(45deg, var(--highlight-color), #ff6b6b);
+            color: white;
+            padding: 0.9rem 1.8rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin: 1rem 0;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+        }
+
+        section { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 1.5rem; margin: 1.5rem 0; }
+        section h3 { color: var(--highlight-color); margin-bottom: 1rem; }
+
+        .steps { counter-reset: step; }
+        .step { padding: 0.75rem; border-left: 3px solid var(--highlight-color); margin: 0.75rem 0; background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+        .step::before { counter-increment: step; content: counter(step) ". "; color: var(--highlight-color); font-weight: bold; }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .tag {
+            background: rgba(233, 69, 96, 0.2);
+            color: var(--highlight-color);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(233, 69, 96, 0.3);
+        }
+
+        .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+        .ad-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 200px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .footer { background: rgba(0, 0, 0, 0.3); padding: 2rem 0; margin-top: 3rem; border-top: 1px solid var(--border-color); text-align: center; }
+
+        @media (max-width: 768px) {
+            .main-content { grid-template-columns: 1fr; }
+            .sidebar { order: -1; }
+            .game-title { font-size: 1.7rem; }
+            .p-card { width: 40px; height: 54px; }
+        }
+    </style>
+</head>
+<body>
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+    height="0" width="0" style="display:none;visibility:hidden" loading="lazy"></iframe></noscript>
+
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">PlayfulHub</a>
+                <nav class="breadcrumb">
+                    <a href="/">Início</a>
+                    &raquo; <span>Planning Poker</span>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <main class="game-content">
+                <h1 class="game-title">Planning Poker</h1>
+                <p class="game-description">Estime tarefas com seu time em tempo real. Crie uma sala, compartilhe o link e vote em segredo na escala Fibonacci.</p>
+
+                <div class="game-container">
+                    <a class="game-preview" href="/planning_poker/">
+                        <div class="deck-preview">
+                            <div class="p-card">3</div>
+                            <div class="p-card">5</div>
+                            <div class="p-card">8</div>
+                            <div class="p-card">13</div>
+                            <div class="p-card">?</div>
+                        </div>
+                        <span class="play-button">Criar sala</span>
+                    </a>
+                    <div class="game-overlay"><span class="game-overlay-text">JOGAR</span></div>
+                </div>
+
+                <section>
+                    <h3>Como funciona</h3>
+                    <div class="steps">
+                        <div class="step">Crie uma sala com um clique e copie o link gerado.</div>
+                        <div class="step">Compartilhe o link com o time — todos acessam a mesma sala em tempo real via WebSocket.</div>
+                        <div class="step">Cada pessoa vota em segredo na estimativa da tarefa (escala Fibonacci).</div>
+                        <div class="step">Revele os votos, veja média e moda, e comece uma nova rodada.</div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Dicas</h3>
+                    <p>Use o Planning Poker para estimar em pontos de história, horas ideais ou qualquer unidade que o time preferir. Se houver divergência grande, discuta os extremos e vote novamente.</p>
+                </section>
+
+                <section>
+                    <h3>Sobre o jogo</h3>
+                    <div class="tags">
+                        <span class="tag">Scrum</span><span class="tag">Fibonacci</span><span class="tag">Multiplayer</span><span class="tag">WebSocket</span><span class="tag">Agile</span>
+                    </div>
+                </section>
+            </main>
+
+            <aside class="sidebar">
+                <div class="ad-container">Publicidade</div>
+            </aside>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 PlayfulHub - Desenvolvido com carinho por William Mangoni</p>
+        </div>
+    </footer>
+
+    <script>
+        window.addEventListener('load', function () {
+            (function (w, d, s, l, i) {
+                w[l] = w[l] || [];
+                w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+                var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : '';
+                j.async = true;
+                j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+                f.parentNode.insertBefore(j, f);
+            })(window, document, 'script', 'dataLayer', 'GTM-KM6SHZXP');
+        });
+    </script>
+</body>
+</html>

@@ -95,6 +95,7 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_015.md` | Sangue & Prata | Redesign Visual e Sistema de Tiers dos Baús com Escalonamento de Tamanhos e Detalhes | 🚀 Dev Complete | | Alta | [TASK_015.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_015.md) |
 | `TASK_016.md` | Sangue & Prata | Textura de Solo Arenoso/Desértico e Sistema de Cenografia Inteligente com POIs | 🚀 Dev Complete | | Alta | [TASK_016.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_016.md) |
 | `TASK_017.md` | Sangue & Prata | Novos Itens Especiais Espalhados pelo Mapa (Coração, Gema Lilás, Arco e Escudo) | 🚀 Dev Complete | | Alta | [TASK_017.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/blood_and_silver/TASKS/TASK_017.md) |
+| `TASK_001.md` | Planning Poker | Infraestrutura de Salas Multiplayer via WebSocket com URL por Hash (v1) | 🚀 Dev Complete | | Muito Alta | [TASK_001.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/planning_poker/TASKS/TASK_001.md) |
 
 
 

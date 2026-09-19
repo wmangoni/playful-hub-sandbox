@@ -1,0 +1,3513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gasômetro FPS 3D - Defesa da Orla de Porto Alegre</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d0914;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            color: #ffffff;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+            transition: transform 0.05s ease;
+        }
+        .ch-line {
+            position: absolute;
+            background: rgba(0, 242, 254, 0.85);
+            box-shadow: 0 0 6px #00f2fe;
+        }
+        .ch-top { top: 0; left: 9px; width: 2px; height: 6px; }
+        .ch-bottom { bottom: 0; left: 9px; width: 2px; height: 6px; }
+        .ch-left { top: 9px; left: 0; width: 6px; height: 2px; }
+        .ch-right { top: 9px; right: 0; width: 6px; height: 2px; }
+        .ch-dot { top: 9px; left: 9px; width: 2px; height: 2px; background: #fff; position: absolute; }
+
+        /* Hitmarker */
+        #hitmarker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 28px;
+            height: 28px;
+            transform: translate(-50%, -50%) rotate(45deg);
+            pointer-events: none;
+            display: none;
+            z-index: 21;
+        }
+        .hm-line {
+            position: absolute;
+            background: #ff3366;
+            box-shadow: 0 0 8px #ff0055;
+        }
+        .hm-1 { top: 0; left: 13px; width: 2px; height: 8px; }
+        .hm-2 { bottom: 0; left: 13px; width: 2px; height: 8px; }
+        .hm-3 { top: 13px; left: 0; width: 8px; height: 2px; }
+        .hm-4 { top: 13px; right: 0; width: 8px; height: 2px; }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Top Header */
+        .hud-header {
+            position: absolute;
+            top: 20px;
+            left: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .hud-badge {
+            background: rgba(18, 14, 30, 0.85);
+            border: 1px solid rgba(0, 242, 254, 0.4);
+            border-radius: 12px;
+            padding: 10px 18px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .hud-title {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #ffd166;
+            text-transform: uppercase;
+        }
+        .hud-loc {
+            font-size: 13px;
+            color: #00f2fe;
+            font-weight: 600;
+        }
+
+        /* Score and Objective */
+        .hud-objective {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            background: rgba(18, 14, 30, 0.85);
+            border: 1px solid rgba(255, 209, 102, 0.4);
+            border-radius: 12px;
+            padding: 10px 20px;
+            backdrop-filter: blur(10px);
+            text-align: right;
+        }
+        .obj-title {
+            font-size: 12px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .obj-score {
+            font-size: 22px;
+            font-weight: 800;
+            color: #00f2fe;
+        }
+
+        /* Bottom Left: Health */
+        .hud-health {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            background: rgba(18, 14, 30, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            padding: 14px 20px;
+            backdrop-filter: blur(10px);
+            min-width: 220px;
+        }
+        .hp-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #ff3366;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .hp-bar-bg {
+            width: 100%;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .hp-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #ff0055, #ff5500);
+            box-shadow: 0 0 10px #ff0055;
+            transition: width 0.2s ease;
+        }
+
+        /* Jetpack Fuel Gauge */
+        .hud-fuel {
+            margin-top: 10px;
+        }
+        .fuel-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #00f2fe;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .fuel-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        .fuel-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #ffaa00, #00f2fe);
+            box-shadow: 0 0 10px #00f2fe;
+            transition: width 0.1s linear;
+        }
+        .fuel-warning {
+            animation: pulse-fuel 0.5s infinite alternate;
+        }
+        @keyframes pulse-fuel {
+            from { opacity: 1; filter: drop-shadow(0 0 8px #ff3300); }
+            to { opacity: 0.4; }
+        }
+
+        /* Fuel Pickup Banner Alert */
+        #pickup-alert {
+            position: absolute;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(18, 14, 30, 0.9);
+            border: 1px solid #00f2fe;
+            color: #00f2fe;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            padding: 8px 22px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+            display: none;
+            pointer-events: none;
+            z-index: 25;
+            transition: opacity 0.25s ease;
+        }
+
+        /* Boss Health HUD */
+        #boss-hud {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 480px;
+            max-width: 90vw;
+            background: rgba(18, 14, 30, 0.94);
+            border: 2px solid #ff0055;
+            border-radius: 12px;
+            padding: 10px 18px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 0 25px rgba(255, 0, 85, 0.5), inset 0 0 15px rgba(255, 0, 85, 0.2);
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 25;
+            animation: boss-hud-glow 1.5s infinite alternate;
+        }
+        @keyframes boss-hud-glow {
+            from { box-shadow: 0 0 20px rgba(255, 0, 85, 0.4); border-color: #ff0055; }
+            to { box-shadow: 0 0 35px rgba(255, 100, 0, 0.8); border-color: #ff6600; }
+        }
+        .boss-hud-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 800;
+            color: #ff4d6d;
+            letter-spacing: 1.5px;
+        }
+        .boss-title {
+            color: #fff;
+            text-shadow: 0 0 10px #ff0055;
+        }
+        .boss-hp-val {
+            color: #ffaa00;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .boss-hp-bar-bg {
+            width: 100%;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 7px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 0, 85, 0.4);
+        }
+        .boss-hp-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #ff0055, #ffaa00);
+            box-shadow: 0 0 12px #ff0055;
+            transition: width 0.15s ease-out;
+        }
+
+        #boss-warning-banner {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(230, 0, 60, 0.94);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            padding: 12px 28px;
+            border-radius: 30px;
+            box-shadow: 0 0 30px rgba(255, 0, 60, 0.9);
+            display: none;
+            z-index: 30;
+            animation: boss-pulse 0.4s infinite alternate;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        @keyframes boss-pulse {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.05); }
+        }
+
+        /* Bottom Right: Ammo & Weapon */
+        .hud-ammo {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(18, 14, 30, 0.88);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 14px;
+            padding: 14px 22px;
+            backdrop-filter: blur(10px);
+            text-align: right;
+            min-width: 180px;
+        }
+        .weapon-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffd166;
+            letter-spacing: 0.8px;
+            margin-bottom: 2px;
+        }
+        .ammo-display {
+            font-size: 32px;
+            font-weight: 900;
+            color: #00f2fe;
+            line-height: 1;
+        }
+        .ammo-total {
+            font-size: 16px;
+            color: #888;
+            font-weight: 600;
+        }
+        .reload-prompt {
+            font-size: 12px;
+            color: #ff3366;
+            margin-top: 4px;
+            display: none;
+            font-weight: bold;
+            animation: blink 0.8s infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+        /* Damage Vignette */
+        #damage-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            box-shadow: inset 0 0 80px rgba(255, 0, 50, 0.7);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-out;
+            z-index: 15;
+        }
+
+        /* Start / Pause Screen Overlay */
+        #blocker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(9, 6, 18, 0.88);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 50;
+            cursor: pointer;
+            text-align: center;
+        }
+        .start-box {
+            max-width: 580px;
+            padding: 40px;
+            background: rgba(22, 16, 40, 0.95);
+            border: 2px solid rgba(0, 242, 254, 0.5);
+            border-radius: 24px;
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.7), 0 0 40px rgba(0, 242, 254, 0.2);
+        }
+        h1.game-title {
+            margin: 0 0 6px 0;
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            background: linear-gradient(135deg, #ffd166 0%, #ff8c2b 50%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+        .game-subtitle {
+            font-size: 15px;
+            color: #00f2fe;
+            margin-bottom: 24px;
+            font-weight: 600;
+        }
+        .instructions {
+            text-align: left;
+            margin: 20px 0 28px 0;
+            font-size: 14px;
+            line-height: 2.0;
+            color: #e5e5e5;
+        }
+        .key-badge {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(0, 242, 254, 0.5);
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            color: #00f2fe;
+            margin-right: 8px;
+        }
+        .start-btn {
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            color: #0a0a14;
+            padding: 14px 38px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 25px rgba(0, 242, 254, 0.5);
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 32px rgba(0, 242, 254, 0.7);
+        }
+
+        /* Compass Bar */
+        #compass {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(18, 14, 30, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffd166;
+            letter-spacing: 1px;
+        }
+
+        /* Game Over / Victory Modal */
+        #end-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(9, 6, 18, 0.92);
+            backdrop-filter: blur(12px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 60;
+            text-align: center;
+        }
+    </style>
+    <!-- Three.js e PointerLockControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+</head>
+<body>
+    <div id="damage-flash"></div>
+
+    <div id="crosshair">
+        <div class="ch-line ch-top"></div>
+        <div class="ch-line ch-bottom"></div>
+        <div class="ch-line ch-left"></div>
+        <div class="ch-line ch-right"></div>
+        <div class="ch-dot"></div>
+    </div>
+    <div id="hitmarker">
+        <div class="hm-line hm-1"></div>
+        <div class="hm-line hm-2"></div>
+        <div class="hm-line hm-3"></div>
+        <div class="hm-line hm-4"></div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-header">
+            <div class="hud-badge">
+                <span class="hud-title">⚡ Orla Ops</span>
+                <span class="hud-loc">📍 Usina do Gasômetro, POA</span>
+            </div>
+        </div>
+
+        <div id="compass">🧭 OESTE (LAGO GUAÍBA)</div>
+        <div id="pickup-alert">⚡ +40% COMBUSTÍVEL JETPACK</div>
+
+        <!-- Boss Health Bar & Warning -->
+        <div id="boss-hud">
+            <div class="boss-hud-header">
+                <span class="boss-title">⚠️ TITÃ DREADNOUGHT DO GUAÍBA</span>
+                <span id="boss-hp-text" class="boss-hp-val">800 / 800 HP</span>
+            </div>
+            <div class="boss-hp-bar-bg">
+                <div id="boss-hp-bar" class="boss-hp-bar-fill"></div>
+            </div>
+        </div>
+        <div id="boss-warning-banner">⚠️ ALERTA: TITÃ DREADNOUGHT DETECTADO NO GUAÍBA! ⚠️</div>
+
+        <div class="hud-objective">
+            <div class="obj-title">Drones Abatidos</div>
+            <div class="obj-score"><span id="score-val">0</span> / <span id="total-drones">12</span></div>
+        </div>
+
+        <div class="hud-health">
+            <div class="hp-label">
+                <span>SAÚDE DO OPERADOR</span>
+                <span id="hp-text">300 HP</span>
+            </div>
+            <div class="hp-bar-bg">
+                <div id="hp-bar" class="hp-bar-fill"></div>
+            </div>
+
+            <!-- Jetpack Thruster Fuel Gauge -->
+            <div class="hud-fuel">
+                <div class="fuel-label">
+                    <span>🚀 PROPULSORES JETPACK</span>
+                    <span id="fuel-text">100%</span>
+                </div>
+                <div class="fuel-bar-bg">
+                    <div id="fuel-bar" class="fuel-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hud-ammo">
+            <div class="weapon-name">FALCON-7 PLASMA RIFLE</div>
+            <div class="ammo-display"><span id="ammo-clip">30</span> <span class="ammo-total">/ 120</span></div>
+            <div id="reload-prompt" class="reload-prompt">PRESSIONE [ R ] RECARREGAR</div>
+        </div>
+    </div>
+
+    <!-- Start / Pause Screen -->
+    <div id="blocker">
+        <div class="start-box">
+            <h1 class="game-title">Gasômetro 3D FPS</h1>
+            <div class="game-subtitle">Operação Defesa da Orla — Porto Alegre</div>
+            <div class="instructions">
+                <div><span class="key-badge">W A S D</span> Movimentar o Operador</div>
+                <div><span class="key-badge">MOUSE</span> Mirar em 360° (visão livre)</div>
+                <div><span class="key-badge">CLICK ESQ.</span> Disparar Plasma Rifle</div>
+                <div><span class="key-badge">SHIFT</span> Correr / Sprint</div>
+                <div><span class="key-badge">ESPAÇO</span> Pular / Segurar para Acionar Jetpack 🚀</div>
+                <div><span class="key-badge">R</span> Recarregar Munição</div>
+            </div>
+            <div class="start-btn">CLIQUE PARA JOGAR</div>
+        </div>
+    </div>
+
+    <!-- End Game Screen -->
+    <div id="end-screen">
+        <div class="start-box">
+            <h1 id="end-title" class="game-title">MISSÃO CUMPRIDA!</h1>
+            <div id="end-desc" class="game-subtitle">Você limpou a Orla do Gasômetro das ameaças.</div>
+            <p id="end-stats" style="font-size: 16px; color: #ffd166; margin-bottom: 24px;"></p>
+            <div class="start-btn" onclick="location.reload()">JOGAR NOVAMENTE</div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // ==========================================
+        // 1. ÁUDIO PROCEDURAL SINTETIZADO (Web Audio)
+        // ==========================================
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.masterGain = null;
+                this.noiseBuffer = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                    this.masterGain = this.ctx.createGain();
+                    // Volume reduzido geral (confortável e suave)
+                    this.masterGain.gain.setValueAtTime(0.22, this.ctx.currentTime);
+                    this.masterGain.connect(this.ctx.destination);
+
+                    // Pre-baking de buffer de ruído branco (Zero alocação/loops durante o gameplay)
+                    const bufferSize = Math.floor(this.ctx.sampleRate * 0.4);
+                    this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = this.noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                }
+            }
+            playGunshot() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                // Ruído de impacto do disparo
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(450, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t + 0.18);
+                gain.gain.setValueAtTime(0.35, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.2);
+
+                // Ruído branco pré-alocado do estampido
+                if (this.noiseBuffer) {
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = this.noiseBuffer;
+                    const nGain = this.ctx.createGain();
+                    nGain.gain.setValueAtTime(0.25, t);
+                    nGain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+                    noise.connect(nGain);
+                    nGain.connect(this.masterGain);
+                    noise.start(t);
+                    noise.stop(t + 0.12);
+                }
+            }
+            playHit() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(950, t);
+                osc.frequency.setValueAtTime(1300, t + 0.05);
+                gain.gain.setValueAtTime(0.18, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.12);
+            }
+            playExplosion() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                // Grave estrondoso da explosão (130Hz decaindo para 25Hz)
+                const osc = this.ctx.createOscillator();
+                const oGain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(130, t);
+                osc.frequency.exponentialRampToValueAtTime(25, t + 0.35);
+                oGain.gain.setValueAtTime(0.5, t);
+                oGain.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
+                osc.connect(oGain);
+                oGain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.35);
+
+                // Reutiliza o buffer de ruído pré-alocado (Zero custo de CPU)
+                if (this.noiseBuffer) {
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = this.noiseBuffer;
+                    const nGain = this.ctx.createGain();
+                    nGain.gain.setValueAtTime(0.4, t);
+                    nGain.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
+                    noise.connect(nGain);
+                    nGain.connect(this.masterGain);
+                    noise.start(t);
+                    noise.stop(t + 0.35);
+                }
+            }
+            playReload() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(250, t);
+                osc.frequency.exponentialRampToValueAtTime(600, t + 0.15);
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.25);
+            }
+            playHurt() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(160, t);
+                osc.frequency.exponentialRampToValueAtTime(70, t + 0.25);
+                gain.gain.setValueAtTime(0.3, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.25);
+            }
+            startJetpack() {
+                if (!this.ctx || this.jetpackActive) return;
+                this.jetpackActive = true;
+                const t = this.ctx.currentTime;
+
+                this.jetGain = this.ctx.createGain();
+                this.jetGain.gain.setValueAtTime(0.01, t);
+                this.jetGain.gain.linearRampToValueAtTime(0.18, t + 0.1);
+                this.jetGain.connect(this.masterGain);
+
+                this.jetOsc = this.ctx.createOscillator();
+                this.jetOsc.type = 'sawtooth';
+                this.jetOsc.frequency.setValueAtTime(105, t);
+                this.jetOsc.frequency.exponentialRampToValueAtTime(175, t + 0.3);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(320, t);
+
+                this.jetOsc.connect(filter);
+                filter.connect(this.jetGain);
+                this.jetOsc.start(t);
+            }
+            stopJetpack() {
+                if (!this.ctx || !this.jetpackActive) return;
+                this.jetpackActive = false;
+                const t = this.ctx.currentTime;
+                if (this.jetGain) {
+                    this.jetGain.gain.setValueAtTime(this.jetGain.gain.value, t);
+                    this.jetGain.gain.linearRampToValueAtTime(0.001, t + 0.1);
+                }
+                const oscRef = this.jetOsc;
+                const gainRef = this.jetGain;
+                setTimeout(() => {
+                    if (oscRef) {
+                        try { oscRef.stop(); oscRef.disconnect(); } catch (e) {}
+                    }
+                    if (gainRef) {
+                        try { gainRef.disconnect(); } catch (e) {}
+                    }
+                }, 120);
+                this.jetOsc = null;
+                this.jetGain = null;
+            }
+            playFuelPickup() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, t);
+                osc.frequency.exponentialRampToValueAtTime(880, t + 0.1);
+                osc.frequency.exponentialRampToValueAtTime(1320, t + 0.22);
+                gain.gain.setValueAtTime(0.25, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.3);
+            }
+        }
+        const audio = new SoundEngine();
+        window.audio = audio;
+
+        // ==========================================
+        // 2. CONFIGURAÇÃO DA CENA THREE.JS
+        // ==========================================
+        const scene = new THREE.Scene();
+        // Neblina atmosférica no pôr do sol
+        scene.fog = new THREE.FogExp2(0xd66a42, 0.0035);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        window.camera = camera;
+        window.gameCamera = camera;
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            powerPreference: 'high-performance', // Força o navegador a utilizar a GPU dedicada (NVIDIA/AMD)
+            precision: 'mediump'
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        // Limita o pixel ratio a 1.25 para evitar sobrecarga de fillrate em monitores 2K/4K
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowMap; // Muito mais leve que PCFSoftShadowMap (evita queda de FPS)
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Identifica e exibe qual GPU o jogo está utilizando
+        try {
+            const gl = renderer.getContext();
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                const unmaskedRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                console.log('%c[GPU ATIVA]: ' + unmaskedRenderer, 'color: #00f2fe; font-size: 13px; font-weight: bold;');
+            }
+        } catch(e) {}
+
+        // Iluminação: Pôr do sol sobre o Guaíba (Luz Dourada Vinda do Oeste)
+        const ambientLight = new THREE.AmbientLight(0x735a7a, 0.85);
+        scene.add(ambientLight);
+
+        const sunsetLight = new THREE.DirectionalLight(0xff9944, 2.8);
+        sunsetLight.position.set(-350, 180, -100);
+        sunsetLight.castShadow = true;
+        // Otimização de Shadow Map: 1024x1024 economiza 75% da banda de textura de profundidade da GPU
+        sunsetLight.shadow.mapSize.width = 1024;
+        sunsetLight.shadow.mapSize.height = 1024;
+        sunsetLight.shadow.bias = -0.0005;
+        sunsetLight.shadow.camera.near = 10;
+        sunsetLight.shadow.camera.far = 1000;
+        sunsetLight.shadow.camera.left = -300;
+        sunsetLight.shadow.camera.right = 300;
+        sunsetLight.shadow.camera.top = 300;
+        sunsetLight.shadow.camera.bottom = -300;
+        scene.add(sunsetLight);
+
+        // Luz de preenchimento do céu
+        const hemiLight = new THREE.HemisphereLight(0xffbb77, 0x223344, 0.6);
+        scene.add(hemiLight);
+
+        // Céu com gradiente dramático do entardecer
+        const skyGeo = new THREE.SphereGeometry(900, 32, 15);
+        const skyMat = new THREE.MeshBasicMaterial({
+            color: 0xe67340,
+            side: THREE.BackSide
+        });
+        const skyDome = new THREE.Mesh(skyGeo, skyMat);
+        scene.add(skyDome);
+
+        // ==========================================
+        // 2.5 GERADOR DE TEXTURAS PROCEDURAIS (CANVAS 2D & NORMAL MAPS)
+        // ==========================================
+        const TextureGenerator = {
+            createBrickTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#5c544d';
+                ctx.fillRect(0, 0, 512, 512);
+
+                const rows = 16, cols = 8;
+                const rw = 512 / cols, rh = 512 / rows;
+                for (let r = 0; r < rows; r++) {
+                    const offset = (r % 2) * (rw / 2);
+                    for (let c = -1; c <= cols; c++) {
+                        const v = Math.floor((Math.sin(r * 12.3 + c * 45.7) * 0.5 + 0.5) * 35);
+                        const red = 155 + v;
+                        const green = 55 + Math.floor(v * 0.5);
+                        const blue = 38 + Math.floor(v * 0.3);
+                        ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+
+                        const bx = c * rw + offset + 2;
+                        const by = r * rh + 2;
+                        const bw = rw - 4;
+                        const bh = rh - 4;
+                        ctx.fillRect(bx, by, bw, bh);
+
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+                        for (let i = 0; i < 15; i++) {
+                            ctx.fillRect(bx + Math.random() * bw, by + Math.random() * bh, 2, 2);
+                        }
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(8, 4);
+                return tex;
+            },
+
+            createBrickBumpMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#181818';
+                ctx.fillRect(0, 0, 512, 512);
+
+                const rows = 16, cols = 8;
+                const rw = 512 / cols, rh = 512 / rows;
+                for (let r = 0; r < rows; r++) {
+                    const offset = (r % 2) * (rw / 2);
+                    for (let c = -1; c <= cols; c++) {
+                        const baseVal = 190 + Math.floor(Math.random() * 40);
+                        ctx.fillStyle = `rgb(${baseVal}, ${baseVal}, ${baseVal})`;
+                        const bx = c * rw + offset + 2;
+                        const by = r * rh + 2;
+                        const bw = rw - 4;
+                        const bh = rh - 4;
+                        ctx.fillRect(bx, by, bw, bh);
+
+                        ctx.fillStyle = '#666666';
+                        for (let i = 0; i < 20; i++) {
+                            ctx.fillRect(bx + Math.random() * bw, by + Math.random() * bh, 2, 2);
+                        }
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(8, 4);
+                return tex;
+            },
+
+            createChimneyTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 1024;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#5c544d';
+                ctx.fillRect(0, 0, 512, 1024);
+
+                const rows = 64, cols = 8;
+                const rw = 512 / cols, rh = 1024 / rows;
+                for (let r = 0; r < rows; r++) {
+                    const offset = (r % 2) * (rw / 2);
+                    for (let c = -1; c <= cols; c++) {
+                        const v = Math.floor(Math.random() * 25);
+                        ctx.fillStyle = `rgb(${145 + v}, ${52 + v}, ${35 + v})`;
+                        ctx.fillRect(c * rw + offset + 1, r * rh + 1, rw - 2, rh - 2);
+                    }
+                }
+
+                // Cintas de ferro de reforço estrutural
+                const bands = 18;
+                for (let b = 0; b < bands; b++) {
+                    const y = (1024 / bands) * b;
+                    ctx.fillStyle = '#111317';
+                    ctx.fillRect(0, y, 512, 10);
+                    ctx.fillStyle = '#3a3f47';
+                    ctx.fillRect(0, y + 2, 512, 6);
+                    ctx.fillStyle = '#68727d';
+                    ctx.fillRect(0, y + 3, 512, 2);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
+                tex.repeat.set(3, 1);
+                return tex;
+            },
+
+            createRoofTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#38251e';
+                ctx.fillRect(0, 0, 256, 256);
+
+                for (let x = 0; x < 256; x += 16) {
+                    ctx.fillStyle = '#261813';
+                    ctx.fillRect(x, 0, 3, 256);
+                    ctx.fillStyle = '#4d342a';
+                    ctx.fillRect(x + 3, 0, 10, 256);
+                    ctx.fillStyle = '#5c3f33';
+                    ctx.fillRect(x + 5, 0, 4, 256);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(12, 8);
+                return tex;
+            },
+
+            createBoardwalkTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#403d38';
+                ctx.fillRect(0, 0, 512, 512);
+
+                const size = 32;
+                for (let y = 0; y < 512; y += size) {
+                    for (let x = 0; x < 512; x += size) {
+                        const isLight = ((x / size) + (y / size)) % 2 === 0;
+                        const v = Math.floor((Math.random() - 0.5) * 20);
+                        if (isLight) {
+                            ctx.fillStyle = `rgb(${215 + v}, ${210 + v}, ${200 + v})`;
+                        } else {
+                            ctx.fillStyle = `rgb(${160 + v}, ${155 + v}, ${145 + v})`;
+                        }
+                        ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+                        for (let k = 0; k < 8; k++) {
+                            ctx.fillRect(x + Math.random() * size, y + Math.random() * size, 2, 2);
+                        }
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(3, 40);
+                return tex;
+            },
+
+            createBoardwalkBumpMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#202020';
+                ctx.fillRect(0, 0, 256, 256);
+
+                const size = 16;
+                for (let y = 0; y < 256; y += size) {
+                    for (let x = 0; x < 256; x += size) {
+                        const v = 180 + Math.floor(Math.random() * 40);
+                        ctx.fillStyle = `rgb(${v}, ${v}, ${v})`;
+                        ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(3, 40);
+                return tex;
+            },
+
+            createAsphaltTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#222326';
+                ctx.fillRect(0, 0, 512, 512);
+
+                for (let i = 0; i < 12000; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const val = Math.floor(Math.random() * 70 + 40);
+                    ctx.fillStyle = `rgb(${val}, ${val + 2}, ${val + 4})`;
+                    ctx.fillRect(x, y, Math.random() * 2 + 1, Math.random() * 2 + 1);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(4, 40);
+                return tex;
+            },
+
+            createAsphaltBumpMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#808080';
+                ctx.fillRect(0, 0, 256, 256);
+
+                for (let i = 0; i < 8000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const val = Math.random() > 0.5 ? 220 : 50;
+                    ctx.fillStyle = `rgb(${val}, ${val}, ${val})`;
+                    ctx.fillRect(x, y, 1.5, 1.5);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(4, 40);
+                return tex;
+            },
+
+            createGrassTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#293d1f';
+                ctx.fillRect(0, 0, 512, 512);
+
+                for (let i = 0; i < 16000; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const r = Math.random();
+                    if (r < 0.45) ctx.fillStyle = 'rgba(52, 84, 38, 0.4)';
+                    else if (r < 0.8) ctx.fillStyle = 'rgba(32, 52, 24, 0.45)';
+                    else ctx.fillStyle = 'rgba(74, 70, 38, 0.35)';
+                    ctx.fillRect(x, y, Math.random() * 3 + 1, Math.random() * 4 + 1);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(40, 50);
+                return tex;
+            },
+
+            createGrassBumpMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#606060';
+                ctx.fillRect(0, 0, 256, 256);
+
+                for (let i = 0; i < 6000; i++) {
+                    const v = Math.floor(Math.random() * 120 + 80);
+                    ctx.fillStyle = `rgb(${v}, ${v}, ${v})`;
+                    ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 3);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(40, 50);
+                return tex;
+            },
+
+            createWaterNormalMap() {
+                const size = 256;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const imgData = ctx.createImageData(size, size);
+                const data = imgData.data;
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const u = (x / size) * Math.PI * 4;
+                        const v = (y / size) * Math.PI * 4;
+                        const dx = Math.cos(u * 2 + v) * 1.5 + Math.sin(u * 5 - v * 2) * 0.7;
+                        const dy = Math.sin(v * 2 + u) * 1.5 + Math.cos(v * 5 + u * 3) * 0.7;
+
+                        const nx = Math.floor(Math.max(0, Math.min(255, 128 + dx * 32)));
+                        const ny = Math.floor(Math.max(0, Math.min(255, 128 + dy * 32)));
+                        const nz = 255;
+
+                        const idx = (y * size + x) * 4;
+                        data[idx] = nx;
+                        data[idx + 1] = ny;
+                        data[idx + 2] = nz;
+                        data[idx + 3] = 255;
+                    }
+                }
+                ctx.putImageData(imgData, 0, 0);
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(22, 32);
+                return tex;
+            },
+
+            createBuildingFacadeTexture(style) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                const baseColor = style === 'stone' ? '#9c9484' : '#c8c2b4';
+                ctx.fillStyle = baseColor;
+                ctx.fillRect(0, 0, 512, 512);
+
+                const floors = 12, cols = 8;
+                const fw = 512 / cols, fh = 512 / floors;
+
+                for (let f = 0; f < floors; f++) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+                    ctx.fillRect(0, f * fh, 512, 4);
+
+                    for (let c = 0; c < cols; c++) {
+                        const wx = c * fw + 14;
+                        const wy = f * fh + 10;
+                        const ww = fw - 28;
+                        const wh = fh - 18;
+
+                        ctx.fillStyle = '#1c222b';
+                        ctx.fillRect(wx, wy, ww, wh);
+
+                        const hasLight = Math.random() > 0.65;
+                        ctx.fillStyle = hasLight ? '#ffcf75' : '#2f4357';
+                        ctx.fillRect(wx + 2, wy + 2, ww - 4, wh - 4);
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(2, 4);
+                return tex;
+            },
+
+            createGlassFacadeTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#2e495e';
+                ctx.fillRect(0, 0, 512, 512);
+
+                const cols = 12, rows = 16;
+                const pw = 512 / cols, ph = 512 / rows;
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const shade = (c + r) % 3 === 0 ? '#385770' : '#294357';
+                        ctx.fillStyle = shade;
+                        ctx.fillRect(c * pw + 1, r * ph + 1, pw - 2, ph - 2);
+
+                        ctx.strokeStyle = '#0f171f';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(c * pw, r * ph, pw, ph);
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(3, 6);
+                return tex;
+            },
+
+            createBarkTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#423124';
+                ctx.fillRect(0, 0, 128, 256);
+
+                for (let x = 0; x < 128; x += 4) {
+                    const dark = Math.random() > 0.4;
+                    ctx.fillStyle = dark ? '#231810' : '#574130';
+                    ctx.fillRect(x, 0, Math.random() * 3 + 1, 256);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(2, 4);
+                return tex;
+            },
+
+            createFoliageTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#20401b';
+                ctx.fillRect(0, 0, 256, 256);
+
+                for (let i = 0; i < 5000; i++) {
+                    const val = Math.random();
+                    if (val < 0.4) ctx.fillStyle = 'rgba(56, 92, 42, 0.4)';
+                    else if (val < 0.7) ctx.fillStyle = 'rgba(28, 54, 23, 0.4)';
+                    else ctx.fillStyle = 'rgba(82, 115, 52, 0.35)';
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 5 + 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(2, 2);
+                return tex;
+            },
+
+            createConcreteTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#9e9990';
+                ctx.fillRect(0, 0, 256, 256);
+
+                for (let i = 0; i < 4000; i++) {
+                    const val = Math.floor(Math.random() * 50 + 130);
+                    ctx.fillStyle = `rgba(${val}, ${val}, ${val}, 0.15)`;
+                    ctx.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, 30);
+                return tex;
+            },
+
+            createShopfrontTexture(styleIdx = 0) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                // Parede base térreo (granito escuro / mármore)
+                const styles = [
+                    { base: '#1e2229', trim: '#b89047', name: 'CAFÉ DO LAGO', glass: '#8cd7ff' },
+                    { base: '#2b2623', trim: '#c0a080', name: 'LIVRARIA & ARTE', glass: '#ffeaa7' },
+                    { base: '#1a2621', trim: '#2ecc71', name: 'FARMÁCIA ORLA', glass: '#a8ff78' },
+                    { base: '#282c34', trim: '#00f2fe', name: 'CYBER BISTRO', glass: '#00f2fe' }
+                ];
+                const cur = styles[styleIdx % styles.length];
+
+                ctx.fillStyle = cur.base;
+                ctx.fillRect(0, 0, 512, 256);
+
+                // Marquise / Letreiro superior
+                ctx.fillStyle = '#111317';
+                ctx.fillRect(10, 10, 492, 50);
+                ctx.strokeStyle = cur.trim;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(10, 10, 492, 50);
+
+                ctx.fillStyle = cur.trim;
+                ctx.font = 'bold 22px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(cur.name, 256, 35);
+
+                // Vitrine esquerda (vidro iluminado e produtos)
+                ctx.fillStyle = '#0f1722';
+                ctx.fillRect(20, 75, 200, 165);
+                ctx.strokeStyle = '#4a5568';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(20, 75, 200, 165);
+
+                // Brilho interior da vitrine
+                const grad1 = ctx.createLinearGradient(20, 75, 220, 240);
+                grad1.addColorStop(0, 'rgba(255, 230, 160, 0.55)');
+                grad1.addColorStop(1, 'rgba(20, 30, 45, 0.85)');
+                ctx.fillStyle = grad1;
+                ctx.fillRect(24, 79, 192, 157);
+
+                // Porta central com puxador
+                ctx.fillStyle = '#14171d';
+                ctx.fillRect(240, 75, 90, 165);
+                ctx.strokeStyle = cur.trim;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(240, 75, 90, 165);
+
+                // Vidro da porta
+                ctx.fillStyle = 'rgba(140, 215, 255, 0.4)';
+                ctx.fillRect(250, 85, 70, 130);
+                // Puxador metálico
+                ctx.fillStyle = cur.trim;
+                ctx.fillRect(310, 145, 6, 35);
+
+                // Vitrine direita
+                ctx.fillStyle = '#0f1722';
+                ctx.fillRect(350, 75, 140, 165);
+                ctx.strokeStyle = '#4a5568';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(350, 75, 140, 165);
+
+                const grad2 = ctx.createLinearGradient(350, 75, 490, 240);
+                grad2.addColorStop(0, 'rgba(255, 220, 140, 0.6)');
+                grad2.addColorStop(1, 'rgba(25, 35, 50, 0.85)');
+                ctx.fillStyle = grad2;
+                ctx.fillRect(354, 79, 132, 157);
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
+                return tex;
+            },
+
+            createHVACTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                // Metal galvanizado
+                ctx.fillStyle = '#4a525d';
+                ctx.fillRect(0, 0, 256, 256);
+
+                // Painéis e rebites
+                ctx.strokeStyle = '#2b3038';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(4, 4, 248, 248);
+
+                // Grelha de ventilação central
+                ctx.fillStyle = '#181b20';
+                ctx.fillRect(24, 30, 208, 196);
+
+                ctx.fillStyle = '#616d7a';
+                for (let y = 36; y < 220; y += 8) {
+                    ctx.fillRect(28, y, 200, 3);
+                    ctx.fillStyle = '#20242b';
+                    ctx.fillRect(28, y + 3, 200, 3);
+                    ctx.fillStyle = '#616d7a';
+                }
+
+                // Rebites de canto
+                ctx.fillStyle = '#8a9ba8';
+                [10, 246].forEach(x => {
+                    [10, 246].forEach(y => {
+                        ctx.beginPath();
+                        ctx.arc(x, y, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                });
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createHelipadTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                // Asfalto do heliponto
+                ctx.fillStyle = '#222428';
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Borda circular amarela de alerta
+                ctx.strokeStyle = '#ffd166';
+                ctx.lineWidth = 16;
+                ctx.beginPath();
+                ctx.arc(256, 256, 220, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Linha circular branca interna tracejada
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 8;
+                ctx.setLineDash([24, 16]);
+                ctx.beginPath();
+                ctx.arc(256, 256, 180, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 'H' central imponente
+                ctx.fillStyle = '#ffffff';
+                // Hastes verticais
+                ctx.fillRect(160, 130, 34, 252);
+                ctx.fillRect(318, 130, 34, 252);
+                // Barra transversal
+                ctx.fillRect(160, 238, 192, 36);
+
+                // Faixas perimetrais de perigo nos cantos
+                ctx.fillStyle = 'rgba(255, 209, 102, 0.4)';
+                for (let i = 0; i < 512; i += 40) {
+                    ctx.fillRect(i, 0, 20, 16);
+                    ctx.fillRect(i, 496, 20, 16);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
+                return tex;
+            },
+
+            createWoodDeckTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#2a1a12';
+                ctx.fillRect(0, 0, 256, 256);
+
+                const planks = 16;
+                const ph = 256 / planks;
+                for (let p = 0; p < planks; p++) {
+                    const v = Math.floor((Math.random() - 0.5) * 20);
+                    ctx.fillStyle = `rgb(${155 + v}, ${95 + v}, ${55 + v})`;
+                    ctx.fillRect(0, p * ph + 1, 256, ph - 2);
+
+                    // Sulcos de prego
+                    ctx.fillStyle = '#1e140d';
+                    ctx.fillRect(16, p * ph + ph / 2, 4, 2);
+                    ctx.fillRect(128, p * ph + ph / 2, 4, 2);
+                    ctx.fillRect(240, p * ph + ph / 2, 4, 2);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(4, 4);
+                return tex;
+            },
+
+            createPineFoliageTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#142918';
+                ctx.fillRect(0, 0, 256, 256);
+
+                for (let i = 0; i < 6000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    ctx.strokeStyle = Math.random() > 0.5 ? '#1f4225' : '#2b5c34';
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + (Math.random() - 0.5) * 8, y + Math.random() * 8);
+                    ctx.stroke();
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(2, 4);
+                return tex;
+            },
+
+            createPalmBarkTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#5c4838';
+                ctx.fillRect(0, 0, 128, 256);
+
+                // Anéis segmentados de palmeira
+                for (let y = 0; y < 256; y += 12) {
+                    ctx.fillStyle = '#36281e';
+                    ctx.fillRect(0, y, 128, 4);
+                    ctx.fillStyle = '#785e49';
+                    ctx.fillRect(0, y + 4, 128, 8);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, 6);
+                return tex;
+            }
+        };
+
+        // ==========================================
+        // 3. MAPA 3D DA USINA DO GASÔMETRO & PORTO ALEGRE
+        // ==========================================
+        const colliders = []; // Caixas de colisão para o jogador não atravessar paredes
+
+        // A. Lago Guaíba (Água com Ondulações Dinâmicas e Reflexos Dourados)
+        const waterNormalTex = TextureGenerator.createWaterNormalMap();
+        const waterGeo = new THREE.PlaneGeometry(800, 1200, 32, 32);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x0c2538,
+            roughness: 0.12,
+            metalness: 0.88,
+            normalMap: waterNormalTex,
+            normalScale: new THREE.Vector2(0.75, 0.75)
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        water.position.set(-420, -0.4, 0);
+        water.receiveShadow = true;
+        scene.add(water);
+
+        // B. Gramado / Parque da Orla do Gasômetro (Textura Orgânica & Bump)
+        const grassTex = TextureGenerator.createGrassTexture();
+        const grassBump = TextureGenerator.createGrassBumpMap();
+        const groundGeo = new THREE.PlaneGeometry(700, 1000);
+        const groundMat = new THREE.MeshStandardMaterial({
+            color: 0x3d542d,
+            map: grassTex,
+            bumpMap: grassBump,
+            bumpScale: 0.08,
+            roughness: 0.88,
+            metalness: 0.04
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(200, 0, 0);
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // C. Calçadão da Orla e Mureta do Guaíba (Pedras Portuguesas & Concreto)
+        const boardwalkTex = TextureGenerator.createBoardwalkTexture();
+        const boardwalkBump = TextureGenerator.createBoardwalkBumpMap();
+        const boardwalkGeo = new THREE.BoxGeometry(32, 0.4, 800);
+        const boardwalkMat = new THREE.MeshStandardMaterial({
+            map: boardwalkTex,
+            bumpMap: boardwalkBump,
+            bumpScale: 0.06,
+            roughness: 0.65,
+            metalness: 0.08
+        });
+        const boardwalk = new THREE.Mesh(boardwalkGeo, boardwalkMat);
+        boardwalk.position.set(-54, 0.2, 0);
+        boardwalk.receiveShadow = true;
+        scene.add(boardwalk);
+
+        // Mureta de proteção ao longo da orla
+        const concreteTex = TextureGenerator.createConcreteTexture();
+        const railingGeo = new THREE.BoxGeometry(1.2, 1.1, 800);
+        const railingMat = new THREE.MeshStandardMaterial({
+            map: concreteTex,
+            roughness: 0.78,
+            metalness: 0.12
+        });
+        const railing = new THREE.Mesh(railingGeo, railingMat);
+        railing.position.set(-68, 0.75, 0);
+        railing.castShadow = true;
+        railing.receiveShadow = true;
+        scene.add(railing);
+        colliders.push(new THREE.Box3().setFromObject(railing));
+
+        // D. Avenidas (Av. Presidente João Goulart & Cais Mauá - Asfalto & Brita)
+        const asphaltTex = TextureGenerator.createAsphaltTexture();
+        const asphaltBump = TextureGenerator.createAsphaltBumpMap();
+        const roadGeo = new THREE.PlaneGeometry(36, 800);
+        const roadMat = new THREE.MeshStandardMaterial({
+            map: asphaltTex,
+            bumpMap: asphaltBump,
+            bumpScale: 0.05,
+            roughness: 0.85,
+            metalness: 0.08
+        });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.position.set(-20, 0.05, 0);
+        road.receiveShadow = true;
+        scene.add(road);
+
+        // Faixas da avenida
+        const stripeGeo = new THREE.PlaneGeometry(1.0, 750);
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf5f5f5 });
+        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+        stripe.rotation.x = -Math.PI / 2;
+        stripe.position.set(-20, 0.08, 0);
+        scene.add(stripe);
+
+        // Rotatória clássica em frente ao Gasômetro
+        const roundGeo = new THREE.RingGeometry(18, 38, 32);
+        const roundabout = new THREE.Mesh(roundGeo, roadMat);
+        roundabout.rotation.x = -Math.PI / 2;
+        roundabout.position.set(0, 0.06, -35);
+        scene.add(roundabout);
+
+        // Canteiro central da rotatória
+        const centerGrassGeo = new THREE.CylinderGeometry(17.5, 17.5, 0.5, 32);
+        const centerGrass = new THREE.Mesh(centerGrassGeo, groundMat);
+        centerGrass.position.set(0, 0.25, -35);
+        scene.add(centerGrass);
+
+        // E. A HISTÓRICA USINA DO GASÔMETRO
+        const gasometroGroup = new THREE.Group();
+        gasometroGroup.position.set(70, 0, -35);
+
+        // Texturas Procedurais da Usina
+        const brickTex = TextureGenerator.createBrickTexture();
+        const brickBump = TextureGenerator.createBrickBumpMap();
+        const brickMat = new THREE.MeshStandardMaterial({
+            map: brickTex,
+            bumpMap: brickBump,
+            bumpScale: 0.08,
+            roughness: 0.72,
+            metalness: 0.12
+        });
+
+        const roofTex = TextureGenerator.createRoofTexture();
+        const roofMat = new THREE.MeshStandardMaterial({
+            map: roofTex,
+            roughness: 0.78,
+            metalness: 0.22
+        });
+
+        // Corpo Principal da Usina (Tijolos Terracota com Rejunte e Relevo)
+        const gasoBodyGeo = new THREE.BoxGeometry(65, 24, 42);
+        const gasoBody = new THREE.Mesh(gasoBodyGeo, brickMat);
+        gasoBody.position.y = 12;
+        gasoBody.castShadow = true;
+        gasoBody.receiveShadow = true;
+        gasometroGroup.add(gasoBody);
+
+        // Telhado da Usina
+        const roofGeo = new THREE.BoxGeometry(67, 3, 44);
+        const roof = new THREE.Mesh(roofGeo, roofMat);
+        roof.position.y = 25.5;
+        roof.castShadow = true;
+        gasometroGroup.add(roof);
+
+        // A FAMOSA CHAMINÉ DE 117 METROS DO GASÔMETRO
+        // Base quadrada da chaminé
+        const chimBaseGeo = new THREE.BoxGeometry(11, 16, 11);
+        const chimBase = new THREE.Mesh(chimBaseGeo, brickMat);
+        chimBase.position.set(8.5, 8, -26);
+        chimBase.castShadow = true;
+        gasometroGroup.add(chimBase);
+
+        // Coluna cilíndrica da chaminé com cintas de reforço de ferro escuro
+        const chimneyTex = TextureGenerator.createChimneyTexture();
+        const chimneyMat = new THREE.MeshStandardMaterial({
+            map: chimneyTex,
+            bumpMap: brickBump,
+            bumpScale: 0.07,
+            roughness: 0.7,
+            metalness: 0.2
+        });
+        const chimneyGeo = new THREE.CylinderGeometry(4.2, 5.8, 105, 24);
+        const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
+        chimney.position.set(8.5, 68.5, -26);
+        chimney.castShadow = true;
+        gasometroGroup.add(chimney);
+
+        // Anel superior da chaminé
+        const chimRingGeo = new THREE.TorusGeometry(4.8, 0.6, 8, 24);
+        const chimRing = new THREE.Mesh(chimRingGeo, roofMat);
+        chimRing.rotation.x = Math.PI / 2;
+        chimRing.position.set(8.5, 120, -26);
+        gasometroGroup.add(chimRing);
+
+        scene.add(gasometroGroup);
+        gasometroGroup.updateMatrixWorld(true);
+
+        // Adiciona colisão para a Usina (incluindo telhado acessível por Jetpack)
+        const gasoBox = new THREE.Box3().setFromObject(gasoBody);
+        colliders.push(gasoBox);
+        const chimBox = new THREE.Box3().setFromObject(chimBase);
+        colliders.push(chimBox);
+        const roofBox = new THREE.Box3().setFromObject(roof);
+        colliders.push(roofBox);
+
+        // F. EDIFÍCIOS DETALHADOS DO CENTRO HISTÓRICO (Térreos Comerciais, Fachadas 3D, Telhados Técnicos e Helipontos)
+        const bldgTex1 = TextureGenerator.createBuildingFacadeTexture('classic');
+        const bldgMat1 = new THREE.MeshStandardMaterial({ map: bldgTex1, roughness: 0.65 });
+
+        const bldgTex2 = TextureGenerator.createGlassFacadeTexture();
+        const bldgMat2 = new THREE.MeshStandardMaterial({ map: bldgTex2, roughness: 0.18, metalness: 0.82 });
+
+        const bldgTex3 = TextureGenerator.createBuildingFacadeTexture('stone');
+        const bldgMat3 = new THREE.MeshStandardMaterial({ map: bldgTex3, roughness: 0.7 });
+
+        const hvacTex = TextureGenerator.createHVACTexture();
+        const hvacMat = new THREE.MeshStandardMaterial({ map: hvacTex, roughness: 0.45, metalness: 0.75 });
+
+        const helipadTex = TextureGenerator.createHelipadTexture();
+        const helipadMat = new THREE.MeshStandardMaterial({ map: helipadTex, roughness: 0.6, metalness: 0.2 });
+
+        const deckTex = TextureGenerator.createWoodDeckTexture();
+        const deckMat = new THREE.MeshStandardMaterial({ map: deckTex, roughness: 0.7, metalness: 0.1 });
+
+        const metalTrimMat = new THREE.MeshStandardMaterial({ color: 0x22262d, roughness: 0.3, metalness: 0.85 });
+        const concreteWallMat = new THREE.MeshStandardMaterial({ color: 0x7a7468, roughness: 0.8, metalness: 0.1 });
+        const windowFrameMat = new THREE.MeshStandardMaterial({ color: 0x181e26, roughness: 0.25, metalness: 0.8 });
+        const glassReflectionMat = new THREE.MeshStandardMaterial({ color: 0x3d5a73, roughness: 0.1, metalness: 0.9 });
+        const acUnitMat = new THREE.MeshStandardMaterial({ color: 0xd8dcd6, roughness: 0.5, metalness: 0.3 });
+
+        // Coordenadas e configurações dos 9 edifícios principais
+        const buildingConfigs = [
+            { x: 160, z: 40, w: 50, d: 45, h: 48, mat: bldgMat1, shopIdx: 0, hasHelipad: false, hasDeck: true, name: "Edifício Farroupilha" },
+            { x: 160, z: -110, w: 45, d: 50, h: 62, mat: bldgMat2, shopIdx: 1, hasHelipad: true, hasDeck: false, name: "Torre Mauá Glass" },
+            { x: 230, z: 50, w: 55, d: 60, h: 75, mat: bldgMat3, shopIdx: 2, hasHelipad: true, hasDeck: false, name: "Edifício Riachuelo Plaza" },
+            { x: 230, z: -40, w: 50, d: 45, h: 58, mat: bldgMat1, shopIdx: 3, hasHelipad: false, hasDeck: true, name: "Solar da Alfândega" },
+            { x: 230, z: -125, w: 45, d: 55, h: 84, mat: bldgMat2, shopIdx: 0, hasHelipad: true, hasDeck: false, name: "Centro Empresarial Guaíba" },
+            { x: 300, z: 10, w: 60, d: 60, h: 95, mat: bldgMat3, shopIdx: 1, hasHelipad: true, hasDeck: false, name: "Skyline Tower POA" },
+            { x: 300, z: -80, w: 55, d: 50, h: 70, mat: bldgMat1, shopIdx: 2, hasHelipad: false, hasDeck: true, name: "Residencial Duque de Caxias" },
+            { x: 75, z: 95, w: 42, d: 38, h: 32, mat: bldgMat3, shopIdx: 3, hasHelipad: false, hasDeck: false, name: "Casarão Histórico Orla" },
+            { x: 75, z: -160, w: 48, d: 40, h: 36, mat: bldgMat1, shopIdx: 0, hasHelipad: false, hasDeck: false, name: "Edifício Gasômetro Flat" },
+        ];
+
+        const beaconLights = [];
+        const hvacFans = [];
+        const fuelPads = [];
+
+        function createDetailedBuilding(cfg) {
+            const bGroup = new THREE.Group();
+            const { x, z, w, d, h, mat, shopIdx, hasHelipad, hasDeck } = cfg;
+
+            // 1. TÉRREO COMERCIAL COM VITRINES, PORTAS E TOLDOS (h = 5.5m)
+            const groundFloorH = 5.5;
+            const shopTex = TextureGenerator.createShopfrontTexture(shopIdx);
+            const shopMat = new THREE.MeshStandardMaterial({ map: shopTex, roughness: 0.45, metalness: 0.3 });
+            
+            // Fachada comercial do térreo voltada para a avenida (lado -X ou lados visíveis)
+            const groundGeo = new THREE.BoxGeometry(w, groundFloorH, d);
+            const groundMesh = new THREE.Mesh(groundGeo, concreteWallMat);
+            groundMesh.position.y = groundFloorH / 2;
+            groundMesh.castShadow = true;
+            groundMesh.receiveShadow = true;
+            bGroup.add(groundMesh);
+
+            // Painel de vitrine/loja na face frontal
+            const shopFrontGeo = new THREE.PlaneGeometry(w * 0.92, groundFloorH * 0.85);
+            const shopFrontMesh = new THREE.Mesh(shopFrontGeo, shopMat);
+            shopFrontMesh.position.set(-w / 2 - 0.08, groundFloorH / 2, 0);
+            shopFrontMesh.rotation.y = -Math.PI / 2;
+            bGroup.add(shopFrontMesh);
+
+            // Toldo / Marquise estilizada sobre a vitrine
+            const awningGeo = new THREE.BoxGeometry(2.4, 0.3, w * 0.94);
+            const awningMat = new THREE.MeshStandardMaterial({
+                color: shopIdx % 2 === 0 ? 0xa82e2e : 0x245580,
+                roughness: 0.6
+            });
+            const awning = new THREE.Mesh(awningGeo, awningMat);
+            awning.position.set(-w / 2 - 1.2, groundFloorH - 0.4, 0);
+            awning.rotation.z = -0.15; // Leve caimento de água
+            awning.castShadow = true;
+            bGroup.add(awning);
+
+            // 2. CORPO DO PRÉDIO COM FACHADA E RELEVO 3D
+            const bodyH = h - groundFloorH;
+            const bodyGeo = new THREE.BoxGeometry(w, bodyH, d);
+            const bodyMesh = new THREE.Mesh(bodyGeo, mat);
+            bodyMesh.position.y = groundFloorH + bodyH / 2;
+            bodyMesh.castShadow = true;
+            bodyMesh.receiveShadow = true;
+            bGroup.add(bodyMesh);
+
+            // Molduras e janelas 3D em relevo (Windows Box)
+            const winGeo = new THREE.BoxGeometry(w + 0.35, bodyH * 0.9, d + 0.35);
+            const winMesh = new THREE.Mesh(winGeo, glassReflectionMat);
+            winMesh.position.y = groundFloorH + bodyH / 2;
+            bGroup.add(winMesh);
+
+            // Aparelhos de Ar Condicionado externos suspensos nas laterais
+            const acFloors = Math.floor(bodyH / 6);
+            for (let f = 1; f < acFloors; f++) {
+                if (Math.random() > 0.35) {
+                    const acMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.6), acUnitMat);
+                    const acSide = Math.random() > 0.5 ? 1 : -1;
+                    acMesh.position.set(-w / 2 - 0.35, groundFloorH + f * 5.8, (Math.random() - 0.5) * (d * 0.7));
+                    acMesh.castShadow = true;
+                    bGroup.add(acMesh);
+
+                    // Suporte de ferro do AC
+                    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.5), metalTrimMat);
+                    bracket.position.set(acMesh.position.x + 0.2, acMesh.position.y - 0.45, acMesh.position.z);
+                    bGroup.add(bracket);
+                }
+            }
+
+            // 3. LAJE TÉCNICA E PARAPEITOS DE SEGURANÇA NO TELHADO
+            const roofY = h;
+            // Parapeito perimetral de alvenaria (evita queda e dá colisão sólida)
+            const wallThick = 0.8;
+            const wallH = 1.3;
+            // Parede frontal / traseira do parapeito
+            const pWallGeoZ = new THREE.BoxGeometry(w, wallH, wallThick);
+            const pWallNorth = new THREE.Mesh(pWallGeoZ, concreteWallMat);
+            pWallNorth.position.set(0, roofY + wallH / 2, -d / 2 + wallThick / 2);
+            bGroup.add(pWallNorth);
+            const pWallSouth = new THREE.Mesh(pWallGeoZ, concreteWallMat);
+            pWallSouth.position.set(0, roofY + wallH / 2, d / 2 - wallThick / 2);
+            bGroup.add(pWallSouth);
+
+            // Parede lateral leste / oeste do parapeito
+            const pWallGeoX = new THREE.BoxGeometry(wallThick, wallH, d - wallThick * 2);
+            const pWallWest = new THREE.Mesh(pWallGeoX, concreteWallMat);
+            pWallWest.position.set(-w / 2 + wallThick / 2, roofY + wallH / 2, 0);
+            bGroup.add(pWallWest);
+            const pWallEast = new THREE.Mesh(pWallGeoX, concreteWallMat);
+            pWallEast.position.set(w / 2 - wallThick / 2, roofY + wallH / 2, 0);
+            bGroup.add(pWallEast);
+
+            // 4. CASA DE MÁQUINAS DOS ELEVADORES COM PORTA DE FERRO
+            const liftW = Math.min(w * 0.35, 12);
+            const liftD = Math.min(d * 0.35, 12);
+            const liftH = 4.2;
+            const liftGeo = new THREE.BoxGeometry(liftW, liftH, liftD);
+            const liftMesh = new THREE.Mesh(liftGeo, concreteWallMat);
+            liftMesh.position.set(w * 0.2, roofY + liftH / 2, d * 0.15);
+            liftMesh.castShadow = true;
+            bGroup.add(liftMesh);
+
+            // Porta da casa de máquinas
+            const doorGeo = new THREE.PlaneGeometry(1.6, 2.8);
+            const doorMesh = new THREE.Mesh(doorGeo, metalTrimMat);
+            doorMesh.position.set(liftMesh.position.x - liftW / 2 - 0.05, roofY + 1.4, liftMesh.position.z);
+            doorMesh.rotation.y = -Math.PI / 2;
+            bGroup.add(doorMesh);
+
+            // 5. UNIDADES HVAC DE CLIMATIZAÇÃO INDUSTRIAL & DUTOS
+            const hvacUnitW = 6, hvacUnitH = 2.4, hvacUnitD = 4;
+            const hvacMesh = new THREE.Mesh(new THREE.BoxGeometry(hvacUnitW, hvacUnitH, hvacUnitD), hvacMat);
+            hvacMesh.position.set(-w * 0.22, roofY + hvacUnitH / 2, -d * 0.18);
+            hvacMesh.castShadow = true;
+            bGroup.add(hvacMesh);
+
+            // Ventoinha industrial giratória no topo do HVAC
+            const fanGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.3, 8);
+            const fanMesh = new THREE.Mesh(fanGeo, metalTrimMat);
+            fanMesh.position.set(hvacMesh.position.x, roofY + hvacUnitH + 0.15, hvacMesh.position.z);
+            bGroup.add(fanMesh);
+            hvacFans.push(fanMesh);
+
+            // Dutos de exaustão cilíndricos conectados
+            const ductGeo = new THREE.CylinderGeometry(0.4, 0.4, 5, 8);
+            const ductMesh = new THREE.Mesh(ductGeo, metalTrimMat);
+            ductMesh.rotation.z = Math.PI / 2;
+            ductMesh.position.set(hvacMesh.position.x + 4, roofY + 1.2, hvacMesh.position.z);
+            bGroup.add(ductMesh);
+
+            // 6. CAIXA D'ÁGUA INDUSTRIAL ELEVADA SOBRE TRELIÇA
+            const tankH = 3.6, tankR = 2.4;
+            const tankMesh = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR, tankH, 16), metalTrimMat);
+            tankMesh.position.set(liftMesh.position.x, roofY + liftH + tankH / 2 + 1.5, liftMesh.position.z);
+            tankMesh.castShadow = true;
+            bGroup.add(tankMesh);
+
+            // Pés de sustentação da caixa d'água
+            [-1.5, 1.5].forEach(px => {
+                [-1.5, 1.5].forEach(pz => {
+                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.5, 6), metalTrimMat);
+                    leg.position.set(liftMesh.position.x + px, roofY + liftH + 0.75, liftMesh.position.z + pz);
+                    bGroup.add(leg);
+                });
+            });
+
+            // 7. HELIPONTO COM BALIZAMENTO OU LOUNGE COM DECK DE MADEIRA
+            if (hasHelipad) {
+                const padSize = Math.min(w, d) * 0.55;
+                const padMesh = new THREE.Mesh(new THREE.PlaneGeometry(padSize, padSize), helipadMat);
+                padMesh.rotation.x = -Math.PI / 2;
+                padMesh.position.set(-w * 0.12, roofY + 0.08, d * 0.15);
+                bGroup.add(padMesh);
+
+                // Luzes de balizamento verde/âmbar nas 4 pontas do heliponto
+                const halfPad = padSize / 2;
+                const beaconOffsets = [
+                    { x: -halfPad, z: -halfPad },
+                    { x: halfPad, z: -halfPad },
+                    { x: halfPad, z: halfPad },
+                    { x: -halfPad, z: halfPad }
+                ];
+                beaconOffsets.forEach((bOff, i) => {
+                    const bLightMesh = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.3, 6, 6),
+                        new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x00ff88 : 0xffaa00 })
+                    );
+                    bLightMesh.position.set(padMesh.position.x + bOff.x, roofY + 0.35, padMesh.position.z + bOff.z);
+                    bGroup.add(bLightMesh);
+                });
+
+                // Registra Fuel Pad com recarga contínua
+                fuelPads.push({
+                    pos: new THREE.Vector3(x + padMesh.position.x, roofY + 1.0, z + padMesh.position.z),
+                    radius: padSize * 0.55,
+                    name: cfg.name
+                });
+
+                // Feixe luminoso vertical do Fuel Pad (visível do solo e ar)
+                const beamGeo = new THREE.CylinderGeometry(0.6, 0.6, 60, 12, 1, true);
+                const beamMat = new THREE.MeshBasicMaterial({
+                    color: 0x00f2fe,
+                    transparent: true,
+                    opacity: 0.28,
+                    side: THREE.DoubleSide
+                });
+                const beam = new THREE.Mesh(beamGeo, beamMat);
+                beam.position.set(padMesh.position.x, roofY + 30, padMesh.position.z);
+                bGroup.add(beam);
+
+            } else if (hasDeck) {
+                // Terraço / Lounge com deck de madeira e pérgola
+                const deckSize = Math.min(w, d) * 0.45;
+                const deckMesh = new THREE.Mesh(new THREE.PlaneGeometry(deckSize, deckSize), deckMat);
+                deckMesh.rotation.x = -Math.PI / 2;
+                deckMesh.position.set(-w * 0.15, roofY + 0.08, d * 0.15);
+                bGroup.add(deckMesh);
+
+                // Pérgola de madeira
+                for (let beamIdx = -deckSize / 2 + 1; beamIdx <= deckSize / 2 - 1; beamIdx += 2.5) {
+                    const pergolaBeam = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, deckSize), metalTrimMat);
+                    pergolaBeam.position.set(deckMesh.position.x + beamIdx, roofY + 3.2, deckMesh.position.z);
+                    bGroup.add(pergolaBeam);
+                }
+            }
+
+            // 8. ANTENA DE TELECOMUNICAÇÃO COM LED VERMELHO DE TOPO
+            const antennaH = 14;
+            const antenna = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.35, antennaH, 8),
+                metalTrimMat
+            );
+            antenna.position.set(liftMesh.position.x, roofY + liftH + tankH + antennaH / 2 + 1.5, liftMesh.position.z);
+            bGroup.add(antenna);
+
+            // Luz vermelha pulsante da antena (Sinalizador aéreo)
+            const redLed = new THREE.Mesh(
+                new THREE.SphereGeometry(0.45, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xff1122 })
+            );
+            redLed.position.set(antenna.position.x, antenna.position.y + antennaH / 2, antenna.position.z);
+            bGroup.add(redLed);
+            beaconLights.push({ mesh: redLed });
+
+            // Posiciona o grupo no mundo
+            bGroup.position.set(x, 0, z);
+            scene.add(bGroup);
+
+            // Adiciona colisor do corpo principal e da cobertura para o player pousar com Jetpack
+            const totalCollider = new THREE.Box3().setFromCenterAndSize(
+                new THREE.Vector3(x, h / 2, z),
+                new THREE.Vector3(w, h, d)
+            );
+            colliders.push(totalCollider);
+
+            return bGroup;
+        }
+
+        buildingConfigs.forEach(cfg => createDetailedBuilding(cfg));
+
+        // G. VEGETAÇÃO BOTÂNICA MULTI-ESPÉCIES (Carvalhos, Coníferas, Palmeiras e Arbustos)
+        const barkTex = TextureGenerator.createBarkTexture();
+        const treeTrunkMat = new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.88 });
+        const palmBarkTex = TextureGenerator.createPalmBarkTexture();
+        const palmTrunkMat = new THREE.MeshStandardMaterial({ map: palmBarkTex, roughness: 0.85 });
+
+        const foliageTex = TextureGenerator.createFoliageTexture();
+        const treeLeavesMat = new THREE.MeshStandardMaterial({ map: foliageTex, roughness: 0.75 });
+        const pineFoliageTex = TextureGenerator.createPineFoliageTexture();
+        const pineLeavesMat = new THREE.MeshStandardMaterial({ map: pineFoliageTex, roughness: 0.82 });
+
+        // 1. Carvalhos Frondosos com Copas Compostas
+        function createOakTree(x, z, scale = 1.0) {
+            const group = new THREE.Group();
+            const trunkH = 4.5 * scale;
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * scale, 0.85 * scale, trunkH, 8), treeTrunkMat);
+            trunk.position.y = trunkH / 2;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            // 4 esferas/dodecaedros sobrepostos formando copa densa e orgânica
+            const foliageOffsets = [
+                { x: 0, y: trunkH + 2.0 * scale, z: 0, r: 3.2 * scale },
+                { x: 1.8 * scale, y: trunkH + 1.2 * scale, z: 0.8 * scale, r: 2.5 * scale },
+                { x: -1.6 * scale, y: trunkH + 1.4 * scale, z: -0.9 * scale, r: 2.6 * scale },
+                { x: 0.5 * scale, y: trunkH + 3.2 * scale, z: -0.8 * scale, r: 2.3 * scale }
+            ];
+            foliageOffsets.forEach(fo => {
+                const fol = new THREE.Mesh(new THREE.DodecahedronGeometry(fo.r), treeLeavesMat);
+                fol.position.set(fo.x, fo.y, fo.z);
+                fol.castShadow = true;
+                group.add(fol);
+            });
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+            colliders.push(new THREE.Box3().setFromObject(trunk));
+        }
+
+        // 2. Coníferas / Pinheiros em Camadas Cônicas
+        function createPineTree(x, z, scale = 1.0) {
+            const group = new THREE.Group();
+            const trunkH = 3.0 * scale;
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * scale, 0.55 * scale, trunkH, 8), treeTrunkMat);
+            trunk.position.y = trunkH / 2;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            // 3 cones de folhagem sobrepostos
+            const coneLayers = [
+                { y: trunkH + 1.5 * scale, r: 3.2 * scale, h: 4.0 * scale },
+                { y: trunkH + 3.5 * scale, r: 2.5 * scale, h: 3.6 * scale },
+                { y: trunkH + 5.5 * scale, r: 1.6 * scale, h: 3.0 * scale }
+            ];
+            coneLayers.forEach(cl => {
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(cl.r, cl.h, 8), pineLeavesMat);
+                cone.position.y = cl.y;
+                cone.castShadow = true;
+                group.add(cone);
+            });
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+            colliders.push(new THREE.Box3().setFromObject(trunk));
+        }
+
+        // 3. Palmeiras Urbanas Elegantes
+        function createPalmTree(x, z, scale = 1.0) {
+            const group = new THREE.Group();
+            const trunkH = 8.0 * scale;
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * scale, 0.55 * scale, trunkH, 8), palmTrunkMat);
+            trunk.position.set(0, trunkH / 2, 0);
+            trunk.rotation.z = (Math.sin(z) * 0.08); // Leve curvatura natural
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            // 8 folhas arqueadas no topo
+            for (let i = 0; i < 8; i++) {
+                const ang = (i / 8) * Math.PI * 2;
+                const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.4 * scale, 0.08, 4.0 * scale), treeLeavesMat);
+                leaf.position.set(Math.cos(ang) * 1.6 * scale, trunkH, Math.sin(ang) * 1.6 * scale);
+                leaf.rotation.y = ang;
+                leaf.rotation.x = 0.35;
+                leaf.castShadow = true;
+                group.add(leaf);
+            }
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+            colliders.push(new THREE.Box3().setFromObject(trunk));
+        }
+
+        // 4. Arbustos e Floreiras
+        function createBush(x, z, scale = 1.0) {
+            const bush = new THREE.Mesh(new THREE.SphereGeometry(1.4 * scale, 6, 6), treeLeavesMat);
+            bush.position.set(x, 0.8 * scale, z);
+            bush.scale.set(1.4, 0.8, 1.2);
+            bush.castShadow = true;
+            scene.add(bush);
+        }
+
+        // Distribuição Botânica ao longo da Orla, Parque e Canteiros
+        for (let z = -280; z <= 280; z += 30) {
+            const type = Math.abs(z) % 3;
+            if (type === 0) createOakTree(-44, z + (Math.sin(z) * 5), 1.1);
+            else if (type === 1) createPalmTree(-46, z + (Math.cos(z) * 4), 1.0);
+            else createPineTree(-43, z, 1.15);
+
+            // Arbustos junto à orla
+            createBush(-40, z + 12, 0.9);
+            createBush(-40, z - 12, 0.8);
+        }
+
+        // Árvores no Parque do Gasômetro (Lado Leste)
+        for (let z = -220; z <= 220; z += 45) {
+            createOakTree(28 + (Math.sin(z) * 12), z, 1.25);
+            createPineTree(42 + (Math.cos(z) * 10), z + 18, 1.1);
+        }
+
+        // H. MOBILIÁRIO URBANO (Postes Curvados LED, Semáforos, Pontos de Ônibus, Hidrantes)
+        const streetPoleMat = new THREE.MeshStandardMaterial({ color: 0x22262e, roughness: 0.35, metalness: 0.85 });
+        const glassBusStopMat = new THREE.MeshStandardMaterial({ color: 0xa0cce8, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.65 });
+
+        for (let z = -280; z <= 280; z += 40) {
+            // Postes de iluminação pública moderna com braço curvado
+            const poleGroup = new THREE.Group();
+            const pHeight = 8.5;
+            const pColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, pHeight, 8), streetPoleMat);
+            pColumn.position.y = pHeight / 2;
+            pColumn.castShadow = true;
+            poleGroup.add(pColumn);
+
+            // Braço curvado sobre a pista
+            const pArm = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.15, 0.15), streetPoleMat);
+            pArm.position.set(1.4, pHeight - 0.1, 0);
+            poleGroup.add(pArm);
+
+            // Luminária LED
+            const pLamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.6), new THREE.MeshBasicMaterial({ color: 0xfffae0 }));
+            pLamp.position.set(2.8, pHeight - 0.2, 0);
+            poleGroup.add(pLamp);
+
+            poleGroup.position.set(-36, 0, z);
+            scene.add(poleGroup);
+
+            // Lixeiras urbanas de metal
+            const trashBin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.9, 8), metalTrimMat);
+            trashBin.position.set(-37.5, 0.45, z + 6);
+            trashBin.castShadow = true;
+            scene.add(trashBin);
+
+            // Hidrantes clássicos vermelhos a cada 120m
+            if (Math.abs(z) % 120 === 0) {
+                const hydGroup = new THREE.Group();
+                const hydMat = new THREE.MeshStandardMaterial({ color: 0xd62828, roughness: 0.4, metalness: 0.6 });
+                const hydBody = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 8), hydMat);
+                hydBody.position.y = 0.4;
+                hydGroup.add(hydBody);
+                const hydCap = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), hydMat);
+                hydCap.position.y = 0.8;
+                hydGroup.add(hydCap);
+                hydGroup.position.set(-37.5, 0, z + 18);
+                scene.add(hydGroup);
+            }
+        }
+
+        // Pontos de Ônibus Cobertos com Painéis de Vidro
+        [-120, 80].forEach(pz => {
+            const busStop = new THREE.Group();
+            // Cobertura de concreto/aço
+            const bsRoof = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.25, 2.8), metalTrimMat);
+            bsRoof.position.set(0, 3.2, 0);
+            busStop.add(bsRoof);
+
+            // Pilares de sustentação
+            [-2.0, 2.0].forEach(bx => {
+                const bsPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.2, 6), metalTrimMat);
+                bsPillar.position.set(bx, 1.6, -1.2);
+                busStop.add(bsPillar);
+            });
+
+            // Painel traseiro de vidro com propaganda
+            const bsGlass = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 0.1), glassBusStopMat);
+            bsGlass.position.set(0, 1.6, -1.2);
+            busStop.add(bsGlass);
+
+            // Banco de madeira
+            const bsBench = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.15, 0.6), deckMat);
+            bsBench.position.set(0, 0.6, -0.7);
+            busStop.add(bsBench);
+
+            busStop.position.set(-36.5, 0, pz);
+            scene.add(busStop);
+            colliders.push(new THREE.Box3().setFromObject(busStop));
+        });
+
+        // I. TRÁFEGO DINÂMICO DE CARROS NA AVENIDA PRINCIPAL
+        const trafficCars = [];
+        const carColors = [0x222222, 0xe0e0e0, 0x1f4287, 0xa82e2e, 0xf1c40f, 0x27ae60];
+
+        function createAvenueCar(type = 'sedan', colorHex = 0xe0e0e0, isSouthbound = true) {
+            const carGroup = new THREE.Group();
+            const carPaintMat = new THREE.MeshStandardMaterial({
+                color: colorHex,
+                roughness: 0.18,
+                metalness: 0.85
+            });
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+            const carGlassMat = new THREE.MeshStandardMaterial({ color: 0x151b24, roughness: 0.1, metalness: 0.9 });
+
+            let bodyW = 2.1, bodyL = 4.6, bodyH = 1.3;
+            if (type === 'suv') { bodyW = 2.3; bodyL = 4.9; bodyH = 1.6; }
+            else if (type === 'bus') { bodyW = 2.8; bodyL = 11.5; bodyH = 3.2; }
+
+            // Chassi / Corpo inferior
+            const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH * 0.55, bodyL), carPaintMat);
+            body.position.y = 0.4 + (bodyH * 0.55) / 2;
+            body.castShadow = true;
+            carGroup.add(body);
+
+            // Cabine / Teto com vidros
+            if (type !== 'bus') {
+                const cabinL = bodyL * 0.55;
+                const cabin = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.9, bodyH * 0.55, cabinL), carGlassMat);
+                cabin.position.set(0, body.position.y + bodyH * 0.45, -0.2);
+                cabin.castShadow = true;
+                carGroup.add(cabin);
+            }
+
+            // 4 Rodas (ou 6 para ônibus)
+            const wheelRadius = type === 'bus' ? 0.55 : 0.42;
+            const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.35, 12);
+            const wheelPositions = [
+                { x: bodyW / 2 + 0.1, z: bodyL * 0.32 },
+                { x: -bodyW / 2 - 0.1, z: bodyL * 0.32 },
+                { x: bodyW / 2 + 0.1, z: -bodyL * 0.32 },
+                { x: -bodyW / 2 - 0.1, z: -bodyL * 0.32 }
+            ];
+            const carWheels = [];
+            wheelPositions.forEach(wp => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(wp.x, wheelRadius, wp.z);
+                carGroup.add(wheel);
+                carWheels.push(wheel);
+            });
+
+            // Faróis dianteiros LED
+            const headLightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            [-bodyW * 0.38, bodyW * 0.38].forEach(hx => {
+                const hLight = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), headLightMat);
+                hLight.position.set(hx, 0.7, bodyL / 2 + 0.05);
+                carGroup.add(hLight);
+            });
+
+            // Lanternas traseiras vermelhas
+            const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff1122 });
+            [-bodyW * 0.38, bodyW * 0.38].forEach(tx => {
+                const tLight = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), tailLightMat);
+                tLight.position.set(tx, 0.7, -bodyL / 2 - 0.05);
+                carGroup.add(tLight);
+            });
+
+            // Direção de tráfego
+            const laneX = isSouthbound ? -28.5 : -12.5;
+            const speed = (isSouthbound ? 1 : -1) * (20 + Math.random() * 12);
+            if (!isSouthbound) carGroup.rotation.y = Math.PI;
+
+            carGroup.position.set(laneX, 0, (Math.random() - 0.5) * 500);
+            scene.add(carGroup);
+
+            trafficCars.push({
+                group: carGroup,
+                wheels: carWheels,
+                speed,
+                isSouthbound,
+                laneX
+            });
+        }
+
+        // Cria pool de 10 veículos na avenida
+        const carTypes = ['sedan', 'taxi', 'suv', 'sedan', 'bus', 'sedan', 'suv', 'sedan'];
+        for (let i = 0; i < 10; i++) {
+            const isSouth = i % 2 === 0;
+            const cType = carTypes[i % carTypes.length];
+            const col = cType === 'taxi' ? 0xf1c40f : carColors[i % carColors.length];
+            createAvenueCar(cType, col, isSouth);
+        }
+
+        // ==========================================
+        // 4. ARMA EM PRIMEIRA PESSOA (MODELO 3D)
+        // ==========================================
+        const gunGroup = new THREE.Group();
+
+        // Corpo do rifle
+        const gunBodyGeo = new THREE.BoxGeometry(0.12, 0.18, 0.85);
+        const gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x1f222e, roughness: 0.3, metalness: 0.8 });
+        const gunBody = new THREE.Mesh(gunBodyGeo, gunBodyMat);
+        gunGroup.add(gunBody);
+
+        // Cano da arma
+        const barrelGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.5, 12);
+        const barrelMat = new THREE.MeshStandardMaterial({ color: 0x0e1017, metalness: 0.9, roughness: 0.2 });
+        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.03, -0.6);
+        gunGroup.add(barrel);
+
+        // Mira holográfica
+        const sightGeo = new THREE.BoxGeometry(0.06, 0.08, 0.15);
+        const sightMat = new THREE.MeshStandardMaterial({ color: 0x111115, metalness: 0.5 });
+        const sight = new THREE.Mesh(sightGeo, sightMat);
+        sight.position.set(0, 0.13, -0.15);
+        gunGroup.add(sight);
+
+        // Laser / Led brilhante
+        const ledGeo = new THREE.BoxGeometry(0.02, 0.02, 0.6);
+        const ledMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+        const led = new THREE.Mesh(ledGeo, ledMat);
+        led.position.set(0.062, 0.02, -0.1);
+        gunGroup.add(led);
+
+        // Flash do Disparo (Muzzle Flash)
+        const flashGeo = new THREE.SphereGeometry(0.15, 8, 8);
+        const flashMat = new THREE.MeshBasicMaterial({ color: 0xffe66d, transparent: true, opacity: 0 });
+        const muzzleFlash = new THREE.Mesh(flashGeo, flashMat);
+        muzzleFlash.position.set(0, 0.03, -0.9);
+        gunGroup.add(muzzleFlash);
+
+        // Luz pontual do disparo
+        const muzzleLight = new THREE.PointLight(0xffaa00, 0, 15);
+        muzzleLight.position.set(0, 0.03, -0.9);
+        gunGroup.add(muzzleLight);
+
+        // Posição no campo de visão (canto inferior direito)
+        gunGroup.position.set(0.32, -0.28, -0.65);
+        camera.add(gunGroup);
+        scene.add(camera);
+
+        // ==========================================
+        // 5. CONTROLES FPS & POINTER LOCK
+        // ==========================================
+        const controls = new THREE.PointerLockControls(camera, document.body);
+        const blocker = document.getElementById('blocker');
+
+        blocker.addEventListener('click', () => {
+            audio.init();
+            controls.lock();
+        });
+        controls.addEventListener('lock', () => {
+            blocker.style.display = 'none';
+        });
+        controls.addEventListener('unlock', () => {
+            blocker.style.display = 'flex';
+            if (audio) audio.stopJetpack();
+            moveState.jetpack = false;
+        });
+
+        const moveState = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            sprint: false,
+            jump: false,
+            jetpack: false
+        };
+
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        let canJump = false;
+        const maxPlayerHealth = 300;
+        let playerHealth = 300;
+
+        // Parâmetros de Voo do Jetpack
+        const jetpack = {
+            fuel: 100,             // Porcentagem 0 - 100%
+            maxFuel: 100,
+            burnRate: 18.0,        // Queima ~18% por segundo (~5.5 segundos de voo)
+            thrustForce: 48.0,     // Supera gravidade de 28.0 com empuxo ascendente
+            maxVerticalSpeed: 16.0,// Velocidade máxima de subida controlada
+            isThrusting: false
+        };
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.code) {
+                case 'KeyW': moveState.forward = true; break;
+                case 'KeyS': moveState.backward = true; break;
+                case 'KeyA': moveState.left = true; break;
+                case 'KeyD': moveState.right = true; break;
+                case 'ShiftLeft':
+                case 'ShiftRight': moveState.sprint = true; break;
+                case 'Space':
+                    moveState.jetpack = true;
+                    if (canJump) {
+                        velocity.y = 11.5;
+                        canJump = false;
+                    }
+                    break;
+                case 'KeyR':
+                    reloadWeapon();
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            switch (e.code) {
+                case 'KeyW': moveState.forward = false; break;
+                case 'KeyS': moveState.backward = false; break;
+                case 'KeyA': moveState.left = false; break;
+                case 'KeyD': moveState.right = false; break;
+                case 'ShiftLeft':
+                case 'ShiftRight': moveState.sprint = false; break;
+                case 'Space':
+                    moveState.jetpack = false;
+                    if (audio) audio.stopJetpack();
+                    break;
+            }
+        });
+
+        // Posição Inicial do Jogador: Na calçada da Orla olhando para o Gasômetro
+        camera.position.set(-38, 2.0, -10);
+
+        // ==========================================
+        // 5.5 SISTEMA DE CÉLULAS DE COMBUSTÍVEL 3D (RECARGA DE JETPACK)
+        // ==========================================
+        const fuelPickups = [];
+
+        const fuelSpawnCoords = [
+            { x: -48, y: 1.2, z: -65, desc: "Calçadão da Orla Norte" },
+            { x: -48, y: 1.2, z: 65, desc: "Calçadão da Orla Sul" },
+            { x: -14, y: 1.2, z: -35, desc: "Entrada Principal da Usina" },
+            { x: 70, y: 27.2, z: -35, desc: "Telhado da Usina do Gasômetro" },
+            { x: 38, y: 1.2, z: -95, desc: "Gramado do Parque da Orla" },
+            { x: 125, y: 1.2, z: 25, desc: "Avenida do Centro Histórico" },
+            { x: 78, y: 9.5, z: -60, desc: "Marquise junto à Chaminé" },
+            // Células de Combustível Estratégicas nos Telhados do Centro Histórico (Rooftop Hopping)
+            { x: 160, y: 49.2, z: 40, desc: "Telhado Ed. Farroupilha (48m)" },
+            { x: 160, y: 63.2, z: -110, desc: "Heliponto Torre Mauá (62m)" },
+            { x: 230, y: 76.2, z: 50, desc: "Heliponto Ed. Riachuelo (75m)" },
+            { x: 230, y: 59.2, z: -40, desc: "Telhado Solar Alfândega (58m)" },
+            { x: 230, y: 85.2, z: -125, desc: "Heliponto Centro Guaíba (84m)" },
+            { x: 300, y: 96.2, z: 10, desc: "Heliponto Skyline Tower (95m)" },
+            { x: 300, y: 71.2, z: -80, desc: "Lounge Residencial Duque (70m)" },
+            { x: 75, y: 33.2, z: 95, desc: "Telhado Casarão Histórico (32m)" },
+            { x: 75, y: 37.2, z: -160, desc: "Telhado Gasômetro Flat (36m)" },
+            { x: 8.5, y: 121.2, z: -26, desc: "Topo da Chaminé Histórica (120m)" }
+        ];
+
+        function createFuelCanister3D() {
+            const group = new THREE.Group();
+
+            // Cilindro do latão de combustível de plasma
+            const bodyGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.9, 16);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0x15222e,
+                metalness: 0.85,
+                roughness: 0.25
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.castShadow = true;
+            group.add(body);
+
+            // Núcleo energético luminoso ciano
+            const coreGeo = new THREE.CylinderGeometry(0.40, 0.40, 0.45, 16);
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            group.add(core);
+
+            // Anéis de contenção de plasma magnético
+            const ringGeo = new THREE.TorusGeometry(0.62, 0.04, 8, 24);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const ring1 = new THREE.Mesh(ringGeo, ringMat);
+            ring1.rotation.x = Math.PI / 3;
+            group.add(ring1);
+
+            const ring2 = new THREE.Mesh(ringGeo, ringMat);
+            ring2.rotation.y = Math.PI / 3;
+            group.add(ring2);
+
+            return { group, ring1, ring2 };
+        }
+
+        fuelSpawnCoords.forEach((coord, idx) => {
+            const parts = createFuelCanister3D();
+            parts.group.position.set(coord.x, coord.y, coord.z);
+            scene.add(parts.group);
+
+            fuelPickups.push({
+                group: parts.group,
+                ring1: parts.ring1,
+                ring2: parts.ring2,
+                baseY: coord.y,
+                active: true,
+                respawnCooldown: 0,
+                id: idx
+            });
+        });
+
+        // ==========================================
+        // 5.6 SISTEMA DE CAIXAS DE MUNIÇÃO 3D (FALCON-7 AMMO CRATES)
+        // ==========================================
+        const ammoPickups = [];
+        window.ammoPickups = ammoPickups;
+
+        const ammoSpawnCoords = [
+            { x: 15, y: 1.2, z: 25, desc: "Praça da Usina" },
+            { x: -28, y: 1.2, z: -50, desc: "Calçadão da Orla Centro" },
+            { x: -16, y: 1.2, z: 70, desc: "Avenida Mauá Sul" },
+            { x: 55, y: 1.2, z: -40, desc: "Pátio Leste Gasômetro" },
+            { x: -36, y: 1.2, z: 120, desc: "Parada de Ônibus Norte" },
+            { x: 110, y: 1.2, z: -80, desc: "Acesso Centro Histórico" },
+            { x: 160, y: 50.5, z: 40, desc: "Rooftop Ed. Farroupilha" },
+            { x: 160, y: 64.5, z: -110, desc: "Rooftop Torre Mauá" },
+            { x: 230, y: 77.5, z: 50, desc: "Rooftop Riachuelo Plaza" },
+            { x: 230, y: 60.5, z: -40, desc: "Rooftop Solar da Alfândega" },
+            { x: 300, y: 97.5, z: 10, desc: "Rooftop Skyline Tower" },
+            { x: 0, y: 20.2, z: -25, desc: "Telhado Principal Gasômetro" }
+        ];
+
+        function createAmmoCrate3D() {
+            const group = new THREE.Group();
+
+            // Caixa tática militar reforçada
+            const boxGeo = new THREE.BoxGeometry(0.85, 0.6, 0.85);
+            const boxMat = new THREE.MeshStandardMaterial({
+                color: 0x1f2b1d,
+                metalness: 0.8,
+                roughness: 0.35
+            });
+            const box = new THREE.Mesh(boxGeo, boxMat);
+            box.castShadow = true;
+            group.add(box);
+
+            // Faixas amarelas táticas
+            const bandGeo = new THREE.BoxGeometry(0.88, 0.15, 0.88);
+            const bandMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
+            const band = new THREE.Mesh(bandGeo, bandMat);
+            group.add(band);
+
+            // Projetil holográfico/plasma flutuando sobre a caixa
+            const magGeo = new THREE.BoxGeometry(0.32, 0.45, 0.18);
+            const magMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+            const mag = new THREE.Mesh(magGeo, magMat);
+            mag.position.y = 0.65;
+            group.add(mag);
+
+            return { group, mag };
+        }
+
+        ammoSpawnCoords.forEach((coord, idx) => {
+            const parts = createAmmoCrate3D();
+            parts.group.position.set(coord.x, coord.y, coord.z);
+            scene.add(parts.group);
+
+            ammoPickups.push({
+                group: parts.group,
+                mag: parts.mag,
+                baseY: coord.y,
+                active: true,
+                respawnCooldown: 0,
+                id: idx
+            });
+        });
+
+        function triggerFuelAlert(msg) {
+            const alertEl = document.getElementById('pickup-alert');
+            if (!alertEl) return;
+            alertEl.innerText = msg;
+            alertEl.style.display = 'block';
+            alertEl.style.opacity = '1';
+            clearTimeout(alertEl.fadeTimeout);
+            alertEl.fadeTimeout = setTimeout(() => {
+                alertEl.style.opacity = '0';
+                setTimeout(() => { alertEl.style.display = 'none'; }, 260);
+            }, 1800);
+        }
+
+        // ==========================================
+        // ASSETS COMPARTILHADOS DE PARTÍCULAS (ZERO GC & ZERO SHADER COMPILE SPIKE)
+        // ==========================================
+        const sharedSparkGeo = new THREE.SphereGeometry(0.08, 4, 4);
+        const sharedSparkMatOrange = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+        const sharedSparkMatCyan = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+        const sharedSparkMatYellow = new THREE.MeshBasicMaterial({ color: 0xffe600 });
+        const sharedTracerGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6);
+        const sharedTracerMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+        const sharedBoltGeo = new THREE.SphereGeometry(0.2, 6, 6);
+        const sharedBoltMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+        const _tracerStart = new THREE.Vector3();
+        const _tracerDir = new THREE.Vector3();
+        const _upVector = new THREE.Vector3(0, 1, 0);
+
+        function createJetpackThrusterParticles(pos) {
+            // Desativado para garantir 60 FPS limpos e fluidos durante voo
+        }
+
+        // ==========================================
+        // 6. SISTEMA DE DISPARO, MUNIÇÃO & BALÍSTICA
+        // ==========================================
+        let clipAmmo = 30;
+        const maxClip = 30;
+        let totalAmmo = 120;
+        let isReloading = false;
+        let canShoot = true;
+        let score = 0;
+
+        const raycaster = new THREE.Raycaster();
+        const centerScreen = new THREE.Vector2(0, 0);
+        const tracers = []; // Projéteis visíveis
+        const particles = []; // Partículas
+        const _calcRayHit = new THREE.Vector3();
+
+        function shoot() {
+            if (!controls.isLocked || isReloading || !canShoot) return;
+            if (clipAmmo <= 0) {
+                document.getElementById('reload-prompt').style.display = 'block';
+                return;
+            }
+
+            canShoot = false;
+            clipAmmo--;
+            updateHUD();
+
+            audio.playGunshot();
+
+            // Recoil físico da arma
+            gunGroup.position.z += 0.08;
+            gunGroup.rotation.x += 0.08;
+
+            // Flash
+            muzzleFlash.material.opacity = 1.0;
+            muzzleLight.intensity = 4.0;
+            setTimeout(() => {
+                muzzleFlash.material.opacity = 0;
+                muzzleLight.intensity = 0;
+            }, 50);
+
+            // Raycast a partir do centro da tela sem instanciar novos vetores
+            raycaster.setFromCamera(centerScreen, camera);
+
+            // Testa colisão apenas com drones vivos e o Chefão Titã (se ativo)
+            const activeHitboxes = [];
+            for (let i = 0; i < drones.length; i++) {
+                if (drones[i].alive) activeHitboxes.push(drones[i].hitbox);
+            }
+            if (activeBoss && activeBoss.alive) {
+                activeHitboxes.push(activeBoss.hitbox);
+            }
+            const intersects = raycaster.intersectObjects(activeHitboxes, false);
+
+            let hitPoint = null;
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                hitPoint = hit.point;
+                const drone = hit.object.userData.drone;
+                const boss = hit.object.userData.boss;
+                if (drone) {
+                    drone.takeDamage(35);
+                    showHitmarker();
+                } else if (boss) {
+                    boss.takeDamage(35);
+                    showHitmarker();
+                }
+            } else {
+                // Se não acertou drone, testa apenas elementos chave de cenário (evita traversar toda a cena)
+                const sceneHits = raycaster.intersectObjects([ground, boardwalk, railing, road], false);
+                if (sceneHits.length > 0) {
+                    hitPoint = sceneHits[0].point;
+                } else {
+                    _calcRayHit.copy(raycaster.ray.origin).addScaledVector(raycaster.ray.direction, 300);
+                    hitPoint = _calcRayHit;
+                }
+            }
+
+            // Cria Tracer visível do tiro
+            createTracer(hitPoint);
+
+            // Cooldown entre disparos (Rifle Automático: 110ms)
+            setTimeout(() => {
+                canShoot = true;
+            }, 110);
+        }
+
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0) shoot();
+        });
+
+        function reloadWeapon() {
+            if (isReloading || clipAmmo === maxClip || totalAmmo <= 0) return;
+            isReloading = true;
+            document.getElementById('reload-prompt').style.display = 'none';
+            audio.playReload();
+
+            // Animação de recarga
+            gunGroup.position.y -= 0.35;
+            gunGroup.rotation.z += 0.3;
+
+            setTimeout(() => {
+                const needed = maxClip - clipAmmo;
+                const take = Math.min(needed, totalAmmo);
+                clipAmmo += take;
+                totalAmmo -= take;
+                gunGroup.position.y += 0.35;
+                gunGroup.rotation.z -= 0.3;
+                isReloading = false;
+                updateHUD();
+            }, 1200);
+        }
+
+        function createTracer(target) {
+            gunGroup.getWorldPosition(_tracerStart);
+            const tracer = new THREE.Mesh(sharedTracerGeo, sharedTracerMat);
+            tracer.position.copy(_tracerStart);
+            _tracerDir.copy(target).sub(_tracerStart).normalize();
+            tracer.quaternion.setFromUnitVectors(_upVector, _tracerDir);
+            scene.add(tracer);
+
+            tracers.push({
+                mesh: tracer,
+                target: target,
+                speed: 250,
+                progress: 0
+            });
+        }
+
+        function createSparks(point) {
+            // Desativado para eliminar churn de GC e manter 60 FPS cravados
+        }
+
+        function showHitmarker() {
+            audio.playHit();
+            const hm = document.getElementById('hitmarker');
+            hm.style.display = 'block';
+            setTimeout(() => { hm.style.display = 'none'; }, 100);
+        }
+
+        function updateHUD() {
+            document.getElementById('ammo-clip').innerText = clipAmmo;
+            document.querySelector('.ammo-total').innerText = `/ ${totalAmmo}`;
+            document.getElementById('hp-text').innerText = `${Math.max(0, Math.round(playerHealth))} HP`;
+            document.getElementById('hp-bar').style.width = `${Math.max(0, (playerHealth / maxPlayerHealth) * 100)}%`;
+            document.getElementById('score-val').innerText = score;
+
+            // Atualiza Medidor de Combustível do Jetpack
+            const fuelPercent = Math.max(0, Math.round(jetpack.fuel));
+            const fuelText = document.getElementById('fuel-text');
+            const fuelBar = document.getElementById('fuel-bar');
+            if (fuelText && fuelBar) {
+                fuelText.innerText = `${fuelPercent}%`;
+                fuelBar.style.width = `${fuelPercent}%`;
+                if (fuelPercent <= 20) {
+                    fuelBar.classList.add('fuel-warning');
+                    fuelBar.style.background = 'linear-gradient(90deg, #ff0055, #ff3300)';
+                    fuelBar.style.boxShadow = '0 0 10px #ff0055';
+                    fuelText.style.color = '#ff3300';
+                } else {
+                    fuelBar.classList.remove('fuel-warning');
+                    fuelBar.style.background = 'linear-gradient(90deg, #ffaa00, #00f2fe)';
+                    fuelBar.style.boxShadow = '0 0 10px #00f2fe';
+                    fuelText.style.color = '#00f2fe';
+                }
+            }
+        }
+
+        // ==========================================
+        // 7. INIMIGOS: DRONES DE COMBATE PATRULHANDO
+        // ==========================================
+        const drones = [];
+        window.drones = drones;
+        const totalDronesCount = 12;
+        document.getElementById('total-drones').innerText = totalDronesCount;
+
+        class CombatDrone {
+            constructor(x, z, patrolRadius) {
+                this.group = new THREE.Group();
+                this.origin = new THREE.Vector3(x, 6 + Math.random() * 5, z);
+                this.group.position.copy(this.origin);
+                this.patrolRadius = patrolRadius;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = 0.8 + Math.random() * 0.5;
+                this.health = 70;
+                this.alive = true;
+                this.shootCooldown = 2.0 + Math.random() * 2;
+
+                // Chassi do Drone
+                const bodyGeo = new THREE.SphereGeometry(1.2, 12, 12);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f242d, metalness: 0.8, roughness: 0.3 });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                this.group.add(body);
+
+                // Olho / Sensor Vermelho Hostil
+                const eyeGeo = new THREE.SphereGeometry(0.4, 12, 12);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+                const eye = new THREE.Mesh(eyeGeo, eyeMat);
+                eye.position.set(0, 0, 1.0);
+                this.group.add(eye);
+
+                // Braços dos propulsores
+                const armGeo = new THREE.CylinderGeometry(0.1, 0.1, 3.8, 8);
+                const armMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 });
+                const arm1 = new THREE.Mesh(armGeo, armMat);
+                arm1.rotation.z = Math.PI / 2;
+                this.group.add(arm1);
+                const arm2 = new THREE.Mesh(armGeo, armMat);
+                arm2.rotation.x = Math.PI / 2;
+                this.group.add(arm2);
+
+                // Propulsores / Turbinas
+                for (let i = 0; i < 4; i++) {
+                    const rotGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12);
+                    const rotMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+                    const rot = new THREE.Mesh(rotGeo, rotMat);
+                    const ang = (i * Math.PI) / 2;
+                    rot.position.set(Math.cos(ang) * 1.9, 0.2, Math.sin(ang) * 1.9);
+                    this.group.add(rot);
+                }
+
+                // Hitbox para o Raycaster
+                const hitGeo = new THREE.SphereGeometry(1.8, 8, 8);
+                const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+                this.hitbox = new THREE.Mesh(hitGeo, hitMat);
+                this.hitbox.userData.drone = this;
+                this.group.add(this.hitbox);
+
+                scene.add(this.group);
+            }
+
+            update(delta) {
+                if (!this.alive) return;
+
+                // Movimento orbital / patrulha
+                this.angle += this.speed * delta * 0.4;
+                const targetX = this.origin.x + Math.cos(this.angle) * this.patrolRadius;
+                const targetZ = this.origin.z + Math.sin(this.angle) * this.patrolRadius;
+                this.group.position.x += (targetX - this.group.position.x) * 0.05;
+                this.group.position.z += (targetZ - this.group.position.z) * 0.05;
+
+                // Flutuação vertical suave
+                this.group.position.y = this.origin.y + Math.sin(Date.now() * 0.003 + this.origin.x) * 0.8;
+
+                // Olha para o jogador se estiver próximo
+                const distToPlayer = this.group.position.distanceTo(camera.position);
+                if (distToPlayer < 90) {
+                    this.group.lookAt(camera.position.x, camera.position.y, camera.position.z);
+
+                    // Disparo hostil contra o jogador
+                    this.shootCooldown -= delta;
+                    if (this.shootCooldown <= 0) {
+                        this.firePlasma();
+                        this.shootCooldown = 2.2 + Math.random() * 1.5;
+                    }
+                }
+            }
+
+            firePlasma() {
+                const bolt = new THREE.Mesh(sharedBoltGeo, sharedBoltMat);
+                bolt.position.copy(this.group.position);
+                scene.add(bolt);
+
+                const dir = camera.position.clone().sub(this.group.position).normalize();
+                droneBolts.push({
+                    mesh: bolt,
+                    dir: dir,
+                    life: 4.0
+                });
+            }
+
+            takeDamage(dmg) {
+                if (!this.alive) return;
+                this.health -= dmg;
+                if (this.health <= 0) {
+                    this.destroy();
+                }
+            }
+
+            destroy() {
+                this.alive = false;
+                audio.playExplosion();
+                score++;
+                updateHUD();
+
+                // Elimina o drone instantaneamente sem alterar matrizes complexas ou recompilar shaders
+                this.group.visible = false;
+                scene.remove(this.group);
+
+                // Se todos os drones comuns forem abatidos, surge o CHEFÃO ÉPICO!
+                if (score >= totalDronesCount) {
+                    spawnEpicBoss();
+                }
+            }
+        }
+
+        // ==========================================
+        // 7.5 CHEFÃO ÉPICO: TITÃ DREADNOUGHT DO GUAÍBA
+        // ==========================================
+        let activeBoss = null;
+        window.activeBoss = null;
+
+        class BossDreadnought {
+            constructor(x, y, z) {
+                this.group = new THREE.Group();
+                this.origin = new THREE.Vector3(x, y, z);
+                this.group.position.copy(this.origin);
+                this.maxHealth = 800;
+                this.health = 800;
+                this.alive = true;
+                this.angle = 0;
+                this.speed = 0.45;
+                this.shootCooldown = 1.8;
+                this.salvoCooldown = 4.8;
+
+                // 1. Chassi Central Octogonal Blindado (Titã)
+                const hullGeo = new THREE.CylinderGeometry(5.2, 4.2, 3.6, 8);
+                const hullMat = new THREE.MeshStandardMaterial({
+                    color: 0x11161d,
+                    metalness: 0.9,
+                    roughness: 0.2
+                });
+                const hull = new THREE.Mesh(hullGeo, hullMat);
+                this.group.add(hull);
+
+                // 2. Anel Reator Energético Rotativo
+                const ringGeo = new THREE.TorusGeometry(3.6, 0.32, 10, 32);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3300 });
+                this.reactorRing = new THREE.Mesh(ringGeo, ringMat);
+                this.reactorRing.rotation.x = Math.PI / 2;
+                this.group.add(this.reactorRing);
+
+                // 3. Olho Ciclópico Principal (Sensor Vermelho Hostil Gigante)
+                const eyeGeo = new THREE.SphereGeometry(1.3, 16, 16);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+                this.eye = new THREE.Mesh(eyeGeo, eyeMat);
+                this.eye.position.set(0, 0, 3.8);
+                this.group.add(this.eye);
+
+                // 4. Quatro Asas e Propulsores Gigantes de Plasma
+                this.turbines = [];
+                const wingPositions = [
+                    { x: 5.2, y: 0.5, z: 3.2, rot: Math.PI / 4 },
+                    { x: -5.2, y: 0.5, z: 3.2, rot: -Math.PI / 4 },
+                    { x: 5.2, y: 0.5, z: -3.2, rot: -Math.PI / 4 },
+                    { x: -5.2, y: 0.5, z: -3.2, rot: Math.PI / 4 }
+                ];
+                wingPositions.forEach(wp => {
+                    const wingGeo = new THREE.BoxGeometry(3.8, 0.45, 2.4);
+                    const wingMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.3 });
+                    const wing = new THREE.Mesh(wingGeo, wingMat);
+                    wing.position.set(wp.x, wp.y, wp.z);
+                    wing.rotation.y = wp.rot;
+                    this.group.add(wing);
+
+                    const turbGeo = new THREE.CylinderGeometry(0.9, 0.9, 2.6, 12);
+                    const turbMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+                    const turb = new THREE.Mesh(turbGeo, turbMat);
+                    turb.position.set(wp.x * 1.35, wp.y, wp.z * 1.35);
+                    this.group.add(turb);
+                    this.turbines.push(turb);
+                });
+
+                // 5. Canhões Duplos de Cerco de Plasma (Laterais)
+                const cannonGeo = new THREE.CylinderGeometry(0.38, 0.45, 5.8, 12);
+                const cannonMat = new THREE.MeshStandardMaterial({ color: 0x1f242d, metalness: 0.95, roughness: 0.15 });
+                this.cannonLeft = new THREE.Mesh(cannonGeo, cannonMat);
+                this.cannonLeft.rotation.x = Math.PI / 2;
+                this.cannonLeft.position.set(3.2, -1.2, 3.5);
+                this.group.add(this.cannonLeft);
+
+                this.cannonRight = new THREE.Mesh(cannonGeo, cannonMat);
+                this.cannonRight.rotation.x = Math.PI / 2;
+                this.cannonRight.position.set(-3.2, -1.2, 3.5);
+                this.group.add(this.cannonRight);
+
+                // 6. Hitbox para Raycaster
+                const hitGeo = new THREE.SphereGeometry(6.5, 10, 10);
+                const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+                this.hitbox = new THREE.Mesh(hitGeo, hitMat);
+                this.hitbox.userData.boss = this;
+                this.group.add(this.hitbox);
+
+                scene.add(this.group);
+            }
+
+            update(delta) {
+                if (!this.alive) return;
+
+                // Animações mecânicas
+                this.reactorRing.rotation.z += 2.5 * delta;
+                this.turbines.forEach((t, idx) => {
+                    t.rotation.y += (idx % 2 === 0 ? 3.5 : -3.5) * delta;
+                });
+
+                // Patrulha orbital imponente sobre o Guaíba e a Usina
+                this.angle += this.speed * delta * 0.25;
+                const targetX = this.origin.x + Math.cos(this.angle) * 45;
+                const targetZ = this.origin.z + Math.sin(this.angle) * 45;
+                this.group.position.x += (targetX - this.group.position.x) * 0.04;
+                this.group.position.z += (targetZ - this.group.position.z) * 0.04;
+                this.group.position.y = this.origin.y + Math.sin(Date.now() * 0.002) * 3.5;
+
+                // Mira no jogador
+                this.group.lookAt(camera.position.x, camera.position.y + 1.5, camera.position.z);
+
+                // Ataque 1: Salva Tripla de Canhões de Plasma Pesado
+                this.shootCooldown -= delta;
+                if (this.shootCooldown <= 0) {
+                    this.fireHeavySalvo();
+                    this.shootCooldown = 1.6 + Math.random() * 0.8;
+                }
+
+                // Ataque 2: Barragem de Flak em Espalhamanto
+                this.salvoCooldown -= delta;
+                if (this.salvoCooldown <= 0) {
+                    this.fireFlakBurst();
+                    this.salvoCooldown = 4.5 + Math.random() * 2.0;
+                }
+            }
+
+            fireHeavySalvo() {
+                [-3.2, 0, 3.2].forEach(offset => {
+                    const bolt = new THREE.Mesh(sharedBoltGeo, sharedBoltMat);
+                    const spawnPos = new THREE.Vector3(offset, -1.0, 4.5).applyMatrix4(this.group.matrixWorld);
+                    bolt.position.copy(spawnPos);
+                    scene.add(bolt);
+
+                    const dir = camera.position.clone().sub(spawnPos).normalize();
+                    dir.x += (Math.random() - 0.5) * 0.08;
+                    dir.y += (Math.random() - 0.5) * 0.08;
+                    dir.z += (Math.random() - 0.5) * 0.08;
+                    dir.normalize();
+
+                    droneBolts.push({
+                        mesh: bolt,
+                        dir: dir,
+                        life: 5.0
+                    });
+                });
+            }
+
+            fireFlakBurst() {
+                for (let i = 0; i < 4; i++) {
+                    const bolt = new THREE.Mesh(sharedBoltGeo, sharedBoltMat);
+                    const spawnPos = new THREE.Vector3((Math.random() - 0.5) * 4, 1.5, 3.0).applyMatrix4(this.group.matrixWorld);
+                    bolt.position.copy(spawnPos);
+                    scene.add(bolt);
+
+                    const dir = camera.position.clone().sub(spawnPos).normalize();
+                    dir.x += (Math.random() - 0.5) * 0.25;
+                    dir.y += (Math.random() - 0.5) * 0.2;
+                    dir.z += (Math.random() - 0.5) * 0.25;
+                    dir.normalize();
+
+                    droneBolts.push({
+                        mesh: bolt,
+                        dir: dir,
+                        life: 4.5
+                    });
+                }
+            }
+
+            takeDamage(dmg) {
+                if (!this.alive) return;
+                this.health -= dmg;
+                updateBossHUD();
+                if (this.health <= 0) {
+                    this.destroy();
+                }
+            }
+
+            destroy() {
+                this.alive = false;
+                audio.playExplosion();
+                this.group.visible = false;
+                scene.remove(this.group);
+                hideBossHUD();
+                showVictoryScreen();
+            }
+        }
+
+        function spawnEpicBoss() {
+            if (activeBoss) return;
+            activeBoss = new BossDreadnought(20, 36, -30);
+            window.activeBoss = activeBoss;
+            showBossHUD();
+            triggerFuelAlert("⚠️ ALERTA: TITÃ DREADNOUGHT DO GUAÍBA DETECTADO!");
+        }
+        window.spawnEpicBoss = spawnEpicBoss;
+
+        function showBossHUD() {
+            const bhud = document.getElementById('boss-hud');
+            const bwarn = document.getElementById('boss-warning-banner');
+            if (bhud) bhud.style.display = 'flex';
+            if (bwarn) {
+                bwarn.style.display = 'block';
+                setTimeout(() => { bwarn.style.display = 'none'; }, 4000);
+            }
+            updateBossHUD();
+        }
+
+        function hideBossHUD() {
+            const bhud = document.getElementById('boss-hud');
+            if (bhud) bhud.style.display = 'none';
+        }
+
+        function updateBossHUD() {
+            if (!activeBoss) return;
+            const hpText = document.getElementById('boss-hp-text');
+            const hpBar = document.getElementById('boss-hp-bar');
+            if (hpText && hpBar) {
+                const hp = Math.max(0, Math.round(activeBoss.health));
+                hpText.innerText = `${hp} / ${activeBoss.maxHealth} HP`;
+                const pct = Math.max(0, (hp / activeBoss.maxHealth) * 100);
+                hpBar.style.width = `${pct}%`;
+            }
+        }
+
+        const droneBolts = [];
+
+        // Instancia os Drones em locais estratégicos ao redor da Usina do Gasômetro
+        const droneSpawns = [
+            { x: 30, z: -35, r: 25 },  // Em volta da chaminé do Gasômetro
+            { x: 80, z: -80, r: 30 },  // Pátio leste da usina
+            { x: -10, z: 40, r: 35 },  // Sobre a rotatória e orla
+            { x: 50, z: 80, r: 40 },   // Praça norte
+            { x: 120, z: 0, r: 35 },   // Próximo aos prédios
+            { x: -20, z: -120, r: 30 }, // Orla sul
+            { x: 90, z: 120, r: 40 },  // Avenida Mauá
+            { x: 140, z: -70, r: 35 }, // Quarteirões do centro
+            { x: -45, z: 0, r: 20 },   // Acima da margem do Guaíba
+            { x: 60, z: -140, r: 35 }, // Frente sul da usina
+            { x: 190, z: 20, r: 40 },  // Em direção ao centro histórico
+            { x: 8.5, z: -26, r: 18 }  // Topo da chaminé (sentinela do topo)
+        ];
+
+        droneSpawns.forEach(s => drones.push(new CombatDrone(s.x, s.z, s.r)));
+
+        // ==========================================
+        // 8. FIM DE JOGO & VITÓRIA
+        // ==========================================
+        function takePlayerDamage(amount) {
+            playerHealth -= amount;
+            audio.playHurt();
+            updateHUD();
+
+            // Flash vermelho na tela
+            const flash = document.getElementById('damage-flash');
+            flash.style.opacity = '1.0';
+            setTimeout(() => { flash.style.opacity = '0'; }, 250);
+
+            if (playerHealth <= 0) {
+                showGameOverScreen();
+            }
+        }
+
+        function showGameOverScreen() {
+            controls.unlock();
+            const endScreen = document.getElementById('end-screen');
+            document.getElementById('end-title').innerText = 'OPERADOR ELIMINADO';
+            document.getElementById('end-title').style.color = '#ff0055';
+            document.getElementById('end-desc').innerText = 'A Orla do Gasômetro foi tomada pelas forças hostis.';
+            document.getElementById('end-stats').innerText = `Drones destruídos: ${score} de ${totalDronesCount}`;
+            endScreen.style.display = 'flex';
+        }
+
+        function showVictoryScreen() {
+            controls.unlock();
+            const endScreen = document.getElementById('end-screen');
+            document.getElementById('end-title').innerText = 'MISSÃO CUMPRIDA!';
+            document.getElementById('end-title').style.color = '#00f2fe';
+            document.getElementById('end-desc').innerText = 'Você garantiu a segurança da Orla e da histórica Usina do Gasômetro!';
+            document.getElementById('end-stats').innerText = `Todos os ${totalDronesCount} drones foram abatidos!`;
+            endScreen.style.display = 'flex';
+        }
+
+        // ==========================================
+        // 9. LOOP PRINCIPAL DE RENDERIZAÇÃO & FÍSICA
+        // ==========================================
+        // ==========================================
+        // 9. LOOP PRINCIPAL DE RENDERIZAÇÃO & FÍSICA (ZERO GC ALLOCATIONS)
+        // ==========================================
+        let prevTime = performance.now();
+        const playerRadius = 1.0;
+
+        // Variáveis estáticas reaproveitadas para zerar pausas do Garbage Collector
+        const _playerBox = new THREE.Box3();
+        const _playerMin = new THREE.Vector3();
+        const _playerMax = new THREE.Vector3();
+        const _prevPos = new THREE.Vector3();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now();
+            const delta = Math.min((time - prevTime) / 1000, 0.1);
+            prevTime = time;
+
+            if (controls.isLocked) {
+                // Atualiza Movimentação do Jogador
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                velocity.y -= 28.0 * delta; // Gravidade
+
+                // Acionamento do Jetpack (Propulsão vertical a jato)
+                if (moveState.jetpack && jetpack.fuel > 0) {
+                    jetpack.isThrusting = true;
+                    jetpack.fuel = Math.max(0, jetpack.fuel - jetpack.burnRate * delta);
+                    velocity.y = Math.min(velocity.y + jetpack.thrustForce * delta, jetpack.maxVerticalSpeed);
+                    audio.startJetpack();
+                    createJetpackThrusterParticles(camera.position);
+                    updateHUD();
+                } else {
+                    if (jetpack.isThrusting) {
+                        jetpack.isThrusting = false;
+                        audio.stopJetpack();
+                    }
+                }
+
+                direction.z = Number(moveState.forward) - Number(moveState.backward);
+                direction.x = Number(moveState.right) - Number(moveState.left);
+                direction.normalize();
+
+                const currentSpeed = moveState.sprint ? 96.0 : 54.0;
+
+                if (moveState.forward || moveState.backward) velocity.z -= direction.z * currentSpeed * delta;
+                if (moveState.left || moveState.right) velocity.x -= direction.x * currentSpeed * delta;
+
+                // Aplica movimento reaproveitando vetor de posição prévia
+                _prevPos.copy(camera.position);
+
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+                camera.position.y += velocity.y * delta;
+
+                // Colisão vertical com o chão ou superfícies superiores de prédios/usina
+                let floorY = 2.0;
+                for (let i = 0; i < colliders.length; i++) {
+                    const b = colliders[i];
+                    if (camera.position.x >= b.min.x - 0.4 && camera.position.x <= b.max.x + 0.4 &&
+                        camera.position.z >= b.min.z - 0.4 && camera.position.z <= b.max.z + 0.4) {
+                        if (_prevPos.y >= b.max.y + 1.2 && camera.position.y <= b.max.y + 2.0) {
+                            floorY = Math.max(floorY, b.max.y + 2.0);
+                        }
+                    }
+                }
+
+                if (camera.position.y <= floorY) {
+                    velocity.y = 0;
+                    camera.position.y = floorY;
+                    canJump = true;
+                }
+
+                // Limite do Lago Guaíba (jogador não pode nadar indefinidamente no fundo)
+                if (camera.position.x < -66) {
+                    camera.position.x = -66;
+                }
+
+                // Colisão horizontal com Paredes dos Edifícios e Usina (AABB) sem alocar objetos
+                _playerMin.set(camera.position.x - playerRadius, camera.position.y - 1.8, camera.position.z - playerRadius);
+                _playerMax.set(camera.position.x + playerRadius, camera.position.y + 0.2, camera.position.z + playerRadius);
+                _playerBox.set(_playerMin, _playerMax);
+
+                for (let i = 0; i < colliders.length; i++) {
+                    if (_playerBox.intersectsBox(colliders[i])) {
+                        // Só bloqueia no plano horizontal se o jogador estiver abaixo do topo do obstáculo
+                        if (camera.position.y < colliders[i].max.y + 1.8) {
+                            camera.position.x = _prevPos.x;
+                            camera.position.z = _prevPos.z;
+                            break;
+                        }
+                    }
+                }
+
+                // Animação de Weapon Bobbing (arma oscila suavemente ao andar em velocidade elevada)
+                const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
+                if (isMoving && canJump) {
+                    const bobSpeed = moveState.sprint ? 16 : 11;
+                    gunGroup.position.x = 0.32 + Math.sin(time * 0.001 * bobSpeed) * 0.015;
+                    gunGroup.position.y = -0.28 + Math.abs(Math.cos(time * 0.001 * bobSpeed)) * 0.018;
+                } else {
+                    // Respiração em repouso
+                    gunGroup.position.x = 0.32;
+                    gunGroup.position.y = -0.28 + Math.sin(time * 0.002) * 0.004;
+                }
+
+                // Retorno do Recoil da arma
+                gunGroup.position.z += (-0.65 - gunGroup.position.z) * 0.2;
+                gunGroup.rotation.x += (0 - gunGroup.rotation.x) * 0.2;
+            }
+
+            // Atualiza Tracers de Projéteis sem alocação
+            for (let i = tracers.length - 1; i >= 0; i--) {
+                const tr = tracers[i];
+                tr.progress += tr.speed * delta;
+                const dist = tr.mesh.position.distanceTo(tr.target);
+                if (dist < 4.0 || tr.progress > 400) {
+                    scene.remove(tr.mesh);
+                    tracers.splice(i, 1);
+                } else {
+                    _tracerDir.subVectors(tr.target, tr.mesh.position).normalize();
+                    tr.mesh.position.addScaledVector(_tracerDir, tr.speed * delta);
+                }
+            }
+
+            // Atualiza Projéteis de Plasma dos Drones
+            for (let i = droneBolts.length - 1; i >= 0; i--) {
+                const b = droneBolts[i];
+                b.life -= delta;
+                b.mesh.position.addScaledVector(b.dir, 40 * delta);
+
+                // Verifica colisão com o jogador
+                if (b.mesh.position.distanceTo(camera.position) < 2.0) {
+                    takePlayerDamage(18);
+                    scene.remove(b.mesh);
+                    droneBolts.splice(i, 1);
+                    continue;
+                }
+
+                if (b.life <= 0) {
+                    scene.remove(b.mesh);
+                    droneBolts.splice(i, 1);
+                }
+            }
+
+            // Atualiza Partículas
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.userData.life -= delta;
+                p.position.x += p.userData.vel.x * delta;
+                p.position.y += p.userData.vel.y * delta;
+                p.position.z += p.userData.vel.z * delta;
+                p.userData.vel.y -= 9.8 * delta; // Gravidade na partícula
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Atualiza Drones de Combate
+            drones.forEach(d => d.update(delta));
+
+            // Atualiza Chefão Titã Dreadnought (se ativo)
+            if (activeBoss && activeBoss.alive) {
+                activeBoss.update(delta);
+            }
+
+            // Atualiza Tráfego de Veículos na Avenida
+            if (trafficCars && trafficCars.length > 0) {
+                trafficCars.forEach(car => {
+                    car.group.position.z += car.speed * delta;
+                    // Rotação das rodas com base na velocidade
+                    car.wheels.forEach(w => {
+                        w.rotation.x += (car.speed * delta) / 0.42;
+                    });
+                    // Reciclagem contínua fora do campo de visão (±380m)
+                    if (car.isSouthbound && car.group.position.z > 380) {
+                        car.group.position.z = -380;
+                    } else if (!car.isSouthbound && car.group.position.z < -380) {
+                        car.group.position.z = 380;
+                    }
+                });
+            }
+
+            // Atualiza Luzes Vermelhas Pulsantes de Balizamento das Antenas
+            if (beaconLights && beaconLights.length > 0) {
+                const pulse = 0.5 + 0.5 * Math.sin(time * 0.006);
+                beaconLights.forEach(b => {
+                    b.mesh.scale.setScalar(0.8 + 0.4 * pulse);
+                });
+            }
+
+            // Atualiza Rotação das Ventoinhas Industriais de HVAC
+            if (hvacFans && hvacFans.length > 0) {
+                hvacFans.forEach(f => {
+                    f.rotation.y += 3.8 * delta;
+                });
+            }
+
+            // Recarga Contínua em Helipontos com Fuel Pads (Ao pousar na plataforma)
+            if (fuelPads && fuelPads.length > 0) {
+                fuelPads.forEach(pad => {
+                    const horizDist = Math.hypot(camera.position.x - pad.pos.x, camera.position.z - pad.pos.z);
+                    const vertDist = Math.abs(camera.position.y - pad.pos.y);
+                    if (horizDist < pad.radius && vertDist < 2.8) {
+                        if (jetpack.fuel < jetpack.maxFuel) {
+                            jetpack.fuel = Math.min(jetpack.maxFuel, jetpack.fuel + 18 * delta);
+                            updateHUD();
+                        }
+                    }
+                });
+            }
+
+            // Atualiza e verifica coleta de Células de Combustível de Plasma (Jetpack Pickups)
+            fuelPickups.forEach(item => {
+                if (item.active) {
+                    // Animação de levitação e rotação constante
+                    item.group.position.y = item.baseY + Math.sin(time * 0.003 + item.id) * 0.18;
+                    item.group.rotation.y += 1.6 * delta;
+                    item.ring1.rotation.z += 2.2 * delta;
+                    item.ring2.rotation.x += 2.0 * delta;
+
+                    // Coleta pelo Jogador
+                    const dist = camera.position.distanceTo(item.group.position);
+                    if (dist < 2.4) {
+                        item.active = false;
+                        item.group.visible = false;
+                        item.respawnCooldown = 20.0; // 20s para reaparecer
+
+                        const gain = 40;
+                        jetpack.fuel = Math.min(jetpack.maxFuel, jetpack.fuel + gain);
+                        audio.playFuelPickup();
+                        triggerFuelAlert(`⚡ +${gain}% COMBUSTÍVEL JETPACK`);
+                        updateHUD();
+                    }
+                } else {
+                    item.respawnCooldown -= delta;
+                    if (item.respawnCooldown <= 0) {
+                        item.active = true;
+                        item.group.visible = true;
+                    }
+                }
+            });
+
+            // Atualiza e verifica coleta de Caixas de Munição Falcon-7 (Ammo Pickups)
+            if (ammoPickups && ammoPickups.length > 0) {
+                ammoPickups.forEach(item => {
+                    if (item.active) {
+                        // Rotação suave do holograma de munição
+                        item.mag.rotation.y += 2.0 * delta;
+                        item.mag.position.y = 0.65 + Math.sin(time * 0.003 + item.id) * 0.08;
+
+                        // Coleta pelo Jogador
+                        const dist = camera.position.distanceTo(item.group.position);
+                        if (dist < 2.4) {
+                            item.active = false;
+                            item.group.visible = false;
+                            item.respawnCooldown = 15.0; // 15s para reaparecer
+
+                            const gain = 60;
+                            totalAmmo += gain;
+                            audio.playReload();
+                            triggerFuelAlert(`📦 +${gain} MUNIÇÃO FALCON-7`);
+                            updateHUD();
+                        }
+                    } else {
+                        item.respawnCooldown -= delta;
+                        if (item.respawnCooldown <= 0) {
+                            item.active = true;
+                            item.group.visible = true;
+                        }
+                    }
+                });
+            }
+
+            // Animação das Ondulações do Lago Guaíba ao Entardecer
+            if (waterNormalTex) {
+                waterNormalTex.offset.x += 0.016 * delta;
+                waterNormalTex.offset.y += 0.011 * delta;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Redimensionamento de Janela
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

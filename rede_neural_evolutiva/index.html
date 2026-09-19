@@ -489,6 +489,141 @@
         let bestEverNeuralNetwork = null;
         let bestEverGeneration = 0;
 
+        // =========================================================================
+        // MOTOR DE ÁUDIO SINTETIZADO (Web Audio API)
+        // =========================================================================
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        // Ativa AudioContext no primeiro gesto do usuário
+        ['click', 'keydown', 'touchstart'].forEach(eventType => {
+            window.addEventListener(eventType, () => {
+                getAudioContext();
+            }, { once: true, passive: true });
+        });
+
+        // Som de pulo sintetizado (Cyberpunk Chirp ascendente)
+        function playSynthJump() {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx || ctx.state !== 'running') return;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'triangle';
+                const now = ctx.currentTime;
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.exponentialRampToValueAtTime(680, now + 0.1);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+
+                osc.onended = () => {
+                    osc.disconnect();
+                    gain.disconnect();
+                };
+            } catch (err) {
+                console.warn('[Audio] Erro ao reproduzir som de pulo:', err);
+            }
+        }
+
+        // Som de colisão / morte sintetizado (Sawtooth descendente + Ruído Branco)
+        function playSynthCollision() {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx || ctx.state !== 'running') return;
+
+                const now = ctx.currentTime;
+
+                // 1. Oscilador dente-de-serra com filtro passa-baixas
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.16);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(450, now);
+                filter.frequency.exponentialRampToValueAtTime(60, now + 0.16);
+
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.16);
+
+                osc.onended = () => {
+                    osc.disconnect();
+                    filter.disconnect();
+                    gain.disconnect();
+                };
+
+                // 2. Ruído Branco curto para textura de impacto
+                const bufferSize = Math.floor(ctx.sampleRate * 0.12);
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                }
+
+                const noiseSource = ctx.createBufferSource();
+                noiseSource.buffer = buffer;
+
+                const noiseFilter = ctx.createBiquadFilter();
+                noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.value = 350;
+
+                const noiseGain = ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.1, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+                noiseSource.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(ctx.destination);
+
+                noiseSource.start(now);
+                noiseSource.stop(now + 0.12);
+
+                noiseSource.onended = () => {
+                    noiseSource.disconnect();
+                    noiseFilter.disconnect();
+                    noiseGain.disconnect();
+                };
+            } catch (err) {
+                console.warn('[Audio] Erro ao reproduzir som de colisão:', err);
+            }
+        }
+
+        // Aliases / Fallbacks seguros para extensões futuras
+        function playSynthHumanJump() { playSynthJump(); }
+        function playSynthBossWarning() {}
+        function playSynthLaserFire() {}
+
         // --- Classe Perceptron (Rede Neural) ---
         class MLP {
             constructor(numInputs, hiddenUnits1, hiddenUnits2, numOutputs) {
