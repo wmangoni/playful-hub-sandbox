@@ -235,7 +235,7 @@ async function runTests() {
 
   // 6. Validar Estabilidade e Performance WebGL
   console.log('\n--- Test 6: Estabilidade do Loop WebGL e Ausência de Erros ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, 1500));
 
   if (consoleErrors.length > 0) {
     console.error('Erros no console:', consoleErrors);
