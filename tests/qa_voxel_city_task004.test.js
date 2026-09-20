@@ -59,7 +59,7 @@ async function runTests() {
   console.log('\n--- 0. Navegando para Voxel City ---');
   await page.goto(`http://127.0.0.1:${PORT}/voxel_city/index.html`, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await page.waitForFunction(() => !!window.game, { timeout: 20000 });
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, ));
 
   // 1. Clima Dinâmico (Ciclo sunny/rainy, partículas + piscinas, física de tração)
   console.log('\n--- Test 1: Clima Dinâmico & Física de Tração ---');
@@ -215,7 +215,7 @@ async function runTests() {
 
   // 6. Estabilidade (0 erros)
   console.log('\n--- Test 6: Estabilidade WebGL e Ausência de Erros ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, ));
   if (consoleErrors.length > 0) {
     console.error('Erros no console:', consoleErrors);
     throw new Error(`Encontrados ${consoleErrors.length} erros no console.`);
