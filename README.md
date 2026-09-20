@@ -39,6 +39,7 @@ O hub centraliza 20 minijogos e simuladores diferentes, acessíveis por rotas am
 18. **Rede Neural Evolutiva (`/rede_neural_evolutiva`)**: Experimento científico que mostra agentes virtuais evoluindo de forma autônoma.
 19. **Three.js Earth (`/threejs-earth-main`)**: Demonstração em 3D interativa do planeta Terra utilizando a biblioteca Three.js.
 20. **Sangue & Prata (`/jogos/blood_and_silver`)**: Roguelite gótico de sobrevivência com armas automáticas (espada, arco, besta, água benta), passivos, evoluções e chefes.
+21. **Planning Poker (`/jogos/planning_poker`)**: Estime tarefas em equipe em tempo real via WebSocket — crie uma sala com link único, vote em segredo na escala Fibonacci e revele os votos com estatísticas.
 
 ---
 

@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const planningPoker = require('./planning_poker/ws.js');
 const app = express();
 const port = process.env.PORT || 3000;
 const fs = require('fs'); // Adicionado para verificar a existência do arquivo ads.txt
@@ -32,6 +33,16 @@ app.use(cors({
 
 // Middleware para processar JSON
 app.use(express.json());
+
+// Planning Poker: sala identificada na URL por um id curto único.
+// Registrado antes do express.static para o redirecionamento vencer o index.html do diretório.
+app.get('/planning_poker', (req, res) => {
+    const roomId = planningPoker.issueRoomId();
+    res.redirect(302, '/planning_poker/' + roomId);
+});
+app.get('/planning_poker/:roomId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'planning_poker/index.html'));
+});
 
 // Servir arquivos estáticos da pasta raiz com cache
 app.use(express.static('./', {
@@ -133,6 +144,7 @@ createHtmlRoute('/jogos/rede_neural_evolutiva', 'jogos/rede_neural_evolutiva.htm
 createHtmlRoute('/jogos/voxel_arena', 'jogos/voxel_arena.html');
 createHtmlRoute('/jogos/threejs_earth', 'jogos/threejs_earth.html');
 createHtmlRoute('/jogos/blood_and_silver', 'jogos/blood_and_silver.html');
+createHtmlRoute('/jogos/planning_poker', 'jogos/planning_poker.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -208,10 +220,13 @@ app.get('/health', (req, res) => {
 
 // Iniciar o servidor (não iniciar durante testes)
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(port, () => {
+    const httpServer = app.listen(port, () => {
         console.log(`Servidor rodando em http://localhost:${port}`);
         console.log(`Jogo acessível em http://localhost:${port}/jogo`);
+        console.log(`Planning Poker (WebSocket) em ws://localhost:${port}${planningPoker.WS_PATH}`);
     });
+    // Atrela o WebSocket de salas do Planning Poker ao mesmo servidor HTTP
+    planningPoker.attach(httpServer);
 }
 
 module.exports = app;
