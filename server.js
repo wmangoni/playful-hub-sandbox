@@ -104,9 +104,6 @@ app.get('/robots.txt', (req, res) => {
 // Função auxiliar para criar rotas de páginas HTML
 const createHtmlRoute = (route, filename) => {
     app.get(route, (req, res) => {
-        console.log(`Body: ${req.body}`);
-        console.log(`Headers: ${req.headers}`);
-        console.log(`Servindo arquivo: ${filename}`);
         res.sendFile(path.join(__dirname, filename));
     });
 };
@@ -145,6 +142,7 @@ createHtmlRoute('/jogos/voxel_arena', 'jogos/voxel_arena.html');
 createHtmlRoute('/jogos/threejs_earth', 'jogos/threejs_earth.html');
 createHtmlRoute('/jogos/blood_and_silver', 'jogos/blood_and_silver.html');
 createHtmlRoute('/jogos/planning_poker', 'jogos/planning_poker.html');
+createHtmlRoute('/jogos/blender_game', 'jogos/blender_game.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -172,25 +170,28 @@ createHtmlRoute('/rede_neural_evolutiva', 'rede_neural_evolutiva/index.html');
 createHtmlRoute('/voxel_arena', 'voxel_arena/index.html');
 createHtmlRoute('/threejs-earth-main', 'threejs-earth-main/index.html');
 createHtmlRoute('/blood_and_silver', 'blood_and_silver/index.html');
+createHtmlRoute('/blender_game', 'blender_game/game_fps.html');
+createHtmlRoute('/blender_game/fps', 'blender_game/game_fps.html');
+createHtmlRoute('/blender_game/island', 'blender_game/game.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
 app.use('/ded/assets', express.static(path.join(__dirname, 'ded/assets')));
 app.use('/driving_simulator/assets', express.static(path.join(__dirname, 'driving_simulator/assets')));
+app.use('/blender_game', express.static(path.join(__dirname, 'blender_game')));
 
 app.use(helmet());
 
-// Você pode precisar configurar o helmet, especialmente o CSP,
-// para permitir que seus scripts e assets funcionem corretamente.
-// Exemplo básico (PODE PRECISAR DE AJUSTES):
+// Configuração do helmet CSP para compatibilidade com CDNs de jogos
 app.use(
   helmet.contentSecurityPolicy({
     directives: {
-      defaultSrc: ["'self'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com"],
+      defaultSrc: ["'self'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "blob:"],
       workerSrc: ["'self'", "blob:"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https://unpkg.com", "https://chessboardjs.com", "https://chessboardjs.com/img/"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https://unpkg.com", "https://chessboardjs.com", "https://chessboardjs.com/img/"],
     },
   })
 );
@@ -204,8 +205,8 @@ const limiter = rateLimit({
   message: 'Muitas requisições criadas a partir deste IP, por favor tente novamente após 15 minutos'
 });
 
-// Aplica o rate limiting a todas as requisições
-app.use(limiter);
+// Aplica o rate limiting às rotas de API
+app.use('/api/', limiter);
 // Ou aplique apenas a rotas específicas: app.use('/api/', limiter); 
 
 // Adicionar health check

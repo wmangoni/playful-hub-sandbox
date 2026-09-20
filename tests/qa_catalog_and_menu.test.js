@@ -59,27 +59,29 @@ async function runTests() {
   // 1. Validar contagem e presença de todos os cards de jogos no menu
   console.log('\n--- Test 1: Verificação dos Cards do Menu Principal ---');
   const menuCards = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('.game-grid a.play-button'));
-    return links.map(link => {
-      const title = link.querySelector('.game-title')?.textContent?.trim();
-      const href = link.getAttribute('href');
-      const icon = link.querySelector('.icon-centered')?.textContent?.trim();
-      return { title, href, icon };
+    const cards = Array.from(document.querySelectorAll('.game-card, .game-grid a.play-button'));
+    return cards.map(card => {
+      const link = card.tagName === 'A' ? card : (card.querySelector('a.card-link') || card.querySelector('a'));
+      const title = card.querySelector('.card-title, .game-title')?.textContent?.trim() || '';
+      const href = link ? link.getAttribute('href') : '';
+      const tech = card.querySelector('.tech-tag')?.textContent?.trim() || '';
+      return { title, href, tech };
     });
   });
 
   console.log(`Total de jogos encontrados no menu principal: ${menuCards.length}`);
-  console.log('Lista de Jogos no Menu:', menuCards.map(c => `${c.icon} ${c.title} (${c.href})`));
+  console.log('Lista de Jogos no Menu:', menuCards.map(c => `[${c.tech || 'Game'}] ${c.title} (${c.href})`));
 
   const hasPinball = menuCards.some(c => c.href.includes('pinball'));
   const hasEarth = menuCards.some(c => c.href.includes('threejs_earth'));
+  const hasBlender = menuCards.some(c => c.href.includes('blender_game'));
 
-  if (!hasPinball || !hasEarth || menuCards.length < 22) {
-    throw new Error(`Menu principal deve conter pelo menos 22 jogos, incluindo Pinball e Three.js Earth. Encontrados: ${menuCards.length}`);
+  if (!hasPinball || !hasEarth || !hasBlender || menuCards.length < 25) {
+    throw new Error(`Menu principal deve conter pelo menos 25 jogos, incluindo Pinball, Three.js Earth e Blender FPS. Encontrados: ${menuCards.length}`);
   }
-  console.log(`✅ Teste 1: Todos os ${menuCards.length} jogos (incluindo Pinball e Three.js Earth) estão presentes no menu principal.`);
+  console.log(`✅ Teste 1: Todos os ${menuCards.length} jogos (incluindo Pinball, Three.js Earth e Blender FPS) estão presentes no menu principal.`);
 
-  // 2. Validar que todas as 22 páginas em /jogos/ respondem com sucesso
+  // 2. Validar que todas as 25 páginas em /jogos/ respondem com sucesso
   console.log('\n--- Test 2: Validação de Acesso a Todas as Páginas de Jogos (/jogos/...) ---');
   const gamesControl = JSON.parse(fs.readFileSync(path.join(__dirname, '../games_control.json'), 'utf8'));
   console.log(`Total de jogos cadastrados em games_control.json: ${gamesControl.length}`);

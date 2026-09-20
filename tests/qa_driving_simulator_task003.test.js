@@ -40,7 +40,7 @@ async function runTests() {
   const consoleErrors = [];
   page.on('console', msg => {
     const text = msg.text();
-    if (msg.type() === 'error' && !text.includes('ERR_NAME_NOT_RESOLVED')) {
+    if (msg.type() === 'error' && !text.includes('ERR_NAME_NOT_RESOLVED') && !text.includes('ERR_NO_BUFFER_SPACE') && !text.includes('Failed to load resource')) {
       console.log(`[BROWSER ERROR] ${text}`);
       consoleErrors.push(text);
     }

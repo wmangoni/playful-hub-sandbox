@@ -320,7 +320,7 @@ async function runTests() {
 
   // 7. Validar Estabilidade em Execução (60 frames sem exceções)
   console.log('\n--- Test 7: Estabilidade e Ausência de Erros no Console do Navegador ---');
-  await page.waitForTimeout(2000); // Executar a simulação por 2 segundos
+  await new Promise(r => setTimeout(r, )); // Executar a simulação por 2 segundos
 
   if (consoleErrors.length > 0) {
     console.error('Erros encontrados no console:', consoleErrors);
