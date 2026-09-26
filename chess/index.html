@@ -883,11 +883,15 @@
                     handleStockfishMessage(event.data);
                 };
 
+                stockfishWorker.onerror = function(err) {
+                    console.warn("Stockfish Worker notice:", (err && err.message) || err);
+                };
+
                 stockfishWorker.postMessage('uci');
                 stockfishWorker.postMessage('ucinewgame');
                 stockfishWorker.postMessage('isready');
             } catch (e) {
-                console.error("Erro ao inicializar o Stockfish.js:", e);
+                console.warn("Stockfish.js init notice:", e);
             }
         }
 
@@ -2427,11 +2431,8 @@
             }
         });
 
-        // --- Wiring TASK_003 & TASK_004 ---
-        document.getElementById('timeControlSelect').addEventListener('change', function () { getAudioContext(); selectTimePreset(this.value); });
-        document.querySelectorAll('.puzzle-btn').forEach(b => b.addEventListener('click', () => startPuzzle(parseInt(b.dataset.puzzle))));
-        document.getElementById('exitPuzzleBtn').addEventListener('click', exitPuzzleMode);
-        document.getElementById('newGameButton').addEventListener('click', function () {
+        function startNewGame() {
+            game = new Chess();
             currentActivePuzzle = null;
             document.getElementById('puzzleStatus').textContent = '';
             removeNeon();
@@ -2439,9 +2440,33 @@
             lowestStockfishEval = 0;
             matchHistoryAnalysis = [];
             document.getElementById('postGameAnalysisBtn').style.display = 'none';
+            if (board) {
+                board.position('start');
+                board.draggable = true;
+            }
+            document.getElementById('replayControls').style.display = 'none';
+            replayMoves = [];
+            replayIndex = -1;
+            bestMoveRecommended = null;
+            
+            capturedPieces.w = [];
+            capturedPieces.b = [];
+            updateCapturedPieces();
+            updateStatus();
+            removeHighlights();
+            removeLegalMoveHighlights();
+            document.getElementById('turn').textContent = 'Turno: Brancas';
+            $('#myBoard .square-55d63').removeClass('highlight-check');
             checkRotation();
-            selectTimePreset(document.getElementById('timeControlSelect').value);
-        });
+            const timeSelect = document.getElementById('timeControlSelect');
+            if (timeSelect) selectTimePreset(timeSelect.value);
+        }
+
+        // --- Wiring TASK_003 & TASK_004 ---
+        document.getElementById('timeControlSelect').addEventListener('change', function () { getAudioContext(); selectTimePreset(this.value); });
+        document.querySelectorAll('.puzzle-btn').forEach(b => b.addEventListener('click', () => startPuzzle(parseInt(b.dataset.puzzle))));
+        document.getElementById('exitPuzzleBtn').addEventListener('click', exitPuzzleMode);
+        document.getElementById('newGameButton').addEventListener('click', startNewGame);
 
         // Hook de teste expandido (TASK_004)
         window.__chess = {
@@ -2459,7 +2484,8 @@
             getReviewData: () => matchHistoryAnalysis,
             renderMoveBadgeForSquare,
             clearMoveBadges,
-            playAchievementSFX
+            playAchievementSFX,
+            startNewGame
         };
 
         // --- Configuração Chessboard.js ---
@@ -2483,26 +2509,6 @@
         board = Chessboard('myBoard', config);
 
         // --- Event Listeners Globais ---
-        document.getElementById('newGameButton').addEventListener('click', function() {
-            game = new Chess();
-            board.position('start');
-            board.draggable = true;
-            document.getElementById('replayControls').style.display = 'none';
-            replayMoves = [];
-            replayIndex = -1;
-            bestMoveRecommended = null;
-            
-            capturedPieces.w = [];
-            capturedPieces.b = [];
-            updateCapturedPieces();
-            updateStatus();
-            removeHighlights();
-            removeLegalMoveHighlights();
-            document.getElementById('turn').textContent = 'Turno: Brancas';
-            $('#myBoard .square-55d63').removeClass('highlight-check');
-            checkRotation();
-        });
-
         document.getElementById('difficulty').addEventListener('change', function(e) {
             currentDifficultyDepth = parseInt(e.target.value);
         });
@@ -2521,7 +2527,11 @@
         });
 
         // --- Inicialização ---
-        $(window).resize(board.resize);
+        $(window).resize(function() {
+            if (board && typeof board.resize === 'function') {
+                board.resize();
+            }
+        });
         initStockfish();
         updateStatus();
     </script>

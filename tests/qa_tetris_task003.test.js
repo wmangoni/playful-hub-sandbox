@@ -56,8 +56,8 @@ async function runTests() {
     await dialog.accept();
   });
 
-  console.log('\n--- 1. Navegando para o jogo Tetris ---');
-  await page.goto(`http://127.0.0.1:${PORT}/tetris/index.html`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  console.log('\n--- 1. Navegando para o jogo Tetris / Block Stacker ---');
+  await page.goto(`http://127.0.0.1:${PORT}/block_stacker/index.html`, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await page.waitForFunction(() => !!window.__tetris, { timeout: 15000 });
 
   // 1. Validar Elementos de UI do Modo Sobrevivência e Seletor
@@ -240,7 +240,7 @@ async function runTests() {
 
   // 5. Validar Estabilidade e Ausência de Erros no Console
   console.log('\n--- Test 5: Estabilidade de Execução e Ausência de Erros ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, 1500));
 
   if (consoleErrors.length > 0) {
     console.error('Erros encontrados no console:', consoleErrors);

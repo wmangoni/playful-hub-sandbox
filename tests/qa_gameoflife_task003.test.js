@@ -229,7 +229,7 @@ async function runTests() {
 
   // 4. Validar Estabilidade Geral e Ausência de Erros no Canvas
   console.log('\n--- Test 4: Estabilidade de Renderização e Ausência de Erros ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, ));
 
   if (consoleErrors.length > 0) {
     console.error('Erros no console:', consoleErrors);

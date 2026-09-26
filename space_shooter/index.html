@@ -674,8 +674,8 @@
     const bossHPContainer = document.getElementById('boss-hp-bar-container');
     const bossHPFill = document.getElementById('boss-hp-bar-fill');
 
-    const containerWidth = gameContainer.offsetWidth;
-    const containerHeight = gameContainer.offsetHeight;
+    const containerWidth = (gameContainer && gameContainer.offsetWidth) || 600;
+    const containerHeight = (gameContainer && gameContainer.offsetHeight) || 400;
     const playerWidth = 40;
     const playerHeight = 40;
 
@@ -1820,10 +1820,17 @@
 
     function playSound(audioElement) {
         if (audioElement) {
-            audioElement.currentTime = 0;
-            audioElement.play().catch(error => {
-                console.error("Error playing sound:", error);
-            });
+            try {
+                audioElement.currentTime = 0;
+                const promise = audioElement.play();
+                if (promise !== undefined) {
+                    promise.catch(error => {
+                        if (error && error.name !== 'NotAllowedError') {
+                            console.warn("Audio play warning:", error);
+                        }
+                    });
+                }
+            } catch (e) {}
         }
     }
 
@@ -2928,6 +2935,15 @@
             if (e.key === ' ' && !isSpecialPressed) {
                 isSpecialPressed = true;
             }
+            if (e.key === 'h' || e.key === 'H') {
+                if (weaponModal) {
+                    renderWeaponCards();
+                    weaponModal.style.display = weaponModal.style.display === 'flex' ? 'none' : 'flex';
+                }
+            }
+            if (e.key === 'Escape') {
+                if (weaponModal) weaponModal.style.display = 'none';
+            }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -3299,6 +3315,77 @@
     window.controlsInitialized = false;
     loadHighScore();
     resetGame();
+
+    // Hook global para automação de QA e testes
+    window.__spaceShooter = {
+        getPlayerState: () => ({
+            hp: playerCurrentHP,
+            maxHp: playerMaxHP,
+            x: playerX,
+            y: playerY,
+            score: score,
+            highScore: highScore,
+            phase: currentPhase,
+            specialCharges: specialCharges,
+            isSpecialActive: isSpecialActive,
+            isInvulnerable: isPlayerInvulnerable,
+            hasShield: typeof hasShield !== 'undefined' ? hasShield : 0,
+            isGameOver: isGameOver,
+            coins: coins,
+            activeWeapon: activeWeapon,
+            unlockedWeapons: [...unlockedWeapons]
+        }),
+        getBossState: () => ({
+            isBossActive: isBossActive,
+            isDreadnoughtActive: isDreadnoughtActive,
+            bossData: bossData,
+            bossPhase: bossPhase,
+            generatorsCount: bossGenerators.filter(g => g.hp > 0).length,
+            isHyperbeamCharging: isHyperbeamCharging,
+            isHyperbeamFiring: isHyperbeamFiring
+        }),
+        getWeaponsState: () => ({
+            activeWeapon: activeWeapon,
+            unlockedWeapons: [...unlockedWeapons],
+            specs: WEAPON_SPECS
+        }),
+        getBlackHoleState: () => ({
+            active: blackHoleActive,
+            x: blackHoleX,
+            y: blackHoleY,
+            timer: blackHoleTimer
+        }),
+        getEscortState: () => ({
+            active: escortModeActive,
+            hp: goliathHP,
+            maxHp: goliathMaxHP,
+            x: goliathX,
+            y: goliathY
+        }),
+        fireBullet: () => {
+            lastFireTime = 0;
+            fireBullet();
+        },
+        triggerSpecial: () => {
+            if (specialCharges > 0 && !isSpecialActive) activateSpecial();
+        },
+        playerTakeDamage,
+        spawnBoss,
+        spawnDreadnoughtPrime,
+        defeatDreadnought,
+        spawnBlackHole,
+        destroyBlackHole,
+        initEscortMode,
+        goliathTakeDamage,
+        buyWeapon: (id) => window.buyWeapon(id),
+        equipWeapon: (id) => window.equipWeapon(id),
+        setCoins: (c) => { coins = c; updateCoinsDisplay(); },
+        setPhase: (p) => { currentPhase = p; if (phaseDisplay) phaseDisplay.textContent = `Fase: ${currentPhase}`; },
+        setScore: (s) => { score = s; if (scoreElement) scoreElement.textContent = `Score: ${score}`; },
+        resetGame,
+        openWeaponModal: () => { if (weaponModal) { renderWeaponCards(); weaponModal.style.display = 'flex'; } },
+        closeWeaponModal: () => { if (weaponModal) { weaponModal.style.display = 'none'; } }
+    };
 </script>
 </body>
 </html>

@@ -202,6 +202,7 @@
         const ctx = canvas.getContext('2d');
         canvas.width = screenWidth;
         canvas.height = screenHeight;
+        ctx.imageSmoothingEnabled = false;
 
         // --- UI Elements ---
         const startScreen = document.getElementById('startScreen');
@@ -316,6 +317,65 @@
         const floorColor2 = "#5A4A3A"; // Lighter brown
         const ceilingColor1 = "#465058"; // Dark grey-blue
         const ceilingColor2 = "#5A6874"; // Lighter grey-blue
+
+        // --- High-Resolution Retro Textures & Sprites System ---
+        const gameTextures = {
+          wall1: { src: 'assets/textures/wall_brick.png', img: null, loaded: false },
+          wall2: { src: 'assets/textures/wall_stone.png', img: null, loaded: false },
+          wall3: { src: 'assets/textures/wall_tech.png', img: null, loaded: false },
+          wall4: { src: 'assets/textures/wall_mossy.png', img: null, loaded: false },
+          door: { src: 'assets/textures/door_metal.png', img: null, loaded: false },
+          floor: { src: 'assets/textures/floor_tile.png', img: null, loaded: false },
+          grunt: { src: 'assets/textures/monster_grunt.png', img: null, loaded: false },
+          demon: { src: 'assets/textures/monster_demon.png', img: null, loaded: false },
+          cyber_imp: { src: 'assets/textures/monster_imp.png', img: null, loaded: false },
+        };
+
+        // Offscreen canvas and buffers for fast textured floor rendering
+        const floorWidth = Math.max(200, Math.floor(screenWidth / 2));
+        const floorHeight = Math.max(100, Math.floor(screenHeight / 2));
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = floorWidth;
+        floorCanvas.height = floorHeight;
+        const floorCtx = floorCanvas.getContext('2d');
+        let floorImageData = null;
+        let floorBuf32 = null;
+        let floorTexPixels = null;
+
+        function initFloorTextureBuffer(img) {
+          try {
+            const tc = document.createElement('canvas');
+            tc.width = img.width;
+            tc.height = img.height;
+            const tctx = tc.getContext('2d');
+            tctx.drawImage(img, 0, 0);
+            const idata = tctx.getImageData(0, 0, img.width, img.height);
+            floorTexPixels = new Uint32Array(idata.data.buffer);
+            floorImageData = floorCtx.createImageData(floorWidth, floorHeight);
+            floorBuf32 = new Uint32Array(floorImageData.data.buffer);
+          } catch (e) {
+            console.warn('Could not init floor texture buffer (e.g. file:// CORS):', e);
+          }
+        }
+
+        function loadGameTextures() {
+          for (const key in gameTextures) {
+            const item = gameTextures[key];
+            const img = new Image();
+            img.onload = () => {
+              item.img = img;
+              item.loaded = true;
+              if (key === 'floor') {
+                initFloorTextureBuffer(img);
+              }
+            };
+            img.onerror = () => {
+              console.warn('Texture failed to load:', item.src);
+            };
+            img.src = item.src;
+          }
+        }
+        loadGameTextures();
 
         // --- Enemy Definitions ---
         const enemyTypes = {
@@ -2293,8 +2353,11 @@
             zBuffer[x] = ray.perpWallDist;
             
             const lineHeight = (screenHeight * wallHeightMultiplier / ray.perpWallDist) | 0;
-            const drawStart = Math.max(0, ((screenHeight - lineHeight) / 2) | 0);
-            const drawEnd = Math.min(screenHeight - 1, ((screenHeight + lineHeight) / 2) | 0);
+            const fullDrawStart = (screenHeight - lineHeight) / 2;
+            const fullDrawEnd = (screenHeight + lineHeight) / 2;
+            const drawStart = Math.max(0, fullDrawStart | 0);
+            const drawEnd = Math.min(screenHeight, Math.ceil(fullDrawEnd));
+            const drawHeight = drawEnd - drawStart;
             
             const wallType = map[ray.mapY]?.[ray.mapX];
             
@@ -2307,42 +2370,103 @@
             }
             
             if (renderType >= 1 && renderType <= 4) {
-              const wallStyle = wallColors[renderType];
-              const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
-              let shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
-              let baseWallColor = shadeColor(wallStyle.base, distanceFade * -80, shadeFactor);
+              const wallTex = gameTextures['wall' + renderType];
+              let wallX;
+              if (ray.side === 0) {
+                wallX = player.y + ray.distance * Math.sin(rayAngle);
+              } else {
+                wallX = player.x + ray.distance * Math.cos(rayAngle);
+              }
+              wallX -= Math.floor(wallX);
               
-              if (drawEnd > drawStart) {
+              if (drawHeight > 0) {
                 ctx.globalAlpha = secretAlpha;
-                ctx.fillStyle = baseWallColor;
-                ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
                 
-                if (OPTIMIZE_MODE < 2) {
-                  let wallX;
-                  if (ray.side === 0) {
-                    wallX = player.y + ray.perpWallDist * Math.sin(rayAngle);
-                  } else {
-                    wallX = player.x + ray.perpWallDist * Math.cos(rayAngle);
+                if (wallTex && wallTex.loaded && wallTex.img) {
+                  let texX = Math.floor(wallX * wallTex.img.width);
+                  if (ray.side === 0 && Math.cos(rayAngle) > 0) texX = wallTex.img.width - texX - 1;
+                  if (ray.side === 1 && Math.sin(rayAngle) < 0) texX = wallTex.img.width - texX - 1;
+                  texX = Math.max(0, Math.min(wallTex.img.width - 1, texX));
+                  
+                  const texScale = wallTex.img.height / lineHeight;
+                  const srcY = Math.max(0, (drawStart - fullDrawStart) * texScale);
+                  const srcH = Math.min(wallTex.img.height - srcY, drawHeight * texScale);
+                  
+                  ctx.drawImage(wallTex.img, texX, srcY, 1, srcH, x, drawStart, 1, drawHeight);
+                  
+                  // Distance fog + directional side shadowing
+                  const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
+                  const sideShadow = (ray.side === 1) ? 0.22 : 0.0;
+                  const darkAlpha = Math.min(0.92, distanceFade * 0.78 + sideShadow);
+                  if (darkAlpha > 0.02) {
+                    ctx.fillStyle = `rgba(0, 0, 0, ${darkAlpha.toFixed(2)})`;
+                    ctx.fillRect(x, drawStart, 1, drawHeight);
                   }
-                  wallX -= Math.floor(wallX);
-                  applyWallPattern(x, drawStart, drawEnd, wallX, wallStyle, baseWallColor);
+                } else {
+                  const wallStyle = wallColors[renderType];
+                  const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
+                  let shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
+                  let baseWallColor = shadeColor(wallStyle.base, distanceFade * -80, shadeFactor);
+                  ctx.fillStyle = baseWallColor;
+                  ctx.fillRect(x, drawStart, 1, drawHeight);
+                  
+                  if (OPTIMIZE_MODE < 2) {
+                    applyWallPattern(x, drawStart, drawEnd, wallX, wallStyle, baseWallColor);
+                  }
                 }
                 ctx.globalAlpha = 1.0;
               }
             } else if (isDoorTile(wallType)) {
-              const doorColor = doorColors[wallType] || '#888888';
-              const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
-              const shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
-              const baseDoorColor = shadeColor(doorColor, distanceFade * -80, shadeFactor);
-              if (drawEnd > drawStart) {
-                ctx.fillStyle = baseDoorColor;
-                ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
-                if (OPTIMIZE_MODE < 2) {
-                  const wX = ray.wallX ?? 0;
-                  const seam = Math.floor(wX * 32);
-                  if ((seam & 3) < 2) {
-                    ctx.fillStyle = shadeColor(baseDoorColor, -25);
-                    ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+              if (drawHeight > 0) {
+                const doorTex = gameTextures.door;
+                let wallX;
+                if (ray.side === 0) {
+                  wallX = player.y + ray.distance * Math.sin(rayAngle);
+                } else {
+                  wallX = player.x + ray.distance * Math.cos(rayAngle);
+                }
+                wallX -= Math.floor(wallX);
+                const wX = (ray.wallX !== undefined && ray.wallX > 0) ? ray.wallX : wallX;
+
+                if (doorTex && doorTex.loaded && doorTex.img) {
+                  let texX = Math.floor(wX * doorTex.img.width);
+                  texX = Math.max(0, Math.min(doorTex.img.width - 1, texX));
+                  
+                  const texScale = doorTex.img.height / lineHeight;
+                  const srcY = Math.max(0, (drawStart - fullDrawStart) * texScale);
+                  const srcH = Math.min(doorTex.img.height - srcY, drawHeight * texScale);
+                  
+                  ctx.drawImage(doorTex.img, texX, srcY, 1, srcH, x, drawStart, 1, drawHeight);
+
+                  // Keycard door indicators
+                  if (wallType === TILE_DOOR_RED) {
+                    ctx.fillStyle = 'rgba(230, 30, 30, 0.35)';
+                    ctx.fillRect(x, drawStart, 1, drawHeight);
+                  } else if (wallType === TILE_DOOR_BLUE) {
+                    ctx.fillStyle = 'rgba(30, 120, 240, 0.35)';
+                    ctx.fillRect(x, drawStart, 1, drawHeight);
+                  }
+
+                  const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
+                  const sideShadow = (ray.side === 1) ? 0.22 : 0.0;
+                  const darkAlpha = Math.min(0.92, distanceFade * 0.78 + sideShadow);
+                  if (darkAlpha > 0.02) {
+                    ctx.fillStyle = `rgba(0, 0, 0, ${darkAlpha.toFixed(2)})`;
+                    ctx.fillRect(x, drawStart, 1, drawHeight);
+                  }
+                } else {
+                  const doorColor = doorColors[wallType] || '#888888';
+                  const distanceFade = Math.min(1, ray.perpWallDist / fogDepth);
+                  const shadeFactor = (ray.side === 1) ? 0.8 : 1.0;
+                  const baseDoorColor = shadeColor(doorColor, distanceFade * -80, shadeFactor);
+                  ctx.fillStyle = baseDoorColor;
+                  ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+                  if (OPTIMIZE_MODE < 2) {
+                    const seam = Math.floor(wX * 32);
+                    if ((seam & 3) < 2) {
+                      ctx.fillStyle = shadeColor(baseDoorColor, -25);
+                      ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+                    }
                   }
                 }
               }
@@ -2392,8 +2516,13 @@
             
             let isPickup = Object.values(pickupTypes).find(pt => pt.type === sprite.type);
             let isEnemy = !isPickup && sprite.currentHealth !== undefined;
+            const monsterTex = isEnemy ? gameTextures[sprite.type] : null;
+            let alpha = 1.0;
+            if (isEnemy && sprite.state === 'dying') {
+              alpha = Math.max(0, 1.0 - (sprite.dyingTimer / 0.5));
+            }
             
-            // Draw Simple Rectangle (as before)
+            // Draw Sprite or Simple Rectangle
             let spriteColor = '#FF00FF';
             if (isPickup) {
               spriteColor = sprite.color;
@@ -2409,8 +2538,26 @@
               if (stripe >= 0 && stripe < screenWidth && perpDist < zBuffer[stripe]) {
                 const clampedDrawStartY = Math.max(0, drawStartY);
                 const clampedDrawEndY = Math.min(screenHeight, drawStartY + spriteHeight);
-                if (clampedDrawEndY > clampedDrawStartY) {
-                  ctx.fillRect(stripe, clampedDrawStartY, 1, clampedDrawEndY - clampedDrawStartY);
+                const clampedH = clampedDrawEndY - clampedDrawStartY;
+                if (clampedH <= 0) continue;
+
+                if (monsterTex && monsterTex.loaded && monsterTex.img) {
+                  const spriteProgressX = (stripe - drawStartX) / spriteWidth;
+                  let texCol = Math.floor(spriteProgressX * monsterTex.img.width);
+                  texCol = Math.max(0, Math.min(monsterTex.img.width - 1, texCol));
+                  ctx.save();
+                  ctx.globalAlpha = alpha;
+                  const texScaleY = monsterTex.img.height / spriteHeight;
+                  const srcY = Math.max(0, (clampedDrawStartY - drawStartY) * texScaleY);
+                  const srcH = Math.min(monsterTex.img.height - srcY, clampedH * texScaleY);
+                  ctx.drawImage(monsterTex.img, texCol, srcY, 1, srcH, stripe, clampedDrawStartY, 1, clampedH);
+                  if (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 80) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                    ctx.fillRect(stripe, clampedDrawStartY, 1, clampedH);
+                  }
+                  ctx.restore();
+                } else {
+                  ctx.fillRect(stripe, clampedDrawStartY, 1, clampedH);
                 }
               }
             }
@@ -2438,30 +2585,69 @@
           });
         }
 
-        // --- Optimized Floor/Ceiling Rendering ---
+        // --- High-Performance Atmospheric Ceiling & Textured Floor Rendering ---
         function renderBackgroundAndFloor() {
-          // OPTIMIZED: Simple gradients, no per-pixel calculation
-          
-          // Sky gradient (unchanged is fine)
+          // Atmospheric Ceiling Gradient with Deep Dark Void
           const skyGradient = ctx.createLinearGradient(0, 0, 0, screenHeight / 2);
-          skyGradient.addColorStop(0, ceilingColor1); // Darker at top
-          skyGradient.addColorStop(1, ceilingColor2); // Lighter near horizon
+          skyGradient.addColorStop(0, '#0a0d12');
+          skyGradient.addColorStop(0.7, '#141a24');
+          skyGradient.addColorStop(1, '#202936');
           ctx.fillStyle = skyGradient;
           ctx.fillRect(0, 0, screenWidth, screenHeight / 2);
-          
-          // Floor gradient
-          const floorGradient = ctx.createLinearGradient(0, screenHeight / 2, 0, screenHeight);
-          // Adjust colors slightly based on simple distance fog approximation (can be precalculated)
-          const horizonFloorColor = lerpColor(floorColor2, "#202020", 0.1); // Slightly fogged near horizon
-          const nearFloorColor = lerpColor(floorColor1, "#202020", 0.5); // More fogged near bottom
-          floorGradient.addColorStop(0, horizonFloorColor); // Lighter (less fog) near horizon
-          floorGradient.addColorStop(1, nearFloorColor); // Darker (more fog) closer
-          ctx.fillStyle = floorGradient;
-          ctx.fillRect(0, screenHeight / 2, screenWidth, screenHeight / 2);
-          
-          // --- Optional: Simple Horizon Line ---
-          // ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-          // ctx.fillRect(0, screenHeight / 2 - 1, screenWidth, 2);
+
+          // Fast 3D Textured Floor Casting
+          if (floorTexPixels && floorBuf32 && floorImageData && OPTIMIZE_MODE < 2) {
+            const dirX = Math.cos(player.angle);
+            const dirY = Math.sin(player.angle);
+            const halfFovTan = Math.tan(FOV / 2);
+            const planeX = -Math.sin(player.angle) * halfFovTan;
+            const planeY = Math.cos(player.angle) * halfFovTan;
+
+            const rayDirX0 = dirX - planeX;
+            const rayDirY0 = dirY - planeY;
+            const rayDirX1 = dirX + planeX;
+            const rayDirY1 = dirY + planeY;
+
+            let bufIdx = 0;
+            for (let y = 0; y < floorHeight; y++) {
+              // y ranges from 0 (horizon) to floorHeight - 1 (near bottom)
+              const rowDist = (wallHeightMultiplier * floorHeight) / (y + 0.5);
+              const floorStepX = rowDist * (rayDirX1 - rayDirX0) / floorWidth;
+              const floorStepY = rowDist * (rayDirY1 - rayDirY0) / floorWidth;
+              let fx = player.x + rowDist * rayDirX0;
+              let fy = player.y + rowDist * rayDirY0;
+
+              // Distance fog: bright near player, dark at horizon
+              const shade = Math.max(0.12, Math.min(1.0, 1.0 - (rowDist / fogDepth) * 0.75));
+              const shadeInt = (shade * 256) | 0;
+
+              for (let x = 0; x < floorWidth; x++) {
+                const tx = ((fx - Math.floor(fx)) * 256) & 255;
+                const ty = ((fy - Math.floor(fy)) * 256) & 255;
+                const pixel = floorTexPixels[(ty << 8) | tx];
+
+                const r = ((pixel & 0xFF) * shadeInt) >> 8;
+                const g = (((pixel >> 8) & 0xFF) * shadeInt) >> 8;
+                const b = (((pixel >> 16) & 0xFF) * shadeInt) >> 8;
+
+                floorBuf32[bufIdx++] = (0xFF000000) | (b << 16) | (g << 8) | r;
+
+                fx += floorStepX;
+                fy += floorStepY;
+              }
+            }
+            floorCtx.putImageData(floorImageData, 0, 0);
+            ctx.drawImage(floorCanvas, 0, screenHeight / 2, screenWidth, screenHeight / 2);
+          } else {
+            // Smooth gradient fallback
+            const floorGradient = ctx.createLinearGradient(0, screenHeight / 2, 0, screenHeight);
+            const horizonFloorColor = lerpColor(floorColor2, "#1a1a1a", 0.3);
+            const nearFloorColor = lerpColor(floorColor1, "#111111", 0.6);
+            floorGradient.addColorStop(0, horizonFloorColor);
+            floorGradient.addColorStop(1, nearFloorColor);
+            ctx.fillStyle = floorGradient;
+            ctx.fillRect(0, screenHeight / 2, screenWidth, screenHeight / 2);
+          }
         }
 
 
@@ -2622,59 +2808,84 @@
                   ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
                   // ... optional pickup details (shading, shine) ...
                 } else if (isEnemy) {
-                  // ... existing enemy stripe rendering (color, alpha, shading, eyes) ...
-                  let enemyColor;
+                  const monsterTex = gameTextures[sprite.type];
                   let alpha = 1.0;
                   if (sprite.state === 'dying') {
-                    /* dying fade/color */
                     alpha = Math.max(0, 1.0 - (sprite.dyingTimer / 0.5));
-                    enemyColor = lerpColor(sprite.color, '#444444', 1.0 - alpha);
-                  } else if (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 80) {
-                    enemyColor = '#FFFFFF';
-                  } else {
-                    const distanceFade = Math.min(1, perpDist / fogDepth);
-                    enemyColor = shadeColor(sprite.color, distanceFade * -80);
                   }
-                  const finalEnemyColorWithAlpha = `rgba(${hexToRgb(enemyColor).r}, ${hexToRgb(enemyColor).g}, ${hexToRgb(enemyColor).b}, ${alpha.toFixed(2)})`;
-                  // Apply shading based on spriteProgressX
-                  const spriteProgressX = (stripe - drawStartX) / spriteWidth;
-                  const shadeAmount = -40 * Math.abs(spriteProgressX - 0.5) * 2;
-                  const shadedColor = shadeColor(enemyColor, shadeAmount);
-                  const finalShadedColorWithAlpha = `rgba(${hexToRgb(shadedColor).r}, ${hexToRgb(shadedColor).g}, ${hexToRgb(shadedColor).b}, ${alpha.toFixed(2)})`;
-                  ctx.fillStyle = finalShadedColorWithAlpha;
-                  ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
-                  
-                  // ... Eye rendering logic ...
-                  // Draw "Eyes" - more distinct
-                  if (sprite.state !== 'dying' && spriteHeight > 20) { // Only if large enough
-                    const eyeHeightRatio = 0.25; // Vertical position from top
-                    const eyeZoneStartRatio = 0.2; // Horizontal start within sprite width
-                    const eyeZoneEndRatio = 0.8;
-                    const eyeSeparationRatio = 0.3; // Space between eyes
-                    const eyeWidthRatio = 0.15; // Width of each eye relative to sprite width
-                    
-                    const eyeY = stripeStartYClamped + stripeHeight * eyeHeightRatio;
-                    const eyeH = Math.max(1, Math.floor(spriteHeight * 0.1));
-                    
-                    // Calculate positions for left and right eyes
-                    const leftEyeStripeStart = Math.floor(drawStartX + spriteWidth * eyeZoneStartRatio);
-                    const leftEyeStripeEnd = Math.floor(leftEyeStripeStart + spriteWidth * eyeWidthRatio);
-                    const rightEyeStripeStart = Math.floor(drawStartX + spriteWidth * (eyeZoneEndRatio - eyeWidthRatio));
-                    const rightEyeStripeEnd = Math.floor(rightEyeStripeStart + spriteWidth * eyeWidthRatio);
-                    
-                    // Check if current stripe falls within either eye's zone
-                    if ((stripe >= leftEyeStripeStart && stripe < leftEyeStripeEnd) || (stripe >= rightEyeStripeStart && stripe < rightEyeStripeEnd)) {
-                      const pupilStripeOffset = Math.floor(spriteWidth * eyeWidthRatio * 0.3); // Indent pupil slightly
-                      const isPupil = (stripe > leftEyeStripeStart + pupilStripeOffset && stripe < leftEyeStripeEnd - pupilStripeOffset) ||
-                        (stripe > rightEyeStripeStart + pupilStripeOffset && stripe < rightEyeStripeEnd - pupilStripeOffset);
-                      
-                      let eyeColor = (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 150) ? '#FF5555' : '#FFFACD'; // Pale yellow default, redder when hit recently
-                      if (isPupil) {
-                        eyeColor = '#111111'; // Black pupil
+
+                  if (monsterTex && monsterTex.loaded && monsterTex.img) {
+                    const spriteProgressX = (stripe - drawStartX) / spriteWidth;
+                    let texCol = Math.floor(spriteProgressX * monsterTex.img.width);
+                    texCol = Math.max(0, Math.min(monsterTex.img.width - 1, texCol));
+
+                    const texScaleY = monsterTex.img.height / spriteHeight;
+                    const srcY = Math.max(0, (stripeStartYClamped - finalDrawStartY) * texScaleY);
+                    const srcH = Math.min(monsterTex.img.height - srcY, stripeHeight * texScaleY);
+
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(monsterTex.img, texCol, srcY, 1, srcH, stripe, stripeStartYClamped, 1, stripeHeight);
+
+                    // White hit flash when recently shot
+                    if (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 80) {
+                      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                      ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
+                    } else {
+                      // Distance fog
+                      const distanceFade = Math.min(1, perpDist / fogDepth);
+                      if (distanceFade > 0.05) {
+                        ctx.fillStyle = `rgba(0, 0, 0, ${(distanceFade * 0.7).toFixed(2)})`;
+                        ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
                       }
+                    }
+                    ctx.restore();
+                  } else {
+                    let enemyColor;
+                    if (sprite.state === 'dying') {
+                      enemyColor = lerpColor(sprite.color, '#444444', 1.0 - alpha);
+                    } else if (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 80) {
+                      enemyColor = '#FFFFFF';
+                    } else {
+                      const distanceFade = Math.min(1, perpDist / fogDepth);
+                      enemyColor = shadeColor(sprite.color, distanceFade * -80);
+                    }
+                    const finalEnemyColorWithAlpha = `rgba(${hexToRgb(enemyColor).r}, ${hexToRgb(enemyColor).g}, ${hexToRgb(enemyColor).b}, ${alpha.toFixed(2)})`;
+                    const spriteProgressX = (stripe - drawStartX) / spriteWidth;
+                    const shadeAmount = -40 * Math.abs(spriteProgressX - 0.5) * 2;
+                    const shadedColor = shadeColor(enemyColor, shadeAmount);
+                    const finalShadedColorWithAlpha = `rgba(${hexToRgb(shadedColor).r}, ${hexToRgb(shadedColor).g}, ${hexToRgb(shadedColor).b}, ${alpha.toFixed(2)})`;
+                    ctx.fillStyle = finalShadedColorWithAlpha;
+                    ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
+                    
+                    if (sprite.state !== 'dying' && spriteHeight > 20) {
+                      const eyeHeightRatio = 0.25;
+                      const eyeZoneStartRatio = 0.2;
+                      const eyeZoneEndRatio = 0.8;
+                      const eyeSeparationRatio = 0.3;
+                      const eyeWidthRatio = 0.15;
                       
-                      ctx.fillStyle = `rgba(${hexToRgb(eyeColor).r}, ${hexToRgb(eyeColor).g}, ${hexToRgb(eyeColor).b}, ${alpha.toFixed(2)})`;
-                      ctx.fillRect(stripe, Math.floor(eyeY), 1, eyeH);
+                      const eyeY = stripeStartYClamped + stripeHeight * eyeHeightRatio;
+                      const eyeH = Math.max(1, Math.floor(spriteHeight * 0.1));
+                      
+                      const leftEyeStripeStart = Math.floor(drawStartX + spriteWidth * eyeZoneStartRatio);
+                      const leftEyeStripeEnd = Math.floor(leftEyeStripeStart + spriteWidth * eyeWidthRatio);
+                      const rightEyeStripeStart = Math.floor(drawStartX + spriteWidth * (eyeZoneEndRatio - eyeWidthRatio));
+                      const rightEyeStripeEnd = Math.floor(rightEyeStripeStart + spriteWidth * eyeWidthRatio);
+                      
+                      if ((stripe >= leftEyeStripeStart && stripe < leftEyeStripeEnd) || (stripe >= rightEyeStripeStart && stripe < rightEyeStripeEnd)) {
+                        const pupilStripeOffset = Math.floor(spriteWidth * eyeWidthRatio * 0.3);
+                        const isPupil = (stripe > leftEyeStripeStart + pupilStripeOffset && stripe < leftEyeStripeEnd - pupilStripeOffset) ||
+                          (stripe > rightEyeStripeStart + pupilStripeOffset && stripe < rightEyeStripeEnd - pupilStripeOffset);
+                        
+                        let eyeColor = (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 150) ? '#FF5555' : '#FFFACD';
+                        if (isPupil) {
+                          eyeColor = '#111111';
+                        }
+                        
+                        ctx.fillStyle = `rgba(${hexToRgb(eyeColor).r}, ${hexToRgb(eyeColor).g}, ${hexToRgb(eyeColor).b}, ${alpha.toFixed(2)})`;
+                        ctx.fillRect(stripe, Math.floor(eyeY), 1, eyeH);
+                      }
                     }
                   }
                 }
@@ -2703,135 +2914,9 @@
                 // Health Fill
                 const healthColor = healthPercent > 0.6 ? '#33FF33' : (healthPercent > 0.3 ? '#FFFF33' : '#FF3333'); // Brighter colors
                 ctx.fillStyle = healthColor;
-                ctx.fillRect(barX + 1, clampedBarY + 1, Math.floor((barWidth - 2) * healthPercent), clampedBarHeight - 2);
+                ctx.fillRect(barX, clampedBarY, Math.floor(barWidth * healthPercent), clampedBarHeight);
               }
             }
-            
-            
-            // Iterate through vertical stripes of the sprite
-            for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
-              // Check if stripe is on screen and in front of wall
-              if (stripe >= 0 && stripe < screenWidth && perpDist < zBuffer[stripe]) {
-                
-                // --- Determine Color & Details based on Sprite Type ---
-                // Is it a Pickup? (Check if sprite has a 'type' matching pickupTypes)
-                const pickupInfo = Object.values(pickupTypes).find(pt => pt.type === sprite.type);
-                
-                if (pickupInfo) {
-                  // --- PICKUP RENDERING ---
-                  const basePickupColor = pickupInfo.color;
-                  const distanceFade = Math.min(1, perpDist / fogDepth);
-                  const finalPickupColor = shadeColor(basePickupColor, distanceFade * -80); // Apply fog
-                  
-                  // Calculate vertical texture coordinate (0 to 1)
-                  const stripeStartYClamped = Math.max(0, Math.floor(finalDrawStartY));
-                  const stripeEndYClamped = Math.min(screenHeight, Math.floor(finalDrawEndY));
-                  const stripeHeight = stripeEndYClamped - stripeStartYClamped;
-                  
-                  if (stripeHeight <= 0) continue; // Skip if stripe has no height                                
-                  
-                  // Draw the main color stripe
-                  ctx.fillStyle = finalPickupColor;
-                  ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
-                  
-                  // Add subtle lighting/shading
-                  const spriteProgressX = (stripe - drawStartX) / spriteWidth; // 0 to 1 across sprite width
-                  if (spriteProgressX < 0.15 || spriteProgressX > 0.85) {
-                    // Darker edges
-                    ctx.fillStyle = shadeColor(finalPickupColor, -25);
-                    ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
-                  } else if (spriteProgressX > 0.4 && spriteProgressX < 0.6) {
-                    // Slightly lighter center column for roundness feel
-                    ctx.fillStyle = shadeColor(finalPickupColor, 15);
-                    ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
-                  }
-                  
-                  // Add a shine effect based on angle/position
-                  const shinePos = 0.3; // Where the shine line appears vertically (0 to 1)
-                  const shineThickness = 0.08;
-                  const shineStartY = stripeStartYClamped + stripeHeight * shinePos;
-                  const shineEndY = shineStartY + stripeHeight * shineThickness;
-                  if (shineEndY > shineStartY) { // Only draw if thick enough
-                    ctx.fillStyle = shadeColor(finalPickupColor, 50); // Brighter shine color
-                    ctx.fillRect(stripe, Math.floor(shineStartY), 1, Math.ceil(shineEndY - shineStartY));
-                  }
-                  
-                  
-                } else { // --- ENEMY RENDERING ---
-                  let enemyColor;
-                  let alpha = 1.0; // Default alpha
-                  
-                  if (sprite.state === 'dying') {
-                    // Fade out effect while dying
-                    const dyingProgress = 1.0 - (sprite.dyingTimer / 0.5); // 0 to 1 as timer decreases
-                    alpha = Math.max(0, 1.0 - dyingProgress);
-                    // Maybe slightly change color too? e.g., lerp to grey or red
-                    enemyColor = lerpColor(sprite.color, '#444444', dyingProgress * 0.8);
-                  } else if (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 80) { // Shorter hit flash
-                    enemyColor = '#FFFFFF'; // Bright white flash
-                  } else {
-                    const distanceFade = Math.min(1, perpDist / fogDepth);
-                    enemyColor = shadeColor(sprite.color, distanceFade * -80); // Apply fog
-                  }
-                  
-                  const finalEnemyColorWithAlpha = `rgba(${hexToRgb(enemyColor).r}, ${hexToRgb(enemyColor).g}, ${hexToRgb(enemyColor).b}, ${alpha.toFixed(2)})`;
-                  ctx.fillStyle = finalEnemyColorWithAlpha;
-                  
-                  // Clamp Y drawing coordinates
-                  const stripeStartYClamped = Math.max(0, Math.floor(finalDrawStartY));
-                  const stripeEndYClamped = Math.min(screenHeight, Math.floor(finalDrawEndY));
-                  const stripeHeight = stripeEndYClamped - stripeStartYClamped;
-                  
-                  if (stripeHeight <= 0) continue; // Skip zero-height stripes
-                  
-                  // Draw main enemy stripe
-                  ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
-                  
-                  
-                  // Add simple shading for roundness
-                  const spriteProgressX = (stripe - drawStartX) / spriteWidth;
-                  const shadeAmount = -40 * Math.abs(spriteProgressX - 0.5) * 2; // Darker towards edges
-                  const shadedColor = shadeColor(enemyColor, shadeAmount);
-                  const finalShadedColorWithAlpha = `rgba(${hexToRgb(shadedColor).r}, ${hexToRgb(shadedColor).g}, ${hexToRgb(shadedColor).b}, ${alpha.toFixed(2)})`;
-                  ctx.fillStyle = finalShadedColorWithAlpha;
-                  ctx.fillRect(stripe, stripeStartYClamped, 1, stripeHeight);
-                  
-                  
-                  // Draw "Eyes" - more distinct
-                  if (sprite.state !== 'dying' && spriteHeight > 20) { // Only if large enough
-                    const eyeHeightRatio = 0.25; // Vertical position from top
-                    const eyeZoneStartRatio = 0.2; // Horizontal start within sprite width
-                    const eyeZoneEndRatio = 0.8;
-                    const eyeSeparationRatio = 0.3; // Space between eyes
-                    const eyeWidthRatio = 0.15; // Width of each eye relative to sprite width
-                    
-                    const eyeY = stripeStartYClamped + stripeHeight * eyeHeightRatio;
-                    const eyeH = Math.max(1, Math.floor(spriteHeight * 0.1));
-                    
-                    // Calculate positions for left and right eyes
-                    const leftEyeStripeStart = Math.floor(drawStartX + spriteWidth * eyeZoneStartRatio);
-                    const leftEyeStripeEnd = Math.floor(leftEyeStripeStart + spriteWidth * eyeWidthRatio);
-                    const rightEyeStripeStart = Math.floor(drawStartX + spriteWidth * (eyeZoneEndRatio - eyeWidthRatio));
-                    const rightEyeStripeEnd = Math.floor(rightEyeStripeStart + spriteWidth * eyeWidthRatio);
-                    
-                    // Check if current stripe falls within either eye's zone
-                    if ((stripe >= leftEyeStripeStart && stripe < leftEyeStripeEnd) || (stripe >= rightEyeStripeStart && stripe < rightEyeStripeEnd)) {
-                      const pupilStripeOffset = Math.floor(spriteWidth * eyeWidthRatio * 0.3); // Indent pupil slightly
-                      const isPupil = (stripe > leftEyeStripeStart + pupilStripeOffset && stripe < leftEyeStripeEnd - pupilStripeOffset) ||
-                        (stripe > rightEyeStripeStart + pupilStripeOffset && stripe < rightEyeStripeEnd - pupilStripeOffset);
-                      
-                      let eyeColor = (sprite.isHit && Date.now() - sprite.lastHitTimestamp < 150) ? '#FF5555' : '#FFFACD'; // Pale yellow default, redder when hit recently
-                      if (isPupil) {
-                        eyeColor = '#111111'; // Black pupil
-                      }
-                      
-                      ctx.fillStyle = `rgba(${hexToRgb(eyeColor).r}, ${hexToRgb(eyeColor).g}, ${hexToRgb(eyeColor).b}, ${alpha.toFixed(2)})`;
-                      ctx.fillRect(stripe, Math.floor(eyeY), 1, eyeH);
-                    }
-                  }
-                }
-              }
-            } // End for loop (stripes)
           }); // End forEach (sprites)
         } // End renderSprites function
 

@@ -174,7 +174,7 @@ async function runTests() {
 
   // 4. Validar Estabilidade Geral
   console.log('\n--- Test 4: Estabilidade e Ausência de Erros no Console ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, 1500));
 
   if (consoleErrors.length > 0) {
     console.error('Erros no console:', consoleErrors);

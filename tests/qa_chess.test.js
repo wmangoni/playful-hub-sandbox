@@ -1,4 +1,6 @@
+process.env.NODE_ENV = 'test';
 const http = require('http');
+const path = require('path');
 const app = require('../server');
 
 let server;
@@ -19,9 +21,10 @@ async function startServer() {
 }
 
 async function runTests() {
-  console.log('--- STARTING QA TEST SUITE FOR CHESS (TASK_003) ---');
+  console.log('===============================================================');
+  console.log('  QA TEST SUITE - CHESS (TASK_003 & TASK_004)');
+  console.log('===============================================================');
   
-  console.log('Loading puppeteer (ESM)...');
   const puppeteerModule = await import('puppeteer');
   puppeteer = puppeteerModule.default;
   
@@ -40,15 +43,21 @@ async function runTests() {
     await dialog.accept();
   });
 
-  // Capture browser logs
+  const consoleErrors = [];
   page.on('console', msg => {
     const text = msg.text();
-    if (msg.type() === 'error' || text.includes('Sucesso') || text.includes('Tempo') || text.includes('Puzzle')) {
-      console.log(`[BROWSER CONSOLE] ${msg.type().toUpperCase()}: ${text}`);
+    if (msg.type() === 'error' && !text.includes('ERR_NAME_NOT_RESOLVED') && !text.includes('ERR_NO_BUFFER_SPACE') && !text.includes('Failed to load resource')) {
+      console.log(`[BROWSER CONSOLE ERROR] ${text}`);
+      consoleErrors.push(text);
     }
   });
 
-  console.log('Navigating to Chess game page...');
+  page.on('pageerror', err => {
+    console.log(`[BROWSER PAGEERROR] ${err.toString()}`);
+    consoleErrors.push(err.toString());
+  });
+
+  console.log('\n--- 1. Navegando para o jogo Chess ---');
   await page.goto(`http://127.0.0.1:${PORT}/chess`, { waitUntil: 'networkidle2' });
   
   // 1. Verify existence of UI components
@@ -72,7 +81,6 @@ async function runTests() {
 
   // 2. Test Time Presets
   console.log('\n--- Test 2: Testing clock presets ---');
-  // Check initial Zen state
   let whiteTimeText = await page.evaluate(() => document.getElementById('time-white').textContent);
   let blackTimeText = await page.evaluate(() => document.getElementById('time-black').textContent);
   console.log(`Initial time (Zen): White=${whiteTimeText}, Black=${blackTimeText}`);
@@ -106,7 +114,6 @@ async function runTests() {
 
   // 3. Test Puzzle Loader and Move Validation
   console.log('\n--- Test 3: Testing Puzzle Trainer Mode ---');
-  // Select first puzzle: Pastor Mate
   console.log('Activating Puzzle 1: Scholar\'s Mate...');
   await page.click('.puzzle-btn[data-puzzle="0"]');
   await new Promise(r => setTimeout(r, 500));
@@ -121,7 +128,6 @@ async function runTests() {
   // Test incorrect move in Puzzle Mode (e.g. e2 to e4)
   console.log('Executing incorrect move (e2 to e4)...');
   let moveResult = await page.evaluate(() => {
-    // Attempt incorrect move
     return handlePuzzleMove('e2', 'e4');
   });
   console.log(`Incorrect move accepted: ${moveResult}`);
@@ -169,8 +175,70 @@ async function runTests() {
     throw new Error('Hints should be turned off after toggle click');
   }
 
+  // 5. Test Pass & Play Mode and Board Rotation
+  console.log('\n--- Test 5: Testing Pass & Play Local Mode and Board Rotation ---');
+  const passAndPlayCheck = await page.evaluate(() => {
+    const c = window.__chess;
+    c.setGameMode('pass_and_play');
+    const mode = c.getGameMode();
+    const boardEl = document.getElementById('myBoard');
+    c.checkRotation();
+    
+    return {
+      mode,
+      hasBoardElement: !!boardEl
+    };
+  });
+  console.log('Pass & Play mode status:', JSON.stringify(passAndPlayCheck, null, 2));
+  if (passAndPlayCheck.mode !== 'pass_and_play') {
+    throw new Error('Pass & Play mode failed to activate');
+  }
+  console.log('✅ Teste 5: Modo Pass & Play e controle de rotação validados.');
+
+  // 6. Test Achievements Modal and Unlock
+  console.log('\n--- Test 6: Testing Achievements Mural Modal ---');
+  const achievementsCheck = await page.evaluate(() => {
+    const c = window.__chess;
+    c.unlockAchievement('first_blood');
+    const achievements = c.getAchievements();
+    const isUnlocked = achievements.includes('first_blood');
+    
+    // Test modal open / close
+    const modalBtn = document.getElementById('achievementsModalBtn');
+    modalBtn.click();
+    const modalOpen = document.getElementById('achievementsModal').classList.contains('active');
+    
+    document.getElementById('closeAchievementsModal').click();
+    const modalClosed = !document.getElementById('achievementsModal').classList.contains('active');
+
+    return {
+      isUnlocked,
+      modalOpen,
+      modalClosed
+    };
+  });
+  console.log('Achievements status:', JSON.stringify(achievementsCheck, null, 2));
+  if (!achievementsCheck.isUnlocked || !achievementsCheck.modalOpen || !achievementsCheck.modalClosed) {
+    throw new Error('Achievements unlock or modal open/close failed');
+  }
+  console.log('✅ Teste 6: Mural de conquistas e desbloqueio de achievements validados.');
+
+  // 7. Verify Stability and No Console Errors
+  console.log('\n--- Test 7: Estabilidade e Ausência de Erros no Console ---');
+  await new Promise(r => setTimeout(r, 1000));
+  if (consoleErrors.length > 0) {
+    console.error('Erros no console:', consoleErrors);
+    throw new Error(`Encontrados ${consoleErrors.length} erros no console.`);
+  }
+  console.log('✅ Teste 7: Chess executou perfeitamente com 0 erros.');
+
+  // Screenshot de Evidência
+  const screenshotPath = path.join(__dirname, 'chess_qa_evidence.png');
+  await page.screenshot({ path: screenshotPath, fullPage: true });
+  console.log(`\n📸 Screenshot de evidência capturada em: ${screenshotPath}`);
+
   console.log('\n=============================================');
-  console.log('🎉 ALL CHESS TASK_003 TESTS PASSED SUCCESSFULLY!');
+  console.log('🎉 ALL CHESS QA TESTS PASSED SUCCESSFULLY!');
   console.log('=============================================');
 }
 

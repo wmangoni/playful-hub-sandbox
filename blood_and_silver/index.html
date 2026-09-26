@@ -1419,9 +1419,6 @@
             vampire3Walk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires3/With_shadow/Vampires3_Walk_with_shadow.png',
             enemyWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires1/With_shadow/Vampires1_Walk_with_shadow.png',
             bossWalk: '../assets/vampire-4-direction-pixel-character-sprite-pack/PNG/Vampires3/With_shadow/Vampires3_Walk_with_shadow.png',
-            ground: '../assets/skeleton-top-down-pixel-art/PNG/Ground_rocks.png',
-            water: '../assets/skeleton-top-down-pixel-art/PNG/Water_coasts.png',
-            dungeonWallsFloor: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/walls_floor.png',
             dungeonCracks: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/decorative_cracks_floor.png',
             dungeonObjects: '../assets/2d-top-down-pixel-dungeon-asset-pack/Tiled_files/Objects.png',
             dungeonFire: '../assets/2d-top-down-pixel-dungeon-asset-pack/PNG/fire_animation.png',
@@ -1459,6 +1456,27 @@
             { file: 'Dead_arm_shadow1_1.png', w: 64, h: 64, weight: 1 },
             { file: 'Thorn_plant_shadow1_1.png', w: 128, h: 128, weight: 1 }
         ];
+
+        // Vegetação do pack skeleton, sempre no tamanho nativo (1:1) para não deformar o pixel art.
+        // r = raio de ocupação usado para espaçar a vegetação na geração.
+        const FLORA_SPRITES = {
+            treeL: { file: 'Tree_shadow1_1.png', w: 128, h: 128, r: 26 },
+            treeM: { file: 'Tree_shadow1_2.png', w: 64, h: 64, r: 20 },
+            treeS: { file: 'Tree_shadow1_3.png', w: 64, h: 64, r: 14 },
+            deadTreeL: { file: 'Dead_tree_shadow1_1.png', w: 128, h: 128, r: 24 },
+            deadTreeM: { file: 'Dead_tree_shadow1_2.png', w: 128, h: 128, r: 22 },
+            dryBushL: { file: 'Plant_shadow1_1.png', w: 128, h: 128, r: 24 },
+            dryBushM: { file: 'Plant_shadow1_2.png', w: 64, h: 64, r: 16 },
+            dryBushS: { file: 'Plant_shadow1_3.png', w: 32, h: 32, r: 10 },
+            thornL: { file: 'Thorn_plant_shadow1_1.png', w: 128, h: 128, r: 30 },
+            thornM: { file: 'Thorn_plant_shadow1_4.png', w: 64, h: 64, r: 18 },
+            thornS: { file: 'Thorn_plant_shadow1_5.png', w: 64, h: 64, r: 12 },
+            log: { file: 'Broken_tree_shadow1_1.png', w: 128, h: 128, r: 26 },
+            stumpL: { file: 'Broken_tree_shadow1_4.png', w: 64, h: 64, r: 14 },
+            stumpS: { file: 'Broken_tree_shadow1_3.png', w: 32, h: 32, r: 10 },
+            rockM: { file: 'Rock_shadow1_2.png', w: 64, h: 64, r: 18 },
+            rockS: { file: 'Rock_shadow1_4.png', w: 32, h: 32, r: 10 }
+        };
 
         const PONDS = [
             { x: 850, y: 1150, radius: 140 },
@@ -1522,12 +1540,11 @@
         let shake = 0;
         let bestTime = 0;
         let lastCollect = 0;
-        let groundPattern = null;
-        let waterPattern = null;
         let scenery = [];
 
         function loadAssets() {
-            const paths = Object.values(ASSETS).concat(OBJECT_CATALOG.map(function (o) { return OBJ_DIR + o.file; }));
+            const spritePaths = OBJECT_CATALOG.concat(Object.values(FLORA_SPRITES)).map(function (o) { return OBJ_DIR + o.file; });
+            const paths = Array.from(new Set(Object.values(ASSETS).concat(spritePaths)));
             let loaded = 0;
             paths.forEach(function (src) {
                 const img = new Image();
@@ -1713,10 +1730,16 @@
             scenery.length = 0;
             const rng = mulberry32(20260816);
 
+            // Props não nascem dentro dos lagos (não consome o rng: o resto do mapa não muda)
+            function inPond(x, y) {
+                return PONDS.some(function (p) { return Math.hypot(x - p.x, y - p.y) < p.radius * 1.2; });
+            }
+
             function addPrefab(prefabKey, x, y) {
                 const p = DUNGEON_PREFABS[prefabKey];
                 if (!p) return;
                 if (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < 240) return;
+                if (inPond(x, y)) return;
                 x = Math.max(70, Math.min(WORLD_W - 70, x));
                 y = Math.max(70, Math.min(WORLD_H - 70, y));
                 scenery.push({
@@ -1814,16 +1837,1368 @@
                 const rx = 100 + rng() * (WORLD_W - 200);
                 const ry = 100 + rng() * (WORLD_H - 200);
                 if (Math.hypot(rx - WORLD_W / 2, ry - WORLD_H / 2) < 240) continue;
-                const pick = (rng() < 0.5) ? { file: 'Dead_tree_shadow1_1.png', w: 96, h: 96 } : { file: 'Rock_shadow1_1.png', w: 48, h: 48 };
+                const pick = (rng() < 0.5) ? { file: 'Dead_tree_shadow1_1.png', w: 128, h: 128 } : { file: 'Rock_shadow1_1.png', w: 64, h: 64 };
+                if (inPond(rx, ry)) continue;
                 scenery.push({ file: OBJ_DIR + pick.file, w: pick.w, h: pick.h, x: rx, y: ry });
             }
 
             // Ordenar por coordenada Y para correta profundidade visual 2.5D
-            scenery.sort(function (a, b) {
-                if (a.isGroundCrack && !b.isGroundCrack) return -1;
-                if (!a.isGroundCrack && b.isGroundCrack) return 1;
-                return a.y - b.y;
+            scenery.sort(compareSceneryDepth);
+            refreshStaticScenery();
+        }
+
+        function compareSceneryDepth(a, b) {
+            if (a.isGroundCrack && !b.isGroundCrack) return -1;
+            if (!a.isGroundCrack && b.isGroundCrack) return 1;
+            return a.y - b.y;
+        }
+
+        // =====================================================================
+        // CENÁRIO PROCEDURAL — solo, lagos, decalques, vegetação e ambiente
+        // =====================================================================
+        // Tudo o que é estático (solo, lagos, decalques, props sem animação e vegetação) é
+        // "assado" em chunks CHUNK×CHUNK no espaço do mundo, gerados sob demanda e guardados
+        // num cache LRU. Por frame o chão custa só ~15 drawImage, independente da quantidade
+        // de decoração; apenas o que é animado (fogo, névoa, brilho da água) é redesenhado.
+        // A geração das texturas e o bake dos chunks rodam em fatias pequenas com orçamento
+        // por frame (maior enquanto um overlay cobre a tela), para nenhum frame pagar de uma vez.
+
+        // Tema do cenário: 'deserto' segue a direção de arte do TASK_016 (solo arenoso à noite,
+        // vegetação seca e oásis verdes em volta dos lagos); 'charneca' é a variante verde.
+        const SCENERY_THEME = 'deserto';
+
+        const CHUNK = 256;
+        const CHUNK_CACHE_MAX = 48;          // ~12 MB; anel da câmera (≤30) + área de spawn (≤15)
+        const CHUNK_PREFETCH_MARGIN = 160;   // anel pré-assado ao redor da câmera
+        const WORK_BUDGET_MS = 2.5;          // geração/bake por frame durante o jogo
+        const WORK_BUDGET_OVERLAY_MS = 8;    // idem com menu/popup cobrindo a tela
+        const TEX = 256;                     // texturas procedurais repetíveis (divide CHUNK)
+        const TEX_MASK = TEX - 1;
+        const COARSE = 8;                    // passo da grade grossa das máscaras (px; os >> 3 dependem dele)
+        const COARSE_N = CHUNK / COARSE + 3; // +1 célula de borda de cada lado (arestas sem emenda)
+        const CLS_W = CHUNK + 2;             // classificação do solo com 1px de borda
+        const BIOME_CONTRAST = 3;            // estreita a faixa de transição entre biomas
+        const DETAIL_AMP = 0.55;             // quanto o ruído fino recorta as bordas
+        const OASIS_REACH = 1.8;             // alcance do oásis, em raios do lago
+        const OASIS_CONTRAST = 1.5;
+        const OASIS_DETAIL = 0.9;
+        const DECALS_PER_CHUNK = 120;
+        const SPAWN_CLEAR_RADIUS = 150;      // vegetação não nasce colada ao ponto de spawn
+
+        // Paletas curtas (6 tons, do mais escuro ao mais claro) no estilo do pack skeleton:
+        // médio-escuras e dessaturadas para personagens, orbes e projéteis continuarem legíveis.
+        // A areia parte das cores de contato das variantes "shadow3" do pack (feitas para areia).
+        const GROUND_PALETTES = {
+            sand: [[55, 46, 37], [85, 72, 56], [99, 84, 64], [111, 95, 72], [129, 111, 85], [157, 137, 106]],
+            hardpan: [[50, 41, 34], [64, 53, 43], [74, 62, 50], [84, 70, 56], [100, 85, 69], [124, 107, 87]],
+            grass: [[33, 43, 36], [43, 55, 44], [50, 64, 49], [58, 73, 54], [70, 86, 60], [90, 104, 68]],
+            dirt: [[40, 33, 30], [52, 43, 37], [62, 52, 43], [72, 60, 49], [88, 75, 62], [112, 98, 81]],
+            water: [[16, 27, 35], [21, 36, 46], [28, 48, 59], [39, 65, 75], [74, 106, 112], [142, 166, 164]],
+            mud: [[29, 25, 23], [37, 31, 28], [46, 38, 33]]
+        };
+        const PAL_FLAT = {};
+        Object.keys(GROUND_PALETTES).forEach(function (k) { PAL_FLAT[k] = new Uint8Array([].concat.apply([], GROUND_PALETTES[k])); });
+
+        // Arbustos procedurais: contorno, sombra, base, luz, brilho e detalhe (frutos/flores).
+        const BUSH_PALETTES = {
+            moss: [[17, 25, 21], [29, 44, 34], [41, 61, 44], [57, 81, 53], [80, 106, 67], [148, 44, 54]],
+            dusk: [[15, 23, 25], [26, 41, 41], [36, 57, 54], [50, 76, 69], [72, 99, 87], [170, 160, 190]],
+            blood: [[24, 12, 14], [46, 22, 24], [64, 30, 30], [84, 42, 38], [106, 58, 48], [196, 158, 110]],
+            dry: [[29, 26, 20], [55, 50, 35], [77, 70, 46], [101, 92, 59], [127, 117, 78], [192, 180, 146]]
+        };
+
+        // Classes do solo: 0 = principal, 1 = manchas e clareiras (máscara de bioma), 2 = oásis
+        // em volta dos lagos. h = "altura" relativa, usada nas arestas iluminadas/sombreadas.
+        // Decalques e vegetação: tabelas [tipo, peso]; 'bush:<paleta>' = arbusto procedural.
+        const THEMES = {
+            deserto: {
+                ground: [
+                    { palette: 'sand', texture: 'sand', h: 1 },
+                    { palette: 'hardpan', texture: 'dirt', h: 0 },
+                    { palette: 'grass', texture: 'grass', h: 2 }
+                ],
+                oasis: true,
+                patchThreshold: 0.64,    // máscara de bioma acima disso = mancha/clareira
+                fog: [184, 172, 154],
+                rockTint: 'rgba(34, 24, 16, 0.26)',   // escurece as pedras claras do pack (noite)
+                decals: [
+                    [['pebble', 22], ['dryTuft', 20], ['twig', 6], ['bone', 2], [null, 50]],
+                    [['pebble', 34], ['dryTuft', 16], ['twig', 10], ['bone', 2], ['leaves', 4], [null, 34]],
+                    [['tuft', 50], ['clover', 8], ['pebble', 4], ['twig', 2]]
+                ],
+                meadows: [false, false, true],   // classes com canteiros de flores
+                edgeTufts: [false, false, true], // classes cuja borda ganha tufos transbordando
+                grove: [['twig', 2], ['leaves', 1], [null, 5]],
+                flora: {
+                    groves: 24,
+                    groveTrees: [['treeL', 2], ['treeM', 3], ['treeS', 2], ['deadTreeL', 2], ['deadTreeM', 2]],
+                    groveBushes: [['bush:dry', 4], ['dryBushM', 2], ['dryBushS', 3], ['thornS', 2], ['bush:blood', 1]],
+                    groveExtras: [['log', 1], ['stumpL', 2], ['stumpS', 2], ['rockS', 2]],
+                    spawn: [['bush:dry', 5], ['dryBushS', 3], ['rockS', 2], ['thornS', 1], ['stumpS', 1]],
+                    pond: [['bush:moss', 5], ['bush:dusk', 3], ['treeS', 2], ['treeM', 1]],
+                    scattered: [
+                        ['bush:dry', 110], ['bush:blood', 20], ['dryBushS', 40], ['dryBushM', 22], ['dryBushL', 8],
+                        ['thornS', 22], ['thornM', 12], ['thornL', 6], ['stumpS', 12], ['stumpL', 6], ['log', 5],
+                        ['rockS', 34], ['rockM', 18], ['treeS', 8], ['deadTreeL', 8]
+                    ]
+                }
+            },
+            charneca: {
+                ground: [
+                    { palette: 'grass', texture: 'grass', h: 1 },
+                    { palette: 'dirt', texture: 'dirt', h: 0 },
+                    { palette: 'grass', texture: 'grass', h: 1 }
+                ],
+                oasis: false,
+                patchThreshold: 0.6,
+                fog: [196, 204, 214],
+                rockTint: 'rgba(22, 24, 28, 0.4)',
+                decals: [
+                    [['tuft', 50], ['clover', 8], ['pebble', 5], ['leaves', 2], ['twig', 3], ['flowerWhite', 1]],
+                    [['pebble', 35], ['dryTuft', 25], ['twig', 12], ['bone', 3], ['leaves', 7], [null, 18]],
+                    [['tuft', 50], ['clover', 8]]
+                ],
+                meadows: [true, false, true],
+                edgeTufts: [true, false, true],
+                grove: [['leaves', 2], ['mushroom', 1], [null, 7]],
+                flora: {
+                    groves: 30,
+                    groveTrees: [['treeL', 3], ['treeM', 3], ['treeS', 2], ['deadTreeM', 1]],
+                    groveBushes: [['bush:moss', 5], ['bush:dusk', 3], ['bush:blood', 1]],
+                    groveExtras: [['log', 2], ['stumpL', 2], ['stumpS', 2]],
+                    spawn: [['bush:moss', 20], ['bush:dusk', 8], ['bush:dry', 4], ['treeS', 4], ['treeM', 2], ['stumpS', 2], ['dryBushS', 2]],
+                    pond: [['bush:moss', 7], ['bush:dusk', 3]],
+                    scattered: [
+                        ['bush:moss', 86], ['bush:dusk', 52], ['bush:dry', 35], ['bush:blood', 17], ['dryBushS', 34], ['dryBushM', 18],
+                        ['dryBushL', 6], ['thornS', 16], ['thornM', 10], ['thornL', 4], ['stumpS', 14], ['stumpL', 8], ['log', 6],
+                        ['rockS', 24], ['rockM', 12], ['treeS', 12], ['treeM', 6], ['deadTreeL', 5]
+                    ]
+                }
+            }
+        };
+        const THEME = THEMES[SCENERY_THEME];
+        const GROUND_FALLBACK = 'rgb(' + GROUND_PALETTES[THEME.ground[0].palette][2].join(', ') + ')';
+
+        const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+        const FLOWER_KINDS = ['flowerViolet', 'flowerWhite', 'flowerYellow'];
+        const DARKENED_SPRITE = /\/Rock_shadow/;   // pedras do pack: claras demais para a noite
+        // "Chão" que as variantes shadow1 do pack pintam na base do sprite (feito para solo
+        // cinza-claro); é recolorido para o solo do tema, senão vira um halo claro.
+        const PACK_GROUND_COLORS = [[76, 79, 73], [57, 61, 55], [134, 139, 124], [45, 49, 43]];
+        const PACK_GROUND_TONES = [2, 1, 3, 0];
+
+        const flora = [];
+        const groves = [];
+        const clearings = [];
+        const pondShapes = [];
+        const staticBuckets = new Map();
+        const chunkCache = new Map();
+        const chunkPool = [];
+        const decalCache = new Map();
+        const spriteCache = new Map();
+        const coarseBiome = new Float32Array(COARSE_N * COARSE_N);
+        const coarseTone = new Float32Array(COARSE_N * COARSE_N);
+        const coarseMix = new Float32Array(COARSE_N * COARSE_N);
+        const coarseWet = new Float32Array(COARSE_N * COARSE_N);
+        const classBuf = new Uint8Array(CLS_W * CLS_W);
+        const bakeImage = new ImageData(CHUNK, CHUNK);
+        const groundLayers = [];                 // por classe: { pal, tex, h }
+        const groundHeights = new Uint8Array(3);
+        let animatedScenery = [];
+        let groundTex = null;
+        let decalAtlas = null;
+        let bushVariants = null;
+        let fogSprites = null;
+        let lightSprite = null;
+        let vignetteSprite = null;
+        let initTasks = [];
+        let staticSignature = '';
+        let chunkFrame = 0;
+        let chunksHaveAssets = false;
+        const chunkStats = { baked: 0, allocated: 0, lastBakeMs: 0, maxBakeMs: 0, maxSliceMs: 0, fallbackDraws: 0 };
+
+        function createCanvas(w, h) {
+            const c = document.createElement('canvas');
+            c.width = w;
+            c.height = h;
+            return c;
+        }
+
+        function hash2(x, y, seed) {
+            let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1442695041)) | 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177);
+            h ^= h >>> 16;
+            return (h >>> 0) / 4294967296;
+        }
+
+        function ditherAt(x, y) {
+            return (BAYER4[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+        }
+
+        // Value noise suave; com period > 0 a malha se repete (textura sem emendas).
+        function valueNoise(x, y, period, seed) {
+            let x0 = Math.floor(x), y0 = Math.floor(y);
+            const fx = x - x0, fy = y - y0;
+            const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+            let x1 = x0 + 1, y1 = y0 + 1;
+            if (period) {
+                x0 = ((x0 % period) + period) % period;
+                y0 = ((y0 % period) + period) % period;
+                x1 = (x0 + 1) % period;
+                y1 = (y0 + 1) % period;
+            }
+            const a = hash2(x0, y0, seed), b = hash2(x1, y0, seed);
+            const c = hash2(x0, y1, seed), d = hash2(x1, y1, seed);
+            return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+        }
+
+        function fbm(x, y, octaves, period, seed) {
+            let sum = 0, amp = 0.5, norm = 0, f = 1;
+            for (let i = 0; i < octaves; i++) {
+                sum += valueNoise(x * f, y * f, period * f, seed + i * 101) * amp;
+                norm += amp;
+                amp *= 0.5;
+                f *= 2;
+            }
+            return sum / norm;
+        }
+
+        function pickWeighted(rng, table) {
+            let total = 0;
+            for (const e of table) total += e[1];
+            let r = rng() * total;
+            for (const e of table) {
+                r -= e[1];
+                if (r <= 0) return e[0];
+            }
+            return table[table.length - 1][0];
+        }
+
+        // ---------- Texturas do solo (índices de paleta, TEX×TEX, repetíveis) ----------
+        // Geradas em faixas de linhas (tarefas de inicialização) e finalizadas com os detalhes
+        // que dependem do rng sequencial (folhas de grama, pedriscos, rachaduras).
+        function buildGroundTexRows(tex, y0, y1) {
+            for (let y = y0; y < y1; y++) {
+                for (let x = 0; x < TEX; x++) {
+                    const i = y * TEX + x;
+                    // Grama: tom base + aglomerados de 8–16px com borda dura + grão esparso
+                    const gc = fbm(x / 16, y / 16, 2, 16, 23);
+                    const gg = hash2(x, y, 29);
+                    let k = gc < 0.36 ? 1 : (gc > 0.66 ? 3 : 2);
+                    if (gg < 0.035) k--;
+                    else if (gg > 0.97) k++;
+                    tex.grass[i] = k;
+                    // Terra: manchas mais ásperas
+                    const dc = fbm(x / 16, y / 16, 3, 16, 37);
+                    const dg = hash2(x, y, 43);
+                    let dk = dc < 0.38 ? 1 : (dc > 0.64 ? 3 : 2);
+                    if (dg < 0.05) dk = Math.max(1, dk - 1);
+                    else if (dg > 0.95) dk = Math.min(3, dk + 1);
+                    tex.dirt[i] = dk;
+                    // Areia: ondulações de duna a cada 8px (onduladas pelo ruído), só em parte do solo
+                    const warp = fbm(x / 32, y / 32, 2, 8, 61) * 8 + fbm(x / 64, y / 64, 1, 4, 67) * 6;
+                    const t = ((y + warp) / 8) % 1;
+                    let sk = 2;
+                    if (fbm(x / 64, y / 64, 2, 4, 71) > 0.5) {
+                        if (t < 0.16) sk = 3;
+                        else if (t > 0.5 && t < 0.63) sk = 1;
+                    }
+                    const sg = hash2(x, y, 73);
+                    if (sg < 0.03) sk = Math.max(1, sk - 1);
+                    else if (sg > 0.975) sk = Math.min(4, sk + 1);
+                    tex.sand[i] = sk;
+                    // Ruído (período 64px) que ondula as bordas entre classes do solo
+                    tex.detail[i] = fbm(x / 64, y / 64, 3, 4, 53);
+                    // Limiar aleatório para misturar duas amostragens da textura (anti-repetição)
+                    tex.rand[i] = hash2(x, y, 79);
+                }
+            }
+        }
+
+        function finishGroundTextures(tex) {
+            const rng = mulberry32(7719);
+            const grass = tex.grass, dirt = tex.dirt, sand = tex.sand;
+            // Folhas de grama: traços verticais curtos (base escura, ponta clara — luz do alto),
+            // mais densas onde a grama é mais viçosa
+            for (let i = 0; i < 3400; i++) {
+                const bx = (rng() * TEX) | 0, by = (rng() * TEX) | 0;
+                if (rng() > fbm(bx / 64, by / 64, 2, 4, 11) * 1.6 - 0.1) continue;
+                const len = 2 + ((rng() * 3) | 0);
+                const lean = rng() < 0.4 ? (rng() < 0.5 ? -1 : 1) : 0;
+                for (let j = 0; j < len; j++) {
+                    const px = (bx + (j === len - 1 ? lean : 0)) & TEX_MASK;
+                    const py = (by - j) & TEX_MASK;
+                    grass[py * TEX + px] = j === 0 ? (rng() < 0.3 ? 0 : 1) : (j === len - 1 ? (rng() < 0.2 ? 5 : 4) : 3);
+                }
+            }
+            // Pedriscos: luz no topo-esquerda, sombra embaixo-direita (muitos na terra, poucos na areia)
+            function pebbles(target, count) {
+                for (let i = 0; i < count; i++) {
+                    const cx = (rng() * TEX) | 0, cy = (rng() * TEX) | 0;
+                    const w = 1 + ((rng() * 3) | 0), h = 1 + ((rng() * 2) | 0);
+                    for (let yy = 0; yy <= h; yy++) {
+                        for (let xx = 0; xx <= w; xx++) {
+                            const corner = (xx === 0 || xx === w) && (yy === 0 || yy === h);
+                            if (corner && w > 1) continue;
+                            target[((cy + yy) & TEX_MASK) * TEX + ((cx + xx) & TEX_MASK)] = 4;
+                        }
+                    }
+                    target[(cy & TEX_MASK) * TEX + ((cx + (w > 1 ? 1 : 0)) & TEX_MASK)] = 5;
+                    for (let xx = (w > 1 ? 1 : 0); xx <= w; xx++) target[((cy + h + 1) & TEX_MASK) * TEX + ((cx + xx) & TEX_MASK)] = 0;
+                }
+            }
+            pebbles(dirt, 240);
+            pebbles(sand, 50);
+            // Rachaduras finas na terra seca (passeio aleatório)
+            for (let i = 0; i < 28; i++) {
+                let x = (rng() * TEX) | 0, y = (rng() * TEX) | 0;
+                const len = 5 + ((rng() * 9) | 0);
+                for (let j = 0; j < len; j++) {
+                    dirt[(y & TEX_MASK) * TEX + (x & TEX_MASK)] = 0;
+                    if (rng() < 0.6) x += rng() < 0.5 ? -1 : 1;
+                    else y += rng() < 0.5 ? -1 : 1;
+                }
+            }
+        }
+
+        // Contorno orgânico dos lagos: raio relativo tabelado por ângulo (256 passos).
+        function buildPondShapes() {
+            pondShapes.length = 0;
+            const rng = mulberry32(4441);
+            for (let p = 0; p < PONDS.length; p++) {
+                const shape = new Float32Array(256);
+                const ph1 = rng() * TWO_PI, ph2 = rng() * TWO_PI, ph3 = rng() * TWO_PI;
+                for (let a = 0; a < 256; a++) {
+                    const t = a / 256 * TWO_PI;
+                    shape[a] = 1 + 0.07 * Math.sin(3 * t + ph1) + 0.045 * Math.sin(5 * t + ph2) + 0.025 * Math.sin(9 * t + ph3);
+                }
+                pondShapes.push(shape);
+            }
+        }
+
+        // Distância normalizada ao contorno do lago mais próximo (<1 = dentro d'água).
+        function pondDistance(x, y) {
+            let best = Infinity;
+            for (let p = 0; p < PONDS.length; p++) {
+                const pond = PONDS[p];
+                const dx = x - pond.x, dy = y - pond.y;
+                const d2 = dx * dx + dy * dy;
+                const lim = pond.radius * 1.6;
+                if (d2 > lim * lim) continue;
+                const a = ((Math.atan2(dy, dx) / TWO_PI + 1) * 256) & 255;
+                const dn = Math.sqrt(d2) / (pond.radius * pondShapes[p][a]);
+                if (dn < best) best = dn;
+            }
+            return best;
+        }
+
+        // > 0 dentro do alcance do oásis de algum lago
+        function wetAt(x, y) {
+            let w = -OASIS_REACH;
+            for (const p of PONDS) {
+                const d = OASIS_REACH - Math.hypot(x - p.x, y - p.y) / p.radius;
+                if (d > w) w = d;
+            }
+            return w;
+        }
+
+        // ---------- Máscara de bioma (espaço de mundo) ----------
+        function clearingsNear(x, y, size) {
+            const out = [];
+            for (const c of clearings) {
+                if (c.x + c.r < x || c.x - c.r > x + size || c.y + c.r < y || c.y - c.r > y + size) continue;
+                out.push(c);
+            }
+            return out;
+        }
+
+        function biomeAt(x, y, near) {
+            const wx = x / 560, wy = y / 560;
+            const qx = fbm(wx + 5.2, wy + 1.3, 2, 0, 71);
+            const qy = fbm(wx + 1.7, wy + 9.2, 2, 0, 83);
+            let b = fbm(wx + (qx - 0.5) * 1.8, wy + (qy - 0.5) * 1.8, 4, 0, 97);
+            // Clareiras sob os dioramas; margens sem manchas ao redor dos lagos
+            for (const c of near) {
+                const dx = x - c.x, dy = y - c.y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 >= c.r * c.r) continue;
+                const k = 1 - Math.sqrt(d2) / c.r;
+                b += k * k * c.s;
+            }
+            return b;
+        }
+
+        // Classe do solo num ponto (mesmas fórmulas do bake) e se está perto de uma borda.
+        function groundAt(x, y, near) {
+            const detail = groundTex.detail;
+            const xi = x | 0, yi = y | 0;
+            let w = -1;
+            if (THEME.oasis) {
+                w = wetAt(x, y) * OASIS_CONTRAST + (detail[((yi + 128) & TEX_MASK) * TEX + ((xi + 128) & TEX_MASK)] - 0.5) * OASIS_DETAIL;
+                if (w > 0) return { cls: 2, edge: w < 0.08 };
+            }
+            const v = (biomeAt(x, y, near) - THEME.patchThreshold) * BIOME_CONTRAST + (detail[(yi & TEX_MASK) * TEX + (xi & TEX_MASK)] - 0.5) * DETAIL_AMP;
+            return { cls: v > 0 ? 1 : 0, edge: Math.abs(v) < 0.08 || w > -0.08 };
+        }
+
+        // ---------- Decalques procedurais (atlas de slots 16×16, âncora no pé) ----------
+        function buildDecalAtlas() {
+            const rng = mulberry32(9127);
+            const SLOT = 16, COLS = 8, ROWS = 6;
+            const canvas = createCanvas(SLOT * COLS, SLOT * ROWS);
+            const g = canvas.getContext('2d');
+            const img = g.createImageData(canvas.width, canvas.height);
+            const data = img.data;
+            const kinds = {};
+            let slot = 0;
+            let ox = 0, oy = 0;
+            function px(x, y, c, a) {
+                x = Math.round(x); y = Math.round(y);
+                if (x < 0 || y < 0 || x >= SLOT || y >= SLOT) return;
+                const o = ((oy + y) * canvas.width + ox + x) * 4;
+                data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = a === undefined ? 255 : a;
+            }
+            function add(kind, draw) {
+                ox = (slot % COLS) * SLOT;
+                oy = Math.floor(slot / COLS) * SLOT;
+                draw();
+                (kinds[kind] = kinds[kind] || []).push({ sx: ox, sy: oy });
+                slot++;
+            }
+            const G = GROUND_PALETTES.grass;
+            function tuft(pal, blades, maxLen) {
+                const n = blades + ((rng() * 3) | 0);
+                for (let b = 0; b < n; b++) {
+                    const ang = -Math.PI / 2 + (rng() - 0.5) * 1.5;
+                    const len = 3 + rng() * maxLen;
+                    const bx = 8 + (rng() - 0.5) * 4;
+                    for (let t = 0; t <= len; t++) {
+                        const c = t < 1 ? pal[0] : (t < len * 0.45 ? pal[2] : (t < len - 1 ? pal[3] : pal[4]));
+                        px(bx + Math.cos(ang) * t, 15 + Math.sin(ang) * t, c);
+                    }
+                }
+            }
+            function stone(cx, cy, w, h, base, light, dark) {
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        if ((x === 0 || x === w - 1) && (y === 0 || y === h - 1) && w > 2) continue;
+                        px(cx + x, cy + y, base);
+                    }
+                }
+                px(cx + (w > 2 ? 1 : 0), cy, light);
+                for (let x = (w > 2 ? 1 : 0); x < w - (w > 2 ? 1 : 0); x++) px(cx + x, cy + h, dark, 200);
+            }
+            function flower(cx, cy, petal, core) {
+                px(cx, cy + 1, G[2]); px(cx, cy + 2, G[1]);
+                px(cx - 1, cy, petal); px(cx + 1, cy, petal); px(cx, cy - 1, petal); px(cx, cy + 1, petal);
+                px(cx, cy, core);
+            }
+            const dryPal = [[44, 38, 28], [62, 55, 38], [84, 76, 50], [108, 98, 64], [134, 122, 82]];
+            const tuftPal = [G[0], G[1], G[3], G[4], G[5]];
+            for (let i = 0; i < 6; i++) add('tuft', function () { tuft(tuftPal, 3 + (i % 3), 3 + (i % 3) * 1.5); });
+            for (let i = 0; i < 3; i++) add('dryTuft', function () { tuft(dryPal, 3, 3 + i); });
+            const flowerColors = {
+                flowerYellow: [[198, 166, 72], [120, 84, 44]],
+                flowerWhite: [[206, 200, 188], [228, 196, 92]],
+                flowerViolet: [[118, 86, 150], [222, 204, 126]]
+            };
+            Object.keys(flowerColors).forEach(function (k) {
+                for (let i = 0; i < 3; i++) {
+                    add(k, function () {
+                        const n = 2 + ((rng() * 3) | 0);
+                        // espalhadas na horizontal (colunas de 4px) para não empilharem
+                        for (let f = 0; f < n; f++) flower(2 + f * 4 + Math.round(rng()), 8 + rng() * 5, flowerColors[k][0], flowerColors[k][1]);
+                    });
+                }
             });
+            for (let i = 0; i < 4; i++) {
+                add('pebble', function () {
+                    const n = 1 + ((rng() * 3) | 0);
+                    for (let s = 0; s < n; s++) stone(2 + rng() * 9, 9 + rng() * 4, 2 + ((rng() * 3) | 0), 2 + ((rng() * 2) | 0), [96, 94, 88], [138, 134, 124], [36, 34, 32]);
+                });
+            }
+            const leafColors = [[112, 52, 34], [140, 80, 40], [94, 34, 36], [122, 98, 52]];
+            for (let i = 0; i < 3; i++) {
+                add('leaves', function () {
+                    const n = 3 + ((rng() * 4) | 0);
+                    for (let l = 0; l < n; l++) {
+                        const c = leafColors[(rng() * leafColors.length) | 0];
+                        const x = 2 + rng() * 12, y = 6 + rng() * 9;
+                        px(x, y, c); if (rng() < 0.6) px(x + 1, y, c);
+                    }
+                });
+            }
+            for (let i = 0; i < 2; i++) {
+                add('twig', function () {
+                    const dir = i === 0 ? 1 : -1;
+                    for (let t = 0; t < 7; t++) px(8 + (t - 3) * dir, 13 - Math.floor(t / 2), t % 3 === 0 ? [58, 42, 32] : [78, 58, 42]);
+                    px(8 + dir, 10, [78, 58, 42]); px(8 + dir, 9, [92, 70, 50]);
+                });
+            }
+            const capColors = [[[118, 62, 48], [214, 202, 184]], [[178, 166, 142], [214, 206, 186]]];
+            for (let i = 0; i < 3; i++) {
+                add('mushroom', function () {
+                    const cap = capColors[i % 2];
+                    const n = 1 + ((rng() * 3) | 0);
+                    for (let m = 0; m < n; m++) {
+                        const x = 4 + Math.round(rng() * 8), y = 11 + Math.round(rng() * 3);
+                        px(x, y, [206, 196, 176]); px(x, y - 1, [206, 196, 176]);
+                        px(x - 1, y - 2, cap[0]); px(x, y - 2, cap[0]); px(x + 1, y - 2, cap[0]);
+                        px(x, y - 3, cap[0]); px(x - 1, y - 2, cap[1]);
+                        px(x, y + 1, [24, 30, 24], 150);
+                    }
+                });
+            }
+            for (let i = 0; i < 4; i++) {
+                add('reed', function () {
+                    const n = 2 + ((rng() * 3) | 0);
+                    for (let r = 0; r < n; r++) {
+                        const x = 4 + Math.round(rng() * 8), len = 6 + Math.round(rng() * 6);
+                        for (let t = 0; t < len; t++) px(x + (t > len - 3 && r % 2 ? 1 : 0), 15 - t, t < 2 ? [40, 54, 36] : [70, 90, 56]);
+                        if (rng() < 0.6) { px(x, 15 - len, [96, 62, 38]); px(x, 14 - len, [96, 62, 38]); px(x, 13 - len, [74, 46, 30]); }
+                    }
+                });
+            }
+            for (let i = 0; i < 2; i++) {
+                add('clover', function () {
+                    const n = 5 + ((rng() * 5) | 0);
+                    for (let c = 0; c < n; c++) px(4 + rng() * 8, 9 + rng() * 6, rng() < 0.5 ? [72, 98, 60] : [92, 120, 72]);
+                });
+            }
+            for (let i = 0; i < 2; i++) {
+                add('bone', function () {
+                    const pale = [178, 170, 150], dark = [70, 62, 54];
+                    const x0 = 4 + i * 2, y0 = 11 - i;
+                    for (let t = 0; t < 6; t++) px(x0 + t, y0 + (i ? Math.floor(t / 3) : 0), pale);
+                    px(x0 - 1, y0 - 1, pale); px(x0 - 1, y0 + 1, pale); px(x0 + 6, y0 - 1 + i, pale); px(x0 + 6, y0 + 1 + i, pale);
+                    for (let t = 0; t < 6; t++) px(x0 + t, y0 + 1 + (i ? Math.floor(t / 3) : 0), dark, 170);
+                });
+            }
+            for (let i = 0; i < 2; i++) {
+                add('lily', function () {
+                    const cx = 8, cy = 11;
+                    for (let y = -2; y <= 2; y++) {
+                        for (let x = -3; x <= 3; x++) {
+                            if (x * x / 10 + y * y / 5 > 1) continue;
+                            if (x > 0 && y === 0) continue;   // entalhe da folha
+                            px(cx + x, cy + y, y < 0 ? [70, 102, 62] : [52, 80, 50]);
+                        }
+                    }
+                    if (i === 1) { px(cx - 1, cy - 1, [214, 196, 206]); px(cx - 1, cy - 2, [236, 222, 230]); }
+                });
+            }
+            g.putImageData(img, 0, 0);
+            return { canvas: canvas, kinds: kinds };
+        }
+
+        // ---------- Arbustos procedurais (lobos de folhagem, luz do alto-esquerda) ----------
+        // 3–6 lobos com contorno recortado, sombreados de trás para a frente: crescente de luz
+        // no alto-esquerda, base escura, oclusão onde um lobo da frente cobre o de trás e
+        // marcas de folha esparsas — leitura de folhagem sem virar ruído.
+        function paintBushSprite(canvas, rng, size, pal) {
+            const W = canvas.width, H = canvas.height;
+            const g = canvas.getContext('2d');
+            const img = g.createImageData(W, H);
+            const data = img.data;
+            const cx = W / 2, base = H - 5;
+            const lobes = [{ x: cx, y: base - size * 0.44, r: size * 0.29 }];
+            const side = 2 + ((rng() * 3) | 0);
+            for (let i = 0; i < side; i++) {
+                const t = side === 1 ? 0 : i / (side - 1) * 2 - 1;
+                lobes.push({
+                    x: cx + t * size * 0.27 + (rng() - 0.5) * size * 0.08,
+                    y: base - size * (0.3 + 0.12 * (1 - Math.abs(t))) + (rng() - 0.5) * size * 0.06,
+                    r: size * (0.19 + rng() * 0.07)
+                });
+            }
+            if (size >= 24) lobes.push({ x: cx + (rng() - 0.5) * size * 0.2, y: base - size * 0.2, r: size * 0.2 });
+            for (const l of lobes) {
+                l.k = 5 + ((rng() * 3) | 0);       // nº de recortes na borda do lobo
+                l.ph = rng() * TWO_PI;
+            }
+            lobes.sort(function (a, b) { return a.y - b.y; });   // de trás para a frente
+            const owner = new Int8Array(W * H).fill(-1);
+            const tone = new Uint8Array(W * H);
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    for (let j = lobes.length - 1; j >= 0; j--) {
+                        const l = lobes[j];
+                        const dx = x + 0.5 - l.x, dy = (y + 0.5 - l.y) * 1.12;
+                        const rr = l.r * (1 + 0.1 * Math.sin(l.k * Math.atan2(dy, dx) + l.ph));
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 >= rr * rr) continue;
+                        const nx = dx / rr, ny = dy / rr;
+                        const lit = -(nx * 0.6 + ny * 0.8);
+                        const vy = (y + 0.5 - (base - size * 0.74)) / (size * 0.74);
+                        const s = 0.5 + lit * 0.36 - vy * 0.16 - (d2 / (rr * rr)) * 0.08;
+                        owner[y * W + x] = j;
+                        tone[y * W + x] = s < 0.3 ? 1 : (s < 0.5 ? 2 : (s < 0.7 ? 3 : 4));
+                        break;
+                    }
+                }
+            }
+            const seed = (rng() * 1e6) | 0;
+            function put(i, c, a) {
+                data[i * 4] = c[0]; data[i * 4 + 1] = c[1]; data[i * 4 + 2] = c[2]; data[i * 4 + 3] = a;
+            }
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const i = y * W + x;
+                    const o = owner[i];
+                    if (o < 0) continue;
+                    let k = tone[i];
+                    // Oclusão: 2px logo acima de um lobo que está na frente
+                    const b1 = y + 1 < H ? owner[i + W] : -1, b2 = y + 2 < H ? owner[i + 2 * W] : -1;
+                    if (b1 > o || b2 > o) k = Math.max(1, k - (b1 > o ? 2 : 1));
+                    // Marcas de folha "∧" em células 4×4 com deslocamento aleatório
+                    const cxl = x >> 2, cyl = y >> 2;
+                    if (hash2(cxl, cyl, seed) < 0.55) {
+                        const mx = (cxl << 2) + ((hash2(cxl, cyl, seed + 1) * 2) | 0), my = (cyl << 2) + ((hash2(cxl, cyl, seed + 2) * 2) | 0);
+                        const lx = x - mx, ly = y - my;
+                        if ((ly === 1 && (lx === 0 || lx === 2)) || (ly === 0 && lx === 1)) k = k >= 3 ? Math.min(4, k + 1) : Math.max(1, k - 1);
+                    }
+                    put(i, pal[k], 255);
+                }
+            }
+            // Frutos/flores: pares de pixels no lado iluminado, com 1px de sombra embaixo
+            const accents = Math.round(size / 8) + ((rng() * 3) | 0);
+            for (let a = 0, tries = 0; a < accents && tries < 200; tries++) {
+                const x = 1 + ((rng() * (W - 2)) | 0), y = 1 + ((rng() * (H - 3)) | 0);
+                const i = y * W + x;
+                if (owner[i] < 0 || tone[i] < 3 || owner[i + W] < 0) continue;
+                put(i, pal[5], 255);
+                put(i + W, pal[1], 255);
+                a++;
+            }
+            // Contorno escuro de 1px
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const i = y * W + x;
+                    if (owner[i] >= 0) continue;
+                    const edge = (x > 0 && owner[i - 1] >= 0) || (x + 1 < W && owner[i + 1] >= 0) || (y > 0 && owner[i - W] >= 0) || (y + 1 < H && owner[i + W] >= 0);
+                    if (edge) put(i, pal[0], 255);
+                }
+            }
+            // Sombra projetada no chão (sob o contorno)
+            const sx = cx + 2, sy = base - size * 0.08, rx = size * 0.5, ry = size * 0.17;
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const i = y * W + x;
+                    if (data[i * 4 + 3]) continue;
+                    const dx = (x + 0.5 - sx) / rx, dy = (y + 0.5 - sy) / ry;
+                    if (dx * dx + dy * dy < 1) put(i, [6, 9, 9], 92);
+                }
+            }
+            g.putImageData(img, 0, 0);
+        }
+
+        // Descritores dos arbustos (tamanho, raio e canvas); os pixels são pintados depois,
+        // numa tarefa de inicialização, antes de qualquer chunk ser assado.
+        function createBushVariants() {
+            const rng = mulberry32(5501);
+            const sizes = [16, 20, 24, 28, 34, 40];
+            const variants = {};
+            Object.keys(BUSH_PALETTES).forEach(function (key, p) {
+                variants[key] = sizes.map(function (size, i) {
+                    const s = size + ((rng() * 4) | 0) - 2;
+                    return { canvas: createCanvas(s + 6, Math.ceil(s * 0.9) + 6), size: s, palette: key, seed: 5501 + p * 16 + i, r: Math.round(s * 0.42) };
+                });
+            });
+            return variants;
+        }
+
+        // ---------- Névoa, luz de fogo e vinheta (pré-renderizados uma vez) ----------
+        function buildFogSprite(seed) {
+            const W = 96, H = 48;
+            const canvas = createCanvas(W, H);
+            const g = canvas.getContext('2d');
+            const img = g.createImageData(W, H);
+            const col = THEME.fog;
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const nx = (x + 0.5 - W / 2) / (W / 2), ny = (y + 0.5 - H / 2) / (H / 2);
+                    const fall = Math.max(0, 1 - nx * nx - ny * ny);
+                    const n = fbm(x / 14, y / 14, 3, 0, seed);
+                    const a = Math.max(0, Math.min(1, (n - 0.32) * 2.4)) * fall * fall;
+                    const o = (y * W + x) * 4;
+                    img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = Math.round(a * 255);
+                }
+            }
+            g.putImageData(img, 0, 0);
+            return canvas;
+        }
+
+        function buildLightSprite() {
+            const canvas = createCanvas(128, 128);
+            const g = canvas.getContext('2d');
+            const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+            grad.addColorStop(0, 'rgba(255, 185, 65, 0.38)');
+            grad.addColorStop(0.5, 'rgba(230, 110, 30, 0.16)');
+            grad.addColorStop(1, 'rgba(180, 60, 10, 0)');
+            g.fillStyle = grad;
+            g.fillRect(0, 0, 128, 128);
+            return canvas;
+        }
+
+        function buildVignetteSprite() {
+            const canvas = createCanvas(240, 135);
+            const g = canvas.getContext('2d');
+            const grad = g.createRadialGradient(120, 67, 24, 120, 67, 150);
+            grad.addColorStop(0, 'rgba(10, 4, 8, 0)');
+            grad.addColorStop(0.5, 'rgba(10, 4, 8, 0.08)');
+            grad.addColorStop(1, 'rgba(10, 4, 8, 0.5)');
+            g.fillStyle = grad;
+            g.fillRect(0, 0, 240, 135);
+            return canvas;
+        }
+
+        // Fila de geração pesada (texturas, atlas, arbustos, névoa), consumida em fatias
+        // pelo orçamento de trabalho de cada frame — fora do long task de carregamento.
+        function buildInitTasks() {
+            const N = TEX * TEX;
+            const tex = { grass: new Uint8Array(N), dirt: new Uint8Array(N), sand: new Uint8Array(N), detail: new Float32Array(N), rand: new Float32Array(N) };
+            const tasks = [];
+            for (let y = 0; y < TEX; y += 8) {
+                tasks.push(buildGroundTexRows.bind(null, tex, y, y + 8));
+            }
+            tasks.push(function () { finishGroundTextures(tex); });
+            tasks.push(function () { decalAtlas = buildDecalAtlas(); });
+            Object.keys(bushVariants).forEach(function (key) {
+                bushVariants[key].forEach(function (v) {
+                    tasks.push(function () { paintBushSprite(v.canvas, mulberry32(v.seed), v.size, BUSH_PALETTES[v.palette]); });
+                });
+            });
+            tasks.push(function () { fogSprites = [buildFogSprite(301), buildFogSprite(577), buildFogSprite(911)]; });
+            tasks.push(function () {
+                THEME.ground.forEach(function (layer, i) {
+                    groundLayers[i] = { pal: PAL_FLAT[layer.palette], tex: tex[layer.texture], h: layer.h };
+                    groundHeights[i] = layer.h;
+                });
+                groundTex = tex;
+            });
+            return tasks;
+        }
+
+        // Partida iniciada antes da geração terminar: conclui o que falta de uma vez.
+        function finishInitTasks() {
+            while (initTasks.length) initTasks.shift()();
+        }
+
+        function initProceduralScenery() {
+            buildPondShapes();
+            bushVariants = createBushVariants();
+            lightSprite = buildLightSprite();
+            vignetteSprite = buildVignetteSprite();
+            initTasks = buildInitTasks();
+            staticSignature = '';
+            refreshStaticScenery();
+        }
+
+        // ---------- Vegetação (gerada uma vez, determinística) ----------
+        function generateFlora() {
+            flora.length = 0;
+            groves.length = 0;
+            const rng = mulberry32(20260926);
+            const F = THEME.flora;
+            const CELL = 16, GW = Math.ceil(WORLD_W / CELL), GH = Math.ceil(WORLD_H / CELL);
+            const occ = new Uint8Array(GW * GH);
+            function cells(x, y, r, fn) {
+                const c0 = Math.max(0, Math.floor((x - r) / CELL)), c1 = Math.min(GW - 1, Math.floor((x + r) / CELL));
+                const r0 = Math.max(0, Math.floor((y - r) / CELL)), r1 = Math.min(GH - 1, Math.floor((y + r) / CELL));
+                for (let cy = r0; cy <= r1; cy++) {
+                    for (let cx = c0; cx <= c1; cx++) {
+                        const dx = (cx + 0.5) * CELL - x, dy = (cy + 0.5) * CELL - y;
+                        if (dx * dx + dy * dy <= (r + CELL * 0.5) * (r + CELL * 0.5) && fn(cy * GW + cx)) return true;
+                    }
+                }
+                return false;
+            }
+            function mark(x, y, r) { cells(x, y, r, function (i) { occ[i] = 1; return false; }); }
+            function free(x, y, r) {
+                if (x < 60 || y < 60 || x > WORLD_W - 60 || y > WORLD_H - 60) return false;
+                if (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < SPAWN_CLEAR_RADIUS + r) return false;
+                return !cells(x, y, r, function (i) { return occ[i] === 1; });
+            }
+            for (const o of scenery) {
+                if (!o.isGroundCrack) mark(o.x, o.y, Math.max(o.w, o.h) * 0.5 + 8);
+            }
+            PONDS.forEach(function (p) { mark(p.x, p.y, p.radius * 1.2 + 6); });
+
+            // kind = chave de FLORA_SPRITES ou 'bush:<paleta>' (arbusto procedural)
+            function addFlora(kind, x, y, maxSize) {
+                if (kind.indexOf('bush:') === 0) {
+                    const palette = kind.slice(5);
+                    const v = bushVariants[palette][(rng() * (maxSize || 6)) | 0];
+                    if (!free(x, y, v.r)) return false;
+                    flora.push({ canvas: v.canvas, w: v.canvas.width, h: v.canvas.height, x: Math.round(x), y: Math.round(y), flora: 'bush_' + palette });
+                    mark(x, y, v.r);
+                    return true;
+                }
+                const s = FLORA_SPRITES[kind];
+                if (!free(x, y, s.r)) return false;
+                flora.push({ file: OBJ_DIR + s.file, w: s.w, h: s.h, x: Math.round(x), y: Math.round(y), flora: kind });
+                mark(x, y, s.r);
+                return true;
+            }
+            function around(cx, cy, minR, maxR) {
+                const a = rng() * TWO_PI, d = minR + rng() * (maxR - minR);
+                return [cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.8];
+            }
+
+            // 1. Bosques: árvores agrupadas, sub-bosque e tocos/pedras
+            for (let i = 0; i < F.groves; i++) {
+                const gx = 220 + rng() * (WORLD_W - 440), gy = 220 + rng() * (WORLD_H - 440);
+                if (!free(gx, gy, 40)) continue;
+                groves.push({ x: gx, y: gy, r: 190 });
+                const trees = 2 + ((rng() * 4) | 0);
+                for (let k = 0, placed = 0; k < trees * 4 && placed < trees; k++) {
+                    const p = around(gx, gy, 0, 95);
+                    if (addFlora(pickWeighted(rng, F.groveTrees), p[0], p[1])) placed++;
+                }
+                let bushes = 4 + ((rng() * 6) | 0);
+                for (let k = 0; k < 30 && bushes > 0; k++) {
+                    const p = around(gx, gy, 35, 150);
+                    if (addFlora(pickWeighted(rng, F.groveBushes), p[0], p[1])) bushes--;
+                }
+                if (rng() < 0.7) {
+                    const p = around(gx, gy, 60, 140);
+                    addFlora(pickWeighted(rng, F.groveExtras), p[0], p[1]);
+                }
+            }
+            // 2. Entorno do spawn: a primeira tela da partida não fica vazia
+            for (let k = 0, placed = 0; k < 120 && placed < 16; k++) {
+                const a = rng() * TWO_PI, d = 190 + rng() * 280;
+                if (addFlora(pickWeighted(rng, F.spawn), WORLD_W / 2 + Math.cos(a) * d, WORLD_H / 2 + Math.sin(a) * d * 0.7, 4)) placed++;
+            }
+            // 3. Margens dos lagos (oásis no deserto)
+            PONDS.forEach(function (pond) {
+                let n = 7 + ((rng() * 5) | 0);
+                for (let k = 0; k < 36 && n > 0; k++) {
+                    const a = rng() * TWO_PI, d = pond.radius * (1.3 + rng() * 0.35);
+                    if (addFlora(pickWeighted(rng, F.pond), pond.x + Math.cos(a) * d, pond.y + Math.sin(a) * d, 5)) n--;
+                }
+            });
+            // 4. Dispersos pelo campo
+            for (const entry of F.scattered) {
+                for (let k = 0; k < entry[1]; k++) {
+                    addFlora(entry[0], 80 + rng() * (WORLD_W - 160), 80 + rng() * (WORLD_H - 160));
+                }
+            }
+        }
+
+        // Recalcula clareiras, vegetação e o índice por chunk quando o cenário muda.
+        // generateScenery() é determinística: a cada nova partida o cache de chunks é mantido.
+        function refreshStaticScenery() {
+            if (!bushVariants) return;   // initProceduralScenery ainda não rodou (ela chama de novo)
+            let sig = scenery.length;
+            for (const o of scenery) sig = (sig * 31 + Math.round(o.x) * 7 + Math.round(o.y)) | 0;
+            const signature = String(sig);
+            if (signature === staticSignature) {
+                indexStaticScenery();
+                return;
+            }
+            staticSignature = signature;
+            clearings.length = 0;
+            for (const o of scenery) {
+                if (o.file) continue;
+                if (o.isGroundCrack) clearings.push({ x: o.x, y: o.y, r: 30, s: 0.35 });
+                else clearings.push({ x: o.x, y: o.y, r: 58, s: 0.3 });
+            }
+            PONDS.forEach(function (p) { clearings.push({ x: p.x, y: p.y, r: p.radius * 1.9, s: -0.45 }); });
+            generateFlora();
+            indexStaticScenery();
+            decalCache.clear();
+            flushChunkCache();
+        }
+
+        function indexStaticScenery() {
+            staticBuckets.clear();
+            const list = scenery.concat(flora).sort(compareSceneryDepth);
+            for (const o of list) {
+                const c0 = Math.floor((o.x - o.w / 2 - 2) / CHUNK), c1 = Math.floor((o.x + o.w / 2 + 2) / CHUNK);
+                const r0 = Math.floor((o.y - o.h / 2 - 2) / CHUNK), r1 = Math.floor((o.y + o.h / 2 + 10) / CHUNK);
+                for (let cy = r0; cy <= r1; cy++) {
+                    for (let cx = c0; cx <= c1; cx++) {
+                        const key = chunkKey(cx, cy);
+                        let bucket = staticBuckets.get(key);
+                        if (!bucket) staticBuckets.set(key, bucket = []);
+                        bucket.push(o);
+                    }
+                }
+            }
+            animatedScenery = scenery.filter(function (o) { return o.isFire; });
+        }
+
+        // ---------- Chunks ----------
+        function chunkKey(cx, cy) {
+            return (cy + 16) * 256 + (cx + 16);
+        }
+
+        function flushChunkCache() {
+            chunkCache.forEach(function (ch) { chunkPool.push(ch); });
+            chunkCache.clear();
+            cancelBakeJob();
+        }
+
+        function chunkDecals(cx, cy) {
+            const key = chunkKey(cx, cy);
+            let list = decalCache.get(key);
+            if (list) return list;
+            list = [];
+            const ox = cx * CHUNK, oy = cy * CHUNK;
+            const rng = mulberry32(Math.floor(hash2(cx, cy, 977) * 4294967296));
+            const near = clearingsNear(ox, oy, CHUNK);
+            const K = decalAtlas.kinds;
+            for (let i = 0; i < DECALS_PER_CHUNK; i++) {
+                const x = ox + rng() * CHUNK, y = oy + rng() * CHUNK;
+                const roll = rng();
+                const pd = pondDistance(x, y);
+                let kind = null;
+                if (pd < 0.93) {
+                    if (roll < 0.05) kind = 'lily';
+                } else if (pd < 1.0) {
+                    kind = null;
+                } else if (pd < 1.32) {
+                    kind = roll < 0.55 ? 'reed' : (roll < 0.68 ? 'pebble' : (roll < 0.8 ? 'tuft' : null));
+                } else {
+                    const g = groundAt(x, y, near);
+                    let inGrove = false;
+                    for (const gr of groves) {
+                        const dx = x - gr.x, dy = y - gr.y;
+                        if (dx * dx + dy * dy < gr.r * gr.r) { inGrove = true; break; }
+                    }
+                    if (g.edge && THEME.edgeTufts[g.cls] && roll < 0.7) {
+                        kind = 'tuft';   // a grama transborda sobre a borda vizinha
+                    } else if (inGrove && roll < 0.3) {
+                        kind = pickWeighted(rng, THEME.grove);
+                    } else if (THEME.meadows[g.cls] && roll < 0.55 && fbm(x / 220, y / 220, 2, 0, 151) > 0.6) {
+                        // Flores em canteiros, cada canteiro de uma cor (com algumas de outra)
+                        const hue = fbm(x / 480, y / 480, 2, 0, 167) + (rng() - 0.5) * 0.12;
+                        kind = FLOWER_KINDS[hue < 0.45 ? 0 : (hue < 0.56 ? 1 : 2)];
+                    } else {
+                        kind = pickWeighted(rng, THEME.decals[g.cls]);
+                    }
+                }
+                if (!kind) continue;
+                const variants = K[kind];
+                list.push({ d: variants[(rng() * variants.length) | 0], x: Math.round(x), y: Math.round(y) });
+            }
+            decalCache.set(key, list);
+            return list;
+        }
+
+        function drawSceneryShadow(g, o, sx, sy) {
+            const p = o.prefab;
+            if (!p || p.isGroundFlat) return;   // sprites do pack e arbustos já trazem sombra
+            g.fillStyle = 'rgba(8, 6, 10, 0.3)';
+            g.beginPath();
+            g.ellipse(sx + 1, sy + p.h / 2 - 1, (p.shadowW || p.w) * 0.5 + 1, Math.max(3, p.shadowH || 4), 0, 0, TWO_PI);
+            g.fill();
+        }
+
+        function drawSceneryObject(g, o, sx, sy, time) {
+            if (o.prefab && o.prefab.tiles) {
+                const p = o.prefab;
+                const originX = Math.round(sx - p.w / 2);
+                const originY = Math.round(sy - p.h / 2);
+                for (const t of p.tiles) {
+                    const img = images[ASSETS[t.asset]];
+                    if (!img || !img.complete || !img.naturalWidth) continue;
+                    let srcX = t.sx;
+                    let srcY = t.sy;
+                    if (p.isFire) {
+                        if (p.fireType === 'fire1') {
+                            const frame = Math.floor(time * 8) % 6;
+                            srcX = (t.col % 11) * 16;
+                            srcY = (t.row + frame * 3) * 16;
+                        } else if (p.fireType === 'fire2') {
+                            const frame = Math.floor(time * 8) % 3;
+                            srcX = (t.col % 6) * 16;
+                            srcY = (t.row + frame * 4) * 16;
+                        }
+                    }
+                    g.drawImage(img, srcX, srcY, 16, 16, originX + t.dx, originY + t.dy, 16, 16);
+                }
+            } else if (o.canvas) {
+                g.drawImage(o.canvas, Math.round(sx - o.w / 2), Math.round(sy - o.h / 2));
+            } else if (o.file) {
+                const img = images[o.file];
+                if (img && img.complete && img.naturalWidth) {
+                    g.drawImage(processedSprite(img, o.file), sx - o.w / 2, sy - o.h / 2, o.w, o.h);
+                }
+            }
+        }
+
+        // Cópia do sprite do pack ajustada ao tema, criada uma vez por arquivo: o "chão" da
+        // base vira a cor do solo (levemente sombreada) e as pedras escurecem para a noite.
+        function processedSprite(img, key) {
+            let c = spriteCache.get(key);
+            if (c) return c;
+            c = createCanvas(img.naturalWidth, img.naturalHeight);
+            const g = c.getContext('2d', { willReadFrequently: true });
+            g.drawImage(img, 0, 0);
+            try {
+                const data = g.getImageData(0, 0, c.width, c.height);
+                const d = data.data;
+                const pal = GROUND_PALETTES[THEME.ground[0].palette];
+                for (let i = 0; i < d.length; i += 4) {
+                    if (!d[i + 3]) continue;
+                    for (let k = 0; k < 4; k++) {
+                        const s = PACK_GROUND_COLORS[k];
+                        if (d[i] !== s[0] || d[i + 1] !== s[1] || d[i + 2] !== s[2]) continue;
+                        const t = pal[PACK_GROUND_TONES[k]];
+                        d[i] = t[0] * 0.9; d[i + 1] = t[1] * 0.9; d[i + 2] = t[2] * 0.9;
+                        break;
+                    }
+                }
+                g.putImageData(data, 0, 0);
+            } catch (e) {
+                // file://: o canvas fica "tainted" e não pode ser lido — mantém a cor original
+            }
+            if (DARKENED_SPRITE.test(key)) {
+                g.globalCompositeOperation = 'source-atop';
+                g.fillStyle = THEME.rockTint;
+                g.fillRect(0, 0, c.width, c.height);
+            }
+            spriteCache.set(key, c);
+            return c;
+        }
+
+        // ---------- Bake fatiado ----------
+        // Cada etapa processa fatias (faixas de linhas, vizinhos, composição) de custo pequeno.
+        // O custo de cada etapa é estimado (média móvel) e uma fatia só começa se couber no
+        // orçamento do frame; os buffers (grades, classBuf, bakeImage) são do bake em andamento.
+        function sliceRange(total, i, n) {
+            return [Math.floor(i * total / n), Math.floor((i + 1) * total / n)];
+        }
+
+        // Etapa 1: grades grossas (bioma, tom, mistura de texturas e umidade) com 1 célula
+        // de borda, para as máscaras serem contínuas entre chunks vizinhos.
+        function bakeCoarseSlice(job, i, n) {
+            const r = sliceRange(COARSE_N, i, n);
+            const ox = job.cx * CHUNK, oy = job.cy * CHUNK;
+            if (i === 0) {
+                job.near = clearingsNear(ox, oy, CHUNK);
+                job.oasis = false;
+            }
+            for (let j = r[0]; j < r[1]; j++) {
+                for (let k = 0; k < COARSE_N; k++) {
+                    const wx = ox + (k - 1) * COARSE, wy = oy + (j - 1) * COARSE;
+                    const idx = j * COARSE_N + k;
+                    coarseBiome[idx] = biomeAt(wx, wy, job.near);
+                    coarseTone[idx] = fbm(wx / 300, wy / 300, 2, 0, 131);
+                    coarseMix[idx] = valueNoise(wx / 170, wy / 170, 0, 173);
+                    if (THEME.oasis) {
+                        const w = wetAt(wx, wy);
+                        coarseWet[idx] = w;
+                        if (w * OASIS_CONTRAST + OASIS_DETAIL * 0.5 > 0) job.oasis = true;
+                    }
+                }
+            }
+        }
+
+        // Etapa 2: classe do solo por pixel (0 principal, 1 mancha, 2 oásis), com 1px de borda.
+        function bakeClassSlice(job, i, n) {
+            const r = sliceRange(CLS_W, i, n);
+            const ox = job.cx * CHUNK, oy = job.cy * CHUNK;
+            const detail = groundTex.detail;
+            const oasis = job.oasis;
+            for (let row = r[0]; row < r[1]; row++) {
+                const y = row - 1;
+                const cy = y + COARSE, gy = cy >> 3, fy = (cy & 7) * 0.125;
+                const trow = ((oy + y) & TEX_MASK) * TEX, wrow = ((oy + y + 128) & TEX_MASK) * TEX;
+                let c = row * CLS_W;
+                for (let x = -1; x <= CHUNK; x++, c++) {
+                    const cx = x + COARSE, fx = (cx & 7) * 0.125;
+                    const i00 = gy * COARSE_N + (cx >> 3), i10 = i00 + COARSE_N;
+                    if (oasis) {
+                        const w0 = coarseWet[i00] + (coarseWet[i00 + 1] - coarseWet[i00]) * fx;
+                        const w1 = coarseWet[i10] + (coarseWet[i10 + 1] - coarseWet[i10]) * fx;
+                        if ((w0 + (w1 - w0) * fy) * OASIS_CONTRAST + (detail[wrow + ((ox + x + 128) & TEX_MASK)] - 0.5) * OASIS_DETAIL > 0) {
+                            classBuf[c] = 2;
+                            continue;
+                        }
+                    }
+                    const b0 = coarseBiome[i00] + (coarseBiome[i00 + 1] - coarseBiome[i00]) * fx;
+                    const b1 = coarseBiome[i10] + (coarseBiome[i10 + 1] - coarseBiome[i10]) * fx;
+                    const v = (b0 + (b1 - b0) * fy - THEME.patchThreshold) * BIOME_CONTRAST + (detail[trow + ((ox + x) & TEX_MASK)] - 0.5) * DETAIL_AMP;
+                    classBuf[c] = v > 0 ? 1 : 0;
+                }
+            }
+        }
+
+        // Etapa 3: cor. Luz do alto — nas bordas, a classe mais baixa ganha sombra logo abaixo
+        // da mais alta, e a mais alta ganha uma aresta clara onde a vizinha de cima é mais baixa.
+        function bakeColorSlice(job, i, n) {
+            const r = sliceRange(CHUNK, i, n);
+            const ox = job.cx * CHUNK, oy = job.cy * CHUNK;
+            const data = bakeImage.data;
+            const rand = groundTex.rand;
+            const H = groundHeights;
+            let o = r[0] * CHUNK * 4;
+            for (let y = r[0]; y < r[1]; y++) {
+                const cy = y + COARSE, gy = cy >> 3, fy = (cy & 7) * 0.125;
+                const wy = oy + y;
+                const rowA = (wy & TEX_MASK) * TEX;
+                const rowB = ((wy + 131) & TEX_MASK) * TEX;           // 2ª amostragem: espelhada e deslocada
+                const rowR = ((wy + 97) & TEX_MASK) * TEX;
+                let c = (y + 1) * CLS_W + 1;
+                for (let x = 0; x < CHUNK; x++, c++, o += 4) {
+                    const wx = ox + x;
+                    const cls = classBuf[c];
+                    const layer = groundLayers[cls];
+                    const h = layer.h;
+                    const hu = H[classBuf[c - CLS_W]], hd = H[classBuf[c + CLS_W]];
+                    const cx = x + COARSE, fx = (cx & 7) * 0.125;
+                    const i00 = gy * COARSE_N + (cx >> 3), i10 = i00 + COARSE_N;
+                    let k;
+                    if (hu > h) k = 0;
+                    else if (hd > h || H[classBuf[c - 1]] > h || H[classBuf[c + 1]] > h) k = 1;
+                    else if (hu < h) k = 4;
+                    else if (hd < h) k = 1;
+                    else {
+                        // Mistura estocástica de duas amostragens da textura, guiada por um ruído
+                        // de baixa frequência: quebra a repetição a cada 256px sem criar emendas
+                        const m0 = coarseMix[i00] + (coarseMix[i00 + 1] - coarseMix[i00]) * fx;
+                        const m1 = coarseMix[i10] + (coarseMix[i10 + 1] - coarseMix[i10]) * fx;
+                        const useB = rand[rowR + ((wx + 31) & TEX_MASK)] < ((m0 + (m1 - m0) * fy) - 0.35) * 3.3;
+                        k = layer.tex[useB ? rowB + ((73 - wx) & TEX_MASK) : rowA + (wx & TEX_MASK)];
+                    }
+                    // Tom contínuo em larga escala (~±10%)
+                    const t0 = coarseTone[i00] + (coarseTone[i00 + 1] - coarseTone[i00]) * fx;
+                    const t1 = coarseTone[i10] + (coarseTone[i10 + 1] - coarseTone[i10]) * fx;
+                    const m = 0.8 + (t0 + (t1 - t0) * fy) * 0.4;
+                    const p = layer.pal;
+                    k *= 3;
+                    data[o] = p[k] * m;
+                    data[o + 1] = p[k + 1] * m;
+                    data[o + 2] = p[k + 2] * m;
+                    data[o + 3] = 255;
+                }
+            }
+        }
+
+        // Etapa 4: lagos (água, espuma e lama) sobre o solo já pintado.
+        function bakePondSlice(job, i, n) {
+            const r = sliceRange(CHUNK, i, n);
+            const ox = job.cx * CHUNK, oy = job.cy * CHUNK;
+            const data = bakeImage.data;
+            const pw = PAL_FLAT.water, pm = PAL_FLAT.mud;
+            for (let p = 0; p < PONDS.length; p++) {
+                const pond = PONDS[p];
+                const shape = pondShapes[p];
+                const outer = pond.radius * 1.15 * 1.14;
+                const x0 = Math.max(0, Math.floor(pond.x - outer - ox)), x1 = Math.min(CHUNK, Math.ceil(pond.x + outer - ox));
+                const y0 = Math.max(r[0], Math.floor(pond.y - outer - oy)), y1 = Math.min(r[1], Math.ceil(pond.y + outer - oy));
+                for (let y = y0; y < y1; y++) {
+                    const wy = oy + y, dy = wy - pond.y;
+                    for (let x = x0; x < x1; x++) {
+                        const wx = ox + x, dx = wx - pond.x;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 > outer * outer) continue;
+                        const a = ((Math.atan2(dy, dx) / TWO_PI + 1) * 256) & 255;
+                        const dn = Math.sqrt(d2) / (pond.radius * shape[a]);
+                        const dth = ditherAt(wx, wy);
+                        let pal = null, k = 0;
+                        if (dn < 1) {
+                            pal = pw;
+                            k = Math.max(0, 3 - Math.floor((1 - dn) * 7 + dth));        // raso (3) → fundo (0)
+                            if (dn > 0.955 && hash2(wx, wy, 23) > 0.45 && hash2(wx >> 1, wy >> 1, 29) > 0.35) {
+                                k = hash2(wx, wy, 31) > 0.75 ? 5 : 4;                  // espuma irregular na margem
+                            } else if (k <= 2) {
+                                // Ondulações: traços curtos em células 8×4, com linha e início sorteados
+                                const hc = hash2(wx >> 3, wy >> 2, 17);
+                                if (hc > 0.7 && (wy & 3) === ((hc * 40) & 3)) {
+                                    const lx = (wx & 7) - ((hc * 400) & 3);
+                                    if (lx >= 0 && lx < 3 + ((hc * 1000) & 1)) k = 4;
+                                }
+                            }
+                        } else if (dn < 1.07) {
+                            pal = pm;
+                            k = Math.min(2, Math.floor((dn - 1) / 0.07 * 2 + dth));    // lama molhada
+                        } else if (dn < 1.14 && hash2(wx, wy, 37) > (dn - 1.07) / 0.07) {
+                            pal = pm;
+                            k = 2;                                                     // transição pontilhada
+                        }
+                        if (!pal) continue;
+                        const o = (y * CHUNK + x) * 4;
+                        k *= 3;
+                        data[o] = pal[k];
+                        data[o + 1] = pal[k + 1];
+                        data[o + 2] = pal[k + 2];
+                    }
+                }
+            }
+        }
+
+        // Etapa 5: listas de decalques dos 3×3 vizinhos (uma por fatia; ficam em cache).
+        function bakeDecalSlice(job, i) {
+            chunkDecals(job.cx - 1 + (i % 3), job.cy - 1 + Math.floor(i / 3));
+        }
+
+        // Etapa 6: canvas do chunk (reciclado), pixels e decalques — incluindo os dos vizinhos
+        // que invadem a borda, em ordem de Y global: sem emendas.
+        function composeGroundSlice(job) {
+            const key = chunkKey(job.cx, job.cy);
+            while (chunkCache.size >= CHUNK_CACHE_MAX) {
+                let oldestKey = -1, oldest = Infinity;
+                chunkCache.forEach(function (ch, k) {
+                    if (k !== key && ch.used < oldest) { oldest = ch.used; oldestKey = k; }
+                });
+                chunkPool.push(chunkCache.get(oldestKey));
+                chunkCache.delete(oldestKey);
+            }
+            let ch = chunkPool.pop();
+            if (!ch) {
+                const canvas = createCanvas(CHUNK, CHUNK);
+                const g = canvas.getContext('2d');
+                g.imageSmoothingEnabled = false;
+                ch = { canvas: canvas, g: g, used: 0, stale: false };
+                chunkStats.allocated++;
+            }
+            job.ch = ch;
+            const g = ch.g;
+            const ox = job.cx * CHUNK, oy = job.cy * CHUNK;
+            g.putImageData(bakeImage, 0, 0);
+            const decals = [];
+            for (let ny = job.cy - 1; ny <= job.cy + 1; ny++) {
+                for (let nx = job.cx - 1; nx <= job.cx + 1; nx++) {
+                    for (const d of chunkDecals(nx, ny)) {
+                        if (d.x + 8 > ox && d.x - 8 < ox + CHUNK && d.y + 1 > oy && d.y - 15 < oy + CHUNK) decals.push(d);
+                    }
+                }
+            }
+            decals.sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+            const atlas = decalAtlas.canvas;
+            for (const d of decals) g.drawImage(atlas, d.d.sx, d.d.sy, 16, 16, d.x - 8 - ox, d.y - 15 - oy, 16, 16);
+        }
+
+        // Etapa 7: sombras, props estáticos e vegetação (o fogo só deixa a sombra; é animado
+        // por frame). O chunk entra no cache substituindo a versão obsoleta, se houver.
+        function composePropsSlice(job) {
+            const ch = job.ch;
+            const g = ch.g;
+            const ox = job.cx * CHUNK, oy = job.cy * CHUNK;
+            const key = chunkKey(job.cx, job.cy);
+            const bucket = staticBuckets.get(key);
+            if (bucket) {
+                for (const o of bucket) drawSceneryShadow(g, o, Math.round(o.x) - ox, Math.round(o.y) - oy);
+                for (const o of bucket) {
+                    if (!o.isFire) drawSceneryObject(g, o, Math.round(o.x) - ox, Math.round(o.y) - oy, 0);
+                }
+            }
+            const old = chunkCache.get(key);
+            if (old) chunkPool.push(old);
+            ch.used = chunkFrame;
+            ch.stale = !assetsReady;   // assado sem os sprites: reassar quando carregarem
+            chunkCache.set(key, ch);
+            job.ch = null;
+        }
+
+        const BAKE_STEPS = [
+            { slices: 5, run: bakeCoarseSlice, est: 0.5 },
+            { slices: 6, run: bakeClassSlice, est: 0.5 },
+            { slices: 8, run: bakeColorSlice, est: 0.5 },
+            { slices: 4, run: bakePondSlice, est: 0.2 },
+            { slices: 9, run: bakeDecalSlice, est: 0.2 },
+            { slices: 1, run: composeGroundSlice, est: 0.5 },
+            { slices: 1, run: composePropsSlice, est: 0.3 }
+        ];
+        let bakeJob = null;   // { cx, cy, step, slice, ms, near, oasis, ch }
+
+        function newBakeJob(cx, cy) {
+            return { cx: cx, cy: cy, step: 0, slice: 0, ms: 0, near: null, oasis: false, ch: null };
+        }
+
+        function cancelBakeJob() {
+            if (bakeJob && bakeJob.ch) chunkPool.push(bakeJob.ch);
+            bakeJob = null;
+        }
+
+        // Executa uma fatia; devolve true quando o chunk fica pronto.
+        function runBakeSlice(job) {
+            const step = BAKE_STEPS[job.step];
+            const t0 = performance.now();
+            step.run(job, job.slice, step.slices);
+            const ms = performance.now() - t0;
+            step.est += (ms - step.est) * 0.2;
+            job.ms += ms;
+            if (ms > chunkStats.maxSliceMs) chunkStats.maxSliceMs = ms;
+            if (++job.slice >= step.slices) {
+                job.slice = 0;
+                job.step++;
+            }
+            if (job.step < BAKE_STEPS.length) return false;
+            chunkStats.baked++;
+            chunkStats.lastBakeMs = job.ms;
+            if (job.ms > chunkStats.maxBakeMs) chunkStats.maxBakeMs = job.ms;
+            return true;
+        }
+
+        // Assa um chunk inteiro agora (visível e ausente durante o jogo). Reaproveita o bake
+        // fatiado se for o mesmo chunk; senão o descarta, pois os buffers serão sobrescritos.
+        function bakeChunkNow(cx, cy) {
+            let job = bakeJob;
+            if (!job || job.cx !== cx || job.cy !== cy) {
+                cancelBakeJob();
+                job = newBakeJob(cx, cy);
+            }
+            bakeJob = null;
+            while (!runBakeSlice(job)) { /* fatias restantes */ }
+            return chunkCache.get(chunkKey(cx, cy));
+        }
+
+        // Próximo chunk a assar: o ausente mais perto do alvo e, só depois, os obsoletos.
+        // No menu/game over (overlay opaco) o alvo é a área de spawn da próxima partida;
+        // durante o jogo, o anel ao redor da câmera.
+        function nextChunkToBake(camX, camY) {
+            let x0, y0, x1, y1, fx, fy;
+            if (game.status === 'menu' || game.status === 'gameover') {
+                x0 = WORLD_W / 2 - VIEW_W / 2; y0 = WORLD_H / 2 - VIEW_H / 2;
+                x1 = x0 + VIEW_W; y1 = y0 + VIEW_H;
+                fx = WORLD_W / 2; fy = WORLD_H / 2;
+            } else {
+                const m = CHUNK_PREFETCH_MARGIN;
+                x0 = camX - m; y0 = camY - m; x1 = camX + VIEW_W + m; y1 = camY + VIEW_H + m;
+                fx = camX + VIEW_W / 2; fy = camY + VIEW_H / 2;
+            }
+            // nunca além da borda do mundo (+16px da margem do screen shake)
+            const c0 = Math.floor(Math.max(x0, -16) / CHUNK), c1 = Math.floor(Math.min(x1, WORLD_W + 16) / CHUNK);
+            const r0 = Math.floor(Math.max(y0, -16) / CHUNK), r1 = Math.floor(Math.min(y1, WORLD_H + 16) / CHUNK);
+            let best = null, bestScore = Infinity;
+            for (let cy = r0; cy <= r1; cy++) {
+                for (let cx = c0; cx <= c1; cx++) {
+                    const ch = chunkCache.get(chunkKey(cx, cy));
+                    if (ch && !ch.stale) continue;
+                    const dx = (cx + 0.5) * CHUNK - fx, dy = (cy + 0.5) * CHUNK - fy;
+                    const score = dx * dx + dy * dy + (ch ? 1e9 : 0);
+                    if (score < bestScore) { bestScore = score; best = [cx, cy]; }
+                }
+            }
+            return best;
+        }
+
+        // Trabalho de cenário do frame, dentro do orçamento: primeiro a geração inicial,
+        // depois o bake fatiado. Sempre avança ao menos uma fatia.
+        function runSceneryWork(camX, camY) {
+            const t0 = performance.now();
+            const budget = game.status === 'playing' ? WORK_BUDGET_MS : WORK_BUDGET_OVERLAY_MS;
+            let ran = false;
+            while (initTasks.length) {
+                if (ran && performance.now() - t0 > budget) return;
+                initTasks.shift()();
+                ran = true;
+            }
+            for (;;) {
+                if (!bakeJob) {
+                    const next = nextChunkToBake(camX, camY);
+                    if (!next) return;
+                    bakeJob = newBakeJob(next[0], next[1]);
+                }
+                if (ran && performance.now() - t0 + BAKE_STEPS[bakeJob.step].est > budget) return;
+                if (runBakeSlice(bakeJob)) bakeJob = null;
+                ran = true;
+            }
         }
 
         function initEnemyPool() {
@@ -3825,67 +5200,42 @@
             updateHud();
         }
 
-        function makeTilePattern(src, tx, ty) {
-            const img = images[src];
-            if (!img || !img.complete || !img.naturalWidth) return null;
-            const c = document.createElement('canvas');
-            c.width = 16;
-            c.height = 16;
-            const cctx = c.getContext('2d');
-            cctx.imageSmoothingEnabled = false;
-            cctx.drawImage(img, tx * 16, ty * 16, 16, 16, 0, 0, 16, 16);
-            return ctx.createPattern(c, 'repeat');
-        }
-
-        function makeDesertTilePattern() {
-            const img = images[ASSETS.dungeonWallsFloor];
-            const c = document.createElement('canvas');
-            c.width = 64;
-            c.height = 64;
-            const cctx = c.getContext('2d');
-            cctx.imageSmoothingEnabled = false;
-
-            // Fundo base arenoso
-            cctx.fillStyle = '#6e4d2a';
-            cctx.fillRect(0, 0, 64, 64);
-
-            if (img && img.complete && img.naturalWidth) {
-                // Ladrilho 4x4 com coordenadas exatas de chão do walls_floor.png
-                // Tile principal: col 2, row 8 (32, 128)
-                // Tile variação 1: col 3, row 8 (48, 128)
-                // Tile variação 2: col 2, row 9 (32, 144)
-                // Tile variação 3: col 3, row 9 (48, 144)
-                const floorCoords = [
-                    { sx: 32, sy: 128 },
-                    { sx: 48, sy: 128 },
-                    { sx: 32, sy: 144 },
-                    { sx: 48, sy: 144 }
-                ];
-                for (let x = 0; x < 4; x++) {
-                    for (let y = 0; y < 4; y++) {
-                        const tile = floorCoords[(x * 3 + y * 7) % floorCoords.length];
-                        cctx.drawImage(img, tile.sx, tile.sy, 16, 16, x * 16, y * 16, 16, 16);
+        function drawGround() {
+            // Sprites carregados depois dos primeiros chunks: continuam na tela e são
+            // reassados aos poucos (sem flush, sem quadrados vazios)
+            if (assetsReady && !chunksHaveAssets) {
+                chunksHaveAssets = true;
+                chunkCache.forEach(function (ch) { ch.stale = true; });
+            }
+            chunkFrame++;
+            const playing = game.status === 'playing';
+            // Partida iniciada antes da geração inicial terminar (clique logo após carregar)
+            if (playing && initTasks.length) finishInitTasks();
+            const camX = Math.round(camera.x), camY = Math.round(camera.y);
+            // margem de 16px cobre o deslocamento do screen shake
+            const c0 = Math.floor((camX - 16) / CHUNK), c1 = Math.floor((camX + VIEW_W + 16) / CHUNK);
+            const r0 = Math.floor((camY - 16) / CHUNK), r1 = Math.floor((camY + VIEW_H + 16) / CHUNK);
+            // Menu, game over e popups cobrem a tela com overlay opaco: nada é assado às pressas
+            // (o trabalho em fatias cuida); em jogo, um chunk visível ausente é assado na hora.
+            let synced = false;
+            for (let cy = r0; cy <= r1; cy++) {
+                for (let cx = c0; cx <= c1; cx++) {
+                    let ch = chunkCache.get(chunkKey(cx, cy));
+                    if (!ch && playing) {
+                        ch = bakeChunkNow(cx, cy);
+                        synced = true;
+                    }
+                    if (ch) {
+                        ch.used = chunkFrame;
+                        ctx.drawImage(ch.canvas, cx * CHUNK - camX, cy * CHUNK - camY);
+                    } else {
+                        ctx.fillStyle = GROUND_FALLBACK;
+                        ctx.fillRect(cx * CHUNK - camX, cy * CHUNK - camY, CHUNK, CHUNK);
+                        if (playing) chunkStats.fallbackDraws++;
                     }
                 }
             }
-            // Sutil tonalização de areia e dunas desérticas
-            cctx.fillStyle = 'rgba(205, 155, 85, 0.22)';
-            cctx.fillRect(0, 0, 32, 32);
-            cctx.fillRect(32, 32, 32, 32);
-            cctx.fillStyle = 'rgba(75, 45, 18, 0.16)';
-            cctx.fillRect(0, 32, 32, 32);
-            cctx.fillRect(32, 0, 32, 32);
-
-            return ctx.createPattern(c, 'repeat');
-        }
-
-        function drawGround() {
-            if (!groundPattern) groundPattern = makeDesertTilePattern();
-            ctx.fillStyle = groundPattern || '#5c3e21';
-            ctx.save();
-            ctx.translate(-camera.x, -camera.y);
-            ctx.fillRect(camera.x - 20, camera.y - 20, VIEW_W + 40, VIEW_H + 40);
-            ctx.restore();
+            if (!synced) runSceneryWork(camX, camY);
             drawBoundary();
         }
 
@@ -3899,80 +5249,68 @@
             ctx.shadowBlur = 0;
         }
 
+        // Os lagos são assados nos chunks; aqui só cintilam alguns reflexos na superfície.
         function drawWater() {
-            if (!waterPattern) waterPattern = makeTilePattern(ASSETS.water, 24, 14);
-            if (!waterPattern) return;
-            ctx.fillStyle = waterPattern;
-            ctx.save();
-            ctx.translate(-camera.x, -camera.y);
-            for (const pond of PONDS) {
-                ctx.beginPath();
-                ctx.arc(pond.x, pond.y, pond.radius, 0, TWO_PI);
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(30, 60, 90, 0.55)';
-                ctx.lineWidth = 3;
-                ctx.stroke();
+            const time = game.time;
+            ctx.fillStyle = '#c4dee2';
+            for (let p = 0; p < PONDS.length; p++) {
+                const pond = PONDS[p];
+                const sx = pond.x - camera.x, sy = pond.y - camera.y;
+                if (sx + pond.radius < 0 || sx - pond.radius > VIEW_W || sy + pond.radius < 0 || sy - pond.radius > VIEW_H) continue;
+                for (let i = 0; i < 14; i++) {
+                    const s = Math.sin(time * (1.1 + hash2(p, i, 59)) + i * 2.1);
+                    if (s < 0.6) continue;
+                    const a = hash2(p, i, 31) * TWO_PI, d = Math.sqrt(hash2(p, i, 47)) * pond.radius * 0.8;
+                    const gx = Math.round(sx + Math.cos(a) * d), gy = Math.round(sy + Math.sin(a) * d);
+                    ctx.globalAlpha = (s - 0.6) * 2;
+                    ctx.fillRect(gx - 1, gy, 3, 1);
+                    ctx.fillRect(gx, gy - 1, 1, 3);
+                }
             }
-            ctx.restore();
+            ctx.globalAlpha = 1;
         }
 
+        // Só os props animados (braseiros e tochas); o restante do cenário está nos chunks.
         function drawObjects() {
             const time = game.time;
-            for (const o of scenery) {
+            for (const o of animatedScenery) {
                 if (o.x + o.w < camera.x || o.x - o.w > camera.x + VIEW_W || o.y + o.h < camera.y || o.y - o.h > camera.y + VIEW_H) continue;
                 const sx = Math.round(o.x - camera.x);
                 const sy = Math.round(o.y - camera.y);
-
-                // 1. Luz de tocha / braseiro no chão arenoso
+                // Luz de tocha / braseiro (gradiente pré-renderizado, escalado pelo pulso)
                 if (o.hasLight) {
-                    const lightPulse = 1 + Math.sin(time * 8 + o.x) * 0.08;
-                    const lightR = 60 * lightPulse;
-                    ctx.save();
-                    const grad = ctx.createRadialGradient(sx, sy + o.h * 0.2, 4, sx, sy + o.h * 0.2, lightR);
-                    grad.addColorStop(0, 'rgba(255, 185, 65, 0.38)');
-                    grad.addColorStop(0.5, 'rgba(230, 110, 30, 0.16)');
-                    grad.addColorStop(1, 'rgba(180, 60, 10, 0)');
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.arc(sx, sy + o.h * 0.2, lightR, 0, TWO_PI);
-                    ctx.fill();
-                    ctx.restore();
+                    const lightR = 60 * (1 + Math.sin(time * 8 + o.x) * 0.08);
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.drawImage(lightSprite, sx - lightR, sy + o.h * 0.2 - lightR, lightR * 2, lightR * 2);
+                    ctx.imageSmoothingEnabled = false;
                 }
-
-                // 2. Renderização precisa dos tiles do Prefab
-                if (o.prefab && o.prefab.tiles) {
-                    const p = o.prefab;
-                    const originX = Math.round(sx - p.w / 2);
-                    const originY = Math.round(sy - p.h / 2);
-
-                    for (const t of p.tiles) {
-                        const img = images[ASSETS[t.asset]];
-                        if (!img || !img.complete || !img.naturalWidth) continue;
-
-                        let srcX = t.sx;
-                        let srcY = t.sy;
-
-                        if (p.isFire) {
-                            if (p.fireType === 'fire1') {
-                                const frame = Math.floor(time * 8) % 6;
-                                srcX = (t.col % 11) * 16;
-                                srcY = (t.row + frame * 3) * 16;
-                            } else if (p.fireType === 'fire2') {
-                                const frame = Math.floor(time * 8) % 3;
-                                srcX = (t.col % 6) * 16;
-                                srcY = (t.row + frame * 4) * 16;
-                            }
-                        }
-
-                        ctx.drawImage(img, srcX, srcY, 16, 16, originX + t.dx, originY + t.dy, 16, 16);
-                    }
-                } else if (o.file) {
-                    const img = images[o.file];
-                    if (img && img.complete && img.naturalWidth) {
-                        ctx.drawImage(img, sx - o.w / 2, sy - o.h / 2, o.w, o.h);
-                    }
-                }
+                drawSceneryObject(ctx, o, sx, sy, time);
             }
+        }
+
+        // Névoa rasteira à deriva (presa ao mundo) e vinheta — só sob os personagens,
+        // para dar clima sem esconder inimigos, orbes ou projéteis.
+        const FOG_WISPS = 10;
+        const FOG_SPAN_X = VIEW_W + 640, FOG_SPAN_Y = VIEW_H + 340;
+        function drawAmbience() {
+            const time = game.time;
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            for (let i = 0; fogSprites && i < FOG_WISPS; i++) {
+                const wx = hash2(i, 1, 613) * FOG_SPAN_X + time * (5 + hash2(i, 3, 613) * 7);
+                const wy = hash2(i, 2, 613) * FOG_SPAN_Y + time * (1 + hash2(i, 4, 613) * 2);
+                // enrola numa janela maior que a tela: a volta acontece sempre fora de vista
+                const x = ((wx - camera.x) % FOG_SPAN_X + FOG_SPAN_X) % FOG_SPAN_X - 540;
+                const y = ((wy - camera.y) % FOG_SPAN_Y + FOG_SPAN_Y) % FOG_SPAN_Y - 280;
+                const sprite = fogSprites[i % fogSprites.length];
+                const scale = 4 + hash2(i, 5, 613) * 1.5;
+                ctx.globalAlpha = 0.16 + 0.05 * Math.sin(time * 0.25 + i * 1.7);
+                ctx.drawImage(sprite, x, y, sprite.width * scale, sprite.height * scale);
+            }
+            ctx.globalAlpha = 1;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.drawImage(vignetteSprite, 0, 0, VIEW_W, VIEW_H);
+            ctx.restore();
         }
 
         function drawMeleeArcs() {
@@ -4543,6 +5881,7 @@
             }
             drawGround();
             drawWater();
+            drawAmbience();
             drawObjects();
             drawPickups();
             drawOrbs();
@@ -4682,9 +6021,10 @@
         audio = initAudio();
         loadBest();
         generateScenery();
+        initProceduralScenery();
         initMapPickups();
         setStatus('menu');
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>

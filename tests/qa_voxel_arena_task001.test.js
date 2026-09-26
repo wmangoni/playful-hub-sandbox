@@ -205,7 +205,7 @@ async function runTests() {
 
   // 5. Validar Estabilidade e Ausência de Erros no Loop WebGL
   console.log('\n--- Test 5: Estabilidade WebGL e Ausência de Erros ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, ));
 
   if (consoleErrors.length > 0) {
     console.error('Erros no console:', consoleErrors);

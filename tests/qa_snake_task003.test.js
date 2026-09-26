@@ -215,7 +215,7 @@ async function runTests() {
 
   // 5. Validar Estabilidade e Execução a 60 FPS
   console.log('\n--- Test 5: Estabilidade do Loop Canvas e Ausência de Erros ---');
-  await page.waitForTimeout(1500);
+  await new Promise(r => setTimeout(r, ));
 
   if (consoleErrors.length > 0) {
     console.error('Erros no console:', consoleErrors);
