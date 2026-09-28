@@ -128,6 +128,11 @@ export const QUEST_AREAS = {
   cogumelos: { x: -106, z: 26, r: 26 },
   gato: { x: -84, z: -78, r: 16 },
   dentadura: { x: -100, z: 38, r: 8 },
+  pimenta: { x: 90, z: 107, r: 16 },
+  baile: { x: 76, z: -64, r: 24 },
+  pelo: { x: -82, z: 98, r: 26 },
+  sotao: { x: 126, z: 3, r: 16 },
+  casamento: { x: 45, z: -122, r: 12 },
 };
 
 // Nível das criaturas por região: fácil perto da vila e das primeiras missões, difícil nos cantos mais sinistros.

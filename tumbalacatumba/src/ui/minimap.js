@@ -285,7 +285,7 @@ export class Minimap {
         best = ic;
       }
     }
-    if (best) this.game.ui.showTooltip('mm', `<div class="tt-name" style="color:${best.color ?? '#ffd100'}">${best.title}</div>${best.sub ? `<div class="tt-sub">${best.sub}</div>` : ''}`, e.clientX, e.clientY);
+    if (best) this.game.ui.showTooltip('mm', `<div class="tt-name" style="color:${best.color ?? '#ffb86a'}">${best.title}</div>${best.sub ? `<div class="tt-sub">${best.sub}</div>` : ''}`, e.clientX, e.clientY);
     else this.game.ui.hideTooltip('mm');
   }
 
@@ -351,8 +351,8 @@ export class Minimap {
         ctx.lineTo(-3 * this.res, 0);
         ctx.lineTo(-6 * this.res, 7 * this.res);
         ctx.closePath();
-        ctx.fillStyle = m.tracked ? '#ffd100' : 'rgba(255,209,0,0.55)';
-        ctx.strokeStyle = '#2a1400';
+        ctx.fillStyle = m.tracked ? '#ff8a2a' : 'rgba(255,138,42,0.55)';
+        ctx.strokeStyle = '#16101d';
         ctx.lineWidth = 2 * this.res;
         ctx.stroke();
         ctx.fill();
@@ -361,9 +361,9 @@ export class Minimap {
         continue;
       }
       const grd = ctx.createRadialGradient(x, y, rr * 0.2, x, y, rr);
-      grd.addColorStop(0, 'rgba(255,209,0,0.28)');
-      grd.addColorStop(0.85, 'rgba(255,209,0,0.22)');
-      grd.addColorStop(1, 'rgba(255,209,0,0)');
+      grd.addColorStop(0, 'rgba(255,138,42,0.3)');
+      grd.addColorStop(0.85, 'rgba(255,138,42,0.24)');
+      grd.addColorStop(1, 'rgba(255,138,42,0)');
       ctx.fillStyle = grd;
       ctx.beginPath();
       ctx.arc(x, y, rr, 0, TAU);
@@ -385,8 +385,8 @@ export class Minimap {
         y = S / 2 + (dy / d) * edge;
       }
       if (m.kind === 'npc') {
-        ctx.fillStyle = '#ffd100';
-        ctx.strokeStyle = '#000';
+        ctx.fillStyle = '#efe6d2';
+        ctx.strokeStyle = '#16101d';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, 3.2 * this.res, 0, TAU);
@@ -400,7 +400,7 @@ export class Minimap {
       } else {
         drawMarker(ctx, m.kind, x, y, 17 * this.res);
       }
-      this.icons.push({ sx: x / this.res, sy: y / this.res, title: m.title, sub: m.sub, color: m.kind === 'npc' || m.kind === 'pet' ? '#3cff3c' : '#ffd100' });
+      this.icons.push({ sx: x / this.res, sy: y / this.res, title: m.title, sub: m.sub, color: m.kind === 'npc' || m.kind === 'pet' ? '#b4f05a' : '#ffb86a' });
     }
     // seta do jogador
     const yaw = g.player.visualYaw;
@@ -414,8 +414,8 @@ export class Minimap {
     ctx.lineTo(-a * 0.35, 0);
     ctx.lineTo(-a * 0.7, a * 0.65);
     ctx.closePath();
-    ctx.fillStyle = '#fff6c8';
-    ctx.strokeStyle = '#2a1400';
+    ctx.fillStyle = '#efe6d2';
+    ctx.strokeStyle = '#16101d';
     ctx.lineWidth = 2.5 * this.res;
     ctx.stroke();
     ctx.fill();
@@ -532,29 +532,29 @@ export class WorldMap {
     for (const z of SUBZONES) {
       if (z.id === 'vila') continue;
       const hov = this.hoverZone?.id === z.id;
-      c.font = `700 ${hov ? 30 : 26}px Almendra, serif`;
+      c.font = `700 ${hov ? 34 : 30}px "Mountains of Christmas", serif`;
       c.lineWidth = 6;
       c.strokeStyle = 'rgba(20,10,4,0.85)';
       const y = W(z.z) - (z.id === 'praca' ? 70 : 0);
       c.strokeText(z.name, W(z.x), y);
-      c.fillStyle = hov ? '#fff4b0' : '#ffd36b';
+      c.fillStyle = hov ? '#ffb86a' : '#f3ead6';
       c.fillText(z.name, W(z.x), y);
       // faixa de nível das criaturas da região
       const lv = ZONE_LEVELS[z.id];
       if (lv) {
         const t = lv[0] === lv[1] ? `Nível ${lv[0]}` : `Níveis ${lv[0]}–${lv[1]}`;
-        c.font = '700 19px Almendra, serif';
+        c.font = '400 21px "Patrick Hand", sans-serif';
         c.lineWidth = 5;
         c.strokeText(t, W(z.x), y + 27);
         c.fillStyle = g.ui.levelColor(Math.round((lv[0] + lv[1]) / 2));
         c.fillText(t, W(z.x), y + 27);
       }
     }
-    c.font = '700 44px Cinzel, serif';
+    c.font = '700 52px "Mountains of Christmas", serif';
     c.lineWidth = 8;
     c.strokeStyle = 'rgba(20,10,4,0.9)';
     c.strokeText('Vale Tumbalacatumba', S / 2, 60);
-    c.fillStyle = '#ffd100';
+    c.fillStyle = '#ffb86a';
     c.fillText('Vale Tumbalacatumba', S / 2, 60);
     // rosa dos ventos
     const rx = S - 120, ry = S - 120;
@@ -574,7 +574,7 @@ export class WorldMap {
       c.fill();
       c.stroke();
     }
-    c.font = '700 26px Cinzel, serif';
+    c.font = '700 30px "Mountains of Christmas", serif';
     c.fillStyle = '#2a1406';
     c.fillText('N', 0, -88);
     c.restore();
@@ -593,8 +593,8 @@ export class WorldMap {
         c.stroke();
         c.setLineDash([]);
       } else if (m.kind === 'npc' || m.kind === 'pet') {
-        c.fillStyle = m.kind === 'pet' ? '#ff7a3a' : '#ffd100';
-        c.strokeStyle = '#000';
+        c.fillStyle = m.kind === 'pet' ? '#ff7a3a' : '#efe6d2';
+        c.strokeStyle = '#16101d';
         c.lineWidth = 2;
         c.beginPath();
         c.arc(x, y, 6, 0, TAU);
@@ -615,8 +615,8 @@ export class WorldMap {
     c.lineTo(-8, 0);
     c.lineTo(-16, 15);
     c.closePath();
-    c.fillStyle = '#fff6c8';
-    c.strokeStyle = '#2a1400';
+    c.fillStyle = '#efe6d2';
+    c.strokeStyle = '#16101d';
     c.lineWidth = 5;
     c.stroke();
     c.fill();

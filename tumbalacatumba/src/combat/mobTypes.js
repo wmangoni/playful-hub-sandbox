@@ -38,6 +38,7 @@ export const MOB_TYPES = {
     name: 'Aranha Cabeluda', family: 'Fera', model: MM.createHairySpider, move: 'ground',
     hp: 1.15, dmg: 1.05, xp: 1.05, speed: 1.5, run: 5.6, radius: 0.6, aggro: 9, reach: 1.9, social: 8,
     atk: { dur: 0.8, hit: 0.6, cd: 1.1 }, deathRoll: Math.PI, lift: 0.55, color: '#3a2848', respawn: 60,
+    questDrop: { key: 'pelo', chance: 0.8, text: 'Você arrancou um Tufo de Pelo de Aranha.' },
     sfx: { aggro: 'hiss', hit: 'hiss', die: 'hiss' },
     barks: {
       aggro: ['Ssssss...', 'Oito pernas, zero paciência!', 'Fica pro jantar?', 'Visita! Vou buscar a teia boa.'],
@@ -89,3 +90,6 @@ export const MOB_TYPES = {
     },
   },
 };
+
+// o id do tipo é a chave dos objetivos de caça das missões (ex.: 'caveira')
+for (const [id, t] of Object.entries(MOB_TYPES)) t.id = id;

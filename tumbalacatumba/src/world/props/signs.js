@@ -33,7 +33,7 @@ export async function buildSignAtlas() {
   const entries = [];
   SIGN_TEXTS.forEach((text, i) => {
     const y0 = i * RH;
-    g.font = '44px Griffy, "Marcellus", serif';
+    g.font = '44px Griffy, "IM Fell English", serif';
     const tw = Math.min(W - 40, g.measureText(text).width + 60);
     const x0 = (W - tw) / 2;
     // madeira

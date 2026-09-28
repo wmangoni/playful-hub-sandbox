@@ -1,6 +1,6 @@
 # Tumbalacatumba — guia técnico
 
-RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Burton terror-engraçado", HUD e controles no estilo World of Warcraft, entregue como **um único HTML** que roda via `file://`. O `README.md` descreve o jogo para quem joga (controles, conteúdo). Este arquivo reúne o necessário para mexer no código sem repetir erros já resolvidos.
+RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Burton terror-engraçado", controles de MMO clássico e interface com identidade própria ("caderno de contos costurado"), entregue como **um único HTML** que roda via `file://`. O `README.md` descreve o jogo para quem joga (controles, conteúdo). Este arquivo reúne o necessário para mexer no código sem repetir erros já resolvidos.
 
 ## Comandos
 
@@ -15,6 +15,7 @@ RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Bur
 - **Arquivo único**: nada de Web Workers, `import()` dinâmico, `fetch` de assets ou URLs externas. Fontes só via `@fontsource/*`, importando o subset em `src/main.js` (o build embute os woff2). Canvas que desenha texto com essas fontes precisa de `await document.fonts.load(...)` antes.
 - **Tudo procedural**: sem modelos, texturas ou sons externos. Os modelos saem do `Builder` (`src/render/builder.js`), que mescla primitivas com cores de vértice.
 - Textos do jogo, comentários e mensagens em português do Brasil.
+- **Identidade visual própria** (não imitar a interface de nenhum outro jogo): tinta preta arroxeada (`--ink`), papel cor de osso (`--bone`), abóbora (`--pumpkin`), verde-fantasma (`--ghoul`) e roxo-hematoma (`--bruise`), todas em `src/ui/styles.css`. Formas com cantos tortos (`--crooked`), pontos de costura (contorno tracejado por dentro) e listras preto-e-osso; nada de dourado com bisel, gárgulas, anel dourado no retrato nem `!`/`?` amarelos. Fontes: Mountains of Christmas (títulos, `--title-font`), IM Fell English (texto, `--ui-font`), Patrick Hand (números e chat, `--chat-font`) e Griffy (logotipo e placas).
 - `src/world/layout.js` é a fonte única da planta do mapa (zonas, estradas, `NPC_SPOTS`, áreas de missão, `ZONE_LEVELS` e `MOB_SPAWNS`). Mude lá e deixe o resto derivar.
 
 ## Mapa do código
@@ -22,9 +23,9 @@ RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Bur
 - `src/game.js`: orquestra render, loop, título → jogo, presets `QUALITY` (baixa/media/alta), opções, atalhos e resolução adaptativa (`_adapt`).
 - `src/render/`: `toon.js` (neblina global, `toonMat`, `MAT.vc`/`MAT.vcDouble`, brilhos `glowMat`/`flameMat` e o registro `GLOW`), `postfx.js` (composer e `LAYER_FX`), `builder.js` e `bake.js` (texturas assadas na GPU).
 - `src/world/`: `terrain.js`, `sky.js`, `daynight.js` (keyframes de luz, neblina e gradação por hora), `water.js`, `world.js` (movimento, colisão e água), `colliders.js`, `populate.js` (espalha os props) e `props/` (`batch.js` com o `StaticBatch`, árvores, casas, placas).
-- `src/entities/`: jogador, câmera estilo WoW, `rig.js` (animação procedural, com as chaves da Lanternada em `K_ATTACK`), `npc.js` (`NPC`, `Pickup`), modelos de PNJs e criaturas (`mobModels.js` tem as 5 criaturas hostis), vida ambiente.
-- `src/combat/`: `combat.js` (atributos do jogador por nível em `playerStats`, golpe, dano, XP, morte e volta à praça), `mob.js` (IA: idle → chase ⇄ attack → return, dead → gone) e `mobTypes.js` (números de cada criatura). Os corvos (`questWorld`) e os sapos (`ambientLife`) nascem lá e o combate os adota como neutros.
-- `src/quests/`: `data.js` (as 11 missões e seus textos), `progress.js` (estado e save), `interact.js` (seleção e interação), `questWorld.js` (lógica das missões no mundo).
+- `src/entities/`: jogador, câmera de terceira pessoa, `rig.js` (animação procedural, com as chaves da Lanternada em `K_ATTACK`), `npc.js` (`NPC`, `Pickup`), modelos de PNJs e criaturas (`mobModels.js` tem as 5 criaturas hostis), vida ambiente.
+- `src/combat/`: `combat.js` (atributos do jogador por nível em `playerStats`, golpe, dano, XP, morte e volta à praça, objetivos de caça pelo `type.id`, Cuspe de Fogo do pet em `updatePet`), `mob.js` (IA: idle → chase ⇄ attack → return, dead → gone) e `mobTypes.js` (números de cada criatura). Os corvos (`questWorld`) e os sapos (`ambientLife`) nascem lá e o combate os adota como neutros.
+- `src/quests/`: `data.js` (as 16 missões e seus textos; as 5 últimas são continuações), `progress.js` (estado e save), `interact.js` (seleção e interação), `questWorld.js` (lógica das missões no mundo).
 - `src/ui/`: HUD, janelas, minimapa, retratos 3D, ícones em SVG e canvas. `combatHud.js` cuida das barras de vida, placas das criaturas e tela de morte.
 - `src/fx/`: `lights.js` (`Halos` e `LightPool`), `ambience.js`, `effects.js`. Em `src/audio/audio.js` ficam a música e os efeitos em WebAudio.
 
@@ -39,7 +40,7 @@ RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Bur
 
 ## Como testar
 
-- **e2e**: abrir `Tumbalacatumba.html?play&notut&t=12` via `file://` (sem HMR), esperar `__game.state === 'play'`, injetar `tools/e2e_sync.js` e chamar `__T.run(passo)` na ordem descrita no arquivo. Resultado esperado: todas as missões concluídas, nível 5, o passo `combate` vencendo um marujo e `window.__errors` vazio. Rode contra o HTML final, porque um erro de TDZ já apareceu só no build. O e2e liga o modo pacífico: sem isso, criaturas hostis e os 15% de neutros incomodados atrapalham os teleportes.
+- **e2e**: abrir `Tumbalacatumba.html?play&notut&t=12` via `file://` (sem HMR), esperar `__game.state === 'play'`, injetar `tools/e2e_sync.js` e chamar `__T.run(passo)` na ordem descrita no arquivo. Resultado esperado: as 16 missões concluídas, nível 7 (máximo), o passo `combate` vencendo um marujo, o passo `fogo` com o Belzebuzinho acertando um rato e `window.__errors` vazio. Os passos de caça esperam as criaturas renascerem (70 s simulados). Rode contra o HTML final, porque um erro de TDZ já apareceu só no build. O e2e liga o modo pacífico: sem isso, criaturas hostis e os 15% de neutros incomodados atrapalham os teleportes.
 - **Aba em segundo plano** (browser-harness): o Chrome pausa o `requestAnimationFrame` e segura `setTimeout`/`setInterval`. Por isso o e2e avança só a simulação (`update(1/30)`), sem render e sem timers, e o carregamento cede com `setTimeout` em vez de rAF. Screenshots funcionam depois de um `tick()` manual.
 - FPS só vale com a aba visível. Para simular 1080p, use `Emulation.setDeviceMetricsOverride` e depois `Emulation.clearDeviceMetricsOverride`.
 - Ao terminar, apague os saves de teste do localStorage (em `file://` e em `http://127.0.0.1:5178`) e pare o dev server pelo PID ou pela porta. `pkill -f "node .*vite"` já matou o próprio shell.
@@ -74,13 +75,17 @@ Referência: 60 FPS a 1592×818 na qualidade média, com ~318 draw calls por qua
 - `#overlay` tem `z-index: 1` (contexto de empilhamento) para as placas de nome não passarem por cima das janelas.
 - Foco: botões, selects, checkboxes e sliders recebem `blur()` depois do uso, e `_isTyping` (`core/input.js`) só considera campos de texto. Sem isso, o Espaço clica de novo no botão e o WASD para de funcionar.
 - Os marcadores `!`/`?` são desenhados em SVG com traços grossos. Com glifo de fonte ficam finos demais.
+- Nomes de classe curtos colidem: as placas das criaturas eram `.mp` e herdavam para a barra de Coragem (`bar mp`), que sumia. Hoje são `.mobplate`.
+- Patrick Hand e IM Fell English só têm peso 400; `font-weight: 700` nelas vira negrito falso borrado. Mountains of Christmas é carregada só no 700.
 - Não reaproveite nomes curtos em blocos internos: um `const` que sombreava outra variável causou erro de TDZ só no build minificado.
 
 **Combate**
 - O painel do navegador pausa o `requestAnimationFrame` em segundo plano: para testar lutas, avance a simulação com `tick(1/30)` em laço, não com espera em tempo real.
 - Números flutuantes (`ui.floaty`) animam por CSS e somem por `setTimeout`; em aba parada não aparecem em captura, o que não é bug.
+- O Belzebuzinho só cospe fogo (flag `petFire`, da missão *Cuspe de Fogo*) em criaturas que já estão brigando com o jogador, nunca puxa briga. Dano de `petFireDamage` (nv 3: 5–7 a cada ~3,4 s, uns 7% do dano do jogador): mantenha baixo.
+- O farol fica apagado (`populated.anchors.lighthouse.lit`) até a missão *Casamento no Farol* acender o lampião; o `applyState` restaura isso e muda o Suspiro para a ilha depois do casamento.
 
-**Controles** (estilo WoW)
+**Controles** (de MMO clássico)
 - Eventos de mouse, não pointer events, para detectar os dois botões juntos. `e.code` para as teclas. Um limiar de arrasto de 5 px separa clique de arrasto.
 - Sem pointer lock por padrão, porque o Chrome mostra um aviso a cada lock. O cursor some por CSS durante o arrasto.
 

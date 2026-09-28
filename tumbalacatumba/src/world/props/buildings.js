@@ -641,6 +641,7 @@ export function makeLighthouse() {
   const m = k.model('lighthouse');
   m.colliders.push({ type: 'c', x: 0, z: 0, r: 2.6 });
   m.anchors.lamp = V3(0.07 * (H + 2.4), H + 2.4, 0.03 * (H + 2.4));
+  m.anchors.door = V3(0, 0, 3.4);
   m.map = { r: 2.4, roof: '#8a2a2e', round: true };
   return m;
 }

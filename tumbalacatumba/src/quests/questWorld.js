@@ -11,6 +11,7 @@ import {
 } from '../world/layout.js';
 
 const rng = new RNG(777);
+const _mouth = new THREE.Vector3();
 
 export class QuestWorld {
   constructor(game) {
@@ -29,10 +30,17 @@ export class QuestWorld {
     mk('suspiro', () => NM.createGhost('Suspiro'));
     mk('nevoa', () => NM.createGhost('Lady Névoa', { lady: true }));
     this.npcList = Object.values(this.npcs);
-    this.npcs.juvenal.barkList = () => (P.status('ossos') === 'done' ? ['Tumbalacatumba tumba tá!', 'Inteiraço e dançando!', 'Quando o relógio bate a uma...'] : this.npcs.juvenal.info.barks);
     this.npcs.zepalha.barkList = () => (P.status('corvos') === 'done' ? ['Zzzzz...', 'Zzz... crá... zzz...', '(ronco de palha)'] : this.npcs.zepalha.info.barks);
     this.npcs.conde.barkList = () => (P.status('dentadura') === 'done' ? ['Olhem meu sorriso! OLHEM!', 'Finalmente, comida sólida.', 'Mwahahaha! ...com dentes!'] : this.npcs.conde.info.barks);
-    this.npcs.suspiro.barkList = () => (P.status('resposta') === 'done' ? ['Ela disse sim! (suspiro feliz)', 'Estou nas nuvens! Literalmente, eu flutuo.'] : this.npcs.suspiro.info.barks);
+    this.npcs.suspiro.barkList = () => {
+      if (P.status('casamento') === 'done') return ['Recém-casados! (suspiro feliz)', 'Ela é minha esposa. Para sempre. E "sempre", para nós, é bastante tempo.', 'Viu o farol? Fui eu que... bom, foi você.'];
+      return P.status('resposta') === 'done' ? ['Ela disse sim! (suspiro feliz)', 'Estou nas nuvens! Literalmente, eu flutuo.'] : this.npcs.suspiro.info.barks;
+    };
+    this.npcs.nevoa.barkList = () => (P.status('casamento') === 'done' ? ['Casada! Finalmente um motivo para usar o véu.', 'Ele suspira menos agora. Só um pouquinho.'] : this.npcs.nevoa.info.barks);
+    this.npcs.juvenal.barkList = () => {
+      if (P.status('baile') === 'done') return ['Baile sem mordida é outra coisa!', 'Tumbalacatumba tumba tá! Tac-tac!', 'Quer castanhola? Eu tenho costela sobrando.'];
+      return P.status('ossos') === 'done' ? ['Tumbalacatumba tumba tá!', 'Inteiraço e dançando!', 'Quando o relógio bate a uma...'] : this.npcs.juvenal.info.barks;
+    };
 
     this.pickups = [];
     this.setupCat();
@@ -41,6 +49,7 @@ export class QuestWorld {
     this.setupFrog();
     this.setupEgg();
     this.setupPickups();
+    this.setupLighthouse();
     this.pet = new Pet(game);
     P.on((type, data) => this.onEvent(type, data));
     this.applyState();
@@ -341,11 +350,48 @@ export class QuestWorld {
     }
     const mush = [[-96, 30], [-104, 18], [-118, 30], [-110, 40], [-126, 22], [-92, 8], [-100, -2], [-132, 8], [-88, 32]];
     for (const [x, z] of mush) add('cogumelo', CM.ITEM_MODELS.mushroom, x, z, { name: 'Cogumelo Risonho', lift: 0.02 });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + 0.8, r = 7 + (i % 2) * 5;
+      add('pimenta', CM.ITEM_MODELS.pepper, VENTS.x + Math.cos(a) * r, VENTS.z + Math.sin(a) * r, { name: 'Pimenta do Capeta', lift: 0.2 });
+    }
     for (let i = 0; i < 11; i++) {
       const a = (i / 11) * TAU, r = 6 + (i % 4) * 5;
       add('vagalume', CM.ITEM_MODELS.firefly, WOODS.x + Math.cos(a) * r, WOODS.z + Math.sin(a) * r, { name: 'Vaga-lume', nightOnly: true, wander: 1.6, sparkle: 0.8 });
     }
   }
+  // ------------------------------------------------------------------ farol (casamento)
+  setupLighthouse() {
+    const g = this.game, lh = g.populated.anchors.lighthouse;
+    if (!lh) return;
+    this.lighthouse = lh;
+    const pos = new THREE.Vector3(lh.door.x, g.world.groundHeight(lh.door.x, lh.door.z), lh.door.z);
+    g.interaction.add(
+      new Interactable({
+        kind: 'object', name: 'Lampião do Farol', subtitle: 'Apagado há cem anos', reaction: 'neutral', pos, radius: 0.8, height: 2.4, range: 4,
+        cursor: 'use', selectable: false, enabled: () => this.P.wants('farol'), hint: 'Clique com o botão direito para subir e acender o lampião',
+        onInteract: () => this.lightLighthouse(),
+      })
+    );
+    this.lhSparkle = makeSparkle(1.8);
+    this.lhSparkle.position.copy(pos).y += 1.3;
+    g.scene.add(this.lhSparkle);
+  }
+  lightLighthouse() {
+    const g = this.game;
+    // subir a escada leva um tempo; apanhar no caminho interrompe
+    g.ui.cast('Acendendo o farol', 3, {
+      icon: 'lantern',
+      onDone: () => {
+        this.lighthouse.lit = true;
+        this.P.setFlag('lighthouse');
+        this.P.progress('farol');
+        g.fx.sparkleBurst(this.lighthouse.lamp, '#ffe0a0', 30);
+        g.audio?.sfx('ready');
+        g.ui.info('A luz do Farol Desalinhado volta a girar depois de cem anos!');
+      },
+    });
+  }
+
   resetPickups(keys) {
     for (const p of this.pickups) if (keys.includes(p.key)) p.reset();
   }
@@ -366,16 +412,27 @@ export class QuestWorld {
     }
     if (type === 'abandon' && q.id === 'carta') this.npcs.suspiro.rig.letter.visible = true;
     if (type === 'turnin') {
-      if (q.id === 'ossos') {
+      if (q.id === 'ossos' || q.id === 'baile') {
         this.npcs.juvenal.action = 'dance';
         setTimeout(() => (this.npcs.juvenal.action = null), 9000);
+      }
+      if (q.id === 'cuspe') {
+        g.ui.chat('Belzebuzinho aprendeu Cuspe de Fogo! Ele cospe bolas de fogo nas criaturas que brigam com você.', 'system');
+        setTimeout(() => g.ui.info('Belzebuzinho aprendeu Cuspe de Fogo!'), 1500);
+        if (this.pet.active) this.pet.say('PIU! ...PUF! (sai fogo)');
+      }
+      if (q.id === 'casamento') {
+        for (const id of ['suspiro', 'nevoa']) {
+          this.npcs[id].action = 'cheer';
+          setTimeout(() => (this.npcs[id].action = null), 6000);
+        }
       }
       if (q.id === 'resposta') {
         this.npcs.suspiro.action = 'cheer';
         setTimeout(() => (this.npcs.suspiro.action = null), 6000);
       }
       if (q.id === 'brasas') g.ui.info('Os braseiros ao redor do ninho se acendem!');
-      const flagMap = { gato: 'catHome', brasas: 'braziers', aboboras: 'mayorHappy' };
+      const flagMap = { gato: 'catHome', brasas: 'braziers', aboboras: 'mayorHappy', cuspe: 'petFire' };
       if (flagMap[q.id]) this.P.setFlag(flagMap[q.id]);
       this.applyState();
     }
@@ -402,6 +459,14 @@ export class QuestWorld {
     const door = this.game.populated.anchors.aranhildaDoor;
     if (door) this.catHome = { x: door.x + 1.4, z: door.z - 0.3, yaw: 0.6 };
     this.game.player.setHat?.(!!P.flags.hat);
+    // farol apagado até o casamento; depois do casamento o Suspiro mora na ilha com a Lady Névoa
+    if (this.lighthouse) this.lighthouse.lit = !!P.flags.lighthouse;
+    if (P.status('casamento') === 'done') {
+      const s = N.suspiro, n = NPC_SPOTS.nevoa, x = n.x + 1.7, z = n.z + 0.9;
+      s.pos.set(x, this.game.world.groundHeight(x, z), z);
+      s.homeYaw = s.yaw = n.yaw;
+      s.rig.root.position.copy(s.pos);
+    }
     if (P.flags.hatched && P.flags.petOut !== false) this.pet.summon();
   }
 
@@ -411,6 +476,10 @@ export class QuestWorld {
     this.updatePumpkins(dt);
     this.updateEgg(dt);
     for (const p of this.pickups) p.update(dt, t);
+    if (this.lhSparkle) {
+      this.lhSparkle.visible = this.P.wants('farol');
+      this.lhSparkle.material.rotation = t * 0.8;
+    }
     this.pet.update(dt);
     if (this.frog.rig.root.visible) this.frog.rig.animate(dt, {});
   }
@@ -425,6 +494,13 @@ class Pet {
     this.active = false;
     this.rig.root.visible = false;
     this.barkT = 12;
+    this.spitT = -1; // tempo desde o início da cusparada (-1 = parado)
+  }
+  /** prepara uma bola de fogo contra a criatura (o combate decide quando) */
+  spitAt(target) {
+    this.spitT = 0;
+    this.spitTarget = target;
+    this.spat = false;
   }
   say(t) {
     this.game.ui?.bubble({ pos: this.w.pos, rig: this.rig }, t, 2.5);
@@ -452,7 +528,24 @@ class Pet {
     const sp = d > 6 ? pl.runSpeed * (pl.mounted ? 1.9 : 1.25) : d > 1.2 ? 3.5 : 0;
     this.w.moveToward(tx, tz, sp, dt, 0.6);
     if (d < 1.2) this.w.yaw = dampAngle(this.w.yaw, yaw, 2, dt);
-    this.w.sync(dt);
+    if (this.spitT >= 0) {
+      // vira para o alvo, joga a cabeça para trás e cospe
+      this.spitT += dt;
+      const t = this.spitTarget;
+      if (t) this.w.yaw = dampAngle(this.w.yaw, Math.atan2(t.pos.x - this.w.pos.x, t.pos.z - this.w.pos.z), 14, dt);
+      if (!this.spat && this.spitT >= 0.3) {
+        this.spat = true;
+        if (t?.targetable) {
+          const mouth = this.rig.j.head.getWorldPosition(_mouth);
+          mouth.x += Math.sin(this.w.yaw) * 0.2;
+          mouth.z += Math.cos(this.w.yaw) * 0.2;
+          this.game.combat.launchFireball(mouth, t);
+          if (Math.random() < 0.25) this.say(['PIU! (cospe fogo)', 'Toma, bicho feio!', 'Piu piu PUF!', 'Queima, queima!'][Math.floor(Math.random() * 4)]);
+        }
+      }
+      if (this.spitT > 0.65) this.spitT = -1;
+    }
+    this.w.sync(dt, { spit: this.spitT });
     this.barkT -= dt;
     if (this.barkT < 0) {
       this.barkT = 25 + Math.random() * 30;

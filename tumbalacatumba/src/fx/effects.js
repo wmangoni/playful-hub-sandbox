@@ -464,6 +464,18 @@ export class Effects {
     }
     this.softGlow.spawn({ p: pos.clone(), v: new THREE.Vector3(), life: 0.14, size: 1.3 * scale, grow: 1.6, drag: 0, c: c.clone().multiplyScalar(1.4), a: 0.9 });
   }
+  /** rastro da bola de fogo do Belzebuzinho: faíscas e um fiozinho de fumaça */
+  fireTrail(pos, dt) {
+    // por tempo, não por quadro: sem limite de FPS isso viraria uma avalanche de partículas
+    this._trailT = (this._trailT ?? 0) + dt;
+    if (this._trailT < 1 / 40) return;
+    this._trailT = 0;
+    const c = this._fireC ?? (this._fireC = new THREE.Color('#ff9a3a'));
+    for (let i = 0; i < 2; i++) {
+      this.glowB.spawn({ p: pos.clone(), v: new THREE.Vector3(rng.range(-0.6, 0.6), rng.range(0.2, 1.2), rng.range(-0.6, 0.6)), life: rng.range(0.2, 0.4), size: rng.range(0.18, 0.3), g: -1, drag: 2, c: c.clone().multiplyScalar(2.2), a: 1 });
+    }
+    if (rng.chance(0.4)) this.smokeB.spawn({ p: pos.clone(), v: new THREE.Vector3(0, 0.6, 0), life: 0.6, size: 0.25, grow: 2.2, drag: 1, c: new THREE.Color('#4a3a3a'), a: 0.35 });
+  }
   /** caveira se desmanchando em ossinhos */
   bones(pos) {
     const c = new THREE.Color('#ece4cc');

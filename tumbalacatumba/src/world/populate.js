@@ -267,7 +267,9 @@ export async function populateWorld(world, plan, progress = () => {}) {
         beam2.rotation.y = Math.PI;
         piv.add(beam2);
         scene.add(piv);
-        out.animated.push({ update: (dt, t, g) => { piv.rotation.y += dt * 0.6; beamMat.uniforms.opacity.value = 0.22 * (g?.dayNight?.lamps ?? 1); piv.visible = beamMat.uniforms.opacity.value > 0.01; } });
+        // lit: o farol fica apagado até a missão do casamento (questWorld.applyState)
+        const lh = (out.anchors.lighthouse = { lamp, door: toWorld(x, p.y, z, rot, m.anchors.door), lit: true });
+        out.animated.push({ update: (dt, t, g) => { piv.rotation.y += dt * 0.6; beamMat.uniforms.opacity.value = 0.22 * (g?.dayNight?.lamps ?? 1) * (lh.lit ? 1 : 0); piv.visible = beamMat.uniforms.opacity.value > 0.01; } });
         M.circles.push({ x, z, r: 2.4, fill: '#8a2a2e', tall: true });
         break;
       }

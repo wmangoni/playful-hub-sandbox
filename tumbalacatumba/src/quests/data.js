@@ -6,17 +6,21 @@ export const ITEMS = {
   chapeu: { name: 'Chapéu de Abóbora Oficial', quality: 'uncommon', icon: 'pumpkinhat', desc: 'Equipar: Sua cabeça fica 37% mais outonal.', flavor: 'Presente da Prefeitura. Não é comestível (tentaram).', use: 'hat' },
   rotula: { name: 'Rótula Sobressalente', quality: 'poor', icon: 'kneecap', desc: 'Não serve para nada.', flavor: 'Pertencia a alguém. Agora pertence a você.' },
   lanterna: { name: 'Lanterna de Vaga-lumes', quality: 'rare', icon: 'lantern', desc: 'Passivo: Sua lanterna brilha em verde mágico e ilumina o dobro.', flavor: 'Os vaga-lumes cobram hora extra.' },
-  belzebu: { name: 'Belzebuzinho', quality: 'epic', icon: 'chick', desc: 'Mascote: Chama o filhote de avestruz demônio que acha que você é a mãe dele.', flavor: 'Não alimentar depois da meia-noite. Nem antes.', use: 'pet' },
+  belzebu: { name: 'Belzebuzinho', quality: 'epic', icon: 'chick', desc: 'Mascote: Chama o filhote de avestruz demônio que acha que você é a mãe dele. Depois do mingau ardido, cospe fogo nos inimigos.', flavor: 'Não alimentar depois da meia-noite. Nem antes.', use: 'pet' },
   vassoura: { name: 'Vassoura Velha da Vesga', quality: 'epic', icon: 'broom', desc: 'Montaria: Aumenta a velocidade de movimento em 65%.', flavor: 'Voa baixinho e reclama o tempo todo.', use: 'mount' },
   colar: { name: 'Colar de Presas Falsas', quality: 'uncommon', icon: 'fangs', desc: '+5 de Charme Macabro.', flavor: 'O Conde tinha um par sobrando. De 1703.' },
   pena: { name: 'Pena de Corvo Ofendido', quality: 'common', icon: 'feather', desc: 'Material de artesanato.', flavor: 'Ainda está resmungando.' },
   carta: { name: 'Carta Perfumada', quality: 'quest', icon: 'letter', desc: 'Item de missão.', flavor: 'Cheira a lavanda e naftalina. Molhada de lágrimas de ectoplasma.' },
   resposta: { name: 'Bilhete da Lady Névoa', quality: 'quest', icon: 'letter2', desc: 'Item de missão.', flavor: 'Está escrito "SIM" com letra caprichada. E um borrão de batom.' },
   dentadura: { name: 'Dentadura de Ouro do Conde', quality: 'quest', icon: 'dentures', desc: 'Item de missão.', flavor: 'Ainda úmida de sapo. Eca.' },
+  castanholas: { name: 'Castanholas de Costela', quality: 'common', icon: 'bone', desc: 'Não serve para nada, mas faz tac-tac.', flavor: 'Tumbalacatumba tumba tá, agora com ritmo.' },
+  tonico: { name: 'Tônico Capilar da Vesga', quality: 'rare', icon: 'potion', desc: 'Usar: Restaura 40 de vida. Recarga de 60 s.', flavor: 'Efeito colateral: sobrancelha nova.', use: 'tonic' },
+  capa: { name: 'Capa de Veludo Roída', quality: 'rare', icon: 'cape', desc: '+7 de Drama Noturno.', flavor: 'Os buracos são de traça. Ou de morcego. Ou do tataravô.' },
+  buque: { name: 'Buquê da Lady Névoa', quality: 'epic', icon: 'bouquet', desc: 'Não murcha. Já veio murcho.', flavor: 'Quem pega o buquê é o próximo a morrer de amor.' },
 };
 
 export const QUALITY_COLORS = {
-  poor: '#9d9d9d', common: '#ffffff', uncommon: '#1eff00', rare: '#0070dd', epic: '#a335ee', quest: '#ffd100',
+  poor: '#9a928c', common: '#efe6d2', uncommon: '#9ee05a', rare: '#5ab4ff', epic: '#c77dff', quest: '#ffa84a',
 };
 
 export const QUESTS = [
@@ -193,6 +197,92 @@ export const QUESTS = [
     startItem: 'resposta',
     area: null,
   },
+  // ---------------------------------------------------------------- continuações
+  {
+    id: 'cuspe',
+    title: 'Cuspe de Fogo',
+    level: 3,
+    minLevel: 3,
+    giver: 'custodio',
+    turnIn: 'custodio',
+    requires: ['chocar'],
+    text:
+      'Ô, mãe de capetinha! Tenho uma notícia boa e uma ruim.\n\nA boa: o Belzebuzinho tá crescendo forte. A ruim: ele ainda não sabe cuspir fogo, e filhote de avestruz demônio que não cospe fogo sofre bullying no galinheiro.\n\nA vó dele só cuspia fogo depois de comer Pimenta do Capeta, que nasce lá nas Fendas Sulfurosas, pertinho das rachaduras quentes. Traz umas 5 que eu preparo um mingau ardido pro bichinho.',
+    summary: 'Colha 5 Pimentas do Capeta nas Fendas Sulfurosas e leve para Seu Custódio.',
+    objectives: [{ key: 'pimenta', need: 5, label: 'Pimentas do Capeta' }],
+    progress: 'Cadê as pimenta? O Belzebuzinho já tentou cuspir fogo e saiu só um soluço.',
+    complete: 'Óia que pimenta bonita! Arde só de olhar.\n\n(Seu Custódio mistura tudo num mingau. Belzebuzinho come, fica vermelho... mais vermelho... e solta um PUF! de fogo.)\n\nPronto! Agora ele cospe bola de fogo nos bicho que mexer com você. É fraquinho ainda, mas é de coração.',
+    rewards: { xp: 450, money: 3000, items: [] },
+    area: 'pimenta',
+  },
+  {
+    id: 'baile',
+    title: 'Baile de Arromba',
+    level: 3,
+    minLevel: 3,
+    giver: 'juvenal',
+    turnIn: 'juvenal',
+    requires: ['ossos'],
+    text:
+      'Parceiro! Agora que tô inteiraço, vou dar o maior baile que esse cemitério já viu.\n\nSó tem um probleminha: umas Caveiras Saltitantes fugiram do ossário e ficam pulando nos convidados, mordendo o tornozelo de todo mundo. Assim ninguém dança!\n\nDá um jeito em 6 delas? Com a sua lanterna, de preferência. Elas são ocas, faz um barulho ótimo.',
+    summary: 'Derrote 6 Caveiras Saltitantes no Cemitério Sorridente.',
+    objectives: [{ key: 'caveira', need: 6, label: 'Caveiras Saltitantes derrotadas' }],
+    progress: 'Ainda tem caveira mordendo canela por aí, parceiro. E eu nem tenho canela sobrando.',
+    complete: 'Ouviu esse silêncio? É o som de um baile sem mordida!\n\nTumbalacatumba tumba tá! Toma essas castanholas, fiz com duas costelas minhas. Não se preocupa, eu tenho um monte.',
+    rewards: { xp: 500, money: 4500, items: ['castanholas'] },
+    area: 'baile',
+  },
+  {
+    id: 'pelo',
+    title: 'Poção Cabeluda',
+    level: 4,
+    minLevel: 4,
+    giver: 'vesga',
+    turnIn: 'vesga',
+    requires: ['cogumelos'],
+    text:
+      'Hihihi! A Poção do Riso Eterno deu certo! Até demais: o Zé Palha ri dormindo e os sapos não param de gargalhar.\n\nAgora vou fazer minha obra-prima: o Tônico Capilar da Vesga! Preciso de 5 Tufos de Pelo de Aranha Cabeluda. As aranhas vivem no Bosque Retorcido e não emprestam o pelo de bom grado.\n\nConvença-as. Com força. Hihihi!',
+    summary: 'Arranque 5 Tufos de Pelo das Aranhas Cabeludas do Bosque Retorcido.',
+    objectives: [{ key: 'pelo', need: 5, label: 'Tufos de Pelo de Aranha' }],
+    progress: 'Nada de pelo ainda? Se quiser, faço uma poção para dar coragem. Ela também dá bigode.',
+    complete: 'Que tufos lindos! Macios, fedidos e com uma perninha ainda se mexendo. Perfeito!\n\n(O caldeirão borbulha e solta uma fumaça em forma de peruca.)\n\nToma um frasco. Passa na careca ou bebe, tanto faz: cura machucado e arrepia a nuca. E ele se enche sozinho, hihihi.',
+    rewards: { xp: 600, money: 6500, items: ['tonico'] },
+    area: 'pelo',
+  },
+  {
+    id: 'sotao',
+    title: 'Despejo no Sótão',
+    level: 5,
+    minLevel: 5,
+    giver: 'conde',
+    turnIn: 'conde',
+    requires: ['dentadura'],
+    text:
+      'Ah, meu salvador dentário. Finalmente posso sorrir de novo... e foi sorrindo que descobri o problema.\n\nEnquanto eu estava banguela, ninguém me levava a sério. Nem os morcegos. Uns Morcegos Dentuços invadiram o sótão da mansão e agora dão festas todas as noites. Com o MEU sangue de reserva!\n\nExpulse 5 deles. Eu mesmo faria, mas acabei de fazer as unhas.',
+    summary: 'Derrote 5 Morcegos Dentuços em volta da Mansão Dentúcio.',
+    objectives: [{ key: 'morcego', need: 5, label: 'Morcegos Dentuços expulsos' }],
+    progress: 'Ainda ouço guinchos no sótão. E alguém toca órgão de madrugada. Não sou eu.',
+    complete: 'Silêncio no sótão! Que maravilha. Dá até para ouvir os fantasmas do porão reclamando, como nos velhos tempos.\n\nPegue esta capa. Era do meu tataravô. Está um pouco roída, mas continua dramática.',
+    rewards: { xp: 700, money: 12000, items: ['capa'] },
+    area: 'sotao',
+  },
+  {
+    id: 'casamento',
+    title: 'Casamento no Farol',
+    level: 5,
+    minLevel: 5,
+    giver: 'suspiro',
+    turnIn: 'nevoa',
+    requires: ['resposta'],
+    text:
+      'Ahhh... (suspiro de felicidade)... Vamos nos casar! Eu e a Lady Névoa! No Farol Desalinhado, à luz do farol, como nos romances de mil setecentos e pouco.\n\nSó que o farol está apagado há cem anos. E uns Marujos Afogados tomaram conta do penhasco: pingam no tapete e cantam desafinado.\n\nDerrote 4 marujos, suba e acenda o lampião do farol. Depois avise minha noiva na ilha. Eu faria isso, mas sou transparente e eles não me levam a sério.',
+    summary: 'Derrote 4 Marujos Afogados, acenda o lampião do Farol Desalinhado e avise a Lady Névoa.',
+    objectives: [{ key: 'marujo', need: 4, label: 'Marujos Afogados derrotados' }, { key: 'farol', need: 1, label: 'Lampião do farol aceso' }],
+    progress: 'O Suspiro me contou do casamento. Não piso naquele farol enquanto estiver escuro e cheio de marinheiro molhado.',
+    complete: 'O farol... está aceso? Depois de cem anos?\n\n(Lady Névoa enxuga uma lágrima de ectoplasma.)\n\nDiga ao Suspiro que aceito. De novo. E que ele pode parar de suspirar, agora é oficial. Fique com o meu buquê. Quem pega o buquê é o próximo a... bem, a morrer de amor.',
+    rewards: { xp: 750, money: 15000, items: ['buque'] },
+    area: 'casamento',
+  },
 ];
 
 // XP necessária para passar de cada nível
@@ -271,9 +361,10 @@ export const ZONE_FLAVOR = {
 export const TIPS = [
   'Dica: Segure o botão direito do mouse para girar a câmera e o personagem ao mesmo tempo.',
   'Dica: Clique com o botão direito em um personagem para conversar.',
-  'Dica: Um ! amarelo indica uma missão disponível. Um ? amarelo indica uma missão pronta para entregar.',
+  'Dica: Um ! cor de abóbora indica uma missão disponível. Um ? cor de abóbora indica uma missão pronta para entregar.',
   'Dica: Pressione M para abrir o mapa e L para abrir o Diário de Missões.',
   'Dica: Pressione R para correr automaticamente.',
   'Dica: A Lápide de Regresso (tecla 6) leva você de volta à praça.',
   'Dica: Vaga-lumes só aparecem à noite. O Coveiro Tonico pode ajudar você a esperar.',
+  'Dica: Terminou uma missão? Volte a quem pediu: muita história tem continuação.',
 ];

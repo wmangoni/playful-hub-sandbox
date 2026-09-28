@@ -1,11 +1,10 @@
-import '@fontsource/marcellus/latin-400.css';
-import '@fontsource/marcellus/latin-ext-400.css';
-import '@fontsource/cinzel/latin-700.css';
+// fontes: Mountains of Christmas (títulos), IM Fell English (texto de livro antigo),
+// Patrick Hand (letra à mão: números, chat) e Griffy (logotipo e placas)
+import '@fontsource/mountains-of-christmas/latin-700.css';
+import '@fontsource/im-fell-english/latin-400.css';
+import '@fontsource/im-fell-english/latin-400-italic.css';
+import '@fontsource/patrick-hand/latin-400.css';
 import '@fontsource/griffy/latin-400.css';
-import '@fontsource/almendra/latin-400.css';
-import '@fontsource/almendra/latin-700.css';
-import '@fontsource/roboto-condensed/latin-400.css';
-import '@fontsource/roboto-condensed/latin-700.css';
 import './ui/styles.css';
 import './ui/hud.css';
 import { Game } from './game.js';
@@ -29,7 +28,7 @@ const loader = document.createElement('div');
 loader.id = 'boot';
 const tips = [
   'Dica: segure o botão direito do mouse para girar a câmera e o personagem ao mesmo tempo.',
-  'Dica: um ! amarelo sobre alguém indica uma missão. Um ? amarelo, missão pronta para entregar.',
+  'Dica: um ! cor de abóbora sobre alguém indica uma missão. Um ? cor de abóbora, missão pronta para entregar.',
   'Dica: vaga-lumes só aparecem à noite. O coveiro deixa você cochilar até escurecer.',
   'Dica: a Lápide de Regresso (tecla 6) leva você de volta à praça.',
   'Dica: aperte R para correr sozinho e M para abrir o mapa.',

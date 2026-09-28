@@ -34,7 +34,7 @@ export class CombatHud {
   statsHTML() {
     const c = this.game.combat, s = c.st, P = this.game.progress;
     const pct = (v) => `${Math.round(v * 100)}%`;
-    return `<div class="tt-name" style="color:#ffd100">${esc(this.game.player.name)}</div><div class="tt-lvl">Nível ${P.level}</div>
+    return `<div class="tt-name" style="color:#ffb86a">${esc(this.game.player.name)}</div><div class="tt-lvl">Nível ${P.level}</div>
       <div class="tt-stats"><div><span>Vida</span><b>${Math.ceil(c.hp)} / ${s.maxHp}</b></div><div><span>Lanternada</span><b>${s.min}–${s.max}</b></div>
       <div><span>Crítico</span><b>${pct(s.crit)}</b></div><div><span>Golpe a cada</span><b>${s.swing.toFixed(2).replace('.', ',')} s</b></div>
       <div><span>Resistência</span><b>${pct(s.armor)}</b></div></div><div class="tt-flavor">Cada nível deixa o Vicente mais forte.</div>`;
@@ -70,6 +70,7 @@ export class CombatHud {
     if (Math.abs(low - (this._low ?? -1)) > 0.02) {
       this._low = low;
       this.low.style.opacity = low.toFixed(2);
+      this.low.classList.toggle('on', low > 0);
     }
     // vida do alvo (criatura)
     const t = ui.target;
@@ -116,7 +117,7 @@ export class CombatHud {
       }
       if (!p) {
         const el = document.createElement('div');
-        el.className = `mp ${m.inter.reaction}`;
+        el.className = `mobplate ${m.inter.reaction}`;
         el.innerHTML = '<div class="nm"><b></b><span></span></div><div class="hb"><i></i></div>';
         el.querySelector('span').textContent = m.type.name;
         ui.overlay.appendChild(el);
