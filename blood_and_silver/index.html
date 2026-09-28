@@ -820,6 +820,122 @@
             pointer-events: auto;
         }
 
+        /* MINIMAPA: moldura octogonal de prata com filete carmim */
+        .minimap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            margin-top: 2px;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+
+        .minimap.minimap-hidden {
+            opacity: 0;
+        }
+
+        .minimap-zone {
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #e8ecf1;
+            text-shadow: 0 1px 3px #000;
+            padding: 3px 18px;
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            background: linear-gradient(90deg, rgba(92, 16, 30, 0) 0%, rgba(92, 16, 30, 0.92) 16%, rgba(92, 16, 30, 0.92) 84%, rgba(92, 16, 30, 0) 100%);
+        }
+
+        .minimap-frame {
+            position: relative;
+            width: 184px;
+            height: 184px;
+            filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.7));
+        }
+
+        .minimap-frame::before,
+        .minimap-frame::after,
+        .minimap-frame canvas {
+            clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
+        }
+
+        .minimap-frame::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(145deg, #eef1f5 0%, #9aa3ae 30%, #444a54 62%, #c6cdd6 100%);
+        }
+
+        .minimap-frame::after {
+            content: '';
+            position: absolute;
+            inset: 5px;
+            background: #6a1122;
+        }
+
+        .minimap-frame canvas {
+            position: absolute;
+            inset: 8px;
+            width: calc(100% - 16px);
+            height: calc(100% - 16px);
+            z-index: 1;
+        }
+
+        .minimap-north {
+            position: absolute;
+            top: -7px;
+            left: calc(50% - 10px);
+            width: 20px;
+            height: 20px;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+            background: linear-gradient(180deg, #ef5b6f, #7e1426);
+            color: #fbefe0;
+            font-family: 'Cinzel', serif;
+            font-size: 10px;
+            font-weight: 900;
+        }
+
+        .minimap-zoom {
+            position: absolute;
+            bottom: 0;
+            z-index: 2;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid #22262d;
+            background: radial-gradient(circle at 35% 30%, #f3f5f8, #a2abb6 55%, #4c525c);
+            color: #4a0c18;
+            font-family: 'Cinzel', serif;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 22px;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+        .minimap-zoom:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        .minimap-zoom-out {
+            left: 6px;
+        }
+
+        .minimap-zoom-in {
+            right: 6px;
+        }
+
         .hud-pause-btn {
             background: linear-gradient(180deg, #361820, #1f0b12);
             border: 1.5px solid #8c3b47;
@@ -890,6 +1006,34 @@
             .hud-pause-btn {
                 padding: 4px 8px;
                 font-size: 12px;
+            }
+
+            .minimap-frame {
+                width: 116px;
+                height: 116px;
+            }
+
+            .minimap-frame::after {
+                inset: 4px;
+            }
+
+            .minimap-frame canvas {
+                inset: 6px;
+                width: calc(100% - 12px);
+                height: calc(100% - 12px);
+            }
+
+            .minimap-zone {
+                font-size: 10px;
+                max-width: 140px;
+                padding: 2px 12px;
+            }
+
+            .minimap-zoom {
+                width: 20px;
+                height: 20px;
+                font-size: 13px;
+                line-height: 18px;
             }
 
             .overlay h1 {
@@ -989,6 +1133,15 @@
         <div class="hud-right">
             <div class="time" id="timeText">00:00</div>
             <button class="hud-pause-btn" id="mobilePauseBtn" aria-label="Pausar jogo">⏸️ Pausar</button>
+            <div class="minimap" id="minimap">
+                <div class="minimap-zone" id="minimapZone">Arena do Crepúsculo</div>
+                <div class="minimap-frame">
+                    <canvas id="minimapCanvas" width="168" height="168"></canvas>
+                    <div class="minimap-north">N</div>
+                    <button class="minimap-zoom minimap-zoom-out" id="minimapZoomOut" tabindex="-1" aria-label="Afastar minimapa (tecla −)">−</button>
+                    <button class="minimap-zoom minimap-zoom-in" id="minimapZoomIn" tabindex="-1" aria-label="Aproximar minimapa (tecla +)">+</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1163,7 +1316,7 @@
                 id: 'v3',
                 name: 'Vampiro Blindado',
                 sprite: 'vampire3Walk',
-                hp: 48,
+                hp: 28.8,   // 48 − 40%: resistente demais para quem circula e atira
                 speed: 26,
                 damage: 9,
                 radius: 16,
@@ -1261,8 +1414,25 @@
             meat: { name: 'Carne', desc: 'Aumenta a vida máxima.', stat: 'maxhp', amount: 15, maxLevel: 5, icon: '🥩' },
             mushroom: { name: 'Cogumelo Noturno', desc: 'Regenera vida aos poucos.', stat: 'regen', amount: 0.5, maxLevel: 5, icon: '🍄' },
             spirit_orb: { name: 'Orbe Espiritual', desc: 'Atrai gemas de mais longe.', stat: 'magnet', amount: 15, maxLevel: 5, icon: '🔮' },
-            boar_ring: { name: 'Anel do Javali', desc: 'Aumenta a velocidade de movimento.', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' }
+            boar_ring: { name: 'Anel do Javali', desc: 'Aumenta a velocidade de movimento.', stat: 'move_speed', amount: 0.06, maxLevel: 5, icon: '💍' },
+            aegis: { name: 'Égide de Prata', desc: 'Bloqueia golpes inteiros e se refaz sozinha.', stat: 'ward', amount: 1, maxLevel: 8, icon: '⚜️' }
         };
+
+        // Égide de Prata por nível: golpes bloqueados antes de sumir e segundos para se refazer.
+        // A cada nível ganha +1 golpe OU -0,5 s de recarga, alternando e começando pela recarga:
+        // o golpe extra é o passo mais forte (no nv 2 seria um salto de +77%), e assim a
+        // mitigação sob pressão (com os 0,7 s de invulnerabilidade após cada golpe) cresce quase
+        // em linha reta, de ~0,17 para ~0,69 golpe bloqueado por segundo.
+        const WARD_LEVELS = [
+            { charges: 1, regen: 5.0 },
+            { charges: 1, regen: 4.5 },
+            { charges: 2, regen: 4.5 },
+            { charges: 2, regen: 4.0 },
+            { charges: 3, regen: 4.0 },
+            { charges: 3, regen: 3.5 },
+            { charges: 4, regen: 3.5 },
+            { charges: 4, regen: 3.0 }
+        ];
 
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
@@ -1514,6 +1684,10 @@
             shield: 0,
             maxShield: 100,
             chestSpeedBonus: 0,
+            wardCharges: 0,     // Égide de Prata: golpes que ainda bloqueia
+            wardMax: 0,
+            wardRegen: 0,
+            wardTimer: 0,       // contagem para se refazer (só corre com as cargas zeradas)
             speed: CONFIG.player.speed,
             level: 1,
             xp: 0,
@@ -1934,6 +2108,12 @@
                 decalCount: 160,
                 patchThreshold: 0.64,    // máscara de bioma acima disso = mancha/clareira
                 fog: [184, 172, 154],
+                mapColors: [[128, 108, 80], [88, 72, 57], [60, 86, 56]],   // minimapa: areia, solo duro, oásis
+                names: {
+                    ponds: ['Oásis das Cinzas', 'Oásis Rubro', 'Oásis da Lua Pálida'],
+                    landmarks: { shrine: 'Santuário em Ruínas', graveyard: 'Necrópole das Areias', outpost: 'Caravana Abandonada', relic: 'Cripta das Urnas' },
+                    grove: 'Bosque dos Enforcados', center: 'Arena do Crepúsculo', region: 'Dunas'
+                },
                 tints: { rock: 'rgba(34, 24, 16, 0.36)', deadTree: 'rgba(34, 24, 16, 0.3)', grave: 'rgba(34, 24, 16, 0.42)' },   // sprites claros (noite)
                 decals: [
                     [['pebble', 26], ['dryTuft', 26], ['twig', 7], ['bone', 2], [null, 30]],
@@ -1970,6 +2150,12 @@
                 decalCount: 120,
                 patchThreshold: 0.6,
                 fog: [196, 204, 214],
+                mapColors: [[62, 82, 58], [88, 72, 56], [62, 82, 58]],
+                names: {
+                    ponds: ['Lago das Cinzas', 'Lago Rubro', 'Lago da Lua Pálida'],
+                    landmarks: { shrine: 'Santuário em Ruínas', graveyard: 'Cemitério Esquecido', outpost: 'Acampamento Abandonado', relic: 'Cripta das Urnas' },
+                    grove: 'Bosque Sombrio', center: 'Arena do Crepúsculo', region: 'Charneca'
+                },
                 tints: { rock: 'rgba(22, 24, 28, 0.4)', deadTree: 'rgba(22, 24, 28, 0.3)', grave: 'rgba(22, 24, 28, 0.25)' },
                 decals: [
                     [['tuft', 50], ['clover', 8], ['pebble', 5], ['leaves', 2], ['twig', 3], ['flowerWhite', 1]],
@@ -2007,6 +2193,11 @@
         // cinza-claro); é recolorido para o solo do tema, senão vira um halo claro.
         const PACK_GROUND_COLORS = [[76, 79, 73], [57, 61, 55], [134, 139, 124], [45, 49, 43]];
         const PACK_GROUND_TONES = [2, 1, 3, 0];
+        // Minimapa: mapa do mundo em baixa resolução (1 texel = OVERVIEW_STEP px), em faixas
+        const OVERVIEW_STEP = 8;
+        const OVERVIEW_SIZE = WORLD_W / OVERVIEW_STEP;   // 500×500
+        const OVERVIEW_BAND = 25;                        // linhas por pedido ao worker (~20 ms)
+        const MAP_WATER = [[24, 46, 60], [44, 80, 92], [42, 34, 30]];   // fundo, raso e margem
 
         const flora = [];
         const groves = [];
@@ -2894,6 +3085,9 @@
             workerResults.length = 0;
             if (composeJob && composeJob.ch) chunkPool.push(composeJob.ch);
             composeJob = null;
+            // cenário mudou: o mapa do minimapa é refeito do zero
+            minimap.overviewNext = minimap.overviewStored = 0;
+            minimap.overviewPending = false;
         }
 
         function chunkDecals(cx, cy) {
@@ -3221,6 +3415,32 @@
             }
         }
 
+        // Minimapa: linhas do mapa do mundo com as mesmas classes de solo e lagos do cenário e
+        // o tom em larga escala (roda no worker; sem ele, em fatias na thread principal).
+        function bakeOverviewRows(data, y0, y1) {
+            const cols = THEME.mapColors;
+            let o = 0;
+            for (let j = y0; j < y1; j++) {
+                const wy = (j + 0.5) * OVERVIEW_STEP;
+                let near = null, nearKey = -1;
+                for (let i = 0; i < OVERVIEW_SIZE; i++, o += 4) {
+                    const wx = (i + 0.5) * OVERVIEW_STEP;
+                    const key = Math.floor(wx / CHUNK);
+                    if (key !== nearKey) {
+                        nearKey = key;
+                        near = clearingsNear(key * CHUNK, Math.floor(wy / CHUNK) * CHUNK, CHUNK);
+                    }
+                    const pd = pondDistance(wx, wy);
+                    const c = pd < 0.9 ? MAP_WATER[0] : (pd < 1 ? MAP_WATER[1] : (pd < 1.08 ? MAP_WATER[2] : cols[groundAt(wx, wy, near).cls]));
+                    const m = 0.85 + fbm(wx / 300, wy / 300, 2, 0, 131) * 0.3;
+                    data[o] = c[0] * m;
+                    data[o + 1] = c[1] * m;
+                    data[o + 2] = c[2] * m;
+                    data[o + 3] = 255;
+                }
+            }
+        }
+
         // Etapa 5: listas de decalques dos 3×3 vizinhos (uma por fatia; ficam em cache).
         function bakeDecalSlice(job, i) {
             chunkDecals(job.cx - 1 + (i % 3), job.cy - 1 + Math.floor(i / 3));
@@ -3407,7 +3627,7 @@
             createGroundTex, groundTexNoise, setGroundTex, buildGroundTexRows, finishGroundTextures,
             buildPondShapes, pondDistance, wetAt, clearingsNear, biomeAt, groundAt,
             chunkKey, chunkDecals, collectChunkDecals, sliceRange, bakeCoarseSlice, bakeClassSlice,
-            bakeColorSlice, bakePondSlice
+            bakeColorSlice, bakePondSlice, bakeOverviewRows
         ];
 
         function buildWorkerSource() {
@@ -3415,7 +3635,8 @@
                 TWO_PI: TWO_PI, WORLD_W: WORLD_W, WORLD_H: WORLD_H, CHUNK: CHUNK, TEX: TEX, TEX_MASK: TEX_MASK,
                 COARSE: COARSE, COARSE_N: COARSE_N, CLS_W: CLS_W, BIOME_CONTRAST: BIOME_CONTRAST, DETAIL_AMP: DETAIL_AMP,
                 OASIS_REACH: OASIS_REACH, OASIS_CONTRAST: OASIS_CONTRAST, OASIS_DETAIL: OASIS_DETAIL,
-                BAYER4: BAYER4, FLOWER_KINDS: FLOWER_KINDS
+                BAYER4: BAYER4, FLOWER_KINDS: FLOWER_KINDS,
+                OVERVIEW_STEP: OVERVIEW_STEP, OVERVIEW_SIZE: OVERVIEW_SIZE, MAP_WATER: MAP_WATER
             };
             const lines = ['"use strict";'];
             Object.keys(consts).forEach(function (k) { lines.push('const ' + k + ' = ' + JSON.stringify(consts[k]) + ';'); });
@@ -3466,6 +3687,10 @@
                 postMessage({ type: 'chunk', cx: m.cx, cy: m.cy, gen: m.gen, pixels: pixels, decals: decals }, [pixels.buffer, decals.buffer]);
             } else if (m.type === 'recycle') {
                 if (bufferPool.length < 4) bufferPool.push(m.pixels);
+            } else if (m.type === 'overview') {
+                const rows = new Uint8ClampedArray(OVERVIEW_SIZE * (m.y1 - m.y0) * 4);
+                bakeOverviewRows(rows, m.y0, m.y1);
+                postMessage({ type: 'overview', y0: m.y0, y1: m.y1, gen: m.gen, pixels: rows }, [rows.buffer]);
             }
         }
 
@@ -3503,6 +3728,10 @@
                 if (m.gen !== workerGen) return;   // pedido de antes de um flush
                 workerInFlight--;
                 workerResults.push(m);
+            } else if (m.type === 'overview') {
+                minimap.overviewPending = false;
+                if (m.gen === workerGen) storeOverviewRows(m.y0, m.y1, m.pixels);
+                else minimap.overviewNext = minimap.overviewStored;   // pedido de antes de um flush
             }
             schedulePump();   // sob overlay, compõe e pede o próximo sem esperar o rAF
         }
@@ -3517,6 +3746,8 @@
             workerInFlight = 0;
             workerPending.clear();
             workerResults.length = 0;
+            minimap.overviewPending = false;
+            minimap.overviewNext = minimap.overviewStored;
             if (!groundTex) initTasks = groundTexTasks().concat(initTasks);
         }
 
@@ -3605,12 +3836,17 @@
                     if (runComposeStep(composeJob)) composeJob = null;
                     ran = true;
                 }
+                let idle = false;
                 while (workerInFlight < (overlayWork() ? WORKER_MAX_IN_FLIGHT_OVERLAY : WORKER_MAX_IN_FLIGHT)) {
                     const next = nextChunkToBake(camX, camY);
-                    if (!next) break;
+                    if (!next) { idle = true; break; }
                     workerPending.add(chunkKey(next[0], next[1]));
                     workerInFlight++;
                     sceneryWorker.postMessage({ type: 'bake', cx: next[0], cy: next[1], gen: workerGen });
+                }
+                // ocioso (nenhum chunk faltando): gera o mapa do minimapa, uma faixa por vez
+                if (idle && workerInFlight === 0 && !pendingStart && !minimap.overviewPending && minimap.overviewNext < OVERVIEW_SIZE) {
+                    requestOverviewBand();
                 }
                 return;
             }
@@ -3618,7 +3854,10 @@
             for (;;) {
                 if (!bakeJob) {
                     const next = nextChunkToBake(camX, camY);
-                    if (!next) return;
+                    if (!next) {
+                        if (!pendingStart) bakeOverviewSlice(deadline);
+                        return;
+                    }
                     bakeJob = newBakeJob(next[0], next[1]);
                 }
                 if (ran && performance.now() + BAKE_STEPS[bakeJob.step].est > deadline) return;
@@ -3727,10 +3966,17 @@
             maxhp: 'vida máxima',
             regen: 'regeneração',
             magnet: 'raio de coleta',
-            move_speed: 'vel. de movimento'
+            move_speed: 'vel. de movimento',
+            ward: 'bloqueio'
         };
 
+        function wardText(level) {
+            const w = WARD_LEVELS[Math.max(1, Math.min(WARD_LEVELS.length, level)) - 1];
+            return 'Bloqueia ' + w.charges + (w.charges > 1 ? ' golpes' : ' golpe') + ' · refaz em ' + w.regen.toFixed(1).replace('.', ',') + 's';
+        }
+
         function passiveBonusText(c, level) {
+            if (c.stat === 'ward') return wardText(level);
             if (c.stat === 'cooldown') return '-' + Math.round(c.amount * 100) + '% ' + STAT_LABELS[c.stat] + ' por nível';
             if (c.stat === 'maxhp' || c.stat === 'magnet') return '+' + c.amount + ' ' + STAT_LABELS[c.stat] + ' por nível';
             return '+' + Math.round(c.amount * 100) + '% ' + STAT_LABELS[c.stat] + ' por nível';
@@ -3765,6 +4011,10 @@
             let html = '<div class="tip-title">' + c.icon + ' ' + c.name + '</div>';
             html += '<div class="tip-level">Nível ' + p.level + ' / ' + c.maxLevel + '</div>';
             html += '<div class="tip-desc">' + c.desc + '</div>';
+            if (c.stat === 'ward') {
+                html += '<div class="tip-stats">' + wardText(p.level) + (p.level < c.maxLevel ? '<br>Próximo nível: ' + wardText(p.level + 1) : '') + '</div>';
+                return html;
+            }
             let total;
             if (c.stat === 'cooldown') total = '-' + Math.round(c.amount * p.level * 100) + '%';
             else if (c.stat === 'maxhp' || c.stat === 'magnet') total = '+' + (c.amount * p.level);
@@ -3926,7 +4176,7 @@
         }
 
         function recomputeStats() {
-            const s = { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1 };
+            const s = { area: 1, might: 1, cooldown: 1, speed: 1, maxhp: 0, regen: 0, magnet: 0, move_speed: 1, ward: 0 };
             for (const p of player.passives) {
                 const c = PASSIVES[p.id];
                 if (c.stat === 'cooldown') s.cooldown *= (1 - c.amount * p.level);
@@ -3951,6 +4201,19 @@
             player.hp += (player.maxHp - oldMax);
             player.speed = baseSpeed * s.move_speed;
             player.collectRadius = CONFIG.player.collectRadius + s.magnet;
+
+            // Égide de Prata: recém-obtida já protege; ao subir de nível com o escudo ativo, o golpe
+            // extra entra na hora; enquanto se refaz, a recarga menor vale para a contagem atual.
+            const ward = s.ward > 0 ? WARD_LEVELS[Math.min(WARD_LEVELS.length, s.ward) - 1] : null;
+            if (!ward) {
+                player.wardCharges = player.wardMax = player.wardRegen = player.wardTimer = 0;
+            } else {
+                if (player.wardMax === 0) player.wardCharges = ward.charges;
+                else if (player.wardCharges > 0) player.wardCharges += ward.charges - player.wardMax;
+                player.wardMax = ward.charges;
+                player.wardRegen = ward.regen;
+                player.wardTimer = Math.min(player.wardTimer, ward.regen);
+            }
         }
 
         function resetGame() {
@@ -4221,6 +4484,11 @@
             else if (game.status === 'chest' && chestChoice) { if (k === '1' || k === '2') chooseChestBonus(parseInt(k, 10) - 1); }
             else if (game.status === 'chest' && (k === 'enter' || k === ' ')) closeChest();
             else if ((game.status === 'playing' || game.status === 'paused') && (k === 'enter' || k === 'escape')) togglePause();
+            if (game.status === 'playing') {
+                if (k === '+' || k === '=') setMinimapZoom(minimap.zoom - 1);
+                else if (k === '-' || k === '_') setMinimapZoom(minimap.zoom + 1);
+                else if (k === 'm') toggleMinimap();
+            }
         }
 
         function onKeyUp(e) {
@@ -4276,6 +4544,15 @@
             player.y = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y));
 
             if (player.hitCooldown > 0) player.hitCooldown -= dt;
+            // Égide de Prata: sem cargas, conta a recarga e volta inteira
+            if (player.wardMax > 0 && player.wardCharges === 0) {
+                player.wardTimer -= dt;
+                if (player.wardTimer <= 0) {
+                    player.wardCharges = player.wardMax;
+                    spawnParticles(player.x, player.y, '#dfe6f0', 10);
+                    if (audio) audio.play('ward');
+                }
+            }
             if (player.stats.regen > 0 && player.hp > 0 && player.hp < player.maxHp) {
                 player.hp = Math.min(player.maxHp, player.hp + player.stats.regen * dt);
             }
@@ -4725,7 +5002,7 @@
                     const p = player.passives.find(function (x) { return x.id === opt.id; });
                     icon = c.icon;
                     title = c.name;
-                    desc = c.desc + '<br>' + passiveBonusText(c, 1);
+                    desc = c.desc + '<br>' + passiveBonusText(c, p ? p.level + 1 : 1);
                     prog = p ? ('Nível ' + p.level + ' → ' + (p.level + 1)) : 'NOVO PASSIVO';
                 }
                 el.innerHTML = '<div class="uc-icon">' + icon + '</div><div class="uc-title">' + title + '</div><div class="uc-desc">' + desc + '</div><div class="uc-prog">' + prog + '</div>';
@@ -5022,7 +5299,7 @@
                 if (r.kind === 'passive') {
                     const c = PASSIVES[r.id];
                     const p = player.passives.find(function (x) { return x.id === r.id; });
-                    return { kind: 'passive', id: r.id, icon: c.icon, name: c.name, desc: c.desc + '<br>' + passiveBonusText(c, 1), isNew: !p, level: p ? p.level : 0 };
+                    return { kind: 'passive', id: r.id, icon: c.icon, name: c.name, desc: c.desc + '<br>' + passiveBonusText(c, p ? p.level + 1 : 1), isNew: !p, level: p ? p.level : 0 };
                 }
                 const cw = WEAPONS[r.id];
                 const existing = player.weapons.find(function (x) { return x.id === r.id; });
@@ -5117,6 +5394,7 @@
                 chestCards.appendChild(el);
             });
             chestBtn.style.display = 'none';   // a escolha é obrigatória
+            chestBtn.blur();                   // Enter não pode "clicar" no botão escondido
             if (audio) audio.play('chest');
             setStatus('chest');
         }
@@ -5575,6 +5853,17 @@
         function damagePlayer(dmg) {
             if (player.hitCooldown > 0) return;
             player.hitCooldown = CONFIG.player.hitCooldown;
+
+            // Égide de Prata: bloqueia o golpe inteiro (antes do escudo de energia e da vida)
+            if (player.wardCharges > 0) {
+                player.wardCharges--;
+                if (player.wardCharges === 0) player.wardTimer = player.wardRegen;
+                shake = 3;
+                spawnDamageText(player.x, player.y - player.radius - 8, 'BLOQUEADO ⚜️', '#e6ebf2');
+                spawnParticles(player.x, player.y, '#c9d3e0', 12);
+                if (audio) audio.play('block');
+                return;
+            }
             shake = 8;
 
             // Absorção pelo Escudo de Energia
@@ -5838,6 +6127,251 @@
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.drawImage(vignetteSprite, 0, 0, VIEW_W, VIEW_H);
             ctx.restore();
+        }
+
+        // =====================================================================
+        // MINIMAPA — inspirado nos minimapas de MMO (norte fixo, seta do jogador, pontos de
+        // interesse, nome da região e zoom), com moldura octogonal de prata e sangue do jogo.
+        // Redesenha a ~30 Hz num canvas próprio do HUD; o terreno é o mesmo cenário procedural,
+        // gerado pelo worker em faixas quando ele não tem chunks para assar.
+        // =====================================================================
+        const MINIMAP_ZOOMS = [480, 720, 1080];   // raio visível (px do mundo) por nível de zoom
+        const ZONE_DIRECTIONS = ['do Leste', 'do Sudeste', 'do Sul', 'do Sudoeste', 'do Oeste', 'do Noroeste', 'do Norte', 'do Nordeste'];
+        const minimapEl = document.getElementById('minimap');
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
+        const minimapZone = document.getElementById('minimapZone');
+        const minimapZoomIn = document.getElementById('minimapZoomIn');
+        const minimapZoomOut = document.getElementById('minimapZoomOut');
+        const minimap = {
+            zoom: 1, visible: true, frame: 0, zone: '', zoneTick: 99,
+            overview: createCanvas(OVERVIEW_SIZE, OVERVIEW_SIZE), overviewNext: 0, overviewStored: 0, overviewPending: false,
+            landmarks: [], landmarkSig: null
+        };
+        const minimapPos = [0, 0];
+
+        // Faixa do mapa do mundo pronta (worker ou thread principal)
+        function storeOverviewRows(y0, y1, pixels) {
+            minimap.overview.getContext('2d').putImageData(new ImageData(pixels, OVERVIEW_SIZE, y1 - y0), 0, y0);
+            minimap.overviewStored = y1;
+            if (y1 < OVERVIEW_SIZE) return;
+            // mapa completo: árvores como pontinhos escuros
+            const g = minimap.overview.getContext('2d');
+            g.fillStyle = 'rgba(22, 15, 12, 0.6)';
+            for (const f of flora) {
+                if (/^(tree|deadTree)/.test(f.flora)) g.fillRect(Math.round(f.x / OVERVIEW_STEP) - 1, Math.round(f.y / OVERVIEW_STEP) - 1, 2, 2);
+            }
+        }
+
+        function requestOverviewBand() {
+            const y0 = minimap.overviewNext, y1 = Math.min(OVERVIEW_SIZE, y0 + OVERVIEW_BAND);
+            minimap.overviewNext = y1;
+            minimap.overviewPending = true;
+            sceneryWorker.postMessage({ type: 'overview', y0: y0, y1: y1, gen: workerGen });
+        }
+
+        // Sem worker: gera o mapa do mundo em faixas pequenas dentro do orçamento do frame.
+        function bakeOverviewSlice(deadline) {
+            while (minimap.overviewNext < OVERVIEW_SIZE && performance.now() < deadline) {
+                const y0 = minimap.overviewNext, y1 = Math.min(OVERVIEW_SIZE, y0 + 4);
+                const pixels = new Uint8ClampedArray(OVERVIEW_SIZE * (y1 - y0) * 4);
+                bakeOverviewRows(pixels, y0, y1);
+                minimap.overviewNext = y1;
+                storeOverviewRows(y0, y1, pixels);
+            }
+        }
+
+        // Marcos do mapa: um por diorama (props da mesma categoria agrupados por proximidade)
+        function buildLandmarks() {
+            const list = [];
+            for (const o of scenery) {
+                if (!o.category) continue;
+                let lm = null;
+                for (const l of list) {
+                    if (l.category === o.category && Math.abs(l.x - o.x) < 110 && Math.abs(l.y - o.y) < 110) { lm = l; break; }
+                }
+                if (lm) {
+                    lm.sx += o.x; lm.sy += o.y; lm.n++;
+                    lm.x = lm.sx / lm.n; lm.y = lm.sy / lm.n;
+                } else {
+                    list.push({ category: o.category, x: o.x, y: o.y, sx: o.x, sy: o.y, n: 1 });
+                }
+            }
+            return list;
+        }
+
+        // Nome da região onde o jogador está: lago/oásis, diorama, bosque, arena central ou
+        // a direção no mapa.
+        function zoneNameAt(x, y) {
+            const names = THEME.names;
+            for (let p = 0; p < PONDS.length; p++) {
+                const pond = PONDS[p];
+                if (Math.hypot(x - pond.x, y - pond.y) < pond.radius * (THEME.oasis ? OASIS_REACH : 1.4)) return names.ponds[p];
+            }
+            let best = null, bestD = 170 * 170;
+            for (const l of minimap.landmarks) {
+                const d2 = (x - l.x) * (x - l.x) + (y - l.y) * (y - l.y);
+                if (d2 < bestD) { bestD = d2; best = l; }
+            }
+            if (best) return names.landmarks[best.category];
+            for (const gr of groves) {
+                if (Math.hypot(x - gr.x, y - gr.y) < gr.r * 0.8) return names.grove;
+            }
+            const dx = x - WORLD_W / 2, dy = y - WORLD_H / 2;
+            if (dx * dx + dy * dy < 420 * 420) return names.center;
+            return names.region + ' ' + ZONE_DIRECTIONS[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8];
+        }
+
+        // Posição no minimapa (em minimapPos); com pin, prende na borda o que está fora do alcance.
+        function toMinimap(x, y, k, half, lim, pin) {
+            let dx = (x - player.x) * k, dy = (y - player.y) * k;
+            const d2 = dx * dx + dy * dy;
+            if (d2 > lim * lim) {
+                if (!pin) return false;
+                const f = lim / Math.sqrt(d2);
+                dx *= f; dy *= f;
+            }
+            minimapPos[0] = half + dx;
+            minimapPos[1] = half + dy;
+            return true;
+        }
+
+        function drawLandmarkGlyph(g, category, x, y, u) {
+            g.beginPath();
+            if (category === 'shrine') {          // santuário: losango carmim
+                g.fillStyle = '#c23a48';
+                g.moveTo(x, y - u * 1.4); g.lineTo(x + u, y); g.lineTo(x, y + u * 1.4); g.lineTo(x - u, y);
+            } else if (category === 'graveyard') { // necrópole: cruz prateada
+                g.fillStyle = '#cfd6df';
+                g.rect(x - u * 0.35, y - u * 1.3, u * 0.7, u * 2.6);
+                g.rect(x - u, y - u * 0.65, u * 2, u * 0.7);
+            } else if (category === 'outpost') {  // acampamento: tenda
+                g.fillStyle = '#d0a56a';
+                g.moveTo(x, y - u * 1.2); g.lineTo(x + u * 1.2, y + u); g.lineTo(x - u * 1.2, y + u);
+            } else {                               // cripta: quadrado violeta
+                g.fillStyle = '#a07ccb';
+                g.rect(x - u * 0.9, y - u * 0.9, u * 1.8, u * 1.8);
+            }
+            g.fill();
+            g.strokeStyle = 'rgba(8, 4, 6, 0.85)';
+            g.lineWidth = Math.max(1, u * 0.4);
+            g.stroke();
+        }
+
+        const CHEST_MAP_COLORS = { common: '#b8834c', rare: '#a9bdd4', legendary: '#ffd24a' };
+        const PICKUP_MAP_COLORS = { heart: '#ff5a76', lilac_gem: '#c9a3ff', bow: '#a8dcff', shield: '#48c3f5' };
+
+        function drawMinimap() {
+            if (!minimap.visible || game.status !== 'playing') return;
+            if ((minimap.frame++ & 1) === 1) return;   // ~30 Hz basta para o minimapa
+            if (minimap.landmarkSig !== staticSignature) {
+                minimap.landmarks = buildLandmarks();
+                minimap.landmarkSig = staticSignature;
+            }
+            if (++minimap.zoneTick >= 8) {
+                minimap.zoneTick = 0;
+                const zone = zoneNameAt(player.x, player.y);
+                if (zone !== minimap.zone) {
+                    minimap.zone = zone;
+                    minimapZone.textContent = zone;
+                }
+            }
+            const g = minimapCtx, S = minimapCanvas.width, half = S / 2;
+            const u = S / 168 * 2.4;                    // unidade dos marcadores (acompanha o tamanho)
+            const R = MINIMAP_ZOOMS[minimap.zoom], k = half / R;
+            const lim = half - u * 2.5;
+            g.setTransform(1, 0, 0, 1, 0, 0);
+            g.fillStyle = '#0d080b';
+            g.fillRect(0, 0, S, S);
+
+            // Terreno (mapa do mundo em baixa resolução, suavizado) e a borda do mundo
+            if (minimap.overviewStored > 0) {
+                g.imageSmoothingEnabled = true;
+                const src = 2 * R / OVERVIEW_STEP;
+                g.drawImage(minimap.overview, (player.x - R) / OVERVIEW_STEP, (player.y - R) / OVERVIEW_STEP, src, src, 0, 0, S, S);
+            }
+            g.strokeStyle = 'rgba(150, 38, 56, 0.9)';
+            g.lineWidth = u * 0.6;
+            g.strokeRect(half - player.x * k, half - player.y * k, WORLD_W * k, WORLD_H * k);
+
+            // Marcos (dioramas)
+            for (const l of minimap.landmarks) {
+                if (toMinimap(l.x, l.y, k, half, lim, false)) drawLandmarkGlyph(g, l.category, minimapPos[0], minimapPos[1], u);
+            }
+            // Itens do mapa
+            for (const p of pickups) {
+                if (!p.alive || !toMinimap(p.x, p.y, k, half, lim, false)) continue;
+                g.fillStyle = PICKUP_MAP_COLORS[p.type] || '#ffffff';
+                g.beginPath();
+                g.arc(minimapPos[0], minimapPos[1], u * 0.9, 0, TWO_PI);
+                g.fill();
+            }
+            // Inimigos (pontos) — o chefe fica preso na borda quando longe
+            g.fillStyle = '#e3343f';
+            let boss = null;
+            for (const e of enemies) {
+                if (!e.alive) continue;
+                if (e.isBoss) { boss = e; continue; }
+                if (toMinimap(e.x, e.y, k, half, lim, false)) g.fillRect(minimapPos[0] - u * 0.45, minimapPos[1] - u * 0.45, u * 0.9, u * 0.9);
+            }
+            // Baús (presos na borda quando longe: vale a pena ir buscar)
+            for (const c of chests) {
+                if (!c.alive) continue;
+                toMinimap(c.x, c.y, k, half, lim, true);
+                g.fillStyle = CHEST_MAP_COLORS[c.rarity] || CHEST_MAP_COLORS.common;
+                g.fillRect(minimapPos[0] - u, minimapPos[1] - u * 0.75, u * 2, u * 1.5);
+                g.strokeStyle = '#1a0d08';
+                g.lineWidth = Math.max(1, u * 0.35);
+                g.strokeRect(minimapPos[0] - u, minimapPos[1] - u * 0.75, u * 2, u * 1.5);
+            }
+            if (boss) {
+                toMinimap(boss.x, boss.y, k, half, lim, true);
+                const pulse = 1 + Math.sin(game.time * 6) * 0.2;
+                g.fillStyle = '#ff2a45';
+                g.strokeStyle = '#f6e9d8';
+                g.lineWidth = Math.max(1, u * 0.45);
+                g.beginPath();
+                g.arc(minimapPos[0], minimapPos[1], u * 1.7 * pulse, 0, TWO_PI);
+                g.fill();
+                g.stroke();
+            }
+            // Jogador: seta prateada que aponta para onde ele anda
+            g.translate(half, half);
+            g.rotate(player.facing);
+            g.beginPath();
+            g.moveTo(u * 2.6, 0);
+            g.lineTo(-u * 1.7, u * 1.6);
+            g.lineTo(-u * 0.8, 0);
+            g.lineTo(-u * 1.7, -u * 1.6);
+            g.closePath();
+            g.fillStyle = '#eef2f7';
+            g.fill();
+            g.strokeStyle = '#6a1120';
+            g.lineWidth = Math.max(1, u * 0.5);
+            g.stroke();
+        }
+
+        function setMinimapZoom(z) {
+            minimap.zoom = Math.max(0, Math.min(MINIMAP_ZOOMS.length - 1, z));
+            minimapZoomIn.disabled = minimap.zoom === 0;
+            minimapZoomOut.disabled = minimap.zoom === MINIMAP_ZOOMS.length - 1;
+            minimap.frame = 0;   // redesenha no próximo frame
+        }
+
+        function toggleMinimap() {
+            minimap.visible = !minimap.visible;
+            minimapEl.classList.toggle('minimap-hidden', !minimap.visible);
+        }
+
+        // Canvas na resolução real da tela (nítido em telas de alta densidade)
+        function resizeMinimap() {
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            const size = Math.max(1, Math.round(minimapCanvas.clientWidth * dpr));
+            if (minimapCanvas.width !== size) {
+                minimapCanvas.width = size;
+                minimapCanvas.height = size;
+            }
+            minimap.frame = 0;
         }
 
         function drawMeleeArcs() {
@@ -6268,6 +6802,38 @@
             }
         }
 
+        // Égide de Prata: anel rúnico sob os pés, com uma runa por golpe que ainda bloqueia;
+        // enquanto se refaz, só um arco fino mostra o progresso.
+        function drawWard(sx, sy) {
+            const r = player.radius + 12;
+            ctx.save();
+            ctx.translate(sx, sy + 14);
+            ctx.scale(1, 0.5);
+            if (player.wardCharges > 0) {
+                ctx.strokeStyle = 'rgba(214, 222, 234, 0.6)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, TWO_PI);
+                ctx.stroke();
+                ctx.fillStyle = '#eef2f7';
+                for (let i = 0; i < player.wardCharges; i++) {
+                    const a = game.time * 1.6 + i * TWO_PI / player.wardCharges;
+                    const rx = Math.cos(a) * r, ry = Math.sin(a) * r;
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry - 7); ctx.lineTo(rx + 3, ry); ctx.lineTo(rx, ry + 7); ctx.lineTo(rx - 3, ry);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            } else {
+                ctx.strokeStyle = 'rgba(170, 180, 196, 0.4)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + (1 - player.wardTimer / player.wardRegen) * TWO_PI);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         function drawPlayer() {
             const sx = player.x - camera.x;
             const sy = player.y - camera.y;
@@ -6290,6 +6856,7 @@
                 const maxFrames = (player.row === 1 || player.row === 3) ? 4 : anim.frames;
                 frame = Math.floor(player.animTime * anim.fps) % maxFrames;
             }
+            if (player.wardMax > 0) drawWard(sx, sy);   // anel no chão, sob o personagem
             drawSprite(img, player.row, frame, anim.frames, sx, sy, size, size, false);
 
             // BOLHA DE ESCUDO DE ENERGIA TRANSLÚCIDA PULSANTE
@@ -6420,6 +6987,7 @@
             drawProjectiles();
             drawParticles();
             drawDamageTexts();
+            drawMinimap();
         }
 
         function gameLoop(now) {
@@ -6501,6 +7069,11 @@
                 }
                 else if (name === 'collect') tone('sine', 760, 900, 0.06, 0.04);
                 else if (name === 'tick') tone('square', 500, 500, 0.04, 0.07);
+                else if (name === 'block') {
+                    tone('triangle', 1500, 900, 0.1, 0.16);
+                    noiseSweep(0.1, 0.1, 'bandpass', 4000, 2000);
+                }
+                else if (name === 'ward') tone('sine', 880, 1320, 0.18, 0.1);
                 else if (name === 'gameover') {
                     tone('sawtooth', 300, 60, 1.1, 0.28);
                     tone('square', 150, 40, 1.2, 0.2);
@@ -6512,7 +7085,7 @@
 
         startBtn.addEventListener('click', startGame);
         restartBtn.addEventListener('click', startGame);
-        chestBtn.addEventListener('click', closeChest);
+        chestBtn.addEventListener('click', function () { if (!chestChoice) closeChest(); });
         achievementsBtn.addEventListener('click', openAchievementsModal);
         closeAchievementsBtn.addEventListener('click', closeAchievementsModal);
         resetProgressBtn.addEventListener('click', openResetModal);
@@ -6531,6 +7104,9 @@
         pauseAchBtn.addEventListener('click', openAchievementsModal);
         resumeBtn.addEventListener('click', togglePause);
         mobilePauseBtn.addEventListener('click', togglePause);
+        minimapZoomIn.addEventListener('click', function () { setMinimapZoom(minimap.zoom - 1); });
+        minimapZoomOut.addEventListener('click', function () { setMinimapZoom(minimap.zoom + 1); });
+        window.addEventListener('resize', resizeMinimap);
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
         window.addEventListener('blur', function () { for (const k in keys) keys[k] = false; });
@@ -6549,9 +7125,11 @@
         loadBest();
         generateScenery();
         initProceduralScenery();
+        resizeMinimap();
+        setMinimapZoom(minimap.zoom);
         initMapPickups();
         setStatus('menu');
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>
