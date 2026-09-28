@@ -5,7 +5,7 @@ import * as TR from './props/trees.js';
 import * as BL from './props/buildings.js';
 import * as SG from './props/signs.js';
 import { Builder, S } from '../render/builder.js';
-import { MAT, GLOW, flameMat } from '../render/toon.js';
+import { MAT, GLOW, GLOW_ENTRY, flameMat } from '../render/toon.js';
 import { LAYER_FX } from '../render/postfx.js';
 import { RNG } from '../util/rng.js';
 import { clamp, lerp, TAU } from '../util/math.js';
@@ -269,7 +269,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
         scene.add(piv);
         // lit: o farol fica apagado até a missão do casamento (questWorld.applyState)
         const lh = (out.anchors.lighthouse = { lamp, door: toWorld(x, p.y, z, rot, m.anchors.door), lit: true });
-        const lampGlow = BL.LIGHTHOUSE_LAMP.userData.glow, lampOn = lampGlow.night.clone(), lampOff = new THREE.Color('#15141c');
+        const lampGlow = GLOW_ENTRY.get(BL.LIGHTHOUSE_LAMP), lampOn = lampGlow.night.clone(), lampOff = new THREE.Color('#15141c');
         out.animated.push({ update: (dt, t, g) => { lampGlow.night.copy(lh.lit ? lampOn : lampOff); piv.rotation.y += dt * 0.6; beamMat.uniforms.opacity.value = 0.22 * (g?.dayNight?.lamps ?? 1) * (lh.lit ? 1 : 0); piv.visible = beamMat.uniforms.opacity.value > 0.01; } });
         M.circles.push({ x, z, r: 2.4, fill: '#8a2a2e', tall: true });
         break;

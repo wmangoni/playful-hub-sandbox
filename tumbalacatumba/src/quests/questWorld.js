@@ -382,6 +382,7 @@ export class QuestWorld {
     g.ui.cast('Acendendo o farol', 3, {
       icon: 'lantern',
       onDone: () => {
+        if (!this.P.wants('farol')) return; // abandonou a missão no meio da subida
         this.lighthouse.lit = true;
         this.P.setFlag('lighthouse');
         this.P.progress('farol');

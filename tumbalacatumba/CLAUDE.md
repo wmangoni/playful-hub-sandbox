@@ -75,6 +75,8 @@ Referência: 60 FPS a 1592×818 na qualidade média, com ~318 draw calls por qua
 - `#overlay` tem `z-index: 1` (contexto de empilhamento) para as placas de nome não passarem por cima das janelas.
 - Foco: botões, selects, checkboxes e sliders recebem `blur()` depois do uso, e `_isTyping` (`core/input.js`) só considera campos de texto. Sem isso, o Espaço clica de novo no botão e o WASD para de funcionar.
 - Os marcadores `!`/`?` são desenhados em SVG com traços grossos. Com glifo de fonte ficam finos demais.
+- Canvas 2D: o recorte com `globalCompositeOperation = 'destination-in'` usa o `fillStyle` atual; se ele for um degradê que vai a transparente (o `glow()` dos ícones), a arte some. Defina uma cor opaca antes.
+- Degradês de SVG repetidos em várias placas: com o mesmo `id`, o Chrome resolve `url(#id)` para o primeiro elemento, e se ele estiver numa placa com `display: none` o marcador fica oco. Use id único por SVG (`markerSeq`).
 - Nomes de classe curtos colidem: as placas das criaturas eram `.mp` e herdavam para a barra de Coragem (`bar mp`), que sumia. Hoje são `.mobplate`.
 - Patrick Hand e IM Fell English só têm peso 400; `font-weight: 700` nelas vira negrito falso borrado. Mountains of Christmas é carregada só no 700.
 - Não reaproveite nomes curtos em blocos internos: um `const` que sombreava outra variável causou erro de TDZ só no build minificado.

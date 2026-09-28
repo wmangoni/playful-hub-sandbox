@@ -101,12 +101,14 @@ export const MAT = {
 // Cores > 1 viram HDR e ativam o bloom.
 // ---------------------------------------------------------------------------
 const glowRegistry = [];
+/** entrada de cada material de brilho no ciclo dia/noite (num WeakMap: no userData viraria referência circular e quebraria o clone) */
+export const GLOW_ENTRY = new WeakMap();
 
 export function glowMat(dayHex, nightHex, nightIntensity = 3, opts = {}) {
   const m = new THREE.MeshBasicMaterial({ color: dayHex, ...opts });
   const entry = { m, day: new THREE.Color(dayHex), night: new THREE.Color(nightHex).multiplyScalar(nightIntensity) };
   glowRegistry.push(entry);
-  m.userData.glow = entry; // para quem precisa trocar a cor da noite (ex.: acender/apagar o farol)
+  GLOW_ENTRY.set(m, entry);
   return m;
 }
 

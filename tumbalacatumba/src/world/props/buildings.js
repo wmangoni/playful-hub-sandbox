@@ -637,7 +637,8 @@ export function makeLighthouse() {
     k.b.add(S.cylB(0.06, 0.06, 1.8, 4), PAL.iron, { p: [Math.cos(a) * 1.12, H + 1.5, Math.sin(a) * 1.12] });
   }
   witchRoof(k, { y: H + 3.3, r: 1.6, h: 3.5, roof: '#8a2a2e', bend: 0.6, seg: 10 });
-  addWindow(k, rng, { x: 0, y: 6, z: 1.92, w: 0.5, h: 0.9, trim: PAL.cream, lit: true });
+  // farol abandonado há cem anos: janelas escuras (quem acende é a missão do casamento, no lampião)
+  addWindow(k, rng, { x: 0, y: 6, z: 1.92, w: 0.5, h: 0.9, trim: PAL.cream, lit: false });
   addWindow(k, rng, { x: 0, y: 10.5, z: 1.72, w: 0.45, h: 0.8, trim: PAL.cream, lit: false });
   k.b.add(S.box(1.1, 2.0, 0.2), PAL.woodDark, { p: [0, 2.2, 2.28] });
   k.crook({ lean: 0.07, leanZ: 0.03, wobble: 0.35, freq: 0.3, seed: 3, twist: 0.1, height: 20 });
