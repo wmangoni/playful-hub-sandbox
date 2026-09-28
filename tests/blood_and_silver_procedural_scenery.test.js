@@ -13,25 +13,74 @@ const assert = require('assert');
         headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
+    const url = `http://localhost:${server.address().port}/blood_and_silver/index.html`;
     const pageErrors = [];
-
-    try {
+    const newPage = async () => {
         const page = await browser.newPage();
         page.on('pageerror', err => pageErrors.push(err.toString()));
         await page.setViewport({ width: 1280, height: 720 });
-        const url = `http://localhost:${server.address().port}/blood_and_silver/index.html`;
-        await page.goto(url, { waitUntil: 'networkidle0' });
+        return page;
+    };
+    const frames = (page, n) => page.evaluate(count => new Promise(resolve => {
+        const step = () => (--count <= 0 ? resolve() : requestAnimationFrame(step));
+        requestAnimationFrame(step);
+    }), n);
 
-        // 1. Vegetação gerada, fora do spawn e dos lagos
+    try {
+        // 1. Largada imediata: clicar antes da geração terminar não trava nem deixa o chão vazio
+        const quick = await newPage();
+        await quick.evaluateOnNewDocument(() => {
+            // custo de cada frame já em jogo (callback do requestAnimationFrame)
+            const raf = window.requestAnimationFrame.bind(window);
+            window.__playingFrames = [];
+            window.requestAnimationFrame = cb => raf(t => {
+                const t0 = performance.now();
+                cb(t);
+                if (window.__game && window.__game.game.status === 'playing') window.__playingFrames.push(performance.now() - t0);
+            });
+        });
+        await quick.goto(url, { waitUntil: 'domcontentloaded' });
+        await quick.click('#startBtn');
+        await quick.waitForFunction(() => window.__playingFrames.length >= 20, { timeout: 5000 });
+        const quickStats = await quick.evaluate(() => Object.assign({ first: window.__playingFrames.slice(0, 5) }, window.__game.chunkStats));
+        const firstMax = Math.max.apply(null, quickStats.first);
+        assert.strictEqual(quickStats.worker, true, 'O bake deve rodar no Web Worker (se cair para a thread principal, algo quebrou)');
+        assert.strictEqual(quickStats.fallbackDraws, 0, 'Nenhum chunk sem textura deve aparecer durante o jogo');
+        assert.ok(firstMax < 50, `Os primeiros frames da partida não devem travar (máx: ${firstMax.toFixed(1)}ms)`);
+        console.log(`  ✓ Largada imediata: 1ºs frames ≤ ${firstMax.toFixed(1)}ms, nenhum quadrado vazio, bake no worker`);
+        await quick.close();
+
+        // 2. Sprites atrasados: o chão aparece na hora e os chunks são reassados quando chegam
+        const late = await newPage();
+        await late.setRequestInterception(true);
+        late.on('request', req => {
+            if (req.url().includes('skeleton-top-down-pixel-art')) setTimeout(() => req.continue().catch(() => {}), 1200);
+            else req.continue().catch(() => {});
+        });
+        await late.goto(url, { waitUntil: 'domcontentloaded' });
+        await late.click('#startBtn');
+        await new Promise(r => setTimeout(r, 3500));
+        const lateStats = await late.evaluate(() => {
+            let stale = 0;
+            window.__game.chunkCache.forEach(ch => { if (ch.stale) stale++; });
+            return { fallback: window.__game.chunkStats.fallbackDraws, stale: stale };
+        });
+        assert.strictEqual(lateStats.fallback, 0, 'Com sprites atrasados, nenhum chunk sem textura durante o jogo');
+        assert.strictEqual(lateStats.stale, 0, 'Chunks assados sem os sprites devem ser reassados quando eles carregam');
+        console.log('  ✓ Sprites atrasados: chão contínuo e chunks reassados sem flush');
+        await late.close();
+
+        // 3. Vegetação gerada, fora do spawn e dos lagos
+        const page = await newPage();
+        await page.goto(url, { waitUntil: 'networkidle0' });
         const flora = await page.evaluate(() => {
-            const { flora } = window.__game;
-            const ponds = [{ x: 850, y: 1150, radius: 140 }, { x: 3150, y: 2850, radius: 180 }, { x: 2600, y: 650, radius: 120 }];
+            const { flora, PONDS } = window.__game;
             return {
                 total: flora.length,
                 bushes: flora.filter(f => f.canvas).length,
                 trees: flora.filter(f => /^(tree|deadTree)/.test(f.flora)).length,
                 nearSpawn: flora.filter(f => Math.hypot(f.x - 2000, f.y - 2000) < 150).length,
-                inPonds: flora.filter(f => ponds.some(p => Math.hypot(f.x - p.x, f.y - p.y) < p.radius)).length,
+                inPonds: flora.filter(f => PONDS.some(p => Math.hypot(f.x - p.x, f.y - p.y) < p.radius)).length,
                 signature: flora.map(f => f.flora + ':' + f.x + ',' + f.y).join('|')
             };
         });
@@ -42,13 +91,13 @@ const assert = require('assert');
         assert.strictEqual(flora.inPonds, 0, 'Nenhuma vegetação dentro dos lagos');
         console.log(`  ✓ Vegetação: ${flora.total} elementos (${flora.bushes} arbustos procedurais, ${flora.trees} árvores)`);
 
-        // 2. Geração determinística (mesma semente → mesmo mapa)
+        // 4. Geração determinística (mesma semente → mesmo mapa)
         await page.reload({ waitUntil: 'networkidle0' });
         const signature2 = await page.evaluate(() => window.__game.flora.map(f => f.flora + ':' + f.x + ',' + f.y).join('|'));
         assert.strictEqual(signature2, flora.signature, 'A vegetação deve ser idêntica entre carregamentos');
         console.log('  ✓ Geração determinística entre recarregamentos');
 
-        // 3. Streaming de chunks ao atravessar o mapa: cache e canvases limitados
+        // 5. Streaming de chunks ao atravessar o mapa: cache, canvases e fatias de bake limitados
         await page.click('#startBtn');
         await page.evaluate(() => { window.__game.player.xpToNext = 1e9; });
         await page.keyboard.down('d');
@@ -60,10 +109,11 @@ const assert = require('assert');
         assert.ok(stats.baked > 0, 'Chunks devem ter sido assados');
         assert.ok(stats.cached <= 48, `Cache de chunks limitado a 48 (encontrado: ${stats.cached})`);
         assert.ok(stats.allocated <= 48, `Canvases de chunk reciclados, no máximo 48 (encontrado: ${stats.allocated})`);
-        assert.ok(stats.maxStageMs < 40, `Etapa de bake deve ser curta (máx: ${stats.maxStageMs.toFixed(1)}ms)`);
-        console.log(`  ✓ Chunks: ${stats.baked} assados, ${stats.cached} em cache, ${stats.allocated} canvases, etapa mais lenta ${stats.maxStageMs.toFixed(1)}ms`);
+        assert.ok(stats.maxSliceMs < 12, `Cada fatia de bake deve ser curta (máx: ${stats.maxSliceMs.toFixed(1)}ms)`);
+        assert.strictEqual(stats.fallbackDraws, 0, 'Nenhum chunk sem textura ao atravessar o mapa');
+        console.log(`  ✓ Chunks: ${stats.baked} assados, ${stats.cached} em cache, ${stats.allocated} canvases, fatia mais lenta ${stats.maxSliceMs.toFixed(1)}ms`);
 
-        // 4. Solo texturizado e com luminância que preserva a leitura de personagens e orbes
+        // 6. Solo texturizado e com luminância que preserva a leitura de personagens e orbes
         const ground = await page.evaluate(() => {
             window.__game.enemies.forEach(e => { e.alive = false; });
             return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
