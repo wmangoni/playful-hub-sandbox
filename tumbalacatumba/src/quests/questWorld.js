@@ -398,7 +398,7 @@ export class QuestWorld {
 
   // ------------------------------------------------------------------ eventos e estado
   onEvent(type, q) {
-    const g = this.game;
+    const g = this.game, P = this.P;
     if (type === 'accept') {
       this.resetPickups(q.objectives.map((o) => o.key));
       if (q.id === 'aboboras') this.resetPumpkins();
@@ -411,6 +411,10 @@ export class QuestWorld {
       if (q.id === 'carta') this.npcs.suspiro.rig.letter.visible = false;
     }
     if (type === 'abandon' && q.id === 'carta') this.npcs.suspiro.rig.letter.visible = true;
+    if (type === 'abandon' && q.id === 'casamento' && P.flags.lighthouse) {
+      P.setFlag('lighthouse', false);
+      this.applyState();
+    }
     if (type === 'turnin') {
       if (q.id === 'ossos' || q.id === 'baile') {
         this.npcs.juvenal.action = 'dance';
@@ -514,6 +518,8 @@ class Pet {
   }
   dismiss() {
     this.active = false;
+    this.spitT = -1;
+    this.spitTarget = null;
     this.rig.root.visible = false;
     this.game.fx?.poof(this.w.pos, '#ff6a3a');
   }
@@ -535,7 +541,7 @@ class Pet {
       if (t) this.w.yaw = dampAngle(this.w.yaw, Math.atan2(t.pos.x - this.w.pos.x, t.pos.z - this.w.pos.z), 14, dt);
       if (!this.spat && this.spitT >= 0.3) {
         this.spat = true;
-        if (t?.targetable) {
+        if (t?.targetable && t.engaged) {
           const mouth = this.rig.j.head.getWorldPosition(_mouth);
           mouth.x += Math.sin(this.w.yaw) * 0.2;
           mouth.z += Math.cos(this.w.yaw) * 0.2;

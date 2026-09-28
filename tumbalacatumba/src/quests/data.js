@@ -241,9 +241,9 @@ export const QUESTS = [
     turnIn: 'vesga',
     requires: ['cogumelos'],
     text:
-      'Hihihi! A Poção do Riso Eterno deu certo! Até demais: o Zé Palha ri dormindo e os sapos não param de gargalhar.\n\nAgora vou fazer minha obra-prima: o Tônico Capilar da Vesga! Preciso de 5 Tufos de Pelo de Aranha Cabeluda. As aranhas vivem no Bosque Retorcido e não emprestam o pelo de bom grado.\n\nConvença-as. Com força. Hihihi!',
-    summary: 'Arranque 5 Tufos de Pelo das Aranhas Cabeludas do Bosque Retorcido.',
-    objectives: [{ key: 'pelo', need: 5, label: 'Tufos de Pelo de Aranha' }],
+      'Hihihi! A Poção do Riso Eterno deu certo! Até demais: o Zé Palha ri dormindo e os sapos não param de gargalhar.\n\nAgora vou fazer minha obra-prima: o Tônico Capilar da Vesga! Preciso de 4 Tufos de Pelo de Aranha Cabeluda. As aranhas vivem no Bosque Retorcido e não emprestam o pelo de bom grado.\n\nConvença-as. Com força. Hihihi!',
+    summary: 'Arranque 4 Tufos de Pelo das Aranhas Cabeludas do Bosque Retorcido.',
+    objectives: [{ key: 'pelo', need: 4, label: 'Tufos de Pelo de Aranha' }],
     progress: 'Nada de pelo ainda? Se quiser, faço uma poção para dar coragem. Ela também dá bigode.',
     complete: 'Que tufos lindos! Macios, fedidos e com uma perninha ainda se mexendo. Perfeito!\n\n(O caldeirão borbulha e solta uma fumaça em forma de peruca.)\n\nToma um frasco. Passa na careca ou bebe, tanto faz: cura machucado e arrepia a nuca. E ele se enche sozinho, hihihi.',
     rewards: { xp: 600, money: 6500, items: ['tonico'] },

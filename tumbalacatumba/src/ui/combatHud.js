@@ -67,7 +67,7 @@ export class CombatHud {
       this.pf.classList.toggle('combat', inCombat);
     }
     const low = c.dead ? 0 : clamp((0.35 - c.hp / max) / 0.25, 0, 1);
-    if (Math.abs(low - (this._low ?? -1)) > 0.02) {
+    if (Math.abs(low - (this._low ?? -1)) > 0.02 || (low === 0) !== (this._low === 0)) {
       this._low = low;
       this.low.style.opacity = low.toFixed(2);
       this.low.classList.toggle('on', low > 0);

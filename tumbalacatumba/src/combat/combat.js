@@ -15,7 +15,7 @@ const _f = new THREE.Vector3();
 const PET_RANGE = 14; // só cospe em quem estiver brigando com o jogador, até essa distância do pet
 const PET_CD = 3.2; // segundos entre as cusparadas (+ até 0,6 s)
 const FIRE_SPEED = 13;
-/** dano da bola de fogo: cresce devagar com o nível do jogador (nv 3: 5–7, nv 5: 7–9, nv 7: 9–11) */
+/** dano da bola de fogo: cresce devagar com o nível do jogador (nv 3: 5–7, nv 5: 8–10, nv 7: 10–12) */
 export const petFireDamage = (lv) => Math.round(2 + lv * 1.1 + Math.random() * 2);
 
 /** Atributos do Vicente por nível: vida, dano, crítico, velocidade do golpe e resistência crescem juntos. */
@@ -419,7 +419,7 @@ export class Combat {
       const aim = _f.set(m.pos.x, m.pos.y + m.hopY + f.aimY, m.pos.z);
       const d = p.distanceTo(aim), step = FIRE_SPEED * dt;
       let done = false;
-      if (!m.targetable || f.t > 3) {
+      if (!m.targetable || !m.engaged || f.t > 3) {
         g.fx.poof(p, '#3a2a2a', 0.25);
         done = true;
       } else if (d <= step + m.radius * 0.5) {

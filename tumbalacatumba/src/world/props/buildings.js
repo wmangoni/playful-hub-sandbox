@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Builder, S, curlPoints, crookify } from '../../render/builder.js';
-import { GLOW } from '../../render/toon.js';
+import { GLOW, glowMat } from '../../render/toon.js';
 import { Model } from './batch.js';
 import { PAL } from './palette.js';
 import { mossy } from './small.js';
@@ -616,6 +616,9 @@ export function makeGazebo() {
   return m;
 }
 
+/** vidro do lampião do farol: brilho próprio, apagado até a missão do casamento */
+export const LIGHTHOUSE_LAMP = glowMat('#3b4658', '#ffe0a0', 3.0);
+
 export function makeLighthouse() {
   const k = new Kit();
   const rng = new RNG(71);
@@ -628,7 +631,7 @@ export function makeLighthouse() {
     k.b.add(S.cylB(0.04, 0.04, 0.9, 4), PAL.iron, { p: [Math.cos(a) * 2.1, H + 1.5, Math.sin(a) * 2.1] });
   }
   k.b.add(S.torus(2.1, 0.05, 3, 20), PAL.iron, { p: [0, H + 2.4, 0], r: [Math.PI / 2, 0, 0] });
-  k.g(GLOW.window).add(S.cylB(1.1, 1.1, 1.8, 10), '#fff', { p: [0, H + 1.5, 0] });
+  k.g(LIGHTHOUSE_LAMP).add(S.cylB(1.1, 1.1, 1.8, 10), '#fff', { p: [0, H + 1.5, 0] });
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU;
     k.b.add(S.cylB(0.06, 0.06, 1.8, 4), PAL.iron, { p: [Math.cos(a) * 1.12, H + 1.5, Math.sin(a) * 1.12] });

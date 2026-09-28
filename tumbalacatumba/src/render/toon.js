@@ -104,11 +104,9 @@ const glowRegistry = [];
 
 export function glowMat(dayHex, nightHex, nightIntensity = 3, opts = {}) {
   const m = new THREE.MeshBasicMaterial({ color: dayHex, ...opts });
-  glowRegistry.push({
-    m,
-    day: new THREE.Color(dayHex),
-    night: new THREE.Color(nightHex).multiplyScalar(nightIntensity),
-  });
+  const entry = { m, day: new THREE.Color(dayHex), night: new THREE.Color(nightHex).multiplyScalar(nightIntensity) };
+  glowRegistry.push(entry);
+  m.userData.glow = entry; // para quem precisa trocar a cor da noite (ex.: acender/apagar o farol)
   return m;
 }
 

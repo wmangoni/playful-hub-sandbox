@@ -28,6 +28,7 @@ function crookedRect(g, x, y, w, h, [a, b, c, d]) {
 function frame(g) {
   const R = [13, 5, 14, 6];
   g.globalCompositeOperation = 'destination-in';
+  g.fillStyle = '#000'; // o recorte usa a cor atual: tem que ser opaca
   crookedRect(g, 1, 1, S - 2, S - 2, R);
   g.fill();
   g.globalCompositeOperation = 'source-over';
@@ -418,7 +419,7 @@ const DRAW = {
     g.fillStyle = '#f0e0b8';
     g.fillRect(14, 12, 36, 42);
     g.strokeRect(14, 12, 36, 42);
-    g.fillStyle = '#ffd100';
+    g.fillStyle = '#ff8a2a';
     g.font = 'bold 30px serif';
     g.fillText('!', 27, 44);
   },
@@ -567,10 +568,12 @@ const Q_PATH = 'M9 17 Q9 5 18 5 Q27 5 27 14 Q27 20 21 23.5 Q18 25.5 18 31';
 const BANG = 'M6 5 Q15 -1 24 4 Q21 20 19 34 Q15 37 11 34 Q9 20 6 5 Z';
 const MK = { top: '#ffe0b0', mid: '#ff8a2a', bot: '#b8420e', grey: ['#f4f4f4', '#b8b8b8', '#6a6a6a'] };
 const TILT = { avail: -7, ready: 7, wip: 7 };
+let markerSeq = 0;
 export function markerSVG(kind) {
   const grey = kind === 'wip';
   const [top, mid, bot] = grey ? MK.grey : [MK.top, MK.mid, MK.bot];
-  const id = 'mg' + kind;
+  // id único por marcador: placas escondidas (display: none) com o mesmo id deixariam o degradê vazio
+  const id = `mg${kind}${++markerSeq}`;
   const grad = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="52" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${top}"/><stop offset=".45" stop-color="${mid}"/><stop offset="1" stop-color="${bot}"/></linearGradient>`;
   if (kind === 'avail') {
     const st = `fill="url(#${id})" stroke="${INK}" stroke-width="3.2" stroke-linejoin="round"`;

@@ -583,8 +583,8 @@ export class WorldMap {
     for (const m of mm.collectMarkers()) {
       const x = W(m.x), y = W(m.z);
       if (m.kind === 'area') {
-        c.fillStyle = 'rgba(255,200,0,0.25)';
-        c.strokeStyle = 'rgba(160,110,0,0.9)';
+        c.fillStyle = 'rgba(255,138,42,0.25)';
+        c.strokeStyle = 'rgba(22,16,29,0.85)';
         c.setLineDash([10, 8]);
         c.lineWidth = 3;
         c.beginPath();

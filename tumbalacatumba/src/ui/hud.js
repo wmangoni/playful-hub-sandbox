@@ -610,6 +610,8 @@ export class UI {
     } else if (it.use === 'tonic') {
       // o frasco da Vesga se enche sozinho: não some, só tem recarga
       const left = 60 - (g.time - (this._tonicT ?? -999));
+      if (g.combat.dead) return this.error('Você está morto.');
+      if (g.combat.hp >= g.combat.st.maxHp) return this.error('Você já está com a vida cheia.');
       if (left > 0) return this.error(`O tônico ainda está borbulhando (${Math.ceil(left)} s).`);
       this._tonicT = g.time;
       g.combat.heal(40);
