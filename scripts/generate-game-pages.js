@@ -170,7 +170,7 @@ const gamesData = {
         controls: [
             { key: 'Mouse', action: 'Selecionar e mover unidades' },
             { key: 'Clique', action: 'Construir e atacar' },
-            { key: 'Teclas 1-9', action: 'Selecionar grupos de unidades' }
+            { key: 'Teclas 1\u20119', action: 'Selecionar grupos de unidades' } // hífen não separável: "1-9" quebrava em duas linhas
         ],
         tips: [
             'Equilibre economia e militar - ambos são importantes',
@@ -257,8 +257,8 @@ const gamesData = {
         features: 'Regras clássicas de Conway, padrões emergentes, controles de velocidade',
         objective: 'Observe como padrões complexos emergem de regras simples.',
         controls: [
-            { key: 'Mouse', action: 'Adicionar/remover células' },
-            { key: 'Espaço', action: 'Pausar/continuar' },
+            { key: 'Mouse', action: 'Adicionar / remover células' },
+            { key: 'Espaço', action: 'Pausar / continuar' },
             { key: 'R', action: 'Reiniciar' },
             { key: '+/-', action: 'Ajustar velocidade' }
         ],
@@ -280,7 +280,7 @@ const gamesData = {
         features: 'Física de direção realista, paisagens bonitas, controles suaves',
         objective: 'Dirija com segurança e aproveite a paisagem.',
         controls: [
-            { key: 'WASD', action: 'Acelerar/Frear/Steering' },
+            { key: 'WASD', action: 'Acelerar / Frear / Steering' },
             { key: 'Espaço', action: 'Freio de mão' },
             { key: 'Shift', action: 'Marcha alta' }
         ],
@@ -324,7 +324,7 @@ const gamesData = {
         objective: 'Forme a melhor mão de poker e vença seus oponentes.',
         controls: [
             { key: 'Mouse', action: 'Selecionar ações' },
-            { key: 'Clique', action: 'Apostar/Passar/Desistir' },
+            { key: 'Clique', action: 'Apostar / Passar / Desistir' },
             { key: 'Números', action: 'Valor da aposta' }
         ],
         tips: [
@@ -347,7 +347,7 @@ const gamesData = {
         controls: [
             { key: 'Mouse', action: 'Navegar interface' },
             { key: 'Clique', action: 'Tomar decisões' },
-            { key: 'Teclas 1-9', action: 'Ações rápidas' }
+            { key: 'Teclas 1\u20119', action: 'Ações rápidas' } // hífen não separável: "1-9" quebrava em duas linhas
         ],
         tips: [
             'Equilibre diferentes aspectos da empresa',
@@ -389,7 +389,7 @@ const gamesData = {
         features: 'Física realista, múltiplos objetivos, sistema de pontuação',
         objective: 'Mantenha a bola em jogo e alcance a maior pontuação possível.',
         controls: [
-            { key: 'Z/X', action: 'Paletas esquerda/direita' },
+            { key: 'Z/X', action: 'Paletas esquerda / direita' },
             { key: 'Espaço', action: 'Lançar bola' },
             { key: 'Shift', action: 'Sacudir mesa' }
         ],
@@ -439,7 +439,7 @@ const gamesData = {
             { key: 'Mouse', action: 'Mirar / girar câmera' },
             { key: 'Clique Esq.', action: 'Atacar' },
             { key: 'Clique Dir.', action: 'Defender' },
-            { key: '1-4', action: 'Habilidades (Spin, Dash, Cura, Ultimate)' },
+            { key: '1\u20114', action: 'Habilidades (Spin, Dash, Cura, Ultimate)' }, // hífen não separável: "1-4" quebrava em duas linhas
             { key: 'Scroll', action: 'Zoom da câmera' }
         ],
         tips: [
@@ -462,7 +462,7 @@ const gamesData = {
         controls: [
             { key: 'Espaço', action: 'Pular manualmente (modo teste)' },
             { key: 'Mouse', action: 'Interagir com painéis de controle e gráficos' },
-            { key: 'Clique', action: 'Adicionar/remover obstáculos no modo Sandbox' }
+            { key: 'Clique', action: 'Adicionar / remover obstáculos no modo Sandbox' }
         ],
         tips: [
             'Aumente a taxa de mutação caso a população estagne em um nível de fitness',
@@ -494,6 +494,32 @@ const gamesData = {
         ],
         tags: ['3D', 'Three.js', 'Terra', 'Simulação', 'Espaço', 'Ciência'],
         relatedGames: ['space_shooter', 'voxel_city', 'rede_neural_evolutiva']
+    },
+    'ded_make_character': {
+        title: 'D&D Make Character',
+        description: 'Forja de heróis de D&D 3ª edição online e grátis: consulte e edite classes, raças, perícias e 320 talentos, crie personagens, escolha talentos e perícias pelas regras e gere a ficha de personagem 3.0 pronta para imprimir.',
+        keywords: 'D&D, D&D 3.0, D&D 3.5, dungeons and dragons, ficha de personagem, classes, raças, perícias, talentos, RPG, PlayfulHub',
+        genre: 'RPG / Ficha de Personagem',
+        developer: 'PlayfulHub',
+        features: 'Compêndio com 15 classes, 7 raças, 45 perícias e 320 talentos, cálculo de perícias e talentos por nível, ficha 3.0 em pergaminho para imprimir ou salvar em PDF, dados salvos no navegador',
+        objective: 'Crie o personagem, distribua as perícias e escolha os talentos a que ele tem direito e gere a ficha pronta para a sessão.',
+        controls: [
+            { key: 'Menu', action: 'Navegar entre Personagens, Classes, Raças, Perícias e Talentos' },
+            { key: 'Busca', action: 'Filtrar a lista por qualquer coluna, sem se preocupar com acentos' },
+            { key: 'Clique', action: '"Salvar e gerar ficha" abre a ficha e o popup de talentos e perícias' },
+            { key: '←\u00a0→', action: 'Com uma aba do popup em foco, alternar entre Perícias e Talentos' }, // espaço não separável: as setas não se separam em duas linhas
+            { key: 'Esc', action: 'Fechar o popup de talentos e perícias sem salvar' },
+            { key: 'Ctrl+P', action: 'Imprimir a ficha ou salvá-la em PDF' }
+        ],
+        tips: [
+            'O popup mostra quantos pontos de perícia e quantos talentos o personagem tem, e confere os requisitos nível a nível',
+            'Perícias de outras classes custam 2 pontos por graduação: veja o custo antes de distribuir',
+            'Marque "Economizar tinta" para imprimir a ficha sem o fundo de pergaminho',
+            'As alterações ficam salvas no seu navegador; para recomeçar, restaure os dados originais de uma tabela ou de todas',
+            'Em Classes, clique no nome das classes de prestígio para ver seus pré-requisitos'
+        ],
+        tags: ['RPG', 'D&D 3ª edição', 'Ficha de personagem', 'Compêndio', 'Fantasia medieval'],
+        relatedGames: ['ded', 'strategy_game', 'chess']
     }
 };
 
@@ -550,7 +576,8 @@ function generateRelatedGamesHTML(relatedGames) {
             'voxel_arena': '⚔️',
             'driving_simulator': '🚗',
             'rede_neural_evolutiva': '🧠',
-            'threejs_earth': '🌍'
+            'threejs_earth': '🌍',
+            'ded_make_character': '📜'
         };
         
         return `

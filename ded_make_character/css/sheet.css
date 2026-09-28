@@ -1,0 +1,1466 @@
+/* ==========================================================================
+   Ficha de personagem D&D 3.0 — pergaminho (tela + impressão A4, 2 páginas)
+   Layout da ficha oficial do Livro do Jogador 3.0 (ver TASK_003):
+   placas escuras + versalete, fórmulas em caixas, abas de arma, perícias à
+   direita; pág. 2 em 3 colunas. Fontes livres equivalentes às originais:
+   Scala Sans → Alegreya Sans (+ SC); Pterra → Grenze / Marcellus SC;
+   Celestia Antiqua (texto do livro) → Alegreya (algarismos alinhados).
+   ========================================================================== */
+:root {
+  --ink: #23170a;
+  --ink-soft: #4a3520;
+  --ink-faint: rgba(35, 23, 10, 0.6);
+  --rule: rgba(35, 23, 10, 0.75);
+  --rule-soft: rgba(35, 23, 10, 0.35);
+  --rubric: #7a2211;
+  --temp-panel: rgba(92, 60, 24, 0.24); /* equivalente ao cinza 30% da ficha */
+  --paper: #f1e2bf;
+  --paper-light: #f9f0da;
+  --paper-box: rgba(255, 250, 236, 0.55);
+  --plate-fg: #f7ecd2;
+  --f-sheet: 'Alegreya Sans', 'Segoe UI', sans-serif;
+  --f-sc: 'Alegreya Sans SC', 'Alegreya Sans', sans-serif;
+  --f-title: 'Grenze', 'Cinzel', Georgia, serif;
+  --f-kicker: 'Marcellus SC', 'Cinzel', Georgia, serif;
+  --f-ink: 'Alegreya', Georgia, serif;
+  --sheet-w: 794px; /* A4 a 96 dpi */
+  --sheet-h: 1123px;
+  --box-w: 26px;
+  --box-h: 18px;
+}
+
+/* ---------- Barra de ações (tela) ---------- */
+.sheet-toolbar {
+  max-width: var(--sheet-w);
+  margin: 0 auto var(--sp-6);
+}
+
+.sheet-toolbar__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.sheet-toolbar__title {
+  font-size: var(--fs-2xl);
+}
+
+.sheet-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sheet-toolbar__notes {
+  margin: var(--sp-3) 0 0;
+  padding-left: var(--sp-5);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* escolhas salvas que deixaram de valer (nível, atributos ou compêndio mudaram) */
+.sheet-toolbar__warn {
+  color: var(--ember);
+}
+
+.sheet-toolbar__actions .btn.is-alert {
+  border-color: var(--ember-line);
+  color: var(--ember);
+}
+
+/* ---------- Páginas ---------- */
+.sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-8);
+  zoom: var(--sheet-zoom, 1);
+}
+
+.sf-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--sheet-w);
+  height: var(--sheet-h);
+  padding: 30px 34px 20px;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--f-sheet);
+  font-size: 9px;
+  line-height: 1.2;
+  font-variant-numeric: lining-nums;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 45%, rgba(255, 251, 238, 0.6), transparent 75%),
+    radial-gradient(circle at 0% 0%, rgba(110, 62, 18, 0.32), transparent 20%),
+    radial-gradient(circle at 100% 0%, rgba(110, 62, 18, 0.28), transparent 19%),
+    radial-gradient(circle at 0% 100%, rgba(110, 62, 18, 0.3), transparent 21%),
+    radial-gradient(circle at 100% 100%, rgba(110, 62, 18, 0.34), transparent 22%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.011 .045' numOctaves='4' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .3 0 0 0 0 .12 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .2 0 0 0 0 .08 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, var(--paper-light), var(--paper));
+  box-shadow:
+    inset 0 0 64px rgba(96, 54, 14, 0.4),
+    inset 0 0 12px rgba(96, 54, 14, 0.38),
+    0 22px 60px rgba(0, 0, 0, 0.65);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Moldura ornamental de livro (filete duplo + cantoneiras com gema) */
+.sf-page::before {
+  content: '';
+  position: absolute;
+  inset: 11px;
+  border: 1.4px solid rgba(122, 34, 17, 0.55);
+  outline: 0.8px solid rgba(122, 34, 17, 0.4);
+  outline-offset: 2.5px;
+  pointer-events: none;
+}
+
+.sf-page::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%237a2211' stroke-width='1.3'%3E%3Cpath d='M3 26V3h23'/%3E%3Cpath d='M8 20c0-7 5-12 12-12'/%3E%3C/g%3E%3Cpath d='M6 6l5 0 0 5-5 0z' transform='rotate(45 8.5 8.5)' fill='%237a2211'/%3E%3C/svg%3E") top left / 40px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg transform='rotate(90 20 20)'%3E%3Cg fill='none' stroke='%237a2211' stroke-width='1.3'%3E%3Cpath d='M3 26V3h23'/%3E%3Cpath d='M8 20c0-7 5-12 12-12'/%3E%3C/g%3E%3Cpath d='M6 6l5 0 0 5-5 0z' transform='rotate(45 8.5 8.5)' fill='%237a2211'/%3E%3C/g%3E%3C/svg%3E") top right / 40px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg transform='rotate(270 20 20)'%3E%3Cg fill='none' stroke='%237a2211' stroke-width='1.3'%3E%3Cpath d='M3 26V3h23'/%3E%3Cpath d='M8 20c0-7 5-12 12-12'/%3E%3C/g%3E%3Cpath d='M6 6l5 0 0 5-5 0z' transform='rotate(45 8.5 8.5)' fill='%237a2211'/%3E%3C/g%3E%3C/svg%3E") bottom left / 40px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg transform='rotate(180 20 20)'%3E%3Cg fill='none' stroke='%237a2211' stroke-width='1.3'%3E%3Cpath d='M3 26V3h23'/%3E%3Cpath d='M8 20c0-7 5-12 12-12'/%3E%3C/g%3E%3Cpath d='M6 6l5 0 0 5-5 0z' transform='rotate(45 8.5 8.5)' fill='%237a2211'/%3E%3C/g%3E%3C/svg%3E") bottom right / 40px no-repeat;
+}
+
+/* ---------- Primitivas da ficha ---------- */
+.sf-plate {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: none;
+  width: 54px;
+  height: 25px;
+  padding: 0 3px;
+  background: var(--ink);
+  color: var(--plate-fg);
+  text-align: center;
+  line-height: 1;
+}
+
+.sf-plate b {
+  font-family: var(--f-sheet);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sf-plate small {
+  margin-top: 1px;
+  font-family: var(--f-sc);
+  font-size: 7.4px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.sf-row--hp > .sf-plate,
+.sf-row--ac > .sf-plate {
+  width: 66px;
+}
+
+.sf-plate small {
+  white-space: nowrap;
+}
+
+.sf-plate.is-wide { width: 82px; }
+.sf-plate.is-wide b { font-size: 12.5px; }
+.sf-plate.is-wider { width: 116px; }
+.sf-plate.is-wider b { font-size: 12.5px; }
+
+.sf-cell__box {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--box-w);
+  height: var(--box-h);
+  border: 1.1px solid var(--ink);
+  background: var(--paper-box);
+  font-family: var(--f-sheet);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sf-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  width: 32px;
+}
+
+.sf-cell > small {
+  margin-top: 2px;
+  font-family: var(--f-sheet);
+  font-size: 6px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sf-cell.is-label-top > small {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 13px;
+  margin: 0 0 2px;
+}
+
+.sf-row--attack:not(.is-top) .sf-cell > small {
+  min-height: 13px;
+}
+
+.sf-row--attack.is-top .sf-plate,
+.sf-row--attack.is-top .sf-sign {
+  margin-top: 15px;
+}
+
+.sf-row--hp .sf-plate,
+.sf-row--hp .sf-speed {
+  margin-top: 0;
+}
+
+.sf-row--hp .sf-sign {
+  margin-top: 15px;
+}
+
+.sf-cell.is-total {
+  width: 40px;
+}
+
+.sf-cell.is-total .sf-cell__box {
+  width: 38px;
+  height: 22px;
+  border-width: 1.6px;
+  font-size: 13px;
+}
+
+.sf-cell.is-compact .sf-cell__box {
+  font-size: 8px;
+  letter-spacing: -0.02em;
+}
+
+.sf-cell.is-wide { width: 92px; }
+.sf-cell.is-wide .sf-cell__box { width: 92px; }
+.sf-cell.is-bab { width: 72px; }
+.sf-cell.is-bab .sf-cell__box { width: 72px; height: 22px; font-size: 12px; border-width: 1.6px; }
+
+.sf-cell.is-temp .sf-cell__box,
+.sf-cell__box.is-temp-box {
+  border-color: transparent;
+  background: rgba(255, 250, 236, 0.7);
+  box-shadow: 0 0 0 3px var(--temp-panel);
+}
+
+.sf-sign {
+  flex: none;
+  padding: 0 1px;
+  font-family: var(--f-sheet);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: var(--box-h);
+  white-space: nowrap;
+}
+
+.sf-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.sf-row .sf-plate + .sf-cell,
+.sf-row .sf-plate + .sf-cell__box {
+  margin-left: 3px;
+}
+
+.sf-row__gap {
+  flex: 1;
+}
+
+.sf-field {
+  display: flex;
+  flex-direction: column;
+  flex: var(--span, 1) 1 0;
+  min-width: 0;
+}
+
+.sf-field__value {
+  height: 16px;
+  padding: 0 2px;
+  border-bottom: 0.8px solid var(--ink);
+  font-family: var(--f-ink);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-field > small {
+  margin-top: 1px;
+  font-family: var(--f-sc);
+  font-size: 8.4px;
+  line-height: 1;
+  text-transform: lowercase;
+  color: var(--ink-soft);
+}
+
+.sf-bar {
+  height: 20px;
+  margin: 0 0 4px;
+  padding: 2px 6px;
+  line-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--ink);
+  color: var(--plate-fg);
+  font-family: var(--f-sheet);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ---------- Cabeçalho ---------- */
+.sf-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 238px;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 10px;
+}
+
+.sf-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sf-id__row {
+  display: flex;
+  gap: 7px;
+}
+
+.sf-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 6px 4px;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  text-align: center;
+}
+
+.sf-title__kicker {
+  font-family: var(--f-kicker);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--rubric);
+}
+
+.sf-title__main {
+  margin: 1px 0;
+  font-family: var(--f-title);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.sf-title__sub {
+  font-family: var(--f-kicker);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+
+/* ---------- Página 1: grade ---------- */
+.sf-p1 {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 196px 210px minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr;
+  grid-template-areas:
+    'abil hp hp'
+    'abil ac ac'
+    'abil initbab skills'
+    'left left skills';
+  column-gap: 12px;
+  row-gap: 7px;
+  min-height: 0;
+}
+
+.sf-p1__abilities { grid-area: abil; }
+.sf-p1__hp { grid-area: hp; }
+.sf-p1__ac { grid-area: ac; }
+.sf-p1__initbab { grid-area: initbab; }
+.sf-p1__skills { grid-area: skills; min-height: 0; }
+.sf-p1__left {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.sf-p1__left .sf-weapons {
+  flex: 1;
+  justify-content: space-between;
+}
+
+/* Atributos */
+.sf-abilities__head,
+.sf-ability {
+  display: grid;
+  grid-template-columns: 58px 30px 30px 30px 30px;
+  gap: 4px;
+  align-items: center;
+}
+
+.sf-abilities__head span {
+  font-size: 5.8px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sf-abilities__head span.is-temp-head,
+.sf-saves__head span.is-temp-head {
+  font-size: 5.6px;
+}
+
+.sf-abilities__grid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.sf-temp-panel {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  right: -3px;
+  width: 70px;
+  background: var(--temp-panel);
+}
+
+.sf-ability .sf-plate {
+  width: 58px;
+}
+
+.sf-ability .sf-cell__box {
+  width: 30px;
+  height: 25px;
+}
+
+.sf-ability .sf-cell__box.is-temp-box {
+  box-shadow: none;
+}
+
+.sf-score {
+  font-size: 14px !important;
+  border-width: 1.6px !important;
+}
+
+.sf-score sup {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 6px;
+  font-weight: 700;
+  color: var(--rubric);
+}
+
+/* PV / CA */
+.sf-row--hp,
+.sf-row--ac {
+  flex-wrap: nowrap;
+}
+
+.sf-speed {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1;
+  margin-left: 6px;
+}
+
+.sf-speed b {
+  margin-bottom: 1px;
+  font-size: 10.5px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sf-speed .sf-cell__box {
+  width: auto;
+  height: 22px;
+  border-width: 1.6px;
+  font-size: 12px;
+}
+
+.sf-row--ac .sf-sign:first-of-type {
+  font-size: 12px;
+}
+
+.sf-row--ac {
+  gap: 2px;
+}
+
+.sf-row--ac .sf-cell:not(.is-total) {
+  width: 28px;
+}
+
+.sf-row--ac .sf-row__gap {
+  min-width: 6px;
+}
+
+.sf-row--ac .sf-cell.is-extra {
+  width: 34px;
+}
+
+.sf-initbab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sf-initbab .sf-row {
+  gap: 2px;
+}
+
+.sf-initbab .sf-cell:not(.is-total):not(.is-bab) {
+  width: 28px;
+}
+
+/* ---------- Testes de resistência ---------- */
+.sf-saves__head,
+.sf-save {
+  display: grid;
+  grid-template-columns: 88px 38px 9px 28px 9px 28px 9px 28px 9px 28px 9px 28px;
+  align-items: center;
+  column-gap: 1px;
+}
+
+.sf-saves__head span {
+  font-size: 5.8px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sf-saves__head .is-strong {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.sf-saves__title {
+  white-space: nowrap;
+  text-align: left !important;
+  font-size: 8.4px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em;
+  color: var(--ink) !important;
+  text-decoration: underline;
+}
+
+.sf-saves__body {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.sf-saves__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sf-save .sf-plate {
+  width: 86px;
+}
+
+.sf-save .sf-plate b {
+  font-size: 12px;
+}
+
+.sf-save .sf-cell__box {
+  width: 28px;
+}
+
+.sf-save .sf-cell__box.is-total {
+  width: 38px;
+  height: 22px;
+  border-width: 1.6px;
+  font-size: 13px;
+}
+
+.sf-conditional {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 5px;
+  border: 1.1px solid var(--ink);
+  background: var(--paper-box);
+}
+
+.sf-conditional small {
+  display: block;
+  font-family: var(--f-sc);
+  font-size: 7px;
+  line-height: 1.05;
+  text-transform: lowercase;
+  color: var(--ink-soft);
+}
+
+.sf-conditional ul {
+  margin: 2px 0 0;
+  padding-left: 8px;
+  font-family: var(--f-ink);
+  font-size: 8px;
+  line-height: 1.12;
+}
+
+/* ---------- Ataques ---------- */
+.sf-attacks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-row--attack .sf-cell.is-total .sf-cell__box {
+  width: 44px;
+}
+
+/* ---------- Armas, armadura, escudo ---------- */
+.sf-weapons {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.sf-gearblock {
+  border: 1.1px solid var(--ink);
+  border-top: 0;
+  background: rgba(255, 250, 236, 0.28);
+}
+
+.sf-gearblock__top,
+.sf-gearblock__write {
+  display: flex;
+}
+
+.sf-tab {
+  flex: none;
+  width: 150px;
+  padding: 3px 8px 2px;
+  background: var(--ink);
+  color: var(--plate-fg);
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.sf-tab.is-wide {
+  width: 188px;
+  font-size: 9.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sf-gearblock__name {
+  flex: none;
+  width: 150px;
+  height: 26px;
+  border-right: 0.8px solid var(--rule);
+}
+
+.sf-gearblock__name.is-wide {
+  width: 188px;
+}
+
+.sf-strip {
+  display: flex;
+  flex: 1;
+  align-self: flex-end;
+  background: var(--ink);
+  color: var(--plate-fg);
+}
+
+.sf-strip span,
+.sf-cells span {
+  flex: var(--w, 1) 1 0;
+  min-width: 0;
+  padding: 1px 3px;
+  border-right: 0.8px solid rgba(247, 236, 210, 0.35);
+  font-size: 6.2px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-strip span:last-child,
+.sf-cells span:last-child {
+  border-right: 0;
+}
+
+.sf-gearblock > .sf-strip {
+  width: 100%;
+}
+
+.sf-cells {
+  display: flex;
+  flex: 1;
+}
+
+.sf-cells span {
+  height: 26px;
+  border-right: 0.8px solid var(--rule);
+}
+
+/* ---------- Munição ---------- */
+.sf-ammo__title {
+  margin: 0 0 3px;
+  font-family: var(--f-sheet);
+  color: var(--ink);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.sf-ammo__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+}
+
+.sf-ammo__entry {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.sf-ammo__name {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0.8px solid var(--ink);
+}
+
+.sf-ammo__marks {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(10, 9px);
+  gap: 2px 2px;
+}
+
+.sf-ammo__marks i {
+  height: 8px;
+  border: 0.8px solid var(--ink);
+  background: var(--paper-box);
+}
+
+.sf-ammo__marks i:nth-child(5n) {
+  margin-right: 3px;
+}
+
+/* ---------- Perícias ---------- */
+.sf-skills {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sf-skills__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 2px 8px;
+  background: var(--ink);
+  color: var(--plate-fg);
+}
+
+.sf-skills__title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.sf-skills__max {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sf-skills__max small {
+  font-size: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sf-skills__max .sf-cell__box {
+  width: 46px;
+  height: 15px;
+  border-color: transparent;
+  background: var(--paper-light);
+  color: var(--ink);
+  font-size: 9.5px;
+}
+
+.sf-skills__head,
+.sf-skill {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 26px 24px 8px 22px 8px 22px 8px 22px;
+  column-gap: 2px;
+  align-items: center;
+}
+
+.sf-skills__head {
+  position: relative;
+  min-height: 32px;
+  padding: 2px 0;
+  border-bottom: 0.8px solid var(--rule);
+}
+
+.sf-skills__head span {
+  padding: 0 1px;
+  font-size: 5.6px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sf-skills__name-head {
+  font-family: var(--f-sc);
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  text-align: left !important;
+  text-transform: lowercase !important;
+  color: var(--ink) !important;
+}
+
+.sf-skills__cross {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 9px;
+  margin: -2px 0;
+  background: var(--ink);
+}
+
+.sf-skills__cross span {
+  display: block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  color: var(--plate-fg) !important;
+  white-space: nowrap;
+}
+
+.sf-skills__list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-skill {
+  flex: 1;
+  min-height: 12.5px;
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+
+.sf-check {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border: 0.8px solid var(--ink);
+  background: var(--paper-box);
+}
+
+.sf-check.is-cross {
+  background:
+    linear-gradient(45deg, transparent 43%, var(--ink) 43%, var(--ink) 57%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, var(--ink) 43%, var(--ink) 57%, transparent 57%),
+    var(--paper-box);
+}
+
+.sf-skill__name {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  font-family: var(--f-sc);
+  font-size: 8.2px;
+  line-height: 1.05;
+  text-transform: lowercase;
+}
+
+.sf-skill__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-skill__spec {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 26px;
+  margin-left: 3px;
+}
+
+.sf-skill__spec i {
+  flex: 1;
+  margin: 0 1px 1px;
+  border-bottom: 0.6px solid var(--ink);
+}
+
+.sf-untrained {
+  margin-left: 2px;
+  font-size: 6px;
+  vertical-align: 1px;
+}
+
+.sf-skill__key {
+  font-family: var(--f-sc);
+  font-size: 7.6px;
+  text-align: center;
+  text-transform: lowercase;
+}
+
+.sf-skill__box {
+  height: 10.5px;
+  border-bottom: 0.8px solid var(--ink);
+  font-size: 8.2px;
+  font-weight: 800;
+  line-height: 10.5px;
+  text-align: center;
+}
+
+.sf-skill__box.is-total {
+  border: 0.8px solid var(--ink);
+  background: var(--paper-box);
+}
+
+.sf-skill .sf-sign {
+  font-size: 7.5px;
+  line-height: 10.5px;
+  text-align: center;
+}
+
+.sf-skills__note {
+  margin: 4px 0 0;
+  font-size: 6.3px;
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--ink-soft);
+}
+
+.sf-skills__note b {
+  font-style: normal;
+  color: var(--ink);
+}
+
+/* ---------- Página 2 ---------- */
+.sf-p2 {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 330px 204px minmax(0, 1fr);
+  column-gap: 12px;
+  min-height: 0;
+}
+
+.sf-p2__col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.sf-xp {
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-xp .sf-cell__box {
+  width: 100%;
+  height: 22px;
+  font-family: var(--f-ink);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.sf-xp small {
+  margin-top: 1px;
+  font-family: var(--f-sc);
+  font-size: 8.4px;
+  text-transform: lowercase;
+  color: var(--ink-soft);
+}
+
+.sf-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-gear {
+  flex: 1;
+}
+
+.sf-gear__head,
+.sf-gear__rows li {
+  display: grid;
+  grid-template-columns: 1fr 28px 1fr 28px;
+}
+
+.sf-gear__head span {
+  font-size: 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.sf-gear__head span:nth-child(odd) {
+  text-align: left;
+  padding-left: 2px;
+}
+
+.sf-gear__rows {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-gear__rows li {
+  flex: 1;
+  min-height: 15px;
+}
+
+.sf-gear__rows i {
+  border-bottom: 0.5px solid var(--rule);
+  border-right: 0.5px solid var(--rule-soft);
+}
+
+.sf-gear__rows i:nth-child(2) {
+  border-right: 0.8px solid var(--rule);
+}
+
+.sf-gear__total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 7.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sf-gear__total .sf-cell__box {
+  width: 40px;
+}
+
+.sf-money__box {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  height: 118px;
+  padding: 4px 8px;
+  border: 1.1px solid var(--ink);
+  background: var(--paper-box);
+  font-family: var(--f-sc);
+  font-size: 10px;
+  text-transform: lowercase;
+}
+
+/* min-height 0: o bloco nunca cresce além da coluna (senão empurra Carga e Idiomas para fora da página);
+   o que não couber faz a pauta encolher (fitTexts) */
+.sf-feats {
+  flex: 1;
+  min-height: 0;
+}
+
+.sf-ruled.is-dense .sf-ruled__text {
+  font-size: 8.4px;
+}
+
+.sf-written {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-written li {
+  flex: 1 1 0;
+  min-height: 14px;
+  padding: 0 2px;
+  border-bottom: 0.5px solid var(--rule);
+  font-family: var(--f-ink);
+  font-size: 9.2px;
+  line-height: 1.12;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Pauta contínua: linhas reais (bordas se alinham ao pixel em qualquer escala) atrás do texto.
+   A camada de linhas sobe 5px para que a linha de base (≈10,6px na pauta de 17px) assente sobre ela. */
+.sf-ruled {
+  --pauta: 17px;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 2px 2px 0;
+}
+
+.sf-ruled__lines {
+  position: absolute;
+  top: calc(5.6px - var(--pauta) / 2); /* −2,9px na pauta de 17px; acompanha a pauta reduzida */
+  left: 2px;
+  right: 2px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-ruled__lines i {
+  flex: none;
+  height: var(--pauta);
+  border-bottom: 0.8px solid var(--rule-soft);
+}
+
+.sf-ruled__text {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--f-ink);
+  font-size: 9.2px;
+  line-height: var(--pauta);
+}
+
+/* recuo pendente: as linhas de continuação entram 9px, marcando onde cada entrada começa */
+.sf-ruled__text li {
+  padding-left: 9px;
+  text-indent: -9px;
+}
+
+.sf-written.is-tight li {
+  min-height: 10.5px;
+}
+
+.sf-load {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.sf-load__row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.sf-load .sf-cell {
+  width: 62px;
+}
+
+.sf-load .sf-cell__box {
+  width: 62px;
+  height: 20px;
+  font-size: 10px;
+}
+
+.sf-load .sf-cell > small {
+  font-weight: 800;
+}
+
+.sf-load__notes small {
+  width: 62px;
+  font-size: 6px;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sf-print-note {
+  margin: 0 0 3px;
+  font-size: 6.6px;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.sf-spells {
+  flex: 1;
+}
+
+.sf-spells__lists {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.sf-spells__level {
+  display: flex;
+  flex-direction: column;
+  flex: var(--n, 1);
+}
+
+.sf-spells__level small {
+  margin: 1px 0 -9px;
+  font-family: var(--f-sc);
+  font-size: 7px;
+  line-height: 9px;
+  color: var(--ink-soft);
+}
+
+.sf-spells__level .sf-written li {
+  padding-left: 16px;
+}
+
+.sf-spells__dc {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sf-spells__dc .sf-plate {
+  width: 104px;
+}
+
+.sf-spells__dc .sf-plate b {
+  font-size: 12px;
+}
+
+.sf-spell-table {
+  width: 100%;
+  margin-top: 4px;
+  border-collapse: collapse;
+}
+
+.sf-spell-table th {
+  font-size: 6px;
+  font-weight: 500;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 0 1px 2px;
+}
+
+.sf-spell-table th.is-level {
+  font-weight: 900;
+  font-size: 8px;
+  color: var(--ink);
+}
+
+.sf-spell-table tbody th.is-level {
+  font-size: 8.5px;
+}
+
+.sf-spell-table td {
+  padding: 1.5px 0;
+  text-align: center;
+}
+
+.sf-spell-table .sf-cell__box {
+  margin: 0 auto;
+  width: 30px;
+  height: 15px;
+  font-size: 9.5px;
+}
+
+.sf-zero {
+  font-weight: 800;
+  font-size: 9.5px;
+}
+
+.sf-known {
+  margin-top: 5px;
+}
+
+.sf-known b {
+  display: block;
+  font-family: var(--f-sc);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.sf-known__grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px 4px;
+  margin-top: 2px;
+}
+
+.sf-known__grid span {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.sf-known__grid small {
+  font-size: 6px;
+  color: var(--ink-soft);
+}
+
+.sf-known__grid i {
+  flex: 1;
+  height: 11px;
+  border-bottom: 0.8px solid var(--ink);
+  font-style: normal;
+  font-weight: 800;
+  font-size: 8.5px;
+  text-align: center;
+}
+
+.sf-foot__warn {
+  color: var(--rubric);
+  font-weight: 700;
+}
+
+.sf-foot {
+  margin-top: 6px;
+  font-size: 6.5px;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+/* ---------- Versão econômica: sem o fundo de pergaminho ---------- */
+.sheet.is-eco .sf-page {
+  background: #fffdf8;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.65);
+}
+
+.sheet-toolbar__eco {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-right: var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.sheet-toolbar__eco input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+}
+
+/* ---------- Impressão: só o pergaminho, uma página A4 por folha ---------- */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .sidebar,
+  .topbar,
+  .scrim,
+  .app-footer,
+  .toasts,
+  .skip-link,
+  .no-print,
+  #dmc-icon-sprite {
+    display: none !important;
+  }
+
+  .app {
+    display: block !important;
+    background: none !important;
+  }
+
+  .main,
+  .content {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  .page {
+    animation: none !important;
+  }
+
+  .sheet {
+    display: block;
+    zoom: 1 !important;
+  }
+
+  .sf-page {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    box-shadow: inset 0 0 64px rgba(96, 54, 14, 0.4), inset 0 0 12px rgba(96, 54, 14, 0.38);
+    /* margem de segurança: impressoras comuns não imprimem os 3–5 mm da borda */
+    transform: scale(0.965);
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .sf-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .sheet.is-eco .sf-page {
+    background: #fff;
+    box-shadow: none;
+  }
+}
