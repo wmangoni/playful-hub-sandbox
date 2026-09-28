@@ -16,7 +16,7 @@ const allowedOrigins = [
   'https://playfulhub.herokuapp.com',
   'https://playfulhub.netlify.app'
 ];
-app.use(cors({
+const corsMiddleware = cors({
   origin: function (origin, callback) {
     // Permite requisições sem origin (como Postman, apps mobile, ou same-origin)
     if (!origin) return callback(null, true);
@@ -29,7 +29,21 @@ app.use(cors({
     }
     return callback(null, true);
   }
-}));
+});
+
+// Requisições para a própria origem não são CORS. Navegadores enviam `Origin`
+// mesmo nelas em alguns casos (ex.: <script type="module">); sem esta checagem,
+// o servidor rodando em outra porta/domínio recusaria os próprios arquivos (500).
+const isSameOrigin = (req) => {
+    const origin = req.get('origin');
+    if (!origin) return false;
+    try {
+        return new URL(origin).host === req.get('host');
+    } catch {
+        return false;
+    }
+};
+app.use((req, res, next) => (isSameOrigin(req) ? next() : corsMiddleware(req, res, next)));
 
 // Middleware para processar JSON
 app.use(express.json());
@@ -48,6 +62,14 @@ app.get('/planning_poker/:roomId', (req, res) => {
 app.get(['/tumbalacatumba', '/tumbalacatumba/'], (req, res) => {
     res.sendFile(path.join(__dirname, 'tumbalacatumba/Tumbalacatumba.html'));
 });
+
+// D&D Make Character usa ES Modules: com cache de 1h o navegador poderia misturar
+// módulos de versões diferentes após um deploy. Revalida sempre (ETag → 304).
+app.use('/ded_make_character', express.static(path.join(__dirname, 'ded_make_character'), {
+    etag: true,
+    lastModified: true,
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+}));
 
 // Servir arquivos estáticos da pasta raiz com cache
 app.use(express.static('./', {
@@ -149,6 +171,7 @@ createHtmlRoute('/jogos/blood_and_silver', 'jogos/blood_and_silver.html');
 createHtmlRoute('/jogos/planning_poker', 'jogos/planning_poker.html');
 createHtmlRoute('/jogos/blender_game', 'jogos/blender_game.html');
 createHtmlRoute('/jogos/tumbalacatumba', 'jogos/tumbalacatumba.html');
+createHtmlRoute('/jogos/ded_make_character', 'jogos/ded_make_character.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
