@@ -5,13 +5,15 @@
 //   1. abrir Tumbalacatumba.html?play&notut&t=12 (jogo novo) e esperar __game.state === 'play';
 //   2. executar este arquivo na página;
 //   3. chamar __T.run(passo) para cada passo, nesta ordem:
-//        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, final
+//        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate, final
 //      Cada chamada devolve 'ok' ou 'ERRO ...' (uma chamada por passo cabe no timeout do Runtime.evaluate);
+//      As missões rodam em modo pacífico (as criaturas não atacam); o passo "combate" liga a briga de volta.
 //   4. conferir __T.log (o passo final registra nível, XP, dinheiro, itens e o status de cada missão)
 //      e window.__errors, que deve estar vazio.
 // O jogo salva sozinho: apague 'tumbalacatumba-save-v1' do localStorage depois.
 window.__T = (() => {
-  const g = window.__game, P = g.progress, QW = g.questWorld, L = [];
+  const g = window.__game, P = g.progress, QW = g.questWorld, C = g.combat, L = [];
+  C.peaceful = true;
   const wait = (ms) => { const n = Math.max(1, Math.ceil(ms / 33)); for (let i = 0; i < n; i++) { g.time += 1 / 30; g.update(1 / 30); g.input.endFrame(); } };
   const tp = (x, z) => { g.player.teleport(x, z); g.cam.snapBehind(g.player); };
   const btn = (label) => {
@@ -65,7 +67,7 @@ window.__T = (() => {
     },
     corvos() {
       accept('zepalha', 'corvos');
-      for (const c of QW.crows) { if (!P.wants('corvo')) break; if (c.state !== 'perch') continue; tp(c.home.x + 4, c.home.z + 4); wait(150); g.player.courage = 100; g.abilities.boo(); wait(300); }
+      for (const c of QW.crows) { if (!P.wants('corvo')) break; if (c.state !== 'idle') continue; tp(c.home.x + 4, c.home.z + 4); wait(150); g.player.courage = 100; g.abilities.boo(); wait(300); }
       L.push('corvos: ' + JSON.stringify(P.quests.corvos));
       if (P.status('corvos') === 'complete') turnIn('zepalha', 'corvos');
     },
@@ -78,6 +80,19 @@ window.__T = (() => {
     },
     cogumelos() { accept('vesga', 'cogumelos'); collect('cogumelo'); turnIn('vesga', 'cogumelos'); },
     vagalumes() { accept('tonico', 'vagalumes'); g.dayNight.setTime(22); wait(300); collect('vagalume'); turnIn('tonico', 'vagalumes'); },
+    combate() {
+      // briga de verdade com um marujo do farol: ele tem que morrer e o jogador sobreviver
+      C.peaceful = false;
+      const m = C.mobs.find((x) => x.type.name === 'Marujo Afogado' && x.state === 'idle');
+      tp(m.pos.x + 2, m.pos.z + 1); wait(300);
+      const xp0 = P.xp, hp0 = C.hp;
+      g.interaction.tryInteract(m.inter);
+      for (let i = 0; i < 60 && m.alive && m.state !== 'dead' && !C.dead; i++) wait(250);
+      L.push(`combate: marujo ${m.state} (nível ${m.level}), vida do jogador ${Math.round(hp0)} → ${Math.round(C.hp)}, XP +${P.xp - xp0}, morto ${C.dead}`);
+      if (C.dead) C.release();
+      C.peaceful = true;
+      if (m.state !== 'dead' && m.state !== 'gone') throw new Error('o marujo não morreu');
+    },
     final() {
       L.push(`FINAL nível ${P.level} xp ${P.xp}/${P.xpNeeded} dinheiro ${P.money} itens ${P.bag.map((b) => b.id).join(',')}`);
       L.push('status: ' + JSON.stringify(Object.fromEntries(Object.entries(P.quests).map(([k, v]) => [k, v.status]))));

@@ -1,6 +1,33 @@
 import * as THREE from 'three';
-import { damp, clamp } from '../util/math.js';
+import { damp, clamp, lerp } from '../util/math.js';
 import { toonMat } from '../render/toon.js';
+
+// Lanternada: a lanterna vai para trás do ombro esquerdo, varre a frente da esquerda para a direita
+// com o tronco torcendo junto e termina num passo à frente. Tempos em segundos; e = aceleração até a chave.
+const K_ATTACK = [
+  { t: 0, v: {} },
+  { t: 0.15, e: 'out', v: { torsoY: 0.65, armL: -1.05, armLz: 1.35, torsoX: -0.06, headY: -0.4, armR: -0.45, armRz: -0.5, legL: 0.12, legR: -0.1, bodyY: 0.02 } },
+  { t: 0.23, e: 'in', v: { torsoY: -0.1, armL: -1.6, armLz: 0.25, torsoX: 0.22, headY: 0.05, armR: 0.35, armRz: -0.35, legL: -0.45, legR: 0.3, bodyY: -0.06 } },
+  { t: 0.31, e: 'out', v: { torsoY: -0.78, armL: -1.5, armLz: -0.9, torsoX: 0.28, headY: 0.45, armR: 0.55, armRz: -0.25, legL: -0.5, legR: 0.32, bodyY: -0.07 } },
+  { t: 0.4, v: { torsoY: -0.66, armL: -1.35, armLz: -0.72, torsoX: 0.2, headY: 0.38, armR: 0.4, armRz: -0.25, legL: -0.38, legR: 0.25, bodyY: -0.04 } },
+  { t: 0.56, v: {} },
+];
+const K_HURT = [
+  { t: 0, v: {} },
+  { t: 0.07, e: 'out', v: { torsoX: -0.3, headX: -0.35, armLz: 0.55, armRz: -0.55, armL: 0.25, armR: 0.25, bodyY: -0.04 } },
+  { t: 0.32, v: {} },
+];
+const EASE = { in: (k) => k * k, out: (k) => 1 - (1 - k) * (1 - k), io: (k) => k * k * (3 - 2 * k) };
+
+/** interpola a pose entre as chaves; valores ausentes voltam à pose base */
+function keyPose(keys, at, P, base) {
+  let i = 0;
+  while (i < keys.length - 2 && at > keys[i + 1].t) i++;
+  const a = keys[i], b = keys[i + 1];
+  const k = (EASE[b.e] ?? EASE.io)(clamp((at - a.t) / (b.t - a.t), 0, 1));
+  const names = new Set([...Object.keys(a.v), ...Object.keys(b.v)]);
+  for (const n of names) P[n] = lerp(a.v[n] ?? base[n], b.v[n] ?? base[n], k);
+}
 
 /** Esqueleto simples de grupos (juntas) + animação procedural cartunesca. */
 export class Rig {
@@ -189,6 +216,35 @@ export class Rig {
         P.bodyY = Math.abs(Math.sin(b * 0.5)) * 0.35;
         break;
       }
+      case 'attack': {
+        // correndo, as pernas continuam no passo; parado, entram no golpe
+        const base = { ...P };
+        keyPose(K_ATTACK, at, P, base);
+        if (moving) {
+          P.legL = base.legL;
+          P.legR = base.legR;
+          P.bodyY = base.bodyY;
+        }
+        break;
+      }
+      case 'hurt':
+        keyPose(K_HURT, at, P, { ...P });
+        break;
+      case 'die':
+        // cai de costas, braços abertos
+        P.armL = -0.5;
+        P.armR = -0.7;
+        P.armLz = 1.25;
+        P.armRz = -1.15;
+        P.legL = -0.35;
+        P.legR = 0.15;
+        P.legLz = 0.2;
+        P.legRz = -0.15;
+        P.torsoX = 0.05;
+        P.headX = -0.25;
+        P.headZ = 0.3;
+        P.bodyY = 0.2;
+        break;
       default:
         break;
     }
@@ -227,6 +283,8 @@ export class Rig {
     set(j.head, 'y', P.headY + this.lookYaw);
     set(j.head, 'z', P.headZ);
     this.body.position.y = damp(this.body.position.y, P.bodyY, k, dt);
+    const dying = s.action === 'die';
+    if (dying || this.body.rotation.x) this.body.rotation.x = damp(this.body.rotation.x, dying ? -1.45 : 0, dying ? 5 : 9, dt);
 
     // mola do squash & stretch
     this.squashV += (-this.squash * 90 - this.squashV * 11) * dt;
@@ -243,12 +301,15 @@ export class Rig {
       j.eyes.scale.y = damp(j.eyes.scale.y, sy, 40, dt);
     }
 
-    // destaque ao passar o mouse
+    // destaque ao passar o mouse + clarão avermelhado ao levar um golpe
     this._hl = damp(this._hl, this.highlight, 12, dt);
+    this.flash = Math.max(0, (this.flash || 0) - dt * 6);
     const mats = this.extraMats ? [this.material, ...this.extraMats] : [this.material];
     for (const m of mats) {
-      if (m.emissive) m.emissive.setScalar(this._hl * 0.09);
-      else if (m.uniforms?.uHighlight) m.uniforms.uHighlight.value = this._hl;
+      if (m.emissive) {
+        m.emissive.setScalar(this._hl * 0.09);
+        if (this.flash > 0) m.emissive.setRGB(m.emissive.r + this.flash * 0.75, m.emissive.g + this.flash * 0.3, m.emissive.b + this.flash * 0.25);
+      } else if (m.uniforms?.uHighlight) m.uniforms.uHighlight.value = this._hl + this.flash;
     }
 
     if (this.extra) this.extra(dt, s, this);

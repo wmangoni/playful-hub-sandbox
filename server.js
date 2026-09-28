@@ -44,6 +44,11 @@ app.get('/planning_poker/:roomId', (req, res) => {
     res.sendFile(path.join(__dirname, 'planning_poker/index.html'));
 });
 
+// Tumbalacatumba: servir arquivo HTML compilado standalone diretamente
+app.get(['/tumbalacatumba', '/tumbalacatumba/'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'tumbalacatumba/Tumbalacatumba.html'));
+});
+
 // Servir arquivos estáticos da pasta raiz com cache
 app.use(express.static('./', {
     maxAge: '1h', // Cache de 1 hora para assets estáticos
@@ -143,6 +148,7 @@ createHtmlRoute('/jogos/threejs_earth', 'jogos/threejs_earth.html');
 createHtmlRoute('/jogos/blood_and_silver', 'jogos/blood_and_silver.html');
 createHtmlRoute('/jogos/planning_poker', 'jogos/planning_poker.html');
 createHtmlRoute('/jogos/blender_game', 'jogos/blender_game.html');
+createHtmlRoute('/jogos/tumbalacatumba', 'jogos/tumbalacatumba.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -173,6 +179,7 @@ createHtmlRoute('/blood_and_silver', 'blood_and_silver/index.html');
 createHtmlRoute('/blender_game', 'blender_game/game_fps.html');
 createHtmlRoute('/blender_game/fps', 'blender_game/game_fps.html');
 createHtmlRoute('/blender_game/island', 'blender_game/game.html');
+createHtmlRoute('/tumbalacatumba', 'tumbalacatumba/Tumbalacatumba.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));

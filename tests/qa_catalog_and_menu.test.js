@@ -75,11 +75,12 @@ async function runTests() {
   const hasPinball = menuCards.some(c => c.href.includes('pinball'));
   const hasEarth = menuCards.some(c => c.href.includes('threejs_earth'));
   const hasBlender = menuCards.some(c => c.href.includes('blender_game'));
+  const hasTumbala = menuCards.some(c => c.href.includes('tumbalacatumba'));
 
-  if (!hasPinball || !hasEarth || !hasBlender || menuCards.length < 25) {
-    throw new Error(`Menu principal deve conter pelo menos 25 jogos, incluindo Pinball, Three.js Earth e Blender FPS. Encontrados: ${menuCards.length}`);
+  if (!hasPinball || !hasEarth || !hasBlender || !hasTumbala || menuCards.length < 26) {
+    throw new Error(`Menu principal deve conter pelo menos 26 jogos, incluindo Pinball, Three.js Earth, Blender FPS e Tumbalacatumba. Encontrados: ${menuCards.length}`);
   }
-  console.log(`✅ Teste 1: Todos os ${menuCards.length} jogos (incluindo Pinball, Three.js Earth e Blender FPS) estão presentes no menu principal.`);
+  console.log(`✅ Teste 1: Todos os ${menuCards.length} jogos (incluindo Pinball, Three.js Earth, Blender FPS e Tumbalacatumba) estão presentes no menu principal.`);
 
   // 2. Validar que todas as 25 páginas em /jogos/ respondem com sucesso
   console.log('\n--- Test 2: Validação de Acesso a Todas as Páginas de Jogos (/jogos/...) ---');

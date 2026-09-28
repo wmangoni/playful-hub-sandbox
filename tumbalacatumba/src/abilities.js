@@ -25,11 +25,21 @@ export class Abilities {
 
   use(id) {
     const f = this[id];
+    if (this.game.combat?.dead) {
+      this.game.ui.error('Você está morto.');
+      return false;
+    }
     return f ? f.call(this) : false;
+  }
+
+  /** Lanternada (tecla 7) */
+  attack() {
+    return this.game.combat.manualAttack();
   }
 
   boo() {
     const g = this.game, p = g.player;
+    if (p.dead) return false;
     if (p.mounted) {
       g.ui.error('Difícil assustar alguém montado numa vassoura.');
       return false;
@@ -45,6 +55,7 @@ export class Abilities {
     g.audio?.sfx('boo');
     g.cam.shake = 0.35;
     const n = g.questWorld.scareCrows(p.pos, 10);
+    g.combat.fearAround(p.pos, 8, 2.5);
     for (const npc of g.questWorld.npcList) {
       if (npc.pos.distanceTo(p.pos) < 7) npc.say(rng.pick(SCREAMS[npc.id] ?? ['Aaah!']), 2.6);
     }
@@ -55,7 +66,7 @@ export class Abilities {
 
   dance() {
     const g = this.game, p = g.player;
-    if (p.mounted) return false;
+    if (p.mounted || p.dead) return false;
     if (p.action === 'dance') {
       p.action = null;
       return true;
@@ -104,6 +115,10 @@ export class Abilities {
       g.ui.error('Você não pode fazer isso enquanto se move.');
       return false;
     }
+    if (g.combat.inCombat) {
+      g.ui.error('Você está em combate.');
+      return false;
+    }
     g.ui.cast('Vassoura Velha', 1.5, {
       icon: 'broom',
       onDone: () => {
@@ -142,7 +157,7 @@ export class Abilities {
 
   sit() {
     const p = this.game.player;
-    if (p.mounted || !p.grounded) return false;
+    if (p.mounted || !p.grounded || p.dead) return false;
     p.sitting = !p.sitting;
     return true;
   }

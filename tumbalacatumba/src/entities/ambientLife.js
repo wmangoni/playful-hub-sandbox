@@ -52,7 +52,7 @@ export class AmbientLife {
       const pad = new THREE.Mesh(new THREE.CircleGeometry(0.55, 12, 0.3, TAU - 0.6).rotateX(-Math.PI / 2), new THREE.MeshToonMaterial({ color: '#4a7a3a' }));
       pad.position.copy(r.root.position).y -= 0.015;
       scene.add(pad);
-      this.frogs.push({ rig: r, t: rng.range(1, 6), hop: 0, base: r.root.position.y });
+      this.frogs.push({ rig: r, base: r.root.position.y, t: rng.range(1, 6) });
       i++;
     }
     // coruja no bosque
@@ -134,25 +134,7 @@ export class AmbientLife {
       r.root.visible = g.camera.position.distanceTo(r.root.position) < 80;
       if (r.root.visible) r.animate(dt, {});
     }
-    // sapos: pulinho e coaxar
-    const pl = g.player.pos;
-    for (const f of this.frogs) {
-      const r = f.rig;
-      r.root.visible = g.camera.position.distanceTo(r.root.position) < 60;
-      if (!r.root.visible) continue;
-      f.t -= dt;
-      if (f.t < 0) {
-        f.t = rng.range(3, 9);
-        f.hop = 0.001;
-        if (r.root.position.distanceTo(pl) < 18) g.ui?.bubble({ pos: r.root.position, rig: r, yOff: 0.1 }, rng.pick(['Croac.', 'Croac croac!', '(coaxar melancólico)', 'Croooac...']), 2);
-      }
-      if (f.hop > 0) {
-        f.hop += dt * 2.2;
-        r.root.position.y = f.base + Math.sin(Math.min(1, f.hop) * Math.PI) * 0.45;
-        if (f.hop >= 1) f.hop = 0;
-      }
-      r.animate(dt, {});
-    }
+    // (os sapos pulam, coaxam e brigam em combat/: são criaturas neutras)
     for (const o of this.owls) if (g.camera.position.distanceTo(o.root.position) < 70) o.animate(dt, {});
     // aranhas sobem e descem
     for (const s of this.spiders) {

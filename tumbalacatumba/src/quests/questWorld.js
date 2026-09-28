@@ -192,7 +192,7 @@ export class QuestWorld {
     }
   }
 
-  // ------------------------------------------------------------------ corvos
+  // ------------------------------------------------------------------ corvos (a IA de briga fica em combat/)
   setupCrows() {
     const g = this.game;
     this.crows = [];
@@ -213,65 +213,19 @@ export class QuestWorld {
       rig.root.position.set(p.x, baseY, p.z);
       rig.root.rotation.y = rng.range(0, TAU);
       g.scene.add(rig.root);
-      this.crows.push({ rig, home: new THREE.Vector3(p.x, baseY, p.z), state: 'perch', t: 0, vel: new THREE.Vector3(), cawT: rng.range(3, 12) });
+      this.crows.push({ rig, home: new THREE.Vector3(p.x, baseY, p.z) });
     }
   }
-  /** "Buu!" do jogador: espanta corvos no raio. Retorna quantos. */
+  /** "Buu!" do jogador: espanta corvos no raio (até os que estão brigando). Retorna quantos. */
   scareCrows(pos, radius = 10) {
     let n = 0;
     for (const c of this.crows) {
-      if (c.state !== 'perch') continue;
-      if (c.rig.root.position.distanceTo(pos) < radius) {
-        this.flyAway(c, pos);
+      if (c.pos.distanceTo(pos) < radius && c.scare(pos)) {
         n++;
         if (this.P.wants('corvo')) this.P.progress('corvo');
       }
     }
     return n;
-  }
-  flyAway(c, from) {
-    c.state = 'fly';
-    c.t = 0;
-    const d = c.rig.root.position.clone().sub(from);
-    d.y = 0;
-    d.normalize();
-    c.vel.set(d.x * 7, 5, d.z * 7);
-    c.rig.flying = true;
-    c.rig.root.rotation.y = Math.atan2(d.x, d.z);
-    this.game.audio?.sfx('caw');
-    this.game.ui.bubble({ pos: c.rig.root.position, rig: c.rig, yOff: 0.4 }, rng.pick(['CRÁ!', 'Crá crá!', 'CRÁÁÁ!']), 1.6);
-  }
-  updateCrows(dt) {
-    const pl = this.game.player.pos;
-    for (const c of this.crows) {
-      const r = c.rig;
-      if (c.state === 'perch') {
-        r.root.visible = true;
-        r.root.position.copy(c.home);
-        if (r.root.position.distanceTo(pl) < 2.8) this.flyAway(c, pl);
-        c.cawT -= dt;
-        if (c.cawT < 0) {
-          c.cawT = rng.range(8, 20);
-          if (r.root.position.distanceTo(pl) < 25) this.game.ui.bubble({ pos: c.home, rig: r, yOff: 0.4 }, rng.pick(['Crá crá!', 'Crá! (risada de corvo)', 'Olha o espantalho, crá crá!']), 2);
-        }
-      } else if (c.state === 'fly') {
-        c.t += dt;
-        c.vel.y += dt * 1.5;
-        r.root.position.addScaledVector(c.vel, dt);
-        if (c.t > 3.5) {
-          c.state = 'gone';
-          c.t = 0;
-          r.root.visible = false;
-        }
-      } else {
-        c.t += dt;
-        if (c.t > 45 && pl.distanceTo(c.home) > 28) {
-          c.state = 'perch';
-          r.flying = false;
-        }
-      }
-      if (r.root.visible) r.animate(dt, {});
-    }
   }
 
   // ------------------------------------------------------------------ sapo
@@ -455,7 +409,6 @@ export class QuestWorld {
     for (const n of this.npcList) n.update(dt);
     this.updateCat(dt);
     this.updatePumpkins(dt);
-    this.updateCrows(dt);
     this.updateEgg(dt);
     for (const p of this.pickups) p.update(dt, t);
     this.pet.update(dt);

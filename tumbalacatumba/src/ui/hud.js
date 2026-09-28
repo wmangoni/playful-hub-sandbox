@@ -3,11 +3,12 @@ import { icon, cursorURL, coinsHTML, markerSVG } from './icons.js';
 import { Minimap, WorldMap, paintWorldMap } from './minimap.js';
 import { Portraits } from './portrait.js';
 import { Dialog, QuestLog, Bags, Menu, esc } from './windows.js';
+import { CombatHud } from './combatHud.js';
 import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR } from '../quests/data.js';
 import { createPlayerModel } from '../entities/models.js';
 import * as NM from '../entities/npcModels.js';
 import * as CM from '../entities/creatureModels.js';
-import { ZONE_NAME, QUEST_AREAS } from '../world/layout.js';
+import { ZONE_NAME, QUEST_AREAS, ZONE_LEVELS } from '../world/layout.js';
 import { Progress } from '../quests/progress.js';
 import { clamp } from '../util/math.js';
 
@@ -86,7 +87,7 @@ export class UI {
 
     // cursores
     const st = document.documentElement.style;
-    for (const k of ['default', 'talk', 'loot', 'use']) st.setProperty(`--cur-${k}`, `url(${cursorURL(k)}) ${k === 'default' ? '1 1' : '8 8'}`);
+    for (const k of ['default', 'talk', 'loot', 'use', 'attack']) st.setProperty(`--cur-${k}`, `url(${cursorURL(k)}) ${k === 'default' ? '1 1' : k === 'attack' ? '2 2' : '8 8'}`);
     document.body.classList.add('cur-default');
 
     // mapa pintado, minimapa, retratos
@@ -115,6 +116,7 @@ export class UI {
     this.buildActionBar();
     this.buildMicro();
     this.buildChat();
+    this.combatHud = new CombatHud(game, this);
     this.q('#tracker .tog').onclick = () => {
       this.trackerCollapsed = !this.trackerCollapsed;
       this.q('#tracker .tog').textContent = this.trackerCollapsed ? '[+]' : '[−]';
@@ -184,14 +186,21 @@ export class UI {
   buildActionBar() {
     const g = this.game, P = g.progress;
     this.slots = [
-      { key: '1', code: 'Digit1', id: 'boo', name: 'Buu!', icon: 'boo', cd: 2.5, desc: 'Solta um "BUU!" apavorante. Espanta corvos num raio de 10 metros.' },
+      { key: '1', code: 'Digit1', id: 'boo', name: 'Buu!', icon: 'boo', cd: 2.5, desc: 'Solta um "BUU!" apavorante. Espanta corvos num raio de 10 metros e faz as criaturas por perto fugirem de medo por 2,5 s.' },
       { key: '2', code: 'Digit2', id: 'dance', name: 'Dança Macabra', icon: 'dance', cd: 0.6, desc: 'Dança como se ninguém estivesse olhando. Todo mundo está olhando.' },
       { key: '3', code: 'Digit3', id: 'lantern', name: 'Lanterna', icon: 'lantern', cd: 0.4, desc: 'Acende ou apaga sua lanterna. Muito útil à noite.' },
       { key: '4', code: 'Digit4', id: 'pet', name: 'Belzebuzinho', icon: 'chick', cd: 2, desc: 'Chama ou dispensa seu filhote de avestruz demônio.', locked: () => !P.hasItem('belzebu') },
       { key: '5', code: 'Digit5', id: 'mount', name: 'Vassoura Velha', icon: 'broom', cd: 1, desc: 'Monta na vassoura (+65% de velocidade). Conjuração de 1,5 s.', locked: () => !P.hasItem('vassoura') },
       { key: '6', code: 'Digit6', id: 'hearth', name: 'Lápide de Regresso', icon: 'hearth', cd: 45, desc: 'Leva você de volta à Praça do Relógio Torto. Conjuração de 4 s.' },
+      {
+        key: '7', code: 'Digit7', id: 'attack', name: 'Lanternada', icon: 'lanternada', cd: 1, selfCd: true,
+        desc: () => {
+          const s = g.combat.st;
+          return `Gira a lanterna num arco à sua frente: ${s.min}–${s.max} de dano no alvo e 60% em até mais duas criaturas grudadas nele. Liga o ataque automático. Um golpe a cada ${s.swing.toFixed(2).replace('.', ',')} s. Fica mais forte a cada nível.`;
+        },
+      },
     ];
-    for (let i = 7; i <= 12; i++) this.slots.push({ key: i <= 9 ? String(i) : i === 10 ? '0' : i === 11 ? '-' : '=', empty: true });
+    for (let i = 8; i <= 12; i++) this.slots.push({ key: i <= 9 ? String(i) : i === 10 ? '0' : i === 11 ? '-' : '=', empty: true });
     const bar = this.q('#bottom .bar-frame');
     for (const s of this.slots) {
       const e = document.createElement('div');
@@ -204,7 +213,8 @@ export class UI {
       e.onclick = () => this.useSlot(s);
       e.onmousemove = (ev) => {
         const lk = s.locked?.();
-        this.showTooltip('slot', `<div class="tt-name" style="color:#fff">${esc(s.name)}</div>${lk ? '<div class="tt-far">Ainda não aprendido</div>' : ''}<div class="tt-flavor" style="color:#ffd100">${esc(s.desc)}</div>${s.cd >= 2 ? `<div class="tt-sub">Recarga: ${s.cd} s</div>` : ''}`, ev.clientX, ev.clientY);
+        const desc = typeof s.desc === 'function' ? s.desc() : s.desc;
+        this.showTooltip('slot', `<div class="tt-name" style="color:#fff">${esc(s.name)}</div>${lk ? '<div class="tt-far">Ainda não aprendido</div>' : ''}<div class="tt-flavor" style="color:#ffd100">${esc(desc)}</div>${s.cd >= 2 ? `<div class="tt-sub">Recarga: ${s.cd} s</div>` : ''}`, ev.clientX, ev.clientY);
       };
       e.onmouseleave = () => this.hideTooltip('slot');
     }
@@ -215,13 +225,13 @@ export class UI {
       this.error('Você ainda não tem isso.');
       return;
     }
-    if (s.cdLeft > 0) {
+    if (s.cdLeft > 0 && !s.selfCd) {
       this.error('Ainda não está pronto.');
       return;
     }
     const ok = this.game.abilities.use(s.id);
     if (ok !== false) {
-      s.cdLeft = s.cd;
+      if (!s.selfCd) s.cdLeft = s.cd;
       s.el.classList.add('press');
       setTimeout(() => s.el.classList.remove('press'), 120);
     }
@@ -231,11 +241,11 @@ export class UI {
     for (const s of this.slots) {
       if (s.empty) continue;
       if (s.cdLeft > 0) s.cdLeft = Math.max(0, s.cdLeft - dt);
-      const cool = s.cdLeft > 0 && s.cd >= 1;
+      const cool = s.cdLeft > 0 && s.cd >= 0.75;
       s.el.classList.toggle('cooling', cool);
       if (cool) s.el.querySelector('.cd').style.background = `conic-gradient(rgba(0,0,0,0.7) ${(s.cdLeft / s.cd) * 360}deg, transparent 0)`;
       s.el.classList.toggle('locked', !!s.locked?.());
-      const active = (s.id === 'lantern' && g.player.lanternOn) || (s.id === 'dance' && g.player.action === 'dance') || (s.id === 'pet' && g.questWorld.pet.active) || (s.id === 'mount' && g.player.mounted);
+      const active = (s.id === 'lantern' && g.player.lanternOn) || (s.id === 'dance' && g.player.action === 'dance') || (s.id === 'pet' && g.questWorld.pet.active) || (s.id === 'mount' && g.player.mounted) || (s.id === 'attack' && g.combat.autoAttack);
       s.el.classList.toggle('active', active);
     }
   }
@@ -388,6 +398,16 @@ export class UI {
   }
   tooltipFor(it) {
     if (!it) return this.hideTooltip('world');
+    if (it.kind === 'mob') {
+      const m = it.mob;
+      let h = `<div class="tt-name" style="color:${it.reaction === 'hostile' ? '#ff4030' : '#ffd100'}">${esc(it.name)}</div>`;
+      h += `<div class="tt-lvl"><span style="color:${this.levelColor(m.level)}">Nível ${m.level}</span> ${esc(it.family)}</div>`;
+      h += `<div class="tt-sub">${it.reaction === 'hostile' ? 'Hostil: ataca quem chega perto' : 'Neutro: só briga se provocado'}</div>`;
+      if (m.hp < m.maxHp) h += `<div class="tt-sub">Vida: ${Math.ceil(m.hp)} / ${m.maxHp}</div>`;
+      if (it.hint) h += `<div class="tt-hint">${esc(it.hint)}</div>`;
+      if (this.game.interaction.distTo(it) > it.range) h += `<div class="tt-far">Longe demais</div>`;
+      return this.showTooltip('world', h);
+    }
     const reactColor = it.kind === 'item' ? '#ffffff' : it.reaction === 'friendly' ? '#3cff3c' : '#ffd100';
     let h = `<div class="tt-name" style="color:${reactColor}">${esc(it.name)}</div>`;
     if (it.subtitle) h += `<div class="tt-sub">&lt;${esc(it.subtitle)}&gt;</div>`;
@@ -428,7 +448,7 @@ export class UI {
       return;
     }
     tf.classList.remove('hidden');
-    tf.classList.remove('friendly', 'neutral', 'item');
+    tf.classList.remove('friendly', 'neutral', 'hostile', 'item');
     tf.classList.add(it.kind === 'item' ? 'item' : it.reaction);
     tf.querySelector('.name').textContent = it.name;
     tf.querySelector('.sub').textContent = it.subtitle ? `<${it.subtitle}>` : '';
@@ -445,7 +465,7 @@ export class UI {
       zepalha: NM.createScarecrow, conde: NM.createVampire, zumbi: NM.createZombie, vesga: NM.createWitch, suspiro: () => NM.createGhost('Suspiro'), nevoa: () => NM.createGhost('Lady Névoa', { lady: true }),
       'Sr. Bigodes': CM.createCat, 'Abóbora Fujona': () => CM.createRebelPumpkin(1), 'Sapo Sorridente': () => CM.createFrog(true), 'Ovo do Capeta': CM.createEgg, Belzebuzinho: CM.createChick,
     };
-    const f = F[key];
+    const f = F[key] ?? it.portrait;
     const rig = f ? f() : null;
     if (rig && key === 'juvenal') rig.setComplete(this.game.progress.status('ossos') === 'done');
     if (rig && key === 'conde') rig.fangs.visible = this.game.progress.status('dentadura') === 'done';
@@ -457,11 +477,8 @@ export class UI {
     const P = this.game.progress;
     const pf = this.q('.unit.player');
     pf.querySelector('.level').textContent = P.level;
-    const hp = 80 + P.level * 20;
-    pf.querySelector('.bar.hp span').textContent = `${hp} / ${hp}`;
-    pf.querySelector('.bar.mp span').textContent = `Coragem ${100}%`;
     const xp = this.q('#bottom .xp');
-    xp.querySelector('i').style.width = `${(P.xp / P.xpNeeded) * 100}%`;
+    xp.querySelector('i').style.width = `${Math.min(1, P.xp / P.xpNeeded) * 100}%`;
     xp.querySelector('span').textContent = `XP: ${P.xp} / ${P.xpNeeded}`;
     this.q('#micro .money').innerHTML = coinsHTML(P.money);
     this.playerPortraitRig.hat.visible = !!P.flags.hat;
@@ -570,6 +587,7 @@ export class UI {
       this.renderPlayer();
     } else if (it.use === 'eat') {
       g.progress.removeItem(id);
+      g.combat.heal(12);
       this.info('Você comeu o biscoito. Tinha gosto de... arrependimento.');
       g.audio?.sfx('eat');
     } else if (it.use === 'pet') g.abilities.use('pet');
@@ -881,6 +899,7 @@ export class UI {
     this.updateActionBar(dt);
     this.updateCast(dt);
     this.updateOverlay(dt);
+    this.combatHud.update(dt);
     this.updateWaypoint();
     this.dialog.update();
     this.q('#minimap .clock').textContent = g.dayNight.clockText();
@@ -892,7 +911,8 @@ export class UI {
       this.zoneSeen = this.zoneSeen || {};
       const now = g.time;
       if (this.lastZone !== null && z && !(now - (this.zoneSeen[z.id] ?? -999) < 45)) {
-        this.zoneText(z.name, ZONE_FLAVOR[z.id]);
+        const lv = ZONE_LEVELS[z.id];
+        this.zoneText(z.name, (ZONE_FLAVOR[z.id] ?? '') + (lv ? ` · Criaturas de nível ${lv[0] === lv[1] ? lv[0] : `${lv[0]}–${lv[1]}`}` : ''));
         g.audio?.sfx('zone');
       }
       if (z) this.zoneSeen[z.id] = now;

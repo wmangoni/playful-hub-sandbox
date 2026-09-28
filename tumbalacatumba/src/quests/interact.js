@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WATER_LEVEL } from '../world/layout.js';
 
 const _o = new THREE.Vector3();
 const _d = new THREE.Vector3();
@@ -125,7 +126,7 @@ export class Interaction {
     this.target = it;
     this.game.ui?.setTarget(it);
     if (it) {
-      this.ringMat.color.set(it.reaction === 'friendly' ? '#3cff3c' : '#ffd100');
+      this.ringMat.color.set(it.reaction === 'friendly' ? '#3cff3c' : it.reaction === 'hostile' ? '#ff3a2a' : '#ffd100');
       const r = Math.max(0.9, (it.radius ?? 0.7) * 2.4);
       this.ring.scale.set(r, 1, r);
     }
@@ -136,7 +137,8 @@ export class Interaction {
     this.ring.visible = !!it && it.enabled();
     if (!this.ring.visible) return;
     const w = this.game.world;
-    const y = Math.max(w.groundHeight(it.pos.x, it.pos.z), it.pos.y - (it.npc?.rig?.float ? 0.6 : 0));
+    const gy = w.groundHeight(it.pos.x, it.pos.z);
+    const y = it.ringGround ? Math.max(gy, WATER_LEVEL) : Math.max(gy, it.pos.y - (it.npc?.rig?.float ? 0.6 : 0));
     this.ring.position.set(it.pos.x, y + 0.06, it.pos.z);
     this.ring.rotation.y += 0.01;
     this.ringMat.opacity = 0.75 + Math.sin(this.game.time * 3) * 0.2;
@@ -145,6 +147,16 @@ export class Interaction {
   tryInteract(it) {
     const g = this.game;
     if (!it.enabled()) return;
+    if (g.combat?.dead) {
+      g.ui.error('Você está morto.');
+      return;
+    }
+    // criatura: seleciona e parte para a briga (o golpe cuida do alcance)
+    if (it.kind === 'mob') {
+      this.setTarget(it);
+      it.onInteract?.(g, it);
+      return;
+    }
     if (this.distTo(it) > it.range) {
       g.ui.error('Você está muito longe.');
       return;
@@ -189,9 +201,10 @@ export class Interaction {
       else g.ui.error('Não há nada por perto.');
     }
     if (input.hit('Tab')) {
-      const npcs = this.list
-        .filter((it) => it.enabled() && it.selectable && this.distTo(it) < 40)
-        .sort((a, b) => this.distTo(a) - this.distTo(b));
+      // como no WoW: Tab alterna entre as criaturas por perto; sem nenhuma, entre os PNJs
+      const near = this.list.filter((it) => it.enabled() && it.selectable && this.distTo(it) < 40);
+      const foes = near.filter((it) => it.kind === 'mob' && this.distTo(it) < 30);
+      const npcs = (foes.length ? foes : near).sort((a, b) => this.distTo(a) - this.distTo(b));
       if (npcs.length) {
         const i = npcs.indexOf(this.target);
         this.setTarget(npcs[(i + 1) % npcs.length]);
