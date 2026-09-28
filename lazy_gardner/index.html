@@ -275,10 +275,15 @@
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+        // "../lazy_gardner/" resolve certo tanto em /lazy_gardner quanto em /lazy_gardner/index.html
+        import { SHARED_UNIFORMS, hashString, cloneShaderMaterial } from '../lazy_gardner/procedural.js';
+        import { createTerrain, getTerrainHeight, setGroundBiome, syncGroundTint, createSoilPatch, SOIL_MATERIALS, createGrass } from '../lazy_gardner/terrain.js';
+        import { buildPlantModel, createDeadStump, disposePlantMesh, setLotusGlow, shapeSeedFor, getAllPlantMaterials } from '../lazy_gardner/plant_models.js';
 
         // --- Configuração Inicial ---
         let scene, camera, renderer;
         let ground, sky;
+        let grass; // grama 3D instanciada
         let directionalLight, ambientLight; // TASK_003: refs p/ troca de bioma
         let bearModel; // Variável para armazenar o modelo do urso
         const plants = [];
@@ -342,7 +347,7 @@
 
         // === TASK_003: Biomas de estufa ===
         const GREENHOUSE_BIOMES = {
-            default:   { name: 'Padrão',     groundColor: 0x228B22, skyColor: 0x87CEEB, lightColor: 0xffffff, lightIntensity: 1.2, cost: 0,    growthMult: 1.0,  harvestMult: 1.0 },
+            default:   { name: 'Padrão',     groundColor: 0x3f7d2a, skyColor: 0x87CEEB, lightColor: 0xffffff, lightIntensity: 1.2, cost: 0,    growthMult: 1.0,  harvestMult: 1.0 },
             desert:    { name: 'Desértica',  groundColor: 0xD2B48C, skyColor: 0xEDC9AF, lightColor: 0xffd1b3, lightIntensity: 1.6, cost: 1500, growthMult: 1.0,  harvestMult: 1.2, droughtBias: true },
             glacial:   { name: 'Glacial',    groundColor: 0xE0FFFF, skyColor: 0xB0C4DE, lightColor: 0xd9e6f2, lightIntensity: 1.0, cost: 3000, growthMult: 1.0,  harvestMult: 1.0, freezesPests: true },
             cyberglow: { name: 'Ciber-Glow', groundColor: 0x0a0c10, skyColor: 0x05020a, lightColor: 0xb573ff, lightIntensity: 1.4, cost: 6000, growthMult: 1.25, harvestMult: 1.0 }
@@ -366,6 +371,13 @@
         let harvesterTimer = 0;
         const HARVEST_INTERVAL = 3; // segundos
         let harvesterRobotMesh = null;
+
+        // Partículas (vagalumes, poeira, pólen): geometria/materiais compartilhados, sem vazamento
+        const PARTICLE_GEO = new THREE.SphereGeometry(0.05, 4, 4);
+        const FIREFLY_MAT = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+        const POLLEN_MAT = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+        const PEST_PARTICLE_MAT = new THREE.MeshBasicMaterial({ color: 0x8bc34a });
+        const DUST_MAT = new THREE.MeshBasicMaterial({ color: 0xb9f6ca });
 
         const flowerBloomColors = [
             0xFF69B4, // HotPink (original)
@@ -521,17 +533,20 @@
             fillLight.position.set(-5, 8, -7.5); // Posição oposta à luz principal
             scene.add(fillLight);
 
-            // Chão (Ground)
-            const groundGeometry = new THREE.PlaneGeometry(100, 100);
-            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22, side: THREE.DoubleSide }); // Verde grama
-            ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2; // Deitar o plano
-            ground.receiveShadow = true;
+            // Chão: relevo procedural + textura procedural (terrain.js)
+            ground = createTerrain(renderer);
             scene.add(ground);
+
+            // Grama 3D com vento
+            grass = createGrass();
+            scene.add(grass.mesh);
+
+            // Névoa leve: dá profundidade às colinas do horizonte (cor sincronizada com o céu)
+            scene.fog = new THREE.Fog(0x87CEEB, 38, 150);
 
             // Sky Dome (Simples)
             const skyGeometry = new THREE.SphereGeometry(500, 32, 16); // Raio grande
-            const skyMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide }); // Material visível por dentro
+            const skyMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false }); // Material visível por dentro (sem névoa)
             sky = new THREE.Mesh(skyGeometry, skyMaterial);
             scene.add(sky);
             updateSkyColor(); // Definir cor inicial
@@ -589,6 +604,7 @@
             });
 
             // Iniciar loop de animação
+            warmUpShaders();
             animate();
             updateWeather(); // Define o clima inicial
             updateAudio(); // Tenta iniciar o áudio
@@ -599,17 +615,41 @@
                 getWeather: () => simulatedWeather,
                 getMultipliers: () => ({ growth: weatherGrowthMultiplier, gold: goldMultiplier }),
                 setWeather: (w) => { simulatedWeather = w; applyWeatherEffects(); updateSkyColor(); },
-                plantAt: (x, z, type) => plantSeed(new THREE.Vector3(x, 0, z), type),
+                plantAt: (x, z, type) => plantSeed(new THREE.Vector3(x, getTerrainHeight(x, z), z), type),
+                getTerrainHeight, getRenderer: () => renderer, getGrass: () => grass, getCamera: () => camera, getScene: () => scene,
+                setDayProgress: (p) => { timeAccumulator = p * dayDuration; },
+                setPlantStage: (plant, stage) => { plant.growthStage = stage; rebuildPlantMesh(plant); plant.popT = 1; plant.mesh.scale.setScalar(1); },
                 plantSeed, harvestPlant, spawnPest, killPest, buySprinkler, buyScarecrow, buyHarvester,
                 isPlantMature, updatePests, updateHarvesterRobots, updatePlantGrowth,
                 // === TASK_003 ===
                 GREENHOUSE_BIOMES, HYBRID_INFO, switchGreenhouse, buyGreenhouse, applyBiome,
-                checkCrossbreeding, triggerHybridization, plantHybrid, createHybridMesh,
+                checkCrossbreeding, triggerHybridization, plantHybrid, createHybridMesh: buildPlantModel,
                 enterExhibition, evaluatePlantForShow, biomeGrowthMult, biomeHarvestMult,
                 getGround: () => ground, getSky: () => sky, getDirLight: () => directionalLight,
                 getState: () => ({ greenhouse: gardenState.currentGreenhouse, unlocked: gardenState.unlockedGreenhouses, hybrids: gardenState.hybridSeedsInventory, buff: globalGrowthBuff }),
                 forceExhibitionReady: () => { gardenState.lastExhibitionTimestamp = 0; }
             };
+        }
+
+        // Pré-compila os shaders (plantas, canteiros, partículas), inclusive o passe de
+        // sombra, para o primeiro plantio de cada espécie não causar travada.
+        function warmUpShaders() {
+            const geo = new THREE.PlaneGeometry(1, 1);
+            const mats = [...getAllPlantMaterials(), SOIL_MATERIALS.wet, SOIL_MATERIALS.dry, FIREFLY_MAT, POLLEN_MAT, PEST_PARTICLE_MAT, DUST_MAT];
+            const group = new THREE.Group();
+            mats.forEach(m => {
+                const mesh = new THREE.Mesh(geo, m);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                group.add(mesh);
+            });
+            group.position.set(0, 5, 0);
+            group.scale.setScalar(0.0001); // invisível (menor que um pixel)
+            scene.add(group);
+            renderer.compile(scene, camera);
+            renderer.render(scene, camera);
+            scene.remove(group);
+            geo.dispose();
         }
 
         function setSeedType(type) {
@@ -695,12 +735,38 @@
         }
 
         function cleanDeadPlant(plant) {
-            if (plant.mesh) scene.remove(plant.mesh);
-            if (plant.soilMesh) scene.remove(plant.soilMesh);
+            if (plant.mesh) { scene.remove(plant.mesh); disposePlantMesh(plant.mesh); }
+            if (plant.soilMesh) { scene.remove(plant.soilMesh); plant.soilMesh.geometry.dispose(); }
             const idx = plants.indexOf(plant);
             if (idx >= 0) plants.splice(idx, 1);
+            refreshGrassClearings();
             showNotification('Canteiro limpo. Plante de novo! 🌱', 2500);
             saveGame();
+        }
+
+        // --- Helpers de posicionamento no relevo ---
+        // A planta fica sempre na altura do terreno em (x, z)
+        function snapToTerrain(position) {
+            position.y = getTerrainHeight(position.x, position.z);
+            return position;
+        }
+        // Coloca a malha da planta (modelo, toco) na cena, na posição da planta
+        function attachPlantMesh(plant, mesh) {
+            plant.mesh = mesh;
+            mesh.position.copy(plant.position);
+            mesh.userData.plantData = plant;
+            scene.add(mesh);
+            return mesh;
+        }
+        // Canteiro de terra que acompanha o relevo (indicador de umidade)
+        function addSoilPatch(plant) {
+            plant.soilMesh = createSoilPatch(plant.position.x, plant.position.z, shapeSeedFor(plant));
+            scene.add(plant.soilMesh);
+            updateSoilColor(plant);
+        }
+        // Clareiras na grama 3D onde há canteiros
+        function refreshGrassClearings() {
+            if (grass) grass.setClearings(plants.map(p => ({ x: p.position.x, z: p.position.z, r: 0.62 })));
         }
 
         function plantSeed(position, type) {
@@ -717,7 +783,7 @@
             const plantData = {
                 id: THREE.MathUtils.generateUUID(),
                 type: type,
-                position: position.clone(),
+                position: snapToTerrain(position.clone()),
                 plantedTime: clock.getElapsedTime(),
                 growthStage: 0,
                 mesh: null,
@@ -728,29 +794,15 @@
                 growTimer: 0,    // segundos efetivos de crescimento
                 isDead: false,
                 hasPest: false,
-                isHybrid: false, hasHybridSeed: null, moistureSum: 0, moistureSamples: 0 // TASK_003
+                isHybrid: false, hasHybridSeed: null, moistureSum: 0, moistureSamples: 0, // TASK_003
+                shapeSeed: hashString(THREE.MathUtils.generateUUID()) // forma estável ao crescer/recarregar
             };
 
-            plantData.mesh = createPlantMesh(plantData);
-            plantData.mesh.position.copy(position); // Colocar na posição correta
-            plantData.mesh.position.y += 0.1; // Elevar um pouco para evitar z-fighting inicial
-            plantData.mesh.castShadow = true;
-
-            plantData.mesh.userData.plantData = plantData;
-            scene.add(plantData.mesh);
-
-            // Anel de terra (indicador de umidade)
-            const soilGeo = new THREE.RingGeometry(0.35, 0.6, 24);
-            const soilMat = new THREE.MeshStandardMaterial({ color: 0x3D2314, side: THREE.DoubleSide });
-            const soilMesh = new THREE.Mesh(soilGeo, soilMat);
-            soilMesh.rotation.x = -Math.PI / 2;
-            soilMesh.position.copy(position);
-            soilMesh.position.y = 0.02;
-            soilMesh.receiveShadow = true;
-            scene.add(soilMesh);
-            plantData.soilMesh = soilMesh;
+            attachPlantMesh(plantData, createPlantMesh(plantData));
+            addSoilPatch(plantData);
 
             plants.push(plantData);
+            refreshGrassClearings();
             showFloatingText(`-${cost} 🪙`, position, '#ff8a80');
             saveGame();
         }
@@ -821,296 +873,9 @@
             });
         }
 
+        // Modelos procedurais (plant_models.js): 1 a 4 malhas mescladas por planta
         function createPlantMesh(plantData) {
-            if (plantData.isHybrid) return createHybridMesh(plantData); // TASK_003
-            const stages = getPlantStages(plantData.type);
-            const stageName = stages[plantData.growthStage];
-            let geometry, material, mesh;
-            const sizeVariation = plantData.sizeVariation || 1.0;
-
-            switch (plantData.type) {
-                case 'flower':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                    if (stageName === 'seed') {
-                        geometry = new THREE.SphereGeometry(0.08 * sizeVariation, 8, 6);
-                        material.color.set(0x8B4513);
-                    } else if (stageName === 'sprout') {
-                        geometry = new THREE.ConeGeometry(0.12 * sizeVariation, 0.3 * sizeVariation, 8);
-                        material.color.set(0x90EE90);
-                        mesh = new THREE.Mesh(geometry, material);
-                        mesh.position.y = 0.15 * sizeVariation;
-                        return mesh;
-                    } else if (stageName === 'bud') {
-                        geometry = new THREE.SphereGeometry(0.2 * sizeVariation, 8, 6);
-                        material.color.set(0xFFC0CB);
-                    } else {
-                        geometry = new THREE.SphereGeometry(0.3 * sizeVariation, 16, 12);
-                        material.color.set(plantData.bloomColor || 0xFF69B4);
-                    }
-                    break;
-
-                case 'tree':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                    const trunkHeight = [0.1, 0.8, 1.5, 3.0][plantData.growthStage] * sizeVariation;
-                    const trunkRadius = [0.05, 0.1, 0.2, 0.4][plantData.growthStage] * sizeVariation;
-                    const leavesRadius = [0.1, 0.5, 1.0, 1.8][plantData.growthStage] * sizeVariation;
-                    const leavesColor = stageName === 'seed' ? 0x8B4513 : 0x006400;
-
-                    const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.8, trunkRadius, trunkHeight, 8);
-                    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-                    const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
-                    trunkMesh.castShadow = true;
-                    trunkMesh.position.y = trunkHeight / 2;
-
-                    mesh = new THREE.Group();
-                    mesh.add(trunkMesh);
-
-                    if (stageName !== 'seed') {
-                        const leavesGeo = new THREE.SphereGeometry(leavesRadius, 16, 12);
-                        const colorVariation = -0.1 + Math.random() * 0.2;
-                        const baseColor = new THREE.Color(leavesColor);
-                        baseColor.r = Math.max(0, Math.min(1, baseColor.r * (1 + colorVariation * 0.3)));
-                        baseColor.g = Math.max(0, Math.min(1, baseColor.g * (1 + colorVariation)));
-                        baseColor.b = Math.max(0, Math.min(1, baseColor.b * (1 + colorVariation * 0.3)));
-
-                        const leavesMat = new THREE.MeshStandardMaterial({ color: baseColor });
-                        const leavesMesh = new THREE.Mesh(leavesGeo, leavesMat);
-                        leavesMesh.castShadow = true;
-                        leavesMesh.position.y = trunkHeight + leavesRadius * 0.7;
-                        mesh.add(leavesMesh);
-                    }
-                    return mesh;
-
-                case 'pinetree':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                    const pineHeight = [0.1, 1.5, 3.0, 6.0, 11.0][plantData.growthStage] * sizeVariation;
-                    const pineTrunkRadius = [0.05, 0.1, 0.2, 0.35, 0.5][plantData.growthStage] * sizeVariation;
-                    const pineTrunkColor = 0x5C4033;
-
-                    const pineTrunkGeo = new THREE.CylinderGeometry(pineTrunkRadius * 0.8, pineTrunkRadius, pineHeight, 10);
-                    const pineTrunkMat = new THREE.MeshStandardMaterial({ color: pineTrunkColor });
-                    const pineTrunkMesh = new THREE.Mesh(pineTrunkGeo, pineTrunkMat);
-                    pineTrunkMesh.castShadow = true;
-                    pineTrunkMesh.position.y = pineHeight / 2;
-
-                    mesh = new THREE.Group();
-                    mesh.add(pineTrunkMesh);
-
-                    if (stageName !== 'seed') {
-                        const numLayers = plantData.growthStage === 1 ? 1 :
-                            plantData.growthStage === 2 ? 3 :
-                                plantData.growthStage === 3 ? 4 : 5;
-
-                        let pineGreen = plantData.growthStage === 4 ? 0x1A4D2E : 0x2E8B57;
-                        const colorVariation = -0.1 + Math.random() * 0.2;
-                        const baseColor = new THREE.Color(pineGreen);
-                        baseColor.g = Math.max(0, Math.min(1, baseColor.g * (1 + colorVariation)));
-                        baseColor.b = Math.max(0, Math.min(1, baseColor.b * (1 + colorVariation * 0.5)));
-                        pineGreen = baseColor;
-
-                        for (let i = 0; i < numLayers; i++) {
-                            const layerVariation = 0.95 + Math.random() * 0.1;
-                            const layerHeight = pineHeight * (0.45 - i * 0.05) * layerVariation;
-                            const layerRadius = pineHeight * (0.35 - i * 0.03) * layerVariation;
-                            const layerY = pineHeight * (stageName === 'ancient' ? (0.5 + i * 0.12) : (0.55 + i * 0.15));
-
-                            const coneGeo = new THREE.ConeGeometry(layerRadius, layerHeight, 10);
-                            const coneMat = new THREE.MeshStandardMaterial({ color: pineGreen, roughness: 0.9, flatShading: true });
-                            const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-                            coneMesh.castShadow = true;
-                            coneMesh.position.y = layerY;
-                            mesh.add(coneMesh);
-                        }
-
-                        if (stageName === 'ancient') {
-                            const barkDetails = 15 + Math.floor(Math.random() * 10);
-                            for (let i = 0; i < barkDetails; i++) {
-                                const barkSize = (0.1 + Math.random() * 0.2) * sizeVariation;
-                                const barkGeo = new THREE.BoxGeometry(barkSize, barkSize * 0.5, barkSize);
-                                const barkMat = new THREE.MeshStandardMaterial({ color: 0x4B3621, roughness: 1.0 });
-                                const barkMesh = new THREE.Mesh(barkGeo, barkMat);
-                                const angle = Math.random() * Math.PI * 2;
-                                const trunkOffset = pineTrunkRadius * 0.9;
-                                const height = Math.random() * pineHeight * 0.8;
-                                barkMesh.position.set(Math.cos(angle) * trunkOffset, height, Math.sin(angle) * trunkOffset);
-                                barkMesh.rotation.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5);
-                                mesh.add(barkMesh);
-                            }
-                        }
-                    }
-                    return mesh;
-
-                case 'mushroom':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.7 });
-                    const mushStemHeight = [0.05, 0.2, 0.4][plantData.growthStage] * sizeVariation;
-                    const mushCapRadius = [0.05, 0.25, 0.5][plantData.growthStage] * sizeVariation;
-
-                    const stemHue = Math.random() * 0.1;
-                    const stemColor = new THREE.Color(0xFFFACD).lerp(new THREE.Color(0xFFF0C0), stemHue);
-                    const capHue = Math.random() * 0.2;
-                    const baseCapColor = stageName === 'spore' ? 0xD2B48C : 0xDC143C;
-                    const capColor = new THREE.Color(baseCapColor).lerp(stageName === 'spore' ? new THREE.Color(0xC2A478) : new THREE.Color(0xFF0000), capHue);
-
-                    const stemGeo = new THREE.CylinderGeometry(mushStemHeight * 0.3, mushStemHeight * 0.4, mushStemHeight, 8);
-                    const stemMat = new THREE.MeshStandardMaterial({ color: stemColor });
-                    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
-                    stemMesh.castShadow = true;
-                    stemMesh.position.y = mushStemHeight / 2;
-
-                    mesh = new THREE.Group();
-                    mesh.add(stemMesh);
-
-                    if (stageName !== 'spore') {
-                        const capGeo = new THREE.SphereGeometry(mushCapRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-                        const capMat = new THREE.MeshStandardMaterial({ color: capColor });
-                        const capMesh = new THREE.Mesh(capGeo, capMat);
-                        capMesh.castShadow = true;
-                        capMesh.position.y = mushStemHeight;
-                        mesh.add(capMesh);
-                    }
-                    return mesh;
-
-                case 'bamboo':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.6 });
-                    const bambooColor = 0x6B8E23;
-                    if (stageName === 'seed') {
-                        geometry = new THREE.SphereGeometry(0.05 * sizeVariation, 8, 6);
-                        material.color.set(0x8B4513);
-                    } else {
-                        mesh = new THREE.Group();
-                        const numStalks = stageName === 'shoot' ? 1 : (stageName === 'cluster' ? 4 : 10);
-                        const heightBase = stageName === 'shoot' ? 0.5 : (stageName === 'cluster' ? 1.2 : 2.5);
-
-                        for (let i = 0; i < numStalks; i++) {
-                            const h = heightBase * (0.8 + Math.random() * 0.4) * sizeVariation;
-                            const r = 0.03 * sizeVariation;
-                            const stalkGeo = new THREE.CylinderGeometry(r, r, h, 6);
-                            const stalkMat = new THREE.MeshStandardMaterial({ color: bambooColor });
-                            const stalk = new THREE.Mesh(stalkGeo, stalkMat);
-                            stalk.castShadow = true;
-                            const offset = stageName === 'shoot' ? 0 : (0.1 + Math.random() * 0.2);
-                            const angle = Math.random() * Math.PI * 2;
-                            stalk.position.set(Math.cos(angle) * offset, h / 2, Math.sin(angle) * offset);
-                            stalk.rotation.x = (Math.random() - 0.5) * 0.2;
-                            stalk.rotation.z = (Math.random() - 0.5) * 0.2;
-                            mesh.add(stalk);
-
-                            if (stageName !== 'shoot') {
-                                const numLeaves = stageName === 'cluster' ? 2 : 5;
-                                for (let j = 0; j < numLeaves; j++) {
-                                    const leafGeo = new THREE.ConeGeometry(0.05, 0.2, 4);
-                                    const leafMat = new THREE.MeshStandardMaterial({ color: 0x9ACD32 });
-                                    const leaf = new THREE.Mesh(leafGeo, leafMat);
-                                    const leafH = Math.random() * h;
-                                    leaf.position.set(0, leafH - h / 2, 0);
-                                    leaf.rotation.z = Math.PI / 3;
-                                    leaf.rotation.y = Math.random() * Math.PI * 2;
-                                    stalk.add(leaf);
-                                }
-                            }
-                        }
-                        return mesh;
-                    }
-                    break;
-
-                case 'berrybush':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                    if (stageName === 'seed') {
-                        geometry = new THREE.SphereGeometry(0.06 * sizeVariation, 8, 6);
-                        material.color.set(0x8B4513);
-                    } else if (stageName === 'sapling') {
-                        mesh = new THREE.Group();
-                        const trunkGeo = new THREE.CylinderGeometry(0.02 * sizeVariation, 0.03 * sizeVariation, 0.4 * sizeVariation, 6);
-                        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-                        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-                        trunk.position.y = 0.2 * sizeVariation;
-                        mesh.add(trunk);
-
-                        const foliageGeo = new THREE.SphereGeometry(0.15 * sizeVariation, 8, 8);
-                        const foliageMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-                        const foliage = new THREE.Mesh(foliageGeo, foliageMat);
-                        foliage.position.y = 0.4 * sizeVariation;
-                        mesh.add(foliage);
-                        return mesh;
-                    } else {
-                        mesh = new THREE.Group();
-                        const mainBushGeo = new THREE.SphereGeometry(0.5 * sizeVariation, 16, 12);
-                        const bushColor = 0x006400;
-                        const bushMat = new THREE.MeshStandardMaterial({ color: bushColor, roughness: 1.0 });
-                        const mainBush = new THREE.Mesh(mainBushGeo, bushMat);
-                        mainBush.position.y = 0.4 * sizeVariation;
-                        mainBush.scale.y = 0.8;
-                        mesh.add(mainBush);
-
-                        if (stageName === 'berry') {
-                            const numBerries = 10 + Math.floor(Math.random() * 10);
-                            const berryGeo = new THREE.SphereGeometry(0.05 * sizeVariation, 6, 6);
-                            const berryMat = new THREE.MeshStandardMaterial({ color: 0xFF0000, roughness: 0.4 });
-
-                            for (let i = 0; i < numBerries; i++) {
-                                const berry = new THREE.Mesh(berryGeo, berryMat);
-                                const u = Math.random();
-                                const v = Math.random();
-                                const theta = 2 * Math.PI * u;
-                                const phi = Math.acos(2 * v - 1);
-                                const r = 0.45 * sizeVariation;
-                                berry.position.set(
-                                    r * Math.sin(phi) * Math.cos(theta),
-                                    0.4 * sizeVariation + r * Math.sin(phi) * Math.sin(theta) * 0.8,
-                                    r * Math.cos(phi)
-                                );
-                                mesh.add(berry);
-                            }
-                        }
-                        return mesh;
-                    }
-                    break;
-
-                case 'lotus':
-                    material = new THREE.MeshStandardMaterial({ roughness: 0.5 });
-                    if (stageName === 'spore') {
-                        geometry = new THREE.SphereGeometry(0.04 * sizeVariation, 8, 6);
-                        material.color.set(0x4B0082); // Indigo
-                    } else {
-                        mesh = new THREE.Group();
-
-                        // Pad (Folha)
-                        const padGeo = new THREE.CircleGeometry(0.3 * sizeVariation, 16);
-                        const padMat = new THREE.MeshStandardMaterial({ color: 0x228B22, side: THREE.DoubleSide });
-                        const pad = new THREE.Mesh(padGeo, padMat);
-                        pad.rotation.x = -Math.PI / 2;
-                        pad.position.y = 0.05; // Flutuando levemente
-                        mesh.add(pad);
-
-                        // Corte na folha (estilo vitória régia) - visual simples
-                        // (Poderia ser feito com geometria customizada, mas círculo serve por enquanto)
-
-                        if (stageName === 'bud' || stageName === 'bloom') {
-                            const budSize = stageName === 'bud' ? 0.1 : 0.25;
-                            const budColor = 0xFF69B4; // HotPink
-                            const budGeo = new THREE.SphereGeometry(budSize * sizeVariation, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-                            const budMat = new THREE.MeshStandardMaterial({ color: budColor });
-
-                            if (stageName === 'bloom') {
-                                budMat.emissive = new THREE.Color(0xFF1493); // Brilho base
-                                budMat.emissiveIntensity = 0.2;
-                                // Lógica de brilho noturno será tratada no updateTimeOfDay ou aqui se tiver acesso ao timeOfDay
-                            }
-
-                            const flower = new THREE.Mesh(budGeo, budMat);
-                            flower.position.y = 0.05;
-                            mesh.add(flower);
-                        }
-                        return mesh;
-                    }
-                    break;
-            }
-
-            if (!mesh && geometry) {
-                mesh = new THREE.Mesh(geometry, material);
-                mesh.position.y = (geometry.parameters.height || geometry.parameters.radius * 2 || 0.2) / 2;
-            }
-            return mesh;
+            return buildPlantModel(plantData);
         }
 
         function isPlantMature(plant) {
@@ -1119,29 +884,19 @@
         }
 
         function rebuildPlantMesh(plant) {
-            if (plant.mesh) scene.remove(plant.mesh);
-            plant.mesh = createPlantMesh(plant);
-            if (plant.mesh) {
-                plant.mesh.position.copy(plant.position);
-                if (plant.mesh.type === 'Group') {
-                    plant.mesh.position.y = plant.position.y;
-                } else {
-                    plant.mesh.position.y = plant.position.y + (plant.mesh.geometry?.parameters?.height / 2 || plant.mesh.geometry?.parameters?.radius || 0.1);
-                }
-                plant.mesh.castShadow = true;
-                plant.mesh.userData.plantData = plant;
-                scene.add(plant.mesh);
-                // TASK_003: pop-in elástico + poeira mágica ao mudar de estágio
-                plant.popT = 0;
-                plant.mesh.scale.setScalar(0.1);
-                if (plant.growthStage > 0) spawnGrowthDust(plant.position);
-            }
+            if (plant.mesh) { scene.remove(plant.mesh); disposePlantMesh(plant.mesh); }
+            attachPlantMesh(plant, createPlantMesh(plant));
+            // TASK_003: pop-in elástico + poeira mágica ao mudar de estágio
+            plant.popT = 0;
+            plant.mesh.scale.setScalar(0.1);
+            if (plant.growthStage > 0) spawnGrowthDust(plant.position);
         }
 
+        // Terra molhada (escura, brilhante) x seca (clara, fosca): materiais compartilhados
         function updateSoilColor(plant) {
             if (!plant.soilMesh) return;
             const wet = (plant.moisture ?? 100) >= 30;
-            plant.soilMesh.material.color.set(wet ? 0x3D2314 : 0x9A8A78);
+            plant.soilMesh.material = wet ? SOIL_MATERIALS.wet : SOIL_MATERIALS.dry;
         }
 
         function notifyMaturity(plant, newStageName) {
@@ -1275,7 +1030,7 @@
                     showNotification(`O clima mudou: ${weatherLabel()}`, 3000);
                 }
             }
-            weatherStatusElement.textContent = `Clima: ${weatherLabel()}`;
+            setTextIfChanged(weatherStatusElement, `Clima: ${weatherLabel()}`);
         }
 
         // === TASK_002: Sistema de partículas de chuva ===
@@ -1307,6 +1062,12 @@
             pos.needsUpdate = true;
         }
 
+        // Evita recriar o nó de texto (e invalidar o layout) quando o valor não muda
+        function setTextIfChanged(el, text) {
+            if (el && el.textContent !== text) el.textContent = text;
+        }
+        const _timeCol = new THREE.Color(), _biomeCol = new THREE.Color(); // reaproveitadas a cada frame
+
         function updateTimeOfDay(deltaTime) {
             timeAccumulator += deltaTime * timeSpeed;
             const cycleTime = timeAccumulator % dayDuration;
@@ -1337,35 +1098,31 @@
                     butterflies.length = 0; // Limpar o array
                 }
             }
-            timeStatusElement.textContent = `Hora: ${timeOfDay === 'day' ? 'Dia ☀️' : (timeOfDay === 'evening' ? 'Entardecer 🌇' : 'Noite 🌙')}`;
+            setTextIfChanged(timeStatusElement, `Hora: ${timeOfDay === 'day' ? 'Dia ☀️' : (timeOfDay === 'evening' ? 'Entardecer 🌇' : 'Noite 🌙')}`);
 
             // Atualizar luz direcional (simular sol/lua)
-            const sunAngle = dayProgress * Math.PI * 2 - Math.PI / 2; // Ciclo completo de 2PI, começando do horizonte leste
-            const light = scene.getObjectByProperty('isDirectionalLight', true);
+            // Sol nasce em 0.95, se põe em 0.5; a lua faz o arco da noite. O arco nunca
+            // desce abaixo do horizonte (antes o sol iluminava o chão por baixo no início do dia).
+            const sunT = (dayProgress + 0.05) % 1;
+            const arcT = sunT < 0.55 ? sunT / 0.55 : (sunT - 0.55) / 0.45;
+            const sunAngle = arcT * Math.PI;
+            const light = directionalLight; // referência direta (sem varrer a cena a cada frame)
             if (light) {
-                light.position.set(Math.cos(sunAngle) * 15, Math.sin(sunAngle) * 10 + 5, 10); // Movimento no céu
+                light.position.set(Math.cos(sunAngle) * 15, Math.sin(sunAngle) * 12 + 3, 8); // Movimento no céu
                 const baseInt = timeOfDay === 'night' ? 0.3 : (timeOfDay === 'evening' ? 0.8 : 1.5);
                 light.intensity = baseInt * (biomeLightIntensity / 1.2); // TASK_003: tint do bioma
-                const timeCol = new THREE.Color(timeOfDay === 'night' ? 0xaaaaff : (timeOfDay === 'evening' ? 0xffccaa : 0xffffff));
-                timeCol.lerp(new THREE.Color(biomeLightColor), 0.4);
-                light.color.copy(timeCol);
+                _timeCol.setHex(timeOfDay === 'night' ? 0xaaaaff : (timeOfDay === 'evening' ? 0xffccaa : 0xffffff));
+                _timeCol.lerp(_biomeCol.setHex(biomeLightColor), 0.4);
+                light.color.copy(_timeCol);
                 light.target.position.set(0, 0, 0); // Manter olhando para o centro
             }
-            const ambient = scene.getObjectByProperty('isAmbientLight', true);
+            const ambient = ambientLight;
             if (ambient) {
                 ambient.intensity = timeOfDay === 'night' ? 0.2 : (timeOfDay === 'evening' ? 0.4 : 0.6);
             }
 
-            // Atualizar brilho da Lótus
-            plants.forEach(plant => {
-                if (plant.type === 'lotus' && plant.growthStage === 3 && plant.mesh) { // Bloom
-                    // Encontrar a parte da flor (último filho adicionado)
-                    const flower = plant.mesh.children[plant.mesh.children.length - 1];
-                    if (flower && flower.material) {
-                        flower.material.emissiveIntensity = timeOfDay === 'night' ? 1.0 : 0.2;
-                    }
-                }
-            });
+            // Brilho das lótus floridas (material compartilhado entre todas)
+            setLotusGlow(timeOfDay === 'night' ? 1.0 : 0.2);
         }
 
         function updateSkyColor() {
@@ -1379,7 +1136,8 @@
                 groundCol.lerp(new THREE.Color(0x556B2F), 0.3); // Verde mais escuro
             } else if (timeOfDay === 'night') {
                 skyCol.set(0x000033); // Azul escuro
-                groundCol.set(0x1A4D2E); // Verde bem escuro
+                // Escurece a cor do próprio bioma (antes virava verde até no deserto/geleira)
+                groundCol.multiplyScalar(0.5).lerp(new THREE.Color(0x1A2E4D), 0.15);
             }
 
             // Modificador de clima
@@ -1397,7 +1155,9 @@
             }
             if (ground && ground.material) {
                 ground.material.color = groundCol;
+                syncGroundTint(ground, biome.groundColor); // terra exposta acompanha o tom
             }
+            if (scene && scene.fog) scene.fog.color.copy(skyCol).lerp(new THREE.Color(0xffffff), timeOfDay === 'day' ? 0.06 : 0);
         }
 
         function updateButterflies(deltaTime) {
@@ -1421,9 +1181,7 @@
         }
 
         function addFirefly() {
-            const geometry = new THREE.SphereGeometry(0.05, 4, 4);
-            const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
-            const firefly = new THREE.Mesh(geometry, material);
+            const firefly = new THREE.Mesh(PARTICLE_GEO, FIREFLY_MAT);
 
             firefly.position.set(
                 (Math.random() - 0.5) * 20,
@@ -1554,28 +1312,18 @@
             removePest(pest);
             if (!plant || plant.isDead) return;
             plant.isDead = true;
-            if (plant.mesh) scene.remove(plant.mesh);
-            const stump = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.08, 0.13, 0.45, 6),
-                new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 1.0 })
-            );
-            stump.position.copy(plant.position);
-            stump.position.y = plant.position.y + 0.22;
-            stump.rotation.z = 0.3;
-            stump.castShadow = true;
-            stump.userData.plantData = plant;
-            plant.mesh = stump;
-            scene.add(stump);
+            if (plant.mesh) { scene.remove(plant.mesh); disposePlantMesh(plant.mesh); }
+            attachPlantMesh(plant, createDeadStump(plant));
             showNotification('😢 Uma praga devorou sua planta! Clique no tronco seco para limpar.', 4500);
             saveGame();
         }
 
         function spawnPestParticles(pos) {
             const group = new THREE.Group();
-            const mat = new THREE.MeshBasicMaterial({ color: 0x8bc34a });
+            const mat = PEST_PARTICLE_MAT;
             const parts = [];
             for (let i = 0; i < 12; i++) {
-                const p = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), mat);
+                const p = new THREE.Mesh(PARTICLE_GEO, mat);
                 p.position.copy(pos);
                 parts.push({ mesh: p, vel: new THREE.Vector3((Math.random() - 0.5), Math.random(), (Math.random() - 0.5)).multiplyScalar(2.5) });
                 group.add(p);
@@ -1606,7 +1354,7 @@
             }));
             const light = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), neonMat);
             light.position.set(0, 0.85, -0.1); group.add(light);
-            group.position.set(-8, 0, -8);
+            group.position.set(-8, getTerrainHeight(-8, -8) - 0.02, -8);
             return group;
         }
 
@@ -1673,7 +1421,8 @@
                         growthStage: p.growthStage, growTimer: p.growTimer, moisture: p.moisture,
                         isDead: p.isDead, bloomColor: p.bloomColor, sizeVariation: p.sizeVariation,
                         isHybrid: p.isHybrid, hasHybridSeed: p.hasHybridSeed,
-                        moistureSum: p.moistureSum, moistureSamples: p.moistureSamples
+                        moistureSum: p.moistureSum, moistureSamples: p.moistureSamples,
+                        shapeSeed: p.shapeSeed
                     }))
                 };
                 localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1696,7 +1445,8 @@
             gardenState.lastExhibitionTimestamp = data.lastExhibitionTimestamp || 0;
 
             (data.plants || []).forEach(pd => {
-                const pos = new THREE.Vector3(pd.x, pd.y, pd.z);
+                // Saves antigos gravaram y do chão plano: a altura é sempre recalculada pelo relevo
+                const pos = snapToTerrain(new THREE.Vector3(pd.x, 0, pd.z));
                 const plantData = {
                     id: THREE.MathUtils.generateUUID(), type: pd.type, position: pos,
                     plantedTime: clock.getElapsedTime(), growthStage: pd.growthStage || 0,
@@ -1704,31 +1454,14 @@
                     bloomColor: pd.bloomColor || (pd.type === 'flower' ? flowerBloomColors[0] : null),
                     moisture: pd.moisture ?? 100, growTimer: pd.growTimer || 0, isDead: !!pd.isDead, hasPest: false,
                     isHybrid: !!pd.isHybrid, hasHybridSeed: pd.hasHybridSeed || null,
-                    moistureSum: pd.moistureSum || 0, moistureSamples: pd.moistureSamples || 0
+                    moistureSum: pd.moistureSum || 0, moistureSamples: pd.moistureSamples || 0,
+                    shapeSeed: pd.shapeSeed // ausente em saves antigos: derivada da posição (shapeSeedFor)
                 };
-                if (plantData.isDead) {
-                    const stump = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.08, 0.13, 0.45, 6),
-                        new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 1.0 }));
-                    stump.position.copy(pos); stump.position.y = pos.y + 0.22; stump.rotation.z = 0.3;
-                    stump.castShadow = true; stump.userData.plantData = plantData; plantData.mesh = stump;
-                    scene.add(stump);
-                } else {
-                    plantData.mesh = createPlantMesh(plantData);
-                    if (plantData.mesh) {
-                        plantData.mesh.position.copy(pos);
-                        plantData.mesh.position.y += 0.1;
-                        plantData.mesh.castShadow = true;
-                        plantData.mesh.userData.plantData = plantData;
-                        scene.add(plantData.mesh);
-                    }
-                }
-                const soilMesh = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.6, 24),
-                    new THREE.MeshStandardMaterial({ color: 0x3D2314, side: THREE.DoubleSide }));
-                soilMesh.rotation.x = -Math.PI / 2; soilMesh.position.copy(pos); soilMesh.position.y = 0.02;
-                scene.add(soilMesh); plantData.soilMesh = soilMesh;
+                attachPlantMesh(plantData, plantData.isDead ? createDeadStump(plantData) : createPlantMesh(plantData));
+                addSoilPatch(plantData);
                 plants.push(plantData);
             });
+            refreshGrassClearings();
             ensureHarvesterRobot();
         }
 
@@ -1818,7 +1551,10 @@
             gardenState.currentGreenhouse = id;
             biomeLightColor = biome.lightColor;
             biomeLightIntensity = biome.lightIntensity;
-            if (ground) ground.material.color.setHex(biome.groundColor);
+            if (ground) { ground.material.color.setHex(biome.groundColor); setGroundBiome(ground, id); }
+            if (grass) grass.setBiome(id);
+            SHARED_UNIFORMS.uSnow.value = id === 'glacial' ? 1 : 0; // neve no topo das copas
+            SHARED_UNIFORMS.uCyber.value = id === 'cyberglow' ? 1 : 0; // contorno neon nas plantas
             if (sky && sky.material) sky.material.color.setHex(biome.skyColor);
             if (directionalLight) { directionalLight.color.setHex(biome.lightColor); directionalLight.intensity = biome.lightIntensity; }
             updateSkyColor();
@@ -1851,38 +1587,6 @@
         function biomeGrowthMult() { return (GREENHOUSE_BIOMES[gardenState.currentGreenhouse] || GREENHOUSE_BIOMES.default).growthMult; }
         function biomeHarvestMult() { return (GREENHOUSE_BIOMES[gardenState.currentGreenhouse] || GREENHOUSE_BIOMES.default).harvestMult; }
 
-        // -- Materiais e malha de plantas híbridas --
-        function getHybridFlowerMaterial(hybridType) {
-            const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
-            const c = canvas.getContext('2d');
-            const grad = c.createLinearGradient(0, 0, 0, 128);
-            if (hybridType === 'firelotus') { grad.addColorStop(0, '#ff3300'); grad.addColorStop(0.5, '#ff9900'); grad.addColorStop(1, '#ffea00'); }
-            else if (hybridType === 'crystalbamboo') { grad.addColorStop(0, '#00ffff'); grad.addColorStop(0.5, '#0088ff'); grad.addColorStop(1, '#9900ff'); }
-            else { grad.addColorStop(0, '#ffd700'); grad.addColorStop(0.5, '#ffa500'); grad.addColorStop(1, '#ffffff'); }
-            c.fillStyle = grad; c.fillRect(0, 0, 128, 128);
-            const tex = new THREE.CanvasTexture(canvas);
-            const emissive = hybridType === 'firelotus' ? 0x661100 : hybridType === 'crystalbamboo' ? 0x004488 : 0x554400;
-            return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.2, metalness: 0.8, emissive: new THREE.Color(emissive), emissiveIntensity: 1.0 });
-        }
-        function createHybridMesh(plantData) {
-            const stages = ['seed', 'sprout', 'bloom'];
-            const stageName = stages[plantData.growthStage] || 'seed';
-            const sv = plantData.sizeVariation || 1;
-            if (stageName === 'seed') {
-                return new THREE.Mesh(new THREE.SphereGeometry(0.09 * sv, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8B4513 }));
-            }
-            const group = new THREE.Group();
-            const stemH = (stageName === 'sprout' ? 0.4 : 0.7) * sv;
-            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * sv, 0.05 * sv, stemH, 8), new THREE.MeshStandardMaterial({ color: 0x2e7d32 }));
-            stem.position.y = stemH / 2; stem.castShadow = true; group.add(stem);
-            const flowerR = (stageName === 'sprout' ? 0.14 : 0.32) * sv;
-            const flower = new THREE.Mesh(new THREE.IcosahedronGeometry(flowerR, 1), getHybridFlowerMaterial(plantData.type));
-            flower.position.y = stemH + flowerR * 0.6; flower.castShadow = true;
-            flower.userData.isHybridFlower = true;
-            group.add(flower);
-            return group;
-        }
-
         // -- Polinização cruzada (crossbreeding) --
         const hybridParticles = [];
         function checkCrossbreeding(deltaTime) {
@@ -1911,7 +1615,7 @@
         }
         function createHybridizationParticles(fromPos, toPos) {
             for (let i = 0; i < 14; i++) {
-                const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+                const m = new THREE.Mesh(PARTICLE_GEO, POLLEN_MAT);
                 m.position.copy(fromPos); m.position.y += 0.5;
                 scene.add(m);
                 hybridParticles.push({ mesh: m, from: fromPos.clone(), to: toPos.clone(), t: -i * 0.05 });
@@ -1932,7 +1636,13 @@
             plants.forEach(p => {
                 if (p.hasHybridSeed && p.mesh) {
                     const pulse = 0.5 + Math.sin(elapsed * 4) * 0.5;
-                    p.mesh.traverse(o => { if (o.isMesh && o.material && 'emissiveIntensity' in o.material) { o.material.emissive = new THREE.Color(0x00ffcc); o.material.emissiveIntensity = pulse; } });
+                    p.mesh.traverse(o => {
+                        if (!o.isMesh || !o.material || !('emissiveIntensity' in o.material)) return;
+                        // Os materiais são compartilhados entre plantas: clona só para esta
+                        if (!o.material.userData.owned) o.material = cloneShaderMaterial(o.material);
+                        o.material.emissive.setHex(0x00ffcc);
+                        o.material.emissiveIntensity = pulse;
+                    });
                 }
             });
         }
@@ -1963,20 +1673,17 @@
             if ((gardenState.hybridSeedsInventory[type] || 0) <= 0) { showNotification('Sem sementes híbridas desse tipo.', 2000); return; }
             gardenState.hybridSeedsInventory[type]--;
             const plantData = {
-                id: THREE.MathUtils.generateUUID(), type, position: position.clone(),
+                id: THREE.MathUtils.generateUUID(), type, position: snapToTerrain(position.clone()),
                 plantedTime: clock.getElapsedTime(), growthStage: 0, mesh: null, notifiedStages: {},
                 sizeVariation: 1.1 + Math.random() * 0.3, bloomColor: null,
                 moisture: 100, growTimer: 0, isDead: false, hasPest: false,
-                isHybrid: true, moistureSum: 0, moistureSamples: 0
+                isHybrid: true, moistureSum: 0, moistureSamples: 0,
+                shapeSeed: hashString(THREE.MathUtils.generateUUID())
             };
-            plantData.mesh = createPlantMesh(plantData);
-            plantData.mesh.position.copy(position); plantData.mesh.position.y += 0.1;
-            plantData.mesh.castShadow = true; plantData.mesh.userData.plantData = plantData;
-            scene.add(plantData.mesh);
-            const soilMesh = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.6, 24), new THREE.MeshStandardMaterial({ color: 0x3D2314, side: THREE.DoubleSide }));
-            soilMesh.rotation.x = -Math.PI / 2; soilMesh.position.copy(position); soilMesh.position.y = 0.02;
-            scene.add(soilMesh); plantData.soilMesh = soilMesh;
+            attachPlantMesh(plantData, createPlantMesh(plantData));
+            addSoilPatch(plantData);
             plants.push(plantData);
+            refreshGrassClearings();
             currentSeedType = null;
             showFloatingText('🧬 Híbrido plantado!', position, '#00ffcc');
             refreshHybridInventoryUI(); saveGame();
@@ -2029,10 +1736,10 @@
         function updateExhibitionCooldownUI() {
             const span = document.getElementById('showCooldown');
             if (!span) return;
-            if (exhibitionReady()) { span.textContent = 'pronto'; }
+            if (exhibitionReady()) { setTextIfChanged(span, 'pronto'); }
             else {
                 const left = Math.ceil(EXHIBITION_COOLDOWN - (Date.now() - gardenState.lastExhibitionTimestamp) / 1000);
-                span.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+                setTextIfChanged(span, `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`);
             }
         }
 
@@ -2040,9 +1747,10 @@
         function spawnGrowthDust(position) {
             const group = new THREE.Group();
             const parts = [];
-            const mat = new THREE.MeshBasicMaterial({ color: 0xb9f6ca });
+            const mat = DUST_MAT;
             for (let i = 0; i < 10; i++) {
-                const p = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), mat);
+                const p = new THREE.Mesh(PARTICLE_GEO, mat);
+                p.scale.setScalar(0.8);
                 p.position.copy(position); p.position.y += 0.3;
                 parts.push({ mesh: p, vel: new THREE.Vector3((Math.random() - 0.5), Math.random() * 1.5, (Math.random() - 0.5)).multiplyScalar(1.5) });
                 group.add(p);
@@ -2070,6 +1778,12 @@
 
             const deltaTime = clock.getDelta();
             const elapsed = clock.getElapsedTime();
+
+            // Vento das plantas e da grama (mais forte na chuva, transição suave)
+            SHARED_UNIFORMS.uTime.value = elapsed;
+            const windTarget = simulatedWeather === 'rainy' ? 1.9 : (simulatedWeather === 'drought' ? 0.6 : 1.0);
+            SHARED_UNIFORMS.uWind.value += (windTarget - SHARED_UNIFORMS.uWind.value) * Math.min(1, deltaTime * 0.8);
+            if (grass) grass.update(camera); // LOD da grama por distância
 
             updatePlantGrowth(deltaTime);
             updateWeather(deltaTime);
