@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Builder, S, curlPoints, crookify } from '../../render/builder.js';
-import { GLOW } from '../../render/toon.js';
+import { GLOW, glowMat } from '../../render/toon.js';
 import { Model } from './batch.js';
 import { PAL } from './palette.js';
 import { mossy } from './small.js';
@@ -616,6 +616,9 @@ export function makeGazebo() {
   return m;
 }
 
+/** vidro do lampião do farol: brilho próprio, apagado até a missão do casamento */
+export const LIGHTHOUSE_LAMP = glowMat('#3b4658', '#ffe0a0', 3.0);
+
 export function makeLighthouse() {
   const k = new Kit();
   const rng = new RNG(71);
@@ -628,19 +631,21 @@ export function makeLighthouse() {
     k.b.add(S.cylB(0.04, 0.04, 0.9, 4), PAL.iron, { p: [Math.cos(a) * 2.1, H + 1.5, Math.sin(a) * 2.1] });
   }
   k.b.add(S.torus(2.1, 0.05, 3, 20), PAL.iron, { p: [0, H + 2.4, 0], r: [Math.PI / 2, 0, 0] });
-  k.g(GLOW.window).add(S.cylB(1.1, 1.1, 1.8, 10), '#fff', { p: [0, H + 1.5, 0] });
+  k.g(LIGHTHOUSE_LAMP).add(S.cylB(1.1, 1.1, 1.8, 10), '#fff', { p: [0, H + 1.5, 0] });
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU;
     k.b.add(S.cylB(0.06, 0.06, 1.8, 4), PAL.iron, { p: [Math.cos(a) * 1.12, H + 1.5, Math.sin(a) * 1.12] });
   }
   witchRoof(k, { y: H + 3.3, r: 1.6, h: 3.5, roof: '#8a2a2e', bend: 0.6, seg: 10 });
-  addWindow(k, rng, { x: 0, y: 6, z: 1.92, w: 0.5, h: 0.9, trim: PAL.cream, lit: true });
+  // farol abandonado há cem anos: janelas escuras (quem acende é a missão do casamento, no lampião)
+  addWindow(k, rng, { x: 0, y: 6, z: 1.92, w: 0.5, h: 0.9, trim: PAL.cream, lit: false });
   addWindow(k, rng, { x: 0, y: 10.5, z: 1.72, w: 0.45, h: 0.8, trim: PAL.cream, lit: false });
   k.b.add(S.box(1.1, 2.0, 0.2), PAL.woodDark, { p: [0, 2.2, 2.28] });
   k.crook({ lean: 0.07, leanZ: 0.03, wobble: 0.35, freq: 0.3, seed: 3, twist: 0.1, height: 20 });
   const m = k.model('lighthouse');
   m.colliders.push({ type: 'c', x: 0, z: 0, r: 2.6 });
   m.anchors.lamp = V3(0.07 * (H + 2.4), H + 2.4, 0.03 * (H + 2.4));
+  m.anchors.door = V3(0, 0, 3.4);
   m.map = { r: 2.4, roof: '#8a2a2e', round: true };
   return m;
 }

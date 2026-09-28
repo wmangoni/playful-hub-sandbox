@@ -49,12 +49,15 @@ function ringTexture() {
   grd.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grd;
   g.fillRect(0, 0, S, S);
-  g.strokeStyle = 'rgba(255,255,255,0.9)';
-  g.lineWidth = 5;
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+  // pontos de costura em volta (como um retalho pregado no chão)
+  g.strokeStyle = 'rgba(255,255,255,0.95)';
+  g.lineWidth = 6;
+  g.lineCap = 'round';
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
     g.beginPath();
-    g.arc(S / 2, S / 2, S * 0.43, a - 0.18, a + 0.18);
+    g.moveTo(S / 2 + c * S * 0.39, S / 2 + s * S * 0.39);
+    g.lineTo(S / 2 + c * S * 0.47, S / 2 + s * S * 0.47);
     g.stroke();
   }
   return new THREE.CanvasTexture(c);
@@ -66,8 +69,8 @@ export class Interaction {
     this.list = [];
     this.hover = null;
     this.target = null;
-    // círculo de seleção no chão (verde = amigável, amarelo = neutro)
-    this.ringMat = new THREE.MeshBasicMaterial({ map: ringTexture(), color: '#3cff3c', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, fog: false });
+    // círculo de seleção no chão (verde-fantasma = amigável, vela = neutro, vermelho = hostil)
+    this.ringMat = new THREE.MeshBasicMaterial({ map: ringTexture(), color: '#b4f05a', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, fog: false });
     this.ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), this.ringMat);
     this.ring.layers.set(1);
     this.ring.renderOrder = 4;
@@ -126,7 +129,7 @@ export class Interaction {
     this.target = it;
     this.game.ui?.setTarget(it);
     if (it) {
-      this.ringMat.color.set(it.reaction === 'friendly' ? '#3cff3c' : it.reaction === 'hostile' ? '#ff3a2a' : '#ffd100');
+      this.ringMat.color.set(it.reaction === 'friendly' ? '#b4f05a' : it.reaction === 'hostile' ? '#ff5a4a' : '#ffc84a');
       const r = Math.max(0.9, (it.radius ?? 0.7) * 2.4);
       this.ring.scale.set(r, 1, r);
     }

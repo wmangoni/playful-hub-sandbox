@@ -1,6 +1,7 @@
-// Ícones desenhados em canvas no estilo "ícone quadrado com bisel" do WoW.
+// Ícones desenhados em canvas: arte num quadrado de cantos tortos, com contorno de tinta e pontos de costura.
 const cache = new Map();
 const S = 64;
+const INK = '#16101d';
 
 function bg(g, c1, c2) {
   const grd = g.createRadialGradient(S * 0.4, S * 0.35, 4, S / 2, S / 2, S * 0.75);
@@ -9,17 +10,44 @@ function bg(g, c1, c2) {
   g.fillStyle = grd;
   g.fillRect(0, 0, S, S);
 }
-function bevel(g) {
-  const t = g.createLinearGradient(0, 0, S, S);
-  t.addColorStop(0, 'rgba(255,255,255,0.28)');
-  t.addColorStop(0.45, 'rgba(255,255,255,0)');
-  t.addColorStop(1, 'rgba(0,0,0,0.45)');
-  g.strokeStyle = t;
-  g.lineWidth = 5;
-  g.strokeRect(2.5, 2.5, S - 5, S - 5);
-  g.strokeStyle = 'rgba(0,0,0,0.9)';
-  g.lineWidth = 2;
-  g.strokeRect(1, 1, S - 2, S - 2);
+/** retângulo de cantos tortos (cada canto com um raio) */
+function crookedRect(g, x, y, w, h, [a, b, c, d]) {
+  g.beginPath();
+  g.moveTo(x + a, y);
+  g.lineTo(x + w - b, y);
+  g.quadraticCurveTo(x + w, y, x + w, y + b);
+  g.lineTo(x + w, y + h - c);
+  g.quadraticCurveTo(x + w, y + h, x + w - c, y + h);
+  g.lineTo(x + d, y + h);
+  g.quadraticCurveTo(x, y + h, x, y + h - d);
+  g.lineTo(x, y + a);
+  g.quadraticCurveTo(x, y, x + a, y);
+  g.closePath();
+}
+/** moldura dos ícones: recorte de cantos tortos, vinheta, contorno de tinta e pontos de costura */
+function frame(g) {
+  const R = [13, 5, 14, 6];
+  g.globalCompositeOperation = 'destination-in';
+  g.fillStyle = '#000'; // o recorte usa a cor atual: tem que ser opaca
+  crookedRect(g, 1, 1, S - 2, S - 2, R);
+  g.fill();
+  g.globalCompositeOperation = 'source-over';
+  const v = g.createRadialGradient(S * 0.45, S * 0.4, S * 0.2, S / 2, S / 2, S * 0.75);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(12,8,18,0.5)');
+  g.fillStyle = v;
+  crookedRect(g, 1, 1, S - 2, S - 2, R);
+  g.fill();
+  g.lineWidth = 4;
+  g.strokeStyle = '#16101d';
+  crookedRect(g, 2, 2, S - 4, S - 4, R);
+  g.stroke();
+  g.setLineDash([4, 4]);
+  g.lineWidth = 1.4;
+  g.strokeStyle = 'rgba(239,230,210,0.6)';
+  crookedRect(g, 6.5, 6.5, S - 13, S - 13, [9, 3, 10, 4]);
+  g.stroke();
+  g.setLineDash([]);
 }
 function ink(g, w = 3) {
   g.lineWidth = w;
@@ -132,6 +160,59 @@ const DRAW = {
       for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, rr = i % 2 ? r * 0.4 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
       g.closePath(); g.fill();
     }
+  },
+  potion(g) {
+    // frasco do tônico capilar, com fios de cabelo brotando da rolha
+    bg(g, '#5aa87a', '#0e2a1a');
+    glow(g, 32, 40, 22, 'rgba(180,240,90,0.6)');
+    ink(g);
+    g.fillStyle = 'rgba(200,230,255,0.35)';
+    g.beginPath(); g.arc(32, 41, 15, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#9ee05a';
+    g.beginPath(); g.arc(32, 41, 15, 0.15, Math.PI - 0.15); g.closePath(); g.fill();
+    g.beginPath(); g.arc(32, 41, 15, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(200,230,255,0.35)';
+    g.fillRect(27, 17, 10, 11); g.strokeRect(27, 17, 10, 11);
+    g.fillStyle = '#8a5a32';
+    g.fillRect(25.5, 12, 13, 6); g.strokeRect(25.5, 12, 13, 6);
+    g.lineWidth = 2;
+    for (const [x, c] of [[28, -1], [32, 0.3], [36, 1]]) { g.beginPath(); g.moveTo(x, 12); g.quadraticCurveTo(x + c * 6, 6, x + c * 3, 2); g.stroke(); }
+    g.fillStyle = '#e8ffc0';
+    for (const [x, y, r] of [[26, 44, 2.2], [36, 38, 1.6], [31, 48, 1.4]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+  },
+  cape(g) {
+    // capa de veludo roída, com gola alta e forro vermelho
+    bg(g, '#8a2a3a', '#1a0408');
+    ink(g);
+    g.fillStyle = '#b8283a';
+    g.beginPath(); g.moveTo(18, 14); g.lineTo(10, 10); g.lineTo(20, 24); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(46, 14); g.lineTo(54, 10); g.lineTo(44, 24); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#2a1430';
+    g.beginPath(); g.moveTo(20, 14); g.lineTo(44, 14); g.lineTo(54, 52);
+    for (let i = 0; i < 5; i++) g.quadraticCurveTo(52 - i * 8 - 4, 46, 50 - (i + 1) * 8, 54);
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#8a2a3a';
+    for (const [x, y, r] of [[27, 38, 2.4], [40, 30, 2], [34, 46, 1.8]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = '#e0b048';
+    g.beginPath(); g.arc(32, 16, 3, 0, Math.PI * 2); g.fill(); g.stroke();
+  },
+  bouquet(g) {
+    // buquê de flores murchas com laço
+    bg(g, '#8a8ab8', '#1a1a2a');
+    ink(g, 2.5);
+    g.strokeStyle = '#3a5a2a';
+    for (const [x, y] of [[22, 20], [32, 16], [42, 20], [27, 26], [38, 26]]) { g.beginPath(); g.moveTo(32, 52); g.quadraticCurveTo((x + 32) / 2, 36, x, y); g.stroke(); }
+    g.strokeStyle = '#120a14';
+    const flower = (x, y, c) => {
+      g.fillStyle = c;
+      for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 + 0.6; g.beginPath(); g.ellipse(x + Math.cos(a) * 4, y + Math.sin(a) * 4 + 2, 3.6, 2.4, a, 0, Math.PI * 2); g.fill(); g.stroke(); }
+      g.fillStyle = '#e0c060';
+      g.beginPath(); g.arc(x, y + 2, 2, 0, Math.PI * 2); g.fill();
+    };
+    flower(22, 20, '#a898c0'); flower(42, 20, '#b8a8b0'); flower(32, 15, '#c8b8d8'); flower(27, 27, '#9a8aa8'); flower(38, 27, '#b0a0c0');
+    g.fillStyle = '#f4ecd8';
+    g.beginPath(); g.moveTo(32, 44); g.lineTo(22, 40); g.lineTo(24, 50); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(32, 44); g.lineTo(42, 40); g.lineTo(40, 50); g.closePath(); g.fill(); g.stroke();
   },
   chick(g) {
     bg(g, '#e88a3a', '#6a1a10');
@@ -338,7 +419,7 @@ const DRAW = {
     g.fillStyle = '#f0e0b8';
     g.fillRect(14, 12, 36, 42);
     g.strokeRect(14, 12, 36, 42);
-    g.fillStyle = '#ffd100';
+    g.fillStyle = '#ff8a2a';
     g.font = 'bold 30px serif';
     g.fillText('!', 27, 44);
   },
@@ -392,13 +473,13 @@ export function icon(name) {
   c.width = c.height = S;
   const g = c.getContext('2d');
   (DRAW[name] || DRAW.skull)(g);
-  if (name !== 'empty') bevel(g);
+  if (name !== 'empty') frame(g);
   const url = c.toDataURL();
   cache.set(name, url);
   return url;
 }
 
-/** cursor do mouse estilo "manopla" + variações */
+/** cursores: mão de esqueleto (padrão), balão (conversar), baldinho de abóbora (pegar), chave (usar) e forcado (atacar) */
 export function cursorURL(kind) {
   const key = 'cur-' + kind;
   if (cache.has(key)) return cache.get(key);
@@ -407,50 +488,66 @@ export function cursorURL(kind) {
   const g = c.getContext('2d');
   g.lineJoin = 'round';
   g.lineWidth = 1.6;
-  g.strokeStyle = '#1a0e06';
+  g.strokeStyle = INK;
+  // traço com contorno de tinta (osso, cabo, haste)
+  const bone = (x0, y0, x1, y1, w, col = '#f1e8d4') => {
+    g.lineCap = 'round';
+    for (const [c2, lw] of [[INK, w + 2.6], [col, w]]) {
+      g.strokeStyle = c2;
+      g.lineWidth = lw;
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x1, y1);
+      g.stroke();
+    }
+    g.strokeStyle = INK;
+    g.lineWidth = 1.6;
+  };
   if (kind === 'talk') {
     g.fillStyle = '#f4ecd8';
-    g.beginPath(); g.ellipse(16, 12, 13, 9, 0, 0, Math.PI * 2); g.fill(); g.stroke();
-    g.beginPath(); g.moveTo(8, 18); g.lineTo(4, 28); g.lineTo(14, 20); g.fill(); g.stroke();
-    g.fillStyle = '#5a3a1a';
-    for (const x of [10, 16, 22]) { g.beginPath(); g.arc(x, 12, 1.8, 0, Math.PI * 2); g.fill(); }
+    g.beginPath(); g.ellipse(16, 12, 13, 9, -0.12, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(9, 18); g.lineTo(3, 29); g.lineTo(15, 20); g.fill(); g.stroke();
+    g.fillStyle = INK;
+    for (const x of [10, 16, 22]) { g.beginPath(); g.arc(x, 12 - (x - 16) * 0.12, 1.8, 0, Math.PI * 2); g.fill(); }
   } else if (kind === 'loot') {
-    g.fillStyle = '#b8864a';
-    g.beginPath(); g.moveTo(8, 12); g.quadraticCurveTo(2, 30, 16, 30); g.quadraticCurveTo(30, 30, 24, 12); g.closePath(); g.fill(); g.stroke();
-    g.fillStyle = '#8a5a2a';
-    g.fillRect(9, 7, 14, 6); g.strokeRect(9, 7, 14, 6);
-    g.fillStyle = '#ffd100';
-    g.beginPath(); g.arc(16, 20, 3, 0, Math.PI * 2); g.fill();
+    // baldinho de abóbora das gostosuras
+    g.lineWidth = 2;
+    g.beginPath(); g.arc(16, 13, 9, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    g.lineWidth = 1.6;
+    g.fillStyle = '#ff8a2a';
+    g.beginPath(); g.ellipse(16, 20, 12, 9.5, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = INK;
+    g.beginPath(); g.moveTo(9, 19); g.lineTo(12, 15); g.lineTo(14, 19); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(18, 19); g.lineTo(20, 15); g.lineTo(23, 19); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(9, 22); g.lineTo(12, 25); g.lineTo(14, 23); g.lineTo(16, 26); g.lineTo(18, 23); g.lineTo(20, 25); g.lineTo(23, 22); g.lineTo(16, 24); g.closePath(); g.fill();
   } else if (kind === 'attack') {
-    // espada torta (cursor de ataque, como no WoW)
-    const grd = g.createLinearGradient(2, 2, 20, 20);
-    grd.addColorStop(0, '#ffffff');
-    grd.addColorStop(1, '#9aa0b8');
-    g.fillStyle = grd;
-    g.beginPath(); g.moveTo(2, 2); g.lineTo(9, 4); g.lineTo(21, 17); g.lineTo(17, 21); g.lineTo(4, 9); g.closePath(); g.fill(); g.stroke();
-    g.fillStyle = '#c8962a';
-    g.beginPath(); g.moveTo(14, 24); g.lineTo(24, 14); g.lineTo(26, 16); g.lineTo(16, 26); g.closePath(); g.fill(); g.stroke();
-    g.fillStyle = '#6a3a1a';
-    g.beginPath(); g.moveTo(21, 23); g.lineTo(23, 21); g.lineTo(29, 27); g.lineTo(27, 29); g.closePath(); g.fill(); g.stroke();
-    g.fillStyle = '#c8962a';
-    g.beginPath(); g.arc(28.5, 28.5, 2.4, 0, Math.PI * 2); g.fill(); g.stroke();
+    // forcado do Seu Custódio apontando para o canto
+    bone(11, 11, 29, 29, 3.2, '#8a5a32');
+    bone(15, 5, 5, 15, 2.2, '#cfd0d8');
+    bone(10, 10, 2.5, 2.5, 2, '#cfd0d8');
+    bone(15, 5, 9, 0.8, 2, '#cfd0d8');
+    bone(5, 15, 0.8, 9, 2, '#cfd0d8');
   } else if (kind === 'use') {
-    g.fillStyle = '#c8c0a8';
-    g.beginPath();
-    for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, r = i % 2 ? 12 : 9; g.lineTo(16 + Math.cos(a) * r, 16 + Math.sin(a) * r); }
-    g.closePath(); g.fill(); g.stroke();
-    g.fillStyle = '#5a5040';
-    g.beginPath(); g.arc(16, 16, 4, 0, Math.PI * 2); g.fill();
+    // chave de esqueleto com caveirinha na argola
+    bone(12, 12, 27, 27, 2.8, '#cbbf9f');
+    bone(24, 24, 21, 27, 2.4, '#cbbf9f');
+    bone(27, 21, 24, 24, 2.4, '#cbbf9f');
+    g.fillStyle = '#efe6d2';
+    g.beginPath(); g.arc(8.5, 8.5, 7, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = INK;
+    for (const x of [6.2, 10.8]) { g.beginPath(); g.arc(x, 8, 1.7, 0, Math.PI * 2); g.fill(); }
+    g.fillRect(7.6, 11.4, 1.8, 1.8);
   } else {
-    // manopla dourada apontando
-    const grd = g.createLinearGradient(0, 0, 20, 26);
-    grd.addColorStop(0, '#fff2b0');
-    grd.addColorStop(0.5, '#d8a840');
-    grd.addColorStop(1, '#7a5212');
-    g.fillStyle = grd;
-    g.beginPath();
-    g.moveTo(2, 2); g.lineTo(6, 20); g.lineTo(10, 15); g.lineTo(17, 27); g.lineTo(22, 24); g.lineTo(15, 12); g.lineTo(22, 11); g.closePath();
-    g.fill(); g.stroke();
+    // mão de esqueleto apontando (a ponta do dedo é o clique)
+    bone(19, 12, 23, 15, 3.2);
+    bone(21.5, 15.5, 24.5, 19, 3.2);
+    bone(21.5, 19.5, 23.5, 23, 3);
+    bone(12, 19.5, 7.5, 22, 3.2);
+    bone(21, 23, 27.5, 29.5, 4);
+    g.fillStyle = '#f1e8d4';
+    g.beginPath(); g.ellipse(16.5, 17.5, 6.2, 5, Math.PI / 4, 0, Math.PI * 2); g.fill(); g.stroke();
+    bone(9.6, 9.6, 14, 14, 3.6);
+    bone(3, 3, 8.4, 8.4, 3.4);
   }
   const url = c.toDataURL();
   cache.set(key, url);
@@ -466,39 +563,48 @@ export function coinsHTML(copper) {
   return parts.join(' ');
 }
 
-/** marcadores de missão estilo WoW (SVG gordinho com contorno) */
+/** marcadores de missão: "!" e "?" cor de abóbora, tortinhos e com contorno de tinta (cinza = em andamento) */
 const Q_PATH = 'M9 17 Q9 5 18 5 Q27 5 27 14 Q27 20 21 23.5 Q18 25.5 18 31';
+const BANG = 'M6 5 Q15 -1 24 4 Q21 20 19 34 Q15 37 11 34 Q9 20 6 5 Z';
+const MK = { top: '#ffe0b0', mid: '#ff8a2a', bot: '#b8420e', grey: ['#f4f4f4', '#b8b8b8', '#6a6a6a'] };
+const TILT = { avail: -7, ready: 7, wip: 7 };
+let markerSeq = 0;
 export function markerSVG(kind) {
   const grey = kind === 'wip';
-  const top = grey ? '#f4f4f4' : '#fff7b0', mid = grey ? '#b8b8b8' : '#ffd100', bot = grey ? '#6a6a6a' : '#c07800';
-  const id = 'mg' + kind;
-  const defs = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset=".45" stop-color="${mid}"/><stop offset="1" stop-color="${bot}"/></linearGradient></defs>`;
+  const [top, mid, bot] = grey ? MK.grey : [MK.top, MK.mid, MK.bot];
+  // id único por marcador: placas escondidas (display: none) com o mesmo id deixariam o degradê vazio
+  const id = `mg${kind}${++markerSeq}`;
+  const grad = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="52" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${top}"/><stop offset=".45" stop-color="${mid}"/><stop offset="1" stop-color="${bot}"/></linearGradient>`;
   if (kind === 'avail') {
-    const st = `fill="url(#${id})" stroke="#241000" stroke-width="3.2" stroke-linejoin="round"`;
-    return `<svg viewBox="0 0 30 52" width="30" height="52">${defs}<path d="M6 4 Q15 0 24 4 L19 34 Q15 36 11 34 Z" ${st}/><circle cx="15" cy="44" r="5.6" ${st}/></svg>`;
+    const st = `fill="url(#${id})" stroke="${INK}" stroke-width="3.2" stroke-linejoin="round"`;
+    return `<svg viewBox="0 0 30 52" width="30" height="52"><defs>${grad}</defs><g transform="rotate(${TILT.avail} 15 26)"><path d="${BANG}" ${st}/><circle cx="15.5" cy="44" r="5.8" ${st}/></g></svg>`;
   }
-  return `<svg viewBox="0 0 36 52" width="36" height="52"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="52" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${top}"/><stop offset=".45" stop-color="${mid}"/><stop offset="1" stop-color="${bot}"/></linearGradient></defs>
-    <path d="${Q_PATH}" fill="none" stroke="#241000" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  return `<svg viewBox="0 0 36 52" width="36" height="52"><defs>${grad}</defs><g transform="rotate(${TILT[kind] ?? 7} 18 26)">
+    <path d="${Q_PATH}" fill="none" stroke="${INK}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="${Q_PATH}" fill="none" stroke="url(#${id})" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="18" cy="44" r="5.6" fill="url(#${id})" stroke="#241000" stroke-width="3.2"/></svg>`;
+    <circle cx="18" cy="44" r="5.8" fill="url(#${id})" stroke="${INK}" stroke-width="3.2"/></g></svg>`;
 }
 
 /** mesmo marcador desenhado num canvas 2D (minimapa/mapa) */
 export function drawMarker(ctx, kind, x, y, h) {
   const k = h / 52;
+  const w = kind === 'avail' ? 15 : 18;
   ctx.save();
-  ctx.translate(x - (kind === 'avail' ? 15 : 18) * k, y - 26 * k);
+  ctx.translate(x, y);
+  ctx.rotate(((TILT[kind] ?? 7) * Math.PI) / 180);
+  ctx.translate(-w * k, -26 * k);
   ctx.scale(k, k);
   const grey = kind === 'wip';
+  const [top, mid, bot] = grey ? MK.grey : [MK.top, MK.mid, MK.bot];
   const g = ctx.createLinearGradient(0, 0, 0, 52);
-  g.addColorStop(0, grey ? '#f4f4f4' : '#fff7b0');
-  g.addColorStop(0.45, grey ? '#b8b8b8' : '#ffd100');
-  g.addColorStop(1, grey ? '#6a6a6a' : '#c07800');
+  g.addColorStop(0, top);
+  g.addColorStop(0.45, mid);
+  g.addColorStop(1, bot);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.strokeStyle = '#241000';
+  ctx.strokeStyle = INK;
   if (kind === 'avail') {
-    const p = new Path2D('M6 4 Q15 0 24 4 L19 34 Q15 36 11 34 Z');
+    const p = new Path2D(BANG);
     ctx.fillStyle = g;
     ctx.lineWidth = 3.6;
     ctx.stroke(p);
@@ -510,12 +616,12 @@ export function drawMarker(ctx, kind, x, y, h) {
     ctx.lineWidth = 8;
     ctx.strokeStyle = g;
     ctx.stroke(p);
-    ctx.strokeStyle = '#241000';
+    ctx.strokeStyle = INK;
   }
   ctx.fillStyle = g;
   ctx.lineWidth = 3.6;
   ctx.beginPath();
-  ctx.arc(kind === 'avail' ? 15 : 18, 44, 5.6, 0, Math.PI * 2);
+  ctx.arc(kind === 'avail' ? 15.5 : 18, 44, 5.8, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fill();
   ctx.restore();

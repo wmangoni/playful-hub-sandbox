@@ -192,7 +192,7 @@ export class Game {
     const has = Progress.hasSave();
     el.innerHTML = `<div class="logo"><h1>Tumbalacatumba</h1><p>Contos do Vale Assombrado</p></div>
       <div class="menu">${has ? '<button class="wbtn" data-a="cont">Continuar</button>' : ''}<button class="wbtn" data-a="new">${has ? 'Novo Jogo' : 'Jogar'}</button></div>
-      <div class="hint">Controles como no <b>World of Warcraft</b>: <b>W A S D</b> para andar · segure o <b>botão direito</b> do mouse para girar câmera e personagem · <b>botão esquerdo</b> gira só a câmera · <b>clique direito</b> em alguém para conversar · roda do mouse = zoom.</div>
+      <div class="hint">Controles de <b>MMO clássico</b>: <b>W A S D</b> para andar · segure o <b>botão direito</b> do mouse para girar câmera e personagem · <b>botão esquerdo</b> gira só a câmera · <b>clique direito</b> em alguém para conversar · roda do mouse = zoom.</div>
       <div class="credit">feito com three.js · 100% procedural</div>`;
     document.body.appendChild(el);
     this.titleEl = el;

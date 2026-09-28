@@ -1,11 +1,12 @@
-// Teste ponta a ponta que joga as 11 missões avançando só a simulação (sem render e sem timers).
+// Teste ponta a ponta que joga as 16 missões avançando só a simulação (sem render e sem timers).
 // Funciona mesmo com a aba em segundo plano, onde o Chrome pausa o rAF e segura os timers.
 //
 // Uso (browser-harness, console do DevTools ou CDP):
 //   1. abrir Tumbalacatumba.html?play&notut&t=12 (jogo novo) e esperar __game.state === 'play';
 //   2. executar este arquivo na página;
 //   3. chamar __T.run(passo) para cada passo, nesta ordem:
-//        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate, final
+//        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate,
+//        cuspe, fogo, baile, pelos, sotao, casamento, final
 //      Cada chamada devolve 'ok' ou 'ERRO ...' (uma chamada por passo cabe no timeout do Runtime.evaluate);
 //      As missões rodam em modo pacífico (as criaturas não atacam); o passo "combate" liga a briga de volta.
 //   4. conferir __T.log (o passo final registra nível, XP, dinheiro, itens e o status de cada missão)
@@ -38,6 +39,20 @@ window.__T = (() => {
       tp(p.pos.x + 1, p.pos.z + 0.5); wait(120);
       if (!p.available()) continue;
       g.interaction.tryInteract(p.inter); wait(650);
+    }
+    L.push(`${key}: ${JSON.stringify(P.activeQuests().map((q) => [q.id, P.quests[q.id].counts]))}`);
+  };
+  // derrota criaturas de um tipo até a missão não precisar mais; se faltar, espera longe para renascerem
+  const hunt = (typeName, key) => {
+    for (let round = 0; round < 6 && P.wants(key); round++) {
+      for (const m of C.mobs.filter((x) => x.type.name === typeName)) {
+        if (!P.wants(key)) break;
+        if (m.state !== 'idle') continue;
+        tp(m.pos.x + 2, m.pos.z + 1); wait(100);
+        if (!m.alive) continue;
+        m.takeDamage(99999, g.player.pos); wait(150);
+      }
+      if (P.wants(key)) { tp(0, 13); wait(70000); }
     }
     L.push(`${key}: ${JSON.stringify(P.activeQuests().map((q) => [q.id, P.quests[q.id].counts]))}`);
   };
@@ -92,6 +107,38 @@ window.__T = (() => {
       if (C.dead) C.release();
       C.peaceful = true;
       if (m.state !== 'dead' && m.state !== 'gone') throw new Error('o marujo não morreu');
+    },
+    cuspe() { accept('custodio', 'cuspe'); collect('pimenta'); turnIn('custodio', 'cuspe'); L.push('cuspe de fogo: ' + P.flags.petFire); },
+    fogo() {
+      // só o Belzebuzinho bate (o jogador não ataca): tem que acertar, e com pouco dano
+      C.peaceful = false;
+      if (!QW.pet.active) QW.pet.summon();
+      const m = C.mobs.find((x) => x.type.name === 'Rato-Zumbi' && x.state === 'idle');
+      tp(m.pos.x + 3, m.pos.z + 2); QW.pet.w.pos.set(m.pos.x + 4, 0, m.pos.z + 3); wait(200);
+      m.aggro(false, true);
+      const hp0 = m.hp, orig = C.launchFireball.bind(C);
+      let shots = 0;
+      C.launchFireball = (a, b) => { shots++; orig(a, b); };
+      wait(8000);
+      C.launchFireball = orig;
+      L.push(`fogo: ${shots} bolas de fogo, rato ${Math.round(hp0)} → ${Math.round(m.hp)} (${m.state})`);
+      if (m.alive) m.takeDamage(99999, g.player.pos);
+      C.peaceful = true;
+      C.hp = C.st.maxHp;
+      if (!shots || m.hp >= hp0) throw new Error('o Belzebuzinho não cuspiu fogo');
+    },
+    baile() { accept('juvenal', 'baile'); hunt('Caveira Saltitante', 'caveira'); turnIn('juvenal', 'baile'); },
+    pelos() { accept('vesga', 'pelo'); hunt('Aranha Cabeluda', 'pelo'); turnIn('vesga', 'pelo'); },
+    sotao() { accept('conde', 'sotao'); hunt('Morcego Dentuço', 'morcego'); turnIn('conde', 'sotao'); },
+    casamento() {
+      accept('suspiro', 'casamento');
+      hunt('Marujo Afogado', 'marujo');
+      const lamp = g.interaction.list.find((i) => i.name === 'Lampião do Farol');
+      tp(lamp.pos.x + 1, lamp.pos.z + 1); wait(200);
+      g.interaction.tryInteract(lamp); wait(3600);
+      L.push('farol aceso: ' + QW.lighthouse.lit + ' ' + JSON.stringify(P.quests.casamento));
+      turnIn('nevoa', 'casamento');
+      L.push(`suspiro a ${QW.npcs.suspiro.pos.distanceTo(QW.npcs.nevoa.pos).toFixed(1)} m da noiva`);
     },
     final() {
       L.push(`FINAL nível ${P.level} xp ${P.xp}/${P.xpNeeded} dinheiro ${P.money} itens ${P.bag.map((b) => b.id).join(',')}`);

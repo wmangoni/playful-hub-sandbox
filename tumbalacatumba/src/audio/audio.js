@@ -369,6 +369,9 @@ export class Audio {
         [659, 523, 440, 330, 247].forEach((f, i) => this.bell(f, t + i * 0.28, 0.1 * v, 1.8, this.sfxBus, 0.7));
         this.osc('sawtooth', 110, t, 2.2, 0.03 * v, { a: 0.3, f2: 55, rev: 0.6 });
         break;
+      case 'fireball': this.noise(t, 0.3, 0.1 * v, { f: 500, q: 1.2, f2: 1800 }); this.osc('sine', 140, t, 0.2, 0.08 * v, { f2: 70 }); break;
+      case 'fireHit': for (let i = 0; i < 4; i++) this.noise(t + i * 0.05, 0.06, 0.08 * v, { type: 'highpass', f: 1800 + i * 300 }); this.osc('sine', 120, t, 0.18, 0.1 * v, { f2: 50 }); break;
+      case 'drink': [0, 0.14, 0.28].forEach((d, i) => this.osc('sine', 420 + i * 90, t + d, 0.1, 0.07 * v, { f2: 700 + i * 90 })); break;
       case 'squeak': [0, 0.11].forEach((d) => this.osc('sine', 2100, t + d, 0.08, 0.06 * v, { f2: 2900 })); break;
       case 'rattle': for (let i = 0; i < 6; i++) this.noise(t + i * 0.045, 0.03, 0.1 * v, { type: 'bandpass', f: 1800 + (i % 2) * 700, q: 4 }); break;
       case 'hiss': this.noise(t, 0.55, 0.07 * v, { type: 'highpass', f: 3200, a: 0.06 }); break;

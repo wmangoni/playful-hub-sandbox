@@ -337,6 +337,16 @@ export function createChick() {
   rig.extra = (dt, s, r) => {
     r.flame.scale.set(1 + Math.sin(r.t * 17) * 0.1, 1 + Math.sin(r.t * 13) * 0.2, 1);
     if ((s.speed || 0) < 0.3) r.j.head.rotation.x = Math.max(0, Math.sin(r.t * 0.8)) * 0.6 * (Math.sin(r.t * 0.27) > 0.6 ? 1 : 0.1);
+    // Cuspe de Fogo: joga a cabeça para trás, estica o pescoço para a frente e a chama da cabeça se aviva
+    const sp = s.spit ?? -1;
+    if (sp >= 0) {
+      const back = sp < 0.3 ? Math.sin((sp / 0.3) * Math.PI * 0.5) : 0;
+      const fwd = sp >= 0.3 ? Math.sin(Math.min(1, (sp - 0.3) / 0.35) * Math.PI) : 0;
+      r.j.head.rotation.x = -0.7 * back + 0.8 * fwd;
+      r.j.torso.rotation.x = -0.18 * back + 0.3 * fwd;
+      r.flame.scale.multiplyScalar(1 + back * 0.6 + fwd * 0.9);
+      r.body.scale.set(1 + fwd * 0.08, 1 - fwd * 0.1, 1 + fwd * 0.08);
+    }
   };
   rig.height = 1.0;
   rig.portraitY = 0.72;
@@ -375,6 +385,19 @@ export const ITEM_MODELS = {
     c.add(S.hemi(0.2, 12, 6), '#fff', { p: [0, 0.26, 0], s: [1, 0.7, 1] });
     for (let i = 0; i < 5; i++) c.add(S.sphere(0.035, 5, 4), '#fff', { p: [Math.cos(i * 1.25) * 0.12, 0.36, Math.sin(i * 1.25) * 0.12] });
     g.add(new THREE.Mesh(c.build(), GLOW.mushroomPink));
+    return g;
+  },
+  pepper() {
+    const g = new THREE.Group();
+    const b = new Builder();
+    b.add(S.tube([V3(0, 0.2, 0), V3(0.05, 0.1, 0.02), V3(0.03, -0.04, 0.03), V3(-0.05, -0.14, 0), V3(-0.1, -0.16, -0.02)], (t) => 0.065 * (1 - t * 0.85) + 0.006, 7), '#d8281c');
+    b.add(S.cyl(0.035, 0.05, 0.05, 6), '#3a6a1a', { p: [0, 0.22, 0] });
+    b.add(S.tube([V3(0, 0.24, 0), V3(0.02, 0.3, 0), V3(0.06, 0.33, 0)], 0.012, 4), '#3a6a1a');
+    g.add(new THREE.Mesh(b.build(), toonMat({ vertexColors: true })));
+    // um bafinho de calor na ponta
+    const c = new Builder();
+    c.add(S.sphere(0.035, 6, 5), '#fff', { p: [-0.1, -0.16, -0.02] });
+    g.add(new THREE.Mesh(c.build(), GLOW.lava));
     return g;
   },
   firefly() {

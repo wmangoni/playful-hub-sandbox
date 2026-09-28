@@ -238,7 +238,7 @@ export class QuestLog {
       const st = P.status(q.id);
       h += `<div class="qi ${q.id === this.sel ? 'sel' : ''}" data-id="${q.id}" style="color:${this.ui.levelColor(q.level)}">[${q.level}] ${esc(q.title)}${st === 'complete' ? '<span class="st">(Completa)</span>' : ''}</div>`;
     }
-    if (!qs.length) h += '<div class="qi" style="color:#aaa">Nenhuma missão ativa. Procure por um <b style="color:#ffd100">!</b> amarelo.</div>';
+    if (!qs.length) h += '<div class="qi" style="color:#aaa">Nenhuma missão ativa. Procure por um <b style="color:#ff8a2a">!</b> cor de abóbora.</div>';
     this.list.innerHTML = h;
     this.list.querySelectorAll('.qi[data-id]').forEach((e) => (e.onclick = () => {
       this.sel = e.dataset.id;

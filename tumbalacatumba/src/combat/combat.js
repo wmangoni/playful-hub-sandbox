@@ -4,10 +4,19 @@ import { MOB_TYPES, PLAYER_REACH, mobDmg, mobXp } from './mobTypes.js';
 import { MOB_SPAWNS, ZONE_LEVELS, NPC_SPOTS, HOME_SPOT } from '../world/layout.js';
 import { XP_TABLE } from '../quests/data.js';
 import { RNG } from '../util/rng.js';
+import { LAYER_FX } from '../render/postfx.js';
 import { clamp, hashStr, TAU } from '../util/math.js';
 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const _h = new THREE.Vector3();
+const _f = new THREE.Vector3();
+
+// Cuspe de Fogo do Belzebuzinho: ajuda de leve, nunca decide a briga sozinho
+const PET_RANGE = 14; // só cospe em quem estiver brigando com o jogador, até essa distância do pet
+const PET_CD = 3.2; // segundos entre as cusparadas (+ até 0,6 s)
+const FIRE_SPEED = 13;
+/** dano da bola de fogo: cresce devagar com o nível do jogador (nv 3: 5–7, nv 5: 8–9, nv 7: 10–12) */
+export const petFireDamage = (lv) => Math.round(2 + lv * 1.1 + Math.random() * 2);
 
 /** Atributos do Vicente por nível: vida, dano, crítico, velocidade do golpe e resistência crescem juntos. */
 export function playerStats(lv) {
@@ -39,6 +48,9 @@ export class Combat {
     this.swingT = -1;
     this.lastCombat = -99;
     this.engagedN = 0;
+    this.fireballs = [];
+    this.firePool = [];
+    this.petCd = 2;
     this.stLevel = game.progress.level;
     this.st = playerStats(this.stLevel);
     this.hp = this.st.maxHp;
@@ -350,7 +362,86 @@ export class Combat {
     const coins = Math.round(m.level * (6 + Math.random() * 14) * (T.xp ?? 1));
     if (coins > 0) P.addMoney(coins);
     if (T.drop && Math.random() < T.drop.chance) P.addItem(T.drop.id, 1);
+    // missões de caça contam o tipo da criatura; algumas soltam item de missão
+    if (P.wants(T.id)) P.progress(T.id);
+    if (T.questDrop && P.wants(T.questDrop.key) && Math.random() < T.questDrop.chance) {
+      g.ui.chat(T.questDrop.text, 'loot');
+      g.audio?.sfx('loot');
+      P.progress(T.questDrop.key);
+    }
     if (g.interaction.target === m.inter) this.autoAttack = false;
+  }
+
+  // ------------------------------------------------------------ Belzebuzinho cospe fogo
+  /** em quem o pet cospe: no alvo do jogador, se estiver brigando; senão, na criatura brigando mais perto dele */
+  petTarget(from) {
+    const t = this.target;
+    if (t?.engaged && t.pos.distanceTo(from) < PET_RANGE) return t;
+    let best = null, bd = PET_RANGE;
+    for (const m of this.mobs) {
+      if (!m.engaged) continue;
+      const d = m.pos.distanceTo(from);
+      if (d < bd) {
+        bd = d;
+        best = m;
+      }
+    }
+    return best;
+  }
+
+  /** a bola de fogo sai da boca do pet e persegue o alvo */
+  launchFireball(from, target) {
+    let mesh = this.firePool.pop();
+    if (!mesh) {
+      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff8a2a').multiplyScalar(3.2) }));
+      mesh.layers.set(LAYER_FX);
+      this.game.scene.add(mesh);
+    }
+    mesh.visible = true;
+    mesh.position.copy(from);
+    this.fireballs.push({ mesh, target, t: 0, aimY: (target.rig.height ?? 1) * target.rig.root.scale.y * 0.5 });
+    this.game.audio?.sfx('fireball', 0.8);
+  }
+
+  updatePet(dt) {
+    const g = this.game, pet = g.questWorld.pet;
+    this.petCd -= dt;
+    if (this.petCd <= 0 && pet.active && pet.spitT < 0 && g.progress.flags.petFire && !this.dead && !this.peaceful && this.engagedN > 0) {
+      const t = this.petTarget(pet.w.pos);
+      if (t) {
+        pet.spitAt(t);
+        this.petCd = PET_CD + Math.random() * 0.6;
+      } else this.petCd = 0.3;
+    }
+    for (let i = this.fireballs.length - 1; i >= 0; i--) {
+      const f = this.fireballs[i], m = f.target, p = f.mesh.position;
+      f.t += dt;
+      const aim = _f.set(m.pos.x, m.pos.y + m.hopY + f.aimY, m.pos.z);
+      const d = p.distanceTo(aim), step = FIRE_SPEED * dt;
+      let done = false;
+      if (!m.targetable || !m.engaged || f.t > 3) {
+        g.fx.poof(p, '#3a2a2a', 0.25);
+        done = true;
+      } else if (d <= step + m.radius * 0.5) {
+        const dmg = petFireDamage(g.progress.level);
+        const at = this.headOf(m);
+        if (m.takeDamage(dmg, p)) g.ui.floaty(String(dmg), 'pet', at);
+        else g.ui.floaty('Evadiu', 'miss', at);
+        g.fx.hitSpark(aim, '#ffb050', 12, 0.8);
+        g.fx.poof(aim, '#ff7a3a', 0.35);
+        g.audio?.sfx('fireHit', 0.8);
+        this.lastCombat = g.time;
+        done = true;
+      } else {
+        p.addScaledVector(aim.sub(p).normalize(), step);
+        g.fx.fireTrail(p, dt);
+      }
+      if (done) {
+        f.mesh.visible = false;
+        this.firePool.push(f.mesh);
+        this.fireballs.splice(i, 1);
+      }
+    }
   }
 
   xpFor(m) {
@@ -416,6 +507,7 @@ export class Combat {
     this.engagedN = n;
     if (n > 1) this.separate();
     this.updateSwing(dt);
+    this.updatePet(dt);
     // fora de combate a vida volta sozinha (sentado volta bem mais rápido)
     if (!this.dead && !this.inCombat && this.hp < this.st.maxHp) this.hp = Math.min(this.st.maxHp, this.hp + this.st.maxHp * (p.sitting ? 0.1 : 0.03) * dt);
   }

@@ -130,6 +130,8 @@ export class Progress {
   }
 
   addXP(n) {
+    // no nível máximo a experiência não acumula (a barra fica cheia)
+    if (this.level >= XP_TABLE.length - 1) return;
     this.xp += n;
     this.emit('xp', n);
     while (this.level < XP_TABLE.length - 1 && this.xp >= XP_TABLE[this.level]) {
@@ -140,6 +142,7 @@ export class Progress {
       const after = QUESTS.filter((x) => this.isAvailable(x.id) && !before.includes(x.id));
       if (after.length) this.emit('newquests', after);
     }
+    if (this.level >= XP_TABLE.length - 1) this.xp = 0;
   }
 
   addMoney(c) {
@@ -164,7 +167,7 @@ export class Progress {
     return this.bag.some((b) => b.id === id);
   }
 
-  /** marcador sobre o PNJ: 'ready' (? amarelo), 'avail' (! amarelo), 'wip' (? cinza) ou null */
+  /** marcador sobre o PNJ: 'ready' (? abóbora), 'avail' (! abóbora), 'wip' (? cinza) ou null */
   markerFor(npcId) {
     let avail = false, wip = false;
     for (const q of QUESTS) {

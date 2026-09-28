@@ -9,7 +9,7 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 
 > O progresso é salvo automaticamente no navegador (`localStorage`). Na tela de título aparece **Continuar**.
 
-## Controles (iguais aos do World of Warcraft)
+## Controles (de MMO clássico)
 
 | Ação | Tecla / mouse |
 |---|---|
@@ -34,15 +34,21 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 
 ## O que tem no vale
 
-- **11 missões** com PNJs: o Prefeito Abóbora (cuja cabeça gira entre a cara feliz e a preocupada),
+- **16 missões** com PNJs: o Prefeito Abóbora (cuja cabeça gira entre a cara feliz e a preocupada),
   Dona Aranhilda e seu gato de três olhos, o esqueleto Juvenal que se desmontou no baile,
   o Seu Custódio e o ovo de avestruz demônio que você precisa **chocar sentando nele**,
   o espantalho insone, o Conde Dentúcio que perdeu a dentadura (um sapo está usando),
   a bruxa Madame Vesga, o fantasma apaixonado Suspiro e a Lady Névoa…
-- Recompensas que mudam o jogo: **chapéu de abóbora**, **pet** Belzebuzinho que te segue,
-  **vassoura voadora** (+65% de velocidade), lanterna de vaga-lumes, dinheiro e níveis 1→5.
+- **5 continuações** que levam às regiões de criaturas: *Cuspe de Fogo* (Seu Custódio, pimentas nas Fendas),
+  *Baile de Arromba* (Juvenal, caveiras no cemitério), *Poção Cabeluda* (Vesga, pelos das aranhas do bosque),
+  *Despejo no Sótão* (Conde, morcegos da mansão) e *Casamento no Farol* (Suspiro e Lady Névoa: marujos e
+  o farol apagado há cem anos).
+- Recompensas que mudam o jogo: **chapéu de abóbora**, **pet** Belzebuzinho que te segue e, depois do
+  mingau ardido, **cospe bolas de fogo** nas criaturas que brigam com você (dano baixo, só uma ajudinha),
+  **vassoura voadora** (+65% de velocidade), lanterna de vaga-lumes, **tônico** que cura 40 de vida
+  (recarga de 60 s), dinheiro e níveis 1→7.
 - **Combate**: a **Lanternada** gira a lanterna num arco à frente (acerta o alvo e, com 60% do dano,
-  até mais duas criaturas grudadas nele), com ataque automático, críticos e números de dano estilo WoW.
+  até mais duas criaturas grudadas nele), com ataque automático, críticos e números de dano flutuando.
   O **Buu!** agora também faz as criaturas fugirem de medo por 2,5 s. Cada nível deixa o Vicente mais forte
   (vida, dano, crítico, velocidade do golpe e resistência — passe o mouse no retrato para ver a ficha).
   Fora de combate a vida volta sozinha (sentado, bem mais rápido); se cair, é só voltar à praça.
@@ -63,7 +69,7 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 - **Ciclo de dia e noite** (12 min por dia, ajustável): lua gigante nascendo atrás da Colina Espiral,
   estrelas, janelas e postes acendendo, vaga-lumes, morcegos, névoa rasteira, fumaça nas chaminés.
   Uma missão só pode ser feita à noite (o coveiro deixa você "cochilar" até escurecer).
-- **Interface estilo WoW**: quadros de unidade com retrato 3D ao vivo, minimapa com marcadores
+- **Interface de caderno de contos costurado**: retrato 3D ao vivo num camafeu de borda listrada, minimapa com marcadores
   `!` / `?`, áreas de objetivo e setas, rastreador de missões, diálogos em pergaminho, diário,
   mapa-múndi, mochila, barra de ações com recarga, barra de XP, barra de conjuração, chat,
   balões de fala, placas de nome, texto de zona ao entrar em cada área e tela de título.
@@ -88,7 +94,7 @@ src/
   game.js              orquestra tudo (render, loop, fluxo título → jogo, salvar)
   world/               terreno procedural, céu, água, dia/noite, layout do mapa, colisão, props
   render/              materiais toon, construtor de geometria, pós-processamento (contorno de tinta, bloom)
-  entities/            jogador, câmera estilo WoW, rig de animação, modelos de PNJs e criaturas
+  entities/            jogador, câmera de terceira pessoa, rig de animação, modelos de PNJs e criaturas
   combat/              golpe do jogador, atributos por nível, IA e tipos das criaturas
   quests/              dados das missões, progresso/salvamento, interação, lógica das missões no mundo
   ui/                  HUD (quadros, minimapa, rastreador, chat, janelas), ícones e retratos 3D

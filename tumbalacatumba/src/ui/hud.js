@@ -4,7 +4,7 @@ import { Minimap, WorldMap, paintWorldMap } from './minimap.js';
 import { Portraits } from './portrait.js';
 import { Dialog, QuestLog, Bags, Menu, esc } from './windows.js';
 import { CombatHud } from './combatHud.js';
-import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR } from '../quests/data.js';
+import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR, XP_TABLE } from '../quests/data.js';
 import { createPlayerModel } from '../entities/models.js';
 import * as NM from '../entities/npcModels.js';
 import * as CM from '../entities/creatureModels.js';
@@ -12,29 +12,43 @@ import { ZONE_NAME, QUEST_AREAS, ZONE_LEVELS } from '../world/layout.js';
 import { Progress } from '../quests/progress.js';
 import { clamp } from '../util/math.js';
 
-const GRAD = `<defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4d88a"/><stop offset=".45" stop-color="#b88a38"/><stop offset="1" stop-color="#4a3210"/></linearGradient></defs>`;
-const GARGOYLE = `<svg viewBox="0 0 104 108">${GRAD}
-<path d="M58 64 C44 30 26 14 4 16 C14 24 12 32 6 40 C16 42 18 50 12 58 C22 58 28 64 26 72 C36 68 46 70 52 80 Z" fill="url(#gb)" stroke="#1a1006" stroke-width="2.5" stroke-linejoin="round"/>
-<path d="M22 30 C32 34 40 44 46 56 M14 46 C26 48 34 56 40 66" fill="none" stroke="#5a3e14" stroke-width="2"/>
-<path d="M60 106 C50 90 52 72 62 62 C66 52 64 42 70 36 L73 20 L81 32 C86 30 90 30 94 32 L101 19 L103 36 C107 44 105 54 97 60 C101 72 101 92 95 106 Z" fill="url(#gb)" stroke="#1a1006" stroke-width="2.5" stroke-linejoin="round"/>
-<circle cx="82" cy="45" r="4.2" fill="#ffe14a" stroke="#1a1006" stroke-width="1.5"/><circle cx="95" cy="45" r="4.2" fill="#ffe14a" stroke="#1a1006" stroke-width="1.5"/>
-<path d="M82 42.5 v5 M95 42.5 v5" stroke="#1a1006" stroke-width="1.6"/>
-<path d="M84 54 q4.5 3 9 0" fill="none" stroke="#1a1006" stroke-width="1.8" stroke-linecap="round"/>
-<path d="M62 102 C40 108 28 94 36 84 C42 76 54 82 48 90 C45 94 40 91 42 88" fill="none" stroke="#1a1006" stroke-width="7" stroke-linecap="round"/>
-<path d="M62 102 C40 108 28 94 36 84 C42 76 54 82 48 90 C45 94 40 91 42 88" fill="none" stroke="url(#gb)" stroke-width="4" stroke-linecap="round"/></svg>`;
-const WING = `<svg viewBox="0 0 56 44">${GRAD}<path d="M54 40 C44 18 28 6 2 4 C10 10 9 16 4 22 C12 22 15 27 11 33 C19 32 24 36 23 42 C32 37 42 38 54 40 Z" fill="url(#gb)" stroke="#1a1006" stroke-width="2" stroke-linejoin="round"/></svg>`;
-function ringSVG() {
-  let studs = '';
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    studs += `<circle cx="${110 + Math.cos(a) * 101}" cy="${110 + Math.sin(a) * 101}" r="3.2" fill="#fff0b0" stroke="#3a2408" stroke-width="1.2"/>`;
+const INK = '#16101d', BONE = '#efe6d2';
+
+/** ponta da barra de ações: um caracol listrado (como o da Colina Espiral) saindo do chão, com uma lapidezinha */
+function curlSVG() {
+  const cx = 60, cy = 42, r0 = 25, turns = 1.75;
+  const pts = [];
+  // haste: sobe da base e chega na vertical ao ponto mais à esquerda do caracol
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14, u = 1 - t;
+    pts.push([u * u * u * 24 + 3 * u * u * t * 24 + 3 * u * t * t * (cx - r0) + t * t * t * (cx - r0), u * u * u * 106 + 3 * u * u * t * 80 + 3 * u * t * t * 62 + t * t * t * cy]);
   }
-  return `<svg class="ring" viewBox="0 0 220 220"><defs><linearGradient id="rgl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbe4a0"/><stop offset=".35" stop-color="#c8963c"/><stop offset=".7" stop-color="#6a4818"/><stop offset="1" stop-color="#e0b860"/></linearGradient></defs>
-  <circle cx="110" cy="110" r="101" fill="none" stroke="#120a02" stroke-width="17"/>
-  <circle cx="110" cy="110" r="101" fill="none" stroke="url(#rgl)" stroke-width="12"/>
-  <circle cx="110" cy="110" r="94.5" fill="none" stroke="#1a1006" stroke-width="2"/>${studs}
-  <path d="M110 0 l9 12 h-18 z" fill="url(#rgl)" stroke="#1a1006" stroke-width="1.5"/>
-  <text x="110" y="23" text-anchor="middle" font-family="Cinzel,serif" font-weight="700" font-size="12" fill="#1a1006">N</text></svg>`;
+  // espiral no sentido horário, fechando até quase o centro
+  for (let i = 1; i <= 64; i++) {
+    const k = i / 64, a = Math.PI + k * turns * Math.PI * 2, r = r0 * (1 - k * 0.9);
+    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+  }
+  const d = 'M' + pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L');
+  const line = (stroke, w, extra = '') => `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
+  return `<svg viewBox="0 0 104 108">
+  <g transform="rotate(7 78 92)"><path d="M67 107 V86 Q67 75 78 75 Q89 75 89 86 V107 Z" fill="#cbbf9f" stroke="${INK}" stroke-width="3"/>
+  <path d="M78 81 v13 M73 86 h10" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/></g>
+  <path d="M8 107 q4 -9 7 0 M16 107 q3 -7 6 0 M90 107 q3 -8 6 0" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
+  ${line(INK, 14)}${line(BONE, 7)}${line(INK, 7, 'stroke-dasharray="6 8" stroke-linecap="butt"')}</svg>`;
+}
+
+/** moldura do minimapa: listras preto-e-osso, pontos de costura por dentro e o N numa etiqueta */
+function ringSVG() {
+  const stripe = ((Math.PI * 2 * 101) / 28).toFixed(2);
+  // pontos de costura: um círculo tracejado grosso (tracinhos radiais), num elemento só
+  const stitch = ((Math.PI * 2 * 92.3) / 40).toFixed(2);
+  return `<svg class="ring" viewBox="0 0 220 220">
+  <circle cx="110" cy="110" r="101" fill="none" stroke="${INK}" stroke-width="19"/>
+  <circle cx="110" cy="110" r="101" fill="none" stroke="${BONE}" stroke-width="12"/>
+  <circle cx="110" cy="110" r="101" fill="none" stroke="${INK}" stroke-width="12" stroke-dasharray="${stripe} ${stripe}"/>
+  <circle cx="110" cy="110" r="92.3" fill="none" stroke="${BONE}" stroke-width="5.5" stroke-dasharray="1.8 ${(stitch - 1.8).toFixed(2)}" opacity=".75"/>
+  <g transform="rotate(-6 110 10)"><path d="M100 1 h20 q3 0 3 3 v12 q0 3 -3 3 h-20 q-3 0 -3 -3 v-12 q0 -3 3 -3 z" fill="${BONE}" stroke="${INK}" stroke-width="2"/>
+  <text x="110" y="16" text-anchor="middle" font-family="Mountains of Christmas, serif" font-weight="700" font-size="16" fill="${INK}">N</text></g></svg>`;
 }
 
 export class UI {
@@ -50,7 +64,6 @@ export class UI {
     root.innerHTML = `
     <div class="anchor tl"><div class="frames">
       <div class="unit player">
-        <div class="wing l">${WING}</div><div class="wing r">${WING}</div>
         <div class="portrait"><canvas></canvas></div><div class="ring"></div>
         <div class="bars"><div class="name">Vicente</div><div class="bar hp"><i></i><span></span></div><div class="bar mp"><i></i><span></span></div></div>
         <div class="level">1</div>
@@ -70,7 +83,7 @@ export class UI {
       <div id="tracker" class="pe"><div class="head"><span>Missões</span><span class="tog">[−]</span></div><div class="list"></div></div>
     </div>
     <div class="anchor bl"><div id="chat" class="pe"><div class="tabs"><span class="on">Geral</span></div><div class="log"></div><input class="hidden" maxlength="140" spellcheck="false" placeholder="Diga algo... (/ajuda para comandos)"></div></div>
-    <div class="anchor bc"><div id="bottom"><div class="gargoyle l">${GARGOYLE}</div><div class="bar-frame pe"></div><div class="gargoyle r">${GARGOYLE}</div>
+    <div class="anchor bc"><div id="bottom"><div class="curl l">${curlSVG()}</div><div class="bar-frame pe"></div><div class="curl r">${curlSVG()}</div>
       <div class="xp pe"><i></i><div class="ticks"></div><span></span></div></div></div>
     <div class="anchor br"><div id="micro" class="pe"><div class="money"></div></div></div>
     <div id="castbar" class="hidden"><img class="ico"><i></i><span></span></div>
@@ -107,7 +120,7 @@ export class UI {
     this.qlog = new QuestLog(game, this);
     this.bags = new Bags(game, this);
     this.menu = new Menu(game, this);
-    this.mapWin = this.makeWin('worldmap', 'frame-dark', `<div class="wtitle">Mapa — Vale Tumbalacatumba</div><button class="close">×</button><div class="inner"><canvas></canvas><div class="legend"><span><b>!</b> Missão disponível</span><span><b>?</b> Pronta para entregar</span><span><b style="color:#bdbdbd">?</b> Em andamento</span><span><b style="color:#ffd100">◯</b> Área do objetivo</span></div></div><div class="coords"></div>`);
+    this.mapWin = this.makeWin('worldmap', 'frame-dark', `<div class="wtitle">Mapa — Vale Tumbalacatumba</div><button class="close">×</button><div class="inner"><canvas></canvas><div class="legend"><span><b>!</b> Missão disponível</span><span><b>?</b> Pronta para entregar</span><span><b style="color:#bdbdbd">?</b> Em andamento</span><span><b style="color:#ff8a2a">◯</b> Área do objetivo</span></div></div><div class="coords"></div>`);
     this.mapWin.querySelector('.close').onclick = () => this.toggleMap(false);
     this.worldMap = new WorldMap(game, this.mapWin);
     this.tut = this.makeWin('tutorial', 'frame-dark', `<div class="inner"><div class="txt"></div><div class="foot"><button class="wbtn small">Entendi</button></div></div>`);
@@ -173,7 +186,7 @@ export class UI {
   }
   levelColor(lv) {
     const d = lv - this.game.progress.level;
-    return d >= 3 ? '#ff8040' : d >= -2 ? '#ffd100' : d >= -4 ? '#40c040' : '#9d9d9d';
+    return d >= 3 ? '#ff6a3a' : d >= -2 ? '#ffc84a' : d >= -4 ? '#9ee05a' : '#9d958e';
   }
   setCursor(kind) {
     if (this._cur === kind) return;
@@ -189,7 +202,10 @@ export class UI {
       { key: '1', code: 'Digit1', id: 'boo', name: 'Buu!', icon: 'boo', cd: 2.5, desc: 'Solta um "BUU!" apavorante. Espanta corvos num raio de 10 metros e faz as criaturas por perto fugirem de medo por 2,5 s.' },
       { key: '2', code: 'Digit2', id: 'dance', name: 'Dança Macabra', icon: 'dance', cd: 0.6, desc: 'Dança como se ninguém estivesse olhando. Todo mundo está olhando.' },
       { key: '3', code: 'Digit3', id: 'lantern', name: 'Lanterna', icon: 'lantern', cd: 0.4, desc: 'Acende ou apaga sua lanterna. Muito útil à noite.' },
-      { key: '4', code: 'Digit4', id: 'pet', name: 'Belzebuzinho', icon: 'chick', cd: 2, desc: 'Chama ou dispensa seu filhote de avestruz demônio.', locked: () => !P.hasItem('belzebu') },
+      {
+        key: '4', code: 'Digit4', id: 'pet', name: 'Belzebuzinho', icon: 'chick', cd: 2, locked: () => !P.hasItem('belzebu'),
+        desc: () => 'Chama ou dispensa seu filhote de avestruz demônio.' + (P.flags.petFire ? ' Ele cospe bolas de fogo (dano baixo) nas criaturas que brigam com você.' : ''),
+      },
       { key: '5', code: 'Digit5', id: 'mount', name: 'Vassoura Velha', icon: 'broom', cd: 1, desc: 'Monta na vassoura (+65% de velocidade). Conjuração de 1,5 s.', locked: () => !P.hasItem('vassoura') },
       { key: '6', code: 'Digit6', id: 'hearth', name: 'Lápide de Regresso', icon: 'hearth', cd: 45, desc: 'Leva você de volta à Praça do Relógio Torto. Conjuração de 4 s.' },
       {
@@ -214,7 +230,7 @@ export class UI {
       e.onmousemove = (ev) => {
         const lk = s.locked?.();
         const desc = typeof s.desc === 'function' ? s.desc() : s.desc;
-        this.showTooltip('slot', `<div class="tt-name" style="color:#fff">${esc(s.name)}</div>${lk ? '<div class="tt-far">Ainda não aprendido</div>' : ''}<div class="tt-flavor" style="color:#ffd100">${esc(desc)}</div>${s.cd >= 2 ? `<div class="tt-sub">Recarga: ${s.cd} s</div>` : ''}`, ev.clientX, ev.clientY);
+        this.showTooltip('slot', `<div class="tt-name" style="color:#fff">${esc(s.name)}</div>${lk ? '<div class="tt-far">Ainda não aprendido</div>' : ''}<div class="tt-flavor">${esc(desc)}</div>${s.cd >= 2 ? `<div class="tt-sub">Recarga: ${s.cd} s</div>` : ''}`, ev.clientX, ev.clientY);
       };
       e.onmouseleave = () => this.hideTooltip('slot');
     }
@@ -400,7 +416,7 @@ export class UI {
     if (!it) return this.hideTooltip('world');
     if (it.kind === 'mob') {
       const m = it.mob;
-      let h = `<div class="tt-name" style="color:${it.reaction === 'hostile' ? '#ff4030' : '#ffd100'}">${esc(it.name)}</div>`;
+      let h = `<div class="tt-name" style="color:${it.reaction === 'hostile' ? '#ff5a4a' : '#ffc84a'}">${esc(it.name)}</div>`;
       h += `<div class="tt-lvl"><span style="color:${this.levelColor(m.level)}">Nível ${m.level}</span> ${esc(it.family)}</div>`;
       h += `<div class="tt-sub">${it.reaction === 'hostile' ? 'Hostil: ataca quem chega perto' : 'Neutro: só briga se provocado'}</div>`;
       if (m.hp < m.maxHp) h += `<div class="tt-sub">Vida: ${Math.ceil(m.hp)} / ${m.maxHp}</div>`;
@@ -408,9 +424,9 @@ export class UI {
       if (this.game.interaction.distTo(it) > it.range) h += `<div class="tt-far">Longe demais</div>`;
       return this.showTooltip('world', h);
     }
-    const reactColor = it.kind === 'item' ? '#ffffff' : it.reaction === 'friendly' ? '#3cff3c' : '#ffd100';
+    const reactColor = it.kind === 'item' ? '#efe6d2' : it.reaction === 'friendly' ? '#b4f05a' : '#ffc84a';
     let h = `<div class="tt-name" style="color:${reactColor}">${esc(it.name)}</div>`;
-    if (it.subtitle) h += `<div class="tt-sub">&lt;${esc(it.subtitle)}&gt;</div>`;
+    if (it.subtitle) h += `<div class="tt-sub">~ ${esc(it.subtitle)} ~</div>`;
     if (it.level) h += `<div class="tt-lvl">Nível ${it.level}</div>`;
     const P = this.game.progress;
     if (it.npc) {
@@ -451,7 +467,7 @@ export class UI {
     tf.classList.remove('friendly', 'neutral', 'hostile', 'item');
     tf.classList.add(it.kind === 'item' ? 'item' : it.reaction);
     tf.querySelector('.name').textContent = it.name;
-    tf.querySelector('.sub').textContent = it.subtitle ? `<${it.subtitle}>` : '';
+    tf.querySelector('.sub').textContent = it.subtitle ? `~ ${it.subtitle} ~` : '';
     tf.querySelector('.level').textContent = it.level ?? '';
     tf.querySelector('.bar.hp span').textContent = '100%';
     this.portraits.setRig('target', this.portraitFor(it));
@@ -478,8 +494,9 @@ export class UI {
     const pf = this.q('.unit.player');
     pf.querySelector('.level').textContent = P.level;
     const xp = this.q('#bottom .xp');
-    xp.querySelector('i').style.width = `${Math.min(1, P.xp / P.xpNeeded) * 100}%`;
-    xp.querySelector('span').textContent = `XP: ${P.xp} / ${P.xpNeeded}`;
+    const maxed = P.level >= XP_TABLE.length - 1;
+    xp.querySelector('i').style.width = `${maxed ? 100 : Math.min(1, P.xp / P.xpNeeded) * 100}%`;
+    xp.querySelector('span').textContent = maxed ? 'Nível máximo' : `XP: ${P.xp} / ${P.xpNeeded}`;
     this.q('#micro .money').innerHTML = coinsHTML(P.money);
     this.playerPortraitRig.hat.visible = !!P.flags.hat;
   }
@@ -590,6 +607,16 @@ export class UI {
       g.combat.heal(12);
       this.info('Você comeu o biscoito. Tinha gosto de... arrependimento.');
       g.audio?.sfx('eat');
+    } else if (it.use === 'tonic') {
+      // o frasco da Vesga se enche sozinho: não some, só tem recarga
+      const left = 60 - (g.time - (this._tonicT ?? -999));
+      if (g.combat.dead) return this.error('Você está morto.');
+      if (g.combat.hp >= g.combat.st.maxHp) return this.error('Você já está com a vida cheia.');
+      if (left > 0) return this.error(`O tônico ainda está borbulhando (${Math.ceil(left)} s).`);
+      this._tonicT = g.time;
+      g.combat.heal(40);
+      g.audio?.sfx('drink');
+      this.info('Você bebe o tônico. Sua nuca fica toda arrepiada.');
     } else if (it.use === 'pet') g.abilities.use('pet');
     else if (it.use === 'mount') g.abilities.use('mount');
     else if (it.use === 'hearth') this.useSlot(this.slots.find((s) => s.id === 'hearth'));
@@ -612,7 +639,7 @@ export class UI {
     Progress.clearSave();
   }
 
-  /** pop-up de confirmação estilo WoW (fica fora do #hud para funcionar também no título) */
+  /** pop-up de confirmação (fica fora do #hud para funcionar também no título) */
   confirm(text, onYes, { yes = 'Sim', no = 'Não' } = {}) {
     let w = document.getElementById('popup');
     if (!w) {
@@ -795,7 +822,7 @@ export class UI {
       el.className = 'np';
       el.innerHTML = `<div class="mk"></div><div class="nm"></div><div class="tl"></div>`;
       el.querySelector('.nm').textContent = npc.info.name;
-      el.querySelector('.tl').textContent = `<${npc.info.title}>`;
+      el.querySelector('.tl').textContent = `~ ${npc.info.title} ~`;
       this.overlay.appendChild(el);
       this.plates.push({ npc, el, mk: el.querySelector('.mk'), last: '' });
     }
@@ -863,9 +890,9 @@ export class UI {
   startTutorial() {
     this.tipIndex = 0;
     this.tipSteps = [
-      { text: 'Bem-vindo a <b>Tumbalacatumba</b>! Use <b>W A S D</b> para andar. Segure o <b>botão direito do mouse</b> e arraste para olhar ao redor — como no WoW.' },
-      { text: 'Personagens com um <b>!</b> amarelo têm missões. O <b>Prefeito Abóbora</b> está logo ali na praça: clique nele com o <b>botão direito</b> para conversar.' },
-      { text: 'Suas missões aparecem à direita e as áreas de objetivo ficam em <b>amarelo no minimapa</b>. Aperte <b>M</b> para o mapa e <b>L</b> para o diário.', on: 'accept' },
+      { text: 'Bem-vindo a <b>Tumbalacatumba</b>! Use <b>W A S D</b> para andar. Segure o <b>botão direito do mouse</b> e arraste para olhar ao redor.' },
+      { text: 'Personagens com um <b>!</b> cor de abóbora têm missões. O <b>Prefeito Abóbora</b> está logo ali na praça: clique nele com o <b>botão direito</b> para conversar.' },
+      { text: 'Suas missões aparecem à direita e as áreas de objetivo ficam em <b>laranja no minimapa</b>. Aperte <b>M</b> para o mapa e <b>L</b> para o diário.', on: 'accept' },
     ];
     this.showTip();
   }
@@ -902,7 +929,12 @@ export class UI {
     this.combatHud.update(dt);
     this.updateWaypoint();
     this.dialog.update();
-    this.q('#minimap .clock').textContent = g.dayNight.clockText();
+    // só mexe no DOM quando o texto muda (reescrever todo quadro repinta a etiqueta do relógio)
+    const clock = g.dayNight.clockText();
+    if (clock !== this._clock) {
+      this._clock = clock;
+      (this._clockEl ??= this.q('#minimap .clock')).textContent = clock;
+    }
     // zona
     const z = g.world.zoneAt(g.player.pos.x, g.player.pos.z);
     const zid = z?.id ?? 'wild';
@@ -943,7 +975,8 @@ export class UI {
     // tooltip do alvo sob o mouse acompanha distância
     if (this.target) {
       const tf = this.q('.unit.target');
-      tf.style.opacity = g.interaction.distTo(this.target) > this.target.range * 1.5 ? 0.7 : 1;
+      const op = g.interaction.distTo(this.target) > this.target.range * 1.5 ? '0.7' : '1';
+      if (tf.style.opacity !== op) tf.style.opacity = op;
     }
   }
 
