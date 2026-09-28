@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Tumbalacatumba — RPG de missões em mundo aberto com visual cartunesco à la Tim Burton feito em three.js. Explore o Vale Assombrado, converse com PNJs, cumpra quests e divirta-se grátis no PlayfulHub!">
+    <meta name="keywords" content="rpg 3d, three.js, mundo aberto, tim burton, halloween, jogo procedural, quests, webgl, PlayfulHub">
+    <meta property="og:title" content="Tumbalacatumba — Contos do Vale Assombrado - Jogue Grátis no PlayfulHub">
+    <meta property="og:description" content="RPG de missões em mundo aberto estilo World of Warcraft com visual cartunesco à la Tim Burton. Totalmente procedural em Three.js.">
+    <meta property="og:image" content="/assets/images/tumbalacatumba_preview.png">
+    <meta property="og:url" content="https://playfulhub.com.br/jogos/tumbalacatumba">
+    <meta property="og:type" content="website">
+
+    <title>Tumbalacatumba — Contos do Vale Assombrado | PlayfulHub</title>
+
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="preconnect" href="https://pagead2.googlesyndication.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"></noscript>
+
+    <style>
+        :root {
+            --primary-color: #0d0a1a;
+            --secondary-color: #1b122e;
+            --accent-color: #3b1e54;
+            --highlight-color: #ff9a3c;
+            --highlight-hover: #ffaa5a;
+            --text-light: #f5f0fa;
+            --text-muted: #b8a9cf;
+            --border-color: rgba(255, 255, 255, 0.12);
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: var(--text-light);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        .header {
+            background: rgba(13, 10, 26, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content { display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--highlight-color); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+        .breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-light); text-decoration: none; transition: color 0.3s ease; }
+        .breadcrumb a:hover { color: var(--highlight-color); }
+
+        .main-content { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; margin: 2rem 0; }
+        .game-content { background: rgba(255, 255, 255, 0.04); border-radius: 15px; padding: 2rem; backdrop-filter: blur(10px); border: 1px solid var(--border-color); }
+        .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+
+        .game-header { text-align: center; margin-bottom: 2rem; }
+        .game-title {
+            font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;
+            background: linear-gradient(45deg, #ff9a3c, #c084fc);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .game-description { font-size: 1.15rem; color: var(--text-muted); max-width: 720px; margin: 0 auto; }
+
+        .game-container {
+            background: #000; border-radius: 12px; margin: 1.5rem 0; text-align: center;
+            border: 2px solid var(--border-color); position: relative; overflow: hidden;
+            aspect-ratio: 16 / 9;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .game-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        .game-controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--highlight-color);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff9a3c, #c084fc);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 154, 60, 0.4);
+        }
+
+        .instructions { background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; border-left: 4px solid var(--highlight-color); }
+        .instructions h3 { color: var(--highlight-color); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+        .control-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+        .control-key { background: rgba(255, 154, 60, 0.2); color: var(--highlight-color); border: 1px solid rgba(255, 154, 60, 0.4); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold; min-width: 32px; text-align: center; font-size: 0.85rem; }
+
+        .tips { background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; }
+        .tips h3 { color: var(--highlight-color); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .tip-item { background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 0.85rem 1rem; margin: 0.75rem 0; border-left: 3px solid var(--highlight-color); display: flex; align-items: center; }
+        .tip-number { background: var(--highlight-color); color: #120a1a; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 0.75rem; flex-shrink: 0; font-size: 0.85rem; }
+
+        .game-info { background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+        .info-item { display: flex; flex-direction: column; gap: 0.25rem; }
+        .info-label { font-weight: bold; color: var(--highlight-color); font-size: 0.9rem; }
+        .info-value { color: var(--text-muted); }
+        .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+        .tag { background: rgba(192, 132, 252, 0.15); color: #d8b4fe; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; border: 1px solid rgba(192, 132, 252, 0.3); }
+
+        .ad-container { background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 1rem; text-align: center; min-height: 250px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); }
+        .ad-container ins { width: 100%; height: 100%; min-height: 250px; }
+
+        .related-games { background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 1.5rem; border: 1px solid var(--border-color); }
+        .related-games h3 { color: var(--highlight-color); margin-bottom: 1rem; }
+        .related-game { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.04); border-radius: 8px; margin: 0.5rem 0; text-decoration: none; color: var(--text-light); transition: background 0.3s ease; }
+        .related-game:hover { background: rgba(255, 255, 255, 0.08); }
+        .related-game-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+        .footer { background: rgba(0, 0, 0, 0.4); padding: 2rem 0; margin-top: 3rem; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); }
+
+        @media (max-width: 768px) {
+            .main-content { grid-template-columns: 1fr; }
+            .sidebar { order: -1; }
+            .game-title { font-size: 2rem; }
+            .controls-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
+    height="0" width="0" style="display:none;visibility:hidden" loading="lazy"></iframe></noscript>
+
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">🎮 PlayfulHub</a>
+                <nav class="breadcrumb">
+                    <a href="/">Início</a>
+                    <i class="fas fa-chevron-right"></i>
+                    <a href="/jogos">Jogos</a>
+                    <i class="fas fa-chevron-right"></i>
+                    <span>Tumbalacatumba</span>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <main class="game-content">
+                <div class="game-header">
+                    <h1 class="game-title">Tumbalacatumba</h1>
+                    <p class="game-description">Contos do Vale Assombrado — Um RPG de missões em mundo aberto com visual cartunesco "à la Tim Burton", controles estilo World of Warcraft, ciclo dia/noite e áudio 100% procedural em Three.js.</p>
+                </div>
+
+                <div class="game-container" id="game-container">
+                    <iframe id="game-frame" class="game-iframe" src="../tumbalacatumba/Tumbalacatumba.html" allow="fullscreen; pointer-lock" title="Tumbalacatumba — Contos do Vale Assombrado"></iframe>
+                </div>
+
+                <div class="game-controls-bar">
+                    <div class="status-indicator">
+                        <i class="fas fa-ghost"></i> Mundo Aberto Procedural Ativo
+                    </div>
+                    <button class="btn" onclick="toggleFullscreen()"><i class="fas fa-expand"></i> Tela Cheia</button>
+                </div>
+
+                <section class="instructions">
+                    <h3><i class="fas fa-gamepad"></i> Como Jogar & Controles (Estilo WoW)</h3>
+                    <div class="controls-grid">
+                        <div class="control-item">
+                            <span class="control-key">W A S D</span>
+                            <span>Andar / Recuar / Girar</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Mouse Dir.</span>
+                            <span>Girar Câmera + Personagem</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Mouse Esq.</span>
+                            <span>Girar só Câmera / Alvo</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Espaço</span>
+                            <span>Pular obstáculos</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Clique Dir. / F</span>
+                            <span>Conversar / Pegar / Usar</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Tab</span>
+                            <span>Alternar alvos próximos</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">1 – 7</span>
+                            <span>Barra de Ações & Feitiços</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">7 / Clique Dir.</span>
+                            <span>Lanternada: atacar criaturas</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">L / M / B</span>
+                            <span>Missões / Mapa / Mochila</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">R / NumLock</span>
+                            <span>Correr sozinho (Auto-Run)</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">X / Z</span>
+                            <span>Sentar / Ocultar HUD (Foto)</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Enter</span>
+                            <span>Chat (/dançar, /buu, /hora)</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="control-key">Esc</span>
+                            <span>Menu de Opções & Qualidade</span>
+                        </div>
+                    </div>
+                    <p><strong>Objetivo:</strong> Explore o vale, fale com os habitantes assombrados marcados com <strong style="color: #ffd700;">!</strong>, complete tarefas inusitadas, enfrente criaturas cada vez mais fortes nas regiões mais sinistras (ratos-zumbis, caveiras saltitantes, aranhas cabeludas, morcegos dentuços e marujos afogados), suba de nível e ganhe recompensas como vassoura voadora e mascotes!</p>
+                </section>
+
+                <section class="tips">
+                    <h3><i class="fas fa-lightbulb"></i> Dicas do Vale Assombrado</h3>
+                    <div class="tip-item">
+                        <span class="tip-number">1</span>
+                        <span>O Prefeito Abóbora na praça central tem duas caras e oferece as primeiras missões do vale.</span>
+                    </div>
+                    <div class="tip-item">
+                        <span class="tip-number">2</span>
+                        <span>Vaga-lumes e certos eventos só acontecem à noite — o coveiro Tonico permite que você tire um cochilo para avançar as horas.</span>
+                    </div>
+                    <div class="tip-item">
+                        <span class="tip-number">3</span>
+                        <span>A Lápide de Regresso (tecla 6 da barra de ações) teleporta você instantaneamente de volta à fonte da praça.</span>
+                    </div>
+                    <div class="tip-item">
+                        <span class="tip-number">4</span>
+                        <span>Seu progresso é gravado automaticamente no navegador — você pode continuar a qualquer momento!</span>
+                    </div>
+                </section>
+
+                <section class="game-info">
+                    <h3><i class="fas fa-info-circle"></i> Sobre o Jogo</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Gênero</span>
+                            <span class="info-value">RPG 3D / Mundo Aberto</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Engine & Render</span>
+                            <span class="info-value">Three.js / WebGL</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Estilo Visual</span>
+                            <span class="info-value">Toon Ink-Outline "Tim Burton"</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Áudio</span>
+                            <span class="info-value">Trilha Procedural WebAudio</span>
+                        </div>
+                    </div>
+                    <div class="tags">
+                        <span class="tag">Three.js</span>
+                        <span class="tag">RPG 3D</span>
+                        <span class="tag">Mundo Aberto</span>
+                        <span class="tag">Tim Burton</span>
+                        <span class="tag">Halloween</span>
+                        <span class="tag">Procedural</span>
+                        <span class="tag">Quests</span>
+                    </div>
+                </section>
+            </main>
+
+            <aside class="sidebar">
+                <div class="ad-container">
+                    <ins class="adsbygoogle"
+                         style="display:block"
+                         data-ad-client="ca-pub-6741914590073026"
+                         data-ad-slot="1892478235"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                </div>
+
+                <div class="related-games">
+                    <h3>Jogos Relacionados</h3>
+                    <a href="/jogos/blood_and_silver" class="related-game">
+                        <div class="related-game-icon" style="background: linear-gradient(45deg, #e8435b, #c98a5a);">🧛</div>
+                        <div>
+                            <div style="font-weight: bold;">Sangue & Prata</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Roguelite / Gótico</div>
+                        </div>
+                    </a>
+                    <a href="/jogos/voxel_arena" class="related-game">
+                        <div class="related-game-icon" style="background: linear-gradient(45deg, #6366f1, #a855f7);">⚔️</div>
+                        <div>
+                            <div style="font-weight: bold;">Voxel Arena</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Ação 3D / Sobrevivência</div>
+                        </div>
+                    </a>
+                    <a href="/jogos/blender_game" class="related-game">
+                        <div class="related-game-icon" style="background: linear-gradient(45deg, #06b6d4, #3b82f6);">🏙️</div>
+                        <div>
+                            <div style="font-weight: bold;">FPS Orla do Gasômetro 3D</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Tiro / 3D Three.js</div>
+                        </div>
+                    </a>
+                    <a href="/jogos/ded" class="related-game">
+                        <div class="related-game-icon" style="background: linear-gradient(45deg, #e94560, #ff6b6b);">🎲</div>
+                        <div>
+                            <div style="font-weight: bold;">RPG Adventure Quest</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">RPG / Fantasia</div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="ad-container">
+                    <ins class="adsbygoogle"
+                         style="display:block"
+                         data-ad-client="ca-pub-6741914590073026"
+                         data-ad-slot="1892478236"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024-2026 PlayfulHub - Desenvolvido com ☕ e Three.js por William Mangoni</p>
+        </div>
+    </footer>
+
+    <script>
+        function toggleFullscreen() {
+            const container = document.getElementById('game-container');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    alert('Erro ao ativar tela cheia: ' + err.message);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        window.addEventListener('load', function() {
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','GTM-KM6SHZXP');
+
+            var ga = document.createElement('script');
+            ga.async = true;
+            ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-J0T2LXD7XH';
+            document.head.appendChild(ga);
+            ga.onload = function() {
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                window.gtag = gtag;
+                gtag('js', new Date());
+                gtag('config', 'G-J0T2LXD7XH');
+            };
+
+            var ads = document.createElement('script');
+            ads.async = true;
+            ads.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6741914590073026';
+            ads.crossOrigin = 'anonymous';
+            document.head.appendChild(ads);
+            ads.onload = function() {
+                (adsbygoogle = window.adsbygoogle || []).push({});
+            };
+        });
+    </script>
+</body>
+</html>
