@@ -33,6 +33,8 @@ export class Player {
     this.onStep = null;
     this.onLand = null;
     this.courage = 100;
+    this.dead = false;
+    this.hitStop = 0; // congela o golpe por um instante quando acerta (dá peso à pancada)
 
     this.rig = createPlayerModel();
     this.object = this.rig.root;
@@ -220,7 +222,8 @@ export class Player {
 
     this.courage = Math.min(100, this.courage + dt * (this.sitting ? 12 : 4));
     if (this.action) {
-      this.actionT += dt;
+      if (this.hitStop > 0) this.hitStop -= dt;
+      else this.actionT += dt;
       if (this.actionDur && this.actionT > this.actionDur) this.action = null;
     }
     this.rig.animate(dt, {
@@ -233,6 +236,7 @@ export class Player {
       actionT: this.actionT,
       sit: this.sitting,
       mounted: this.mounted,
+      snap: this.action === 'attack',
     });
 
     // lanterna: acende sozinha à noite ou pelo botão
@@ -246,7 +250,9 @@ export class Player {
       this.rig.lanternMat.userData.greenish = up;
     }
     this.lanternLight.intensity = damp(this.lanternLight.intensity, target * (up ? 9 : 6.5), 6, dt);
-    this.rig.lanternGlow.scale.setScalar(0.6 + target * 0.7);
+    // na Lanternada a chama se aviva (o golpe fica visível mesmo de dia)
+    const flare = this.action === 'attack' ? Math.sin(Math.min(1, this.actionT / 0.45) * Math.PI) : 0;
+    this.rig.lanternGlow.scale.setScalar(0.6 + target * 0.7 + flare * 1.1);
   }
 
   setMounted(v) {

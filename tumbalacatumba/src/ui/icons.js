@@ -101,6 +101,38 @@ const DRAW = {
     g.fillRect(19, 44, 26, 6);
     g.strokeRect(19, 44, 26, 6);
   },
+  lanternada(g) {
+    bg(g, '#c85a2a', '#2a0804');
+    // rastro do golpe
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(255,200,110,0.55)';
+    g.lineWidth = 9;
+    g.beginPath(); g.arc(30, 44, 24, Math.PI * 1.02, Math.PI * 1.72); g.stroke();
+    g.strokeStyle = 'rgba(255,250,220,0.95)';
+    g.lineWidth = 3;
+    g.beginPath(); g.arc(30, 44, 24, Math.PI * 1.1, Math.PI * 1.68); g.stroke();
+    glow(g, 44, 22, 17, 'rgba(255,190,90,0.95)');
+    ink(g, 3);
+    // lanterna inclinada no fim do golpe
+    g.save();
+    g.translate(44, 24);
+    g.rotate(0.55);
+    g.fillStyle = '#2a2632';
+    g.beginPath(); g.moveTo(-9, -8); g.lineTo(9, -8); g.lineTo(6, -13); g.lineTo(-6, -13); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, -15, 4, Math.PI, 0); g.stroke();
+    g.fillStyle = 'rgba(255,214,120,0.95)';
+    g.fillRect(-7, -8, 14, 15); g.strokeRect(-7, -8, 14, 15);
+    g.fillStyle = '#2a2632';
+    g.fillRect(-9, 7, 18, 4); g.strokeRect(-9, 7, 18, 4);
+    g.restore();
+    // estrelinhas do impacto
+    g.fillStyle = '#fff4c0';
+    for (const [x, y, r] of [[13, 47, 4], [21, 55, 2.5], [9, 36, 2.5]]) {
+      g.beginPath();
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, rr = i % 2 ? r * 0.4 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+      g.closePath(); g.fill();
+    }
+  },
   chick(g) {
     bg(g, '#e88a3a', '#6a1a10');
     ink(g);
@@ -389,6 +421,19 @@ export function cursorURL(kind) {
     g.fillRect(9, 7, 14, 6); g.strokeRect(9, 7, 14, 6);
     g.fillStyle = '#ffd100';
     g.beginPath(); g.arc(16, 20, 3, 0, Math.PI * 2); g.fill();
+  } else if (kind === 'attack') {
+    // espada torta (cursor de ataque, como no WoW)
+    const grd = g.createLinearGradient(2, 2, 20, 20);
+    grd.addColorStop(0, '#ffffff');
+    grd.addColorStop(1, '#9aa0b8');
+    g.fillStyle = grd;
+    g.beginPath(); g.moveTo(2, 2); g.lineTo(9, 4); g.lineTo(21, 17); g.lineTo(17, 21); g.lineTo(4, 9); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#c8962a';
+    g.beginPath(); g.moveTo(14, 24); g.lineTo(24, 14); g.lineTo(26, 16); g.lineTo(16, 26); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#6a3a1a';
+    g.beginPath(); g.moveTo(21, 23); g.lineTo(23, 21); g.lineTo(29, 27); g.lineTo(27, 29); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#c8962a';
+    g.beginPath(); g.arc(28.5, 28.5, 2.4, 0, Math.PI * 2); g.fill(); g.stroke();
   } else if (kind === 'use') {
     g.fillStyle = '#c8c0a8';
     g.beginPath();

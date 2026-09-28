@@ -130,6 +130,27 @@ export const QUEST_AREAS = {
   dentadura: { x: -100, z: 38, r: 8 },
 };
 
+// Nível das criaturas por região: fácil perto da vila e das primeiras missões, difícil nos cantos mais sinistros.
+// A vila, o lago e as fendas não têm criaturas.
+export const ZONE_LEVELS = {
+  sitio: [1, 2], // fácil: corvos (neutros)
+  colina: [1, 2], // fácil: ratos-zumbis
+  cemiterio: [2, 3], // médio: caveiras saltitantes
+  pantano: [3, 3], // médio: sapos (neutros)
+  bosque: [3, 4], // médio-difícil: aranhas cabeludas
+  mansao: [4, 5], // difícil: morcegos dentuços
+  farol: [4, 5], // difícil: marujos afogados
+};
+
+// Onde nascem as criaturas hostis (círculo de sorteio; o nível vem de ZONE_LEVELS)
+export const MOB_SPAWNS = [
+  { zone: 'colina', type: 'rato', x: -94, z: -86, r: 22, count: 7 },
+  { zone: 'cemiterio', type: 'caveira', x: 76, z: -64, r: 22, count: 6 },
+  { zone: 'bosque', type: 'aranha', x: -82, z: 98, r: 24, count: 5 },
+  { zone: 'mansao', type: 'morcego', x: 128, z: 2, r: 13, count: 5, safe: 24 },
+  { zone: 'farol', type: 'marujo', x: 46, z: -126, r: 10, count: 4, maxZ: -116 },
+];
+
 ROADS.push(
   { id: 'cem-eixo', w: 2.6, pts: [[0, 21], [0, 8], [0.5, -4], [0, -10]].map(([x, z]) => cemToWorld(x, z)) },
   { id: 'cem-cruz', w: 2.2, pts: [[-20, 2], [-8, 1], [8, 1.5], [20, 1]].map(([x, z]) => cemToWorld(x, z)) },

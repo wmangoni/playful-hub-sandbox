@@ -397,6 +397,7 @@ export class Menu {
         <div><b>Roda</b> zoom</div><div><b>Clique dir.</b> conversar / pegar</div>
         <div><b>F</b> interagir</div><div><b>Tab</b> próximo alvo</div>
         <div><b>1–6</b> barra de ações</div><div><b>X</b> sentar</div>
+        <div><b>7</b> Lanternada (atacar)</div><div><b>Clique dir.</b> em criatura: atacar</div>
         <div><b>L</b> diário de missões</div><div><b>M</b> mapa</div>
         <div><b>B</b> mochila</div><div><b>Enter</b> chat</div>
         <div><b>Esc</b> menu / fechar</div><div><b>Z</b> esconder interface</div>

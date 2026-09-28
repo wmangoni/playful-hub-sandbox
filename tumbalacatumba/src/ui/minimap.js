@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WORLD_SIZE, HALF, SUBZONES, QUEST_AREAS, SWAMP } from '../world/layout.js';
+import { WORLD_SIZE, HALF, SUBZONES, QUEST_AREAS, SWAMP, ZONE_LEVELS } from '../world/layout.js';
 import { clamp, lerp, TAU } from '../util/math.js';
 import { drawMarker } from './icons.js';
 import { RNG } from '../util/rng.js';
@@ -539,6 +539,16 @@ export class WorldMap {
       c.strokeText(z.name, W(z.x), y);
       c.fillStyle = hov ? '#fff4b0' : '#ffd36b';
       c.fillText(z.name, W(z.x), y);
+      // faixa de nível das criaturas da região
+      const lv = ZONE_LEVELS[z.id];
+      if (lv) {
+        const t = lv[0] === lv[1] ? `Nível ${lv[0]}` : `Níveis ${lv[0]}–${lv[1]}`;
+        c.font = '700 19px Almendra, serif';
+        c.lineWidth = 5;
+        c.strokeText(t, W(z.x), y + 27);
+        c.fillStyle = g.ui.levelColor(Math.round((lv[0] + lv[1]) / 2));
+        c.fillText(t, W(z.x), y + 27);
+      }
     }
     c.font = '700 44px Cinzel, serif';
     c.lineWidth = 8;

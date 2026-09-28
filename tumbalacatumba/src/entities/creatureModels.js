@@ -163,13 +163,24 @@ export function createCrow() {
   rig.fixedPose = true;
   rig.flying = false;
   rig.extra = (dt, s, r) => {
+    const u = s.atk ?? -1;
+    if ((s.dead ?? -1) >= 0) {
+      // caído de asas abertas
+      r.j.wingL.rotation.set(0, 1.3, 0.2);
+      r.j.wingR.rotation.set(0, -1.3, -0.2);
+      r.j.head.rotation.set(0.4, 0, 0);
+      return;
+    }
     if (r.flying) {
       const f = Math.sin(r.t * 22);
       r.j.wingL.rotation.y = 1.45;
       r.j.wingR.rotation.y = -1.45;
       r.j.wingL.rotation.z = 0.3 + f * 0.9;
       r.j.wingR.rotation.z = -0.3 - f * 0.9;
-      r.j.torso.rotation.x = -0.3;
+      // bicada: mergulha o corpo e martela com o bico
+      const peck = u >= 0 ? Math.sin(Math.min(1, Math.max(0, (u - 0.35) / 0.4)) * Math.PI) : 0;
+      r.j.torso.rotation.x = -0.3 + peck * 0.8;
+      r.j.head.rotation.x = peck * 0.9 + (s.hurt || 0) * -0.5;
     } else {
       r.j.wingL.rotation.y = damp(r.j.wingL.rotation.y, 0.12, 10, dt);
       r.j.wingR.rotation.y = damp(r.j.wingR.rotation.y, -0.12, 10, dt);
@@ -214,10 +225,30 @@ export function createFrog(withDentures = true) {
     }
     rig.dentures = rig.attach('torso', b.build());
   }
+  // língua enrolada (só aparece na linguada)
+  rig.joint('tongue', 'torso', [0, 0.25, 0.3]);
+  {
+    const b = new Builder();
+    b.add(S.cyl(0.035, 0.045, 1, 6), '#e86a8a', { p: [0, 0, 0.5], r: [Math.PI / 2, 0, 0] });
+    b.add(S.sphere(0.06, 8, 6), '#f08aa0', { p: [0, 0, 1] });
+    rig.tongue = rig.attach('tongue', b.build(), undefined, { cast: false });
+    rig.tongue.visible = false;
+  }
   rig.fixedPose = true;
+  rig.hopPh = 0;
   rig.extra = (dt, s, r) => {
+    const sp = s.speed || 0, u = s.atk ?? -1;
     r.j.torso.scale.y = 1 + Math.max(0, Math.sin(r.t * 2.5)) * 0.06;
     r.j.torso.scale.x = 1 + Math.max(0, Math.sin(r.t * 2.5)) * 0.03;
+    // pulando atrás do jogador
+    if (sp > 0.3) r.hopPh += dt * (6 + sp);
+    const h = sp > 0.3 ? Math.abs(Math.sin(r.hopPh)) : 0;
+    r.body.position.y = damp(r.body.position.y, h * 0.55, 20, dt);
+    // linguada: a língua dispara até o alvo (reach em metros do mundo) e volta
+    const L = u >= 0 ? Math.sin(Math.min(1, Math.max(0, (u - 0.3) / 0.45)) * Math.PI) : 0;
+    r.tongue.visible = L > 0.02;
+    if (r.tongue.visible) r.j.tongue.scale.set(1, 1, 0.1 + (L * (s.reach ?? 2.4)) / (r.root.scale.x || 1));
+    r.j.torso.rotation.x = damp(r.j.torso.rotation.x, u >= 0 ? -0.15 + L * 0.25 : 0, 16, dt) - (s.hurt || 0) * 0.3;
   };
   rig.height = 0.7;
   rig.portraitY = 0.4;

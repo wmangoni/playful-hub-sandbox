@@ -17,6 +17,7 @@ import { Progress } from './quests/progress.js';
 import { QuestWorld } from './quests/questWorld.js';
 import { UI } from './ui/hud.js';
 import { AmbientLife } from './entities/ambientLife.js';
+import { Combat } from './combat/combat.js';
 import { ZONE_NAME } from './world/layout.js';
 
 const nextFrame = () => new Promise((r) => setTimeout(r, 16));
@@ -138,6 +139,7 @@ export class Game {
     await nextFrame();
     this.questWorld = new QuestWorld(this);
     this.life = new AmbientLife(this);
+    this.combat = new Combat(this);
     this.questWorld.npcList.push(this.life.zombie);
     this.ui = new UI(this);
     this.progress.extraSave = () => ({ pos: [+this.player.pos.x.toFixed(2), +this.player.pos.z.toFixed(2)], yaw: +this.player.yaw.toFixed(3), time: +this.dayNight.time.toFixed(2) });
@@ -382,6 +384,7 @@ export class Game {
     this.world.update(dt, this.time);
     this.questWorld.update(dt, this.time);
     this.life.update(dt, this.time);
+    this.combat.update(dt);
     this.ambience.update(dt);
     this.fx.update(dt);
     this.updateClockHands();
@@ -422,6 +425,8 @@ export class Game {
   get debug() {
     return {
       setTime: (h) => this.dayNight.setTime(h),
+      /** liga/desliga o modo pacífico (criaturas não atacam) */
+      peace: (v = !this.combat.peaceful) => (this.combat.peaceful = v),
       tp: (x, z) => this.player.teleport(x, z),
       cam: (yaw, pitch, dist) => {
         if (yaw !== undefined) this.cam.yaw = this.player.yaw = yaw;

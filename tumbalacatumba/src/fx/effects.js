@@ -342,6 +342,10 @@ export class Effects {
     // fumaça das chaminés
     this.emitters = (game.populated.smoke ?? []).map((s) => ({ p: new THREE.Vector3(s.x, s.y, s.z), t: rng.range(0, 1), green: !!s.green }));
     this._smokeC = new THREE.Color();
+    // cria o rastro do golpe já visível (e transparente) para o shader compilar no carregamento
+    this.swoosh(game.player);
+    this._sw.t = 1;
+    this._sw.m.material.uniforms.uA.value = 0;
   }
 
   poof(pos, color = '#b8b0c8', scale = 1) {
@@ -406,6 +410,77 @@ export class Effects {
       this.glowB.spawn({ p: new THREE.Vector3(pos.x + Math.cos(a) * 0.8, pos.y + rng.range(0, 2), pos.z + Math.sin(a) * 0.8), v: new THREE.Vector3(-Math.cos(a) * 0.5, rng.range(1, 3), -Math.sin(a) * 0.5), life: rng.range(0.6, 1.2), size: rng.range(0.2, 0.4), drag: 0.8, c: c.clone().multiplyScalar(2), a: 1 });
     }
   }
+  /** rastro luminoso da Lanternada: um arco na frente do jogador que varre da esquerda para a direita */
+  swoosh(player, color = '#ffc070') {
+    if (!this._sw) {
+      const seg = 28, a0 = 1.35, a1 = -1.35, r0 = 0.42, r1 = 1.22;
+      const pos = [], uv = [], idx = [];
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg, a = a0 + (a1 - a0) * u;
+        for (const [r, v] of [[r0, 0], [r1, 1]]) {
+          pos.push(Math.sin(a) * r, 0, Math.cos(a) * r);
+          uv.push(u, v);
+        }
+        if (i < seg) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx);
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { uHead: { value: 0 }, uA: { value: 0 }, uColor: { value: new THREE.Color() } },
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: /* glsl */ `
+          uniform float uHead, uA; uniform vec3 uColor; varying vec2 vUv;
+          void main() {
+            float k = clamp((vUv.x - (uHead - 0.6)) / 0.6, 0.0, 1.0);
+            float a = step(vUv.x, uHead) * k * k;
+            a *= smoothstep(0.0, 0.75, vUv.y) * (1.0 - smoothstep(0.86, 1.0, vUv.y)) * uA;
+            if (a < 0.003) discard;
+            gl_FragColor = vec4(uColor * (0.6 + 0.8 * k), a);
+          }`,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      });
+      const m = new THREE.Mesh(geo, mat);
+      m.layers.set(LAYER_FX);
+      m.renderOrder = 9;
+      m.frustumCulled = false;
+      m.position.set(0, 1.18, 0.1);
+      m.rotation.z = -0.22;
+      this._sw = { m, t: 1 };
+    }
+    const s = this._sw;
+    if (s.m.parent !== player.object) player.object.add(s.m);
+    s.m.material.uniforms.uColor.value.set(color).multiplyScalar(1.7);
+    s.t = 0;
+    s.m.visible = true;
+  }
+  /** faíscas + clarão rápido no ponto do impacto */
+  hitSpark(pos, color = '#fff0c8', n = 10, scale = 1) {
+    const c = new THREE.Color(color);
+    for (let i = 0; i < n; i++) {
+      const v = new THREE.Vector3(rng.range(-1, 1), rng.range(-0.3, 1), rng.range(-1, 1)).normalize().multiplyScalar(rng.range(3, 7) * scale);
+      this.glowB.spawn({ p: pos.clone(), v, life: rng.range(0.18, 0.38), size: rng.range(0.18, 0.32) * scale, g: 6, drag: 4, c: c.clone().multiplyScalar(2.2), a: 1 });
+    }
+    this.softGlow.spawn({ p: pos.clone(), v: new THREE.Vector3(), life: 0.14, size: 1.3 * scale, grow: 1.6, drag: 0, c: c.clone().multiplyScalar(1.4), a: 0.9 });
+  }
+  /** caveira se desmanchando em ossinhos */
+  bones(pos) {
+    const c = new THREE.Color('#ece4cc');
+    for (let i = 0; i < 24; i++) {
+      const v = new THREE.Vector3(rng.range(-1, 1), rng.range(1.2, 2.6), rng.range(-1, 1)).multiplyScalar(rng.range(1.4, 3.2));
+      this.smokeB.spawn({ p: new THREE.Vector3(pos.x, pos.y + 0.4, pos.z), v, life: rng.range(0.9, 1.4), size: rng.range(0.1, 0.2), g: 12, drag: 0.4, grow: 1, c: c.clone().multiplyScalar(rng.range(0.8, 1.1)), a: 1 });
+    }
+    this.poof(pos, '#c8c0a8', 0.6);
+  }
+  /** respingo de água (marujo) */
+  splashBurst(pos, n = 18) {
+    const c = new THREE.Color('#a8dcec');
+    for (let i = 0; i < n; i++) {
+      const a = rng.range(0, TAU), sp = rng.range(1.2, 3);
+      this.smokeB.spawn({ p: new THREE.Vector3(pos.x, pos.y + 0.6, pos.z), v: new THREE.Vector3(Math.cos(a) * sp, rng.range(2, 4.5), Math.sin(a) * sp), life: rng.range(0.4, 0.8), size: rng.range(0.12, 0.24), g: 10, drag: 0.5, grow: 1, c: c.clone(), a: 0.85 });
+    }
+  }
   castSparkles(pos, color = '#b8a0ff') {
     const c = new THREE.Color(color);
     const a = rng.range(0, TAU);
@@ -435,6 +510,14 @@ export class Effects {
     this.softGlow.update(dt, scale);
     for (const a of [this.fireflies, this.wisps, this.leaves, this.embers, this.bubbles, this.bats]) a.uniforms.uScale.value = scale;
     this.fireflies.points.visible = night > 0.05;
+    const sw = this._sw;
+    if (sw?.m.visible) {
+      sw.t += dt;
+      const u = sw.m.material.uniforms;
+      u.uHead.value = Math.min(1.6, sw.t / 0.12);
+      u.uA.value = 1 - Math.min(1, Math.max(0, (sw.t - 0.1) / 0.22));
+      if (sw.t > 0.34) sw.m.visible = false;
+    }
     if (this.pillar) {
       this.pillar.t += dt;
       this.pillar.m.material.uniforms.uA.value = Math.max(0, 1 - this.pillar.t / 2.2);

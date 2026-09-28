@@ -350,6 +350,30 @@ export class Audio {
       case 'dance': [74, 77, 81].forEach((n, i) => this.osc('triangle', midi(n), t + i * 0.12, 0.12, 0.06 * v)); break;
       case 'lantern': this.osc('sine', 1800, t, 0.06, 0.04 * v); this.noise(t, 0.08, 0.04 * v, { type: 'highpass', f: 4000 }); break;
       case 'poof': this.noise(t, 0.35, 0.1 * v, { f: 900, q: 0.8, f2: 300 }); break;
+      // ---- combate
+      case 'swing': this.noise(t, 0.2, 0.1 * v, { f: 700, q: 1.4, f2: 2600 }); this.osc('sine', 180, t, 0.16, 0.04 * v, { f2: 90 }); break;
+      case 'whiff': this.noise(t, 0.14, 0.06 * v, { f: 1400, q: 1.2, f2: 600 }); break;
+      case 'hit':
+        this.osc('sine', 190, t, 0.14, 0.24 * v, { f2: 55 });
+        this.noise(t, 0.09, 0.16 * v, { type: 'lowpass', f: 1100 });
+        this.osc('triangle', 520, t, 0.05, 0.05 * v, { f2: 300 });
+        break;
+      case 'crit':
+        this.sfx('hit', v * 1.2);
+        this.bell(1318, t + 0.02, 0.08 * v, 0.5);
+        this.osc('square', 880, t + 0.02, 0.08, 0.03 * v, { f2: 1760 });
+        break;
+      case 'hurt': this.osc('sawtooth', 330, t, 0.14, 0.06 * v, { f2: 190 }); this.noise(t, 0.1, 0.1 * v, { type: 'lowpass', f: 700 }); break;
+      case 'mobDie': this.osc('sine', 420, t, 0.45, 0.07 * v, { f2: 110, rev: 0.3 }); this.noise(t + 0.1, 0.3, 0.07 * v, { f: 900, q: 0.8, f2: 300 }); break;
+      case 'death':
+        [659, 523, 440, 330, 247].forEach((f, i) => this.bell(f, t + i * 0.28, 0.1 * v, 1.8, this.sfxBus, 0.7));
+        this.osc('sawtooth', 110, t, 2.2, 0.03 * v, { a: 0.3, f2: 55, rev: 0.6 });
+        break;
+      case 'squeak': [0, 0.11].forEach((d) => this.osc('sine', 2100, t + d, 0.08, 0.06 * v, { f2: 2900 })); break;
+      case 'rattle': for (let i = 0; i < 6; i++) this.noise(t + i * 0.045, 0.03, 0.1 * v, { type: 'bandpass', f: 1800 + (i % 2) * 700, q: 4 }); break;
+      case 'hiss': this.noise(t, 0.55, 0.07 * v, { type: 'highpass', f: 3200, a: 0.06 }); break;
+      case 'screech': [0, 0.07, 0.14].forEach((d, i) => this.osc('sine', 2600 + i * 300, t + d, 0.06, 0.05 * v, { f2: 3600 })); break;
+      case 'glub': [0, 0.13, 0.24].forEach((d, i) => this.osc('sine', 260 + i * 60, t + d, 0.09, 0.09 * v, { f2: 620 + i * 80 })); break;
       default: break;
     }
   }
