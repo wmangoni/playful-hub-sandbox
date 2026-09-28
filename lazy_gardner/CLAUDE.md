@@ -8,6 +8,10 @@ A aplicação utiliza uma abordagem moderna de importação de módulos ESM (imp
 
 - **Estrutura de Arquivos**:
   - `index.html`: Centraliza elementos HTML (Canvas e painel da UI), declarações de áudio (`#ambientSoundDay`, `#ambientSoundNight`, `#rainSound`, `#notificationSound`), folhas de estilo CSS e todo o código modular em JavaScript.
+  - `procedural.js`: base procedural — aleatório com semente (`makeRng`), ruído (`noise2`/`fbm2`/`noise3`), helpers de geometria não indexada (`tube`, `leafStrip`, `blob`, `lathe`, `PartBuilder` que mescla peças por material), texturas em canvas e o shader compartilhado de vento/neve (`addPlantShader`, `SHARED_UNIFORMS`).
+  - `terrain.js`: relevo (`getTerrainHeight` — suave no centro, colinas nas bordas), textura procedural do chão (detalhe tileável + manchas + terra exposta por bioma), canteiros que acompanham o relevo (`createSoilPatch`) e grama 3D instanciada em chunks com LOD (`createGrass`).
+  - `plant_models.js`: modelos low-poly realistas de cada espécie/estágio (`buildPlantModel`), toco seco (`createDeadStump`) e materiais compartilhados. Cada planta guarda `shapeSeed` no save para manter a forma ao crescer/recarregar.
+  - Os módulos são importados com o prefixo `../lazy_gardner/` para funcionar tanto em `/lazy_gardner` quanto em `/lazy_gardner/index.html`.
   - `assets/`: Armazena os áudios ambientes de pássaros, chuva, noite e melodias de aviso (`birds-forest-spring.mp3`, `night-ambience.mp3`, `rain.mp3` e `notification.mp3`).
 
 - **Fluxo de Inicialização e Execução**:
@@ -41,7 +45,9 @@ A aplicação utiliza uma abordagem moderna de importação de módulos ESM (imp
 
 - `init()`: Constrói o universo virtual 3D, luzes principais/preenchimento e registra ouvintes do teclado e mouse.
 - `plantSeed(position, type)`: Instancia um dicionário de propriedades físicas para a planta (incluindo tipo, estágio inicial de crescimento, fator de tamanho aleatório `sizeVariation` e cor da flor `bloomColor`) e adiciona a malha 3D correspondente na cena.
-- `createPlantMesh(plantData)`: Método procedural que projeta malhas dinâmicas usando cilindros para troncos, esferas para copas e cones para folhagens de acordo com a espécie e estágio de crescimento (`seed`, `sapling`, `foliage`, `bloom`, etc.).
+- `createPlantMesh(plantData)`: Delega para `buildPlantModel` (`plant_models.js`): troncos afinados com galhos e raízes, copas de massas deformadas + cards de folhas, pinheiros em camadas estreladas, flores com pétalas, cogumelos amanita/porcini, bambu com nós, arbusto com cachos e lótus sobre uma poça. As peças são mescladas por material (poucas draw calls por planta) e balançam com o vento no shader.
+- `warmUpShaders()`: pré-compila os shaders das plantas/partículas na inicialização (sem travada no primeiro plantio).
+- Desempenho: `tests/perf_lazy_gardener.js` mede o FPS em Full HD com 42 plantas maduras (CPU 1× e 4×; `PERF_VSYNC=1` mede com vsync). Meta: nunca abaixo de 48 FPS. `tests/shots_lazy_gardener.js <pasta>` gera screenshots de inspeção.
 - `updatePlantGrowth(deltaTime)`: Monitora se o tempo de vida da planta ultrapassou os tempos limites de estágio (`growthTimes`), substituindo proceduralmente a malha da cena pelo próximo estágio visual.
 - `updateTimeOfDay(deltaTime)`: Translada a luz direcional em um semicírculo simétrico simulando o movimento da órbita do sol/lua. Controla os estados de luz e transiciona a intensidade de brilho emissivo das flores de lótus (`emissiveIntensity`).
 - `updateSkyColor()`: Executa transições de cores e interpolações lineares (`THREE.Color.lerp`) para suavizar o visual da atmosfera sob efeito do ciclo solar ou da chuva.
