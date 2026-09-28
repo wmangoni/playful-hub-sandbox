@@ -115,7 +115,8 @@ const assert = require('assert');
         console.log('  ✓ Baú de ouro normal: 3 prêmios sorteados');
 
         // 6. Nova partida zera as bênçãos de velocidade
-        await page.evaluate(() => { window.__game.player.hitCooldown = 0; window.__game.player.shield = 0; window.__game.damagePlayer(99999); });
+        // (a roleta acima pode ter dado a Égide de Prata, que bloquearia o golpe)
+        await page.evaluate(() => { const p = window.__game.player; p.hitCooldown = 0; p.shield = 0; p.wardCharges = 0; window.__game.damagePlayer(99999); });
         await page.waitForFunction(() => window.__game.game.status === 'gameover', { timeout: 5000 });
         await page.click('#restartBtn');
         await page.waitForFunction(() => window.__game.game.status === 'playing', { timeout: 5000 });
