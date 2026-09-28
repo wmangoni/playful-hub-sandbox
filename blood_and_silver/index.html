@@ -1411,6 +1411,7 @@
 <body>
     <div id="stage">
         <canvas id="game" width="960" height="540"></canvas>
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="fxSilFilter" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="linear" slope="0" intercept="1"/><feFuncG type="linear" slope="0" intercept="1"/><feFuncB type="linear" slope="0" intercept="1"/><feFuncA type="discrete" tableValues="0 1"/></feComponentTransfer></filter></svg>
         <div class="touch-joystick" id="touchJoystick">
             <div class="touch-base">
                 <div class="touch-knob" id="touchKnob"></div>
@@ -4220,14 +4221,15 @@
                     x: 0, y: 0, radius: 14,
                     hp: 0, maxHp: 0, speed: 0, damage: 6,
                     alive: false, isBoss: false, jitter: 0, jitterTimer: 0, animTime: 0,
-                    type: 'v1', patternTime: 0, phase: 0, spiralDir: 1
+                    type: 'v1', patternTime: 0, phase: 0, spiralDir: 1,
+                    fxOffX: 0, fxOffY: 0, fxShoveT: 0, fxHitT: -9, fxPendT: -9, fxKind: null   // só visual
                 });
             }
         }
 
         function initProjectilePool() {
             for (let i = 0; i < CONFIG.maxProjectiles; i++) {
-                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', weaponId: 'bow', pierce: false, evolved: false, hits: null, alive: false });
+                projectiles.push({ x: 0, y: 0, vx: 0, vy: 0, radius: 5, damage: 0, life: 0, color: '#fff', weaponId: 'bow', pierce: false, evolved: false, hits: null, alive: false, isEnemy: false, fxT: 0, fxAcc: 0, fxKind: null });
             }
         }
 
@@ -4239,7 +4241,7 @@
 
         function initDamageZonePool() {
             for (let i = 0; i < CONFIG.maxDamageZones; i++) {
-                damageZones.push({ x: 0, y: 0, radius: 0, damage: 0, duration: 0, timer: 0, tick: 0, color: '#fff', alive: false });
+                damageZones.push({ x: 0, y: 0, radius: 0, damage: 0, duration: 0, timer: 0, tick: 0, color: '#fff', alive: false, fxKind: null, fxSeed: 0, fxEmit: 0 });
             }
         }
 
@@ -4257,7 +4259,7 @@
                 range: c.range || 0, arcHalf: c.arcHalf || 0, area: c.area || 0, duration: c.duration || 0,
                 projectileSpeed: c.projectileSpeed || 0, pierce: !!c.pierce,
                 evolved: false, evolvedName: '',
-                timer: 0, animTimer: 0
+                timer: 0, animTimer: 0, fxDir: 1
             };
         }
 
@@ -4589,6 +4591,7 @@
             game.knellFlash = 0;
             graveQueue.length = 0;
             graveBlasts.length = 0;
+            resetFx();
             lastCollect = 0;   // game.time recomeça em 0: sem isto o som de coleta sumia na caçada seguinte
             player.x = WORLD_W / 2;
             player.y = WORLD_H / 2;
@@ -5055,6 +5058,8 @@
                 const knockback = c.knockback;
                 const r2 = range * range;
                 const queryR = range + MAX_ENEMY_RADIUS;
+                const slash = fxSlash(w, range, arcHalf);   // só visual: sentido e tempo do corte
+                fxCurSlash = slash;
                 for (const e of queryRange(player.x, player.y, queryR)) {
                     if (!e.alive) continue;
                     const dx = e.x - player.x;
@@ -5065,9 +5070,13 @@
                     while (diff < -Math.PI) diff += TWO_PI;
                     if (Math.abs(diff) <= arcHalf) {
                         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                        hitEnemy(e, dmg, (dx / dist) * knockback, (dy / dist) * knockback);
+                        fxHitDelay = fxSweepDelay(slash, diff, arcHalf);
+                        hitEnemy(e, dmg, (dx / dist) * knockback, (dy / dist) * knockback, false, w);
                     }
                 }
+                fxBurstDone(slash);
+                fxHitDelay = 0;
+                fxCurSlash = null;
             } else if (c.behavior === 'nearest-projectile') {
                 if (audio) audio.play('shoot');
                 const t = nearestEnemy();
@@ -5096,6 +5105,7 @@
                 z.tick = 0;
                 z.color = WEAPONS[w.id].color;
                 z.alive = true;
+                fxZoneSpawn(z, w.evolved);
             }
         }
 
@@ -5107,15 +5117,18 @@
                 if (z.timer >= z.duration) { z.alive = false; continue; }
                 if (z.tick <= 0) {
                     z.tick = 0.5;
+                    fxZonePulse(z);
+                    fxZoneTickBegin(z);
                     for (const e of queryRange(z.x, z.y, z.radius + MAX_ENEMY_RADIUS)) {
                         if (!e.alive) continue;
                         const dx = e.x - z.x;
                         const dy = e.y - z.y;
                         const r = z.radius + e.radius;
                         if (dx * dx + dy * dy < r * r) {
-                            hitEnemy(e, z.damage, 0, 0);
+                            hitEnemy(e, z.damage, 0, 0, false, z);
                         }
                     }
+                    fxZoneTickEnd();
                 }
             }
         }
@@ -5161,7 +5174,11 @@
                 p.isEnemy = false;
                 p.hits = [];
                 p.alive = true;
+                p.fxT = game.time;
+                p.fxAcc = 0;
+                p.fxKind = fxKindOf(w);
             }
+            fxMuzzle(w, base);
         }
 
         function spawnEnemyProjectile(x, y, dirX, dirY, speed, damage, color) {
@@ -5176,6 +5193,7 @@
             p.life = 4.0;
             p.pierce = false;
             p.weaponId = 'enemy_bolt';
+            p.fxKind = null;
             p.color = color || '#e8435b';
             p.evolved = false;
             p.isEnemy = true;
@@ -5302,7 +5320,7 @@
                     const dy = e.y - p.y;
                     const r = p.radius + e.radius;
                     if (dx * dx + dy * dy < r * r) {
-                        hitEnemy(e, p.damage, p.vx * 0.06, p.vy * 0.06);
+                        hitEnemy(e, p.damage, p.vx * 0.06, p.vy * 0.06, false, p);
                         if (p.pierce) {
                             p.hits.push(e);
                         } else {
@@ -5516,6 +5534,9 @@
             e.animTime = Math.random() * 10;
             e.x = Math.max(e.radius, Math.min(WORLD_W - e.radius, e.x));
             e.y = Math.max(e.radius, Math.min(WORLD_H - e.radius, e.y));
+            e.fxOffX = e.fxOffY = 0;
+            e.fxHitT = e.fxPendT = -9;
+            e.fxKind = null;
             e.alive = true;
         }
 
@@ -5546,6 +5567,9 @@
             e.jitter = 0;
             e.jitterTimer = 0;
             e.animTime = 0;
+            e.fxOffX = e.fxOffY = 0;
+            e.fxHitT = e.fxPendT = -9;
+            e.fxKind = null;
             e.alive = true;
             game.activeBoss = e;
             shake = 10;
@@ -5562,8 +5586,10 @@
         }
 
         // quiet: sem som nem número de dano (explosões em área, que já têm efeito próprio)
-        function hitEnemy(e, dmg, kbx, kby, quiet) {
+        // src (opcional, só visual): arma, projétil, zona ou nome do efeito ('thorn'…)
+        function hitEnemy(e, dmg, kbx, kby, quiet, src) {
             e.hp -= dmg;
+            const x0 = e.x, y0 = e.y;
             if (kbx !== undefined && (kbx !== 0 || kby !== 0)) {
                 let resist = 0;
                 if (e.isBoss) {
@@ -5580,7 +5606,7 @@
             }
             if (!quiet) {
                 if (audio) audio.play('hit');
-                spawnDamageText(e.x, e.y - e.radius - 4, String(Math.round(dmg)), '#ffb3c1');
+                fxHit(e, dmg, src, kbx, kby, e.x - x0, e.y - y0);   // impacto, clarão e número de dano
             }
             if (e.hp <= 0) killEnemy(e);
         }
@@ -5596,12 +5622,11 @@
                 shake = 20;
                 for (let i = 0; i < 10; i++) dropOrb(e.x + (Math.random() - 0.5) * 60, e.y + (Math.random() - 0.5) * 60);
                 spawnChest(e.x, e.y, Math.random() < 0.5 ? 'legendary' : 'rare');
-                spawnParticles(e.x, e.y, '#e8435b', 40);
             } else {
                 dropOrb(e.x, e.y);
                 if (Math.random() < CONFIG.chestDropChance) spawnChest(e.x, e.y, rollChestRarity());
-                spawnParticles(e.x, e.y, '#cfd6e6', 8);
             }
+            fxDeath(e);
             const now = performance.now();
             if (audio && now - lastDeathSfx > 40) {
                 lastDeathSfx = now;
@@ -6271,7 +6296,7 @@
                 if (player.wardCharges === 0) player.wardTimer = player.wardRegen;
                 shake = 3;
                 spawnDamageText(player.x, player.y - player.radius - 8, 'BLOQUEADO ⚜️', '#e6ebf2');
-                spawnParticles(player.x, player.y, '#c9d3e0', 12);
+                fxWardBlock();
                 if (audio) audio.play('block');
                 return;
             }
@@ -6324,8 +6349,9 @@
             }
         }
 
-        function spawnDamageText(x, y, text, color) {
-            damageTexts.push({ x: x, y: y, text: text, life: 0.7, maxLife: 0.7, color: color });
+        function spawnDamageText(x, y, text, color, scale) {
+            if (damageTexts.length >= 90) damageTexts.shift();   // hordas: some o mais antigo
+            damageTexts.push({ x: x, y: y, text: text, life: 0.8, maxLife: 0.8, color: color, s: scale || 1, vx: (fxRand() - 0.5) * 36, spr: null });
         }
 
         function updateParticles(dt) {
@@ -6341,7 +6367,9 @@
             for (let i = damageTexts.length - 1; i >= 0; i--) {
                 const d = damageTexts[i];
                 d.life -= dt;
-                d.y -= 28 * dt;
+                const k = Math.max(0, d.life / d.maxLife);
+                d.y -= (14 + 46 * k * k) * dt;
+                d.x += (d.vx || 0) * k * dt;
                 if (d.life <= 0) damageTexts.splice(i, 1);
             }
         }
@@ -6411,6 +6439,7 @@
             updateChestCollection();
             updatePickups(dt);
             updateParticles(dt);
+            updateFx(dt);
             updateCamera();
             shake = Math.max(0, shake - 60 * dt);
             updateHud();
@@ -6735,9 +6764,9 @@
                 const dx = e.x - player.x, dy = e.y - player.y;
                 const d = Math.sqrt(dx * dx + dy * dy) || 1;
                 if (d > R + e.radius) continue;
-                hitEnemy(e, dmg * 4, (dx / d) * 20, (dy / d) * 20);
+                hitEnemy(e, dmg * 4, (dx / d) * 20, (dy / d) * 20, false, 'thorn');
             }
-            spawnParticles(player.x, player.y, '#a3182e', 12);
+            fxThornBurst(player.x, player.y);
         }
 
         // Chama Sepulcral: o abatido explode e fere os vizinhos. A explosão sai um instante depois
@@ -6752,7 +6781,7 @@
         }
 
         function detonateGrave(g) {
-            spawnParticles(g.x, g.y, '#ff8a3d', 8);
+            fxGrave(g.x, g.y);
             graveBlasts.push({ x: g.x, y: g.y, life: 0.3 });
             if (audio) audio.play('grave');
             for (const e of queryRange(g.x, g.y, GRAVE_R + MAX_ENEMY_RADIUS)) {
@@ -6797,6 +6826,7 @@
                     game.knellTimer = OMEN_KNELL_INTERVAL;
                     game.freezeTimer = OMEN_KNELL_FREEZE;
                     game.knellFlash = 0.6;
+                    fxKnell();
                     if (audio) audio.play('knell');
                 }
             }
@@ -6807,6 +6837,1411 @@
 
         function chestPityTime() {
             return CONFIG.chestPity * (hasOmen('lighthouse') ? 0.6 : 1);
+        }
+
+        // =====================================================================
+        // EFEITOS DOS ATAQUES — só visual: nada aqui muda dano, alcance, tempo ou colisão.
+        // Pools fixos e fila de eventos reaproveitada (nada de função/objeto novo por acerto),
+        // sprites pré-desenhados e pré-aquecidos no menu (brilho, estrela, chama, círculo sagrado,
+        // coluna, manchas, silhuetas), mistura aditiva, nenhum shadowBlur, faíscas agrupadas por
+        // cor/opacidade. Se o quadro pesar, fxQ reduz partículas, manchas, chamas e camadas extras.
+        // =====================================================================
+        let fxSeed = 0x2f6b3a91;
+        function fxRand() {
+            fxSeed ^= fxSeed << 13;
+            fxSeed ^= fxSeed >>> 17;
+            fxSeed ^= fxSeed << 5;
+            return (fxSeed >>> 0) / 4294967296;
+        }
+        function fxRange(a, b) { return a + (b - a) * fxRand(); }
+        let fxQ = 1;            // qualidade adaptativa (0,35–1)
+        let fxCostEma = 0;
+        function fxN(n) {       // quantidade × qualidade, com arredondamento estocástico
+            const v = n * fxQ;
+            const i = Math.floor(v);
+            return i + (fxRand() < v - i ? 1 : 0);
+        }
+        function fxBudget(ms) {
+            fxCostEma += (ms - fxCostEma) * 0.08;
+            if (fxCostEma > 9) fxQ = Math.max(0.35, fxQ - 0.03);
+            else if (fxCostEma < 5.5) fxQ = Math.min(1, fxQ + 0.004);
+        }
+
+        // Cores das faíscas em índices (desenhadas agrupadas por cor/opacidade/espessura)
+        const FX_COLORS = [];
+        const FX_COLOR_ALPHA = [];
+        const FX_COLOR_ADD = [];
+        const fxColorIdx = new Map();
+        function fxColor(hex, additive) {
+            const key = hex + (additive ? '+' : '');
+            let i = fxColorIdx.get(key);
+            if (i !== undefined) return i;
+            if (FX_COLORS.length >= 64) return 0;   // limite dos baldes de desenho
+            i = FX_COLORS.length;
+            FX_COLORS.push(hex);
+            FX_COLOR_ALPHA.push([rgba(hex, 0.3), rgba(hex, 0.62), rgba(hex, 0.95)]);
+            FX_COLOR_ADD.push(!!additive);
+            fxColorIdx.set(key, i);
+            return i;
+        }
+
+        // Paletas por fonte de dano (arma, versão evoluída, presságio)
+        const FX_PAL = {
+            sword: { core: '#ffffff', glow: '#9cc4ff', edge: '#ffe2a8', spark: '#fff1cf', text: '#ffe7c2', ember: '#ffcf82' },
+            sword_evo: { core: '#fff1dc', glow: '#ff2548', edge: '#ffc85a', spark: '#ffb347', text: '#ffd36b', ember: '#ff5a3c' },
+            axe: { core: '#fff0dc', glow: '#ff6a2a', edge: '#ffae6a', spark: '#ffc27a', text: '#ffcf9e', ember: '#ff8a3d' },
+            axe_evo: { core: '#f4fbff', glow: '#4aa8ff', edge: '#c6ecff', spark: '#d4f2ff', text: '#bfe8ff', ember: '#8fd6ff' },
+            bow: { core: '#ffffff', glow: '#7cc6ff', edge: '#d8f0ff', spark: '#e6f6ff', text: '#cfeaff', ember: '#bfe6ff' },
+            bow_evo: { core: '#fffbe8', glow: '#ffbf2e', edge: '#fff0b0', spark: '#fff3c4', text: '#ffe38a', ember: '#ffd76a' },
+            crossbow: { core: '#f2ffff', glow: '#22dcff', edge: '#a8f6ff', spark: '#c8fbff', text: '#b8f6ff', ember: '#7df0ff' },
+            crossbow_evo: { core: '#f6f8ff', glow: '#8ea6ff', edge: '#dfe6ff', spark: '#eef2ff', text: '#d2dcff', ember: '#b3c3ff' },   // prata gelada
+            holy: { core: '#f7eeff', glow: '#9b5cff', edge: '#dcc6ff', spark: '#e9dcff', text: '#e3ccff', ember: '#c79bff' },
+            holy_evo: { core: '#fffaf0', glow: '#e3b25c', edge: '#fbeccb', spark: '#fff4d8', text: '#ffe4a8', ember: '#f2cc80' },    // ouro velho
+            thorn: { core: '#ffd6dc', glow: '#d0183a', edge: '#ff6a82', spark: '#ff8a9c', text: '#ff9fb0', ember: '#ff4d6a' },
+            grave: { core: '#fff0d8', glow: '#ff5a14', edge: '#ffb45a', spark: '#ffc27a', text: '#ffc27a', ember: '#ff8a3d' },
+            generic: { core: '#ffffff', glow: '#e8d6dc', edge: '#ffd9e0', spark: '#ffe6ea', text: '#ffb3c1', ember: '#ffb3c1' }
+        };
+        const FX_EVO_KIND = { sword: 'sword_evo', axe: 'axe_evo', bow: 'bow_evo', crossbow: 'crossbow_evo', holy: 'holy_evo' };
+        for (const k in FX_PAL) {                       // índices de cor pré-calculados por paleta
+            const p = FX_PAL[k];
+            p.ciSpark = fxColor(p.spark, true);
+            p.ciEmber = fxColor(p.ember, true);
+            p.ciGlow = fxColor(p.glow, true);
+        }
+        const FX_BLOOD = '#8e0f24';
+        const FX_BLOOD_DARK = '#4a0610';
+        const CI_BLOOD = fxColor(FX_BLOOD, false);
+        const CI_ASH = fxColor('#7c706c', false);
+        const CI_DEBRIS = fxColor('#3a2a1e', false);
+        const CI_GLASS = fxColor('#eafcff', true);
+        const CI_SILVER = fxColor('#e6ebf2', true);
+        const CI_FIRE = fxColor('#ff8a3d', true);
+        const CI_FIRE_HOT = fxColor('#ffe0a8', true);
+        const CI_BOSS_A = fxColor('#ff8a3d', true);
+        const CI_BOSS_B = fxColor('#ffd6dc', true);
+
+        function fxKindOf(src) {
+            if (!src) return 'generic';
+            if (typeof src === 'string') return FX_PAL[src] ? src : 'generic';
+            if (src.fxKind) return src.fxKind;
+            const id = src.weaponId || src.id;
+            const base = id === 'holy_water' ? 'holy' : id;
+            if (!FX_PAL[base]) return 'generic';
+            return src.evolved ? FX_EVO_KIND[base] : base;
+        }
+
+        // ---------- sprites pré-desenhados ----------
+        function fxCanvas(w, h) {
+            const c = document.createElement('canvas');
+            c.width = w;
+            c.height = h;
+            return c;
+        }
+
+        const fxGlowCache = new Map();
+        function fxGlow(hex) {
+            let c = fxGlowCache.get(hex);
+            if (c) return c;
+            c = fxCanvas(64, 64);
+            const g = c.getContext('2d');
+            const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gr.addColorStop(0, rgba(hex, 1));
+            gr.addColorStop(0.2, rgba(hex, 0.8));
+            gr.addColorStop(0.5, rgba(hex, 0.28));
+            gr.addColorStop(1, rgba(hex, 0));
+            g.fillStyle = gr;
+            g.fillRect(0, 0, 64, 64);
+            fxGlowCache.set(hex, c);
+            return c;
+        }
+
+        // Estrela de 4 pontas (mais 4 raios menores) com miolo branco: o "clarão" do impacto
+        const fxStarCache = new Map();
+        function fxStar(hex) {
+            let c = fxStarCache.get(hex);
+            if (c) return c;
+            c = fxCanvas(96, 96);
+            const g = c.getContext('2d');
+            g.translate(48, 48);
+            const ray = function (len, w, alpha) {
+                const gr = g.createLinearGradient(-len, 0, len, 0);
+                gr.addColorStop(0, rgba(hex, 0));
+                gr.addColorStop(0.5, rgba(hex, alpha));
+                gr.addColorStop(1, rgba(hex, 0));
+                g.fillStyle = gr;
+                g.beginPath();
+                g.moveTo(-len, 0);
+                g.quadraticCurveTo(0, -w, len, 0);
+                g.quadraticCurveTo(0, w, -len, 0);
+                g.fill();
+            };
+            for (let k = 0; k < 4; k++) {
+                g.save();
+                g.rotate(k * Math.PI / 4);
+                if (k % 2 === 0) ray(47, 4.5, 1); else ray(26, 3, 0.7);
+                g.restore();
+            }
+            const core = g.createRadialGradient(0, 0, 0, 0, 0, 16);
+            core.addColorStop(0, 'rgba(255,255,255,1)');
+            core.addColorStop(0.4, rgba(hex, 0.7));
+            core.addColorStop(1, rgba(hex, 0));
+            g.fillStyle = core;
+            g.fillRect(-16, -16, 32, 32);
+            fxStarCache.set(hex, c);
+            return c;
+        }
+
+        // Chama sagrada (gota apontando para cima)
+        const fxFlameCache = new Map();
+        function fxFlame(hex) {
+            let c = fxFlameCache.get(hex);
+            if (c) return c;
+            c = fxCanvas(32, 48);
+            const g = c.getContext('2d');
+            const gr = g.createRadialGradient(16, 36, 0, 16, 34, 24);
+            gr.addColorStop(0, 'rgba(255,255,255,0.95)');
+            gr.addColorStop(0.3, rgba(hex, 0.85));
+            gr.addColorStop(1, rgba(hex, 0));
+            g.fillStyle = gr;
+            g.beginPath();
+            g.moveTo(16, 1);
+            g.bezierCurveTo(21, 15, 30, 25, 30, 34);
+            g.arc(16, 34, 14, 0, Math.PI);
+            g.bezierCurveTo(2, 25, 11, 15, 16, 1);
+            g.fill();
+            fxFlameCache.set(hex, c);
+            return c;
+        }
+
+        // Círculo sagrado da água benta: anéis com runas, raios de sol e uma cruz celta no centro
+        const fxRuneCache = new Map();
+        function fxRunes(hex) {
+            let c = fxRuneCache.get(hex);
+            if (c) return c;
+            c = fxCanvas(256, 256);
+            const g = c.getContext('2d');
+            g.translate(128, 128);
+            g.strokeStyle = rgba(hex, 0.95);
+            g.fillStyle = rgba(hex, 0.95);
+            g.lineCap = 'round';
+            g.lineWidth = 3.5;
+            g.beginPath(); g.arc(0, 0, 120, 0, TWO_PI); g.stroke();
+            g.lineWidth = 1.6;
+            g.beginPath(); g.arc(0, 0, 102, 0, TWO_PI); g.stroke();
+            let s = 0x51f15e;
+            const rnd = function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+            for (let i = 0; i < 18; i++) {
+                g.save();
+                g.rotate(i / 18 * TWO_PI);
+                g.translate(0, -111);
+                g.lineWidth = 1.7;
+                g.beginPath();
+                const kind = Math.floor(rnd() * 5);
+                g.moveTo(0, -6); g.lineTo(0, 6);                           // haste
+                if (kind === 0) { g.moveTo(0, -2); g.lineTo(4, -6); g.moveTo(0, 1); g.lineTo(-4, -3); }
+                else if (kind === 1) { g.moveTo(-4, -6); g.lineTo(4, -6); g.moveTo(-3, 6); g.lineTo(3, 2); }
+                else if (kind === 2) { g.moveTo(0, -6); g.lineTo(4, 0); g.lineTo(0, 6); }
+                else if (kind === 3) { g.moveTo(-4, 0); g.lineTo(4, 0); g.moveTo(-3, -5); g.lineTo(3, -5); }
+                else { g.moveTo(0, 0); g.lineTo(-4, 5); g.moveTo(0, 0); g.lineTo(4, 5); }
+                g.stroke();
+                g.restore();
+            }
+            // raios de sol entre o anel interno e o disco central
+            g.lineWidth = 1.8;
+            g.beginPath();
+            for (let i = 0; i < 16; i++) {
+                const a = i / 16 * TWO_PI, r0 = 52, r1 = i % 2 ? 78 : 94;
+                g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
+                g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+            }
+            g.stroke();
+            g.lineWidth = 1.4;
+            g.beginPath(); g.arc(0, 0, 50, 0, TWO_PI); g.stroke();
+            fxRuneCache.set(hex, c);
+            return c;
+        }
+
+        // Cruz celta (haste mais longa embaixo, anel no cruzamento): fica de pé no centro da poça
+        const fxCrossCache = new Map();
+        function fxCross(hex) {
+            let c = fxCrossCache.get(hex);
+            if (c) return c;
+            c = fxCanvas(128, 128);
+            const g = c.getContext('2d');
+            g.translate(64, 64);
+            g.strokeStyle = rgba(hex, 0.95);
+            g.lineCap = 'round';
+            g.lineWidth = 7;
+            g.beginPath();
+            g.moveTo(0, -44); g.lineTo(0, 46);
+            g.moveTo(-30, -12); g.lineTo(30, -12);
+            g.stroke();
+            g.lineWidth = 2.4;
+            g.beginPath(); g.arc(0, -12, 18, 0, TWO_PI); g.stroke();
+            fxCrossCache.set(hex, c);
+            return c;
+        }
+
+        // Base da poça sagrada (brilho + superfície) num único sprite por tipo
+        const fxZoneBaseCache = new Map();
+        function fxZoneBase(kind) {
+            let c = fxZoneBaseCache.get(kind);
+            if (c) return c;
+            const pal = FX_PAL[kind];
+            const evo = kind === 'holy_evo';
+            c = fxCanvas(256, 256);
+            const g = c.getContext('2d');
+            const R = 128, rz = R / 1.3;                  // o sprite cobre 1,3× o raio da poça
+            const gr = g.createRadialGradient(R, R, 0, R, R, R);
+            gr.addColorStop(0, rgba(pal.glow, evo ? 0.26 : 0.42));
+            gr.addColorStop(0.45, rgba(pal.glow, evo ? 0.16 : 0.26));
+            gr.addColorStop(rz / R, rgba(pal.glow, evo ? 0.1 : 0.16));
+            gr.addColorStop(1, rgba(pal.glow, 0));
+            g.fillStyle = gr;
+            g.fillRect(0, 0, 256, 256);
+            g.fillStyle = rgba(pal.edge, evo ? 0.06 : 0.09);
+            g.beginPath(); g.arc(R, R, rz * 0.98, 0, TWO_PI); g.fill();
+            fxZoneBaseCache.set(kind, c);
+            return c;
+        }
+
+        // Coluna de luz (Água Sagrada, morte do chefe)
+        const fxPillarCache = new Map();
+        function fxPillar(hex) {
+            let c = fxPillarCache.get(hex);
+            if (c) return c;
+            c = fxCanvas(48, 256);
+            const g = c.getContext('2d');
+            const h = g.createLinearGradient(0, 0, 48, 0);
+            h.addColorStop(0, rgba(hex, 0));
+            h.addColorStop(0.3, rgba(hex, 0.55));
+            h.addColorStop(0.5, 'rgba(255,255,255,0.95)');
+            h.addColorStop(0.7, rgba(hex, 0.55));
+            h.addColorStop(1, rgba(hex, 0));
+            g.fillStyle = h;
+            g.fillRect(0, 0, 48, 256);
+            g.globalCompositeOperation = 'destination-in';
+            const v = g.createLinearGradient(0, 0, 0, 256);
+            v.addColorStop(0, 'rgba(0,0,0,0)');
+            v.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+            v.addColorStop(1, 'rgba(0,0,0,1)');
+            g.fillStyle = v;
+            g.fillRect(0, 0, 48, 256);
+            fxPillarCache.set(hex, c);
+            return c;
+        }
+
+        // Manchas de sangue (e de fuligem) procedurais para o chão
+        function fxBuildSplats(color, wet, variants, seed) {
+            const out = [];
+            let s = seed;
+            const rnd = function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+            for (let v = 0; v < variants; v++) {
+                const c = fxCanvas(64, 64);
+                const g = c.getContext('2d');
+                g.fillStyle = color;
+                g.beginPath();
+                const n = 13;
+                const rs = [];
+                for (let i = 0; i < n; i++) rs.push(8 + rnd() * 7);
+                for (let i = 0; i <= n; i++) {
+                    const a0 = i / n * TWO_PI, a1 = (i + 0.5) / n * TWO_PI;
+                    const r0 = rs[i % n], r1 = (rs[i % n] + rs[(i + 1) % n]) / 2 + 2;
+                    const x0 = 32 + Math.cos(a0) * r0, y0 = 32 + Math.sin(a0) * r0 * 0.8;
+                    const x1 = 32 + Math.cos(a1) * r1, y1 = 32 + Math.sin(a1) * r1 * 0.8;
+                    if (i === 0) g.moveTo(x0, y0); else g.quadraticCurveTo(x0, y0, x1, y1);
+                }
+                g.closePath();
+                g.fill();
+                const drops = 6 + Math.floor(rnd() * 7);
+                for (let k = 0; k < drops; k++) {
+                    const a = rnd() * TWO_PI, d = 15 + rnd() * 14, r = 0.9 + rnd() * 2.6;
+                    const x = 32 + Math.cos(a) * d, y = 32 + Math.sin(a) * d * 0.8;
+                    g.beginPath();
+                    g.ellipse(x, y, r * (1 + rnd()), r, a, 0, TWO_PI);
+                    g.fill();
+                }
+                if (wet) {
+                    g.fillStyle = wet;
+                    g.beginPath();
+                    g.ellipse(29, 29, 5, 3.5, -0.5, 0, TWO_PI);
+                    g.fill();
+                }
+                out.push(c);
+            }
+            return out;
+        }
+        let fxSplats = null, fxScorch = null;
+        function fxEnsureSplats() {
+            if (fxSplats) return;
+            fxSplats = fxBuildSplats('#5c0a17', '#7d1424', 6, 0x3c9a1);
+            fxScorch = fxBuildSplats('#1e140f', null, 2, 0x7f21);
+        }
+
+        // Orbe de XP: brilho pronto no lugar do shadowBlur (mesmo visual, muito mais barato)
+        let fxOrbSprite = null;
+        function fxOrb() {
+            if (fxOrbSprite) return fxOrbSprite;
+            const c = fxCanvas(28, 28);
+            const g = c.getContext('2d');
+            const gr = g.createRadialGradient(14, 14, 4, 14, 14, 14);
+            gr.addColorStop(0, 'rgba(120, 255, 180, 0.75)');
+            gr.addColorStop(0.45, 'rgba(120, 255, 180, 0.32)');
+            gr.addColorStop(1, 'rgba(120, 255, 180, 0)');
+            g.fillStyle = gr;
+            g.fillRect(0, 0, 28, 28);
+            g.fillStyle = '#7dffb0';
+            g.beginPath(); g.arc(14, 14, 6, 0, TWO_PI); g.fill();
+            fxOrbSprite = c;
+            return c;
+        }
+
+        // Silhueta branca do sprite (sem a sombra) para o clarão do golpe e a desintegração
+        const fxSilCache = new Map();
+        const FX_CAN_FILTER = typeof ctx.filter === 'string';
+        function fxSilhouette(img) {
+            if (!img || !img.complete || !img.naturalWidth) return null;
+            let c = fxSilCache.get(img);
+            if (c) return c;
+            c = fxCanvas(img.naturalWidth, img.naturalHeight);
+            const g = c.getContext('2d');
+            if (FX_CAN_FILTER && document.getElementById('fxSilFilter')) {
+                g.filter = 'url(#fxSilFilter)';
+                g.drawImage(img, 0, 0);
+                g.filter = 'none';
+            } else {
+                g.drawImage(img, 0, 0);
+                g.globalCompositeOperation = 'source-in';
+                g.fillStyle = '#ffffff';
+                g.fillRect(0, 0, c.width, c.height);
+            }
+            fxSilCache.set(img, c);
+            fxWarmList.push(c);
+            return c;
+        }
+
+        // Pré-aquecimento no menu, em fatias ociosas: o primeiro golpe não paga a criação dos sprites
+        function fxPrewarm() {
+            const tasks = [];
+            for (const k in FX_PAL) {
+                const p = FX_PAL[k];
+                tasks.push(function () { fxGlow(p.glow); fxGlow(p.ember); fxGlow(p.core); fxStar(p.edge); fxStar(p.glow); });
+            }
+            tasks.push(function () { fxGlow(FX_BLOOD_DARK); fxGlow('#b39a7a'); fxGlow('#6e5842'); fxGlow('#dfe8ff'); fxGlow('#ff5a14'); fxGlow('#d0183a'); fxGlow('#ff2548'); });
+            tasks.push(function () { fxStar('#ffffff'); fxStar('#fff3c4'); fxStar('#eef2f7'); fxStar('#dcecff'); fxStar('#ffd9a0'); fxStar('#ffe0e6'); });
+            tasks.push(function () { fxFlame(FX_PAL.holy.glow); fxFlame(FX_PAL.holy_evo.glow); fxZoneBase('holy'); fxZoneBase('holy_evo'); });
+            tasks.push(function () { fxRunes(FX_PAL.holy.edge); fxCross(FX_PAL.holy.edge); fxCross(FX_PAL.holy_evo.edge); });
+            tasks.push(function () { fxRunes(FX_PAL.holy_evo.edge); });
+            tasks.push(function () { fxPillar(FX_PAL.holy_evo.glow); fxPillar('#ffb3c1'); fxOrb(); });
+            tasks.push(fxEnsureSplats);
+            tasks.push(function () { for (const k in FX_PAL) fxDigits(FX_PAL[k].text); fxDigits('#ff5a6e'); fxDigits('#38bdf8'); });
+            const sils = function () {                   // silhuetas: esperam os spritesheets
+                const list = [images[ASSETS.vampire1Walk], images[ASSETS.vampire2Walk], images[ASSETS.vampire3Walk], images[ASSETS.bossWalk]];
+                let pending = false;
+                for (const img of list) {
+                    if (img && img.complete && img.naturalWidth) fxSilhouette(img);
+                    else pending = true;
+                }
+                if (pending) tasks.push(sils);
+            };
+            tasks.push(sils);
+            tasks.push(function () {                     // no fim, enfileira tudo para subir como textura
+                const add = function (c) { if (c) fxWarmList.push(c); };
+                [fxGlowCache, fxStarCache, fxFlameCache, fxRuneCache, fxCrossCache, fxZoneBaseCache, fxPillarCache].forEach(function (m) { m.forEach(add); });
+                fxWarmReady = true;
+                (fxSplats || []).forEach(add);
+                (fxScorch || []).forEach(add);
+                add(fxOrbSprite);
+                fxDigitAtlas.forEach(function (at) { add(at.c); });
+            });
+            tasks.push(fxRehearse);
+            const idle = window.requestIdleCallback ? function (f) { window.requestIdleCallback(f, { timeout: 400 }); } : function (f) { setTimeout(f, 40); };
+            const run = function () {
+                const t = tasks.shift();
+                if (!t) return;
+                t();
+                idle(run);
+            };
+            idle(run);
+        }
+
+        // Ensaio no menu, longe da câmera: os caminhos quentes (impacto, morte, eventos, desenho)
+        // já rodam otimizados no primeiro golpe de verdade. Tudo é descartado logo depois.
+        let fxRehearseFrames = 0;
+        function fxRehearse() {
+            if (game.status !== 'menu') return;
+            const wx = camera.x - 3000, wy = camera.y - 3000;
+            const img = images[ASSETS.vampire1Walk];
+            const dummy = enemies[enemies.length - 1];
+            if (dummy.alive) return;
+            fxKillBudget = 99;
+            for (let r = 0; r < 4; r++) {
+                for (const k in FX_PAL) {
+                    fxImpact(k, wx, wy, 1, 0, 30, r === 3);
+                    fxBurst(wx, wy, img, 0, 0, 64, k);
+                }
+                const ox = dummy.x, oy = dummy.y;
+                dummy.x = wx; dummy.y = wy;
+                fxHitDelay = 0.01;
+                fxHit(dummy, 30, 'sword', 1, 0, 0, 0);
+                fxHitDelay = 0;
+                dummy.x = ox; dummy.y = oy;
+                game.time += 0.02;
+                updateFx(1 / 60);
+                game.time -= 0.02;
+            }
+            fxRehearseFrames = 4;
+        }
+
+        // Sprites pré-aquecidos ainda não desenhados no canvas do jogo: o 1º drawImage envia a
+        // textura para a GPU. Faz isso no menu, alguns por quadro, 2 px quase transparentes num canto
+        // (o quadro seguinte pinta por cima), para não pesar no primeiro golpe.
+        const fxWarmList = [];
+        let fxWarmReady = false;
+        function drawFxWarm() {
+            if (fxRehearseFrames > 0 && --fxRehearseFrames === 0 && game.status === 'menu') {
+                resetFx();
+                damageTexts.length = 0;
+            }
+            if (!fxWarmList.length) return;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = 0.02;
+            for (let k = 0; k < 6 && fxWarmList.length; k++) ctx.drawImage(fxWarmList.pop(), 0, 0, 2, 2);
+            ctx.globalAlpha = 1;
+            ctx.setTransform(1, 0, 0, 1, fxShakeX, fxShakeY);
+        }
+
+        // Estado do sprite de um inimigo (mesma regra de drawEnemies), num objeto reaproveitado
+        const fxSt = { img: null, row: 0, frame: 0, size: 64 };
+        function enemySpriteState(e) {
+            const ang = Math.atan2(player.y - e.y, player.x - e.x);
+            let row;
+            if (ang > -Math.PI / 4 && ang <= Math.PI / 4) row = 3;
+            else if (ang > Math.PI / 4 && ang <= 3 * Math.PI / 4) row = 0;
+            else if (ang > -3 * Math.PI / 4 && ang <= -Math.PI / 4) row = 1;
+            else row = 2;
+            let img, anim;
+            if (e.isBoss) {
+                img = images[ASSETS.bossWalk];
+                anim = ANIMS.bossWalk;
+            } else {
+                const typeDef = ENEMY_TYPES[e.type] || ENEMY_TYPES.v1;
+                img = images[ASSETS[typeDef.sprite]] || images[ASSETS.vampire1Walk];
+                anim = ANIMS.enemyWalk;
+            }
+            fxSt.img = img;
+            fxSt.row = row;
+            fxSt.frame = Math.floor(e.animTime * anim.fps) % anim.frames;
+            fxSt.size = e.isBoss ? 128 : 64;
+            return fxSt;
+        }
+
+        // ---------- pools ----------
+        function fxPool(size, make) {
+            const a = new Array(size);
+            for (let i = 0; i < size; i++) a[i] = make();
+            return { a: a, n: 0, size: size };
+        }
+        function fxTake(pool) {
+            return pool.n < pool.size ? pool.a[pool.n++] : null;
+        }
+        function fxKill(pool, i) {        // remove trocando com o último (O(1))
+            const last = pool.a[--pool.n];
+            pool.a[pool.n] = pool.a[i];
+            pool.a[i] = last;
+        }
+        const fxSparks = fxPool(900, function () { return { x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, len: 0, drag: 0, ci: 0, w: 0, b: 0 }; });
+        const fxGlows = fxPool(320, function () { return { x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, s0: 0, s1: 0, spr: null, add: true, a0: 1 }; });
+        const fxRings = fxPool(96, function () { return { x: 0, y: 0, r0: 0, r1: 0, life: 0, max: 1, w: 2, col: '#fff', a0: 1, sq: 1, rot: 0, delay: 0, a1: 0, a2: TWO_PI }; });
+        const fxSlashes = fxPool(12, function () { return { kind: 'sword', t0: 0, sweep: 0.14, fade: 0.12, facing: 0, arcHalf: 0.4, range: 90, dir: 1, thick: 0.42, alpha: 1, grad: null }; });
+        const fxBolts = fxPool(48, function () { return { x1: 0, y1: 0, x2: 0, y2: 0, pts: new Float32Array(20), life: 0, max: 1, next: 0, col: '#fff', w: 1 }; });
+        const fxDecals = fxPool(56, function () { return { x: 0, y: 0, spr: null, s: 1, life: 0, max: 1, a0: 1 }; });
+        const fxCracks = fxPool(40, function () { return { pts: new Float32Array(14), n: 0, life: 0, max: 1, col: '#ffae6a' }; });
+        const fxGhosts = fxPool(48, function () { return { img: null, fx: 0, fy: 0, size: 64, x: 0, y: 0, life: 0, max: 1, grow: 0.35 }; });
+        const fxStandins = fxPool(96, function () { return { img: null, fx: 0, fy: 0, size: 64, x: 0, y: 0, until: 0 }; });
+        const fxThorns = fxPool(6, function () { return { x: 0, y: 0, life: 0, max: 1, n: 12, seed: 0 }; });
+        const fxPillars = fxPool(8, function () { return { x: 0, y: 0, spr: null, life: 0, max: 1, w: 60, h: 360 }; });
+        // Fila de efeitos agendados (a lâmina ainda não chegou): objetos reaproveitados, sem closures
+        const EV_IMPACT = 1, EV_SPARK = 2, EV_BOLT = 3, EV_SLAM = 4, EV_BURST = 5, EV_BOSS = 6, EV_TAG = 7;
+        const fxEvents = fxPool(768, function () { return { t: 0, type: 0, kind: 'generic', x: 0, y: 0, a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, str: '', img: null }; });
+        let fxFlashA = 0, fxFlashCol = '255,255,255';
+        let fxKillBudget = 0;
+        let fxHitDelay = 0;          // atraso visual do golpe corpo a corpo (a lâmina ainda está chegando)
+        let fxCurSlash = null;       // contexto do golpe/tique atual (conta acertos para agregar números)
+        let fxShakeX = 0, fxShakeY = 0;
+        const fxPlayerSpr = { img: null, row: 0, frame: 0, frames: 1 };   // quadro do jogador (redesenho por cima)
+        // Contextos reaproveitados: um golpe corpo a corpo e um tique de poça por vez
+        const fxSwing = { dir: 1, sweep: 0.13, kind: 'sword', lastX: 0, lastY: 0, hasLast: false, hits: 0, sumX: 0, sumY: 0, minY: 0, maxDelay: 0, dmg: 0 };
+        const fxTick = { dir: 1, sweep: 0, kind: 'holy', lastX: 0, lastY: 0, hasLast: false, hits: 0, sumX: 0, sumY: 0, minY: 0, maxDelay: 0, dmg: 0 };
+        const FX_TEXT_PER_BURST = 6;   // números individuais por golpe/tique; o resto vira "×N"
+
+        function fxEvent(delay, type) {
+            const ev = fxTake(fxEvents);
+            if (!ev) return null;
+            ev.t = game.time + delay;
+            ev.type = type;
+            return ev;
+        }
+
+        // ---------- emissores básicos ----------
+        function fxSpark(x, y, ang, speed, life, ci, len, drag, thick) {
+            const s = fxTake(fxSparks);
+            if (!s) return;
+            s.x = x; s.y = y;
+            s.vx = Math.cos(ang) * speed; s.vy = Math.sin(ang) * speed;
+            s.life = s.max = life;
+            s.len = len; s.drag = drag;
+            s.ci = ci; s.w = thick ? 1 : 0;
+        }
+        function fxGlowAt(x, y, spr, s0, s1, life, a0, add, vx, vy) {
+            const g = fxTake(fxGlows);
+            if (!g) return;
+            g.x = x; g.y = y; g.vx = vx || 0; g.vy = vy || 0;
+            g.spr = spr; g.s0 = s0; g.s1 = s1;
+            g.life = g.max = life; g.a0 = a0; g.add = add !== false;
+        }
+        function fxRing(x, y, r0, r1, life, hex, w, a0, sq, rot, delay, a1, a2) {
+            const r = fxTake(fxRings);
+            if (!r) return;
+            r.x = x; r.y = y; r.r0 = r0; r.r1 = r1;
+            r.life = r.max = life; r.w = w; r.a0 = a0; r.col = hex;
+            r.sq = sq || 1; r.rot = rot || 0; r.delay = delay || 0;
+            r.a1 = a1 !== undefined ? a1 : 0;
+            r.a2 = a2 !== undefined ? a2 : TWO_PI;
+        }
+        function fxBoltGen(b) {
+            const n = b.pts.length / 2;
+            const dx = b.x2 - b.x1, dy = b.y2 - b.y1;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const px = -dy / len, py = dx / len;
+            const amp = Math.min(34, len * 0.2);
+            for (let i = 0; i < n; i++) {
+                const t = i / (n - 1);
+                const off = (i === 0 || i === n - 1) ? 0 : (fxRand() - 0.5) * 2 * amp * Math.sin(Math.PI * t);
+                b.pts[i * 2] = b.x1 + dx * t + px * off;
+                b.pts[i * 2 + 1] = b.y1 + dy * t + py * off;
+            }
+        }
+        function fxBolt(x1, y1, x2, y2, life, hex, w) {
+            const b = fxTake(fxBolts);
+            if (!b) return;
+            b.x1 = x1; b.y1 = y1; b.x2 = x2; b.y2 = y2;
+            b.life = b.max = life; b.col = hex; b.w = w || 1;
+            b.next = 0;
+            fxBoltGen(b);
+        }
+        // Raio que nasce fora do corpo do jogador (não cobre o personagem)
+        function fxBoltFromPlayer(x2, y2, life, hex, w) {
+            const dx = x2 - player.x, dy = y2 - player.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 1;
+            const r0 = player.radius + 20;
+            if (d <= r0 + 6) return;
+            fxBolt(player.x + dx / d * r0, player.y + dy / d * r0, x2, y2, life, hex, w);
+        }
+        function fxDecal(x, y, spr, s, life, a0) {
+            const cap = Math.max(16, Math.round(fxDecals.size * fxQ));
+            let d = fxDecals.n < cap ? fxTake(fxDecals) : null;
+            if (!d) {                      // no teto: recicla a mancha mais antiga
+                let oldest = 0;
+                for (let i = 1; i < fxDecals.n; i++) if (fxDecals.a[i].life < fxDecals.a[oldest].life) oldest = i;
+                d = fxDecals.a[oldest];
+            }
+            d.x = x; d.y = y; d.spr = spr; d.s = s;
+            d.life = d.max = life; d.a0 = a0;
+        }
+        function fxCrack(x, y, ang, r0, hex) {
+            const c = fxTake(fxCracks);
+            if (!c) return;
+            let cx = x + Math.cos(ang) * r0, cy = y + Math.sin(ang) * r0;
+            c.n = 7;
+            for (let i = 0; i < c.n; i++) {
+                c.pts[i * 2] = cx; c.pts[i * 2 + 1] = cy;
+                ang += fxRange(-0.55, 0.55);
+                const step = fxRange(7, 13);
+                cx += Math.cos(ang) * step; cy += Math.sin(ang) * step;
+            }
+            c.life = c.max = fxRange(0.7, 1.0);
+            c.col = hex;
+        }
+        function fxGhostOf(img, row, frame, size, x, y, life, grow) {
+            const sil = fxSilhouette(img);
+            if (!sil) return;
+            const g = fxTake(fxGhosts);
+            if (!g) return;
+            g.img = sil; g.fx = frame * FRAME; g.fy = row * FRAME;
+            g.size = size; g.x = x; g.y = y;
+            g.life = g.max = life; g.grow = grow;
+        }
+
+        // ---------- golpes ----------
+        function fxSlash(w, range, arcHalf) {
+            const kind = fxKindOf(w);
+            w.fxDir = -(w.fxDir || 1);                 // alterna o sentido do corte
+            const heavy = w.id === 'axe';
+            const info = fxSwing;
+            info.dir = w.fxDir; info.sweep = heavy ? 0.17 : 0.13; info.kind = kind;
+            info.hasLast = false; info.hits = 0; info.sumX = 0; info.sumY = 0; info.minY = 1e9; info.maxDelay = 0; info.dmg = 0;
+            const s = fxTake(fxSlashes);
+            if (s) {
+                s.kind = kind; s.t0 = game.time; s.sweep = info.sweep; s.fade = heavy ? 0.16 : 0.12;
+                s.facing = player.facing; s.arcHalf = arcHalf; s.range = range; s.dir = info.dir;
+                s.thick = heavy ? 0.62 : 0.44; s.alpha = 1; s.grad = null;
+            }
+            if (kind === 'sword_evo') {                // Espada Rubra: um eco carmim mais largo
+                const e2 = fxTake(fxSlashes);
+                if (e2) {
+                    e2.kind = kind; e2.t0 = game.time + 0.035; e2.sweep = info.sweep; e2.fade = 0.14;
+                    e2.facing = player.facing; e2.arcHalf = arcHalf * 1.04; e2.range = range * 1.2; e2.dir = info.dir;
+                    e2.thick = 0.24; e2.alpha = 0.7; e2.grad = null;
+                }
+            }
+            const pal = FX_PAL[kind];
+            // faíscas da lâmina ao longo do arco, saindo quando a lâmina passa
+            const n = fxN(heavy ? 10 : 8);
+            for (let i = 0; i < n; i++) {
+                const u = fxRand();
+                const a = player.facing - info.dir * arcHalf + info.dir * 2 * arcHalf * u;
+                const r = range * fxRange(0.75, 1.02);
+                const ev = fxEvent((1 - Math.cbrt(1 - u)) * info.sweep, EV_SPARK);
+                if (!ev) break;
+                ev.x = player.x + Math.cos(a) * r; ev.y = player.y + Math.sin(a) * r;
+                ev.a = a + info.dir * Math.PI / 2 + fxRange(-0.4, 0.4);
+                ev.b = fxRange(120, 280); ev.c = fxRange(0.18, 0.32); ev.d = pal.ciSpark;
+            }
+            if (heavy) {
+                const ev = fxEvent(info.sweep * 0.85, EV_SLAM);
+                if (ev) { ev.kind = kind; ev.a = player.facing; ev.b = arcHalf; ev.c = range; }
+            }
+            if (kind === 'axe_evo') {
+                for (let i = 0; i < 3; i++) {
+                    const a = player.facing + fxRange(-arcHalf, arcHalf);
+                    const ev = fxEvent(i * 0.04, EV_BOLT);
+                    if (!ev) break;
+                    ev.x = player.x + Math.cos(a) * range * 1.1; ev.y = player.y + Math.sin(a) * range * 1.1;
+                    ev.a = 0.16; ev.b = 1.3; ev.str = pal.glow; ev.d = 1;   // d = 1: nasce fora do jogador
+                }
+            }
+            return info;
+        }
+
+        // Atraso até a lâmina chegar ao inimigo (ângulo relativo diff dentro do arco)
+        function fxSweepDelay(info, diff, arcHalf) {
+            const u = Math.max(0, Math.min(1, (diff * info.dir + arcHalf) / (2 * arcHalf || 1)));
+            return (1 - Math.cbrt(1 - u)) * info.sweep;
+        }
+
+        // Fim de um golpe/tique: acertos além dos primeiros viram um "×N" no meio do grupo
+        function fxBurstDone(ctxb) {
+            if (ctxb.hits > FX_TEXT_PER_BURST) {
+                const ev = fxEvent(ctxb.maxDelay, EV_TAG);
+                if (ev) {
+                    ev.kind = ctxb.kind;
+                    ev.x = ctxb.sumX / ctxb.hits; ev.y = ctxb.minY - 40;   // acima do número mais alto
+                    ev.str = String(Math.round(ctxb.dmg)) + ' ×' + ctxb.hits;
+                }
+            }
+        }
+
+        function fxAxeSlam(kind, facing, arcHalf, range) {
+            const pal = FX_PAL[kind];
+            const x = player.x, y = player.y + 6;
+            shake = Math.max(shake, kind === 'axe_evo' ? 6 : 5);
+            fxRing(x, y, range * 0.35, range * 1.3, 0.34, pal.edge, 4, 0.85, 0.85, 0, 0, facing - arcHalf * 1.1, facing + arcHalf * 1.1);
+            const cracks = fxN(5);
+            for (let i = 0; i < cracks; i++) fxCrack(x, y, facing + fxRange(-arcHalf, arcHalf), range * fxRange(0.3, 0.5), kind === 'axe_evo' ? pal.glow : pal.edge);
+            if (kind === 'axe_evo') {
+                for (let i = 0; i < 4; i++) {
+                    const a = facing + fxRange(-arcHalf, arcHalf);
+                    fxBoltFromPlayer(x + Math.cos(a) * range * 1.25, y + Math.sin(a) * range * 1.25, 0.22, pal.glow, 1.5);
+                }
+                const gx = x + Math.cos(facing) * range * 0.7, gy = y + Math.sin(facing) * range * 0.7;
+                fxGlowAt(gx, gy, fxGlow(pal.glow), range * 0.6, range * 1.2, 0.22, 0.4);
+            } else {
+                const dust = fxN(8);
+                const dustSpr = fxGlow('#6e5842');
+                for (let i = 0; i < dust; i++) {
+                    const a = facing + fxRange(-arcHalf, arcHalf), r = range * fxRange(0.6, 1.05);
+                    fxGlowAt(x + Math.cos(a) * r, y + Math.sin(a) * r, dustSpr, 20, fxRange(44, 66), fxRange(0.5, 0.75), 0.42, false, Math.cos(a) * 34, Math.sin(a) * 34 - 12);
+                }
+                for (let i = 0; i < 3; i++) {               // brasas no ponto de impacto
+                    const a = facing + (i - 1) * arcHalf * 0.6, r = range * 0.85;
+                    fxGlowAt(x + Math.cos(a) * r, y + Math.sin(a) * r, fxGlow(pal.glow), 20, 70, 0.28, 0.55);
+                }
+                const debris = fxN(6);
+                for (let i = 0; i < debris; i++) {          // pedrinhas voando
+                    const a = facing + fxRange(-arcHalf, arcHalf), r = range * fxRange(0.6, 1);
+                    fxSpark(x + Math.cos(a) * r, y + Math.sin(a) * r, a + fxRange(-0.6, 0.6), fxRange(90, 200), fxRange(0.3, 0.5), CI_DEBRIS, 0.012, 4, true);
+                }
+                const embers = fxN(8);
+                for (let i = 0; i < embers; i++) {
+                    const a = facing + fxRange(-arcHalf, arcHalf);
+                    const r = range * fxRange(0.5, 1);
+                    fxSpark(x + Math.cos(a) * r, y + Math.sin(a) * r, -Math.PI / 2 + fxRange(-0.8, 0.8), fxRange(80, 190), fxRange(0.35, 0.6), pal.ciEmber, 0.02, 2.5, false);
+                }
+            }
+        }
+
+        // Impacto no inimigo: cada fonte com sua assinatura visual
+        function fxImpact(kind, x, y, dx, dy, dmg, lite) {
+            const pal = FX_PAL[kind] || FX_PAL.generic;
+            const ang = Math.atan2(dy, dx);
+            const big = Math.min(1.6, 0.8 + Math.log10(dmg + 1) * 0.35);
+            if (kind === 'holy' || kind === 'holy_evo') {          // queimadura sagrada: leve (muitos por tique)
+                if (fxRand() < 0.55 * fxQ) fxGlowAt(x, y, fxStar(pal.edge), 10, 26 * big, 0.14, 0.8);
+                if (fxRand() < 0.45 * fxQ) fxSpark(x + fxRange(-6, 6), y, -Math.PI / 2 + fxRange(-0.5, 0.5), fxRange(50, 110), fxRange(0.35, 0.55), pal.ciEmber, 0.02, 1.5, false);
+                return;
+            }
+            if (kind === 'crossbow' || kind === 'crossbow_evo') {  // perfuração: cone de choque na direção do voo
+                if (!lite || fxRand() < fxQ) fxRing(x, y, 4, 26, 0.2, pal.edge, 2, 0.9, 0.38, ang);
+                fxGlowAt(x, y, fxStar(pal.glow), 14, 38 * big, 0.13, 0.9);
+                const n = fxN(6);
+                for (let i = 0; i < n; i++) fxSpark(x, y, ang + fxRange(-0.35, 0.35), fxRange(260, 520), fxRange(0.14, 0.26), pal.ciSpark, 0.035, 4, false);
+                const d = fxN(3);
+                for (let i = 0; i < d; i++) fxSpark(x, y, ang + fxRange(-0.9, 0.9), fxRange(90, 200), fxRange(0.2, 0.35), CI_BLOOD, 0.02, 6, true);
+                return;
+            }
+            // lâminas, flechas e o resto: estrela + anel + faíscas no sentido do golpe + sangue
+            const axe = kind === 'axe' || kind === 'axe_evo';
+            if (lite) {
+                if (fxRand() < 0.5 + 0.5 * fxQ) fxGlowAt(x, y, fxStar(pal.edge), 10, 24 * big, 0.12, 0.8);
+            } else {
+                fxGlowAt(x, y, fxStar(pal.edge), 16, (axe ? 50 : 40) * big, 0.15, 1);
+                if (fxRand() < fxQ) fxGlowAt(x, y, fxGlow(pal.glow), 10, 34 * big, 0.18, 0.55);
+                if (kind !== 'sword' && kind !== 'sword_evo' && fxRand() < fxQ) fxRing(x, y, 5, 20 * big, 0.16, pal.edge, 2, 0.8);
+            }
+            const n = fxN(lite ? 3 : (axe ? 8 : 6));
+            for (let i = 0; i < n; i++) fxSpark(x, y, ang + fxRange(-0.7, 0.7), fxRange(220, 460), fxRange(0.14, 0.28), pal.ciSpark, 0.035, 4, false);
+            const d = fxN(lite ? 2 : 4);
+            for (let i = 0; i < d; i++) fxSpark(x, y, ang + fxRange(-1, 1), fxRange(80, 190), fxRange(0.22, 0.4), CI_BLOOD, 0.02, 6, true);
+            if (lite) return;
+            if (kind === 'bow_evo') {
+                const st = fxStar('#fff3c4');
+                for (let i = 0; i < 3; i++) fxGlowAt(x, y, st, 14, 6, fxRange(0.3, 0.5), 0.9, true, fxRange(-70, 70), fxRange(-70, 70));
+            } else if (kind === 'sword_evo' || kind === 'thorn') {
+                for (let i = 0; i < 3; i++) fxSpark(x, y, -Math.PI / 2 + fxRange(-1, 1), fxRange(60, 150), fxRange(0.4, 0.7), pal.ciEmber, 0.02, 2, false);
+            }
+        }
+
+        // Chamado por hitEnemy (só quando o golpe não é "quieto")
+        function fxHit(e, dmg, src, kbx, kby, movedX, movedY) {
+            const kind = fxKindOf(src);
+            const pal = FX_PAL[kind];
+            const delay = fxHitDelay;
+            e.fxKind = kind;
+            if (movedX || movedY) {                     // o empurrão aparece quando a lâmina chega
+                const k = fxShoveK(e);
+                e.fxOffX = e.fxOffX * k - movedX;
+                e.fxOffY = e.fxOffY * k - movedY;
+                e.fxShoveT = game.time + delay;
+            }
+            e.fxHitT = game.time + delay;
+            e.fxPendT = game.time + delay;
+            let dx = kbx || 0, dy = kby || 0;
+            if (!dx && !dy) { dx = e.x - player.x; dy = e.y - player.y; }
+            const x = e.x - movedX, y = e.y - movedY - (e.isBoss ? 34 : 10);
+            const ctxb = fxCurSlash;
+            let lite = false, showText = true;
+            if (ctxb) {
+                ctxb.hits++;
+                ctxb.sumX += x; ctxb.sumY += y;
+                if (y < ctxb.minY) ctxb.minY = y;
+                if (delay > ctxb.maxDelay) ctxb.maxDelay = delay;
+                if (dmg > ctxb.dmg) ctxb.dmg = dmg;
+                lite = ctxb.hits > 5;
+                showText = ctxb.hits <= FX_TEXT_PER_BURST;
+                if (kind === 'axe_evo') {               // Tempestade: raio encadeado entre os atingidos
+                    const fromX = ctxb.hasLast ? ctxb.lastX : player.x, fromY = ctxb.hasLast ? ctxb.lastY : player.y;
+                    const cdx = x - fromX, cdy = y - fromY;
+                    const chain = ctxb.hasLast && cdx * cdx + cdy * cdy < 160 * 160;
+                    const ev = fxEvent(delay, EV_BOLT);
+                    if (ev) {
+                        ev.x = x; ev.y = y; ev.e = fromX; ev.f = fromY;
+                        ev.a = 0.18; ev.b = 1.2; ev.str = pal.glow; ev.d = chain ? 2 : 1;   // 2: encadeado; 1: do jogador
+                    }
+                    ctxb.lastX = x; ctxb.lastY = y; ctxb.hasLast = true;
+                }
+            }
+            if (delay <= 0) {
+                fxImpact(kind, x, y, dx, dy, dmg, lite);
+                if (showText) spawnDamageText(x, y - e.radius - (e.isBoss ? 20 : 0), String(Math.round(dmg)), pal.text, 0.8 + 0.3 * Math.log10(dmg + 1));
+                return;
+            }
+            const ev = fxEvent(delay, EV_IMPACT);
+            if (!ev) return;
+            ev.kind = kind; ev.x = x; ev.y = y; ev.a = dx; ev.b = dy; ev.c = dmg; ev.d = lite ? 1 : 0;
+            ev.e = showText ? e.radius + (e.isBoss ? 20 : 0) : -1;
+        }
+
+        function fxShoveK(e) {
+            if (!e.fxOffX && !e.fxOffY) return 0;
+            if (game.time < e.fxShoveT) return 1;
+            const k = 1 - (game.time - e.fxShoveT) / 0.09;
+            if (k <= 0) { e.fxOffX = 0; e.fxOffY = 0; return 0; }
+            return k * k;
+        }
+
+        // Morte: desintegração em luz, névoa de sangue, cinzas em brasa e mancha no chão
+        function fxDeath(e) {
+            const st = enemySpriteState(e);
+            const pend = e.fxPendT - game.time;
+            if (pend > 0) {                              // a lâmina ainda não chegou: fica um "dublê" até lá
+                const s = fxTake(fxStandins);
+                if (s) {
+                    s.img = st.img; s.fx = st.frame * FRAME; s.fy = st.row * FRAME;
+                    s.size = st.size; s.x = e.x + e.fxOffX; s.y = e.y + e.fxOffY; s.until = game.time + pend;
+                }
+            }
+            const ev = fxEvent(Math.max(0, pend), e.isBoss ? EV_BOSS : EV_BURST);
+            if (!ev) return;
+            ev.kind = e.fxKind || 'generic'; ev.x = e.x; ev.y = e.y;
+            ev.img = st.img; ev.a = st.row; ev.b = st.frame; ev.c = st.size;
+            if (pend <= 0) { fxRunEvent(ev); fxKill(fxEvents, fxEvents.n - 1); }
+        }
+
+        function fxBurst(x, y, img, row, frame, size, kind) {
+            fxEnsureSplats();
+            const pal = FX_PAL[kind] || FX_PAL.generic;
+            fxDecal(x + fxRange(-3, 3), y + 10, fxSplats[Math.floor(fxRand() * fxSplats.length)], fxRange(0.65, 1), fxRange(4.5, 6), 0.8);
+            if (fxKillBudget <= 0) return;               // abates em massa: só a mancha
+            fxKillBudget--;
+            if (fxRand() < 0.4 + 0.6 * fxQ) fxGhostOf(img, row, frame, size, x, y, 0.24, 0.45);
+            const cy = y - 8;
+            fxGlowAt(x, cy, fxGlow(FX_BLOOD_DARK), 16, 46, 0.5, 0.55, false, fxRange(-10, 10), -8);
+            if (fxRand() < fxQ) fxGlowAt(x, cy, fxGlow(pal.glow), 14, 40, 0.22, 0.6);
+            const n = fxN(8);
+            for (let i = 0; i < n; i++) fxSpark(x, cy, fxRand() * TWO_PI, fxRange(90, 230), fxRange(0.25, 0.42), CI_BLOOD, 0.025, 5, true);
+            const m = fxN(6);
+            for (let i = 0; i < m; i++) fxSpark(x + fxRange(-10, 10), cy + fxRange(-10, 8), -Math.PI / 2 + fxRange(-0.7, 0.7), fxRange(40, 130), fxRange(0.5, 0.9), pal.ciEmber, 0.018, 1.2, false);
+            const a = fxN(3);
+            for (let i = 0; i < a; i++) fxSpark(x + fxRange(-8, 8), cy + fxRange(-8, 8), -Math.PI / 2 + fxRange(-0.5, 0.5), fxRange(20, 60), fxRange(0.6, 1), CI_ASH, 0.015, 0.8, false);
+            fxGlowAt(x, cy - 6, fxGlow('#dfe8ff'), 10, 16, 0.7, 0.45, true, fxRange(-8, 8), -46);   // a alma que escapa
+        }
+
+        function fxBossDeath(x, y, img, row, frame, size) {
+            fxEnsureSplats();
+            fxFlashA = 0.35; fxFlashCol = '255,226,232';
+            fxGhostOf(img, row, frame, size, x, y, 0.5, 0.8);
+            fxGlowAt(x, y - 30, fxStar('#ffe0e6'), 60, 260, 0.45, 1);
+            fxGlowAt(x, y - 30, fxGlow('#ff2548'), 60, 220, 0.6, 0.7);
+            fxGlowPillar(x, y, fxPillar('#ffb3c1'), 1.2);
+            for (let i = 0; i < 3; i++) fxRing(x, y, 20, 240 + i * 60, 0.6 + i * 0.18, i === 1 ? '#ffffff' : '#ff4d6a', 4 - i, 0.9, 0.8, 0, i * 0.1);
+            for (let i = 0; i < 4; i++) fxDecal(x + fxRange(-30, 30), y + fxRange(0, 30), fxSplats[i % fxSplats.length], fxRange(1.8, 2.8), 12, 0.9);
+            for (let i = 0; i < 46; i++) fxSpark(x, y - 30, fxRand() * TWO_PI, fxRange(120, 420), fxRange(0.35, 0.7), CI_BLOOD, 0.03, 3.5, true);
+            for (let i = 0; i < 50; i++) fxSpark(x + fxRange(-40, 40), y + fxRange(-60, 10), -Math.PI / 2 + fxRange(-0.9, 0.9), fxRange(60, 260), fxRange(0.7, 1.4), i % 2 ? CI_BOSS_A : CI_BOSS_B, 0.02, 1, false);
+            for (let i = 0; i < 8; i++) fxGlowAt(x + fxRange(-30, 30), y - 20, fxGlow('#dfe8ff'), 12, 22, fxRange(0.9, 1.4), 0.5, true, fxRange(-30, 30), fxRange(-90, -50));
+        }
+        function fxGlowPillar(x, y, spr, life, w, h) {
+            const p = fxTake(fxPillars);
+            if (!p) return;
+            p.x = x; p.y = y; p.spr = spr; p.life = p.max = life; p.w = w || 70; p.h = h || 420;
+        }
+
+        function fxRunEvent(ev) {
+            switch (ev.type) {
+                case EV_IMPACT:
+                    fxImpact(ev.kind, ev.x, ev.y, ev.a, ev.b, ev.c, ev.d === 1);
+                    if (ev.e >= 0) spawnDamageText(ev.x, ev.y - ev.e, String(Math.round(ev.c)), FX_PAL[ev.kind].text, 0.8 + 0.3 * Math.log10(ev.c + 1));
+                    break;
+                case EV_SPARK:
+                    fxSpark(ev.x, ev.y, ev.a, ev.b, ev.c, ev.d, 0.035, 4, false);
+                    break;
+                case EV_BOLT:
+                    if (ev.d === 2) fxBolt(ev.e, ev.f, ev.x, ev.y, ev.a, ev.str, ev.b);
+                    else fxBoltFromPlayer(ev.x, ev.y, ev.a, ev.str, ev.b);
+                    break;
+                case EV_SLAM:
+                    fxAxeSlam(ev.kind, ev.a, ev.b, ev.c);
+                    break;
+                case EV_BURST:
+                    fxBurst(ev.x, ev.y, ev.img, ev.a, ev.b, ev.c, ev.kind);
+                    break;
+                case EV_BOSS:
+                    fxBossDeath(ev.x, ev.y, ev.img, ev.a, ev.b, ev.c);
+                    break;
+                case EV_TAG:
+                    spawnDamageText(ev.x, ev.y, ev.str, FX_PAL[ev.kind].text, 1.35);
+                    break;
+            }
+            ev.img = null;
+        }
+
+        // Disparo do arco/besta: clarão na ponta (à frente do corpo) e faíscas na direção do tiro
+        function fxMuzzle(w, ang) {
+            const kind = fxKindOf(w);
+            const pal = FX_PAL[kind];
+            const x = player.x + Math.cos(ang) * 24, y = player.y - 6 + Math.sin(ang) * 24;
+            fxGlowAt(x, y, fxStar(pal.edge), 8, w.id === 'crossbow' ? 24 : 20, 0.09, 0.8);
+            const n = fxN(w.id === 'crossbow' ? 5 : 3);
+            for (let i = 0; i < n; i++) fxSpark(x, y, ang + fxRange(-0.3, 0.3), fxRange(160, 320), fxRange(0.1, 0.18), pal.ciSpark, 0.035, 4, false);
+            if (w.id === 'crossbow') fxRing(x, y, 3, 16, 0.14, pal.edge, 1.5, 0.7, 0.45, ang);
+        }
+
+        // Água benta: frasco que estoura e vira um círculo sagrado em chamas
+        function fxZoneSpawn(z, evolved) {
+            z.fxKind = evolved ? 'holy_evo' : 'holy';
+            z.fxSeed = fxRand() * TWO_PI;
+            z.fxEmit = 0;
+            const pal = FX_PAL[z.fxKind];
+            fxGlowAt(z.x, z.y, fxGlow(pal.glow), z.radius * 0.6, z.radius * 1.8, 0.3, 0.6);
+            fxGlowAt(z.x, z.y, fxStar('#ffffff'), 20, 90, 0.16, 1);
+            fxRing(z.x, z.y, 6, z.radius, 0.28, pal.edge, 3, 1);
+            const n = fxN(10);
+            for (let i = 0; i < n; i++) fxSpark(z.x, z.y, fxRand() * TWO_PI, fxRange(200, 380), fxRange(0.16, 0.3), CI_GLASS, 0.035, 4, false);
+            const m = fxN(8);
+            for (let i = 0; i < m; i++) fxSpark(z.x, z.y, fxRand() * TWO_PI, fxRange(90, 200), fxRange(0.25, 0.45), pal.ciGlow, 0.02, 5, true);
+        }
+        function fxZonePulse(z) {
+            const pal = FX_PAL[z.fxKind || 'holy'];
+            if (fxRand() < 0.4 + 0.6 * fxQ) fxRing(z.x, z.y, z.radius * 0.2, z.radius * 1.02, 0.4, pal.edge, 2.5, 0.55);
+        }
+        function fxZoneTickBegin(z) {
+            const c = fxTick;
+            c.kind = z.fxKind || 'holy';
+            c.hits = 0; c.sumX = 0; c.sumY = 0; c.minY = 1e9; c.maxDelay = 0; c.dmg = 0; c.hasLast = false;
+            fxCurSlash = c;
+        }
+        function fxZoneTickEnd() {
+            fxBurstDone(fxTick);
+            fxCurSlash = null;
+        }
+
+        // Coroa de Espinhos, Chama Sepulcral, Sino dos Mortos e Égide
+        function fxThornBurst(x, y) {
+            const t = fxTake(fxThorns);
+            if (t) { t.x = x; t.y = y; t.life = t.max = 0.32; t.n = 12; t.seed = fxRand() * TWO_PI; }
+            fxRing(x, y, 22, 120, 0.3, '#ff4d6a', 3, 0.8);
+        }
+        function fxGrave(x, y) {
+            fxEnsureSplats();
+            fxGlowAt(x, y, fxGlow('#ff5a14'), 30, 150, 0.3, 0.75);
+            fxGlowAt(x, y, fxStar('#ffd9a0'), 20, 80, 0.16, 1);
+            fxDecal(x, y + 6, fxScorch[Math.floor(fxRand() * fxScorch.length)], fxRange(1.5, 2), 5, 0.55);
+            const n = fxN(10);
+            for (let i = 0; i < n; i++) fxSpark(x, y, fxRand() * TWO_PI, fxRange(140, 320), fxRange(0.25, 0.5), i % 3 ? CI_FIRE : CI_FIRE_HOT, 0.03, 3, false);
+        }
+        function fxKnell() {
+            fxRing(player.x, player.y, 40, 560, 0.7, '#cfe4ff', 5, 0.8, 0.85);
+            fxRing(player.x, player.y, 30, 420, 0.8, '#ffffff', 2, 0.7, 0.85, 0, 0.12);
+        }
+        function fxWardBlock() {
+            const x = player.x, y = player.y - 6;
+            fxRing(x, y, 20, 52, 0.24, '#e6ebf2', 2.5, 0.9);
+            const n = fxN(9);
+            for (let i = 0; i < n; i++) {
+                const a = fxRand() * TWO_PI;
+                fxSpark(x + Math.cos(a) * 20, y + Math.sin(a) * 20, a, fxRange(160, 320), fxRange(0.18, 0.32), CI_SILVER, 0.035, 4, false);
+            }
+        }
+
+        // ---------- atualização ----------
+        function updateFx(dt) {
+            fxKillBudget = Math.max(2, Math.round(14 * fxQ));
+            const ev = fxEvents.a;
+            for (let i = fxEvents.n - 1; i >= 0; i--) {
+                if (game.time < ev[i].t) continue;
+                const e = ev[i];
+                fxRunEvent(e);
+                // o evento pode ter agendado outros (sempre no fim): localiza de novo antes de remover
+                const j = ev[i] === e ? i : ev.indexOf(e, 0);
+                fxKill(fxEvents, j);
+            }
+            const sp = fxSparks.a;
+            for (let i = fxSparks.n - 1; i >= 0; i--) {
+                const s = sp[i];
+                s.life -= dt;
+                if (s.life <= 0) { fxKill(fxSparks, i); continue; }
+                const k = Math.max(0, 1 - s.drag * dt);
+                s.vx *= k; s.vy *= k;
+                s.x += s.vx * dt; s.y += s.vy * dt;
+            }
+            const gl = fxGlows.a;
+            for (let i = fxGlows.n - 1; i >= 0; i--) {
+                const g = gl[i];
+                g.life -= dt;
+                if (g.life <= 0) { fxKill(fxGlows, i); continue; }
+                g.x += g.vx * dt; g.y += g.vy * dt;
+            }
+            for (let i = fxRings.n - 1; i >= 0; i--) {
+                const r = fxRings.a[i];
+                if (r.delay > 0) { r.delay -= dt; continue; }
+                r.life -= dt;
+                if (r.life <= 0) fxKill(fxRings, i);
+            }
+            for (let i = fxSlashes.n - 1; i >= 0; i--) {
+                const s = fxSlashes.a[i];
+                if (game.time - s.t0 > s.sweep + s.fade) { s.grad = null; fxKill(fxSlashes, i); }
+            }
+            for (let i = fxBolts.n - 1; i >= 0; i--) {
+                const b = fxBolts.a[i];
+                b.life -= dt;
+                if (b.life <= 0) { fxKill(fxBolts, i); continue; }
+                b.next -= dt;
+                if (b.next <= 0) { b.next = 0.045; fxBoltGen(b); }
+            }
+            for (let i = fxDecals.n - 1; i >= 0; i--) {
+                const d = fxDecals.a[i];
+                d.life -= dt;
+                if (d.life <= 0) fxKill(fxDecals, i);
+            }
+            for (let i = fxCracks.n - 1; i >= 0; i--) {
+                const c = fxCracks.a[i];
+                c.life -= dt;
+                if (c.life <= 0) fxKill(fxCracks, i);
+            }
+            for (let i = fxGhosts.n - 1; i >= 0; i--) {
+                const g = fxGhosts.a[i];
+                g.life -= dt;
+                if (g.life <= 0) fxKill(fxGhosts, i);
+            }
+            for (let i = fxStandins.n - 1; i >= 0; i--) {
+                if (game.time >= fxStandins.a[i].until) fxKill(fxStandins, i);
+            }
+            for (let i = fxThorns.n - 1; i >= 0; i--) {
+                const t = fxThorns.a[i];
+                t.life -= dt;
+                if (t.life <= 0) fxKill(fxThorns, i);
+            }
+            for (let i = fxPillars.n - 1; i >= 0; i--) {
+                const p = fxPillars.a[i];
+                p.life -= dt;
+                if (p.life <= 0) fxKill(fxPillars, i);
+            }
+            if (fxFlashA > 0) fxFlashA = Math.max(0, fxFlashA - dt * 1.6);
+            // emissores contínuos: brasas das poças sagradas e o rastro de estrelas do Arco Celeste
+            for (const z of damageZones) {
+                if (!z.alive || !z.fxKind) continue;
+                const pal = FX_PAL[z.fxKind];
+                z.fxEmit += dt * (z.fxKind === 'holy_evo' ? 12 : 8) * fxQ;
+                while (z.fxEmit >= 1) {
+                    z.fxEmit -= 1;
+                    const a = fxRand() * TWO_PI, r = Math.sqrt(fxRand()) * z.radius * 0.95;
+                    fxGlowAt(z.x + Math.cos(a) * r, z.y + Math.sin(a) * r, fxGlow(fxRand() < 0.3 ? pal.core : pal.ember), 7, 2, fxRange(0.6, 1.1), 0.9, true, fxRange(-8, 8), fxRange(-70, -35));
+                }
+            }
+            for (const p of projectiles) {
+                if (!p.alive || p.isEnemy || p.fxKind !== 'bow_evo') continue;
+                p.fxAcc += dt;
+                while (p.fxAcc > 0.028) {
+                    p.fxAcc -= 0.028;
+                    if (fxRand() < fxQ) fxGlowAt(p.x, p.y, fxStar('#fff3c4'), fxRange(10, 16), 2, fxRange(0.3, 0.5), 0.85, true, fxRange(-20, 20), fxRange(-20, 20));
+                }
+            }
+        }
+
+        // ---------- desenho ----------
+        function drawFxGround() {                        // manchas e rachaduras (sob tudo)
+            if (fxDecals.n) {
+                for (let i = 0; i < fxDecals.n; i++) {
+                    const d = fxDecals.a[i];
+                    const sx = d.x - camera.x, sy = d.y - camera.y;
+                    const s = 64 * d.s;
+                    if (sx < -s || sx > VIEW_W + s || sy < -s || sy > VIEW_H + s) continue;
+                    ctx.globalAlpha = d.a0 * Math.min(1, d.life / 1.5);
+                    ctx.drawImage(d.spr, sx - s / 2, sy - s / 2, s, s);
+                }
+                ctx.globalAlpha = 1;
+            }
+            if (fxCracks.n) {
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                for (let i = 0; i < fxCracks.n; i++) {
+                    const c = fxCracks.a[i];
+                    const t = c.life / c.max;
+                    ctx.beginPath();
+                    for (let j = 0; j < c.n; j++) {
+                        const x = c.pts[j * 2] - camera.x, y = c.pts[j * 2 + 1] - camera.y;
+                        if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.globalAlpha = 0.75 * Math.min(1, t * 2);
+                    ctx.strokeStyle = '#261810';
+                    ctx.lineWidth = 2.4;
+                    ctx.stroke();
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.globalAlpha = 0.9 * t * t;
+                    ctx.strokeStyle = c.col;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                ctx.globalAlpha = 1;
+                ctx.lineCap = 'butt';
+                ctx.lineJoin = 'miter';
+            }
+        }
+
+        // Meia-lua do corte (coordenadas locais ao jogador): polígono entre dois arcos, afinando para a cauda
+        function fxSlashPath(s, a0, uTail, uHead, rOut, thick) {
+            const span = 2 * s.arcHalf * s.dir;
+            const n = Math.max(6, Math.min(26, Math.ceil(Math.abs(span * (uHead - uTail)) / 0.09)));
+            ctx.beginPath();
+            for (let i = 0; i <= n; i++) {
+                const a = a0 + span * (uTail + (uHead - uTail) * i / n);
+                const x = Math.cos(a) * rOut, y = Math.sin(a) * rOut;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            for (let i = n; i >= 0; i--) {
+                const w = Math.pow(i / n, 0.7);
+                const r = rOut * (1 - thick * w);
+                const a = a0 + span * (uTail + (uHead - uTail) * i / n);
+                ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath();
+        }
+        function fxSlashGradient(s, pal) {
+            // lâmina "borrada": transparente por dentro, gume brilhante na borda, halo por fora (criado uma vez por corte)
+            const r0 = s.range * (1 - s.thick) * 0.9, r1 = s.range * 1.1;
+            const tr = (s.range - r0) / (r1 - r0);
+            const gr = ctx.createRadialGradient(0, 0, r0, 0, 0, r1);
+            gr.addColorStop(0, rgba(pal.glow, 0));
+            gr.addColorStop(tr * 0.62, rgba(pal.glow, 0.16));
+            gr.addColorStop(tr * 0.93, rgba(pal.edge, 0.55));
+            gr.addColorStop(tr, rgba(pal.core, 0.85));
+            gr.addColorStop(Math.min(0.99, tr + 0.07), rgba(pal.glow, 0.35));
+            gr.addColorStop(1, rgba(pal.glow, 0));
+            return gr;
+        }
+        function drawSlashes() {
+            if (!fxSlashes.n) return;
+            const cx = player.x - camera.x, cy = player.y - camera.y - 6;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < fxSlashes.n; i++) {
+                const s = fxSlashes.a[i];
+                const age = game.time - s.t0;
+                if (age < 0) continue;
+                const pal = FX_PAL[s.kind];
+                const sweepT = Math.min(1, age / s.sweep);
+                const p = 1 - Math.pow(1 - sweepT, 3);
+                const fade = age <= s.sweep ? 1 : Math.max(0, 1 - (age - s.sweep) / s.fade);
+                if (fade <= 0) continue;
+                const uHead = p;
+                const uTail = age <= s.sweep ? Math.max(0, p - 0.85) : 0.15 + 0.85 * (1 - fade);
+                if (uHead - uTail < 0.02) continue;
+                const a0 = s.facing - s.dir * s.arcHalf;
+                const A = s.alpha * fade * (s.arcHalf > 1 ? 0.8 : 1);   // arcos enormes, um pouco mais sutis
+                if (!s.grad) s.grad = fxSlashGradient(s, pal);
+                const r0 = s.range * (1 - s.thick) * 0.9, r1 = s.range * 1.1;
+                ctx.globalAlpha = A;
+                ctx.fillStyle = s.grad;
+                fxSlashPath(s, a0, uTail, uHead, r1, 1 - r0 / r1);
+                ctx.fill();
+                // gume: arco fino e brilhante na borda
+                ctx.globalAlpha = 0.8 * A;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.3;
+                ctx.beginPath();
+                const span = 2 * s.arcHalf * s.dir;
+                const aT = a0 + span * (uTail + (uHead - uTail) * 0.5), aH = a0 + span * uHead;
+                ctx.arc(0, 0, s.range, Math.min(aT, aH), Math.max(aT, aH));
+                ctx.stroke();
+                // clarão na ponta da lâmina durante o corte
+                if (age <= s.sweep) {
+                    const hx = Math.cos(aH) * s.range * 0.9, hy = Math.sin(aH) * s.range * 0.9;
+                    const star = fxStar(pal.edge);
+                    const sz = Math.min(64, s.range * 0.5);
+                    ctx.globalAlpha = 0.8 * A;
+                    ctx.drawImage(star, hx - sz / 2, hy - sz / 2, sz, sz);
+                }
+            }
+            ctx.restore();
+        }
+
+        // Faíscas agrupadas por cor/opacidade/espessura: poucos stroke() por quadro
+        const fxBucketCount = new Uint16Array(64 * 6);
+        const fxBucketStart = new Uint16Array(64 * 6 + 1);
+        const fxOrder = new Uint16Array(900);
+        function drawSparks() {
+            const n = fxSparks.n;
+            if (!n) return;
+            const nb = FX_COLORS.length * 6;
+            fxBucketCount.fill(0, 0, nb);
+            const sp = fxSparks.a;
+            for (let i = 0; i < n; i++) {
+                const s = sp[i];
+                const lvl = Math.min(2, Math.floor(s.life / s.max * 3));
+                s.b = (s.ci * 3 + lvl) * 2 + s.w;
+                fxBucketCount[s.b]++;
+            }
+            fxBucketStart[0] = 0;
+            for (let b = 0; b < nb; b++) fxBucketStart[b + 1] = fxBucketStart[b] + fxBucketCount[b];
+            fxBucketCount.fill(0, 0, nb);
+            for (let i = 0; i < n; i++) {
+                const b = sp[i].b;
+                fxOrder[fxBucketStart[b] + fxBucketCount[b]++] = i;
+            }
+            ctx.lineCap = 'round';
+            for (let pass = 0; pass < 2; pass++) {          // 0: sangue/cinza (normal), 1: luz (aditiva)
+                ctx.globalCompositeOperation = pass ? 'lighter' : 'source-over';
+                for (let b = 0; b < nb; b++) {
+                    const cnt = fxBucketStart[b + 1] - fxBucketStart[b];
+                    if (!cnt) continue;
+                    const ci = (b >> 1) / 3 | 0;
+                    if (FX_COLOR_ADD[ci] !== (pass === 1)) continue;
+                    const lvl = (b >> 1) % 3;
+                    ctx.strokeStyle = FX_COLOR_ALPHA[ci][lvl];
+                    ctx.lineWidth = b & 1 ? 2.6 : 1.7;
+                    ctx.beginPath();
+                    for (let k = fxBucketStart[b]; k < fxBucketStart[b + 1]; k++) {
+                        const s = sp[fxOrder[k]];
+                        const x = s.x - camera.x, y = s.y - camera.y;
+                        let tx = s.vx * s.len, ty = s.vy * s.len;
+                        if (tx * tx + ty * ty < 1) { tx = 0.7; ty = 0.7; }
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x - tx, y - ty);
+                    }
+                    ctx.stroke();
+                }
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.lineCap = 'butt';
+        }
+
+        function drawFxTop() {
+            ctx.imageSmoothingEnabled = true;
+            // colunas de luz
+            if (fxPillars.n) {
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < fxPillars.n; i++) {
+                    const p = fxPillars.a[i];
+                    const t = 1 - p.life / p.max;
+                    const w = p.w * (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) * 0.6);
+                    ctx.globalAlpha = Math.min(1, (1 - t) * 1.4);
+                    ctx.drawImage(p.spr, p.x - camera.x - w / 2, p.y - camera.y - p.h, w, p.h + 20);
+                }
+            }
+            // anéis de choque
+            if (fxRings.n) {
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < fxRings.n; i++) {
+                    const r = fxRings.a[i];
+                    if (r.delay > 0) continue;
+                    const t = 1 - r.life / r.max;
+                    const e = 1 - (1 - t) * (1 - t);
+                    const rad = r.r0 + (r.r1 - r.r0) * e;
+                    ctx.globalAlpha = r.a0 * (1 - t);
+                    ctx.strokeStyle = r.col;
+                    ctx.lineWidth = r.w * (1 - t * 0.6);
+                    ctx.beginPath();
+                    ctx.ellipse(r.x - camera.x, r.y - camera.y, rad, rad * r.sq, r.rot, r.a1, r.a2);
+                    ctx.stroke();
+                }
+            }
+            // espinhos da Coroa (nascem fora do corpo do jogador)
+            if (fxThorns.n) {
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < fxThorns.n; i++) {
+                    const th = fxThorns.a[i];
+                    const age = th.max - th.life;
+                    const grow = age < 0.08 ? age / 0.08 : Math.max(0, 1 - (age - 0.08) / (th.max - 0.08));
+                    const x = th.x - camera.x, y = th.y - camera.y - 6;
+                    for (let pass = 0; pass < 2; pass++) {
+                        ctx.globalAlpha = (pass ? 0.9 : 0.85) * grow;
+                        ctx.fillStyle = pass ? '#ffd6dc' : '#d0183a';
+                        ctx.beginPath();
+                        for (let k = 0; k < th.n; k++) {
+                            const a = th.seed + k / th.n * TWO_PI;
+                            const len = (60 + (k % 3) * 22) * grow;
+                            const bw = pass ? 2.2 : 6;
+                            const ca = Math.cos(a), sa = Math.sin(a);
+                            ctx.moveTo(x + ca * 24 - sa * bw, y + sa * 24 + ca * bw);
+                            ctx.quadraticCurveTo(x + ca * (24 + len * 0.6) + sa * bw * 1.5, y + sa * (24 + len * 0.6) - ca * bw * 1.5, x + ca * (24 + len), y + sa * (24 + len));
+                            ctx.lineTo(x + ca * 24 + sa * bw, y + sa * 24 - ca * bw);
+                        }
+                        ctx.fill();
+                    }
+                }
+            }
+            // raios
+            if (fxBolts.n) {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.lineJoin = 'round';
+                for (let i = 0; i < fxBolts.n; i++) {
+                    const b = fxBolts.a[i];
+                    const a = Math.min(1, b.life / b.max * 1.6);
+                    const n = b.pts.length / 2;
+                    ctx.beginPath();
+                    for (let j = 0; j < n; j++) {
+                        const x = b.pts[j * 2] - camera.x, y = b.pts[j * 2 + 1] - camera.y;
+                        if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.globalAlpha = 0.45 * a;
+                    ctx.strokeStyle = b.col;
+                    ctx.lineWidth = 5 * b.w;
+                    ctx.stroke();
+                    ctx.globalAlpha = 0.95 * a;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5 * b.w;
+                    ctx.stroke();
+                }
+                ctx.lineJoin = 'miter';
+            }
+            // brilhos: névoa (normal) primeiro, luz (aditiva) depois
+            if (fxGlows.n) {
+                for (let pass = 0; pass < 2; pass++) {
+                    ctx.globalCompositeOperation = pass ? 'lighter' : 'source-over';
+                    for (let i = 0; i < fxGlows.n; i++) {
+                        const g = fxGlows.a[i];
+                        if (g.add !== (pass === 1)) continue;
+                        const t = 1 - g.life / g.max;
+                        const e = 1 - (1 - t) * (1 - t);
+                        const s = g.s0 + (g.s1 - g.s0) * e;
+                        ctx.globalAlpha = g.a0 * (1 - t);
+                        ctx.drawImage(g.spr, g.x - camera.x - s / 2, g.y - camera.y - s / 2, s, s);
+                    }
+                }
+            }
+            // desintegração: silhueta branca que se expande e some
+            if (fxGhosts.n) {
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < fxGhosts.n; i++) {
+                    const g = fxGhosts.a[i];
+                    const t = 1 - g.life / g.max;
+                    const s = g.size * (1 + g.grow * t);
+                    ctx.globalAlpha = 0.9 * (1 - t) * (1 - t);
+                    ctx.drawImage(g.img, g.fx, g.fy, FRAME, FRAME, g.x - camera.x - s / 2, g.y - camera.y - s / 2 - (s - g.size) * 0.3, s, s);
+                }
+            }
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+            drawSparks();
+            ctx.imageSmoothingEnabled = false;
+        }
+
+        // O caçador por cima dos próprios efeitos (meio transparente): nunca some na horda
+        function drawPlayerOverlay() {
+            const s = fxPlayerSpr;
+            if (!s.img || !(fxSparks.n + fxGlows.n + fxBolts.n + fxSlashes.n + fxRings.n)) return;
+            ctx.globalAlpha = 0.6;
+            drawSprite(s.img, s.row, s.frame, s.frames, player.x - camera.x, player.y - camera.y, 64, 64, false);
+            ctx.globalAlpha = 1;
+        }
+
+        // Inimigos já mortos mecanicamente cuja lâmina ainda não chegou (visual)
+        function drawStandins() {
+            for (let i = 0; i < fxStandins.n; i++) {
+                const s = fxStandins.a[i];
+                if (!s.img || !s.img.complete) continue;
+                ctx.drawImage(s.img, s.fx, s.fy, FRAME, FRAME, s.x - camera.x - s.size / 2, s.y - camera.y - s.size / 2, s.size, s.size);
+            }
+        }
+
+        function drawFxScreen() {
+            if (fxFlashA <= 0) return;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = fxFlashA;
+            ctx.fillStyle = 'rgb(' + fxFlashCol + ')';
+            ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+            ctx.globalAlpha = 1;
+            ctx.setTransform(1, 0, 0, 1, fxShakeX, fxShakeY);
+        }
+
+        function resetFx() {
+            fxSparks.n = fxGlows.n = fxRings.n = fxSlashes.n = fxBolts.n = fxDecals.n = 0;
+            fxCracks.n = fxGhosts.n = fxStandins.n = fxThorns.n = fxPillars.n = fxEvents.n = 0;
+            fxFlashA = 0;
+            fxHitDelay = 0;
+            fxCurSlash = null;
         }
 
         // =====================================================================
@@ -7054,50 +8489,63 @@
             minimap.frame = 0;
         }
 
-        function drawMeleeArcs() {
-            for (const w of player.weapons) {
-                const c = WEAPONS[w.id];
-                if (c.behavior !== 'melee-horizontal' || w.animTimer <= 0) continue;
-                const t = 1 - w.animTimer / 0.22;
-                const range = w.range * player.stats.area;
-                const arcHalf = (w.arcHalf || c.arcHalf || (Math.PI / 8)) * player.stats.area * (hasOmen('shattered_mirror') ? 1.3 : 1);
-                const sx = player.x - camera.x;
-                const sy = player.y - camera.y;
-                const alpha = (1 - t) * 0.16;
-                ctx.save();
-                ctx.shadowColor = rgba(c.color, 0.45);
-                ctx.shadowBlur = w.evolved ? 14 : 6;
-                ctx.fillStyle = rgba(c.color, alpha);
-                ctx.beginPath();
-                ctx.moveTo(sx, sy);
-                ctx.arc(sx, sy, range, player.facing - arcHalf, player.facing + arcHalf);
-                ctx.closePath();
-                ctx.fill();
-                ctx.strokeStyle = rgba(c.color, alpha * 0.55 + 0.08);
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.restore();
-            }
-        }
-
         function drawDamageZones() {
+            ctx.imageSmoothingEnabled = true;
             for (const z of damageZones) {
                 if (!z.alive) continue;
                 const sx = z.x - camera.x;
                 const sy = z.y - camera.y;
-                const a = Math.max(0.08, 0.3 * (1 - z.timer / z.duration));
-                ctx.save();
+                const r = z.radius;
+                if (sx < -r - 40 || sx > VIEW_W + r + 40 || sy < -r - 160 || sy > VIEW_H + r + 40) continue;
+                const kind = z.fxKind || 'holy';
+                const pal = FX_PAL[kind];
+                const evo = kind === 'holy_evo';
+                // poças sobrepostas dividem o brilho (não viram uma mandala que tampa a horda)
+                let overlap = 0;
+                for (const o of damageZones) {
+                    if (o === z || !o.alive) continue;
+                    const dx = o.x - z.x, dy = o.y - z.y, rr = o.radius + r;
+                    if (dx * dx + dy * dy < rr * rr * 0.5) overlap++;
+                }
+                const a = Math.min(1, z.timer / 0.18) * Math.min(1, (z.duration - z.timer) / 0.45) / (1 + 0.6 * overlap);
+                const t = game.time, seed = z.fxSeed;
+                ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = a;
-                ctx.fillStyle = z.color;
-                ctx.beginPath();
-                ctx.arc(sx, sy, z.radius, 0, TWO_PI);
-                ctx.fill();
-                ctx.strokeStyle = z.color;
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.drawImage(fxZoneBase(kind), sx - r * 1.3, sy - r * 1.3, r * 2.6, r * 2.6);
+                const runes = fxRunes(pal.edge);
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(t * 0.45 + seed);
+                ctx.globalAlpha = (evo ? 0.5 : 0.65) * a;
+                ctx.drawImage(runes, -r, -r, 2 * r, 2 * r);
+                if (fxQ > 0.6) {                          // círculo interno girando ao contrário
+                    ctx.rotate(-t * 1.1);
+                    ctx.globalAlpha = (evo ? 0.25 : 0.32) * a;
+                    ctx.drawImage(runes, -r * 0.55, -r * 0.55, r * 1.1, r * 1.1);
+                }
                 ctx.restore();
-                ctx.globalAlpha = 1;
+                ctx.globalAlpha = (evo ? 0.55 : 0.7) * a * (0.85 + 0.15 * Math.sin(t * 3 + seed));
+                ctx.drawImage(fxCross(pal.edge), sx - r / 2, sy - r / 2, r, r);
+                // chamas sagradas dançando na borda
+                const flame = fxFlame(pal.glow);
+                const n = Math.round((evo ? 14 : 10) * (0.5 + 0.5 * fxQ));
+                const fh = (evo ? 34 : 28) * (0.4 + 0.6 * a);
+                ctx.globalAlpha = 0.75 * a;
+                for (let i = 0; i < n; i++) {
+                    const ang = seed + i / n * TWO_PI + t * 0.3;
+                    const fl = 0.7 + 0.25 * Math.sin(t * 11 + i * 2.3 + seed) + 0.12 * Math.sin(t * 23 + i * 5.1);
+                    const h = fh * fl, w = h * 0.6;
+                    const fx = sx + Math.cos(ang) * r * 0.97, fy = sy + Math.sin(ang) * r * 0.97;
+                    ctx.drawImage(flame, fx - w / 2, fy - h * 0.8, w, h);
+                }
+                if (evo && fxQ > 0.5) {                   // Água Sagrada: feixe de luz discreto no centro
+                    ctx.globalAlpha = 0.3 * a * (0.8 + 0.2 * Math.sin(t * 6 + seed));
+                    ctx.drawImage(fxPillar(pal.glow), sx - 17, sy - 130, 34, 140);
+                }
             }
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.imageSmoothingEnabled = false;
         }
 
         function drawChests() {
@@ -7317,19 +8765,54 @@
         }
 
         function drawOrbs() {
+            const spr = fxOrb();
+            ctx.imageSmoothingEnabled = true;
             for (const o of xpOrbs) {
                 if (!o.alive) continue;
                 const sx = o.x - camera.x;
                 const sy = o.y - camera.y;
-                ctx.save();
-                ctx.shadowColor = 'rgba(120, 255, 180, 0.8)';
-                ctx.shadowBlur = 6;
-                ctx.fillStyle = '#7dffb0';
-                ctx.beginPath();
-                ctx.arc(sx, sy, o.radius, 0, TWO_PI);
-                ctx.fill();
-                ctx.restore();
+                if (sx < -20 || sx > VIEW_W + 20 || sy < -20 || sy > VIEW_H + 20) continue;
+                const s = 28 * o.radius / 6;
+                ctx.drawImage(spr, sx - s / 2, sy - s / 2, s, s);
             }
+            ctx.imageSmoothingEnabled = false;
+        }
+
+        // Rastro de luz do arco/besta (cauda afinando + brilho na ponta), aditivo
+        function drawProjectileTrail(p, sx, sy) {
+            const pal = FX_PAL[p.fxKind || 'bow'];
+            const spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy) || 1;
+            const ux = p.vx / spd, uy = p.vy / spd;
+            const k = p.weaponId === 'crossbow' ? 0.13 : (p.evolved ? 0.16 : 0.1);
+            const len = Math.min(spd * k, (game.time - (p.fxT === undefined ? game.time : p.fxT)) * spd + 4);
+            const tx = sx - ux * len, ty = sy - uy * len;
+            const nx = -uy, ny = ux;
+            const w1 = p.weaponId === 'crossbow' ? 3 : (p.evolved ? 6 : 4.5);
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.45;
+            ctx.fillStyle = pal.glow;
+            ctx.beginPath();
+            ctx.moveTo(sx + nx * w1, sy + ny * w1);
+            ctx.lineTo(tx, ty);
+            ctx.lineTo(sx - nx * w1, sy - ny * w1);
+            ctx.closePath();
+            ctx.fill();
+            const w2 = w1 * 0.35;
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = pal.core;
+            ctx.beginPath();
+            ctx.moveTo(sx + nx * w2, sy + ny * w2);
+            ctx.lineTo(sx - ux * len * 0.7, sy - uy * len * 0.7);
+            ctx.lineTo(sx - nx * w2, sy - ny * w2);
+            ctx.closePath();
+            ctx.fill();
+            const gs = p.evolved ? 30 : 22;
+            ctx.imageSmoothingEnabled = true;
+            ctx.globalAlpha = 0.7;
+            ctx.drawImage(fxGlow(pal.glow), sx - gs / 2, sy - gs / 2, gs, gs);
+            ctx.imageSmoothingEnabled = false;
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
         }
 
         function drawProjectiles() {
@@ -7339,12 +8822,11 @@
                 const sy = p.y - camera.y;
                 if (sx < -40 || sx > VIEW_W + 40 || sy < -40 || sy > VIEW_H + 40) continue;
                 const ang = Math.atan2(p.vy, p.vx);
+                if (!p.isEnemy) drawProjectileTrail(p, sx, sy);
 
                 ctx.save();
                 ctx.translate(sx, sy);
                 ctx.rotate(ang);
-                ctx.shadowColor = rgba(p.color, p.evolved ? 0.9 : 0.6);
-                ctx.shadowBlur = p.evolved ? 12 : 5;
 
                 if (p.isEnemy || p.weaponId === 'enemy_bolt') {
                     // ORBE DE SANGUE / DISPARO SOMBRIO DO VAMPIRO 3
@@ -7538,6 +9020,7 @@
             }
             if (player.wardMax > 0) drawWard(sx, sy);   // anel no chão, sob o personagem
             drawSprite(img, player.row, frame, anim.frames, sx, sy, size, size, false);
+            fxPlayerSpr.img = img; fxPlayerSpr.row = player.row; fxPlayerSpr.frame = frame; fxPlayerSpr.frames = anim.frames;
 
             // BOLHA DE ESCUDO DE ENERGIA TRANSLÚCIDA PULSANTE
             if (player.shield > 0) {
@@ -7603,13 +9086,28 @@
             ctx.stroke();
         }
 
+        function drawEnemyFlash(img, row, frame, sx, sy, size, k) {
+            const sil = fxSilhouette(img);
+            if (!sil) return;
+            ctx.globalAlpha = 0.85 * k;
+            ctx.drawImage(sil, frame * FRAME, row * FRAME, FRAME, FRAME, sx - size / 2, sy - size / 2, size, size);
+            ctx.globalAlpha = 1;
+        }
+
         function drawEnemies() {
             const bossImg = images[ASSETS.bossWalk];
             if (game.freezeTimer > 0) drawFrost();
+            if (fxStandins.n) drawStandins();
             for (const e of enemies) {
                 if (!e.alive) continue;
-                const sx = e.x - camera.x;
-                const sy = e.y - camera.y;
+                let ox = 0, oy = 0;
+                if (e.fxOffX || e.fxOffY) {           // empurrão visual (a posição real já mudou)
+                    const k = fxShoveK(e);
+                    ox = e.fxOffX * k;
+                    oy = e.fxOffY * k;
+                }
+                const sx = e.x + ox - camera.x;
+                const sy = e.y + oy - camera.y;
                 if (sx < -80 || sx > VIEW_W + 80 || sy < -80 || sy > VIEW_H + 80) continue;
 
                 const dx = player.x - e.x;
@@ -7634,12 +9132,16 @@
                     ctx.shadowBlur = 22;
                     drawSprite(bossImg, row, frame, anim.frames, sx, sy, 128, 128, false);
                     ctx.restore();
+                    const ft = game.time - e.fxHitT;
+                    if (ft >= 0 && ft < 0.1) drawEnemyFlash(bossImg, row, frame, sx, sy, 128, 1 - ft / 0.1);
                 } else {
                     const typeDef = ENEMY_TYPES[e.type] || ENEMY_TYPES.v1;
                     const enemyImg = images[ASSETS[typeDef.sprite]] || images[ASSETS.vampire1Walk];
                     const anim = ANIMS.enemyWalk;
                     const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
                     drawSprite(enemyImg, row, frame, anim.frames, sx, sy, 64, 64, false);
+                    const ft = game.time - e.fxHitT;
+                    if (ft >= 0 && ft < 0.1) drawEnemyFlash(enemyImg, row, frame, sx, sy, 64, 1 - ft / 0.1);
                 }
             }
         }
@@ -7656,50 +9158,153 @@
             ctx.globalAlpha = 1;
         }
 
+        // Número pronto (texto + sombra) em 2× de resolução, reaproveitado entre acertos iguais.
+        // Números comuns são montados de um atlas de dígitos por cor (sem fonte/fillText por
+        // valor novo) em canvases reciclados; textos livres ("BLOQUEADO ⚜️") usam fillText.
+        const FX_TEXT_FONT = 'bold 13px Lato, sans-serif';
+        const FX_GLYPHS = '0123456789× +-';
+        const FX_TEXT_SLOT_W = 72;                       // largura (1×) dos canvases reciclados
+        const fxTextCache = new Map();
+        const fxTextFree = [];
+        const fxDigitAtlas = new Map();
+        let fxTextMeasure = null;
+        function fxTextReset() {                          // recicla só os canvases que nenhum número vivo usa
+            const live = new Set();
+            for (const d of damageTexts) if (d.spr) live.add(d.spr);
+            fxTextCache.forEach(function (c) { if (c.fxSlot && !live.has(c)) fxTextFree.push(c); });
+            fxTextCache.clear();
+        }
+        if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', function () { fxTextReset(); fxDigitAtlas.clear(); });
+        function fxDigits(color) {
+            let at = fxDigitAtlas.get(color);
+            if (at) return at;
+            if (!fxTextMeasure) fxTextMeasure = fxCanvas(4, 4).getContext('2d');
+            fxTextMeasure.font = FX_TEXT_FONT;
+            const xs = [], ws = [], advs = [];
+            let x = 0;
+            for (const ch of FX_GLYPHS) {
+                const adv = fxTextMeasure.measureText(ch).width;   // avanço real do glifo
+                const cw = Math.ceil(adv) + 2;                      // recorte com folga para a sombra
+                xs.push(x); ws.push(cw); advs.push(adv);
+                x += cw + 2;
+            }
+            const c = fxCanvas(x * 2, 36);
+            const g = c.getContext('2d');
+            g.scale(2, 2);
+            g.font = FX_TEXT_FONT;
+            g.textAlign = 'left';
+            let i = 0;
+            for (const ch of FX_GLYPHS) {
+                g.fillStyle = 'rgba(24, 4, 10, 0.85)';
+                g.fillText(ch, xs[i] + 1, 15);
+                g.fillStyle = color;
+                g.fillText(ch, xs[i], 14);
+                i++;
+            }
+            at = { c: c, xs: xs, ws: ws, advs: advs };
+            fxDigitAtlas.set(color, at);
+            return at;
+        }
+        function fxTextSprite(text, color) {
+            const key = color + text;
+            let c = fxTextCache.get(key);
+            if (c) return c;
+            if (fxTextCache.size > 300) fxTextReset();
+            let glyphs = true, w = 4;
+            const at = fxDigits(color);
+            for (let i = 0; i < text.length; i++) {
+                const k = FX_GLYPHS.indexOf(text[i]);
+                if (k < 0) { glyphs = false; break; }
+                w += at.advs[k];
+            }
+            if (glyphs && w <= FX_TEXT_SLOT_W) {
+                c = fxTextFree.pop();
+                if (!c) { c = fxCanvas(FX_TEXT_SLOT_W * 2, 36); c.fxSlot = true; }
+                const g = c.getContext('2d');
+                g.clearRect(0, 0, c.width, 36);
+                let x = 2;
+                for (let i = 0; i < text.length; i++) {
+                    const k = FX_GLYPHS.indexOf(text[i]);
+                    g.drawImage(at.c, at.xs[k] * 2, 0, at.ws[k] * 2, 36, x * 2, 0, at.ws[k] * 2, 36);
+                    x += at.advs[k];
+                }
+                c.fxW = w;
+                c.fxSrcW = w * 2;
+            } else {
+                if (!fxTextMeasure) fxTextMeasure = fxCanvas(4, 4).getContext('2d');
+                fxTextMeasure.font = FX_TEXT_FONT;
+                w = Math.ceil(fxTextMeasure.measureText(text).width) + 4;
+                c = fxCanvas(w * 2, 36);
+                const g = c.getContext('2d');
+                g.scale(2, 2);
+                g.font = FX_TEXT_FONT;
+                g.textAlign = 'center';
+                g.fillStyle = 'rgba(24, 4, 10, 0.85)';
+                g.fillText(text, w / 2 + 1, 15);
+                g.fillStyle = color;
+                g.fillText(text, w / 2, 14);
+                c.fxW = w;
+                c.fxSrcW = w * 2;
+            }
+            fxTextCache.set(key, c);
+            return c;
+        }
+
         function drawDamageTexts() {
-            ctx.font = 'bold 13px Lato, sans-serif';
-            ctx.textAlign = 'center';
+            ctx.imageSmoothingEnabled = true;
             for (const d of damageTexts) {
-                ctx.globalAlpha = Math.max(0, d.life / d.maxLife);
-                ctx.fillStyle = d.color;
-                ctx.fillText(d.text, d.x - camera.x, d.y - camera.y);
+                const t = 1 - d.life / d.maxLife;
+                const pop = t < 0.14 ? 1 + 0.6 * (1 - t / 0.14) : 1;   // salta ao aparecer
+                const s = (d.s || 1) * pop;
+                const spr = d.spr || (d.spr = fxTextSprite(d.text, d.color));
+                const w = spr.fxW * s, h = 18 * s;
+                ctx.globalAlpha = t > 0.6 ? Math.max(0, (1 - t) / 0.4) : 1;
+                ctx.drawImage(spr, 0, 0, spr.fxSrcW, 36, d.x - camera.x - w / 2, d.y - camera.y - h * 0.78, w, h);
             }
             ctx.globalAlpha = 1;
+            ctx.imageSmoothingEnabled = false;
         }
 
         function render() {
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            if (shake > 0) {
-                ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-            }
+            fxShakeX = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+            fxShakeY = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+            ctx.setTransform(1, 0, 0, 1, fxShakeX, fxShakeY);
             drawGround();
             drawWater();
+            drawFxGround();
             drawAmbience();
             drawObjects();
             drawPickups();
             drawOrbs();
             drawDamageZones();
             drawChests();
-            drawMeleeArcs();
             drawEnemies();
             drawPlayer();
+            drawSlashes();
             drawProjectiles();
             if (graveBlasts.length) drawGraveBlasts();
+            drawFxTop();
+            drawPlayerOverlay();
             drawParticles();
             drawDamageTexts();
             if (game.knellFlash > 0) {   // clarão do Sino dos Mortos
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.fillStyle = 'rgba(206, 224, 255, ' + (game.knellFlash * 0.3).toFixed(3) + ')';
                 ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+                ctx.setTransform(1, 0, 0, 1, fxShakeX, fxShakeY);
             }
+            drawFxScreen();
+            drawFxWarm();
             drawMinimap();
         }
 
         function gameLoop(now) {
             const dt = Math.min(0.05, (now - lastTime) / 1000);
             lastTime = now;
+            const t0 = performance.now();
             update(dt);
             render();
+            fxBudget(performance.now() - t0);   // qualidade adaptativa dos efeitos
             requestAnimationFrame(gameLoop);
         }
 
@@ -7841,7 +9446,8 @@
         setMinimapZoom(minimap.zoom);
         initMapPickups();
         setStatus('menu');
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, OMENS: OMENS, hasOmen: hasOmen, hitEnemy: hitEnemy, recomputeStats: recomputeStats, fireWeapon: fireWeapon, chestPityTime: chestPityTime, getProgression: function () { return progression; }, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
+        fxPrewarm();
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, OMENS: OMENS, hasOmen: hasOmen, hitEnemy: hitEnemy, step: function (dt) { const st = game.status; game.status = 'playing'; update(dt); if (game.status === 'playing') game.status = st; render(); }, fx: { sparks: fxSparks, glows: fxGlows, rings: fxRings, slashes: fxSlashes, decals: fxDecals, bolts: fxBolts, ghosts: fxGhosts, standins: fxStandins, cracks: fxCracks, pillars: fxPillars, events: fxEvents, silhouette: fxSilhouette, budget: fxBudget, quality: function () { return fxQ; }, prewarmed: function () { return fxWarmReady && !fxWarmList.length && fxSilCache.size >= 3 && fxRuneCache.size >= 2; } }, damageTexts: damageTexts, damageZones: damageZones, recomputeStats: recomputeStats, fireWeapon: fireWeapon, chestPityTime: chestPityTime, getProgression: function () { return progression; }, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>
