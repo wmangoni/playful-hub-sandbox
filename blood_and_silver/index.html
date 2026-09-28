@@ -1184,6 +1184,8 @@
                 w: 26,
                 h: 20,
                 radius: 14,
+                bonusSpeed: 0.02,   // tudo no máximo: +2% de velocidade de movimento OU +15 de vida
+                bonusHeal: 15,
                 bodyDark: '#362112',
                 bodyMid: '#54331c',
                 bodyLight: '#734626',
@@ -1201,6 +1203,8 @@
                 w: 34,
                 h: 26,
                 radius: 18,
+                bonusSpeed: 0.04,
+                bonusHeal: 25,
                 bodyDark: '#1b1f2e',
                 bodyMid: '#2c344a',
                 bodyLight: '#3f4b6a',
@@ -1218,6 +1222,8 @@
                 w: 44,
                 h: 34,
                 radius: 24,
+                bonusSpeed: 0.08,
+                bonusHeal: 50,
                 bodyDark: '#6b4a0d',
                 bodyMid: '#aa7816',
                 bodyLight: '#db9d23',
@@ -1507,6 +1513,7 @@
             maxHp: CONFIG.player.maxHp,
             shield: 0,
             maxShield: 100,
+            chestSpeedBonus: 0,
             speed: CONFIG.player.speed,
             level: 1,
             xp: 0,
@@ -1534,6 +1541,7 @@
         const pickups = [];
         const grid = new Map();
         let levelupOptions = [];
+        let chestChoice = null;   // baú com tudo no máximo: [velocidade, vida] à escolha
 
         let lastTime = performance.now();
         let audio = null;
@@ -3924,6 +3932,7 @@
                 if (c.stat === 'cooldown') s.cooldown *= (1 - c.amount * p.level);
                 else s[c.stat] += c.amount * p.level;
             }
+            s.move_speed += player.chestSpeedBonus;   // bênçãos de baú (valem até o fim da partida)
             const oldMax = player.maxHp;
             player.stats = s;
 
@@ -3952,6 +3961,7 @@
             player.xpToNext = nextLevelXP(1);
             player.weapons = [makeWeapon('sword')];
             player.passives = [];
+            player.chestSpeedBonus = 0;
             recomputeStats();
             player.hp = player.maxHp;
             player.shield = 0;
@@ -4208,6 +4218,7 @@
             if (game.status === 'menu' && (k === 'enter' || k === ' ')) startGame();
             else if (game.status === 'gameover' && k === 'enter') startGame();
             else if (game.status === 'levelup' && (k === '1' || k === '2' || k === '3')) chooseUpgrade(parseInt(k, 10) - 1);
+            else if (game.status === 'chest' && chestChoice) { if (k === '1' || k === '2') chooseChestBonus(parseInt(k, 10) - 1); }
             else if (game.status === 'chest' && (k === 'enter' || k === ' ')) closeChest();
             else if ((game.status === 'playing' || game.status === 'paused') && (k === 'enter' || k === 'escape')) togglePause();
         }
@@ -4723,22 +4734,29 @@
             });
         }
 
+        // Sobe o nível de uma arma/passivo que o jogador já tem, ou entrega um novo (nível 1).
+        function grantUpgrade(kind, id) {
+            if (kind === 'weapon') {
+                const w = player.weapons.find(function (x) { return x.id === id; });
+                if (w) levelUpWeapon(w);
+                else player.weapons.push(makeWeapon(id));
+            } else {
+                const p = player.passives.find(function (x) { return x.id === id; });
+                if (p) levelUpPassive(p);
+                else {
+                    player.passives.push(makePassive(id));
+                    recomputeStats();
+                }
+            }
+        }
+
         function chooseUpgrade(i) {
             const opt = levelupOptions[i];
             if (!opt) return;
             if (opt.kind === 'heal') {
                 player.hp = Math.min(player.maxHp, player.hp + CONFIG.healAmount);
-            } else if (opt.kind === 'weapon') {
-                const w = player.weapons.find(function (x) { return x.id === opt.id; });
-                if (w) levelUpWeapon(w);
-                else player.weapons.push(makeWeapon(opt.id));
-            } else if (opt.kind === 'passive') {
-                const p = player.passives.find(function (x) { return x.id === opt.id; });
-                if (p) levelUpPassive(p);
-                else {
-                    player.passives.push(makePassive(opt.id));
-                    recomputeStats();
-                }
+            } else {
+                grantUpgrade(opt.kind, opt.id);
             }
             levelupOptions = [];
             game.status = 'playing';
@@ -4984,6 +5002,10 @@
                 return;
             }
             const results = rollRoulette(c.rarity);
+            if (!results.length) {
+                openChestChoice(c.rarity);   // nada para melhorar nem evoluir
+                return;
+            }
             const infos = buildRouletteInfos(results);
             applyRouletteResults(results);
             renderChestPopup(c.rarity, infos, null);
@@ -4996,45 +5018,48 @@
         }
 
         function buildRouletteInfos(results) {
-            return results.map(function (id) {
-                const cw = WEAPONS[id];
-                const existing = player.weapons.find(function (x) { return x.id === id; });
-                return { id: id, icon: cw.icon, name: cw.name, isNew: !existing, level: existing ? existing.level : 0 };
+            return results.map(function (r) {
+                if (r.kind === 'passive') {
+                    const c = PASSIVES[r.id];
+                    const p = player.passives.find(function (x) { return x.id === r.id; });
+                    return { kind: 'passive', id: r.id, icon: c.icon, name: c.name, desc: c.desc + '<br>' + passiveBonusText(c, 1), isNew: !p, level: p ? p.level : 0 };
+                }
+                const cw = WEAPONS[r.id];
+                const existing = player.weapons.find(function (x) { return x.id === r.id; });
+                return { kind: 'weapon', id: r.id, icon: cw.icon, name: cw.name, desc: cw.desc, isNew: !existing, level: existing ? existing.level : 0 };
             });
         }
 
+        // Prêmios possíveis da roleta: armas e passivos. Comum/raro só melhoram o que o jogador
+        // já tem (abaixo do nível máximo); o lendário também pode trazer armas e passivos novos.
+        function chestRewardPool(rarity) {
+            const pool = [];
+            for (const id in WEAPONS) {
+                const w = player.weapons.find(function (x) { return x.id === id; });
+                if (w ? w.level < w.maxLevel : rarity === 'legendary') pool.push({ kind: 'weapon', id: id });
+            }
+            for (const id in PASSIVES) {
+                const p = player.passives.find(function (x) { return x.id === id; });
+                if (p ? p.level < p.maxLevel : (rarity === 'legendary' && isPassiveUnlocked(id))) pool.push({ kind: 'passive', id: id });
+            }
+            return pool;
+        }
+
         function rollRoulette(rarity) {
+            const pool = chestRewardPool(rarity);
             const spins = rarity === 'legendary' ? 3 : 1;
             const results = [];
-            for (let i = 0; i < spins; i++) {
-                const id = pickRouletteReward(rarity, results);
-                if (id) results.push(id);
+            while (results.length < spins && pool.length) {
+                results.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
             }
             return results;
         }
 
-        function pickRouletteReward(rarity, already) {
-            let pool;
-            if (rarity === 'legendary') pool = Object.keys(WEAPONS);
-            else pool = player.weapons.map(function (w) { return w.id; });
-            const available = pool.filter(function (id) {
-                if (already.indexOf(id) !== -1) return false;
-                const w = player.weapons.find(function (x) { return x.id === id; });
-                return !w || w.level < w.maxLevel;
-            });
-            if (available.length === 0) return null;
-            return available[Math.floor(Math.random() * available.length)];
-        }
-
         function applyRouletteResults(results) {
-            for (const id of results) {
-                const w = player.weapons.find(function (x) { return x.id === id; });
-                if (w) levelUpWeapon(w);
-                else player.weapons.push(makeWeapon(id));
-            }
+            for (const r of results) grantUpgrade(r.kind, r.id);
         }
 
-        function renderChestPopup(rarity, infos, evoInfo) {
+        function renderChestHeader(rarity) {
             if (rarity === 'legendary') {
                 chestTitle.innerHTML = '👑 BAÚ LENDÁRIO DE OURO';
                 chestTitle.style.color = '#ffd700';
@@ -5048,6 +5073,10 @@
                 chestTitle.style.color = '#d2b48c';
                 chestTitle.style.textShadow = '0 0 12px rgba(210, 180, 140, 0.6)';
             }
+        }
+
+        function renderChestPopup(rarity, infos, evoInfo) {
+            renderChestHeader(rarity);
             chestSubtitle.textContent = 'Roleta de Recompensa';
             chestCards.innerHTML = '';
             if (evoInfo) {
@@ -5063,15 +5092,50 @@
                 const el = document.createElement('div');
                 el.className = 'upgrade-card reveal-card';
                 el.style.animationDelay = ((evoInfo ? 1 : 0) + i * 0.25) + 's';
-                const c = WEAPONS[info.id];
-                const desc = c.desc;
-                const prog = info.isNew ? 'NOVA ARMA' : ('Nível ' + info.level + ' → ' + (info.level + 1));
-                el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + desc + '</div><div class="uc-prog">' + prog + '</div>';
+                const prog = info.isNew ? (info.kind === 'passive' ? 'NOVO PASSIVO' : 'NOVA ARMA') : ('Nível ' + info.level + ' → ' + (info.level + 1));
+                el.innerHTML = '<div class="uc-icon">' + info.icon + '</div><div class="uc-title">' + info.name + '</div><div class="uc-desc">' + info.desc + '</div><div class="uc-prog">' + prog + '</div>';
                 chestCards.appendChild(el);
             });
         }
 
+        // Tudo no máximo (nenhuma arma ou passivo para melhorar ou evoluir): o baú oferece uma
+        // escolha entre velocidade de movimento e vida, com valores pelo tier do baú.
+        function openChestChoice(rarity) {
+            const tier = CHEST_TIERS[rarity] || CHEST_TIERS.common;
+            chestChoice = [{ kind: 'speed', amount: tier.bonusSpeed }, { kind: 'heal', amount: tier.bonusHeal }];
+            renderChestHeader(rarity);
+            chestSubtitle.textContent = 'Arsenal no máximo! Escolha sua bênção (1 ou 2)';
+            chestCards.innerHTML = '';
+            chestChoice.forEach(function (opt, i) {
+                const el = document.createElement('div');
+                el.className = 'upgrade-card reveal-card';
+                el.style.animationDelay = (i * 0.2) + 's';
+                el.innerHTML = opt.kind === 'speed'
+                    ? '<div class="uc-icon">👢</div><div class="uc-title">Passos Ligeiros</div><div class="uc-desc">Velocidade de movimento maior até o fim da partida.</div><div class="uc-prog">+' + Math.round(opt.amount * 100) + '% de velocidade</div>'
+                    : '<div class="uc-icon">❤️</div><div class="uc-title">Restaurar Vida</div><div class="uc-desc">Recupera vida na hora.</div><div class="uc-prog">+' + opt.amount + ' de vida</div>';
+                el.addEventListener('click', function () { chooseChestBonus(i); });
+                chestCards.appendChild(el);
+            });
+            chestBtn.style.display = 'none';   // a escolha é obrigatória
+            if (audio) audio.play('chest');
+            setStatus('chest');
+        }
+
+        function chooseChestBonus(i) {
+            const opt = chestChoice && chestChoice[i];
+            if (!opt) return;
+            if (opt.kind === 'speed') {
+                player.chestSpeedBonus += opt.amount;
+                recomputeStats();
+            } else {
+                player.hp = Math.min(player.maxHp, player.hp + opt.amount);
+            }
+            closeChest();
+        }
+
         function closeChest() {
+            chestChoice = null;
+            chestBtn.style.display = '';
             chestScreen.classList.add('hidden');
             game.status = 'playing';
             hud.style.opacity = '1';
@@ -6487,7 +6551,7 @@
         initProceduralScenery();
         initMapPickups();
         setStatus('menu');
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, sceneryTheme: SCENERY_THEME, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>

@@ -30,7 +30,7 @@ Ordem do update: `updatePlayer` → `updateEnemies` → `rebuildGrid` → `updat
   - `random-area` (Água Benta): zonas de dano persistentes em posições aleatórias.
 - **`PASSIVES`** (8 itens) → `recomputeStats()` aplica `area/might/cooldown/speed/maxhp/regen/magnet/move_speed` em `player.stats`.
 - **`EVOLVED_WEAPONS`** (synergies): `isEvolvable` = arma nível 8 + passivo correspondente → o próximo baú evolui (`evolveWeapon`).
-- **Baús/Roleta**: drop por chance + `chestTimer` (pity ~60s); comum/raro = 1 giro (só armas possuídas); lendário = 3 giros (pode desbloquear novas).
+- **Baús/Roleta**: drop por chance + `chestTimer` (pity ~60s); a roleta (`chestRewardPool`) sorteia armas **e passivos**: comum/raro = 1 giro (só itens possuídos abaixo do nível máximo); lendário = 3 giros (pode trazer armas e passivos novos). Evolução disponível tem prioridade. Com tudo no máximo, o baú oferece uma escolha (`openChestChoice`): +2%/+4%/+8% de velocidade de movimento (`player.chestSpeedBonus`, zera a cada partida) **ou** +15/+25/+50 de vida, conforme o tier (`CHEST_TIERS.*.bonusSpeed/bonusHeal`).
 - **Chefe**: `updateBoss` spawn por tempo fixo (~120s); `computeBossHP` escala a vida por nível + força do arsenal; recompensa com 10 orbes + baú raro/lendário.
 - **Polish**: partículas, números de dano, *screen shake* e recorde de tempo em `localStorage`.
 
