@@ -17,7 +17,7 @@ Ordem do update: `updatePlayer` → `updateEnemies` → `rebuildGrid` → `updat
 
 ## 🧩 Padrões de Projeto
 
-- **Máquina de Estados**: `game.status` ∈ `menu` | `playing` | `levelup` | `chest` | `gameover` (popups pausam a simulação).
+- **Máquina de Estados**: `game.status` ∈ `menu` | `playing` | `levelup` | `chest` | `omen` | `paused` | `gameover` (popups pausam a simulação).
 - **Object Pooling**: inimigos, projéteis, orbes de XP, zonas de dano e baús em arrays pré-alocados (`MAX_*`), reutilizados via flag `alive`.
 - **Particionamento Espacial**: **Spatial Hash Grid** (`GRID_CELL = 64`) — a grade é reconstruída por frame e as colisões consultam apenas as células vizinhas (`queryRange`), evitando `O(armas × inimigos)`.
 - **Colisão sem raiz quadrada**: círculos comparados por distância ao quadrado.
@@ -33,6 +33,7 @@ Ordem do update: `updatePlayer` → `updateEnemies` → `rebuildGrid` → `updat
 - **`EVOLVED_WEAPONS`** (synergies): `isEvolvable` = arma nível 8 + passivo correspondente → o próximo baú evolui (`evolveWeapon`).
 - **Baús/Roleta**: drop por chance + `chestTimer` (pity ~60s); a roleta (`chestRewardPool`) sorteia armas **e passivos**: comum/raro = 1 giro (só itens possuídos abaixo do nível máximo); lendário = 3 giros (pode trazer armas e passivos novos). Evolução disponível tem prioridade. Com tudo no máximo, o baú oferece uma escolha (`openChestChoice`): +2%/+4%/+8% de velocidade de movimento (`player.chestSpeedBonus`, zera a cada partida) **ou** +15/+25/+50 de vida, conforme o tier (`CHEST_TIERS.*.bonusSpeed/bonusHeal`).
 - **Chefe**: `updateBoss` spawn por tempo fixo (~120s); `computeBossHP` escala a vida por nível + força do arsenal; recompensa com 10 orbes + baú raro/lendário.
+- **Presságios** (`OMENS`, 10 cartas; nome próprio do jogo, não "arcanas"): efeitos que valem até o fim da caçada, consultados com `hasOmen(id)` nos sistemas (`recomputeStats`, `killEnemy`, `damagePlayer`, `rollRoulette`, `spawnProjectiles`…). A conquista `omens` (2 chefes no total) faz o "Iniciar" abrir a escolha (`requestStart` → `openOmenPicker('start')`); a `omens_plus` (`reqType: 'run_boss_kills'`, 3 chefes numa caçada, `game.bossKillsRun`) abre `openOmenPicker('run')` a cada `OMEN_INTERVAL` (240 s) até `OMEN_MAX` (3). A última carta fica em `progression.lastOmen`. A Chama Sepulcral usa uma fila (`graveQueue`, no máx. 4 explosões por quadro) para a reação em cadeia não pesar num único quadro.
 - **Polish**: partículas, números de dano, *screen shake* e recorde de tempo em `localStorage`.
 - **Minimapa** (`drawMinimap`, canvas próprio no HUD, ~30 Hz): norte fixo, seta do jogador, marcos dos dioramas, itens, inimigos, baús e chefe (presos na borda quando longe), nome da região (`zoneNameAt`) e zoom (`+`/`−`, `M` esconde). O terreno é o mapa do mundo em baixa resolução (`bakeOverviewRows`), gerado pelo worker do cenário em faixas quando ele está ocioso.
 
