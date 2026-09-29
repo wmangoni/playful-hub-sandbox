@@ -11,6 +11,7 @@ Forja de heróis de D&D migrada do sistema legado `D-D-Make-Character` (CodeIgni
   - popup de **talentos e perícias**: "Salvar e gerar ficha" abre a ficha com `?escolher=1`, e o botão "Talentos e perícias" reabre;
   - acrescentou os 74 talentos do Livro do Jogador 3.0 (320 no total).
 - `TASKS/TASK_005.md`: integração no menu principal do hub pelo padrão do gerador de páginas SEO.
+- `TASKS/TASK_006.md` (refinada, implementação pendente): plano do **simulador de combate** (Arena) e o catálogo `data/catalogo-combate.json`.
 
 ## 🏗️ Arquitetura do Código
 
@@ -29,6 +30,11 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
   - Nunca edite estes arquivos à mão. Regere com `node ded_make_character/tools/sql-to-json.js <dump.sql>`.
   - Ao mudar o conteúdo, incremente `DATA_VERSION`. As cópias locais antigas passam a ser marcadas como desatualizadas.
   - O conversor não exporta `usuarios`: o dump contém e-mail real e hash de senha. Tabelas removidas entram em `RETIRED_TABLES` (`js/entities/index.js`), que apaga as cópias locais órfãs.
+- **`data/catalogo-combate.json`**: a exceção à regra acima. É o catálogo do simulador de combate, **mantido à mão** e fora do formato de tabela do store.
+  - Traz 20 monstros do SRD 3.0 (ND 1–20, Tarrasque no 20) e os personagens de Holy Avenger em regras 3.0.
+  - Formato em `tools/catalogo-combate.md`. Ao mudar o conteúdo, incremente `versao` e valide com `node ded_make_character/tools/validar-catalogo.js`, que também é usado por `tests/ded_make_character_catalogo.test.js`.
+  - O vocabulário de efeitos (`EFEITOS` no validador) é a fonte única. Ao mudá-lo, rode `node ded_make_character/tools/gerar-tabela-efeitos.js` para regravar a tabela do formato; o teste falha se as duas divergirem.
+  - Números vêm do SRD 3.0 (dragon.ee); textos são próprios. Nos personagens de Holy Avenger, `adaptacao` separa o que é oficial do que foi adaptado.
 - **`js/core/store.js`**: o store *copy-on-write*.
   - Leituras usam a cópia do `localStorage` (`dmc:v1:<tabela>`) se existir; senão, o JSON original.
   - Na primeira escrita numa tabela, o JSON original dela é copiado para o `localStorage` e a alteração é aplicada na cópia.
@@ -69,6 +75,11 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
     - Progressão: emparelhamento talento → vaga por nível.
   - **`js/pages/choices.js`** + **`css/choices.css`**: o popup (`<dialog>`). `openChoicesDialog` devolve `{ result, isDirty, dismiss }`, e a ficha usa a guarda do router enquanto ele está aberto.
   - **Tabela `fichas`** (`AUX_TABLES` em `js/entities/index.js`): as escolhas por personagem, na forma `{ personagem_id, pericias: {id da perícia: graduações}, talentos: [{talento_id, parametro}] }`. `computeSheet(..., { escolhas })` soma as graduações e os efeitos de `T30.efeitosTalentos`.
+  - **Simulador de combate** (TASK_006, E2/E3; sem tela ainda):
+    - `js/rules/dice.js`: dados com semente (mulberry32) e `scriptedRng` para testes;
+    - `js/rules/combat30.js`: o motor. `fromCatalog` gera a ficha de combate; `createBattle`, `nextTurn`, `nextRound`, `runBattle` e `simulate` rodam a luta; `rules` expõe as regras;
+    - `js/rules/combat30-specials.js`: as habilidades especiais do vocabulário do catálogo, chamadas pelo núcleo por ganchos. Não importa o núcleo: recebe `K` (= `rules`);
+    - as regras seguem a 3.0 e o §5 da TASK_006; as aproximações da distância abstrata estão no §8.1. Toda mudança exige ajustar `tests/ded_make_character_combate.test.js`, que fixa os dados com `scriptedRng`.
   - **`css/sheet.css`**: 2 páginas A4 de largura fixa (794 × 1123 px), reduzidas com `zoom` em telas estreitas. `@media print` imprime só a ficha. Fontes livres no lugar das originais: Scala Sans → Alegreya Sans e Alegreya Sans SC; Celestia Antiqua → Alegreya; Pterra → Grenze e Marcellus SC.
 - **`js/core/`**:
   - `router.js`: hash router com guarda assíncrona para formulários com alterações não salvas;
