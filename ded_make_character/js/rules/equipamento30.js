@@ -10,6 +10,7 @@
  * (o bordão entra como arma de duas mãos).
  */
 import { normalize as loose } from '../core/format.js';
+import { T30 } from './tables30.js';
 
 export const TAMANHOS_ARMA = ['Miúdo', 'Pequeno', 'Médio', 'Grande'];
 const TAMANHOS_CRIATURA = ['Mínimo', 'Minúsculo', 'Miúdo', 'Pequeno', 'Médio', 'Grande', 'Enorme'];
@@ -23,90 +24,110 @@ const B = ['concussão'];
  * `uso`: 'corpo a corpo', 'distancia' (projétil ou arremesso puro). `arremesso_m`: arma corpo a
  * corpo que também pode ser arremessada (incremento). `projetil`: arco, besta e funda (sem For
  * positiva no dano). `alcance_m` 3: arma de haste com alcance (3.0: glaive, guisarme, lança
- * longa, ranseur, corrente com cravos).
+ * longa, ranseur, corrente com cravos). `peso_lb`: o peso da tabela do SRD, em libras.
  */
 export const ARMAS = [
   // simples, corpo a corpo
-  { id: 'desarmado', nome: 'Desarmado', categoria: 'simples', uso: 'corpo a corpo', tamanho: null, dano: '1d3', critico: C(20, 2), tipo_dano: B, desarmado: true },
-  { id: 'adaga', nome: 'Adaga', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Miúdo', dano: '1d4', critico: C(19, 2), tipo_dano: P, arremesso_m: 3 },
-  { id: 'adaga-de-soco', nome: 'Adaga de soco', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Miúdo', dano: '1d4', critico: C(20, 3), tipo_dano: P },
-  { id: 'maca-leve', nome: 'Maça leve', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: B },
-  { id: 'foice-curta', nome: 'Foice curta', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: S },
-  { id: 'clava', nome: 'Clava', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(20, 2), tipo_dano: B, arremesso_m: 3 },
-  { id: 'meia-lanca', nome: 'Meia-lança', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(20, 3), tipo_dano: P, arremesso_m: 6 },
-  { id: 'maca-pesada', nome: 'Maça pesada', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: B },
-  { id: 'maca-estrela', nome: 'Maça-estrela', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: ['concussão', 'perfurante'] },
-  { id: 'bordao', nome: 'Bordão', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d6', critico: C(20, 2), tipo_dano: B, dupla: true },
-  { id: 'lanca-curta', nome: 'Lança curta', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, arremesso_m: 6 },
+  { id: 'desarmado', nome: 'Desarmado', categoria: 'simples', uso: 'corpo a corpo', tamanho: null, dano: '1d3', critico: C(20, 2), tipo_dano: B, desarmado: true, peso_lb: null },
+  { id: 'adaga', nome: 'Adaga', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Miúdo', dano: '1d4', critico: C(19, 2), tipo_dano: P, arremesso_m: 3, peso_lb: 1 },
+  { id: 'adaga-de-soco', nome: 'Adaga de soco', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Miúdo', dano: '1d4', critico: C(20, 3), tipo_dano: P, peso_lb: 2 },
+  { id: 'maca-leve', nome: 'Maça leve', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: B, peso_lb: 6 },
+  { id: 'foice-curta', nome: 'Foice curta', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: S, peso_lb: 3 },
+  { id: 'clava', nome: 'Clava', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(20, 2), tipo_dano: B, arremesso_m: 3, peso_lb: 3 },
+  { id: 'meia-lanca', nome: 'Meia-lança', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(20, 3), tipo_dano: P, arremesso_m: 6, peso_lb: 3 },
+  { id: 'maca-pesada', nome: 'Maça pesada', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: B, peso_lb: 12 },
+  { id: 'maca-estrela', nome: 'Maça-estrela', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: ['concussão', 'perfurante'], peso_lb: 8 },
+  { id: 'bordao', nome: 'Bordão', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d6', critico: C(20, 2), tipo_dano: B, dupla: true, peso_lb: 4 },
+  { id: 'lanca-curta', nome: 'Lança curta', categoria: 'simples', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, arremesso_m: 6, peso_lb: 5 },
   // simples, à distância
-  { id: 'besta-leve', nome: 'Besta leve', categoria: 'simples', uso: 'distancia', tamanho: 'Pequeno', dano: '1d8', critico: C(19, 2), tipo_dano: P, incremento_m: 24, projetil: true },
-  { id: 'dardo', nome: 'Dardo', categoria: 'simples', uso: 'distancia', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 2), tipo_dano: P, incremento_m: 6 },
-  { id: 'funda', nome: 'Funda', categoria: 'simples', uso: 'distancia', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 2), tipo_dano: B, incremento_m: 15, projetil: true },
-  { id: 'besta-pesada', nome: 'Besta pesada', categoria: 'simples', uso: 'distancia', tamanho: 'Médio', dano: '1d10', critico: C(19, 2), tipo_dano: P, incremento_m: 36, projetil: true },
-  { id: 'azagaia', nome: 'Azagaia', categoria: 'simples', uso: 'distancia', tamanho: 'Médio', dano: '1d6', critico: C(20, 2), tipo_dano: P, incremento_m: 9 },
+  { id: 'besta-leve', nome: 'Besta leve', categoria: 'simples', uso: 'distancia', tamanho: 'Pequeno', dano: '1d8', critico: C(19, 2), tipo_dano: P, incremento_m: 24, projetil: true, peso_lb: 6 },
+  { id: 'dardo', nome: 'Dardo', categoria: 'simples', uso: 'distancia', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 2), tipo_dano: P, incremento_m: 6, peso_lb: 0.5 },
+  { id: 'funda', nome: 'Funda', categoria: 'simples', uso: 'distancia', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 2), tipo_dano: B, incremento_m: 15, projetil: true, peso_lb: 0 },
+  { id: 'besta-pesada', nome: 'Besta pesada', categoria: 'simples', uso: 'distancia', tamanho: 'Médio', dano: '1d10', critico: C(19, 2), tipo_dano: P, incremento_m: 36, projetil: true, peso_lb: 9 },
+  { id: 'azagaia', nome: 'Azagaia', categoria: 'simples', uso: 'distancia', tamanho: 'Médio', dano: '1d6', critico: C(20, 2), tipo_dano: P, incremento_m: 9, peso_lb: 2 },
   // comuns, corpo a corpo
-  { id: 'machado-de-arremesso', nome: 'Machado de arremesso', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: S, arremesso_m: 3 },
-  { id: 'martelo-leve', nome: 'Martelo leve', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 2), tipo_dano: B, arremesso_m: 6 },
-  { id: 'machadinha', nome: 'Machadinha', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 3), tipo_dano: S },
-  { id: 'picareta-leve', nome: 'Picareta leve', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 4), tipo_dano: P },
-  { id: 'espada-curta', nome: 'Espada curta', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(19, 2), tipo_dano: P },
-  { id: 'machado-de-batalha', nome: 'Machado de batalha', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 3), tipo_dano: S },
-  { id: 'mangual-leve', nome: 'Mangual leve', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: B },
-  { id: 'espada-longa', nome: 'Espada longa', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(19, 2), tipo_dano: S },
-  { id: 'picareta-pesada', nome: 'Picareta pesada', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(20, 4), tipo_dano: P },
-  { id: 'rapieira', nome: 'Rapieira', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(18, 2), tipo_dano: P },
-  { id: 'cimitarra', nome: 'Cimitarra', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(18, 2), tipo_dano: S },
-  { id: 'tridente', nome: 'Tridente', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: P, arremesso_m: 3 },
-  { id: 'martelo-de-guerra', nome: 'Martelo de guerra', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 3), tipo_dano: B },
-  { id: 'falcione', nome: 'Falcione', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(18, 2), tipo_dano: S },
-  { id: 'mangual-pesado', nome: 'Mangual pesado', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(19, 2), tipo_dano: B },
-  { id: 'glaive', nome: 'Glaive', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(20, 3), tipo_dano: S, alcance_m: 3 },
-  { id: 'machado-grande', nome: 'Machado grande', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d12', critico: C(20, 3), tipo_dano: S },
-  { id: 'clava-grande', nome: 'Clava grande', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(20, 2), tipo_dano: B },
-  { id: 'espada-grande', nome: 'Espada grande', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d6', critico: C(19, 2), tipo_dano: S },
-  { id: 'guisarme', nome: 'Guisarme', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 3), tipo_dano: S, alcance_m: 3 },
-  { id: 'alabarda', nome: 'Alabarda', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(20, 3), tipo_dano: ['perfurante', 'cortante'] },
-  { id: 'lanca-longa', nome: 'Lança longa', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, alcance_m: 3 },
-  { id: 'ranseur', nome: 'Ranseur', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 3), tipo_dano: P, alcance_m: 3 },
-  { id: 'gadanho', nome: 'Gadanho', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 4), tipo_dano: ['perfurante', 'cortante'] },
+  { id: 'machado-de-arremesso', nome: 'Machado de arremesso', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: S, arremesso_m: 3, peso_lb: 4 },
+  { id: 'martelo-leve', nome: 'Martelo leve', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 2), tipo_dano: B, arremesso_m: 6, peso_lb: 2 },
+  { id: 'machadinha', nome: 'Machadinha', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 3), tipo_dano: S, peso_lb: 5 },
+  { id: 'picareta-leve', nome: 'Picareta leve', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d4', critico: C(20, 4), tipo_dano: P, peso_lb: 4 },
+  { id: 'espada-curta', nome: 'Espada curta', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(19, 2), tipo_dano: P, peso_lb: 3 },
+  { id: 'machado-de-batalha', nome: 'Machado de batalha', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 3), tipo_dano: S, peso_lb: 7 },
+  { id: 'mangual-leve', nome: 'Mangual leve', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: B, peso_lb: 5 },
+  { id: 'espada-longa', nome: 'Espada longa', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(19, 2), tipo_dano: S, peso_lb: 4 },
+  { id: 'picareta-pesada', nome: 'Picareta pesada', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(20, 4), tipo_dano: P, peso_lb: 6 },
+  { id: 'rapieira', nome: 'Rapieira', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(18, 2), tipo_dano: P, peso_lb: 3 },
+  { id: 'cimitarra', nome: 'Cimitarra', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d6', critico: C(18, 2), tipo_dano: S, peso_lb: 4 },
+  { id: 'tridente', nome: 'Tridente', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 2), tipo_dano: P, arremesso_m: 3, peso_lb: 5 },
+  { id: 'martelo-de-guerra', nome: 'Martelo de guerra', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d8', critico: C(20, 3), tipo_dano: B, peso_lb: 8 },
+  { id: 'falcione', nome: 'Falcione', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(18, 2), tipo_dano: S, peso_lb: 16 },
+  { id: 'mangual-pesado', nome: 'Mangual pesado', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(19, 2), tipo_dano: B, peso_lb: 20 },
+  { id: 'glaive', nome: 'Glaive', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(20, 3), tipo_dano: S, alcance_m: 3, peso_lb: 15 },
+  { id: 'machado-grande', nome: 'Machado grande', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d12', critico: C(20, 3), tipo_dano: S, peso_lb: 20 },
+  { id: 'clava-grande', nome: 'Clava grande', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(20, 2), tipo_dano: B, peso_lb: 10 },
+  { id: 'espada-grande', nome: 'Espada grande', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d6', critico: C(19, 2), tipo_dano: S, peso_lb: 15 },
+  { id: 'guisarme', nome: 'Guisarme', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 3), tipo_dano: S, alcance_m: 3, peso_lb: 15 },
+  { id: 'alabarda', nome: 'Alabarda', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d10', critico: C(20, 3), tipo_dano: ['perfurante', 'cortante'], peso_lb: 15 },
+  { id: 'lanca-longa', nome: 'Lança longa', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, alcance_m: 3, peso_lb: 9 },
+  { id: 'ranseur', nome: 'Ranseur', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 3), tipo_dano: P, alcance_m: 3, peso_lb: 15 },
+  { id: 'gadanho', nome: 'Gadanho', categoria: 'comum', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 4), tipo_dano: ['perfurante', 'cortante'], peso_lb: 12 },
   // comuns, à distância
-  { id: 'arco-curto', nome: 'Arco curto', categoria: 'comum', uso: 'distancia', tamanho: 'Médio', dano: '1d6', critico: C(20, 3), tipo_dano: P, incremento_m: 18, projetil: true },
-  { id: 'arco-curto-composto', nome: 'Arco curto composto', categoria: 'comum', uso: 'distancia', tamanho: 'Médio', dano: '1d6', critico: C(20, 3), tipo_dano: P, incremento_m: 21, projetil: true },
-  { id: 'arco-longo', nome: 'Arco longo', categoria: 'comum', uso: 'distancia', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, incremento_m: 30, projetil: true },
-  { id: 'arco-longo-composto', nome: 'Arco longo composto', categoria: 'comum', uso: 'distancia', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, incremento_m: 33, projetil: true },
+  { id: 'arco-curto', nome: 'Arco curto', categoria: 'comum', uso: 'distancia', tamanho: 'Médio', dano: '1d6', critico: C(20, 3), tipo_dano: P, incremento_m: 18, projetil: true, peso_lb: 2 },
+  { id: 'arco-curto-composto', nome: 'Arco curto composto', categoria: 'comum', uso: 'distancia', tamanho: 'Médio', dano: '1d6', critico: C(20, 3), tipo_dano: P, incremento_m: 21, projetil: true, peso_lb: 2 },
+  { id: 'arco-longo', nome: 'Arco longo', categoria: 'comum', uso: 'distancia', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, incremento_m: 30, projetil: true, peso_lb: 3 },
+  { id: 'arco-longo-composto', nome: 'Arco longo composto', categoria: 'comum', uso: 'distancia', tamanho: 'Grande', dano: '1d8', critico: C(20, 3), tipo_dano: P, incremento_m: 33, projetil: true, peso_lb: 3 },
   // exóticas
-  { id: 'kama', nome: 'Kama', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: S, monge: true },
-  { id: 'nunchaku', nome: 'Nunchaku', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: B, monge: true },
-  { id: 'siangham', nome: 'Siangham', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: P, monge: true },
-  { id: 'espada-bastarda', nome: 'Espada bastarda', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d10', critico: C(19, 2), tipo_dano: S },
-  { id: 'machado-de-guerra-anao', nome: 'Machado de guerra anão', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d10', critico: C(20, 3), tipo_dano: S },
-  { id: 'corrente-com-cravos', nome: 'Corrente com cravos', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 2), tipo_dano: P, alcance_m: 3 },
-  { id: 'besta-de-mao', nome: 'Besta de mão', categoria: 'exotica', uso: 'distancia', tamanho: 'Miúdo', dano: '1d4', critico: C(19, 2), tipo_dano: P, incremento_m: 9, projetil: true },
+  { id: 'kama', nome: 'Kama', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: S, monge: true, peso_lb: 2 },
+  { id: 'nunchaku', nome: 'Nunchaku', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: B, monge: true, peso_lb: 2 },
+  { id: 'siangham', nome: 'Siangham', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Pequeno', dano: '1d6', critico: C(20, 2), tipo_dano: P, monge: true, peso_lb: 1 },
+  { id: 'espada-bastarda', nome: 'Espada bastarda', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d10', critico: C(19, 2), tipo_dano: S, peso_lb: 10 },
+  { id: 'machado-de-guerra-anao', nome: 'Machado de guerra anão', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Médio', dano: '1d10', critico: C(20, 3), tipo_dano: S, peso_lb: 15 },
+  { id: 'corrente-com-cravos', nome: 'Corrente com cravos', categoria: 'exotica', uso: 'corpo a corpo', tamanho: 'Grande', dano: '2d4', critico: C(20, 2), tipo_dano: P, alcance_m: 3, peso_lb: 15 },
+  { id: 'besta-de-mao', nome: 'Besta de mão', categoria: 'exotica', uso: 'distancia', tamanho: 'Miúdo', dano: '1d4', critico: C(19, 2), tipo_dano: P, incremento_m: 9, projetil: true, peso_lb: 3 },
 ];
 
-/** `tipo`: leve, média, pesada ou escudo. `metal: false` são as permitidas ao druida. */
+/**
+ * `tipo`: leve, média, pesada ou escudo. `metal: false` são as permitidas ao druida. `peso_lb`: o
+ * peso da tabela do SRD para Médio, em libras (a de Pequeno pesa a metade).
+ */
 export const ARMADURAS = [
-  { id: 'acolchoada', nome: 'Armadura acolchoada', tipo: 'leve', bonus: 1, desMax: 8, penalidade: 0, falhaArcana: 5, metal: false },
-  { id: 'couro', nome: 'Armadura de couro', tipo: 'leve', bonus: 2, desMax: 6, penalidade: 0, falhaArcana: 10, metal: false },
-  { id: 'couro-batido', nome: 'Couro batido', tipo: 'leve', bonus: 3, desMax: 5, penalidade: -1, falhaArcana: 15, metal: true },
-  { id: 'camisao-de-malha', nome: 'Camisão de cota de malha', tipo: 'leve', bonus: 4, desMax: 4, penalidade: -2, falhaArcana: 20, metal: true },
-  { id: 'gibao-de-peles', nome: 'Gibão de peles', tipo: 'média', bonus: 3, desMax: 4, penalidade: -3, falhaArcana: 20, metal: false },
-  { id: 'brunea', nome: 'Brunea', tipo: 'média', bonus: 4, desMax: 3, penalidade: -4, falhaArcana: 25, metal: true },
-  { id: 'cota-de-malha', nome: 'Cota de malha', tipo: 'média', bonus: 5, desMax: 2, penalidade: -5, falhaArcana: 30, metal: true },
-  { id: 'peitoral', nome: 'Peitoral de aço', tipo: 'média', bonus: 5, desMax: 3, penalidade: -4, falhaArcana: 20, metal: true },
-  { id: 'cota-de-talas', nome: 'Cota de talas', tipo: 'pesada', bonus: 6, desMax: 0, penalidade: -7, falhaArcana: 40, metal: true },
-  { id: 'cota-de-placas', nome: 'Cota de placas', tipo: 'pesada', bonus: 6, desMax: 1, penalidade: -6, falhaArcana: 35, metal: true },
-  { id: 'meia-armadura', nome: 'Meia-armadura', tipo: 'pesada', bonus: 7, desMax: 0, penalidade: -7, falhaArcana: 40, metal: true },
-  { id: 'armadura-completa', nome: 'Armadura completa', tipo: 'pesada', bonus: 8, desMax: 1, penalidade: -6, falhaArcana: 35, metal: true },
-  { id: 'broquel', nome: 'Broquel', tipo: 'escudo', bonus: 1, desMax: null, penalidade: -1, falhaArcana: 5, metal: true },
-  { id: 'escudo-pequeno-madeira', nome: 'Escudo pequeno de madeira', tipo: 'escudo', bonus: 1, desMax: null, penalidade: -1, falhaArcana: 5, metal: false },
-  { id: 'escudo-pequeno-aco', nome: 'Escudo pequeno de aço', tipo: 'escudo', bonus: 1, desMax: null, penalidade: -1, falhaArcana: 5, metal: true },
-  { id: 'escudo-grande-madeira', nome: 'Escudo grande de madeira', tipo: 'escudo', bonus: 2, desMax: null, penalidade: -2, falhaArcana: 15, metal: false },
-  { id: 'escudo-grande-aco', nome: 'Escudo grande de aço', tipo: 'escudo', bonus: 2, desMax: null, penalidade: -2, falhaArcana: 15, metal: true },
+  { id: 'acolchoada', nome: 'Armadura acolchoada', tipo: 'leve', bonus: 1, desMax: 8, penalidade: 0, falhaArcana: 5, metal: false, peso_lb: 10 },
+  { id: 'couro', nome: 'Armadura de couro', tipo: 'leve', bonus: 2, desMax: 6, penalidade: 0, falhaArcana: 10, metal: false, peso_lb: 15 },
+  { id: 'couro-batido', nome: 'Couro batido', tipo: 'leve', bonus: 3, desMax: 5, penalidade: -1, falhaArcana: 15, metal: true, peso_lb: 20 },
+  { id: 'camisao-de-malha', nome: 'Camisão de cota de malha', tipo: 'leve', bonus: 4, desMax: 4, penalidade: -2, falhaArcana: 20, metal: true, peso_lb: 25 },
+  { id: 'gibao-de-peles', nome: 'Gibão de peles', tipo: 'média', bonus: 3, desMax: 4, penalidade: -3, falhaArcana: 20, metal: false, peso_lb: 25 },
+  { id: 'brunea', nome: 'Brunea', tipo: 'média', bonus: 4, desMax: 3, penalidade: -4, falhaArcana: 25, metal: true, peso_lb: 30 },
+  { id: 'cota-de-malha', nome: 'Cota de malha', tipo: 'média', bonus: 5, desMax: 2, penalidade: -5, falhaArcana: 30, metal: true, peso_lb: 40 },
+  { id: 'peitoral', nome: 'Peitoral de aço', tipo: 'média', bonus: 5, desMax: 3, penalidade: -4, falhaArcana: 20, metal: true, peso_lb: 30 },
+  { id: 'cota-de-talas', nome: 'Cota de talas', tipo: 'pesada', bonus: 6, desMax: 0, penalidade: -7, falhaArcana: 40, metal: true, peso_lb: 45 },
+  { id: 'cota-de-placas', nome: 'Cota de placas', tipo: 'pesada', bonus: 6, desMax: 1, penalidade: -6, falhaArcana: 35, metal: true, peso_lb: 35 },
+  { id: 'meia-armadura', nome: 'Meia-armadura', tipo: 'pesada', bonus: 7, desMax: 0, penalidade: -7, falhaArcana: 40, metal: true, peso_lb: 50 },
+  { id: 'armadura-completa', nome: 'Armadura completa', tipo: 'pesada', bonus: 8, desMax: 1, penalidade: -6, falhaArcana: 35, metal: true, peso_lb: 50 },
+  { id: 'broquel', nome: 'Broquel', tipo: 'escudo', bonus: 1, desMax: null, penalidade: -1, falhaArcana: 5, metal: true, peso_lb: 5 },
+  { id: 'escudo-pequeno-madeira', nome: 'Escudo pequeno de madeira', tipo: 'escudo', bonus: 1, desMax: null, penalidade: -1, falhaArcana: 5, metal: false, peso_lb: 5 },
+  { id: 'escudo-pequeno-aco', nome: 'Escudo pequeno de aço', tipo: 'escudo', bonus: 1, desMax: null, penalidade: -1, falhaArcana: 5, metal: true, peso_lb: 6 },
+  { id: 'escudo-grande-madeira', nome: 'Escudo grande de madeira', tipo: 'escudo', bonus: 2, desMax: null, penalidade: -2, falhaArcana: 15, metal: false, peso_lb: 10 },
+  { id: 'escudo-grande-aco', nome: 'Escudo grande de aço', tipo: 'escudo', bonus: 2, desMax: null, penalidade: -2, falhaArcana: 15, metal: true, peso_lb: 15 },
 ];
 
 export const armaPorId = id => ARMAS.find(a => a.id === id) || null;
 export const armaduraPorId = id => ARMADURAS.find(a => a.id === id) || null;
+
+/**
+ * Peso em kg (a edição brasileira usa 1 libra ≈ 0,5 kg). Na 3.0 a arma tem tamanho próprio e pesa o
+ * mesmo para qualquer portador; a armadura e o escudo feitos para Pequeno pesam a metade (SRD 3.0,
+ * "Armor fitted for Small characters weighs half as much"). Sem peso na tabela, null.
+ */
+export function pesoKg(item, tamanhoPortador = 'Médio') {
+  if (item?.peso_lb == null) return null;
+  const metade = item.tipo && tamanhoPortador === 'Pequeno' ? 0.5 : 1;
+  return item.peso_lb * metade * T30.kgPorLibra;
+}
+
+/**
+ * Penalidade de armadura de uma armadura ou escudo (≤ 0). A mágica é sempre obra-prima, e a
+ * penalidade dela é 1 menor (SRD 3.0, "all magic armor is also masterwork armor").
+ */
+export const penalidadeDoItem = (base, x) => (base.penalidade < 0 && x?.melhoria ? base.penalidade + 1 : base.penalidade);
 
 /**
  * Quantas categorias a arma é maior que o portador: < 0 leve, 0 de uma mão, 1 de duas mãos,

@@ -1,8 +1,8 @@
 # ⚔️ Tarefa 006 - D&D Make Character: Simulador de combate (Arena) + catálogo de monstros e de Holy Avenger
 
-**Status**: 💻 In Progress — E1 a E7 prontos (catálogo, motor, personagens do jogador, tela da Arena, simulação em lote e magias); falta a E8
+**Status**: 🚀 Dev Complete — E1 a E8 prontos (catálogo, motor, personagens do jogador, tela da Arena, simulação em lote, magias e equipamento na ficha)
 **Responsável**: Claude (TL)
-**Branch**: `feat/ded-simulador-combate` (E1 a E6, PR #50, já no main) e `feat/ded-magias` (E7)
+**Branch**: `feat/ded-simulador-combate` (E1 a E6, PR #50, já no main) e `feat/ded-magias` (E7 e E8, PR #52)
 **Depende de**: TASK_003 (motor de regras `dnd30.js`), TASK_004 (talentos e perícias escolhidos)
 
 ---
@@ -330,7 +330,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 
 ## 🛡️ 6. Equipamento (arena e ficha)
 
-- **Tabelas 3.0** em `js/rules/tables30.js`, pelo SRD 3.0:
+- **Tabelas 3.0** em `js/rules/equipamento30.js` (na implementação, fora de `tables30.js`), pelo SRD 3.0:
   - armas simples, comuns e exóticas mais usadas, com dano (Pequeno/Médio), crítico, incremento, tipo e tamanho da arma. Na 3.0, ser leve, de uma mão ou de duas depende do **tamanho da arma em relação ao portador**: uma espada longa (Média) é de uma mão para um humano e de duas para um halfling;
   - armaduras e escudos, com bônus, Des máxima, penalidade, falha arcana e deslocamento.
 - **Kit padrão por classe**: pelo que a classe sabe usar. Ex.: guerreiro com espada longa, cota de malha e escudo grande de madeira; mago com bordão e besta leve.
@@ -361,7 +361,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 | **E5 Arena** | Tela `#/arena` (montar a luta, luta passo a passo com log), rota antes das genéricas, item no menu lateral e atalho a partir da ficha e da lista *(feito antes da E4, com os combatentes do catálogo, §8.2)* |
 | **E6 Lote** | Simular N vezes sem travar, com o painel de resultados *(feito, §8.4)* |
 | **E7 Magias** | Lista curada com números do SRD 3.0, espaços por dia, IA dos conjuradores *(feito, §8.5)* |
-| **E8 Ficha** | Blocos de arma, armadura e escudo preenchidos, e CA e ataques com o equipamento |
+| **E8 Ficha** | Blocos de arma, armadura e escudo preenchidos, e CA e ataques com o equipamento *(feito, §8.6)* |
 
 Cada etapa segue o fluxo do hub: testes, verificação no navegador e revisão por subagente até aprovar.
 
@@ -603,7 +603,7 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
     - a sanidade em lote (guerreiro 20 vence sempre um ogro; guerreiro 1 perde sempre para o Tarrasque).
   - `tests/ded_make_character_arena.test.js` (8 testes): o limite de um por lado para o personagem.
   - E2E, passo novo: os atalhos da lista e da ficha, o kit do Jonh, o limite de um por lado, o erro da espada grande com escudo, salvar sem escudo com melhoria +1, a gravação em `fichas`, recarregar mantém, a luta usa o equipamento salvo, e o evento de outra aba com a luta aberta só recarrega ao voltar à montagem.
-- **Fica para a E8:** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
+- **Na E8 (§8.6):** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
 
 ### 8.4 E6: a simulação em lote na Arena
 
@@ -737,7 +737,43 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
     - o mago: a preparação padrão no cartão, os espaços de Int 17, o "+" desligado sem espaço, as trocas com o mouse de verdade (inclusive uma magia menor no espaço maior), a gravação em `fichas`, o lote marcado como antigo, e a luta com o Escudo Arcano na 1ª rodada e a Bola de Fogo, sem o Relâmpago tirado;
     - a feiticeira: o limite das conhecidas, o rótulo só com o nome, o anúncio, desmarcar e marcar de novo sem perguntar ao sair, e mudar e sair com "Continuar editando" e "Descartar" (que não grava);
   - sem erros nem texto quebrado no registro: 2.800 lutas de conjuradores (7 classes × níveis 1 a 20 × 10 inimigos) e 2.312 lutas do catálogo.
-- **Fica para a E8:** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
+- **Na E8 (§8.6):** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
+
+### 8.6 E8: o equipamento na ficha impressa
+
+- **De onde vem:** a ficha (`#/personagens/:id/ficha`) usa o equipamento salvo na Arena (`fichas.equipamento`) ou, sem ele, o kit padrão da classe. As contas são as da Arena: `fromPersonagem` devolve também `naFicha`.
+  - Sem equipamento salvo, uma nota na ficha diz que é o kit e leva à Arena.
+  - Personagem sem classe básica e sem equipamento salvo fica como antes, sem os blocos.
+- **Regras compartilhadas** (`js/rules/personagem30.js`), que a luta também passou a usar:
+  - `caComEquipamento`: 10 + armadura + escudo (com a melhoria) + Des (limitada pela armadura) + tamanho + natural + diversos. O monge de armadura perde a CA de monge. Valor ausente (sem Des, sem raça) deixa o total em branco, como antes;
+  - `deslocamentoComArmadura`: média e pesada levam 9 m a 6 m e 6 m a 4,5 m (o anão também, como o traço dele já dizia); o bárbaro mantém o +3 m na média; o monge de armadura perde o deslocamento de monge;
+  - `penalidadeDoItem` (`equipamento30.js`): armadura e escudo mágicos são obra-prima e têm a penalidade de armadura 1 menor (SRD 3.0: "all magic armor is also masterwork armor"). Vale também no ataque sem proficiência, que antes usava a penalidade cheia.
+- **Pesos:** cada arma, armadura e escudo ganhou `peso_lb`, a coluna de peso do SRD 3.0. `pesoKg` converte com 1 libra ≈ 0,5 kg (como a carga). A armadura e o escudo feitos para Pequeno pesam a metade; a arma, não, porque na 3.0 ela tem tamanho próprio.
+- **Na página 1:**
+  - CA: armadura e escudo nas caixas, a Des já limitada, e a CA de monge em "diversos". "Falha de magia arcana" mostra armadura + escudo, e "penal. de armadura" a soma das duas;
+  - deslocamento com a armadura;
+  - corpo a corpo e à distância: a penalidade de armadura sem proficiência entra em "mod. diversos";
+  - perícias marcadas com * (Equilíbrio, Escalar, Arte da Fuga, Esconder-se, Saltar, Furtividade, Acrobacias, Prestidigitação): a penalidade de armadura entra em "mod. diversos", e a nota diz que ela já está somada. Sem proficiência, ela vale também em Cavalgar (SRD 3.0: "all skill rolls that involve moving, including Ride");
+  - três blocos de arma (principal, segunda arma e à distância):
+    - bônus de ataque total em série (+10/+5), dano, decisivo (com Sucesso Decisivo Aprimorado);
+    - alcance (o incremento da arma à distância; "—" corpo a corpo, 3 m na arma de haste), peso, tipo ("concussão e perfurante" na arma de dois tipos, que é dos dois), tamanho da arma;
+    - propriedades: empunhadura (leve, uma mão, "uma mão, com as duas (For ×1,5)", duas mãos), haste, sem proficiência, Acuidade com Arma, Foco e Especialização, a série com duas armas, a rajada e o golpe ki do monge, a recarga, o Tiro Rápido e o bônus até 9 m;
+  - bloco da armadura: tipo, bônus (com a melhoria), Des máxima, penalidade, falha de magia, deslocamento, peso e propriedades (sem proficiência, obra-prima, metal no druida, monge);
+  - bloco do escudo: bônus, peso, penalidade, falha de magia e propriedades;
+  - o material (prata) vai no nome do item. As propriedades cabem em até 3 linhas (a letra encolhe se precisar);
+  - leitor de tela: cada valor leva o rótulo da coluna, escondido, e a faixa de rótulos sai do leitor quando o bloco está preenchido.
+- **Equipamento com erro** (espada grande com escudo…): os blocos mostram os itens, a CA soma a armadura e o escudo, os ataques das armas ficam em branco, e uma nota aponta o problema e leva à Arena.
+- **Na tela:** o diálogo de equipamento da Arena diz que o equipamento vale também na ficha.
+- **Validação:**
+  - `tests/ded_make_character_personagem.test.js`, 3 testes novos:
+    - o guerreiro 5 com espada longa +1, cota +1 e escudo grande de aço: CA 20, penalidade −6, falha 45% e os três blocos conferidos à mão;
+    - os pesos (armadura de Pequeno pela metade) e toda arma e armadura com peso;
+    - a obra-prima no ataque do mago sem proficiência (−4 em vez de −5);
+    - o monge livre (rajada, golpe ki) e de armadura (sem a CA de monge);
+    - o ranger de duas armas, a arma de haste, a espada com as duas mãos;
+    - sem For (blocos sem ataque), sem Des (CA em branco) e o equipamento com erro;
+  - E2E: a anã clériga com o kit (CA 16, 4,5 m), e a ficha do Jonh depois de salvar o equipamento na Arena (espada grande +1 com +9 e 2d6+7, CA 17 sem o escudo, cota com −5);
+  - a checagem de que nenhum bloco transborda (perfis variados) ganhou o monge de cota de malha +1 e o druida de armadura completa +1 (três propriedades na armadura) e confere que nenhum valor dos blocos sai cortado; a impressão em 2 páginas A4 continua passando.
 
 ## 🧪 9. Testes planejados
 
