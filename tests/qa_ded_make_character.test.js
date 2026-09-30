@@ -808,6 +808,100 @@ async function run() {
     await page.evaluate(() => window.__dmc.store.restore('fichas'));
   });
 
+  await step('arena: magias do conjurador (diálogo pelos espaços, salvas em fichas, usadas na luta, lote marcado como antigo)', async () => {
+    const id = await page.evaluate(async () => (await window.__dmc.store.insert('personagens', {
+      nome: 'Merlin', race_id: 1, classe_id: 11, jogador_id: 1, tendencia: 'NB', divindade: null, nivel: 5, idade: 40, sexo: 'M', altura: 1.8, peso: 70,
+      olhos: 'azuis', cabelos: 'brancos', for: 10, des: 14, con: 14, int: 17, sab: 12, car: 10, iniciativa: 0, pvs: 24,
+    })).id);
+    await go(`#/arena?a=p:${id}&b=ogro*3&semente=4242&dist=30`);
+    await sleep(400);
+    assert.strictEqual(await text('.arena-roster__magias'), 'Mísseis Mágicos ×2, Escudo Arcano, Sono, Esfera Flamejante, Flecha Ácida ×2, Bola de Fogo, Relâmpago', 'preparação padrão do mago 5');
+    // um lote antes de mudar as magias
+    await domClick('[data-action="lote"][data-vezes="100"]');
+    await page.waitForSelector('#arena-lote-res', { timeout: 20000 });
+    await page.click(`[data-action="magias"][data-ref="p:${id}"]`);
+    await sleep(300);
+    assert.ok(await page.$('dialog.arena-mag[open]'));
+    const legendas = () => page.$$eval('.arena-mag__legenda', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim()));
+    assert.deepStrictEqual(await legendas(), ['1º nível 4 de 4 espaços', '2º nível 3 de 3 espaços', '3º nível 2 de 2 espaços'], 'Int 17: 3/2/1 + 1 por nível');
+    // espaços cheios: o "+" fica desabilitado; com o mouse, troca o Relâmpago por outra Bola de Fogo
+    assert.ok(await page.$eval('[data-prep="3"][data-id="bola-de-fogo"][data-delta="1"]', b => b.disabled));
+    await page.click('[data-prep="3"][data-id="relampago"][data-delta="-1"]');
+    await sleep(100);
+    assert.strictEqual((await legendas())[2], '3º nível 1 de 2 espaços');
+    await page.click('[data-prep="3"][data-id="bola-de-fogo"][data-delta="1"]');
+    await sleep(100);
+    // uma magia menor num espaço maior: Mísseis Mágicos no 2º, no lugar de uma Flecha Ácida
+    await page.click('[data-prep="2"][data-id="flecha-acida"][data-delta="-1"]');
+    await sleep(100);
+    await page.click('details[data-menores="2"] > summary');
+    await sleep(100);
+    await page.click('details[data-menores="2"] [data-prep="2"][data-id="misseis-magicos"][data-delta="1"]');
+    await sleep(100);
+    assert.ok(await page.$eval('details[data-menores="2"]', d => d.open), 'o "nível menor" continua aberto depois de redesenhar');
+    assert.match(await text('.arena-mag [data-slot="previa"]'), /Espaços por dia\s*1º 4 · 2º 3 · 3º 2/);
+    await page.click('.arena-mag [data-action="salvar"]');
+    await sleep(400);
+    assert.strictEqual(await page.$('dialog.arena-mag'), null);
+    assert.strictEqual(await text('.arena-roster__magias'), 'Mísseis Mágicos ×3, Escudo Arcano, Sono, Esfera Flamejante, Flecha Ácida, Bola de Fogo ×2');
+    const salvas = await page.evaluate(async pid => (await window.__dmc.store.all('fichas')).find(f => f.personagem_id === pid)?.magias, id);
+    assert.deepStrictEqual(salvas, { preparadas: { 1: { 'misseis-magicos': 2, 'escudo-arcano': 1, sono: 1 }, 2: { 'flecha-acida': 1, 'esfera-flamejante': 1, 'misseis-magicos': 1 }, 3: { 'bola-de-fogo': 2 } } });
+    assert.match(await text('.arena-lote'), /os números são da montagem anterior/, 'mudar as magias muda a luta do lote');
+    // a luta usa as magias salvas: reforço antes de o inimigo chegar, depois a Bola de Fogo
+    await domClick('[data-action="comecar"]');
+    await domClick('[data-action="fim"]');
+    await sleep(300);
+    const registro = await logDaArena();
+    assert.match(registro, /Rodada 1\.[^]*Merlin conjura Escudo Arcano[^]*Rodada 2\./);
+    assert.match(registro, /Merlin conjura Bola de Fogo em Ogro \d/);
+    assert.doesNotMatch(registro, /Merlin conjura Relâmpago/, 'o Relâmpago não está mais preparado');
+    await domClick('[data-action="montagem"]');
+    await sleep(300);
+    // feiticeira: conhecidas com o limite de cada nível; desmarcar e marcar de novo não suja o diálogo
+    const fid = await page.evaluate(async () => (await window.__dmc.store.insert('personagens', {
+      nome: 'Sorsha', race_id: 1, classe_id: 10, jogador_id: 1, tendencia: 'CN', divindade: null, nivel: 6, idade: 25, sexo: 'F', altura: 1.7, peso: 60,
+      olhos: 'verdes', cabelos: 'ruivos', for: 10, des: 14, con: 12, int: 12, sab: 10, car: 17, iniciativa: 0, pvs: 28,
+    })).id);
+    await go(`#/arena?a=p:${fid}&b=troll`);
+    await sleep(400);
+    await page.click(`[data-action="magias"][data-ref="p:${fid}"]`);
+    await sleep(300);
+    assert.deepStrictEqual(await legendas(), ['1º nível conhece 4 de 4 · 7 espaços por dia', '2º nível conhece 2 de 2 · 6 espaços por dia', '3º nível conhece 1 de 1 · 4 espaços por dia']);
+    assert.ok(await page.$eval('[data-conhecida="armadura-arcana"]', el => el.disabled), 'cheio: as outras de 1º ficam desligadas');
+    assert.strictEqual(await page.$eval('label[for="mag-conhece-sono"]', el => el.textContent.trim()), 'Sono', 'o rótulo da caixa é só o nome');
+    await page.click('#mag-conhece-sono');
+    await sleep(100);
+    assert.ok(!(await page.$eval('[data-conhecida="armadura-arcana"]', el => el.disabled)), 'com uma vaga, as outras voltam');
+    assert.match(await text('.arena-mag [data-slot="anuncio"]'), /Sono desmarcada: conhece 3 de 4 de 1º nível/);
+    await page.click('#mag-conhece-sono');
+    await sleep(100);
+    await page.keyboard.press('Escape');
+    await sleep(300);
+    assert.strictEqual(await page.$('dialog.arena-mag'), null, 'a mesma escolha: fecha sem perguntar');
+    // mudar e sair pede confirmação; "Continuar editando" fica, "Descartar" fecha sem gravar
+    await page.click(`[data-action="magias"][data-ref="p:${fid}"]`);
+    await sleep(300);
+    await page.click('#mag-conhece-sono');
+    await page.click('#mag-conhece-armadura-arcana');
+    await sleep(100);
+    await page.keyboard.press('Escape');
+    await sleep(300);
+    assert.match(await text('dialog.dialog:not(.arena-mag) .dialog__title'), /Descartar as magias\?/);
+    await page.click('dialog.dialog:not(.arena-mag) [value="cancel"]');
+    await sleep(300);
+    assert.ok(await page.$('dialog.arena-mag[open]'), 'continua editando');
+    assert.ok(await page.$eval('#mag-conhece-armadura-arcana', el => el.checked), 'com a mudança');
+    await page.click('.arena-mag [data-action="cancelar"]');
+    await sleep(300);
+    await page.click('dialog.dialog:not(.arena-mag) [value="confirm"]');
+    await sleep(300);
+    assert.strictEqual(await page.$('dialog.arena-mag'), null);
+    assert.strictEqual(await page.evaluate(async pid => (await window.__dmc.store.all('fichas')).find(f => f.personagem_id === pid) ?? null, fid), null, 'descartar não grava');
+    assert.match(await text('.arena-roster__magias'), /^Mísseis Mágicos, Mãos Flamejantes, Escudo Arcano, Sono, Esfera Flamejante, Flecha Ácida, Bola de Fogo$/);
+    await page.evaluate(() => window.__dmc.store.restore('personagens'));
+    await page.evaluate(() => window.__dmc.store.restore('fichas'));
+  });
+
   await step('arena: simulação em lote (fatias com progresso, cancelar, resultado, assistir a uma luta do lote)', async () => {
     await go('#/arena?a=ogro*2&b=troll&semente=580669');
     await sleep(400);

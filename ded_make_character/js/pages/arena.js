@@ -4,7 +4,8 @@
  *
  * A montagem fica na URL (#/arena?a=ogro*2,p:1&b=troll&semente=…): recarregar ou compartilhar o
  * link repete a mesma luta. Os personagens do jogador ("p:<id>", etapa E4) vêm do store, passam
- * pelo adaptador (`personagem30.js`) e têm o equipamento salvo em `fichas.equipamento`. A
+ * pelo adaptador (`personagem30.js`) e têm o equipamento salvo em `fichas.equipamento` e as
+ * magias (etapa E7, lista curada) em `fichas.magias`. A
  * simulação em lote (etapa E6) roda a mesma luta 100 ou 1.000 vezes em fatias de ~12 ms, para não
  * travar a tela, e mostra quem costuma vencer.
  */
@@ -14,11 +15,13 @@ import { createBattle, criarLote, fromCatalog, gap, nextRound, nextTurn, podeLut
 import { computeSheet } from '../rules/dnd30.js';
 import { dificuldade, nivelDeEncontro } from '../rules/encontro30.js';
 import { rotuloItem } from '../rules/equipamento30.js';
+import { MODO, espacosDoDia, normalizarMagias, resumoDasMagias, temMagiasDaLista } from '../rules/magias30.js';
 import { fromPersonagem } from '../rules/personagem30.js';
 import { icon } from '../ui/icons.js';
 import { emptyState, loadingState, pageHead } from '../ui/page.js';
 import { toast } from '../ui/toast.js';
 import { abrirEquipamento } from './arena-equipamento.js';
+import { abrirMagias } from './arena-magias.js';
 import {
   LIMITES, adicionar, distanciaValida, ehPersonagem, escreverMontagem, lerMontagem, maximoDe, mudarQuantidade, novaSemente, rodadasValidas, sementeValida, totalDoLado,
 } from './arena-setup.js';
@@ -45,6 +48,14 @@ const metros = m => `${m.toLocaleString('pt-BR')} m`;
 
 const SLOTS_EQUIPAMENTO = ['principal', 'secundaria', 'escudo', 'armadura', 'distancia'];
 const textoDoEquipamento = eq => SLOTS_EQUIPAMENTO.map(k => rotuloItem(eq[k])).filter(Boolean).join(' · ') || 'Desarmado';
+/** "Mísseis Mágicos ×2, Escudo Arcano…" ou por que não conjura (druida de metal). */
+function textoDasMagias(e) {
+  if (!e.conjura) return 'Nenhuma magia da lista curada cabe nos espaços deste nível';
+  if (e.ficha && !e.ficha.magias) return 'Sem magias com este equipamento';
+  const resumo = resumoDasMagias(e.magias, e.sheet.classKey);
+  const cura = e.ficha?.magias?.lista.some(s => s.conversao) ? ' · troca por curas' : '';
+  return resumo ? `${resumo}${cura}` : `Nenhuma magia escolhida${cura}`;
+}
 
 /** "Gigante grande" (monstro), "Paladino 19 · Humano meio-celestial" (Holy Avenger) ou "Guerreiro 4 · Humano" (seu personagem). */
 function descricao(e) {
@@ -103,11 +114,16 @@ export async function renderArena({ root, router, query, store }) {
     const salva = dados.fichas.find(f => String(f.personagem_id) === String(p.id)) || null;
     const talentos = (salva?.talentos || []).map(t => ({ nome: talentoPorId.get(String(t.talento_id))?.nome || '', parametro: t.parametro })).filter(t => t.nome);
     const sheet = computeSheet(p, { race, classe, bbaRows: dados.bba, pericias: dados.pericias, escolhas: { ranks: ranksToKeys(dados.pericias, salva?.pericias || {}), talentos } });
-    const calcular = eq => fromPersonagem({ personagem: p, sheet, talentos, equipamento: eq });
+    const calcular = (eq, mg = salva?.magias ?? null) => fromPersonagem({ personagem: p, sheet, talentos, equipamento: eq, magias: mg });
     const r = calcular(salva?.equipamento || null);
+    // conjurador com espaços neste nível (o paladino e o ranger só a partir do 4º) e com alguma
+    // magia da lista que caiba neles (o ranger do 4º ao 7º tem espaços, mas nada a escolher)
+    const temEspacos = Boolean(MODO[sheet.classKey] && Object.keys(espacosDoDia(sheet)).length);
+    const conjura = temEspacos && temMagiasDaLista(sheet);
     return {
       id: `p:${p.id}`, categoria: 'personagem', nome: p.nome, nd: sheet.nivel, sheet, personagem: p, salva, calcular, talentos,
       ficha: r.ficha, equipamento: r.equipamento, erros: r.erros, avisos: r.avisos, pv: r.ficha?.pvMax ?? '—', ca: { total: r.ficha?.ca.total ?? '—' },
+      temEspacos, conjura, magias: conjura ? normalizarMagias(salva?.magias ?? null, sheet) : null,
     };
   }
   const personagens = (dados?.personagens || []).map(entradaDePersonagem).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
@@ -130,7 +146,7 @@ export async function renderArena({ root, router, query, store }) {
     ultimo: null, // uid de quem agiu por último
   };
   let seletor = null;
-  let equipando = null;
+  let editando = null; // o diálogo de equipamento ou o de magias de um personagem
 
   // o cabeçalho e a região de avisos ficam; só a fase (montagem ou luta) é redesenhada
   render(root, html`${cabecalho()}<div data-slot="fase"></div><p class="visually-hidden" aria-live="polite" data-slot="avisos"></p>`);
@@ -180,10 +196,12 @@ export async function renderArena({ root, router, query, store }) {
           <p class="arena-roster__name">${e.nome}</p>
           <p class="arena-roster__meta">${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
           <p class="arena-roster__equip">${textoDoEquipamento(e.equipamento)}</p>
+          ${e.temEspacos ? html`<p class="arena-roster__equip arena-roster__magias">${icon('sparkles')}<span>${textoDasMagias(e)}</span></p>` : ''}
           ${e.erros.length ? html`<p class="arena-roster__erro">${icon('alert')}<span>Não pode lutar: ${e.erros.join('; ')}.</span></p>` : ''}
           ${e.avisos.length ? html`<ul class="arena-roster__avisos">${e.avisos.map(a => html`<li>${a[0].toUpperCase()}${a.slice(1)}</li>`)}</ul>` : ''}
         </div>
         <button type="button" class="btn btn--outline btn--sm" data-action="equipamento" data-lado="${lado}" data-ref="${x.ref}" data-focus="equip-${chave}" aria-label="Equipamento de ${e.nome}">${icon('shield')}Equipamento</button>
+        ${e.conjura ? html`<button type="button" class="btn btn--outline btn--sm" data-action="magias" data-lado="${lado}" data-ref="${x.ref}" data-focus="magias-${chave}" aria-label="Magias de ${e.nome}">${icon('sparkles')}Magias</button>` : ''}
         <button type="button" class="icon-btn icon-btn--danger" data-remover data-lado="${lado}" data-ref="${x.ref}" data-focus="remover-${chave}" data-focus-fallback="adicionar-${lado}" aria-label="Tirar ${e.nome} do lado ${lado}">${icon('trash')}</button>
       </li>`;
     }
@@ -295,14 +313,15 @@ export async function renderArena({ root, router, query, store }) {
 
   /**
    * A montagem que o lote simulou, sem a semente (o lote guarda as dele, que aparecem no resultado)
-   * e com o equipamento dos personagens do jogador (mudá-lo muda a luta).
+   * e com o equipamento e as magias dos personagens do jogador (mudá-los muda a luta).
    */
   const assinatura = () => JSON.stringify({
     ...escreverMontagem(state),
     semente: null,
     equipamento: [...state.A, ...state.B].filter(x => ehPersonagem(x.ref)).map(x => {
-      const eq = porId.get(x.ref)?.equipamento;
-      return [x.ref, SLOTS_EQUIPAMENTO.map(k => (eq?.[k] ? [eq[k].id, eq[k].melhoria || 0, eq[k].material || null] : null))];
+      const e = porId.get(x.ref);
+      const eq = e?.equipamento;
+      return [x.ref, SLOTS_EQUIPAMENTO.map(k => (eq?.[k] ? [eq[k].id, eq[k].melhoria || 0, eq[k].material || null] : null)), JSON.stringify(e?.magias ?? null)];
     }),
   });
   const pct = x => `${(x * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
@@ -874,20 +893,26 @@ export async function renderArena({ root, router, query, store }) {
     return true;
   }
 
+  const TEXTOS_DA_FICHA = {
+    equipamento: { naoSalvo: 'Equipamento não salvo', salvo: 'Equipamento salvo', falhou: 'Não foi possível salvar o equipamento', mudou: 'o equipamento mudou', resumo: e => textoDoEquipamento(e.equipamento) },
+    magias: { naoSalvo: 'Magias não salvas', salvo: 'Magias salvas', falhou: 'Não foi possível salvar as magias', mudou: 'as magias mudaram', resumo: textoDasMagias },
+  };
+
   /**
-   * Grava o equipamento em `fichas.equipamento` (merge: talentos e perícias da ficha ficam). Relê
-   * o store antes: se o personagem foi excluído ou trocado (outra aba, "Restaurar tudo"), não grava,
-   * para não deixar uma ficha que outro personagem herdaria pelo mesmo id.
+   * Grava o equipamento (`fichas.equipamento`) ou as magias (`fichas.magias`) do personagem (merge:
+   * o resto da ficha fica). Relê o store antes: se o personagem foi excluído ou trocado (outra aba,
+   * "Restaurar tudo"), não grava, para não deixar uma ficha que outro personagem herdaria pelo mesmo id.
    */
-  async function salvarEquipamento(e, eq) {
-    const linha = { equipamento: eq, atualizado_em: new Date().toISOString() };
+  async function salvarNaFicha(e, campo, valor) {
+    const t = TEXTOS_DA_FICHA[campo];
+    const linha = { [campo]: valor, atualizado_em: new Date().toISOString() };
     try {
       const [agora, fichasAgora] = await Promise.all([store.get('personagens', e.personagem.id), store.all('fichas')]);
       const mesmo = agora && ['nome', 'classe_id', 'race_id', 'nivel'].every(k => String(agora[k]) === String(e.personagem[k]));
       if (!mesmo) {
         state.recarregarDepois = true;
-        toast({ type: 'error', title: 'Equipamento não salvo', message: `${e.nome} mudou ou não existe mais neste navegador. A Arena recarregou com os dados atuais.` });
-        equipando?.fechar(); // ao fechar, a recarga pendente acontece
+        toast({ type: 'error', title: t.naoSalvo, message: `${e.nome} mudou ou não existe mais neste navegador. A Arena recarregou com os dados atuais.` });
+        editando?.fechar(); // ao fechar, a recarga pendente acontece
         return;
       }
       const existente = fichasAgora.find(f => String(f.personagem_id) === String(e.personagem.id));
@@ -896,11 +921,11 @@ export async function renderArena({ root, router, query, store }) {
       const nova = entradaDePersonagem(e.personagem);
       porId.set(nova.id, nova);
       personagens.splice(personagens.findIndex(x => x.id === nova.id), 1, nova);
-      conferirLote('o equipamento mudou');
+      conferirLote(t.mudou);
       desenharMontagem();
-      toast({ type: 'success', title: 'Equipamento salvo', message: `${nova.nome}: ${textoDoEquipamento(nova.equipamento)}.` });
+      toast({ type: 'success', title: t.salvo, message: `${nova.nome}: ${t.resumo(nova)}.` });
     } catch (err) {
-      toast({ type: 'error', title: 'Não foi possível salvar o equipamento', message: err.message });
+      toast({ type: 'error', title: t.falhou, message: err.message });
       throw err;
     }
   }
@@ -932,20 +957,18 @@ export async function renderArena({ root, router, query, store }) {
     }
     const acao = t.closest('[data-action]')?.dataset.action;
     if (acao === 'adicionar') seletor = abrirSeletor(t.closest('[data-lado]').dataset.lado);
-    else if (acao === 'equipamento') {
+    else if (acao === 'equipamento' || acao === 'magias') {
       const botao = t.closest('[data-action]');
       const e = porId.get(botao.dataset.ref);
       const foco = botao.dataset.focus;
-      equipando = abrirEquipamento({
-        entrada: e,
-        calcular: e.calcular,
-        salvar: eq => salvarEquipamento(e, eq),
-        aoFechar: () => {
-          equipando = null;
-          if (recarregarSePendente()) return;
-          root.querySelector(`[data-focus="${foco}"]`)?.focus();
-        },
-      });
+      const aoFechar = () => {
+        editando = null;
+        if (recarregarSePendente()) return;
+        root.querySelector(`[data-focus="${foco}"]`)?.focus();
+      };
+      editando = acao === 'equipamento'
+        ? abrirEquipamento({ entrada: e, calcular: e.calcular, salvar: eq => salvarNaFicha(e, 'equipamento', eq), aoFechar })
+        : abrirMagias({ entrada: e, calcular: mg => e.calcular(e.equipamento, mg), salvar: mg => salvarNaFicha(e, 'magias', mg), aoFechar });
     }
     else if (acao === 'lote') {
       confirmarCampos();
@@ -1032,11 +1055,11 @@ export async function renderArena({ root, router, query, store }) {
     saindo = true;
     cancelarLote();
     seletor?.fechar();
-    equipando?.fechar();
+    editando?.fechar();
   }
   // o app não recarrega a Arena (evento de outra aba, "Restaurar tudo") com luta ou diálogo aberto:
   // marca a recarga (`adiar`), que acontece ao voltar à montagem ou ao fechar o diálogo
-  cleanup.ocupada = () => state.fase === 'luta' || Boolean(seletor) || Boolean(equipando);
+  cleanup.ocupada = () => state.fase === 'luta' || Boolean(seletor) || Boolean(editando);
   // o lote não segura a recarga (os dados dele ficariam velhos): ela o cancela, e o app avisa
   cleanup.loteRodando = () => Boolean(state.lote?.rodando);
   cleanup.adiar = () => {

@@ -27,7 +27,7 @@ const CAMPOS_COMBATENTE = ['id', 'nome', 'nome_original', 'categoria', 'nd', 'ni
 const CAMPOS_ATAQUE = ['nome', 'tipo', 'bonus', 'dano', 'critico', 'tipo_dano', 'natural', 'secundario', 'alcance_m', 'incremento_m', 'magico', 'material', 'dano_extra', 'efeitos'];
 const CAMPOS_DANO_EXTRA = ['dano', 'tipo', 'afeta'];
 /** Chaves aceitas em `bonus` (efeitos de magias e auras). */
-const BONUS = ['ca', 'ca_natural', 'ca_deflexao', 'ataque', 'dano', 'resistencias', 'fort', 'ref', 'von', 'for', 'des', 'con', 'int', 'sab', 'car', 'pv_temporarios', 'camuflagem_pct', 'niveis_negativos', 'penalidade_for', 'imagens', 'acoes_extras', 'pericias', 'anula', 'rm', 'bba_efetivo', 'for_minima', 'tamanho', 'dano_arma', 'contra_medo'];
+const BONUS = ['ca', 'ca_natural', 'ca_deflexao', 'ca_armadura', 'ataque', 'dano', 'resistencias', 'fort', 'ref', 'von', 'ref_area', 'for', 'des', 'con', 'int', 'sab', 'car', 'pv_temporarios', 'camuflagem_pct', 'niveis_negativos', 'penalidade_for', 'imagens', 'acoes_extras', 'pericias', 'anula', 'rm', 'bba_efetivo', 'for_minima', 'tamanho', 'dano_arma', 'contra_medo'];
 /** Chaves aceitas em `afeta` (restrição de quem sofre o efeito). */
 const AFETA = ['etico', 'exceto_etico', 'moral', 'exceto_moral', 'tipo', 'exceto_tipo', 'exceto_subtipo', 'exceto_raca', 'exceto_estado', 'dv_max', 'pv_max', 'tamanho_max', 'somente'];
 const IMUNIDADES = [...ENERGIAS, 'veneno', 'sono', 'paralisia', 'atordoamento', 'doença', 'acertos críticos', 'dano por contusão', 'dano de atributo', 'dreno de energia', 'efeitos de ação mental', 'morte por dano maciço', 'efeitos de morte', 'metamorfose', 'medo', 'enfeitiçar', 'derrubar', 'petrificação', 'magia'];
@@ -64,7 +64,7 @@ const EFEITOS = {
   magia: {
     obrigatorios: ['magia', 'usos'],
     algum: [['dano'], ['cura'], ['condicao'], ['bonus'], ['efeitos_por_dv']],
-    opcionais: ['nivel_conjurador', 'cd', 'tipo_energia', 'dano_extra', 'area', 'alvo', 'resistencia', 'metade_se_passar', 'duracao', 'afeta', 'condicao_afeta', 'ataque', 'acerto_automatico', 'dano_por_tendencia', 'duracao_por_pv', 'pv_temporarios', 'tempo_de_execucao'],
+    opcionais: ['nivel_conjurador', 'cd', 'tipo_energia', 'dano_extra', 'area', 'alvo', 'resistencia', 'metade_se_passar', 'duracao', 'afeta', 'condicao_afeta', 'ataque', 'acerto_automatico', 'dano_por_tendencia', 'duracao_por_pv', 'pv_temporarios', 'tempo_de_execucao', 'continuo', 'persistente', 'repete', 'limite_dv', 'tipo_bonus'],
   },
   aura: { obrigatorios: ['raio_m'], algum: [['dano', 'tipo_energia'], ['condicao'], ['bonus'], ['dano_atributo']], opcionais: ['resistencia', 'cd', 'duracao', 'afeta', 'condicao_afeta', 'alvo', 'acao'] },
   queimar: { obrigatorios: ['gatilho', 'resistencia', 'cd', 'dano', 'tipo_energia'], opcionais: ['duracao', 'apagar', 'ao_ser_atingido'] },
@@ -244,6 +244,18 @@ function validarSecao(lista, secao) {
         if (!TIPOS_ATAQUE.includes(v)) erros.push(`${onde}: ataque "${v}"`); break;
       case 'aplica_a':
         if (!Array.isArray(v) || v.some(id => !idsEspeciais.has(id))) erros.push(`${onde}: aplica_a deve listar ids de especiais do combatente`); break;
+      case 'continuo':
+        if (!isObj(v) || !DADO.test(String(v.dano)) || !isInt(v.rodadas) || v.rodadas < 1 || Object.keys(v).some(x => !['dano', 'tipo', 'rodadas'].includes(x))) erros.push(`${onde}: continuo { dano, tipo, rodadas }`);
+        else energia(v.tipo, `${onde} continuo`);
+        break;
+      case 'limite_dv':
+        if (!DADO.test(String(v))) erros.push(`${onde}: limite_dv "${v}" (dado, ex.: "2d4")`); break;
+      case 'tipo_bonus':
+        if (!['moral', 'sorte', 'melhoria', 'competencia', 'sagrado', 'profano'].includes(v)) erros.push(`${onde}: tipo_bonus "${v}"`); break;
+      case 'persistente': case 'repete':
+        if (v !== true) erros.push(`${onde}: ${k} (true)`);
+        else if (!isStr(m.duracao)) erros.push(`${onde}: ${k} precisa de duracao`);
+        break;
       case 'metade_se_passar': case 'acerto_automatico': case 'aprimorada': case 'maior': case 'permanente': case 'retorna_ao_dono':
         if (typeof v !== 'boolean') erros.push(`${onde}: ${k} (bool)`); break;
       case 'inicial': case 'secundario':

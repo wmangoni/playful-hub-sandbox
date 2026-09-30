@@ -15,7 +15,7 @@ const notas = {
   'presenca-aterradora': '`quando: "ao-atacar"`; `raio_m: null` = todos os inimigos da luta',
   'condicao-ao-acertar': 'condição com teste a cada acerto (ex.: medo da pancada do balor)',
   petrificacao: '`quando: "olhar"` ou `gatilho`',
-  magia: '`efeitos_por_dv` = `[{ "dv_max": 7, "condicao": "paralisado", "duracao": "…" }]`, cumulativos (vale toda entrada cujo `dv_max` o alvo atende; sem `dv_max`, vale para todos); `dano_por_tendencia` = `{ "eixo": "etico", "L": "total", "N": "metade", "C": "nenhum" }` (com ele, a condição restrita vai em `condicao_afeta`); `ataque` = tipo de ataque (ex.: `toque a distancia`)',
+  magia: '`efeitos_por_dv` = `[{ "dv_max": 7, "condicao": "paralisado", "duracao": "…" }]`, cumulativos (vale toda entrada cujo `dv_max` o alvo atende; sem `dv_max`, vale para todos); `dano_por_tendencia` = `{ "eixo": "etico", "L": "total", "N": "metade", "C": "nenhum" }` (com ele, a condição restrita vai em `condicao_afeta`); `ataque` = tipo de ataque (ex.: `toque a distancia`); `continuo` = `{ "dano": "2d4", "tipo": "ácido", "rodadas": 3 }` (dano sem teste no início dos próximos turnos do alvo: Flecha Ácida); `persistente: true` (Esfera Flamejante: queima de novo a cada turno do conjurador, pela `duracao`); `repete: true` (Produzir Chamas: arremessa de novo, sem gastar a magia, pela `duracao`); `limite_dv` = dado de DV afetados, os de menos DV primeiro (Sono: `"2d4"`); `tipo_bonus` = tipo do `bonus` (`moral`…): do mesmo tipo, vale o maior',
   aura: '`dano_atributo` = `{ atributo, dano }`',
   queimar: 'quem pega fogo; `ao_ser_atingido`: quem acerta o monstro com arma natural também pode pegar fogo',
   'ataque-furtivo': 'vale quando o alvo perde a Des na CA; nunca contra imunes a crítico; à distância só até 9 m',

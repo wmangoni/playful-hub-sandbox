@@ -257,9 +257,25 @@ export function normalizarEquipamento(eq, classKey, tamanho) {
 }
 
 /**
+ * O juramento do druida (3.0) proíbe armadura e escudo de metal e as armas fora da lista dele; com
+ * qualquer um, ele não usa os poderes mágicos (as magias). Devolve o item proibido, ou null.
+ */
+export function proibidoAoDruida(eq) {
+  for (const k of ['principal', 'secundaria', 'distancia']) {
+    const a = armaPorId(eq?.[k]?.id);
+    if (a && !a.desarmado && !LISTAS.dru.includes(a.id)) return a;
+  }
+  for (const k of ['armadura', 'escudo']) {
+    const a = armaduraPorId(eq?.[k]?.id);
+    if (a?.metal) return a;
+  }
+  return null;
+}
+
+/**
  * Problemas do equipamento para este personagem: arma grande demais, arma de duas mãos com
  * escudo ou segunda arma, segunda arma sem uma mão livre, escudo e segunda arma juntos,
- * falta de proficiência, armadura de metal no druida, monge de armadura.
+ * falta de proficiência, armadura de metal ou arma proibida no druida, monge de armadura.
  * Devolve `{ erros, avisos }`: erro impede a combinação; aviso só explica a penalidade.
  */
 export function problemasDoEquipamento(eq, { classKey, raceKey, tamanho = 'Médio', extras = null }) {
@@ -285,7 +301,10 @@ export function problemasDoEquipamento(eq, { classKey, raceKey, tamanho = 'Médi
   for (const a of [armadura, escudo]) {
     if (!a) continue;
     if (!proficienteArmadura(a, { classKey, extras }) && a.penalidade < 0) avisos.push(`sem proficiência com ${a.nome.toLowerCase()}: a penalidade de armadura (−${-a.penalidade}) vale também no ataque.`);
-    if (classKey === 'dru' && a.metal) avisos.push(`${a.nome} é de metal: o druida que a usa perde as magias e as habilidades sobrenaturais (as magias chegam na etapa E7).`);
+    if (classKey === 'dru' && a.metal) avisos.push(`${a.nome} é de metal: o druida que a usa perde as magias e as habilidades sobrenaturais.`);
+  }
+  if (classKey === 'dru') {
+    for (const a of [principal, secundaria, distancia]) if (a && !a.desarmado && !LISTAS.dru.includes(a.id)) avisos.push(`${a.nome}: o juramento do druida proíbe a arma; com ela, ele perde as magias e as habilidades sobrenaturais.`);
   }
   if (classKey === 'mon' && armadura) avisos.push('De armadura, o monge perde o bônus de CA, o deslocamento extra e os ataques desarmados extras (a coluna própria e a rajada).');
   return { erros, avisos };
