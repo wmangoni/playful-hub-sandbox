@@ -343,13 +343,17 @@
 
         .boss-bar {
             position: fixed;
-            top: 76px;
+            top: 72px;
             left: 50%;
             transform: translateX(-50%);
             width: 320px;
             text-align: center;
             z-index: 15;
             pointer-events: none;
+            padding: 5px 10px 8px;
+            background: rgba(12, 4, 8, 0.74);
+            border-radius: 8px;
+            box-sizing: content-box;
         }
 
         .boss-bar.hidden {
@@ -381,6 +385,38 @@
             width: 100%;
             background: linear-gradient(90deg, #8c1f2f, #ff3b5a);
             transition: width 0.1s linear;
+        }
+
+        /* Frenesi (chefe abaixo de metade da vida): a barra pulsa e o nome ganha o aviso */
+        .boss-bar.frenzy .boss-name::after {
+            content: ' · FRENESI';
+            color: #ffb000;
+        }
+
+        .boss-bar.frenzy .boss-hp {
+            border-color: #ff3b5a;
+        }
+
+        .boss-bar.frenzy .boss-hp-fill {
+            background: linear-gradient(90deg, #b3122e, #ff6a3d);
+        }
+
+        /* brilho pulsando por cima da barra: só opacidade (o compositor anima, sem repintar) */
+        .boss-bar.frenzy::after {
+            content: '';
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            bottom: 8px;
+            height: 18px;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(255, 90, 40, 0.95);
+            animation: bossFrenzy 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes bossFrenzy {
+            from { opacity: 0.2; }
+            to { opacity: 1; }
         }
 
         .tooltip {
@@ -1917,7 +1953,7 @@
 
         const CONFIG = {
             player: { radius: 16, maxHp: 100, speed: 110, hitCooldown: 0.7, collectRadius: 90 },
-            boss: { baseHp: 800, radius: 64, speed: 14, damage: 25, interval: 120, knockbackResist: 0.99 },
+            boss: { baseHp: 1200, radius: 64, speed: 40, damage: 25, interval: 120, knockbackResist: 0.99 },
             maxEnemies: 320,
             maxProjectiles: 200,
             maxOrbs: 400,
@@ -2049,6 +2085,8 @@
                 music: 'dunes', bossMusic: 'dunesBoss',   // temas de MUSIC_TRACKS
                 blurb: 'O deserto noturno onde os vampiros caçam.',
                 cast: ['v1', 'v2', 'v3'],   // quem aparece na miniatura do menu
+                // multiplicadores da horda: vida, velocidade, dano, intervalo entre levas e vida do chefe
+                diff: { hp: 1, speed: 1, damage: 1, spawn: 1, boss: 1 },
                 spawn: [
                     [40, [['v1', 0.85], ['v2', 0.15]]],
                     [80, [['v1', 0.50], ['v2', 0.30], ['v3', 0.20]]],
@@ -2062,7 +2100,10 @@
                 blurb: 'Esqueletos, zumbis, múmias, morcegos e o Rei Lich sob as copas malditas.',
                 cast: ['skeleton', 'zombie', 'mummy', 'bat'],
                 // mais dura que a I de propósito: ≈ +25% de vida por sorteio depois dos 140 s e
-                // ≈ +40% de corpos (bandos de morcegos frágeis e esqueletos que se remontam)
+                // ≈ +40% de corpos (bandos de morcegos frágeis e esqueletos que se remontam), e a
+                // horda ainda vem mais forte: +15% de vida, +8% de velocidade, +20% de dano,
+                // levas 10% mais frequentes e o Rei Lich com +20% de vida
+                diff: { hp: 1.15, speed: 1.08, damage: 1.2, spawn: 0.9, boss: 1.2 },
                 spawn: [
                     [35, [['skeleton', 0.72], ['bat', 0.28]]],
                     [80, [['skeleton', 0.44], ['bat', 0.24], ['zombie', 0.20], ['mummy', 0.12]]],
@@ -2076,14 +2117,34 @@
         const REASSEMBLE_HP = 0.6;    // vida do esqueleto remontado (fração da de um novo)
         const CURSE_SPEED = 0.65;     // velocidade do caçador amaldiçoado pela múmia
 
-        // Chefe de cada fase (a cada CONFIG.boss.interval s). ring = rajada em anel de disparos.
+        // Chefe de cada fase (a cada CONFIG.boss.interval s). ring = rajada em anel de disparos;
+        // beam = o raio de longe (dano e, no Lich, a maldição que deixa lento).
         const BOSS_TYPES = {
-            vampire: { id: 'vampire', name: 'VAMPIRO ANCIÃO', sprite: 'bossWalk', glow: 'rgba(255, 40, 70, 0.9)', gore: 'blood' },
+            vampire: {
+                id: 'vampire', name: 'VAMPIRO ANCIÃO', sprite: 'bossWalk', glow: 'rgba(255, 40, 70, 0.9)', gore: 'blood',
+                beam: { damage: 22 }
+            },
             lich: {
                 id: 'lich', name: 'REI LICH', sheet: 'lich', glow: 'rgba(110, 255, 160, 0.85)', gore: 'bone',
-                ring: { interval: 4.5, count: 8, speed: 115, damage: 8, bolt: 'curse' }
+                ring: { interval: 4.5, count: 8, speed: 115, damage: 8, bolt: 'curse' },
+                beam: { damage: 16, curse: 2.2 }
             }
         };
+        // Todos os chefes: perseguem (CONFIG.boss.speed), reaparecem do outro lado da tela quando
+        // o caçador os deixa para trás (teleporte) e disparam um raio telegrafado — a linha de mira
+        // segue o caçador e trava pouco antes do disparo (dá para desviar de lado). Abaixo de
+        // BOSS_FRENZY_AT da vida entram em frenesi: mais rápidos, raio a cada 3 s, anel mais rápido.
+        const BOSS_FRENZY_AT = 0.5;
+        const BOSS_FRENZY_SPEED = 1.5;
+        const BOSS_FRENZY_RING = 0.75;     // intervalo do anel do Lich no frenesi (fração)
+        // hideAfter/unseenAfter = s fora da tela até sumir (depois de visto / sem ter aparecido);
+        // warn = aviso no destino antes de surgir; inset = distância da borda da tela onde surge
+        const BOSS_TP = { hideAfter: 0.45, unseenAfter: 2.5, warn: 0.6, cooldown: 3, frenzyCooldown: 2, inset: 72, minDist: 170 };
+        // charge = carga (mira visível), lock = fim da carga com a mira travada, fire = duração do raio;
+        // frenzyLead = s de antecipação da mira no frenesi (quem segue reto é acertado; quem muda de rumo, não);
+        // hurtUntil = fração do disparo em que ainda fere (depois o feixe só se dissipa); halfWidth = meia
+        // largura da faixa que fere o corpo do caçador (a faixa desenhada na mira travada e no feixe)
+        const BOSS_BEAM = { cooldown: 6, frenzyCooldown: 3, charge: 0.85, frenzyCharge: 0.65, lock: 0.3, frenzyLock: 0.25, frenzyLead: 0.3, fire: 0.4, hurtUntil: 0.85, length: 1150, halfWidth: 11, range: 760, originY: 22 };
 
         const CHEST_TIERS = {
             common: {
@@ -5126,6 +5187,10 @@
                     hp: 0, maxHp: 0, speed: 0, damage: 6,
                     alive: false, isBoss: false, jitter: 0, jitterTimer: 0, animTime: 0,
                     type: 'v1', def: ENEMY_TYPES.v1, patternTime: 0, phase: 0, spiralDir: 1, shootTimer: 0, swoopT: 0, revived: false,
+                    // chefe: teleporte (tpT > 0 = em trânsito para tpX/tpY), raio (beamS 0 = espera,
+                    // 1 = carga, 2 = disparo) e frenesi
+                    tpT: 0, tpCd: 0, offT: 0, seen: false, tpX: 0, tpY: 0,
+                    beamT: 0, beamS: 0, beamClock: 0, beamAng: 0, beamHit: false, frenzy: false,
                     fxOffX: 0, fxOffY: 0, fxShoveT: 0, fxHitT: -9, fxPendT: -9, fxKind: null   // só visual
                 });
             }
@@ -6116,7 +6181,7 @@
             let best = null;
             let bestD = Infinity;
             for (const e of enemies) {
-                if (!e.alive) continue;
+                if (!e.alive || e.tpT > 0) continue;
                 const dx = e.x - player.x;
                 const dy = e.y - player.y;
                 const d = dx * dx + dy * dy;
@@ -6167,6 +6232,42 @@
             curse: { glow: 'rgba(240, 176, 56, 0.9)', trail: 'rgba(110, 70, 18, 0.6)', core: '#f0c04a', ring: '#4e320a', shine: '#fff3cc', hit: '#f0c04a', slow: 1.8 }
         };
 
+        // Disparo inimigo pré-desenhado: rastro, núcleo, anel e reflexo com o mesmo brilho de sombra
+        // (shadowBlur 14) de antes, num canvas por estilo — um drawImage por disparo em vez de quatro
+        // formas com sombra (o anel do Lich põe dezenas na tela). O orbe fica em (OX, OY) e o rastro
+        // aponta para −x (o sprite gira com o disparo). Raio do orbe = ENEMY_BOLT_R (o de
+        // spawnEnemyProjectile).
+        const ENEMY_BOLT_OX = 42, ENEMY_BOLT_OY = 30, ENEMY_BOLT_R = 6;
+        const enemyBoltCache = new Map();
+        function enemyBoltSprite(bolt) {
+            let c = enemyBoltCache.get(bolt);
+            if (c) return c;
+            c = fxCanvas(72, 60);
+            const g = c.getContext('2d');
+            g.translate(ENEMY_BOLT_OX, ENEMY_BOLT_OY);
+            g.shadowColor = bolt.glow;
+            g.shadowBlur = 14;
+            g.strokeStyle = bolt.trail;          // rastro sombrio
+            g.lineWidth = 3.5;
+            g.beginPath();
+            g.moveTo(-14, 0);
+            g.lineTo(0, 0);
+            g.stroke();
+            g.fillStyle = bolt.core;             // núcleo do orbe
+            g.beginPath();
+            g.arc(0, 0, ENEMY_BOLT_R, 0, TWO_PI);
+            g.fill();
+            g.strokeStyle = bolt.ring;           // anel escuro
+            g.lineWidth = 1.2;
+            g.stroke();
+            g.fillStyle = bolt.shine;            // brilho central
+            g.beginPath();
+            g.arc(1.5, -1.5, ENEMY_BOLT_R * 0.35, 0, TWO_PI);
+            g.fill();
+            enemyBoltCache.set(bolt, c);
+            return c;
+        }
+
         // Maldição da múmia: o caçador anda mais devagar por alguns segundos (não acumula)
         function cursePlayer(seconds) {
             if (player.cursedT <= 0) spawnDamageText(player.x, player.y - player.radius - 22, 'AMALDIÇOADO', '#f0c04a', 0.9);
@@ -6197,16 +6298,15 @@
         }
 
         function updateEnemies(dt) {
-            if (game.freezeTimer > 0) return;   // Sino dos Mortos
+            if (game.freezeTimer > 0) {         // Sino dos Mortos (o raio em curso se desfaz)
+                const b = game.activeBoss;
+                if (b && b.beamS) { b.beamS = 0; b.beamT = 1.5; }
+                return;
+            }
             for (const e of enemies) {
                 if (!e.alive) continue;
                 if (e.isBoss) {
-                    const dx = player.x - e.x;
-                    const dy = player.y - e.y;
-                    const ang = Math.atan2(dy, dx);
-                    e.x += Math.cos(ang) * e.speed * dt;
-                    e.y += Math.sin(ang) * e.speed * dt;
-                    if (e.def.ring) bossRing(e, e.def.ring, dt);
+                    if (updateBossAI(e, dt)) continue;   // em trânsito (teleporte)
                 } else {
                     const def = e.def;
                     switch (def.behavior) {
@@ -6223,11 +6323,188 @@
             }
         }
 
-        // Rei Lich: rajada em anel de maldições, girando um pouco a cada rajada
+        // Chefe: persegue, reaparece do outro lado da tela quando fica para trás e dispara o raio.
+        // Devolve true enquanto está em trânsito (sumido: não anda, não ataca, não é alvo).
+        function updateBossAI(e, dt) {
+            const def = e.def;
+            if (!e.frenzy && e.hp < e.maxHp * BOSS_FRENZY_AT) bossFrenzy(e);
+            if (e.tpT > 0) {
+                e.tpT -= dt;
+                fxBossRift(e, dt);
+                if (e.tpT <= 0) bossEmerge(e);
+                else return true;
+            }
+            if (e.tpCd > 0) e.tpCd -= dt;
+            // devagar enquanto carrega o raio, parado enquanto dispara
+            const pace = e.beamS === 2 ? 0 : (e.beamS === 1 ? 0.3 : 1);
+            const spd = e.speed * (e.frenzy ? BOSS_FRENZY_SPEED : 1) * pace;
+            const ang = Math.atan2(player.y - e.y, player.x - e.x);
+            e.x += Math.cos(ang) * spd * dt;
+            e.y += Math.sin(ang) * spd * dt;
+            if (e.frenzy) {
+                e.animTime += dt * 0.5;              // passos mais rápidos no frenesi
+                fxBossEmbers(e, dt);
+            }
+            if (def.ring) bossRing(e, def.ring, dt);
+            if (def.beam) bossBeam(e, def.beam, dt);
+            bossWatchScreen(e, dt);
+            return false;
+        }
+
+        // Ficou fora da tela (o caçador fugiu): some e reaparece do outro lado, de surpresa
+        function bossWatchScreen(e, dt) {
+            const sx = e.x - camera.x, sy = e.y - camera.y, m = 72;
+            if (sx >= -m && sx <= VIEW_W + m && sy >= -m && sy <= VIEW_H + m) {
+                e.seen = true;
+                e.offT = 0;
+                return;
+            }
+            e.offT += dt;
+            if (e.beamS || e.tpCd > 0) return;
+            if (e.offT < (e.seen ? BOSS_TP.hideAfter : BOSS_TP.unseenAfter)) return;
+            const spot = bossTeleportSpot(e);
+            if (!spot) { e.tpCd = 1; return; }   // encurralado no canto do mundo: tenta daqui a pouco
+            e.tpX = spot.x;
+            e.tpY = spot.y;
+            e.tpT = BOSS_TP.warn;
+            e.offT = 0;
+            if (audio) audio.play('bossTp');
+        }
+
+        // Áreas do HUD por cima do canvas, em coordenadas do jogo (o canvas é escalado para a janela e
+        // o HUD não): canto esquerdo e base do minimapa e base da barra do chefe. Medidas só quando o
+        // chefe vai surgir ou entra em frenesi (raro), nunca por quadro.
+        const hudZones = { mmX: VIEW_W, mmY: 0, barY: 64 };
+        function measureHudZones() {
+            const cr = canvas.getBoundingClientRect();
+            if (!cr.width) return;
+            const k = VIEW_W / cr.width;
+            const mm = minimapEl.getBoundingClientRect();
+            const mmOn = minimap.visible && mm.width > 0;
+            hudZones.mmX = mmOn ? (mm.left - cr.left) * k : VIEW_W;
+            hudZones.mmY = mmOn ? (mm.bottom - cr.top) * k : 0;
+            const bb = bossBar.getBoundingClientRect();
+            hudZones.barY = bb.height > 0 ? (bb.bottom - cr.top) * k : 64;
+        }
+
+        // Destino do teleporte: na borda da tela à frente de quem foge (parado: do lado oposto ao
+        // que o chefe sumiu), BOSS_TP.inset px para dentro e abaixo da faixa do HUD no topo (barra do
+        // chefe); embaixo do minimapa ele desliza para baixo. Sem espaço à frente (limite do mundo, HUD),
+        // tenta os lados e só por último o lado de onde ele sumiu.
+        const bossSpot = { x: 0, y: 0 };
+        function bossTeleportSpot(e) {
+            measureHudZones();
+            const px = player.x - camera.x, py = player.y - camera.y;
+            const back = Math.atan2(player.y - e.y, player.x - e.x);
+            const ahead = (player.moving ? player.facing : back) + (Math.random() - 0.5) * 0.5;
+            const inset = BOSS_TP.inset;
+            const top = Math.max(inset, hudZones.barY + 64);   // a cabeça do chefe fica abaixo da barra
+            for (let i = 0; i < 4; i++) {
+                const a = i === 0 ? ahead : (i === 3 ? back : ahead + (i === 1 ? 1 : -1) * Math.PI / 2);   // à frente, dos lados e, por último, atrás
+                const c = Math.cos(a), s = Math.sin(a);
+                let t = Infinity;
+                if (c > 1e-3) t = Math.min(t, (VIEW_W - inset - px) / c);
+                else if (c < -1e-3) t = Math.min(t, (inset - px) / c);
+                if (s > 1e-3) t = Math.min(t, (VIEW_H - inset - py) / s);
+                else if (s < -1e-3) t = Math.min(t, (top - py) / s);
+                if (t < BOSS_TP.minDist) continue;
+                let sx = px + c * t, sy = py + s * t;
+                if (sx > hudZones.mmX - 72 && sy < hudZones.mmY + 96) sy = hudZones.mmY + 96;   // fora do minimapa
+                if (sy > VIEW_H - inset || Math.hypot(sx - px, sy - py) < BOSS_TP.minDist) continue;
+                bossSpot.x = camera.x + sx;
+                bossSpot.y = camera.y + sy;
+                return bossSpot;
+            }
+            return null;
+        }
+
+        function bossEmerge(e) {
+            e.x = e.tpX;
+            e.y = e.tpY;
+            e.tpT = 0;
+            e.tpCd = e.frenzy ? BOSS_TP.frenzyCooldown : BOSS_TP.cooldown;
+            e.seen = true;
+            e.offT = 0;
+            shake = Math.max(shake, 7);
+            fxBossEmerge(e);
+            if (audio) audio.play('bossEmerge');
+        }
+
+        // Frenesi (metade da vida): mais rápido, raio a cada BOSS_BEAM.frenzyCooldown s
+        function bossFrenzy(e) {
+            e.frenzy = true;
+            if (e.beamS === 0) e.beamT = Math.min(e.beamT, BOSS_BEAM.frenzyCooldown);
+            shake = Math.max(shake, 12);
+            bossBar.classList.add('frenzy');
+            measureHudZones();
+            fxBossFrenzy(e);
+            if (audio) audio.play('frenzy');
+        }
+
+        // Raio: carga com a linha de mira seguindo o caçador, trava no fim da carga e dispara;
+        // acerta uma vez quem estiver na linha. Só começa com o chefe à vista.
+        function bossBeam(e, beam, dt) {
+            const B = BOSS_BEAM;
+            const oy = e.y - B.originY;
+            if (e.beamS === 0) {
+                e.beamT -= dt;
+                if (e.beamT > 0) return;
+                const sx = e.x - camera.x, sy = e.y - camera.y;
+                const dx = player.x - e.x, dy = player.y - e.y;
+                if (sx < 0 || sx > VIEW_W || sy < 0 || sy > VIEW_H || dx * dx + dy * dy > B.range * B.range) return;
+                e.beamS = 1;
+                e.beamClock = 0;
+                e.beamHit = false;
+                e.beamAng = Math.atan2(player.y - oy, player.x - e.x);
+                if (audio) audio.play('beamCharge');
+                return;
+            }
+            e.beamClock += dt;
+            if (e.beamS === 1) {
+                const charge = e.frenzy ? B.frenzyCharge : B.charge;
+                const lock = e.frenzy ? B.frenzyLock : B.lock;
+                if (e.beamClock < charge - lock) {
+                    // no frenesi a mira antecipa: vale onde o caçador estará se seguir reto
+                    let tx = player.x, ty = player.y;
+                    if (e.frenzy && player.moving) {
+                        const v = player.speed * (player.cursedT > 0 ? CURSE_SPEED : 1) * B.frenzyLead;
+                        tx += Math.cos(player.facing) * v;
+                        ty += Math.sin(player.facing) * v;
+                    }
+                    e.beamAng = Math.atan2(ty - oy, tx - e.x);
+                }
+                fxBeamCharge(e, dt);
+                if (e.beamClock < charge) return;
+                e.beamS = 2;
+                e.beamClock = 0;
+                shake = Math.max(shake, 6);
+                fxBeamFire(e);
+                if (audio) audio.play('beam');
+                return;
+            }
+            if (!e.beamHit && e.beamClock <= B.fire * B.hurtUntil) {
+                const c = Math.cos(e.beamAng), s = Math.sin(e.beamAng);
+                const vx = player.x - e.x, vy = player.y - oy;
+                const t = Math.max(0, Math.min(B.length, vx * c + vy * s));
+                const qx = vx - c * t, qy = vy - s * t;
+                const r = B.halfWidth + player.radius;
+                if (qx * qx + qy * qy < r * r && damagePlayer(beam.damage)) {
+                    e.beamHit = true;
+                    if (beam.curse) cursePlayer(beam.curse);
+                    fxBeamHit(e);
+                }
+            }
+            if (e.beamClock >= B.fire) {
+                e.beamS = 0;
+                e.beamT = e.frenzy ? B.frenzyCooldown : B.cooldown;
+            }
+        }
+
+        // Rei Lich: rajada em anel de maldições, girando um pouco a cada rajada (mais rápida no frenesi)
         function bossRing(e, ring, dt) {
             e.shootTimer -= dt;
             if (e.shootTimer > 0) return;
-            e.shootTimer = ring.interval;
+            e.shootTimer = ring.interval * (e.frenzy ? BOSS_FRENZY_RING : 1);
             e.phase += 0.37;
             for (let i = 0; i < ring.count; i++) {
                 const a = e.phase + i / ring.count * TWO_PI;
@@ -6285,7 +6562,7 @@
                 const toPlayerY = player.y - e.y;
                 const distToPlayer = Math.hypot(toPlayerX, toPlayerY);
                 if (distToPlayer > 10 && distToPlayer < 560) {
-                    spawnEnemyProjectile(e.x, e.y, toPlayerX / distToPlayer, toPlayerY / distToPlayer, def.projectileSpeed, def.shootDamage, def.bolt);
+                    spawnEnemyProjectile(e.x, e.y, toPlayerX / distToPlayer, toPlayerY / distToPlayer, def.projectileSpeed, Math.round(def.shootDamage * PHASES[currentPhase].diff.damage), def.bolt);
                 }
             }
         }
@@ -6543,7 +6820,7 @@
 
         function updateSpawns(dt) {
             game.spawnTimer -= dt;
-            const interval = Math.max(CONFIG.spawnMin, CONFIG.spawnBase - game.time * 0.018);
+            const interval = Math.max(CONFIG.spawnMin, CONFIG.spawnBase - game.time * 0.018) * PHASES[currentPhase].diff.spawn;
             if (game.spawnTimer <= 0) {
                 game.spawnTimer = interval;
                 spawnEnemy();
@@ -6566,10 +6843,12 @@
             e.type = typeKey;
             e.def = typeDef;
             e.isBoss = false;
+            e.tpT = 0;   // a vaga pode ter sido de um chefe em trânsito
             e.radius = typeDef.radius;
-            e.hp = e.maxHp = typeDef.hp * (1 + game.time * 0.032);
-            e.speed = typeDef.speed * (1 + game.time * 0.008);
-            e.damage = typeDef.damage;
+            const diff = PHASES[currentPhase].diff;
+            e.hp = e.maxHp = typeDef.hp * (1 + game.time * 0.032) * diff.hp;
+            e.speed = typeDef.speed * (1 + game.time * 0.008) * diff.speed;
+            e.damage = Math.round(typeDef.damage * diff.damage);
             e.patternTime = 0;
             e.phase = Math.random() * TWO_PI;
             e.spiralDir = Math.random() < 0.5 ? 1 : -1;
@@ -6639,6 +6918,7 @@
                 CONFIG.boss.baseHp
                 * (1 + (player.level - 1) * 0.25)
                 * (1 + weaponPower * 0.05 + passivePower * 0.03)
+                * PHASES[currentPhase].diff.boss
             );
         }
 
@@ -6663,6 +6943,10 @@
             e.jitter = 0;
             e.jitterTimer = 0;
             e.animTime = 0;
+            e.tpT = 0; e.tpCd = 0; e.offT = 0; e.seen = false;
+            e.beamS = 0; e.beamT = BOSS_BEAM.cooldown; e.beamClock = 0; e.beamHit = false;
+            e.frenzy = false;
+            bossBar.classList.remove('frenzy');
             e.fxOffX = e.fxOffY = 0;
             e.fxHitT = e.fxPendT = -9;
             e.fxKind = null;
@@ -7486,7 +7770,7 @@
         function rebuildGrid() {
             grid.clear();
             for (const e of enemies) {
-                if (!e.alive) continue;
+                if (!e.alive || e.tpT > 0) continue;   // chefe em trânsito: nada o acerta nem ele acerta
                 const cx = Math.floor(e.x / GRID_CELL);
                 const cy = Math.floor(e.y / GRID_CELL);
                 const key = cx + ',' + cy;
@@ -8226,6 +8510,13 @@
             vampire: { flash: '255,226,232', star: '#ffe0e6', glow: '#ff2548', pillar: '#ffb3c1', ring: '#ff4d6a', ciA: CI_BOSS_A, ciB: CI_BOSS_B },
             lich: { flash: '222,255,232', star: '#e6ffee', glow: '#3cf08c', pillar: '#b6ffd2', ring: '#7dffb4', ciA: fxColor('#8dffb8', true), ciB: fxColor('#eaffea', true) }
         };
+        // Raio, teleporte e frenesi de cada chefe: raio (beam/mid/core), faixa do dano na mira travada
+        // (band), contorno escuro (dark), borda da fenda (rim), fenda no chão (rift), névoa ao surgir
+        // (mist), texto e clarão do frenesi
+        const FX_BOSS_POWER = {
+            vampire: { beam: '#ff2548', mid: '#ff8095', core: '#fff0f2', band: '#d0183a', dark: 'rgba(24, 0, 6, 0.72)', rim: '#ff4d6a', rift: 'rgba(12, 0, 3, 0.9)', mist: FX_BLOOD_DARK, text: '#ff5a6e', flash: '255,40,70', ci: fxColor('#ff6a82', true), ciHot: CI_BOSS_B },
+            lich: { beam: '#2fe07e', mid: '#9dffc4', core: '#f2fff6', band: '#16b45e', dark: 'rgba(0, 14, 6, 0.72)', rim: '#7dffb4', rift: 'rgba(0, 8, 4, 0.9)', mist: '#0e3a22', text: '#8dffb8', flash: '60,255,140', ci: FX_BOSS_DEATH.lich.ciA, ciHot: FX_BOSS_DEATH.lich.ciB }
+        };
 
         function fxKindOf(src) {
             if (!src) return 'generic';
@@ -8554,6 +8845,11 @@
             tasks.push(function () { fxPillar(FX_PAL.holy_evo.glow); fxOrb(); });
             tasks.push(function () {                     // morte dos chefes
                 for (const k in FX_BOSS_DEATH) { const b = FX_BOSS_DEATH[k]; fxPillar(b.pillar); fxStar(b.star); fxGlow(b.glow); }
+            });
+            tasks.push(function () {                     // raio, teleporte e frenesi dos chefes; disparos inimigos
+                for (const k in FX_BOSS_POWER) { const b = FX_BOSS_POWER[k]; fxGlow(b.beam); fxStar(b.core); fxGlow(b.mist); }
+                for (const k in ENEMY_BOLTS) fxWarmList.push(enemyBoltSprite(ENEMY_BOLTS[k]));
+                if (!document.fonts || document.fonts.check('900 52px Cinzel')) for (const k in FX_BOSS_POWER) fxWarmList.push(bossBannerSprite(FX_BOSS_POWER[k]));
             });
             tasks.push(fxEnsureSplats);
             tasks.push(function () { for (const k in FX_PAL) fxDigits(FX_PAL[k].text); fxDigits('#ff5a6e'); fxDigits('#38bdf8'); });
@@ -9158,6 +9454,126 @@
             }
         }
 
+        // ---------- chefes: teleporte, raio e frenesi ----------
+        function fxBossPal(e) { return FX_BOSS_POWER[e.def.id] || FX_BOSS_POWER.vampire; }
+        // Fenda no destino do teleporte: faíscas correndo para o centro até o chefe surgir
+        function fxBossRift(e, dt) {
+            const pal = fxBossPal(e);
+            const cx = e.tpX, cy = e.tpY - 24;
+            const n = fxN(dt * 55);
+            for (let i = 0; i < n; i++) {
+                const a = fxRand() * TWO_PI, r = fxRange(60, 104);
+                const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.7;
+                const life = fxRange(0.22, 0.36);
+                fxSpark(x, y, Math.atan2(cy - y, cx - x), Math.hypot(cx - x, cy - y) / life, life, fxRand() < 0.3 ? pal.ciHot : pal.ci, 0.03, 0, false);
+            }
+        }
+        function fxBossEmerge(e) {
+            const pal = fxBossPal(e);
+            const st = enemySpriteState(e);
+            const x = e.x, y = e.y;
+            fxGhostOf(st.img, st.row, st.frame, st.size, x, y, 0.45, 0.35);   // silhueta branca: "materializou"
+            fxGlowAt(x, y - 24, fxStar(pal.core), 40, 190, 0.35, 0.9);
+            fxGlowAt(x, y - 24, fxGlow(pal.beam), 70, 230, 0.5, 0.7);
+            fxRing(x, y + 30, 16, 150, 0.5, pal.rim, 4, 0.9, 0.45);
+            fxRing(x, y + 30, 10, 100, 0.4, '#ffffff', 2, 0.7, 0.45, 0, 0.06);
+            const n = fxN(30);
+            for (let i = 0; i < n; i++) fxSpark(x, y - 24, fxRand() * TWO_PI, fxRange(140, 380), fxRange(0.3, 0.6), i % 3 ? pal.ci : pal.ciHot, 0.03, 3, true);
+            const m = fxN(10);
+            for (let i = 0; i < m; i++) fxGlowAt(x + fxRange(-40, 40), y + fxRange(-50, 20), fxGlow(pal.mist), 30, 70, fxRange(0.5, 0.9), 0.55, false, fxRange(-40, 40), fxRange(-30, 10));
+        }
+        function fxBossFrenzy(e) {
+            const pal = fxBossPal(e);
+            const x = e.x, y = e.y - 24;
+            fxFlashA = Math.max(fxFlashA, 0.18);
+            fxFlashCol = pal.flash;
+            fxGlowAt(x, y, fxGlow(pal.beam), 80, 300, 0.6, 0.8);
+            for (let i = 0; i < 3; i++) fxRing(x, e.y + 20, 20, 170 + i * 50, 0.5 + i * 0.12, i === 1 ? '#ffffff' : pal.rim, 4 - i, 0.85, 0.5, 0, i * 0.08);
+            const n = fxN(36);
+            for (let i = 0; i < n; i++) fxSpark(x, y, fxRand() * TWO_PI, fxRange(160, 420), fxRange(0.35, 0.7), i % 2 ? pal.ci : pal.ciHot, 0.03, 3, true);
+            bossBannerT = game.time;
+        }
+        // Brasas subindo do chefe em frenesi (só com ele à vista)
+        function fxBossEmbers(e, dt) {
+            const sx = e.x - camera.x, sy = e.y - camera.y;
+            if (sx < -80 || sx > VIEW_W + 80 || sy < -80 || sy > VIEW_H + 80) return;
+            const pal = fxBossPal(e);
+            const n = fxN(dt * 34);
+            for (let i = 0; i < n; i++) fxSpark(e.x + fxRange(-34, 34), e.y + fxRange(-34, 30), -Math.PI / 2 + fxRange(-0.35, 0.35), fxRange(50, 115), fxRange(0.5, 0.9), fxRand() < 0.3 ? pal.ciHot : pal.ci, 0.07, 0.6, true);
+        }
+        // "FRENESI!" na fonte gótica do HUD (Cinzel), com contorno escuro; um canvas por chefe. Aparece
+        // como anúncio no alto da tela, logo abaixo da barra do chefe (fora do minimapa e dos cartões).
+        let bossBannerT = -9;
+        const bossBannerCache = new Map();
+        function bossBannerSprite(pal) {
+            let c = bossBannerCache.get(pal);
+            if (c) return c;
+            const font = '900 52px Cinzel, serif';
+            const m = fxCanvas(4, 4).getContext('2d');
+            m.font = font;
+            const w = Math.ceil(m.measureText('FRENESI!').width) + 28;
+            c = fxCanvas(w, 80);
+            const g = c.getContext('2d');
+            g.font = font;
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.lineJoin = 'round';
+            g.strokeStyle = 'rgba(16, 3, 7, 0.95)';
+            g.lineWidth = 10;
+            g.strokeText('FRENESI!', w / 2, 42);
+            const gr = g.createLinearGradient(0, 18, 0, 66);
+            gr.addColorStop(0, pal.core);
+            gr.addColorStop(0.55, pal.text);
+            gr.addColorStop(1, pal.band);
+            g.fillStyle = gr;
+            g.fillText('FRENESI!', w / 2, 42);
+            bossBannerCache.set(pal, c);
+            return c;
+        }
+        function drawBossBanner() {
+            const e = game.activeBoss;
+            const t = game.time - bossBannerT;
+            if (!e || !e.alive || t < 0 || t > 1.5) return;
+            const spr = bossBannerSprite(fxBossPal(e));
+            const pop = t < 0.16 ? 1.6 - 0.6 * (t / 0.16) : 1;
+            const w = spr.width / 2 * pop, h = spr.height / 2 * pop;
+            ctx.imageSmoothingEnabled = true;
+            ctx.globalAlpha = t > 1.25 ? Math.max(0, (1.5 - t) / 0.25) : 1;
+            ctx.drawImage(spr, VIEW_W / 2 - w / 2, Math.max(0, hudZones.barY) + 6 + spr.height / 4 - h / 2, w, h);   // retrato: a barra fica acima do canvas
+            ctx.globalAlpha = 1;
+            ctx.imageSmoothingEnabled = false;
+        }
+        // Carga do raio: faíscas correndo para a origem (o orbe e a mira são desenhados em drawBossAttacks)
+        function fxBeamCharge(e, dt) {
+            const pal = fxBossPal(e);
+            const ox = e.x, oy = e.y - BOSS_BEAM.originY;
+            const n = fxN(dt * 40);
+            for (let i = 0; i < n; i++) {
+                const a = fxRand() * TWO_PI, r = fxRange(34, 60);
+                const life = fxRange(0.16, 0.26);
+                fxSpark(ox + Math.cos(a) * r, oy + Math.sin(a) * r, a + Math.PI, r / life, life, fxRand() < 0.4 ? pal.ciHot : pal.ci, 0.03, 0, false);
+            }
+        }
+        function fxBeamFire(e) {
+            const pal = fxBossPal(e);
+            const ox = e.x, oy = e.y - BOSS_BEAM.originY;
+            const c = Math.cos(e.beamAng), s = Math.sin(e.beamAng);
+            fxGlowAt(ox, oy, fxStar(pal.core), 50, 150, 0.3, 1);
+            fxRing(ox, oy, 10, 70, 0.3, pal.rim, 3, 0.9);
+            const n = fxN(e.frenzy ? 46 : 28);
+            for (let i = 0; i < n; i++) {                // faíscas saltando da linha do raio
+                const t = fxRange(30, 900);
+                const side = fxRand() < 0.5 ? 1 : -1;
+                fxSpark(ox + c * t, oy + s * t, e.beamAng + side * Math.PI / 2 + fxRange(-0.5, 0.5), fxRange(90, 260), fxRange(0.25, 0.5), fxRand() < 0.35 ? pal.ciHot : pal.ci, 0.03, 3, fxRand() < 0.4);
+            }
+        }
+        function fxBeamHit(e) {
+            const pal = fxBossPal(e);
+            fxGlowAt(player.x, player.y - 8, fxStar(pal.core), 30, 110, 0.25, 0.9);
+            const n = fxN(14);
+            for (let i = 0; i < n; i++) fxSpark(player.x, player.y - 8, fxRand() * TWO_PI, fxRange(120, 300), fxRange(0.2, 0.4), pal.ciHot, 0.03, 4, true);
+        }
+
         // ---------- atualização ----------
         function updateFx(dt) {
             fxKillBudget = Math.max(2, Math.round(14 * fxQ));
@@ -9551,6 +9967,267 @@
             }
         }
 
+        // Fenda do teleporte com contorno rachado fixo (24 pontos de raio irregular, em pixels inteiros)
+        const RIFT_JAG = [1, 0.94, 1.06, 0.97, 0.86, 1.02, 1.12, 0.95, 0.99, 0.84, 0.97, 1.05, 0.92, 1.1, 1.0, 0.9, 0.96, 1.08, 0.88, 1.0, 1.04, 0.93, 0.87, 0.98];
+        function riftPath(sx, sy, r) {
+            ctx.beginPath();
+            for (let i = 0; i < RIFT_JAG.length; i++) {
+                const a = i / RIFT_JAG.length * TWO_PI, k = r * RIFT_JAG[i];
+                const x = Math.round(sx + Math.cos(a) * k), y = Math.round(sy + Math.sin(a) * k * 0.42);
+                if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+            }
+            ctx.closePath();
+        }
+        // Linha do spritesheet do chefe olhando para o caçador (mesma regra de drawEnemies)
+        function bossRowAt(x, y) {
+            const ang = Math.atan2(player.y - y, player.x - x);
+            if (ang > -Math.PI / 4 && ang <= Math.PI / 4) return 3;
+            if (ang > Math.PI / 4 && ang <= 3 * Math.PI / 4) return 0;
+            if (ang > -3 * Math.PI / 4 && ang <= -Math.PI / 4) return 1;
+            return 2;
+        }
+
+        // Chefe no chão: a fenda do teleporte (antes de ele surgir) ou a aura do frenesi (por baixo dele)
+        function drawBossGround() {
+            const e = game.activeBoss;
+            if (!e || !e.alive || !(e.tpT > 0 || e.frenzy)) return;
+            const pal = fxBossPal(e);
+            if (e.tpT > 0) {
+                const k = 1 - e.tpT / BOSS_TP.warn;          // 0 → 1 até surgir
+                const sx = Math.round(e.tpX - camera.x), sy = Math.round(e.tpY - camera.y), fy = sy + 32;
+                const r = 18 + 38 * Math.min(1, k * 1.4);
+                // fenda quase preta com a borda rachada acesa (não é poça: é um buraco)
+                riftPath(sx, fy, r);
+                ctx.fillStyle = pal.rift;
+                ctx.fill();
+                ctx.strokeStyle = pal.dark;
+                ctx.lineWidth = 5;
+                ctx.stroke();
+                ctx.strokeStyle = pal.rim;
+                ctx.globalAlpha = 0.6 + 0.4 * k * (0.6 + 0.4 * Math.sin(game.time * 30));
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                // anel que se fecha sobre a fenda: a contagem até ele surgir
+                const rr = r + 74 * (1 - k);
+                ctx.beginPath();
+                ctx.ellipse(sx, fy, rr, rr * 0.42, 0, 0, TWO_PI);
+                ctx.globalAlpha = 0.5;
+                ctx.strokeStyle = pal.dark;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.globalAlpha = 0.45 + 0.5 * k;
+                ctx.strokeStyle = pal.rim;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // no fim do aviso, o chefe sobe da fenda (translúcido)
+                if (k > 0.5) {
+                    const img = enemySheet(e.def);
+                    if (spriteReady(img)) {
+                        const u = (k - 0.5) / 0.5;
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(sx - 80, sy - 90, 160, fy + 10 - (sy - 90));
+                        ctx.clip();
+                        ctx.globalAlpha = 0.25 + 0.45 * u;
+                        drawSprite(img, bossRowAt(e.tpX, e.tpY), 0, ANIMS.bossWalk.frames, sx, sy + Math.round(56 * (1 - u)), 128, 128, false);
+                        ctx.restore();
+                    }
+                }
+                // brilho estreito subindo da fenda (por cima, sem clarear o buraco)
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.imageSmoothingEnabled = true;
+                const gw = 34 + 26 * k, gh = 80 + 50 * k;
+                ctx.globalAlpha = 0.18 + 0.4 * k;
+                ctx.drawImage(fxGlow(pal.beam), sx - gw / 2, fy - 8 - gh, gw, gh);
+            } else {
+                const sx = e.x - camera.x, sy = e.y - camera.y;
+                if (sx > -120 && sx < VIEW_W + 120 && sy > -120 && sy < VIEW_H + 120) {
+                    const p = 0.5 + 0.5 * Math.sin(game.time * 9);
+                    const fx = Math.round(sx), fy = Math.round(sy + 36);
+                    // sombra suave sob os pés (destaca do chão claro) e ondas de calor saindo do chão
+                    ctx.globalAlpha = 0.45;
+                    ctx.fillStyle = pal.dark;
+                    ctx.beginPath();
+                    ctx.ellipse(fx, fy, 44, 17, 0, 0, TWO_PI);
+                    ctx.fill();
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.globalCompositeOperation = 'lighter';
+                    const heat = fxGlow(pal.beam);
+                    for (let i = 0; i < 2; i++) {        // ondas de calor difusas saindo do chão
+                        const u = (game.time * 1.6 + i * 0.5) % 1;
+                        const rr = 40 + 56 * u;
+                        ctx.globalAlpha = 0.6 * (1 - u);
+                        ctx.drawImage(heat, fx - rr, fy - rr * 0.36, rr * 2, rr * 0.72);
+                    }
+                    ctx.globalAlpha = 0.28 + 0.22 * p;
+                    const g = 180 + 30 * p;
+                    ctx.drawImage(fxGlow(pal.beam), sx - g / 2, sy - 20 - g / 2, g, g);
+                }
+            }
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.imageSmoothingEnabled = false;
+        }
+
+        // Mira do raio, na camada do chão (por baixo dos inimigos e do caçador: ele se vê dentro ou fora
+        // da faixa na hora de desviar). Seguindo: linha fina e a largura só sugerida. Travada: a faixa
+        // que fere (a mesma largura do feixe, 2 × halfWidth), saturada, com as bordas marcadas (branco
+        // tingido só no piscar) e setas correndo do chefe para fora (de onde o raio vem e para onde vai).
+        function drawBossAim() {
+            const e = game.activeBoss;
+            if (!e || !e.alive || e.beamS !== 1) return;
+            const pal = fxBossPal(e);
+            const B = BOSS_BEAM, hw = B.halfWidth;
+            const ox = e.x - camera.x, oy = e.y - B.originY - camera.y;
+            const c = Math.cos(e.beamAng), s = Math.sin(e.beamAng);
+            const ex = ox + c * B.length, ey = oy + s * B.length;
+            const nx = -s * hw, ny = c * hw;
+            const charge = e.frenzy ? B.frenzyCharge : B.charge;
+            const lock = e.frenzy ? B.frenzyLock : B.lock;
+            const k = Math.min(1, e.beamClock / charge);
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(ex, ey);
+            ctx.strokeStyle = pal.band;
+            if (e.beamClock >= charge - lock) {
+                const on = Math.sin(game.time * 45) > 0;
+                ctx.globalAlpha = on ? 0.5 : 0.34;
+                ctx.lineWidth = hw * 2;
+                ctx.stroke();
+                ctx.beginPath();                         // bordas: contorno escuro + linha acesa
+                ctx.moveTo(ox + nx, oy + ny);
+                ctx.lineTo(ex + nx, ey + ny);
+                ctx.moveTo(ox - nx, oy - ny);
+                ctx.lineTo(ex - nx, ey - ny);
+                ctx.globalAlpha = 0.8;
+                ctx.strokeStyle = pal.dark;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = on ? pal.core : pal.mid;   // piscar: branco tingido da cor do chefe
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // setas ››› correndo pela faixa (só as que estão na tela)
+                const step = 34, ad = 6, ah = hw * 0.55;
+                ctx.beginPath();
+                for (let d = 44 + (game.time * 260) % step; d < B.length; d += step) {
+                    const tx = ox + c * d, ty = oy + s * d;
+                    if (tx < -20 || tx > VIEW_W + 20 || ty < -20 || ty > VIEW_H + 20) continue;
+                    const bx = tx - c * ad, by = ty - s * ad;
+                    ctx.moveTo(bx - s * ah, by + c * ah);
+                    ctx.lineTo(tx, ty);
+                    ctx.lineTo(bx + s * ah, by - c * ah);
+                }
+                ctx.globalAlpha = 0.5;
+                ctx.strokeStyle = pal.dark;
+                ctx.lineWidth = 4.5;
+                ctx.stroke();
+                ctx.globalAlpha = 0.9;
+                ctx.strokeStyle = pal.mid;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            } else {
+                ctx.globalAlpha = 0.1 + 0.1 * k;         // a largura só sugerida enquanto segue
+                ctx.lineWidth = hw * 2;
+                ctx.stroke();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = (0.5 + 0.4 * k) * (0.75 + 0.25 * Math.sin(game.time * 22));
+                ctx.strokeStyle = pal.mid;
+                ctx.lineWidth = 1.6;
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // Raio do chefe, por cima de tudo. Carga: orbe crescendo 3× na mão do chefe e um anel que se
+        // fecha até o disparo (a mira fica no chão, em drawBossAim). Disparo: feixe com o corpo na
+        // largura do dano e o brilho de fora bem mais fraco; no frenesi, contorno escuro com fio claro.
+        function drawBossAttacks() {
+            const e = game.activeBoss;
+            if (!e || !e.alive || !e.beamS) return;
+            const pal = fxBossPal(e);
+            const B = BOSS_BEAM, hw = B.halfWidth;
+            const ox = e.x - camera.x, oy = e.y - B.originY - camera.y;
+            const c = Math.cos(e.beamAng), s = Math.sin(e.beamAng);
+            const ex = ox + c * B.length, ey = oy + s * B.length;
+            ctx.imageSmoothingEnabled = true;
+            if (e.beamS === 1) {
+                const charge = e.frenzy ? B.frenzyCharge : B.charge;
+                const lock = e.frenzy ? B.frenzyLock : B.lock;
+                const k = Math.min(1, e.beamClock / charge);
+                const locked = e.beamClock >= charge - lock;
+                // orbe crescendo na mão do chefe e o anel que se fecha até o disparo
+                ctx.globalCompositeOperation = 'lighter';
+                const g = 20 + 64 * k, st = 12 + 34 * k;
+                ctx.globalAlpha = 0.65 + 0.35 * k;
+                ctx.drawImage(fxGlow(pal.beam), ox - g / 2, oy - g / 2, g, g);
+                ctx.drawImage(fxStar(pal.core), ox - st / 2, oy - st / 2, st, st);
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.beginPath();
+                ctx.arc(ox, oy, 12 + 46 * (1 - k), 0, TWO_PI);
+                ctx.globalAlpha = 0.7;
+                ctx.strokeStyle = pal.dark;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = locked ? '#ffffff' : pal.mid;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            } else {
+                const t = e.beamClock / B.fire;
+                // largura cheia enquanto fere; no fim (hurtUntil → 1) só se dissipa
+                const wv = t < 0.06 ? 0.7 + 0.3 * t / 0.06 : (t > B.hurtUntil ? Math.max(0, (1 - t) / (1 - B.hurtUntil)) : 1);
+                const av = t > 0.6 ? Math.max(0, 1 - (t - 0.6) / 0.4 * 0.6) : 1;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(ox, oy);
+                ctx.lineTo(ex, ey);
+                if (e.frenzy) {                          // frenesi: contorno escuro com fio claro por fora
+                    ctx.globalAlpha = 0.75 * av;
+                    ctx.strokeStyle = pal.dark;
+                    ctx.lineWidth = (hw * 2 + 14) * wv;
+                    ctx.stroke();
+                    const ow = (hw + 8) * wv;
+                    ctx.beginPath();
+                    ctx.moveTo(ox - s * ow, oy + c * ow);
+                    ctx.lineTo(ex - s * ow, ey + c * ow);
+                    ctx.moveTo(ox + s * ow, oy - c * ow);
+                    ctx.lineTo(ex + s * ow, ey - c * ow);
+                    ctx.globalAlpha = 0.6 * av;
+                    ctx.strokeStyle = pal.rim;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(ox, oy);
+                    ctx.lineTo(ex, ey);
+                }
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.2 * av;
+                ctx.strokeStyle = pal.beam;
+                ctx.lineWidth = hw * 4 * wv;
+                ctx.stroke();
+                ctx.globalAlpha = 0.85 * av;
+                ctx.lineWidth = hw * 2 * wv;
+                ctx.stroke();
+                ctx.globalAlpha = 0.8 * av;
+                ctx.strokeStyle = pal.mid;
+                ctx.lineWidth = hw * 1.15 * wv;
+                ctx.stroke();
+                ctx.globalAlpha = 0.95 * av;
+                ctx.strokeStyle = pal.core;
+                ctx.lineWidth = 6 * wv;
+                ctx.stroke();
+                const g = 90 * (0.6 + 0.4 * wv);
+                ctx.globalAlpha = av;
+                ctx.drawImage(fxGlow(pal.beam), ox - g / 2, oy - g / 2, g, g);
+                ctx.lineCap = 'butt';
+            }
+            ctx.globalAlpha = 1;
+            ctx.imageSmoothingEnabled = false;
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
         function drawFxScreen() {
             if (fxFlashA <= 0) return;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -9768,7 +10445,7 @@
                 g.lineWidth = Math.max(1, u * 0.35);
                 g.strokeRect(minimapPos[0] - u, minimapPos[1] - u * 0.75, u * 2, u * 1.5);
             }
-            if (boss) {
+            if (boss && !(boss.tpT > 0)) {   // em trânsito some do mapa também
                 toMinimap(boss.x, boss.y, k, half, lim, true);
                 const pulse = 1 + Math.sin(game.time * 6) * 0.2;
                 g.fillStyle = '#ff2a45';
@@ -10158,35 +10835,9 @@
                 ctx.rotate(ang);
 
                 if (p.isEnemy || p.weaponId === 'enemy_bolt') {
-                    // ORBE DE SANGUE DO VAMPIRO 3 / MALDIÇÃO DA MÚMIA
-                    const bolt = p.bolt || ENEMY_BOLTS.blood;
-                    ctx.shadowColor = bolt.glow;
-                    ctx.shadowBlur = 14;
-
-                    // Rastro sombrio
-                    ctx.strokeStyle = bolt.trail;
-                    ctx.lineWidth = 3.5;
-                    ctx.beginPath();
-                    ctx.moveTo(-14, 0);
-                    ctx.lineTo(0, 0);
-                    ctx.stroke();
-
-                    // Núcleo do orbe
-                    ctx.fillStyle = bolt.core;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, p.radius, 0, TWO_PI);
-                    ctx.fill();
-
-                    // Anel escuro
-                    ctx.strokeStyle = bolt.ring;
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
-
-                    // Brilho central
-                    ctx.fillStyle = bolt.shine;
-                    ctx.beginPath();
-                    ctx.arc(1.5, -1.5, p.radius * 0.35, 0, TWO_PI);
-                    ctx.fill();
+                    // ORBE DE SANGUE DO VAMPIRO 3 / MALDIÇÃO DA MÚMIA E DO REI LICH (sprite pré-desenhado)
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.drawImage(enemyBoltSprite(p.bolt || ENEMY_BOLTS.blood), -ENEMY_BOLT_OX, -ENEMY_BOLT_OY);
                 } else if (p.weaponId === 'crossbow') {
                     // VIROTE DE BESTA (Quarrel: haste metálica reforçada, ponta perfurante e aletas compactas)
                     const len = p.evolved ? 20 : 16;
@@ -11032,6 +11683,7 @@
                 }
 
                 if (e.isBoss) {
+                    if (e.tpT > 0) continue;   // sumido: reaparece no destino (fenda em drawBossGround)
                     const anim = ANIMS.bossWalk;
                     const frame = Math.floor(e.animTime * anim.fps) % anim.frames;
                     const bossImg = enemySheet(e.def);
@@ -11186,15 +11838,19 @@
             drawOrbs();
             drawDamageZones();
             drawChests();
+            drawBossGround();
+            drawBossAim();
             drawEnemies();
             drawPlayer();
             drawSlashes();
             drawProjectiles();
+            drawBossAttacks();
             if (graveBlasts.length) drawGraveBlasts();
             drawFxTop();
             drawPlayerOverlay();
             drawParticles();
             drawDamageTexts();
+            drawBossBanner();
             if (game.knellFlash > 0) {   // clarão do Sino dos Mortos
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.fillStyle = 'rgba(206, 224, 255, ' + (game.knellFlash * 0.3).toFixed(3) + ')';
@@ -11891,6 +12547,24 @@
                     noiseSweep(0.08, 0.12, 'bandpass', 2400, 1600);
                     setTimeout(function () { noiseSweep(0.08, 0.1, 'bandpass', 2000, 1400); }, 90);
                 }
+                else if (name === 'beamCharge') {       // chefe carregando o raio: zumbido subindo
+                    tone('sawtooth', 110, 520, 0.7, 0.07);
+                    tone('sine', 220, 1040, 0.7, 0.07);
+                }
+                else if (name === 'beam') {             // o raio: estalo e rugido descendo
+                    noiseSweep(0.45, 0.26, 'bandpass', 3200, 420);
+                    tone('sawtooth', 240, 60, 0.45, 0.2);
+                }
+                else if (name === 'bossTp') noiseSweep(0.55, 0.14, 'bandpass', 260, 2200);   // some: sopro subindo
+                else if (name === 'bossEmerge') {       // surge do outro lado
+                    noiseSweep(0.35, 0.24, 'lowpass', 1800, 90);
+                    tone('square', 95, 45, 0.3, 0.16);
+                }
+                else if (name === 'frenzy') {           // frenesi: urro grave
+                    tone('sawtooth', 82, 40, 1.0, 0.3);
+                    tone('sawtooth', 109, 52, 1.0, 0.2);
+                    noiseSweep(0.8, 0.16, 'lowpass', 1200, 100);
+                }
                 else if (name === 'knell') {
                     tone('sine', 110, 104, 1.6, 0.3);
                     tone('sine', 221, 214, 1.1, 0.12);
@@ -11981,7 +12655,7 @@
         initMapPickups();
         setStatus('menu');
         fxPrewarm();
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, get sceneryTheme() { return THEME.id; }, get phase() { return currentPhase; }, PHASES: PHASES, PHASE_UNLOCK_TIME: PHASE_UNLOCK_TIME, setPhase: setPhase, selectPhase: selectPhase, isPhaseUnlocked: isPhaseUnlocked, monsterSheet: monsterSheet, spawnEnemy: spawnEnemy, bonePiles: bonePiles, get pendingPhase() { return pendingPhase; }, get sceneryBuilding() { return !!sceneryBuild; }, get music() { return audio && audio.music; }, renderMusic: renderMusic, MUSIC_TRACKS: MUSIC_TRACKS, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, OMENS: OMENS, hasOmen: hasOmen, hitEnemy: hitEnemy, step: function (dt) { const st = game.status; game.status = 'playing'; update(dt); if (game.status === 'playing') game.status = st; render(); }, fx: { sparks: fxSparks, glows: fxGlows, rings: fxRings, slashes: fxSlashes, decals: fxDecals, bolts: fxBolts, ghosts: fxGhosts, standins: fxStandins, cracks: fxCracks, pillars: fxPillars, events: fxEvents, silhouette: fxSilhouette, budget: fxBudget, quality: function () { return fxQ; }, prewarmed: function () { return fxWarmReady && !fxWarmList.length && fxSilCache.size >= 3 && fxRuneCache.size >= 2; } }, damageTexts: damageTexts, damageZones: damageZones, recomputeStats: recomputeStats, fireWeapon: fireWeapon, chestPityTime: chestPityTime, getProgression: function () { return progression; }, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, get sceneryTheme() { return THEME.id; }, get phase() { return currentPhase; }, PHASES: PHASES, PHASE_UNLOCK_TIME: PHASE_UNLOCK_TIME, setPhase: setPhase, selectPhase: selectPhase, isPhaseUnlocked: isPhaseUnlocked, monsterSheet: monsterSheet, spawnEnemy: spawnEnemy, bonePiles: bonePiles, get pendingPhase() { return pendingPhase; }, get sceneryBuilding() { return !!sceneryBuild; }, get music() { return audio && audio.music; }, renderMusic: renderMusic, MUSIC_TRACKS: MUSIC_TRACKS, CONFIG: CONFIG, camera: camera, BOSS_BEAM: BOSS_BEAM, BOSS_TP: BOSS_TP, BOSS_TYPES: BOSS_TYPES, ENEMY_BOLTS: ENEMY_BOLTS, enemyBoltSprite: enemyBoltSprite, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, OMENS: OMENS, hasOmen: hasOmen, hitEnemy: hitEnemy, step: function (dt) { const st = game.status; game.status = 'playing'; update(dt); if (game.status === 'playing') game.status = st; render(); }, fx: { sparks: fxSparks, glows: fxGlows, rings: fxRings, slashes: fxSlashes, decals: fxDecals, bolts: fxBolts, ghosts: fxGhosts, standins: fxStandins, cracks: fxCracks, pillars: fxPillars, events: fxEvents, silhouette: fxSilhouette, budget: fxBudget, quality: function () { return fxQ; }, prewarmed: function () { return fxWarmReady && !fxWarmList.length && fxSilCache.size >= 3 && fxRuneCache.size >= 2; } }, damageTexts: damageTexts, damageZones: damageZones, recomputeStats: recomputeStats, fireWeapon: fireWeapon, chestPityTime: chestPityTime, getProgression: function () { return progression; }, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>
