@@ -201,6 +201,12 @@ function instanciar(ficha, lado, indice, pos) {
     usos: {},
     recarga: {},
     magiasRestantes: (c.magias?.lista || []).map(s => s.quantidade),
+    // espaços do dia por nível (personagens: `magias.espacos`); cada magia da lista diz de quais sai
+    espacosRestantes: { ...(c.magias?.espacos || {}) },
+    // magias que continuam: Produzir Chamas (arremessar de novo), Esfera Flamejante, Flecha Ácida
+    ativas: {},
+    persistentes: [],
+    continuos: [],
     resistUsada: {},
     agarrando: null,
     agarradoPor: null,
@@ -476,9 +482,30 @@ function deltaMod(c, attr) {
   return mod(atual) - mod(base);
 }
 
-function somaBuff(c, chave) {
-  return c.buffs.reduce((s, bf) => s + (bf.bonus?.[chave] || 0), 0);
+/**
+ * Bônus dos reforços numa chave, como [valor, rótulo]. Bônus do mesmo tipo (`tipo_bonus`: moral,
+ * melhoria…) não se somam (3.0): vale o maior. Sem tipo, somam. `filtro` escolhe os reforços
+ * (Arma Mágica vale só para a arma encantada).
+ */
+function bonusDosReforcos(c, chave, filtro = null) {
+  const soltos = [];
+  const porTipo = new Map();
+  for (const bf of c.buffs) {
+    const v = bf.bonus?.[chave] || 0;
+    if (!v || (filtro && !filtro(bf))) continue;
+    const item = [v, bf.rotulo || 'reforço'];
+    if (!bf.tipo_bonus) soltos.push(item);
+    else if (!porTipo.has(bf.tipo_bonus) || v > porTipo.get(bf.tipo_bonus)[0]) porTipo.set(bf.tipo_bonus, item);
+  }
+  return [...soltos, ...porTipo.values()];
 }
+
+function somaBuff(c, chave, filtro = null) {
+  return bonusDosReforcos(c, chave, filtro).reduce((s, [v]) => s + v, 0);
+}
+
+/** O reforço vale para este ataque? (Arma Mágica: só a arma e a mão encantadas) */
+const valeParaArma = (bf, a) => !bf.somente_arma || (a?.arma_id === bf.somente_arma.id && (a.mao || 'principal') === bf.somente_arma.mao);
 
 // ---------------------------------------------------------------------------------------------
 // distância e movimento
@@ -545,7 +572,8 @@ function caContra(b, alvo, atacante, a) {
   if (hasCond(alvo, 'enredado')) ca -= 2; // −4 Des
   if (hasCond(alvo, 'lento')) ca -= 2;
   if (hasCond(alvo, 'derrubado')) ca += isMelee(a) ? -4 : 4;
-  ca += somaBuff(alvo, 'ca') + somaBuff(alvo, 'ca_deflexao') + (isTouch(a) ? 0 : somaBuff(alvo, 'ca_natural'));
+  // armadura natural (Pele de Árvore) e de armadura (Armadura Arcana) não valem contra toque
+  ca += somaBuff(alvo, 'ca') + somaBuff(alvo, 'ca_deflexao') + (isTouch(a) ? 0 : somaBuff(alvo, 'ca_natural') + somaBuff(alvo, 'ca_armadura'));
   return ca;
 }
 
@@ -563,7 +591,7 @@ function modsDeAtaque(b, c, alvo, a, { investida = false, poderoso = 0 } = {}) {
   // da Acuidade com Arma (`atributo_ataque`)
   const atributo = a.atributo_ataque || (isMelee(a) ? 'for' : 'des');
   add(deltaMod(c, atributo), atributo === 'for' ? 'Força' : 'Destreza');
-  for (const bf of c.buffs) add(bf.bonus?.ataque || 0, bf.rotulo || 'reforço');
+  for (const [v, r] of bonusDosReforcos(c, 'ataque', bf => valeParaArma(bf, a))) add(v, r);
   if (investida) add(2, 'investida');
   if (poderoso) add(-poderoso, 'Ataque Poderoso');
   if (isRanged(a)) {
@@ -598,7 +626,7 @@ function modsDeDano(b, c, alvo, a, { poderoso = 0 } = {}) {
   if (isRanged(a) && a.ate_9m?.dano && alvo && gap(c, alvo) <= 9) v += a.ate_9m.dano;
   if (hasCond(c, 'enjoado')) v -= 2;
   if (hasCond(c, 'lento') && isMelee(a)) v -= 2;
-  v += somaBuff(c, 'dano');
+  v += somaBuff(c, 'dano', bf => valeParaArma(bf, a));
   v += poderoso;
   v += SP.damageMods(K, b, c, alvo, a);
   return v;
@@ -613,6 +641,8 @@ function venceRD(atacante, a, rd) {
   const exceto = String(rd.exceto).trim();
   if (exceto === '—' || exceto === '-') return false;
   let melhoria = a?.magico ? Number(String(a.magico).replace('+', '')) : 0;
+  // Arma Mágica: +1 de melhoria na arma encantada (3.0: vence RD x/+1)
+  for (const bf of atacante?.buffs || []) if (bf.melhoria_arma && valeParaArma(bf, a)) melhoria = Math.max(melhoria, bf.melhoria_arma);
   // armas naturais contam como do tipo que vence a RD da própria criatura
   if (a?.natural && atacante?.rd) {
     const proprio = /^\+(\d+)$/.exec(String(atacante.rd.exceto).trim());
@@ -727,6 +757,10 @@ function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = f
   if (total <= 0) return 0;
   alvo.pv -= letal;
   alvo.contusao += contusao;
+  if (alvo.cond.inconsciente?.sono) {
+    removerCondicao(b, alvo, 'inconsciente');
+    log(b, alvo, 'condicao-fim', `${alvo.nome} acorda com o ferimento.`);
+  }
   if (letal > 0 && alvo.estado === 'estavel') alvo.estado = 'morrendo'; // dano letal reabre os ferimentos
   alvo.stats.danoRecebido += total;
   if (fonte) fonte.stats.danoCausado += total;
@@ -764,7 +798,7 @@ function curar(b, c, valor, fonte = null) {
  * Teste de resistência: d20 + bônus + modificadores ≥ CD. O 1 natural sempre falha e o 20 natural
  * sempre passa (3.0). `medo: true` soma os bônus contra medo (inspirar coragem, aura de coragem).
  */
-function teste(b, c, tipo, cd, { medo = false, rotulo = '', silencioso = false } = {}) {
+function teste(b, c, tipo, cd, { medo = false, area = false, rotulo = '', silencioso = false } = {}) {
   const d = b.rng.die(20);
   let bonus = c.resistencias[tipo] ?? 0;
   if (Object.keys(MEDO).some(m => c.cond[m])) bonus -= 2;
@@ -773,6 +807,7 @@ function teste(b, c, tipo, cd, { medo = false, rotulo = '', silencioso = false }
   bonus -= c.niveisNegativos;
   bonus += { fort: deltaMod(c, 'con'), ref: deltaMod(c, 'des'), von: deltaMod(c, 'sab') }[tipo];
   bonus += somaBuff(c, 'resistencias') + somaBuff(c, tipo);
+  if (area) bonus += somaBuff(c, `${tipo}_area`); // Escudo Arcano: +3 em Reflexos contra áreas
   bonus += SP.saveMods(K, b, c, tipo, { medo });
   const total = d + bonus;
   const passou = d === 20 || (d !== 1 && total >= cd);
@@ -1048,7 +1083,7 @@ function efeitoComTeste(b, c, alvo, ef, { rotulo = '', ignoraRD = true, categori
   }
   let passou = null;
   if (ef.resistencia && ef.cd != null) {
-    passou = teste(b, alvo, ef.resistencia, ef.cd, { rotulo, medo: Boolean(ef.condicao && MEDO[ef.condicao]) }).passou;
+    passou = teste(b, alvo, ef.resistencia, ef.cd, { rotulo, medo: Boolean(ef.condicao && MEDO[ef.condicao]), area: Boolean(ef.area) }).passou;
   }
   // dano, com dano por tendência e metade/evasão
   if (ef.dano || ef.dano_extra) {
@@ -1088,7 +1123,9 @@ function efeitoComTeste(b, c, alvo, ef, { rotulo = '', ignoraRD = true, categori
   if (ef.condicao && passou !== true && (!ef.condicao_afeta || atende(alvo, ef.condicao_afeta)) && alvo.estado !== 'morto') {
     const duracao = ef.duracao_por_pv ? duracaoPorPv(ef.duracao_por_pv, alvo.pv) || ef.duracao : ef.duracao;
     const rodadas = parseDuracao(duracao, b.rng);
-    const ficou = aplicarCondicao(b, alvo, ef.condicao, rodadas, { fonte: c, categoria: categoriaDaCondicao(ef.condicao, categoria) });
+    // quem dorme (Sono) acorda ao ser ferido (SRD)
+    const extra = categoria === 'sono' ? { sono: true } : {};
+    const ficou = aplicarCondicao(b, alvo, ef.condicao, rodadas, { fonte: c, categoria: categoriaDaCondicao(ef.condicao, categoria), extra });
     if (ficou && ficou !== 'morto') anunciarCondicao(b, alvo, ficou, rodadas, rotulo);
   }
   // veneno (sopro do golem): passar no teste inicial não livra do secundário (3.0)

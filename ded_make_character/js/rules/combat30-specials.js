@@ -610,6 +610,15 @@ export function startOfTurn(K, b, c) {
       K.causarDano(b, c, [{ valor: r.total, tipo: c.queimando.tipo }], { fonte: b.get(c.queimando.fonte) });
     }
   }
+  // dano que continua (Flecha Ácida): conta as rodadas no turno de quem sofre, sem teste
+  for (const x of [...(c.continuos || [])]) {
+    if (c.estado === 'morto') break;
+    const r = K.roll(b, x.dano);
+    x.restantes--;
+    if (x.restantes <= 0) c.continuos.splice(c.continuos.indexOf(x), 1);
+    K.log(b, c, 'dano', `${x.rotulo} continua em ${c.nome}: ${x.dano} = ${r.total} de ${x.tipo}${x.restantes > 0 ? '' : ' (acaba)'}.`);
+    K.causarDano(b, c, [{ valor: r.total, tipo: x.tipo }], { fonte: b.get(x.fonte) });
+  }
   // veneno secundário
   for (const v of [...c.venenos]) {
     if (v.expira > K.tick(b)) continue;
@@ -694,6 +703,7 @@ function aura(K, b, c, e) {
 // ações livres: fúria
 
 export function freeActions(K, b, c) {
+  dirigirPersistentes(K, b, c);
   for (const e of comEfeito(c, 'sopro')) {
     if (e.m.acao !== 'livre' || !disponivel(b, K, c, e)) continue;
     const alvo = K.inimigos(b, c).filter(K.alvoValido).sort((x, y) => K.gap(c, x) - K.gap(c, y))[0];
@@ -716,6 +726,38 @@ export function freeActions(K, b, c) {
     c.pv += pvExtra;
     c.buffs.push({ nome: 'furia', rotulo: e.nome, atributos: { for: m.for, con: m.con }, bonus: { von: m.von, ca: m.ca }, pvExtra, semFadiga: Boolean(m.sem_fadiga), expira: K.expiraEm(b, m.duracao_rodadas, c, c) });
     K.log(b, c, 'especial', `${c.nome} entra em ${e.nome}: +${m.for} For, +${m.con} Con (+${pvExtra} PV), +${m.von} Vontade, ${m.ca < 0 ? `−${-m.ca}` : `+${m.ca}`} CA, por ${m.duracao_rodadas} rodadas.`);
+  }
+}
+
+/**
+ * Esfera Flamejante: a cada turno do conjurador, enquanto dura, ele a dirige até o alvo (o mesmo,
+ * ou o inimigo mais próximo que ela fere, se esse caiu) e ela queima (Reflexos anula). Sem ninguém
+ * que ela fira (o golem de ferro, que o fogo cura), fica parada. No SRD dirigi-la é uma ação de
+ * movimento; aqui não gasta nada do turno (§8.5). A RM é testada uma vez por alvo.
+ */
+function dirigirPersistentes(K, b, c) {
+  for (const p of [...(c.persistentes || [])]) {
+    if (p.expira <= K.tick(b)) {
+      c.persistentes.splice(c.persistentes.indexOf(p), 1);
+      K.log(b, c, 'condicao-fim', `A ${p.s.nome} de ${c.nome} se apaga.`);
+      continue;
+    }
+    // quem a RM já barrou (resultado guardado em p.chega) também não conta
+    const fere = y => p.chega[y.uid] !== 'nao' && evDano(K, b, c, y, { ...p.s.m, cd: p.s.cd }, { natureza: p.s.natureza }) > 0;
+    const antes = b.get(p.alvo);
+    let x = antes && K.alvoValido(antes) && fere(antes) ? antes : null;
+    if (!x) x = K.inimigos(b, c).filter(y => K.alvoValido(y) && fere(y)).sort((u, v) => K.gap(antes || c, u) - K.gap(antes || c, v))[0];
+    if (!x) continue;
+    p.alvo = x.uid;
+    K.log(b, c, 'magia', `${c.nome} dirige a ${p.s.nome} até ${x.nome}.`);
+    if (!(x.uid in p.chega)) p.chega[x.uid] = magiaChega(K, b, c, x, p.s);
+    const chega = p.chega[x.uid];
+    if (chega === 'nao') continue;
+    if (chega.excecao) {
+      aplicarExcecao(K, b, c, x, p.s.m, chega.excecao, p.s.nome);
+      continue;
+    }
+    K.efeitoComTeste(b, c, chega.refletida ? c : x, { ...p.s.m, cd: p.s.cd }, { rotulo: p.s.nome });
   }
 }
 
@@ -818,6 +860,10 @@ function evDano(K, b, c, alvo, m, { natureza = 'Sob', categoria = null } = {}) {
     }
   }
   for (const de of m.dano_extra || []) if (!alvo.imunidades.includes(de.tipo)) ev += Math.max(0, K.average(de.dano) * fator - (alvo.resistEnergia[de.tipo] || 0));
+  // dano que continua nas rodadas seguintes (Flecha Ácida), sem teste
+  if (m.continuo && !alvo.imunidades.includes(m.continuo.tipo)) {
+    ev += m.continuo.rodadas * Math.max(0, K.average(m.continuo.dano) * (alvo.vulnerabilidades.includes(m.continuo.tipo) ? 2 : 1) - (alvo.resistEnergia[m.continuo.tipo] || 0));
+  }
   const imuneCond = m.condicao && K.imuneACondicao(alvo, m.condicao, K.categoriaDaCondicao(m.condicao, categoria));
   if (m.condicao && !imuneCond && (!m.condicao_afeta || K.atende(alvo, m.condicao_afeta))) ev += valorCondicao(K, alvo, m.condicao, m.duracao, apoio, repetido) * pf;
   for (const p of m.efeitos_por_dv || []) {
@@ -845,7 +891,12 @@ function valorExcecao(K, alvo, m, excecao, apoio, repetido) {
   return 0;
 }
 
-/** Magias e habilidades similares a magia disponíveis: [{ fonte, nome, m, natureza, nivel, cl, cd, idx? }]. */
+/**
+ * Magias e habilidades similares a magia disponíveis: [{ fonte, nome, m, natureza, nivel, cl, cd, idx?,
+ * espaco?, gratis? }]. Da lista, cada magia precisa ter preparadas (`quantidade`) e, se diz de que
+ * espaços sai (`espaco`, personagens), um espaço livre: o menor que houver. Produzir Chamas ativa
+ * (`repete`) volta sem gastar nada (`gratis`).
+ */
 function magiasDisponiveis(K, b, c) {
   const out = [];
   for (const e of comEfeito(c, 'magia')) {
@@ -853,9 +904,48 @@ function magiasDisponiveis(K, b, c) {
     out.push({ tipo: 'especial', e, nome: e.nome, m: e.m, natureza: e.natureza, cl: e.m.nivel_conjurador ?? c.nd, cd: e.m.cd });
   }
   (c.magias?.lista || []).forEach((s, idx) => {
-    if (!s.mecanica || c.magiasRestantes[idx] <= 0) return;
-    out.push({ tipo: 'lista', idx, nome: s.nome, m: s.mecanica, natureza: 'magia', cl: s.mecanica.nivel_conjurador ?? c.magias.nivel_conjurador, cd: s.mecanica.cd ?? c.magias.cd_base + s.nivel });
+    if (!s.mecanica) return;
+    const base = { tipo: 'lista', idx, nome: s.nome, nivel: s.nivel, m: s.mecanica, natureza: 'magia', cl: s.mecanica.nivel_conjurador ?? c.magias.nivel_conjurador, cd: s.mecanica.cd ?? c.magias.cd_base + s.nivel };
+    if (s.mecanica.repete && c.ativas?.[idx] > K.tick(b)) {
+      out.push({ ...base, gratis: true });
+      return;
+    }
+    if (c.magiasRestantes[idx] <= 0) return;
+    const espaco = [].concat(s.espaco || []).find(k => (c.espacosRestantes?.[k] || 0) > 0) || null;
+    if (s.espaco && !espaco) return;
+    out.push({ ...base, espaco });
   });
+  return out;
+}
+
+/** Nível do espaço de onde a magia sai ("n3" → 3), ou null (catálogo, sem espaços). */
+const numeroDoEspaco = s => (s.espaco ? Number(String(s.espaco).slice(1)) : null);
+
+/**
+ * "Curar Ferimentos Leves (espaço de 2º nível)" quando a magia sai de um espaço maior que o nível
+ * dela; `extras` entram no mesmo parêntese ("Sono (espaço de 3º nível; 2d4 = 4 DV)").
+ */
+function rotuloDaMagia(s, extras = []) {
+  const n = numeroDoEspaco(s);
+  const partes = [...(n && s.nivel != null && n > s.nivel ? [`espaço de ${n}º nível`] : []), ...extras];
+  return partes.length ? `${s.nome} (${partes.join('; ')})` : s.nome;
+}
+
+/**
+ * Sono (3.0): 2d4 DV de criaturas, as de menos DV primeiro (e, empatadas, as mais perto do ponto
+ * de origem); o DV que não dá para a próxima se perde. Quem não pode ser afetado não gasta nada.
+ */
+function porDadosDeVida(K, alvos, principal, m, orcamento, categoria) {
+  const validos = alvos
+    .filter(x => K.podeLutar(x) && !K.efeitoNaoAfeta(x, m, categoria) && !K.imuneACondicao(x, m.condicao, K.categoriaDaCondicao(m.condicao, categoria)))
+    .sort((x, y) => x.dv - y.dv || K.gap(principal, x) - K.gap(principal, y));
+  const out = [];
+  let resta = orcamento;
+  for (const x of validos) {
+    if (x.dv > resta) break;
+    out.push(x);
+    resta -= x.dv;
+  }
   return out;
 }
 
@@ -880,42 +970,52 @@ export function options(K, b, c, alvo) {
       if (c.usos[e.id].n > 0 && (ferido === c || K.gap(c, ferido) <= K.velocidade(c) + 1.5)) out.push({ tipo: 'cura-maos', e, alvo: ferido, ev: Math.min(c.usos[e.id].n, ferido.pvMax - ferido.pv), prioridade: 5 });
     }
     const falta = ferido === c ? 0 : Math.max(0, K.gap(c, ferido) - 1.5);
-    if (conjura && falta <= K.velocidade(c)) for (const s of magiasDisponiveis(K, b, c)) if (s.m.cura) out.push({ tipo: 'magia', s, alvo: ferido, alvos: [ferido], mover: falta, ev: K.average(s.m.cura), prioridade: 5 });
+    // a cura que mais cura sem desperdiçar; empatadas, a do espaço menor
+    const deficit = ferido.pvMax - ferido.pv;
+    if (conjura && falta <= K.velocidade(c)) for (const s of magiasDisponiveis(K, b, c)) if (s.m.cura) out.push({ tipo: 'magia', s, alvo: ferido, alvos: [ferido], mover: falta, ev: Math.min(K.average(s.m.cura), deficit) - 0.01 * (numeroDoEspaco(s) ?? s.nivel ?? 0), prioridade: 5 });
   }
   // inspirar coragem na primeira ação
   for (const e of comEfeito(c, 'inspirar-coragem')) {
     if (!c._inspirou && disponivel(b, K, c, e)) out.push({ tipo: 'inspirar', e, ev: 1, prioridade: 3 });
   }
   if (!alvo) return out;
-  const semInimigoAoAlcance = !K.inimigos(b, c).some(x => K.alvoValido(x) && [...c.ataqueTotal, ...c.ataques].some(a => K.ataqueAlcanca(c, x, a)));
+  // "sem inimigo ao alcance" = ninguém em corpo a corpo com o conjurador (nem ele com alguém): a
+  // besta ou o arco alcançam quase sempre, e o conjurador nunca se reforçaria
+  const semInimigoAoAlcance = !K.inimigos(b, c).some(x => K.alvoValido(x) && K.gap(c, x) <= Math.max(c.alcance || 1.5, x.alcance || 1.5) + 1e-9);
   if (conjura) {
     for (const s of magiasDisponiveis(K, b, c)) {
       const m = s.m;
       if (m.cura) continue;
       if (ehBuff(m)) {
         const ativa = c.buffs.some(bf => bf.rotulo === s.nome);
-        if (!ativa && b.rodada <= 2 && semInimigoAoAlcance) out.push({ tipo: 'magia', s, alvo: c, alvos: [c], ev: 0.5, prioridade: 1 });
+        if (!ativa && b.rodada <= 2 && semInimigoAoAlcance) out.push({ tipo: 'magia', s, alvo: c, alvos: [c], ev: 0.5 + valorDoReforco(K, b, c, m), prioridade: 1 });
         continue;
       }
       if (!m.dano && !m.condicao && !m.efeitos_por_dv && !ehDebuff(m)) continue;
+      if (m.persistente && c.persistentes?.some(p => p.s.nome === s.nome)) continue; // uma esfera de cada vez
       const plano = planejarArea(K, b, c, alvo, m.area, null, { noConjurador: Boolean(m.efeitos_por_dv) || m.alvo === 'pessoal' });
       if (!plano) continue;
+      const categoria = m.condicao === 'inconsciente' ? 'sono' : null;
+      if (m.limite_dv) plano.alvos = porDadosDeVida(K, plano.alvos, alvo, m, Math.floor(K.average(m.limite_dv)), categoria);
       let mover = plano.mover;
       if (m.ataque === 'toque') {
         mover = Math.max(mover, K.gap(c, alvo) - 1.5);
         if (mover > K.velocidade(c)) continue;
       }
-      const pFalhaMagia = chanceFalhaMagia(c, s) / 100;
-      const categoria = m.condicao === 'inconsciente' ? 'sono' : null;
+      const pFalhaMagia = s.gratis ? 0 : chanceFalhaMagia(c, s) / 100;
       let ev = 0;
       for (const x of plano.alvos) {
         const pRm = x.rm && s.natureza !== 'Ext' && s.natureza !== 'Sob' ? Math.min(1, Math.max(0.05, (21 - (x.rm - s.cl)) / 20)) : 1;
         const pAcerto = m.ataque ? K.pAcerto(bonusDeToque(K, c, m.ataque), m.ataque === 'corpo a corpo' ? x.ca.total : x.ca.toque) : 1;
-        const base = evDano(K, b, c, x, { ...m, cd: s.cd }, { natureza: s.natureza, categoria });
+        // Mísseis Mágicos contra quem tem Escudo Arcano: não chegam (a IA não gasta a magia)
+        const barrada = m.acerto_automatico && x.buffs.some(bf => (bf.bonus?.anula || '').includes(s.nome));
+        const base = barrada ? 0 : evDano(K, b, c, x, { ...m, cd: s.cd }, { natureza: s.natureza, categoria });
         const debuff = ehDebuff(m) && !imuneAMagia(x, s.natureza) && !(m.bonus.penalidade_for && x.imunidades.includes('dano de atributo')) ? 4 : 0;
         ev += (base + debuff) * pRm * pAcerto;
       }
       ev *= 1 - pFalhaMagia;
+      // o que continua nas próximas rodadas (a esfera, as chamas na mão) vale um pouco mais (heurística)
+      if (m.persistente || (m.repete && !s.gratis)) ev *= 1 + 0.5 * Math.min(2, Math.max(0, duracaoMedia(K, m.duracao) - 1));
       if (ev > 0) out.push({ tipo: 'magia', s, alvo, alvos: plano.alvos, mover, ev });
     }
   }
@@ -944,6 +1044,21 @@ export function options(K, b, c, alvo) {
     }
   }
   return out;
+}
+
+/**
+ * Quanto um reforço ajuda, só para ordenar os reforços entre si (todos valem pouco perto de atacar):
+ * CA, ataque e dano (vezes os aliados, se é para todos), Força (o modificador vai no ataque e no
+ * dano), imagens, ações extras, camuflagem.
+ */
+function valorDoReforco(K, b, c, m) {
+  const bn = m.bonus || {};
+  const num = v => (typeof v === 'number' ? v : typeof v === 'string' && /d/.test(v) ? K.average(v) : 0);
+  const n = m.alvo === 'aliados' ? K.aliados(b, c).filter(K.podeLutar).length : 1;
+  const ca = num(bn.ca) + num(bn.ca_armadura) + num(bn.ca_natural) + num(bn.ca_deflexao);
+  const golpe = (num(bn.ataque) + num(bn.dano)) * n + num(bn.for);
+  const resto = num(bn.imagens) + 4 * num(bn.acoes_extras) + num(bn.camuflagem_pct) / 10;
+  return 0.01 * (ca + golpe + resto);
 }
 
 /** Área e alvos de um efeito saindo de `c` contra `alvo`; se estiver longe, quanto precisa andar antes. */
@@ -1066,49 +1181,69 @@ function magiaChega(K, b, c, x, s) {
   return 'afeta';
 }
 
-const verbo = s => (s.natureza === 'magia' ? 'conjura' : 'usa');
+const verbo = s => (s.gratis ? 'arremessa de novo' : s.natureza === 'magia' ? 'conjura' : 'usa');
 
-/** Bônus do ataque de uma magia: toque corpo a corpo usa a Força; à distância, a Destreza (3.0). */
+/**
+ * Bônus do ataque de uma magia: toque corpo a corpo usa a Força; à distância, a Destreza (3.0).
+ * Reforços no ataque que não são de uma arma (Bênção) também valem.
+ */
 function bonusDeToque(K, c, tipo) {
   const attr = tipo === 'toque' || tipo === 'corpo a corpo' ? 'for' : 'des';
-  return c.bba + K.mod(c.atributos[attr] ?? 10) + K.deltaMod(c, attr);
+  return c.bba + K.mod(c.atributos[attr] ?? 10) + K.deltaMod(c, attr) + K.somaBuff(c, 'ataque', bf => !bf.somente_arma);
 }
 
 function conjurar(K, b, c, acao) {
   const s = acao.s;
   const m = s.m;
   andarAntes(K, b, c, acao);
-  if (s.tipo === 'lista') c.magiasRestantes[s.idx]--;
-  else gastarUso(K, b, c, s.e);
-  const falha = chanceFalhaMagia(c, s);
+  if (s.tipo === 'lista' && !s.gratis) {
+    c.magiasRestantes[s.idx]--;
+    if (s.espaco) c.espacosRestantes[s.espaco]--;
+  } else if (s.tipo !== 'lista') gastarUso(K, b, c, s.e);
+  const nome = rotuloDaMagia(s);
+  // arremessar de novo as chamas não é conjurar: não tem falha de magia
+  const falha = s.gratis ? 0 : chanceFalhaMagia(c, s);
   if (falha && b.rng.chance(falha)) {
-    K.log(b, c, 'magia', `${c.nome} tenta usar ${s.nome}, mas falha (${falha}% de chance de falha).`);
+    K.log(b, c, 'magia', `${c.nome} tenta usar ${nome}, mas falha (${falha}% de chance de falha).`);
     return;
   }
+  // Produzir Chamas: as chamas ficam na mão enquanto a magia dura
+  if (m.repete && !s.gratis) c.ativas[s.idx] = K.expiraEm(b, K.parseDuracao(m.duracao, b.rng), c, c);
   // reforço: em si mesmo ou nos aliados
   if (ehBuff(m)) {
     const alvos = m.alvo === 'aliados' ? K.aliados(b, c).filter(x => x.estado !== 'morto' && !x.fugindo) : [c];
-    for (const x of alvos) aplicarReforco(K, b, c, x, s);
+    for (const x of alvos) aplicarReforco(K, b, c, x, { ...s, rotulo: nome });
     return;
   }
   if (m.cura) {
     const x = acao.alvo;
     if (x !== c && imuneAMagia(x, s.natureza)) return;
-    K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${s.nome} ${x === c ? 'em si mesmo' : `em ${x.nome}`}.`);
+    K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${nome} ${x === c ? 'em si mesmo' : `em ${x.nome}`}.`);
     K.curar(b, x, K.roll(b, m.cura).total, c);
     return;
   }
   const principal = acao.alvo && K.alvoValido(acao.alvo) ? acao.alvo : K.inimigos(b, c).find(K.alvoValido);
   if (!principal) return;
   const plano = planejarArea(K, b, c, principal, m.area, null, { noConjurador: Boolean(m.efeitos_por_dv) || m.alvo === 'pessoal' });
-  const alvos = plano ? plano.alvos : [principal];
-  K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${s.nome}${alvos.length ? ` em ${alvos.map(x => x.nome).join(', ')}` : ''}.`);
+  let alvos = plano ? plano.alvos : [principal];
+  const categoria = m.condicao === 'inconsciente' ? 'sono' : null;
+  const extras = [];
+  if (m.limite_dv) {
+    const r = K.roll(b, m.limite_dv);
+    alvos = porDadosDeVida(K, alvos, principal, m, r.total, categoria);
+    extras.push(`${m.limite_dv} = ${r.total} DV`);
+  }
+  K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${rotuloDaMagia(s, extras)}${alvos.length ? ` em ${alvos.map(x => x.nome).join(', ')}` : ', mas não afeta ninguém'}.`);
+  // Esfera Flamejante: fica rolando nas próximas rodadas (dirigida no turno do conjurador)
+  if (m.persistente) c.persistentes.push({ s: { ...s }, alvo: principal.uid, expira: K.expiraEm(b, K.parseDuracao(m.duracao, b.rng), c, c), chega: {} });
+  const esfera = m.persistente ? c.persistentes.at(-1) : null;
   if (m.condicao || m.efeitos_por_dv) {
     c._controle = c._controle || {};
     for (const x of alvos) c._controle[x.uid] = b.rodada;
   }
   for (const x of alvos) {
     const chega = magiaChega(K, b, c, x, s);
+    if (esfera) esfera.chega[x.uid] = chega;
     if (chega === 'nao') continue;
     if (chega.excecao) {
       aplicarExcecao(K, b, c, x, m, chega.excecao, s.nome);
@@ -1128,7 +1263,12 @@ function conjurar(K, b, c, acao) {
       K.log(b, destino, 'defesa', `${destino.nome} está protegido contra ${s.nome}.`);
       continue;
     }
-    const r = K.efeitoComTeste(b, c, destino, { ...m, cd: s.cd }, { rotulo: s.nome, categoria: m.condicao === 'inconsciente' ? 'sono' : null });
+    const r = K.efeitoComTeste(b, c, destino, { ...m, cd: s.cd }, { rotulo: s.nome, categoria });
+    // Flecha Ácida: o ácido continua nas rodadas seguintes
+    if (m.continuo && destino.estado !== 'morto' && !r.naoAfeta && !destino.imunidades.includes(m.continuo.tipo)) {
+      destino.continuos.push({ rotulo: s.nome, dano: m.continuo.dano, tipo: m.continuo.tipo, restantes: m.continuo.rodadas, fonte: c.uid });
+      K.log(b, c, 'magia', `${s.nome} continua a ferir ${destino.nome} por mais ${m.continuo.rodadas} rodada${m.continuo.rodadas === 1 ? '' : 's'}.`);
+    }
     if (ehDebuff(m) && destino.estado !== 'morto' && !r.naoAfeta && r.passou !== true) {
       if (m.bonus.niveis_negativos) drenar(K, b, c, destino, K.roll(b, String(m.bonus.niveis_negativos)).total, s.nome);
       if (m.bonus.penalidade_for) danoDeAtributo(K, b, destino, 'for', K.roll(b, String(m.bonus.penalidade_for)).total, c, s.nome, K.parseDuracao(m.duracao || '1 minuto', b.rng));
@@ -1153,11 +1293,26 @@ function aplicarExcecao(K, b, c, x, m, excecao, nome) {
   }
 }
 
+const NOME_DO_ATRIBUTO = { for: 'Força', des: 'Destreza', con: 'Constituição', int: 'Inteligência', sab: 'Sabedoria', car: 'Carisma' };
+
+/**
+ * Reforço num combatente: bônus (somados pelo núcleo, com `tipo_bonus` que não acumula), atributos
+ * (número ou dado: Força do Touro rola 1d4+1), PV temporários, imagens. A mesma magia de novo
+ * renova a duração em vez de somar (3.0). Arma Mágica leva a arma encantada (`somente_arma`).
+ */
 function aplicarReforco(K, b, c, x, s) {
   const m = s.m;
   const bonus = { ...m.bonus };
   const atributos = {};
-  for (const a of ['for', 'des', 'con', 'int', 'sab', 'car']) if (typeof bonus[a] === 'number') { atributos[a] = bonus[a]; delete bonus[a]; }
+  const rolados = [];
+  for (const a of ['for', 'des', 'con', 'int', 'sab', 'car']) {
+    if (typeof bonus[a] === 'number') atributos[a] = bonus[a];
+    else if (typeof bonus[a] === 'string' && /d/.test(bonus[a])) {
+      atributos[a] = K.roll(b, bonus[a]).total;
+      rolados.push(`${bonus[a]} = +${atributos[a]} de ${NOME_DO_ATRIBUTO[a]}`);
+    } else continue;
+    delete bonus[a];
+  }
   if (bonus.pv_temporarios) {
     x.pvTemp = Math.max(x.pvTemp, Number(bonus.pv_temporarios) || 0);
     delete bonus.pv_temporarios;
@@ -1167,8 +1322,19 @@ function aplicarReforco(K, b, c, x, s) {
     delete bonus.imagens;
   }
   const rodadas = K.parseDuracao(m.duracao || '10 rodadas', b.rng);
-  x.buffs.push({ rotulo: s.nome, bonus, atributos, expira: K.expiraEm(b, rodadas, c, x) });
-  K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${s.nome}${x === c ? '' : ` em ${x.nome}`}${rodadas === Infinity ? '' : ` (${rodadas} rodadas)`}.`);
+  const renova = x.buffs.some(bf => bf.rotulo === s.nome);
+  x.buffs = x.buffs.filter(bf => bf.rotulo !== s.nome);
+  x.buffs.push({
+    rotulo: s.nome,
+    bonus,
+    atributos,
+    expira: K.expiraEm(b, rodadas, c, x),
+    ...(m.tipo_bonus ? { tipo_bonus: m.tipo_bonus } : {}),
+    ...(m.somente_arma ? { somente_arma: { ...m.somente_arma } } : {}),
+    ...(m.melhoria_arma ? { melhoria_arma: m.melhoria_arma } : {}),
+  });
+  const detalhes = [...(m.somente_arma?.nome ? [m.somente_arma.nome] : []), ...rolados, ...(rodadas === Infinity ? [] : [`${rodadas} rodadas`]), ...(renova ? ['renova a duração'] : [])];
+  K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${s.rotulo || s.nome}${x === c ? '' : ` em ${x.nome}`}${detalhes.length ? ` (${detalhes.join('; ')})` : ''}.`);
 }
 
 function inspirar(K, b, c, e) {
@@ -1176,7 +1342,8 @@ function inspirar(K, b, c, e) {
   gastarUso(K, b, c, e);
   const m = e.m;
   const alvos = K.aliados(b, c).filter(x => x.estado !== 'morto' && !x.fugindo);
-  for (const x of alvos) x.buffs.push({ rotulo: e.nome, bardo: c.uid, bonus: { ataque: m.bonus_ataque, dano: m.bonus_dano, contra_medo: m.bonus_contra_medo || 0 }, expira: K.expiraEm(b, 5, c, x) });
+  // bônus de moral (3.0): não soma com outro de moral (Bênção); vale o maior
+  for (const x of alvos) x.buffs.push({ rotulo: e.nome, bardo: c.uid, tipo_bonus: 'moral', bonus: { ataque: m.bonus_ataque, dano: m.bonus_dano, contra_medo: m.bonus_contra_medo || 0 }, expira: K.expiraEm(b, 5, c, x) });
   K.log(b, c, 'especial', `${c.nome} usa ${e.nome}: aliados ganham +${m.bonus_ataque} no ataque e +${m.bonus_dano} no dano${m.bonus_contra_medo ? `, +${m.bonus_contra_medo} contra medo` : ''}.`);
 }
 
