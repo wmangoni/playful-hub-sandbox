@@ -494,6 +494,7 @@ export async function renderSheet({ root, store, id, query = new URLSearchParams
           <div class="sheet-toolbar__actions">
             <label class="sheet-toolbar__eco"><input type="checkbox" data-action="eco" ${eco ? 'checked' : ''}> Economizar tinta</label>
             <a class="btn btn--ghost" href="#/personagens/${personagem.id}/editar">${icon('pencil')}Editar personagem</a>
+            <a class="btn btn--ghost" href="#/arena?a=p:${personagem.id}">${icon('arena')}Levar à arena</a>
             <button type="button" class="btn btn--outline ${problemas ? 'is-alert' : ''}" data-action="choices">${icon(problemas ? 'alert' : 'sparkles')}Talentos e perícias</button>
             <button type="button" class="btn btn--primary" data-action="print">${icon('scroll')}Imprimir / salvar PDF</button>
           </div>

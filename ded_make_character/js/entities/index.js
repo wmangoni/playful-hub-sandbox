@@ -15,13 +15,18 @@ export const NAV_GROUPS = [
   { key: 'compendio', label: 'Compêndio' },
 ];
 
+/** Páginas do menu lateral que não são entidades (entram no grupo, depois das entidades). */
+export const NAV_PAGES = [
+  { slug: 'arena', group: 'aventura', icon: 'arena', label: 'Arena' },
+];
+
 export const TABLES = ENTITIES.map(e => e.table);
 
 /** Tabelas de referência (somente leitura, sem tela própria) usadas pela ficha. */
 export const REFERENCE_TABLES = ['bba'];
 
 /** Tabelas sem CRUD próprio que o app grava (copy-on-write, como as demais), com o rótulo do status de dados. */
-export const AUX_TABLES = { fichas: 'Fichas (talentos e perícias escolhidos)' };
+export const AUX_TABLES = { fichas: 'Fichas (talentos, perícias e equipamento)' };
 
 export const entityBySlug = slug => ENTITIES.find(e => e.slug === slug) || null;
 export const entityByTable = table => ENTITIES.find(e => e.table === table) || null;

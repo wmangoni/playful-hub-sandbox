@@ -3,6 +3,7 @@ import { html, render } from './core/dom.js';
 import { createRouter } from './core/router.js';
 import { createStore } from './core/store.js';
 import { AUX_TABLES, ENTITIES, REFERENCE_TABLES, RETIRED_TABLES, TABLES, entityBySlug } from './entities/index.js';
+import { renderArena } from './pages/arena.js';
 import { renderForm, renderList } from './pages/crud.js';
 import { renderHome } from './pages/home.js';
 import { renderSheet } from './pages/sheet.js';
@@ -95,6 +96,8 @@ function renderNotFound() {
 const router = createRouter({
   routes: [
     { name: 'home', pattern: '/' },
+    // antes das genéricas: '/:module' casaria com "arena"
+    { name: 'arena', pattern: '/arena' },
     { name: 'list', pattern: '/:module' },
     { name: 'create', pattern: '/:module/novo' },
     { name: 'edit', pattern: '/:module/:id/editar' },
@@ -104,6 +107,12 @@ const router = createRouter({
     if (name === 'home') {
       const page = mountPage(null, 'home');
       await renderHome({ root: page, store });
+      focusTitle();
+      return;
+    }
+    if (name === 'arena') {
+      const page = mountPage('Arena', 'arena');
+      cleanup = await renderArena({ root: page, router, query, store }) || null;
       focusTitle();
       return;
     }
@@ -136,7 +145,7 @@ const router = createRouter({
 });
 
 /**
- * Fichas (talentos e perícias escolhidos) sem personagem são apagadas. Isso cobre a exclusão
+ * Fichas (talentos, perícias e equipamento) sem personagem são apagadas. Isso cobre a exclusão
  * e "Restaurar originais" em Personagens: a restauração volta o AUTO_INCREMENT, e um personagem
  * novo com o id antigo não pode herdar as escolhas de outro.
  */
@@ -156,9 +165,17 @@ store.subscribe(event => {
   if (event.type === 'corrupted') {
     toast({ type: 'error', title: 'Cópia local descartada', message: 'Os dados salvos neste navegador estavam corrompidos. Voltamos aos dados originais.' });
   }
-  if (event.type === 'external') {
+  // a Arena lê os personagens do store: recarrega na montagem, mas não com luta ou diálogo aberto
+  // (recarregar apagaria a luta em andamento)
+  const arenaOcupada = router.current?.name === 'arena' && cleanup?.ocupada?.();
+  if (event.type === 'external' && arenaOcupada) {
+    cleanup.adiar();
+    toast({ type: 'info', title: 'Dados alterados em outra aba', message: 'A Arena se atualiza quando você voltar à montagem ou fechar o diálogo.' });
+  }
+  if (event.type === 'external' && !arenaOcupada) {
     const onForm = ['create', 'edit'].includes(router.current?.name);
-    toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : 'A tela foi atualizada.' });
+    const loteCancelado = router.current?.name === 'arena' && cleanup?.loteRodando?.();
+    toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : `A tela foi atualizada.${loteCancelado ? ' A simulação em lote foi cancelada.' : ''}` });
     if (!onForm) router.reload();
   }
   refreshChrome();
@@ -176,9 +193,11 @@ document.addEventListener('click', async event => {
     glyph: 'restore',
   });
   if (!ok) return;
+  const loteCancelado = router.current?.name === 'arena' && !cleanup?.ocupada?.() && cleanup?.loteRodando?.();
   store.restoreAll();
-  toast({ type: 'info', title: 'Dados originais restaurados', message: 'Todas as tabelas voltaram ao estado original.' });
-  if (!['create', 'edit'].includes(router.current?.name)) router.reload();
+  toast({ type: 'info', title: 'Dados originais restaurados', message: `Todas as tabelas voltaram ao estado original.${loteCancelado ? ' A simulação em lote foi cancelada.' : ''}` });
+  if (router.current?.name === 'arena' && cleanup?.ocupada?.()) cleanup.adiar(); // recarrega quando a luta ou o diálogo terminar
+  else if (!['create', 'edit'].includes(router.current?.name)) router.reload();
 });
 
 refreshChrome();
