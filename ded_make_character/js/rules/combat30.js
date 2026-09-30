@@ -23,6 +23,15 @@ const sizeIdx = t => Math.max(0, TAMANHOS.indexOf(t));
 const TIPOS_SEM_CRITICO = ['Morto-Vivo', 'Constructo', 'Limo', 'Planta', 'Elemental'];
 /** Tipos destruídos com 0 PV (3.0). */
 const TIPOS_DESTRUIDOS_EM_ZERO = ['Morto-Vivo', 'Constructo'];
+/** Imunidades que o tipo dá na 3.0 (monster_overview do SRD), somadas às do catálogo. */
+const MORTO_OU_CONSTRUCTO = ['efeitos de ação mental', 'veneno', 'sono', 'paralisia', 'atordoamento', 'doença', 'efeitos de morte', 'acertos críticos', 'dano de atributo', 'dreno de energia', 'dano por contusão'];
+const IMUNIDADES_DE_TIPO = {
+  'Morto-Vivo': MORTO_OU_CONSTRUCTO,
+  Constructo: MORTO_OU_CONSTRUCTO,
+  Limo: ['efeitos de ação mental', 'veneno', 'sono', 'paralisia', 'atordoamento', 'metamorfose', 'acertos críticos'],
+  Planta: ['efeitos de ação mental', 'veneno', 'sono', 'paralisia', 'atordoamento', 'metamorfose', 'acertos críticos'],
+  Elemental: ['veneno', 'sono', 'paralisia', 'atordoamento', 'acertos críticos'],
+};
 const MEDO = { abalado: 1, amedrontado: 2, apavorado: 3 };
 /** Condições que tiram o combatente da luta enquanto duram. */
 const FORA_DE_COMBATE = ['paralisado', 'petrificado', 'imobilizado', 'inconsciente', 'amedrontado', 'apavorado', 'enfeitiçado', 'morto'];
@@ -71,7 +80,12 @@ export function atende(c, afeta) {
       case 'tipo': if (!valor.includes(c.tipo)) return false; break;
       case 'exceto_tipo': if (valor.includes(c.tipo)) return false; break;
       case 'exceto_subtipo': if (c.subtipos.some(s => valor.includes(s))) return false; break;
-      case 'exceto_raca': if (c.raca && valor.some(r => loose(r) === loose(c.raca))) return false; break;
+      case 'exceto_raca': {
+        // "Elfo" cobre também "Elfo-do-mar", "Elfo aquático"…
+        const raca = loose(c.raca || '');
+        if (raca && valor.some(r => raca === loose(r) || raca.startsWith(`${loose(r)}-`) || raca.startsWith(`${loose(r)} `))) return false;
+        break;
+      }
       case 'dv_max': if (c.dv > valor) return false; break;
       case 'pv_max': if (c.pv > valor) return false; break;
       case 'tamanho_max': if (sizeIdx(c.tamanho) > sizeIdx(valor)) return false; break;
@@ -151,7 +165,9 @@ export function fromCatalog(e) {
     rd: e.reducao_dano ? { ...e.reducao_dano } : null,
     rm: e.resistencia_magia,
     resistEnergia: { ...e.resistencias_energia },
-    imunidades: [...e.imunidades],
+    imunidades: [...new Set([...e.imunidades, ...(IMUNIDADES_DE_TIPO[e.tipo] || [])])],
+    // constructos e mortos-vivos (3.0): imunes a qualquer efeito que peça Fortitude e a dano por contusão
+    imuneFortitude: TIPOS_DESTRUIDOS_EM_ZERO.includes(e.tipo),
     vulnerabilidades: [...e.vulnerabilidades],
     regeneracao: e.regeneracao ? clone(e.regeneracao) : null,
     curaAcelerada: e.cura_acelerada,
@@ -161,7 +177,7 @@ export function fromCatalog(e) {
     tatica: e.tatica || '',
     // o catálogo não descreve a armadura: a evasão vale (3.0: só com armadura leve ou nenhuma)
     armaduraLeve: true,
-    esquivaSobrenatural: false,
+    esquivaSobrenatural: especiais.some(x => /esquiva sobrenatural/.test(loose(`${x.id} ${x.nome}`).replace(/-/g, ' '))),
   };
 }
 
@@ -238,7 +254,7 @@ export function createBattle({ ladoA, ladoB, semente = Date.now(), rng = null, d
   const iniciativa = b.combatentes.map(c => ({ uid: c.uid, bonus: c.iniciativa, total: b.rng.die(20) + c.iniciativa, desempate: b.rng.float() }));
   iniciativa.sort((x, y) => y.total - x.total || y.bonus - x.bonus || y.desempate - x.desempate);
   b.ordem = iniciativa.map(i => i.uid);
-  log(b, null, 'inicio', () => `Iniciativa: ${iniciativa.map(i => `${b.get(i.uid).nome} ${i.total}`).join(', ')}.`);
+  log(b, null, 'inicio', () => `Iniciativa: ${iniciativa.map(i => `${b.get(i.uid).nome} ${num(i.total)}`).join(', ')}.`);
   for (const c of b.combatentes) SP.onBattleStart(K, b, c);
   return b;
 }
@@ -246,9 +262,9 @@ export function createBattle({ ladoA, ladoB, semente = Date.now(), rng = null, d
 // ---------------------------------------------------------------------------------------------
 // registro
 
-function log(b, ator, tipo, texto, dados = null) {
-  const ev = { rodada: b.rodada, ator: ator?.uid ?? null, tipo, dados };
-  if (b.registrar) ev.texto = typeof texto === 'function' ? texto() : texto;
+function log(b, ator, tipo, texto) {
+  const ev = { rodada: b.rodada, ator: ator?.uid ?? null, tipo };
+  if (b.registrar) ev.texto = String(typeof texto === 'function' ? texto() : texto).replace(/\.{2,}/g, p => (p.length === 2 ? '.' : p));
   b.eventos.push(ev);
   return ev;
 }
@@ -279,21 +295,42 @@ function expiraEm(b, rodadas, fonte, afetado) {
  * Medo acumula (3.0): abalado + abalado = amedrontado; abalado ou amedrontado + amedrontado = apavorado.
  * Devolve o nome da condição que ficou (ou null, se imune).
  */
-function aplicarCondicao(b, c, nome, rodadas, { fonte = null, categoria = null, extra = {} } = {}) {
-  if (c.estado === 'morto' || rodadas === 0) return null;
+/**
+ * O combatente é imune a esta condição? `categoria` é a imunidade do efeito que a causa
+ * ("paralisia" para a paralisia do carniçal, "sono" para Sono…); as demais vêm da própria condição.
+ */
+function imuneACondicao(c, nome, categoria = null) {
   const imune = cat => c.imunidades.includes(cat);
-  if (categoria && imune(categoria)) {
-    log(b, c, 'imune', `${c.nome} é imune (${categoria}).`);
+  if (categoria && imune(categoria)) return categoria;
+  if (MEDO[nome] && (imune('medo') || imune('efeitos de ação mental'))) return 'medo';
+  if ((nome === 'enfeitiçado' || nome === 'confuso') && (imune('enfeitiçar') || imune('efeitos de ação mental'))) return 'efeitos de ação mental';
+  if (nome === 'paralisado' && imune('paralisia')) return 'paralisia';
+  if (nome === 'atordoado' && imune('atordoamento')) return 'atordoamento';
+  if (nome === 'petrificado' && imune('petrificação')) return 'petrificação';
+  if (nome === 'morto' && imune('efeitos de morte')) return 'efeitos de morte';
+  return null;
+}
+
+function aplicarCondicao(b, c, nome, rodadas, { fonte = null, categoria = null, extra = {}, semImunidadeAMorte = false } = {}) {
+  if (c.estado === 'morto') return null;
+  const imunidade = semImunidadeAMorte && nome === 'morto' ? null : imuneACondicao(c, nome, categoria);
+  if (imunidade) {
+    log(b, c, 'imune', `${c.nome} é imune (${imunidade}).`);
     return null;
   }
-  if (MEDO[nome] && (imune('medo') || imune('efeitos de ação mental'))) {
-    log(b, c, 'imune', `${c.nome} é imune a medo.`);
-    return null;
+  // "morto" não é uma condição com duração: é a morte (Implosão, veneno mortal, Palavra Sagrada…)
+  if (nome === 'morto') {
+    // o Tarrasque regenera mesmo morto por magia de morte: cai com −10 PV em contusão (LM 3.0)
+    if (c.regeneracao?.resiste_morte) {
+      c.contusao = Math.max(c.contusao, c.pv + 10);
+      log(b, c, 'regeneracao', `${c.nome} regenera mesmo assim: o efeito de morte só o derruba.`);
+      atualizarEstado(b, c, fonte);
+      return null;
+    }
+    morrer(b, c, fonte, TIPOS_DESTRUIDOS_EM_ZERO.includes(c.tipo) ? 'destruído' : 'morto');
+    return 'morto';
   }
-  if (nome === 'enfeitiçado' && (imune('enfeitiçar') || imune('efeitos de ação mental'))) return null;
-  if (nome === 'confuso' && imune('efeitos de ação mental')) return null;
-  if (nome === 'atordoado' && imune('atordoamento')) return null;
-  if (nome === 'petrificado' && imune('petrificação')) return null;
+  if (rodadas === 0) return null;
   let final = nome;
   if (MEDO[nome]) {
     const atual = Object.keys(MEDO).find(m => c.cond[m]);
@@ -395,7 +432,7 @@ function atualizarEstado(b, c, fonte = null) {
 function morrer(b, c, fonte, como = 'morto') {
   if (c.estado === 'morto') return;
   c.estado = 'morto';
-  c.pv = Math.min(c.pv, 0);
+  c.pv = Math.min(c.pv, TIPOS_DESTRUIDOS_EM_ZERO.includes(c.tipo) ? 0 : -10);
   marcarQueda(b, c);
   if (fonte && fonte.lado !== c.lado) fonte.stats.abates++;
   log(b, c, 'morte', `${c.nome}: ${como}.`);
@@ -488,9 +525,9 @@ function imuneCritico(c) {
 function semDestreza(b, alvo, atacante) {
   if (PERDE_DES.some(n => alvo.cond[n])) return true;
   if (b.rodada === 1 && !alvo.agiu && !alvo.esquivaSobrenatural) return true; // surpreso
-  // quem agarra ou está agarrado perde a Des contra quem não está no agarrão (3.0)
+  // quem está agarrado perde a Des contra quem não está no agarrão (3.0). Quem segura com o agarrar
+  // aprimorado "não é considerado agarrado" e mantém a Des (SRD, Improved Grab).
   if (alvo.agarradoPor && alvo.agarradoPor !== atacante?.uid) return true;
-  if (alvo.agarrando && alvo.agarrando !== atacante?.uid) return true;
   return false;
 }
 
@@ -508,7 +545,6 @@ function caContra(b, alvo, atacante, a) {
   if (hasCond(alvo, 'lento')) ca -= 2;
   if (hasCond(alvo, 'derrubado')) ca += isMelee(a) ? -4 : 4;
   ca += somaBuff(alvo, 'ca') + somaBuff(alvo, 'ca_deflexao') + (isTouch(a) ? 0 : somaBuff(alvo, 'ca_natural'));
-  ca += SP.acMod(K, b, alvo, atacante, a);
   return ca;
 }
 
@@ -628,9 +664,10 @@ function danoDeEnergia(b, alvo, valor, tipo, { passou = null } = {}) {
  * (salvo `ignoraRD`, de magias); a energia pela resistência. Com regeneração, o que não fura
  * vira dano por contusão. Devolve o total que efetivamente tirou do alvo.
  */
-function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = false, rotulo = '' } = {}) {
+function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = false, info = null } = {}) {
   if (alvo.estado === 'morto') return 0;
   const notas = [];
+  let absorvidoRD = 0;
   let letal = 0;
   let contusao = 0;
   let fisico = 0;
@@ -652,6 +689,7 @@ function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = f
     if (alvo.rd && !ignoraRD && !venceRD(fonte, ataque, alvo.rd)) {
       const absorve = Math.min(fisico, alvo.rd.valor);
       fisico -= absorve;
+      absorvidoRD = absorve;
       if (absorve) notas.push(`RD ${alvo.rd.valor}/${alvo.rd.exceto} absorve ${absorve}`);
     }
     if (fisico > 0) {
@@ -659,6 +697,8 @@ function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = f
       else contusao += fisico;
     }
   }
+  // a RD anulou todo o dano do golpe: anula também a maioria dos efeitos que vêm com ele (SRD)
+  if (info) info.anuladoPorRD = absorvidoRD > 0 && letal + contusao === 0;
   if (alvo.pvTemp > 0 && letal > 0) {
     const absorve = Math.min(alvo.pvTemp, letal);
     alvo.pvTemp -= absorve;
@@ -692,8 +732,10 @@ function curar(b, c, valor, fonte = null) {
   c.pv = Math.min(c.pvMax, c.pv + valor);
   const cura = c.pv - antes;
   if (cura > 0) {
-    log(b, c, 'cura', `${c.nome} recupera ${cura} PV (${c.pv}/${c.pvMax}).`);
-    if (c.pv >= 0) atualizarEstado(b, c, fonte); // abaixo de 0 continua morrendo ou estável
+    log(b, c, 'cura', `${c.nome} recupera ${cura} PV (${num(c.pv)}/${c.pvMax}).`);
+    // qualquer cura estabiliza quem está morrendo, mesmo que continue abaixo de 0 (3.0)
+    if (c.pv < 0) c.estado = 'estavel';
+    else atualizarEstado(b, c, fonte);
   }
   return cura;
 }
@@ -719,20 +761,26 @@ function teste(b, c, tipo, cd, { medo = false, rotulo = '', silencioso = false }
   const passou = d === 20 || (d !== 1 && total >= cd);
   if (!silencioso) {
     const nomes = { fort: 'Fortitude', ref: 'Reflexos', von: 'Vontade' };
-    log(b, c, 'teste', () => `${c.nome} ${passou ? 'passa' : 'falha'} em ${nomes[tipo]}${rotulo ? ` (${rotulo})` : ''}: ${d} ${sinal(bonus)} = ${total} contra CD ${cd}${d === 20 ? ', 20 natural' : d === 1 ? ', 1 natural' : ''}.`);
+    log(b, c, 'teste', () => `${c.nome} ${passou ? 'passa' : 'falha'} em ${nomes[tipo]}${rotulo ? ` (${rotulo})` : ''}: ${d} ${sinal(bonus)} = ${num(total)} contra CD ${cd}${d === 20 ? ', 20 natural' : d === 1 ? ', 1 natural' : ''}.`);
   }
   return { passou, d, total, cd };
 }
 
-/** Teste resistido (agarrar, Força): empate vai para o maior modificador; persistindo, rola de novo. */
+/**
+ * Teste resistido (agarrar, Força): empate vai para o maior modificador; persistindo, rola de novo.
+ * `texto` mostra as duas rolagens ("14 + 12 = 26 contra 9 + 4 = 13").
+ */
 function resistido(b, bonusA, bonusB) {
   for (let i = 0; i < 5; i++) {
-    const a = b.rng.die(20) + bonusA;
-    const d = b.rng.die(20) + bonusB;
-    if (a !== d) return { venceu: a > d, a, d };
-    if (bonusA !== bonusB) return { venceu: bonusA > bonusB, a, d };
+    const ra = b.rng.die(20);
+    const rd = b.rng.die(20);
+    const a = ra + bonusA;
+    const d = rd + bonusB;
+    const texto = `${ra} ${sinal(bonusA)} = ${num(a)} contra ${rd} ${sinal(bonusB)} = ${num(d)}`;
+    if (a !== d) return { venceu: a > d, a, d, texto };
+    if (bonusA !== bonusB) return { venceu: bonusA > bonusB, a, d, texto };
   }
-  return { venceu: false, a: 0, d: 0 };
+  return { venceu: false, a: 0, d: 0, texto: 'empate' };
 }
 
 const agarrarDe = c => c.agarrar + deltaMod(c, 'for') - c.niveisNegativos;
@@ -757,7 +805,7 @@ function golpeInterno(b, c, alvo, a, opts) {
   const d = b.rng.die(20);
   const total = d + bonus;
   let acertou = d === 20 || (d !== 1 && total >= ca);
-  const texto = [`${c.nome} ataca ${alvo.nome} com ${a.nome}: ${d} ${sinal(bonus)} = ${total} contra CA ${ca}`];
+  const texto = [`${c.nome} ataca ${alvo.nome} com ${a.nome}: ${d} ${sinal(bonus)} = ${num(total)} contra CA ${ca}`];
   if (m.partes.length && b.registrar) texto[0] += ` (${m.partes.map(([v, r]) => `${v > 0 ? '+' : '−'}${Math.abs(v)} ${r}`).join(', ')})`;
   if (!acertou) {
     texto.push(d === 1 ? '1 natural, erra.' : 'erra.');
@@ -785,7 +833,7 @@ function golpeInterno(b, c, alvo, a, opts) {
   if (d >= margem && !imuneCritico(alvo)) {
     const d2 = b.rng.die(20);
     critico = d2 === 20 || (d2 !== 1 && d2 + bonus >= ca);
-    texto.push(critico ? `ameaça e confirma o crítico (${d2} ${sinal(bonus)} = ${d2 + bonus}), ×${a.critico.multiplicador}` : `ameaça crítico, mas não confirma (${d2} ${sinal(bonus)} = ${d2 + bonus})`);
+    texto.push(critico ? `ameaça e confirma o crítico (${d2} ${sinal(bonus)} = ${num(d2 + bonus)}), ×${a.critico.multiplicador}` : `ameaça crítico, mas não confirma (${d2} ${sinal(bonus)} = ${num(d2 + bonus)})`);
   } else if (d >= margem) texto.push(`${alvo.nome} é imune a crítico`);
   texto.push('acerta.');
   log(b, c, 'ataque', () => texto.join(' — '));
@@ -807,8 +855,9 @@ function golpeInterno(b, c, alvo, a, opts) {
     partes.push({ valor: r.total, tipo: de.tipo });
   }
   const estavaDePe = podeLutar(alvo);
-  const dano = causarDano(b, alvo, partes, { fonte: c, ataque: a });
-  SP.onHit(K, b, c, alvo, a, { critico, dano, natural: d });
+  const info = {};
+  const dano = causarDano(b, alvo, partes, { fonte: c, ataque: a, info });
+  SP.onHit(K, b, c, alvo, a, { critico, dano, natural: d, anuladoPorRD: info.anuladoPorRD });
   return { acertou: true, critico, dano, derrubou: estavaDePe && !podeLutar(alvo) };
 }
 
@@ -879,11 +928,12 @@ function sequencia(b, c, alvoInicial, golpes, opts = {}) {
  * Lê o formato da área: { forma: cone | linha | raio | cubo, tamanho, copias, noConjurador }.
  * O texto do catálogo é livre ("esfera de 6 m de raio", "cone de 15 m", "linha 1,5 m × 60 m").
  */
-export function parseArea(area, tamanho = null, { noConjurador = false } = {}) {
+export function parseArea(area, tamanho = null, { noConjurador = false, nivel = 1 } = {}) {
   const t = loose(area || '');
   const nums = [...t.matchAll(/(\d+(?:,\d+)?)\s*m\b/g)].map(m => Number(m[1].replace(',', '.')));
   let forma = 'raio';
   if (/cone/.test(t)) forma = 'cone';
+  else if (/semicirculo/.test(t)) forma = 'semicirculo';
   else if (/linha|muralha/.test(t)) forma = 'linha';
   else if (/cubo|quadrado|sob o corpo/.test(t)) forma = 'cubo';
   let medida = tamanho;
@@ -893,7 +943,8 @@ export function parseArea(area, tamanho = null, { noConjurador = false } = {}) {
     else if (forma === 'cubo') medida = maior || 3;
     else medida = nums[0] || 3;
   }
-  const copias = /quatro/.test(t) ? 4 : /dois|duas/.test(t) ? 2 : 1;
+  let copias = /quatro/.test(t) ? 4 : /dois|duas/.test(t) ? 2 : 1;
+  if (/por nivel/.test(t)) copias *= Math.max(1, nivel); // "dois cubos de 3 m por nível" (Tempestade de Fogo)
   return { forma, tamanho: medida, copias, noConjurador: noConjurador || /centrad[oa] nele/.test(t) || forma !== 'raio' };
 }
 
@@ -902,6 +953,7 @@ function capacidade(area) {
   const s = area.tamanho;
   let quadrados;
   if (area.forma === 'cone') quadrados = (Math.PI * s * s) / 8 / 2.25;
+  else if (area.forma === 'semicirculo') quadrados = (Math.PI * s * s) / 2 / 2.25;
   else if (area.forma === 'linha') quadrados = s / 1.5;
   else if (area.forma === 'cubo') quadrados = (s / 1.5) ** 2;
   else quadrados = (Math.PI * s * s) / 2.25;
@@ -935,16 +987,47 @@ function alvosNaArea(b, c, area, principal) {
 // ---------------------------------------------------------------------------------------------
 // efeitos com teste (sopro, magias, auras…) — usados também pelos especiais
 
+/** Categoria de imunidade de uma condição causada por um efeito (paralisia do carniçal, Sono…). */
+const categoriaDaCondicao = (cond, categoria = null) => categoria || (MEDO[cond] ? 'medo' : cond === 'paralisado' ? 'paralisia' : null);
+
+/**
+ * O efeito não pode afetar este alvo, antes mesmo de rolar o teste? Devolve o motivo ou null.
+ * `afeta` restringe o efeito inteiro; constructos e mortos-vivos são imunes a tudo o que pede
+ * Fortitude (3.0); um efeito que é só condição (ou só veneno) não afeta quem é imune a ela.
+ */
+function efeitoNaoAfeta(alvo, ef, categoria = null) {
+  if (ef.afeta && !atende(alvo, ef.afeta)) return 'não atende à restrição';
+  if (ef.resistencia === 'fort' && alvo.imuneFortitude) return 'imune a efeitos de Fortitude';
+  const danoso = Boolean(ef.dano || ef.dano_extra?.length || ef.efeitos_por_dv);
+  if (!danoso && ef.condicao && imuneACondicao(alvo, ef.condicao, categoriaDaCondicao(ef.condicao, categoria))) return `imune (${imuneACondicao(alvo, ef.condicao, categoriaDaCondicao(ef.condicao, categoria))})`;
+  if (!danoso && !ef.condicao && ef.veneno && alvo.imunidades.includes('veneno')) return 'imune a veneno';
+  return null;
+}
+
+/** Duração que depende dos PV do alvo (Palavra de Poder: Atordoar): { "até 50": "4d4 rodadas", … }. */
+function duracaoPorPv(tabela, pv) {
+  for (const [faixa, duracao] of Object.entries(tabela)) {
+    const n = [...loose(faixa).matchAll(/\d+/g)].map(Number);
+    const [min, max] = n.length === 1 ? [-Infinity, n[0]] : [n[0], n[1]];
+    if (pv >= min && pv <= max) return duracao;
+  }
+  return null;
+}
+
+const fmtFator = f => ({ 0.5: 'metade', 0.25: 'um quarto', 2: 'o dobro' })[f] || String(f).replace('.', ',');
+
 /**
  * Aplica um efeito com teste de resistência a um alvo: dano (energia ou físico), metade se passar,
  * evasão, condição, veneno. `efeito`: { dano, tipo_energia, dano_extra, resistencia, cd,
  * metade_se_passar, condicao, duracao, condicao_afeta, dano_por_tendencia, efeitos_por_dv }.
+ * Devolve { passou } (null sem teste; `naoAfeta` quando o alvo nem chega a testar).
  */
-function efeitoComTeste(b, c, alvo, ef, { natureza = 'Sob', rotulo = '', ignoraRD = true, categoria = null, ataque = null } = {}) {
-  if (alvo.estado === 'morto') return;
-  if (ef.afeta && !atende(alvo, ef.afeta)) {
-    log(b, alvo, 'imune', `${rotulo || 'O efeito'} não afeta ${alvo.nome}.`);
-    return;
+function efeitoComTeste(b, c, alvo, ef, { rotulo = '', ignoraRD = true, categoria = null, ataque = null } = {}) {
+  if (alvo.estado === 'morto') return { passou: null, naoAfeta: true };
+  const motivo = efeitoNaoAfeta(alvo, ef, categoria);
+  if (motivo) {
+    log(b, alvo, 'imune', `${rotulo || 'O efeito'} não afeta ${alvo.nome} (${motivo}).`);
+    return { passou: null, naoAfeta: true };
   }
   let passou = null;
   if (ef.resistencia && ef.cd != null) {
@@ -959,10 +1042,11 @@ function efeitoComTeste(b, c, alvo, ef, { natureza = 'Sob', rotulo = '', ignoraR
       fator = { total: 1, metade: 0.5, nenhum: 0 }[ef.dano_por_tendencia[letra] || 'total'];
     }
     if (passou === true) {
-      if (ef.resistencia === 'ref' && SP.temEvasao(K, alvo)) fator = 0;
+      // evasão (3.0): só em efeito de Reflexos que dá metade; passar anula o dano
+      if (ef.resistencia === 'ref' && ef.metade_se_passar && SP.temEvasao(K, alvo)) fator = 0;
       else if (ef.metade_se_passar) fator *= 0.5;
       else fator = 0;
-    } else if (passou === false && ef.resistencia === 'ref' && SP.temEvasaoAprimorada(K, alvo)) fator *= 0.5;
+    } else if (passou === false && ef.resistencia === 'ref' && ef.metade_se_passar && SP.temEvasaoAprimorada(K, alvo)) fator *= 0.5;
     if (fator > 0) {
       const partes = [];
       const tipos = Array.isArray(ef.tipo_energia) ? ef.tipo_energia : ef.tipo_energia ? [ef.tipo_energia] : ['fisico'];
@@ -973,35 +1057,41 @@ function efeitoComTeste(b, c, alvo, ef, { natureza = 'Sob', rotulo = '', ignoraR
           const parte = Math.floor(valor / tipos.length);
           tipos.forEach((t, i) => partes.push({ valor: i === 0 ? valor - parte * (tipos.length - 1) : parte, tipo: t, passou }));
         } else partes.push({ valor, tipo: tipos[0], passou });
-        log(b, c, 'dano', () => `${rotulo || 'Efeito'} em ${alvo.nome}: ${ef.dano} = ${r.total}${fator !== 1 ? ` × ${fator} = ${valor}` : ''}${ef.tipo_energia ? ` (${tipos.join(' e ')})` : ''}.`);
+        const fixo = parseDice(ef.dano).n === 0;
+        log(b, c, 'dano', () => `${rotulo || 'Efeito'} em ${alvo.nome}: ${fixo ? r.total : `${ef.dano} = ${r.total}`}${fator !== 1 ? ` (${fmtFator(fator)}: ${valor})` : ''}${ef.tipo_energia ? ` de ${tipos.join(' e ')}` : ''}.`);
       }
       for (const de of ef.dano_extra || []) {
         const r = roll(b.rng, de.dano);
         partes.push({ valor: Math.floor(r.total * fator), tipo: de.tipo, passou });
       }
-      causarDano(b, alvo, partes, { fonte: c, ignoraRD, rotulo, ataque });
+      causarDano(b, alvo, partes, { fonte: c, ignoraRD, ataque });
     }
   }
   // condição (só em quem atende a condicao_afeta)
-  if (ef.condicao && passou !== true && (!ef.condicao_afeta || atende(alvo, ef.condicao_afeta))) {
-    const rodadas = parseDuracao(ef.duracao, b.rng);
-    const cat = categoria || (MEDO[ef.condicao] ? 'medo' : ef.condicao === 'paralisado' ? 'paralisia' : null);
-    const ficou = aplicarCondicao(b, alvo, ef.condicao, rodadas, { fonte: c, categoria: cat });
-    if (ficou) anunciarCondicao(b, alvo, ficou, rodadas, rotulo);
+  if (ef.condicao && passou !== true && (!ef.condicao_afeta || atende(alvo, ef.condicao_afeta)) && alvo.estado !== 'morto') {
+    const duracao = ef.duracao_por_pv ? duracaoPorPv(ef.duracao_por_pv, alvo.pv) || ef.duracao : ef.duracao;
+    const rodadas = parseDuracao(duracao, b.rng);
+    const ficou = aplicarCondicao(b, alvo, ef.condicao, rodadas, { fonte: c, categoria: categoriaDaCondicao(ef.condicao, categoria) });
+    if (ficou && ficou !== 'morto') anunciarCondicao(b, alvo, ficou, rodadas, rotulo);
   }
-  if (ef.veneno && passou !== true) SP.envenenar(K, b, c, alvo, { ...ef.veneno, resistencia: 'fort', cd: ef.cd, jaFalhou: passou === false });
-  // efeitos por DV (Palavra Sagrada, Blasfêmia): cumulativos, sem teste
+  // veneno (sopro do golem): passar no teste inicial não livra do secundário (3.0)
+  if (ef.veneno && alvo.estado !== 'morto') SP.envenenar(K, b, c, alvo, { ...ef.veneno, resistencia: 'fort', cd: ef.cd, jaFalhou: passou === false, jaPassou: passou === true, nome: rotulo });
+  // efeitos por DV (Palavra Sagrada, Blasfêmia): cumulativos, sem teste. "Morto" não é efeito de morte:
+  // mata os vivos e destrói os mortos-vivos (SRD); o constructo, que não é vivo, fica de fora
   for (const p of ef.efeitos_por_dv || []) {
+    if (alvo.estado === 'morto') break;
     if (p.dv_max != null && alvo.dv > p.dv_max) continue;
-    if (p.condicao === 'morto') { morrer(b, alvo, c, 'morto'); return; }
     if (p.condicao) {
       const rodadas = parseDuracao(p.duracao, b.rng);
-      const ficou = aplicarCondicao(b, alvo, p.condicao, rodadas, { fonte: c });
-      if (ficou) anunciarCondicao(b, alvo, ficou, rodadas, rotulo);
+      const ficou = aplicarCondicao(b, alvo, p.condicao, rodadas, { fonte: c, categoria: categoriaDaCondicao(p.condicao), semImunidadeAMorte: alvo.tipo !== 'Constructo' });
+      if (ficou && ficou !== 'morto') anunciarCondicao(b, alvo, ficou, rodadas, rotulo);
     }
-    if (p.dano_atributo) SP.danoDeAtributo(K, b, alvo, p.dano_atributo.atributo, roll(b.rng, p.dano_atributo.dano).total, c);
+    if (p.dano_atributo) {
+      const rodadas = p.dano_atributo.duracao ? parseDuracao(p.dano_atributo.duracao, b.rng) : null;
+      SP.danoDeAtributo(K, b, alvo, p.dano_atributo.atributo, roll(b.rng, p.dano_atributo.dano).total, c, rotulo, rodadas);
+    }
   }
-  void natureza;
+  return { passou };
 }
 
 /** Resistência à magia (3.0): d20 + nível de conjurador ≥ RM. Só contra magias e SM. */
@@ -1011,7 +1101,7 @@ function venceRM(b, c, alvo, nivelConjurador, natureza) {
   if (!rm || (natureza !== 'SM' && natureza !== 'magia')) return true;
   const d = b.rng.die(20);
   const ok = d + nivelConjurador >= rm;
-  log(b, alvo, 'rm', `Resistência à magia de ${alvo.nome} (${rm}): ${d} + ${nivelConjurador} = ${d + nivelConjurador}, ${ok ? 'a magia passa' : 'a magia não o afeta'}.`);
+  log(b, alvo, 'rm', `Resistência à magia de ${alvo.nome} (${rm}): ${d} + ${nivelConjurador} = ${d + nivelConjurador}, ${ok ? 'a magia passa' : 'a magia é barrada'}.`);
   return ok;
 }
 
@@ -1230,7 +1320,7 @@ function encerrar(b, vencedor, motivo) {
       pv: c.pv,
       pvMax: c.pvMax,
       contusao: c.contusao,
-      estado: c.fugindo ? 'fugiu' : c.estado,
+      estado: c.estado === 'morto' ? 'morto' : c.fugindo ? 'fugiu' : c.estado,
       condicoes: Object.keys(c.cond),
       ...c.stats,
     })),
@@ -1279,7 +1369,7 @@ export function simulate({ ladoA, ladoB, distancia = 9, limiteRodadas = 50 }, { 
 const K = {
   log, anunciarCondicao, roll: (b, expr, o) => roll(b.rng, expr, o), average, parseDice, isZero, parseDuracao, parseArea,
   gap, mover, velocidade, inimigos, aliados, alvosNaArea, alvoValido, podeLutar, atende, eixos,
-  inicioDoTurno, venceRD, teste, resistido, agarrarDe, aplicarCondicao, removerCondicao, causarDano, curar, morrer, atualizarEstado,
+  inicioDoTurno, venceRD, furaRegeneracao, teste, resistido, agarrarDe, aplicarCondicao, imuneACondicao, efeitoNaoAfeta, categoriaDaCondicao, removerCondicao, causarDano, curar, morrer, atualizarEstado,
   efeitoComTeste, venceRM, golpe, sequencia, caContra, modsDeAtaque, deltaMod, somaBuff, expiraEm, tick,
   soltarAgarrao, imuneCritico, semDestreza, esperado, pAcerto, isMelee, isRanged, isTouch, ataqueAlcanca, alcanceDe,
   hasCond, talento, sizeIdx, mod, sinal, num, MEDO, TIPOS_SEM_CRITICO,

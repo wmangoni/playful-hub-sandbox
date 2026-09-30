@@ -1,6 +1,6 @@
 # ⚔️ Tarefa 006 - D&D Make Character: Simulador de combate (Arena) + catálogo de monstros e de Holy Avenger
 
-**Status**: 💻 In Progress — E2/E3 (motor de combate); refinamento aprovado pela revisão rigorosa na 3ª rodada
+**Status**: 💻 In Progress — E1 a E3 prontos (catálogo e motor de combate, aprovados pela revisão rigorosa); faltam E4 a E8
 **Responsável**: Claude (TL)
 **Branch**: `feat/ded-simulador-combate` (a partir de `feat/ded-make-character`, PR #48)
 **Depende de**: TASK_003 (motor de regras `dnd30.js`), TASK_004 (talentos e perícias escolhidos)
@@ -273,7 +273,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 - **Especiais de monstros e Holy Avenger**: todo o vocabulário de `tools/catalogo-combate.md`.
   - Os de monstro: sopro (área × vários alvos, recarga, com dano, condição ou veneno); agarrar aprimorado e constrição; engolir e engolfar; rasgar; bote; atropelar; esmagar; veneno (inicial e secundário); presença aterradora; paralisia; dreno de energia; petrificação; queimar; aura; explosão ao morrer; imunidade a magia com exceções; refletir magia; enredar; habilidades similares a magia com dano, cura, condição ou bônus.
   - Os mesmos efeitos de classe dos personagens do jogador: ataque furtivo, evasão, fúria, destruir, inspirar coragem, cura pelas mãos, camuflagem (chance de erro), falha de magia e vorpal.
-  - Um especial com `mecanica: null` ou `efeito: "outro"` **não é simulado** e aparece no log como tal.
+  - Um especial com `mecanica: null` ou `efeito: "outro"` **não é simulado** e aparece no log como tal. As qualidades sem mecânica (sentidos, traços de tipo) ficam fora do aviso (§8.1).
   - O catálogo tem hoje, nas duas seções, os efeitos marcados como `outro` que ficaram de fora de propósito (ex.: forma selvagem, expulsar mortos-vivos, teletransporte).
 - **Área na distância abstrata**: um sopro ou uma bola de fogo acerta o alvo e os aliados dele que estiverem engajados no mesmo ponto, até um limite pelo tamanho da área (cone de 9 m: até 4 criaturas Médias). É uma aproximação, documentada na tela.
 - **Talentos dos personagens**:
@@ -387,15 +387,53 @@ Cada etapa segue o fluxo do hub: testes, verificação no navegador e revisão p
   - cada criatura pesa pelo espaço que ocupa;
   - a área só atinge inimigos (sem fogo amigo);
   - cone, linha e cubo saem do conjurador; esfera sai do alvo, salvo "centrado nele" e Palavra Sagrada/Blasfêmia.
-- **Alcance das magias:** considerado suficiente, salvo toque (precisa chegar ao alvo) e áreas que saem do conjurador (anda antes, se der).
+- **Alcance das magias:**
+  - considerado suficiente, salvo toque e áreas que saem do conjurador;
+  - as magias de toque, inclusive as curas (de toque na 3.0), exigem chegar ao alvo: o conjurador anda antes, se der;
+  - o toque corpo a corpo usa a For; o toque à distância, a Des.
 - **Agarrar (3.0, simplificado):**
-  - agarrar aprimorado faz o teste resistido ao acertar (contra alvo até `tamanho_max`, por padrão uma categoria menor);
-  - quem agarra usa o turno para apertar (dano do agarrar aprimorado e da constrição; sem eles, 1d3 + For) ou para engolir;
-  - quem está agarrado tenta escapar (se tiver 30% de chance ou mais) ou ataca quem o agarra;
-  - os dois perdem a Des na CA contra os outros;
+  - agarrar aprimorado faz o teste resistido ao acertar (contra alvo até `tamanho_max`, por padrão uma categoria menor). Quando o catálogo exige mais de um golpe (`requer`, as duas pancadas do arbusto errante), o teste vem depois da sequência;
+  - quem agarra usa o turno para apertar ou para engolir. Cada teste de agarrar vencido causa o dano do ataque que agarrou e, com constrição, o dano dela também (SRD). Sem nenhum dos dois, causa 1d3 + For;
+  - quem segura com o agarrar aprimorado não é considerado agarrado e mantém a Des na CA (SRD);
+  - quem está agarrado perde a Des contra os outros, tenta escapar (se tiver 30% de chance ou mais) ou ataca quem o agarra com um ataque natural ou uma arma leve;
   - não há o modo de segurar só com a parte do corpo (−20).
-- **Engolido:** leva o dano do estômago no início do turno de quem engoliu. Ataca a CA interna e, ao somar o dano para sair, escapa. Esse dano não tira PV do monstro (o texto 3.0 fala em dano "ao estômago"), e a capacidade do estômago não é limitada.
-- **Olhar (medusa):** quem está ao alcance testa no início do seu turno; ninguém desvia o olhar.
+- **Engolido:**
+  - leva o dano do estômago no início do turno de quem engoliu;
+  - ataca a CA interna com um ataque natural ou uma arma leve e, ao somar o dano para sair, escapa;
+  - esse dano não tira PV do monstro (o texto 3.0 fala em dano "ao estômago"), e a capacidade do estômago não é limitada.
+- **Olhar (medusa):** quem está ao alcance testa no início do seu turno, e ninguém desvia o olhar. Quem é imune a efeito sobrenatural (golem) ou a efeitos de Fortitude (constructo, morto-vivo) nem testa.
+- **Imunidades de tipo (3.0):** somadas às do catálogo, pelo tipo.
+  - Constructos e mortos-vivos: ação mental, veneno, sono, paralisia, atordoamento, doença, efeitos de morte, crítico, dano de atributo, dreno de energia e qualquer efeito que peça Fortitude.
+  - Limos e plantas: ação mental, veneno, sono, paralisia, atordoamento, metamorfose e crítico.
+  - Elementais: veneno, sono, paralisia, atordoamento e crítico.
+  - Imune não rola o teste.
+- **Imunidade a magia:**
+  - sem `abrange` (Paladino de Arton), vale contra magias e habilidades similares a magia, mas não contra sopro (sobrenatural);
+  - com `abrange` (golem), vale o que ele lista;
+  - o próprio combatente continua podendo se curar;
+  - as exceções do golem valem também para a IA: a eletricidade (que o deixa lento) vale a condição, e o fogo (que o cura) vale menos que nada.
+- **A RD que absorve todo o dano do golpe** anula também os efeitos dele, como paralisia e veneno (SRD).
+  - Não anula o agarrar (basta acertar), o dano de energia (queimar) nem o dreno de energia (SRD).
+  - O dano que passou da RD e ficou nos PV temporários conta como sofrido.
+  - O registro só avisa quando algum efeito foi anulado, e diz qual.
+- **"Morto"** (Implosão, veneno mortal) é morte, e não condição com duração. Quem é imune a efeitos de morte não sofre. Quem morre fica com −10 PV (0 no morto-vivo e no constructo, destruídos em 0).
+- **O "morto" dos efeitos por DV** (Palavra Sagrada, Blasfêmia) não é efeito de morte: mata os vivos e destrói os mortos-vivos (SRD). O constructo, que não é vivo, fica de fora. A paralisia desses efeitos respeita a imunidade a paralisia (limos, plantas, constructos, mortos-vivos).
+- **O Tarrasque** regenera mesmo morto por magia de morte (LM 3.0: só fica com −10 PV). No motor, cai inconsciente com a contusão de −10 PV e a regeneração o põe de pé depois de algumas rodadas. Isso vem de `regeneracao.resiste_morte` no catálogo.
+- **Vorpal e morte instantânea por arma** só matam quem regenera se a arma furar a regeneração (SRD). O troll e o Tarrasque não perdem a cabeça para a espada do Paladino.
+- **Veneno no sopro (golem):** passar no teste inicial não livra do secundário, 10 rodadas depois.
+- **Confusão (3.0):** d10 a cada rodada. 1: vagueia por 1 minuto; 2–6: não faz nada; 7–9: ataca a criatura mais próxima, de qualquer lado; 10: age normalmente. Quem é atacado revida no turno seguinte. Quem está preso (agarrado, engolido, engolfado) não vagueia nem ataca quem está de fora: com 1 se debate, e de 7 a 10 age como preso (ataca quem o prende ou tenta escapar).
+- **Presença aterradora:** um teste por luta. Com duração "até sair da área", o efeito dura a luta toda, porque na distância abstrata ninguém sai da área.
+- **Aura com condição (fedor, aura de medo):** também um teste por luta; quem falha sofre a condição e o dano de atributo uma vez só.
+- **Dano de atributo:**
+  - com duração (enfraquecimento da Blasfêmia, Raio do Enfraquecimento), é uma penalidade temporária que não baixa o atributo de 1;
+  - sem duração (veneno, fedor), é dano, e zerar Força ou Destreza deixa indefeso.
+- **Magias de dano de atributo e níveis negativos** (Raio do Enfraquecimento, Enervação) só pegam quem falha no teste, quando há teste.
+- **Palavra de Poder: Atordoar** dura conforme os PV do alvo (`duracao_por_pv`).
+- **Evasão:** vale só em efeito de Reflexos que dá metade. A aprimorada corta pela metade só nesses efeitos.
+- **Cura:** qualquer cura estabiliza quem está morrendo, mesmo que continue abaixo de 0 PV.
+- **Sopro como ação livre** (gás do golem): sai no começo do turno, e o combatente ainda age.
+- **Semicírculo** (Mãos Flamejantes) é uma área em leque saindo do conjurador. "Dois cubos de 3 m por nível" (Tempestade de Fogo) multiplica pelo nível de conjurador.
+- **Explosão Sonora** (teste "parcial" no SRD): o formato não tem esse caso, então passar em Vontade anula tudo. Essa aproximação fica.
 - **Regeneração:** o monstro desmaia quando a contusão passa dos PV, o que o tira da luta. Se a luta continuar, ele se levanta quando a regeneração baixa a contusão.
 - **Dano maciço (3.0):** 50 ou mais num único ataque pede Fortitude CD 15, ou o alvo morre. Mortos-vivos, constructos e quem tem a imunidade não fazem o teste.
 - **Surpresa:** na 1ª rodada, quem ainda não agiu usa a CA de surpresa e sofre ataque furtivo.
@@ -409,16 +447,27 @@ Cada etapa segue o fluxo do hub: testes, verificação no navegador e revisão p
   - `bba_efetivo`, `tamanho` e `dano_arma` (Poder Divino, Força dos Justos): a For e os PV temporários valem;
   - `pericias`.
   - A Velocidade dá um golpe a mais no ataque total.
+- **O que não é simulado** aparece no registro no início da luta: ataques especiais sem mecânica, efeitos `outro` e magias da lista sem mecânica. Qualidades sem mecânica (sentidos, traços de tipo) não são listadas.
 - **IA:**
-  - compara o dano esperado de cada opção (golpes, sopro, magia, engolfar, esmagar), descontando RD, imunidade e resistência;
-  - cura quem está abaixo de 50% dos PV;
-  - reforça na 1ª rodada se não há inimigo ao alcance;
-  - usa o sopro com 2 ou mais alvos ou na 1ª rodada.
+  - compara o dano esperado de cada opção (golpes, sopro, magia, engolfar, esmagar), descontando RD, imunidades (de energia, de condição, a veneno, a efeitos de Fortitude e a magia) e resistência, com a vulnerabilidade 3.0 (×2);
+  - cura quem está abaixo de 50% dos PV, se conseguir chegar até ele;
+  - reforça nas duas primeiras rodadas se não há inimigo ao alcance;
+  - usa o sopro com 2 ou mais alvos ou na 1ª rodada. Os alvos são escolhidos antes da presença aterradora, e sem alvo o sopro não sai.
   - Sozinha, não repete no mesmo alvo, em rodadas seguidas, um controle curto que não tira PV (ex.: Blasfêmia que só deixa pasmo). Sem isso, trancaria o alvo para sempre sem nunca derrubá-lo.
 
 **Validação:**
-- `tests/ded_make_character_combate.test.js`: 20 testes com os dados fixados. Cobrem a lista do §9 e mais: Blasfêmia só contra não malignos, presença aterradora (imunidade depois do teste; morto-vivo imune), veneno secundário 10 rodadas depois, vorpal, nomes repetidos numerados e todo o catálogo lutando sem erro.
-- **Varredura:** os 34 combatentes do catálogo, cada um contra cada um (1.156 lutas), terminam sem erro. Só uma luta chega ao limite de 50 rodadas: Lisandra × Lisandra, duas druidas de pouco dano que se curam.
+- `tests/ded_make_character_combate.test.js`: 46 testes com os dados fixados. Cobrem a lista do §9 e, além dela:
+  - execução do sopro, com recarga compartilhada e veneno;
+  - agarrar (os dois golpes do arbusto, constrição, Des de quem segura), engolir, engolfar;
+  - aura uma vez por luta, queimar, fúria (PV e fadiga), Destruir o Mal, evasão aprimorada;
+  - imunidade a magia com as exceções do golem, carapaça do Tarrasque, falha de magia;
+  - explosão ao morrer, dano maciço, surpresa, investida, incremento, disparo em corpo a corpo;
+  - Ataque Poderoso por rodada, Trespassar, Esquiva;
+  - confusão, Implosão, imunidades de tipo, vorpal contra regeneração, RD que anula efeitos;
+  - IA contra as exceções do golem, Palavra Sagrada em limo, morto-vivo e constructo, magia de morte no Tarrasque;
+  - confuso engolido, morto que tinha fugido no resumo, RD com agarrar e PV temporários;
+  - toque que exige alcance, cura que estabiliza e todo o catálogo lutando sem erro.
+- **Varredura:** os 34 combatentes, cada um contra cada um, com 2 sementes (2.312 lutas), terminam sem erro e sem texto quebrado no registro. As lutas que chegam ao limite de 50 rodadas são impasses legítimos. A mais comum é Lisandra × Lisandra, duas druidas de pouco dano que se curam, que empata em boa parte das sementes.
 
 ## 🧪 9. Testes planejados
 

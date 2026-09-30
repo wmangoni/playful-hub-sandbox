@@ -11,7 +11,7 @@ Forja de heróis de D&D migrada do sistema legado `D-D-Make-Character` (CodeIgni
   - popup de **talentos e perícias**: "Salvar e gerar ficha" abre a ficha com `?escolher=1`, e o botão "Talentos e perícias" reabre;
   - acrescentou os 74 talentos do Livro do Jogador 3.0 (320 no total).
 - `TASKS/TASK_005.md`: integração no menu principal do hub pelo padrão do gerador de páginas SEO.
-- `TASKS/TASK_006.md` (refinada, implementação pendente): plano do **simulador de combate** (Arena) e o catálogo `data/catalogo-combate.json`.
+- `TASKS/TASK_006.md` (em andamento): **simulador de combate** (Arena). Feitos o catálogo `data/catalogo-combate.json` e o motor de combate (E1 a E3); faltam os personagens do jogador, a tela e as etapas seguintes (E4 a E8).
 
 ## 🏗️ Arquitetura do Código
 

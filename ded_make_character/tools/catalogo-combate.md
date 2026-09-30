@@ -90,7 +90,7 @@ Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
 | `resistencia_magia` | inteiro \| null ✔ | |
 | `resistencias_energia` | objeto ✔ | ex.: `{ "fogo": 10 }`; `{}` se nenhuma |
 | `imunidades`, `vulnerabilidades` | string[] ✔ | ver as listas acima; `vulnerabilidades` só aceita energias (uma fraqueza de outro tipo, como a ferrugem do golem, vira especial) |
-| `regeneracao` | objeto \| null ✔ | `{ "valor": 5, "exceto": ["fogo", "ácido"] }`; `exceto` aceita também uma arma: `{ "arma": { "qualidade": ["sagrada", "abençoada"], "bonus_minimo": 3 } }` |
+| `regeneracao` | objeto \| null ✔ | `{ "valor": 5, "exceto": ["fogo", "ácido"] }`; `exceto` aceita também uma arma: `{ "arma": { "qualidade": ["sagrada", "abençoada"], "bonus_minimo": 3 } }`. `"resiste_morte": true` (Tarrasque): efeito de morte só o derruba |
 | `cura_acelerada` | inteiro \| null ✔ | |
 | `resistencias` | objeto ✔ | `{ "fort": 6, "ref": 0, "von": 1 }` (totais) |
 | `atributos` | objeto ✔ | `{ "for": 21, "des": 8, "con": 15, "int": 6, "sab": 10, "car": 7 }`; `null` no atributo que não existe (ex.: Con de morto-vivo) |

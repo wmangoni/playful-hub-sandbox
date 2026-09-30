@@ -372,7 +372,7 @@ function validarSecao(lista, secao) {
       for (const im of c.imunidades) if (!IMUNIDADES.includes(im)) erros.push(`${onde}: imunidade "${im}" fora da lista`);
       for (const v of c.vulnerabilidades) energia(v, `${onde} vulnerabilidades`);
     }
-    if (c.regeneracao !== null && !(isObj(c.regeneracao) && isInt(c.regeneracao.valor) && Array.isArray(c.regeneracao.exceto))) erros.push(`${onde}: regeneracao`);
+    if (c.regeneracao !== null && !(isObj(c.regeneracao) && isInt(c.regeneracao.valor) && Array.isArray(c.regeneracao.exceto) && [undefined, true].includes(c.regeneracao.resiste_morte))) erros.push(`${onde}: regeneracao`);
     else if (c.regeneracao) for (const x of c.regeneracao.exceto) {
       // energia, ou arma com qualidade: { "arma": { "qualidade": ["sagrada", "abençoada"], "bonus_minimo": 3 } }
       if (isObj(x)) {
