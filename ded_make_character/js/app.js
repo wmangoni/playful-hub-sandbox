@@ -3,6 +3,7 @@ import { html, render } from './core/dom.js';
 import { createRouter } from './core/router.js';
 import { createStore } from './core/store.js';
 import { AUX_TABLES, ENTITIES, REFERENCE_TABLES, RETIRED_TABLES, TABLES, entityBySlug } from './entities/index.js';
+import { renderArena } from './pages/arena.js';
 import { renderForm, renderList } from './pages/crud.js';
 import { renderHome } from './pages/home.js';
 import { renderSheet } from './pages/sheet.js';
@@ -95,6 +96,8 @@ function renderNotFound() {
 const router = createRouter({
   routes: [
     { name: 'home', pattern: '/' },
+    // antes das genéricas: '/:module' casaria com "arena"
+    { name: 'arena', pattern: '/arena' },
     { name: 'list', pattern: '/:module' },
     { name: 'create', pattern: '/:module/novo' },
     { name: 'edit', pattern: '/:module/:id/editar' },
@@ -104,6 +107,12 @@ const router = createRouter({
     if (name === 'home') {
       const page = mountPage(null, 'home');
       await renderHome({ root: page, store });
+      focusTitle();
+      return;
+    }
+    if (name === 'arena') {
+      const page = mountPage('Arena', 'arena');
+      cleanup = await renderArena({ root: page, router, query }) || null;
       focusTitle();
       return;
     }
@@ -156,7 +165,8 @@ store.subscribe(event => {
   if (event.type === 'corrupted') {
     toast({ type: 'error', title: 'Cópia local descartada', message: 'Os dados salvos neste navegador estavam corrompidos. Voltamos aos dados originais.' });
   }
-  if (event.type === 'external') {
+  // a Arena não lê o store (E5): recarregar só apagaria a luta em andamento e o seletor aberto
+  if (event.type === 'external' && router.current?.name !== 'arena') {
     const onForm = ['create', 'edit'].includes(router.current?.name);
     toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : 'A tela foi atualizada.' });
     if (!onForm) router.reload();
@@ -178,7 +188,7 @@ document.addEventListener('click', async event => {
   if (!ok) return;
   store.restoreAll();
   toast({ type: 'info', title: 'Dados originais restaurados', message: 'Todas as tabelas voltaram ao estado original.' });
-  if (!['create', 'edit'].includes(router.current?.name)) router.reload();
+  if (!['create', 'edit', 'arena'].includes(router.current?.name)) router.reload();
 });
 
 refreshChrome();

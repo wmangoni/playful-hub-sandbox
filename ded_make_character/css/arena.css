@@ -1,0 +1,828 @@
+/* ==========================================================================
+   Arena (TASK_006, E5): montagem da luta, seletor de combatentes, ordem de
+   iniciativa, registro e resultado. Lado A em azul, lado B em brasa.
+   ========================================================================== */
+
+.arena-h2 {
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-lg);
+  color: var(--gold);
+}
+
+.arena-roster,
+.arena-picker__list,
+.arena-order__list,
+.arena-fighter__chips,
+.arena-log,
+.arena-result__grid,
+.arena-stat__nums,
+.arena-stat__nums dd {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---------- Etiqueta do lado ---------- */
+.arena-tag {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.arena-tag--a {
+  border-color: var(--azure-line);
+  background: var(--azure-bg);
+  color: var(--azure);
+}
+
+.arena-tag--b {
+  border-color: var(--ember-line);
+  background: var(--ember-bg);
+  color: var(--ember);
+}
+
+/* ---------- Montagem: os dois lados ---------- */
+.arena-sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.arena-versus {
+  align-self: center;
+  color: var(--gold-deep);
+  font-family: var(--font-display);
+  font-size: var(--fs-3xl);
+  line-height: 1;
+}
+
+.arena-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  border-top: 3px solid var(--azure-line);
+}
+
+.arena-side--b {
+  border-top-color: var(--ember-line);
+}
+
+.arena-side__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.arena-side__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xl);
+}
+
+.arena-side__meta {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.arena-side__empty {
+  padding: var(--sp-5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.arena-roster {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.arena-roster__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.arena-roster__info {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.arena-roster__name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.arena-roster__meta {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.arena-qty__n {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.4rem;
+  height: 32px;
+  border-inline: 1px solid var(--line);
+  background: var(--surface-2);
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ---------- Opções ---------- */
+.arena-options__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--sp-4) var(--sp-5);
+}
+
+/* .field ocupa as 12 colunas do form-grid; aqui a grade é própria */
+.arena-options__grid .field {
+  grid-column: auto;
+}
+
+.arena-seed {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.arena-seed .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.arena-difficulty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold-deep);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.arena-difficulty > .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--gold);
+}
+
+.arena-difficulty strong {
+  color: var(--text);
+}
+
+.arena-difficulty.is-facil {
+  border-left-color: var(--verdant);
+}
+
+.arena-difficulty.is-justa {
+  border-left-color: var(--gold);
+}
+
+.arena-difficulty.is-dificil {
+  border-left-color: var(--arcane);
+}
+
+.arena-difficulty.is-mortal {
+  border-left-color: var(--ember);
+}
+
+.arena-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3) var(--sp-4);
+  margin-top: var(--sp-5);
+}
+
+.arena-start__hint {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Seletor de combatentes ---------- */
+.arena-picker {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(88vh, 900px);
+}
+
+.arena-picker[open] {
+  display: flex;
+}
+
+.arena-picker__frame {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.arena-picker__head {
+  padding: var(--sp-5) var(--sp-5) 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.arena-picker__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.arena-picker__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.arena-picker__tabs [role='tab'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 var(--fs-md) var(--font-ui);
+  cursor: pointer;
+}
+
+.arena-picker__tabs [role='tab'] .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.arena-picker__tabs [role='tab'][aria-selected='true'] {
+  margin-bottom: -1px;
+  border-color: var(--line-strong);
+  background: var(--surface-1);
+  color: var(--gold-bright);
+}
+
+.arena-picker__tabs [role='tab']:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: -2px;
+}
+
+.arena-picker__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-1);
+}
+
+.arena-picker__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.arena-picker__filters .search {
+  flex: 1 1 260px;
+}
+
+.arena-picker__nd {
+  flex: 0 1 190px;
+  min-height: 42px;
+}
+
+.arena-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.arena-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.arena-pick__info {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.arena-pick__name {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  overflow-wrap: anywhere;
+}
+
+.arena-pick__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.arena-pick__lore {
+  display: -webkit-box;
+  margin-top: var(--sp-1);
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--font-lore);
+  font-size: var(--fs-sm);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.arena-pick__side {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-left: auto;
+}
+
+.arena-pick__count {
+  color: var(--gold);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.arena-picker__empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.arena-picker__empty > .icon {
+  flex: none;
+  color: var(--gold);
+}
+
+.arena-picker__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--line);
+  background: var(--surface-1);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.arena-picker__status {
+  flex: 1 1 240px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Luta: barra de controles ---------- */
+.arena-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.arena-bar__status {
+  min-width: 0;
+}
+
+.arena-bar__round {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--gold-bright);
+}
+
+.arena-bar__seed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.arena-bar__seed code {
+  min-width: 0;
+  color: var(--text);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.arena-bar__info {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.arena-bar__seed .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.arena-bar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* ---------- Luta: iniciativa e registro ---------- */
+.arena-fight {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-5);
+}
+
+.arena-order,
+.arena-log-card {
+  padding: var(--sp-5);
+}
+
+.arena-order__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.arena-fighter {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--azure-line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  transition: box-shadow var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease);
+}
+
+.arena-fighter--b {
+  border-left-color: var(--ember-line);
+}
+
+.arena-fighter.is-turn {
+  box-shadow: 0 0 0 1px var(--gold), 0 0 16px var(--gold-glow);
+}
+
+/* fora da luta: o cartão apaga, mas o texto mantém o contraste AA (sem opacity no cartão todo) */
+.arena-fighter.is-down {
+  border-left-color: var(--line);
+  background: var(--surface-1);
+}
+
+.arena-fighter.is-down .arena-fighter__name {
+  color: var(--text-muted);
+}
+
+.arena-fighter.is-down .arena-hp {
+  opacity: 0.5;
+}
+
+.arena-fighter__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.arena-fighter__name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.arena-fighter__state,
+.arena-fighter__next {
+  margin-left: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.arena-fighter__state {
+  color: var(--ember);
+}
+
+.arena-fighter__state.is-estavel,
+.arena-fighter__state.is-inconsciente,
+.arena-fighter__state.is-incapacitado {
+  color: var(--text-muted);
+}
+
+.arena-fighter__next {
+  color: var(--gold);
+}
+
+.arena-fighter__meta {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.arena-fighter__chips {
+  margin-top: var(--sp-2);
+}
+
+.arena-hp {
+  position: relative;
+  height: 8px;
+  margin: var(--sp-2) 0 var(--sp-1);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-4);
+}
+
+.arena-hp__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--verdant);
+  transition: width var(--dur-3) var(--ease);
+}
+
+.arena-hp--meio .arena-hp__fill {
+  background: var(--gold);
+}
+
+.arena-hp--baixo .arena-hp__fill {
+  background: var(--ember);
+}
+
+/* dano por contusão: a parte dos PV já tomada por ele, listrada */
+.arena-hp__sub {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: repeating-linear-gradient(135deg, rgba(169, 150, 230, 0.9) 0 4px, rgba(169, 150, 230, 0.45) 4px 8px);
+}
+
+.arena-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding-right: var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+
+.arena-log:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.arena-log__item {
+  padding: 3px var(--sp-3);
+  border-left: 2px solid var(--line);
+  color: var(--text-muted);
+}
+
+.arena-log__item[data-lado='A'] {
+  border-left-color: var(--azure-line);
+}
+
+.arena-log__item[data-lado='B'] {
+  border-left-color: var(--ember-line);
+}
+
+.arena-log__item.is-ataque,
+.arena-log__item.is-magia,
+.arena-log__item.is-especial {
+  color: var(--text);
+}
+
+.arena-log__item.is-morte,
+.arena-log__item.is-estado {
+  color: var(--ember);
+  font-weight: 600;
+}
+
+.arena-log__item.is-fim {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-left-color: var(--gold);
+  background: rgba(212, 178, 106, 0.08);
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+
+.arena-log__item.is-nao-simulado {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.arena-log__round {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0 var(--sp-1);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.arena-log__round::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+/* ---------- Resultado ---------- */
+.arena-result {
+  margin-bottom: var(--sp-5);
+  border-top: 3px solid var(--gold);
+}
+
+.arena-result--a {
+  border-top-color: var(--azure);
+}
+
+.arena-result--b {
+  border-top-color: var(--ember);
+}
+
+.arena-result__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.arena-result__head > div {
+  min-width: 0;
+}
+
+.arena-result__head .arena-h2 {
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-xl);
+}
+
+.arena-result__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: rgba(212, 178, 106, 0.1);
+  color: var(--gold-bright);
+}
+
+.arena-result__lead {
+  color: var(--text-muted);
+  overflow-wrap: anywhere; /* semente longa sem espaços */
+}
+
+.arena-result__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: var(--sp-3);
+}
+
+.arena-stat {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--azure-line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.arena-stat--b {
+  border-left-color: var(--ember-line);
+}
+
+.arena-stat__name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.arena-stat__state {
+  margin: var(--sp-1) 0 var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.arena-stat__nums {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.arena-stat__nums dt {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.arena-stat__nums dd {
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ---------- Telas estreitas ---------- */
+@media (max-width: 899.98px) {
+  .arena-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .arena-versus {
+    justify-self: center;
+    font-size: var(--fs-2xl);
+  }
+
+  .arena-fight {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .arena-log {
+    max-height: 60vh;
+  }
+}
+
+@media (max-width: 479.98px) {
+  .arena-side,
+  .arena-order,
+  .arena-log-card {
+    padding: var(--sp-4);
+  }
+
+  .arena-bar__controls .btn {
+    flex: 1 1 auto;
+  }
+
+  .arena-picker__head,
+  .arena-picker__body,
+  .arena-picker__foot {
+    padding-inline: var(--sp-4);
+  }
+
+  /* três abas numa linha: largura igual, texto em até duas linhas, sem ícone */
+  .arena-picker__tabs {
+    flex-wrap: nowrap;
+  }
+
+  .arena-picker__tabs [role='tab'] {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    padding: var(--sp-2);
+    font-size: var(--fs-sm);
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .arena-picker__tabs [role='tab'] .icon {
+    display: none;
+  }
+
+  .arena-pick__side {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

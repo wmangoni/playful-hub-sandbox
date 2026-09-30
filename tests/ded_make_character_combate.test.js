@@ -614,6 +614,17 @@ async function run() {
     K.morrer(b, james, null);
     C.runBattle(b);
     assert.strictEqual(b.fim.combatentes.find(x => x.uid === 'B1').estado, 'morto');
+    // quem caiu enquanto fugia conta como caído; "fugiu" é só para quem ainda estava de pé
+    const b2 = luta(boneco(), [boneco(), boneco()]);
+    Object.assign(b2.get('B1'), { fugindo: true, pv: -3, estado: 'morrendo' });
+    b2.get('B2').fugindo = true;
+    K.morrer(b2, b2.get('A1'), null);
+    C.runBattle(b2);
+    assert.deepStrictEqual(b2.fim.combatentes.filter(x => x.lado === 'B').map(x => x.estado), ['morrendo', 'fugiu']);
+    // limite de 1 rodada, no singular
+    const b3 = C.createBattle({ ladoA: [boneco({ ataques: [], ataqueTotal: [] })], ladoB: [boneco({ ataques: [], ataqueTotal: [] })], semente: 1, limiteRodadas: 1 });
+    C.runBattle(b3);
+    assert.strictEqual(b3.fim.motivo, 'limite de 1 rodada');
     assert.match(textos(b), /Vez de Capitão James K\.$/m);
     assert.doesNotMatch(textos(b), /(?<!\.)\.\.(?!\.)/);
   });

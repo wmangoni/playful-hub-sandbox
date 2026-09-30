@@ -11,7 +11,7 @@ Forja de heróis de D&D migrada do sistema legado `D-D-Make-Character` (CodeIgni
   - popup de **talentos e perícias**: "Salvar e gerar ficha" abre a ficha com `?escolher=1`, e o botão "Talentos e perícias" reabre;
   - acrescentou os 74 talentos do Livro do Jogador 3.0 (320 no total).
 - `TASKS/TASK_005.md`: integração no menu principal do hub pelo padrão do gerador de páginas SEO.
-- `TASKS/TASK_006.md` (em andamento): **simulador de combate** (Arena). Feitos o catálogo `data/catalogo-combate.json` e o motor de combate (E1 a E3); faltam os personagens do jogador, a tela e as etapas seguintes (E4 a E8).
+- `TASKS/TASK_006.md` (em andamento): **simulador de combate** (Arena). Feitos o catálogo `data/catalogo-combate.json`, o motor de combate (E1 a E3) e a tela `#/arena` com os combatentes do catálogo (E5); faltam os personagens do jogador (E4), a simulação em lote e as etapas seguintes (E6 a E8).
 
 ## 🏗️ Arquitetura do Código
 
@@ -59,7 +59,7 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
   - `form.js`: controles, coerção de tipos e preservação de valores legados em selects.
   - `table.js`: tabela, linha expansível e paginação.
   - Também: shell, diálogo (`<dialog>`), toasts e ícones (sprite SVG inline próprio).
-- **`js/pages/`**: `crud.js` (lista e formulário genéricos), `home.js` e `sheet.js` (ficha).
+- **`js/pages/`**: `crud.js` (lista e formulário genéricos), `home.js`, `sheet.js` (ficha) e `arena.js` (simulador).
 - **Ficha 3.0**: é calculada na hora e nada é gravado.
   - **`js/rules/dnd30.js`**: `computeSheet(personagem, { race, classe, bbaRows, pericias })` devolve todos os valores da ficha.
     - Os atributos cadastrados são **valores base**, somados aos ajustes raciais.
@@ -75,11 +75,16 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
     - Progressão: emparelhamento talento → vaga por nível.
   - **`js/pages/choices.js`** + **`css/choices.css`**: o popup (`<dialog>`). `openChoicesDialog` devolve `{ result, isDirty, dismiss }`, e a ficha usa a guarda do router enquanto ele está aberto.
   - **Tabela `fichas`** (`AUX_TABLES` em `js/entities/index.js`): as escolhas por personagem, na forma `{ personagem_id, pericias: {id da perícia: graduações}, talentos: [{talento_id, parametro}] }`. `computeSheet(..., { escolhas })` soma as graduações e os efeitos de `T30.efeitosTalentos`.
-  - **Simulador de combate** (TASK_006, E2/E3; sem tela ainda):
+  - **Simulador de combate** (TASK_006):
     - `js/rules/dice.js`: dados com semente (mulberry32) e `scriptedRng` para testes;
     - `js/rules/combat30.js`: o motor. `fromCatalog` gera a ficha de combate; `createBattle`, `nextTurn`, `nextRound`, `runBattle` e `simulate` rodam a luta; `rules` expõe as regras;
     - `js/rules/combat30-specials.js`: as habilidades especiais do vocabulário do catálogo, chamadas pelo núcleo por ganchos. Não importa o núcleo: recebe `K` (= `rules`);
-    - as regras seguem a 3.0 e o §5 da TASK_006; as aproximações da distância abstrata estão no §8.1. Toda mudança exige ajustar `tests/ded_make_character_combate.test.js`, que fixa os dados com `scriptedRng`.
+    - as regras seguem a 3.0 e o §5 da TASK_006; as aproximações da distância abstrata estão no §8.1. Toda mudança exige ajustar `tests/ded_make_character_combate.test.js`, que fixa os dados com `scriptedRng`;
+    - **Arena** (`#/arena`, §8.2 da TASK_006): `js/pages/arena.js` + `css/arena.css`. A rota vem antes de `/:module` no `app.js`, e o item do menu vem de `NAV_PAGES` (`js/entities/index.js`).
+      - A montagem da luta fica só na URL (`?a=ogro*2&b=troll&semente=…`, `js/pages/arena-setup.js`), sem tocar no store.
+      - Por isso, o `app.js` não recarrega a Arena no evento `external` (outra aba) nem em "Restaurar tudo": o reload apagaria a luta em andamento. **Reveja isso na E4**, quando a Arena passar a ler personagens do store.
+      - O catálogo é lido por `fetch`, uma vez por sessão.
+      - A dica de dificuldade usa o nível de encontro da 3.0 (`js/rules/encontro30.js`).
   - **`css/sheet.css`**: 2 páginas A4 de largura fixa (794 × 1123 px), reduzidas com `zoom` em telas estreitas. `@media print` imprime só a ficha. Fontes livres no lugar das originais: Scala Sans → Alegreya Sans e Alegreya Sans SC; Celestia Antiqua → Alegreya; Pterra → Grenze e Marcellus SC.
 - **`js/core/`**:
   - `router.js`: hash router com guarda assíncrona para formulários com alterações não salvas;
@@ -99,5 +104,8 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
 - `node tests/ded_make_character_listing.test.js`: busca, ordenação e paginação.
 - `node tests/ded_make_character_rules.test.js`: motor de regras 3.0 da ficha.
 - `node tests/ded_make_character_choices.test.js`: escolhas de perícias e talentos (vagas, pontos, requisitos e progressão).
+- `node tests/ded_make_character_catalogo.test.js`: formato do catálogo de combate, pelo validador, com erros plantados.
+- `node tests/ded_make_character_combate.test.js`: motor de combate 3.0, com os dados fixados.
+- `node tests/ded_make_character_arena.test.js`: nível de encontro e montagem da Arena na URL.
 - `NODE_ENV=test node tests/qa_ded_make_character.test.js`: E2E Puppeteer com a jornada completa. Sem `NODE_ENV=test`, o `server.js` tenta ocupar a porta 3000.
 - Ganchos de teste: `window.__dmc = { store, router }`.

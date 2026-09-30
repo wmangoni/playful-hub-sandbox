@@ -1257,7 +1257,7 @@ export function nextTurn(b) {
     b.turno = 0;
     b.rodada++;
     if (b.rodada > b.limiteRodadas) {
-      encerrar(b, null, `limite de ${b.limiteRodadas} rodadas`);
+      encerrar(b, null, `limite de ${b.limiteRodadas} rodada${b.limiteRodadas === 1 ? '' : 's'}`);
       return b.eventos.slice(inicio);
     }
     log(b, null, 'rodada', `Rodada ${b.rodada}.`);
@@ -1320,7 +1320,7 @@ function encerrar(b, vencedor, motivo) {
       pv: c.pv,
       pvMax: c.pvMax,
       contusao: c.contusao,
-      estado: c.estado === 'morto' ? 'morto' : c.fugindo ? 'fugiu' : c.estado,
+      estado: c.estado === 'ativo' && c.fugindo ? 'fugiu' : c.estado, // quem caiu enquanto fugia conta como caído
       condicoes: Object.keys(c.cond),
       ...c.stats,
     })),

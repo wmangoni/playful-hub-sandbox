@@ -15,6 +15,11 @@ export const NAV_GROUPS = [
   { key: 'compendio', label: 'Compêndio' },
 ];
 
+/** Páginas do menu lateral que não são entidades (entram no grupo, depois das entidades). */
+export const NAV_PAGES = [
+  { slug: 'arena', group: 'aventura', icon: 'arena', label: 'Arena' },
+];
+
 export const TABLES = ENTITIES.map(e => e.table);
 
 /** Tabelas de referência (somente leitura, sem tela própria) usadas pela ficha. */

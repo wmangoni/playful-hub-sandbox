@@ -1,8 +1,8 @@
 # ⚔️ Tarefa 006 - D&D Make Character: Simulador de combate (Arena) + catálogo de monstros e de Holy Avenger
 
-**Status**: 💻 In Progress — E1 a E3 prontos (catálogo e motor de combate, aprovados pela revisão rigorosa); faltam E4 a E8
+**Status**: 💻 In Progress — E1 a E3 prontos (catálogo e motor de combate, aprovados pela revisão rigorosa) e E5 (tela da Arena, com os combatentes do catálogo); faltam E4 e E6 a E8
 **Responsável**: Claude (TL)
-**Branch**: `feat/ded-simulador-combate` (a partir de `feat/ded-make-character`, PR #48)
+**Branch**: `feat/ded-simulador-combate` (E1 a E3, PR #50) e `feat/ded-arena` (E5, empilhado sobre ele)
 **Depende de**: TASK_003 (motor de regras `dnd30.js`), TASK_004 (talentos e perícias escolhidos)
 
 ---
@@ -358,7 +358,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 | **E2 Motor** | `combat30.js`: RNG com semente, iniciativa, distância, ataque/crítico/dano, defesas, estados e fim da luta, com testes determinísticos *(feito, §8.1)* |
 | **E3 Especiais** | Mecânicas do vocabulário do catálogo, com testes (ex.: Tarrasque engole, troll regenera, dragão sopra em vários alvos) *(feito, §8.1)* |
 | **E4 Personagens** | Tabelas de armas e armaduras, kit por classe, `fichas.equipamento`, adaptador de `computeSheet`, talentos e habilidades de classe |
-| **E5 Arena** | Tela `#/arena` (montar a luta, luta passo a passo com log), rota antes das genéricas, item no menu lateral e atalho a partir da ficha e da lista |
+| **E5 Arena** | Tela `#/arena` (montar a luta, luta passo a passo com log), rota antes das genéricas, item no menu lateral e atalho a partir da ficha e da lista *(feito antes da E4, com os combatentes do catálogo, §8.2)* |
 | **E6 Lote** | Simular N vezes sem travar, com o painel de resultados |
 | **E7 Magias** | Lista curada com números do SRD 3.0, espaços por dia, IA dos conjuradores |
 | **E8 Ficha** | Blocos de arma, armadura e escudo preenchidos, e CA e ataques com o equipamento |
@@ -468,6 +468,42 @@ Cada etapa segue o fluxo do hub: testes, verificação no navegador e revisão p
   - confuso engolido, morto que tinha fugido no resumo, RD com agarrar e PV temporários;
   - toque que exige alcance, cura que estabiliza e todo o catálogo lutando sem erro.
 - **Varredura:** os 34 combatentes, cada um contra cada um, com 2 sementes (2.312 lutas), terminam sem erro e sem texto quebrado no registro. As lutas que chegam ao limite de 50 rodadas são impasses legítimos. A mais comum é Lisandra × Lisandra, duas druidas de pouco dano que se curam, que empata em boa parte das sementes.
+
+### 8.2 E5: a Arena implementada
+
+A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela interface com os combatentes do catálogo.
+
+- **Rota e menu:** `#/arena` entra no router antes de `/:module`. O item "Arena" do grupo Aventura vem de `NAV_PAGES` (`js/entities/index.js`), a lista de páginas do menu que não são entidades. A home ganhou um atalho.
+- **Arquivos:**
+  - `js/pages/arena.js`: a tela;
+  - `js/pages/arena-setup.js`: a montagem ↔ query da URL, sem DOM;
+  - `js/rules/encontro30.js`: o nível de encontro da dica;
+  - `css/arena.css`.
+- **Montagem:**
+  - dois lados com até 10 combatentes cada, quantidade por entrada (−/+) e remoção;
+  - seletor em diálogo com três abas: Monstros, Holy Avenger e Meus personagens. A busca sem acentos vale para as duas abas do catálogo, e o filtro é por faixa de ND;
+  - opções: distância inicial (passos de 1,5 m, de 0 a 120 m), limite de rodadas (1 a 200) e semente (qualquer texto, ou "Sortear" 6 dígitos). Campo apagado volta ao padrão; a semente apagada volta à anterior.
+- **A montagem fica na URL** (`#/arena?a=ogro*2,ha-lisandra&b=troll&semente=580669`), gravada com `router.replaceQuery`.
+  - Recarregar ou compartilhar o link repete a luta.
+  - Ids que saíram do catálogo e o que passa de 10 por lado ficam de fora, com aviso; quantidade 0 ignora a entrada.
+  - Nada vai para o store. Por isso, a mudança de dados em outra aba e "Restaurar tudo" não recarregam a Arena, o que apagaria a luta em andamento.
+- **Dica de dificuldade:** nível de encontro da 3.0 por lado, NE = 2·log2(Σ 2^(ND/2)), que reproduz a tabela do Livro do Mestre (dois iguais = ND + 2). Para o lado A, pela diferença de NE: até −2 fácil, de −1 a +1 justa, +2 e +3 difícil, +4 ou mais mortal.
+- **Luta:**
+  - Próxima ação avança até alguém fazer algo, porque o turno de quem já morreu não registra nada;
+  - Próxima rodada, Até o fim, Recomeçar (mesma semente), Nova semente e Voltar à montagem;
+  - a ordem de iniciativa mostra PV (com a parte em contusão listrada), a CA atual contra quem o agarra ou o inimigo mais perto (com a base entre parênteses quando reforços, surpresa, Esquiva ou condições a mudam), a distância do inimigo mais perto, estado, condições, reforços, agarrar, engolir e fuga, quem agiu por último e quem vem a seguir;
+  - o registro é desenhado aos poucos, só com os eventos novos, e rola sozinho se você estava no fim dele;
+  - o resultado mostra o vencedor ou o empate com o motivo e, por combatente, a situação, os PV (e a contusão), o dano causado e recebido, a rodada em que caiu e os abates. No resumo do motor, "fugiu" vale só para quem fugiu de pé; quem caiu fugindo conta como caído.
+- **Acessibilidade:** o seletor é um `<dialog>` com abas ARIA (setas, Home e End), e Esc fecha. O foco é preservado nos redesenhos (`data-focus`), e uma região `aria-live` anuncia as últimas ações e o resultado, sem ler o registro inteiro.
+- **Fica para depois:**
+  - a aba Meus personagens e o atalho "Levar à arena" da ficha e da lista entram na E4, com o adaptador de personagem. Por ora, a aba explica isso;
+  - a simulação em lote fica para a E6.
+- **Validação:**
+  - `tests/ded_make_character_arena.test.js` (7 testes): nível de encontro, faixas de dificuldade, leitura e escrita da montagem, limites e semente;
+  - no E2E, 3 passos novos:
+    - seletor (busca sem acento, abas com teclado, ND, quantidade, Esc e foco devolvido, lado cheio, Voltar com o seletor aberto, URL);
+    - passo a passo, até o fim, recomeçar repete o registro, outra aba não apaga a luta, e recarregar mantém a montagem;
+    - a 375 px, sem rolagem horizontal e com as abas numa linha.
 
 ## 🧪 9. Testes planejados
 

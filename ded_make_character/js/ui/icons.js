@@ -35,6 +35,15 @@ const ICONS = {
   feather: `<path d="M20.2 12.2A6 6 0 0 0 11.8 3.8L5 10.6V19h8.4Z"/><path d="M16 8 2 22M17.5 15H9"/>`,
   flame: `<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.3a2.5 2.5 0 0 0 2.5 2.8Z"/>`,
   filter: `<path d="M3 5h18l-7 8.5V19l-4 2v-7.5Z"/>`,
+  // Arena (TASK_006): coliseu, controles da luta e resultado
+  arena: `<path d="M2.5 20.5h19"/><path d="M4 20.5v-9M20 20.5v-9"/><ellipse cx="12" cy="9" rx="9" ry="3.5"/><path d="M8 20.5v-3.5a1.5 1.5 0 0 1 3 0v3.5M13 20.5v-3.5a1.5 1.5 0 0 1 3 0v3.5"/><path d="M4 14.5h16"/>`,
+  play: `<path d="M7 4.5v15l12-7.5Z"/>`,
+  'step-forward': `<path d="M6 5v14l9.5-7Z"/><path d="M18.5 5v14"/>`,
+  'fast-forward': `<path d="M3.5 6v12l8-6Z"/><path d="M12.5 6v12l8-6Z"/>`,
+  'skip-forward': `<path d="M3.5 6v12l7-6Z"/><path d="M10.5 6v12l7-6Z"/><path d="M20.5 6v12"/>`,
+  copy: `<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>`,
+  minus: `<path d="M5 12h14"/>`,
+  trophy: `<path d="M8 21h8M12 16.5V21"/><path d="M7 3.5h10V9a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4a3 3 0 0 0 3 4.3M17 5.5h3a3 3 0 0 1-3 4.3"/>`,
 };
 
 export const ICON_NAMES = Object.keys(ICONS);

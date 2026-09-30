@@ -1,6 +1,6 @@
 /** Estrutura fixa da aplicação: sidebar (gaveta no celular), topbar e rodapé. */
 import { html, raw, render } from '../core/dom.js';
-import { ENTITIES, NAV_GROUPS, tableLabel } from '../entities/index.js';
+import { ENTITIES, NAV_GROUPS, NAV_PAGES, tableLabel } from '../entities/index.js';
 import { icon } from './icons.js';
 
 /** Marca: d20 em ouro com o "20" gravado (gradientes definidos no sprite de ícones). */
@@ -36,6 +36,9 @@ export function renderShell(root) {
             <ul class="nav__list" aria-labelledby="nav-${group.key}">
               ${ENTITIES.filter(e => e.group === group.key).map(e => html`<li>
                 <a class="nav__link" href="#/${e.slug}" data-nav="${e.slug}">${icon(e.icon)}<span>${e.names.plural}</span><span class="nav__count" data-count="${e.table}"></span></a>
+              </li>`)}
+              ${NAV_PAGES.filter(p => p.group === group.key).map(p => html`<li>
+                <a class="nav__link" href="#/${p.slug}" data-nav="${p.slug}">${icon(p.icon)}<span>${p.label}</span></a>
               </li>`)}
             </ul>
           </div>`)}

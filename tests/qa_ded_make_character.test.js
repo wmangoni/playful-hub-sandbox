@@ -594,6 +594,157 @@ async function run() {
     await page.evaluate(() => window.scrollTo(0, 0));
   });
 
+  const logDaArena = () => page.$$eval('.arena-log > li', els => els.map(e => e.textContent.trim()).join('\n'));
+
+  await step('arena: menu lateral e montagem pelo seletor (busca sem acento, abas, ND, quantidade, URL)', async () => {
+    await go('#/arena');
+    await sleep(300);
+    assert.match(await text('h1'), /Arena/);
+    assert.strictEqual(await page.$eval('[data-nav="arena"]', el => el.getAttribute('aria-current')), 'page');
+    assert.ok(await page.$eval('[data-action="comecar"]', el => el.disabled), 'sem combatentes, não começa');
+    await domClick('[data-action="adicionar"][data-lado="A"]');
+    await sleep(300);
+    assert.ok(await page.$('dialog.arena-picker[open]'));
+    await page.type('[data-busca]', 'carnical');
+    await sleep(150);
+    assert.deepStrictEqual(await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim())), ['Carniçal']);
+    await domClick('[data-add="carnical"]');
+    await domClick('[data-add="carnical"]');
+    assert.match(await text('[data-contagem="carnical"]'), /2 no lado A/);
+    await domClick('[data-aba="holy"]');
+    await sleep(100);
+    assert.strictEqual(await page.$eval('[data-busca]', el => el.value), 'carnical', 'a busca vale para as duas abas');
+    assert.match(await text('.arena-picker__empty'), /Nenhum combatente/);
+    await page.$eval('[data-busca]', el => {
+      el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.select('[data-nd]', '16-20');
+    await sleep(100);
+    assert.deepStrictEqual(await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim())), ['Mestre Arsenal', 'Nekapeth', 'Paladino de Arton']);
+    await domClick('[data-aba="meus"]');
+    await sleep(100);
+    assert.match(await text('.arena-picker__empty'), /próxima etapa/);
+    await page.focus('[data-aba="meus"]');
+    await page.keyboard.press('ArrowRight');
+    await sleep(100);
+    assert.strictEqual(await page.evaluate(() => document.activeElement.dataset.aba), 'monstros', 'setas giram entre as abas');
+    await page.keyboard.press('End');
+    await sleep(100);
+    assert.strictEqual(await page.$eval('[aria-selected="true"]', el => el.dataset.aba), 'meus');
+    assert.strictEqual(await page.$eval('[data-aba="holy"]', el => el.getAttribute('aria-selected')), 'false');
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    assert.strictEqual(await page.$('dialog.arena-picker'), null, 'Esc fecha o seletor');
+    assert.strictEqual(await page.evaluate(() => document.activeElement.dataset.action + document.activeElement.dataset.lado), 'adicionarA', 'foco volta ao botão que abriu');
+    await domClick('[data-action="adicionar"][data-lado="B"]');
+    await sleep(300);
+    await page.type('[data-busca]', 'troll');
+    await sleep(150);
+    await domClick('[data-add="troll"]');
+    await domClick('dialog.arena-picker .btn--primary[data-action="fechar"]');
+    await sleep(200);
+    assert.match(page.url(), /#\/arena\?a=carnical\*2&b=troll&semente=\d{6}$/);
+    await domClick('[data-qtd="1"][data-ref="carnical"]');
+    assert.strictEqual(await text('.arena-side--a .arena-qty__n'), '3');
+    await domClick('[data-qtd="-1"][data-ref="carnical"]');
+    assert.strictEqual(await text('.arena-side--a .arena-qty__n'), '2');
+    assert.match(await text('.arena-difficulty'), /Para o lado A, a luta parece/);
+    const semente = await page.$eval('#arena-semente', el => el.value);
+    await page.click('#arena-semente', { clickCount: 1 });
+    await page.keyboard.press('End');
+    for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.press('Tab');
+    await sleep(100);
+    assert.strictEqual(await page.$eval('#arena-semente', el => el.value), semente, 'semente apagada volta à anterior');
+    assert.match(page.url(), new RegExp(`semente=${semente}$`));
+    assert.ok(!(await page.$eval('[data-action="comecar"]', el => el.disabled)));
+    // lado A cheio e B vazio: fechar o seletor leva o foco ao "Adicionar" do lado B
+    await go('#/arena?a=ogro*9&semente=1');
+    await sleep(300);
+    await domClick('[data-action="adicionar"][data-lado="A"]');
+    await sleep(300);
+    await page.type('[data-busca]', 'troll');
+    await sleep(150);
+    await domClick('[data-add="troll"]');
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    assert.strictEqual(await page.evaluate(() => document.activeElement.dataset.action + document.activeElement.dataset.lado), 'adicionarB');
+    // Voltar do navegador com o seletor aberto: o diálogo sai junto com a página
+    await domClick('[data-action="adicionar"][data-lado="B"]');
+    await sleep(300);
+    await page.evaluate(() => history.back());
+    await sleep(500);
+    assert.strictEqual(await page.$('dialog.arena-picker'), null);
+    assert.doesNotMatch(page.url(), /#\/arena\?a=ogro\*9/);
+  });
+
+  await step('arena: passo a passo, até o fim, e recomeçar com a mesma semente repete o registro', async () => {
+    await go('#/arena?a=ogro*2&b=troll&semente=580669');
+    await sleep(400);
+    await domClick('[data-action="comecar"]');
+    await sleep(100);
+    assert.match(await text('[data-slot="situacao"]'), /Pronto para começar/);
+    assert.deepStrictEqual(await page.$$eval('.arena-log > li', els => els.length), 1, 'só a iniciativa');
+    await domClick('[data-action="acao"]');
+    await sleep(80);
+    assert.ok((await page.$$eval('.arena-log > li', els => els.length)) >= 3);
+    assert.ok(await page.$('.arena-fighter.is-turn'), 'marca quem agiu');
+    assert.match(await text('[data-slot="situacao"]'), /Rodada 1 · a seguir:/);
+    await domClick('[data-action="rodada"]');
+    await domClick('[data-action="fim"]');
+    await sleep(150);
+    const final = await logDaArena();
+    assert.match(final, /Fim da luta: /);
+    assert.match(await text('.arena-result h2'), /Vence o lado|Empate/);
+    assert.ok(await page.$eval('[data-action="acao"]', el => el.disabled));
+    await domClick('[data-action="recomecar"]');
+    await sleep(80);
+    assert.strictEqual(await page.$('.arena-result'), null);
+    await domClick('[data-action="fim"]');
+    await sleep(150);
+    assert.strictEqual(await logDaArena(), final, 'a mesma semente repete a luta');
+    // dados mudados em outra aba não apagam a luta (a Arena não lê o store)
+    await page.evaluate(() => window.__dmc.store.handleExternalChange('dmc:v1:races'));
+    await sleep(300);
+    assert.strictEqual(await logDaArena(), final, 'o evento de outra aba não recarrega a Arena');
+    await domClick('[data-action="nova-luta"]');
+    await sleep(80);
+    assert.doesNotMatch(page.url(), /semente=580669/);
+    await page.reload({ waitUntil: 'networkidle0' });
+    await sleep(300);
+    assert.deepStrictEqual(await page.$$eval('.arena-roster__name', els => els.map(e => e.textContent.trim())), ['Ogro', 'Troll'], 'recarregar mantém a montagem');
+    assert.strictEqual(await text('.arena-side--a .arena-qty__n'), '2');
+  });
+
+  await step('arena @375px: montagem, seletor e luta sem rolagem horizontal; abas numa linha', async () => {
+    // viewport simples (sem isMobile): com isMobile o Chrome encolhe a página e esconde o overflow
+    await page.setViewport({ width: 375, height: 812 });
+    await go('#/arena?a=ogro*2,ha-lisandra&b=troll&semente=580669');
+    await sleep(400);
+    const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(await overflow() <= 0, 'montagem');
+    await domClick('[data-action="adicionar"][data-lado="B"]');
+    await sleep(300);
+    const abas = await page.$$eval('.arena-picker [role="tab"]', els => els.map(e => e.getBoundingClientRect().top));
+    assert.strictEqual(new Set(abas).size, 1, `abas em uma linha: ${abas}`);
+    assert.ok(await page.$eval('dialog.arena-picker', el => el.getBoundingClientRect().right <= innerWidth));
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    await domClick('[data-action="comecar"]');
+    await domClick('[data-action="fim"]');
+    await sleep(200);
+    assert.ok(await overflow() <= 0, 'luta');
+    // semente de 40 caracteres sem espaço (o campo aceita qualquer texto)
+    await go('#/arena?a=ogro&b=troll&semente=SementeMuitoLongaSemEspacosParaQuebrar40');
+    await sleep(300);
+    await domClick('[data-action="comecar"]');
+    await domClick('[data-action="fim"]');
+    await sleep(200);
+    assert.ok(await overflow() <= 0, 'semente longa no resultado');
+    await page.setViewport({ width: 1440, height: 900 });
+  });
+
   await step('mobile: gaveta abre/fecha e tabelas viram cartões sem rolagem horizontal', async () => {
     await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
     await page.reload({ waitUntil: 'networkidle0' });
