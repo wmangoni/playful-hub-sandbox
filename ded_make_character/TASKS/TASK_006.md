@@ -1,6 +1,6 @@
 # ⚔️ Tarefa 006 - D&D Make Character: Simulador de combate (Arena) + catálogo de monstros e de Holy Avenger
 
-**Status**: 💻 In Progress — E1 a E5 prontos (catálogo, motor, personagens do jogador e tela da Arena); faltam E6 a E8
+**Status**: 💻 In Progress — E1 a E6 prontos (catálogo, motor, personagens do jogador, tela da Arena e simulação em lote); faltam E7 e E8
 **Responsável**: Claude (TL)
 **Branch**: `feat/ded-simulador-combate` (E1 a E3, PR #50) e `feat/ded-arena` (E5, empilhado sobre ele)
 **Depende de**: TASK_003 (motor de regras `dnd30.js`), TASK_004 (talentos e perícias escolhidos)
@@ -359,7 +359,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 | **E3 Especiais** | Mecânicas do vocabulário do catálogo, com testes (ex.: Tarrasque engole, troll regenera, dragão sopra em vários alvos) *(feito, §8.1)* |
 | **E4 Personagens** | Tabelas de armas e armaduras, kit por classe, `fichas.equipamento`, adaptador de `computeSheet`, talentos e habilidades de classe *(feito depois da E5, §8.3)* |
 | **E5 Arena** | Tela `#/arena` (montar a luta, luta passo a passo com log), rota antes das genéricas, item no menu lateral e atalho a partir da ficha e da lista *(feito antes da E4, com os combatentes do catálogo, §8.2)* |
-| **E6 Lote** | Simular N vezes sem travar, com o painel de resultados |
+| **E6 Lote** | Simular N vezes sem travar, com o painel de resultados *(feito, §8.4)* |
 | **E7 Magias** | Lista curada com números do SRD 3.0, espaços por dia, IA dos conjuradores |
 | **E8 Ficha** | Blocos de arma, armadura e escudo preenchidos, e CA e ataques com o equipamento |
 
@@ -604,6 +604,52 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
   - `tests/ded_make_character_arena.test.js` (8 testes): o limite de um por lado para o personagem.
   - E2E, passo novo: os atalhos da lista e da ficha, o kit do Jonh, o limite de um por lado, o erro da espada grande com escudo, salvar sem escudo com melhoria +1, a gravação em `fichas`, recarregar mantém, a luta usa o equipamento salvo, e o evento de outra aba com a luta aberta só recarrega ao voltar à montagem.
 - **Fica para a E8:** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
+
+### 8.4 E6: a simulação em lote na Arena
+
+- **Motor:** `criarLote(luta, { vezes, semente })` roda a mesma luta `vezes` vezes, com as sementes seguidas (semente + i) e sem texto de registro.
+  - `rodar(n)` roda até mais `n` lutas; `resultado()` resume o que já rodou. O `simulate` virou um atalho que roda o lote de uma vez, com o mesmo resultado.
+  - O resultado traz:
+    - as porcentagens de vitória de cada lado e de empates;
+    - a média de rodadas;
+    - os PV que sobram ao vencedor, no geral e por lado;
+    - quantas vezes cada combatente caiu;
+    - o intervalo de sementes;
+    - a primeira semente de cada resultado (vitória de A, de B e empate).
+- **Na tela:** uma seção "Simulação em lote" na montagem, com os botões "Simular 100 vezes" e "Simular 1.000 vezes".
+  - Roda em fatias de cerca de 12 ms com `setTimeout` (o `requestIdleCallback` não existe no Safari), com uma barra de progresso (`role="progressbar"`) e "Cancelar a simulação".
+    - Não precisou de Web Worker: a tela segue respondendo (a maior espera entre fatias fica perto de 25 ms).
+    - 1.000 lutas levam menos de 1 s nas lutas pequenas e alguns segundos nas grandes (Tarrasque contra 10 ogros, 10 contra 10).
+  - Enquanto o lote roda, "Começar a luta" fica bloqueado.
+    - Mudar a montagem (lados, distância, limite) ou o equipamento de um personagem cancela o lote, com aviso. A semente não cancela, porque o lote guarda as dele.
+    - Só a seção do lote é redesenhada, e só quando o que ela mostra muda. "Começar", "Simular" e a dica mudam no lugar: o `change` de um campo chega no `mousedown` do botão, e trocar o botão ali faria o clique se perder. Quem estiver digitando num campo continua digitando, e o foco só vai para o resultado se estava no lote.
+    - Uma recarga (outra aba, "Restaurar tudo") não espera o lote: cancela-o e recarrega na hora, e o aviso diz que o lote foi cancelado. Sair da página também cancela.
+    - Um erro do motor no meio para o lote e mostra o parcial.
+  - "Começar a luta" e "Simular" usam o que está escrito nas opções, mesmo que o campo ainda não tenha perdido o foco (o `change` só vem no blur).
+  - O resultado mostra:
+    - a barra A × B × empate;
+    - os números (vitórias, empates, média de rodadas, PV que sobram ao vencedor por lado);
+    - "Quem caiu", do que mais caiu ao que menos caiu;
+    - os botões "Ver uma vitória do lado A", "Ver uma vitória do lado B" e "Ver um empate", que abrem a luta daquela semente (ela vira a semente da montagem).
+  - Cancelado, o resultado é parcial e diz quantas lutas rodaram.
+  - Se a montagem ou o equipamento de um personagem mudar depois (a semente não conta), o resultado continua, com o aviso de que é de uma montagem anterior e sem os botões de assistir. O aviso aparece na hora, e "Ver…" confere a montagem antes de abrir a luta.
+  - A assinatura do equipamento usa as posições em ordem fixa: salvar o mesmo equipamento não marca o resultado como antigo.
+  - Se a semente da montagem mudou depois do lote, o resultado diz de qual semente ele partiu.
+  - O foco vai para o resultado ao terminar, e o `aria-live` anuncia o início, o fim com as porcentagens e o cancelamento.
+- **Validação:**
+  - no motor: o lote em fatias dá o mesmo resultado que o `simulate`, a semente de exemplo reproduz o resultado dela, e o parcial conta só o que rodou;
+  - no E2E, um passo novo:
+    - o progresso fica entre 0 e 1.000 no meio (é em fatias) e "Começar" fica bloqueado;
+    - cancelar dá um resultado parcial;
+    - 100 lutas somam 100% e mostram as sementes;
+    - assistir a uma vitória do lado B termina com o lado B vencendo;
+    - o resultado continua ao voltar à montagem e fica marcado como antigo quando a montagem muda;
+    - o resultado cabe a 375 px;
+  - no E2E, mais um passo, com o lote rodando: a distância cancela sem travar; digitar a semente mantém o campo e o foco; mudar o equipamento marca o resultado como antigo (salvar o mesmo kit, não); a outra aba recarrega e avisa;
+  - no passo do lote, depois do resultado:
+    - mudar a semente mantém os "Ver…" e diz de que semente o lote partiu;
+    - o limite 1 marca o resultado como antigo, e voltar a 50 o faz valer de novo;
+    - com o mouse de verdade (`page.click`, que passa pelo mousedown, blur e change), editar um campo e clicar em "Ver…" ou em "Começar" funciona no primeiro clique.
 
 ## 🧪 9. Testes planejados
 

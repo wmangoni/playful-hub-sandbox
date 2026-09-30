@@ -5,9 +5,10 @@
  * do registro. A tela só desenha os eventos; a simulação em lote só conta os resultados.
  *
  * - `fromCatalog(entrada)` converte um combatente de data/catalogo-combate.json para a ficha de
- *   combate. (O adaptador de personagem do jogador, a partir de computeSheet, é a etapa E4.)
+ *   combate; o adaptador de personagem do jogador fica em personagem30.js.
  * - `createBattle({ ladoA, ladoB, semente, distancia, limiteRodadas })` monta a luta.
- * - `nextTurn`, `nextRound` e `runBattle` avançam; `simulate` roda a mesma luta N vezes.
+ * - `nextTurn`, `nextRound` e `runBattle` avançam; `criarLote` roda a mesma luta N vezes em
+ *   fatias (a tela), e `simulate` de uma vez.
  *
  * Posição por distância abstrata: todos ficam numa reta. O lado A começa no 0 e o lado B na
  * distância inicial; cada combatente tem a sua posição e só ataca corpo a corpo quem estiver ao
@@ -1349,34 +1350,68 @@ function encerrar(b, vencedor, motivo) {
 // simulação em lote
 
 /**
- * Roda a mesma luta `vezes` vezes com sementes diferentes (semente + i), sem texto de registro.
- * Devolve as porcentagens de vitória, a média de rodadas, o PV médio restante do vencedor e
- * quantas vezes cada combatente caiu.
+ * Lote em fatias (TASK_006 §4.3, etapa E6): a mesma luta `vezes` vezes, com as sementes seguidas
+ * (semente + i) e sem texto de registro. `rodar(n)` roda até mais `n` lutas e devolve quantas já
+ * foram; a tela chama aos poucos para não travar. `resultado()` resume o que já rodou.
  */
-export function simulate({ ladoA, ladoB, distancia = 9, limiteRodadas = 50 }, { vezes = 100, semente = 1 } = {}) {
+export function criarLote({ ladoA, ladoB, distancia = 9, limiteRodadas = 50 }, { vezes = 100, semente = 1 } = {}) {
   const base = createRng(semente).seed;
-  const res = { vezes, A: 0, B: 0, empate: 0, rodadas: 0, pvVencedor: 0, quedas: {} };
-  for (let i = 0; i < vezes; i++) {
-    const b = createBattle({ ladoA, ladoB, semente: (base + i) >>> 0, distancia, limiteRodadas, registrar: false });
-    const fim = runBattle(b);
-    res[fim.vencedor || 'empate']++;
-    res.rodadas += fim.rodadas;
-    if (fim.vencedor) {
-      const lado = fim.combatentes.filter(c => c.lado === fim.vencedor);
-      res.pvVencedor += lado.reduce((s, c) => s + Math.max(0, c.pv) / c.pvMax, 0) / lado.length;
-    }
-    for (const c of fim.combatentes) if (c.caiuNaRodada != null) res.quedas[c.uid] = (res.quedas[c.uid] || 0) + 1;
-  }
-  const vitorias = res.A + res.B;
+  const res = { A: 0, B: 0, empate: 0, rodadas: 0, pv: { A: 0, B: 0 }, quedas: {}, exemplos: {}, combatentes: null };
+  let feitas = 0;
   return {
     vezes,
-    vitoriasA: res.A / vezes,
-    vitoriasB: res.B / vezes,
-    empates: res.empate / vezes,
-    mediaRodadas: res.rodadas / vezes,
-    pvRestanteVencedor: vitorias ? res.pvVencedor / vitorias : 0,
-    quedas: res.quedas,
+    base,
+    get feitas() {
+      return feitas;
+    },
+    rodar(n = vezes) {
+      const ate = Math.min(vezes, feitas + n);
+      for (; feitas < ate; feitas++) {
+        const s = (base + feitas) >>> 0;
+        const fim = runBattle(createBattle({ ladoA, ladoB, semente: s, distancia, limiteRodadas, registrar: false }));
+        const quem = fim.vencedor || 'empate';
+        res[quem]++;
+        res.rodadas += fim.rodadas;
+        res.exemplos[quem] ??= s; // a primeira semente de cada resultado, para assistir a ela
+        if (fim.vencedor) {
+          const lado = fim.combatentes.filter(c => c.lado === fim.vencedor);
+          res.pv[fim.vencedor] += lado.reduce((soma, c) => soma + Math.max(0, c.pv) / c.pvMax, 0) / lado.length;
+        }
+        for (const c of fim.combatentes) if (c.caiuNaRodada != null) res.quedas[c.uid] = (res.quedas[c.uid] || 0) + 1;
+        res.combatentes ??= fim.combatentes.map(c => ({ uid: c.uid, nome: c.nome, lado: c.lado }));
+      }
+      return feitas;
+    },
+    resultado() {
+      const n = feitas || 1;
+      const vitorias = res.A + res.B;
+      return {
+        vezes: feitas,
+        pedidas: vezes,
+        sementes: feitas ? [base, (base + feitas - 1) >>> 0] : null,
+        vitoriasA: res.A / n,
+        vitoriasB: res.B / n,
+        empates: res.empate / n,
+        mediaRodadas: res.rodadas / n,
+        pvRestanteVencedor: vitorias ? (res.pv.A + res.pv.B) / vitorias : 0,
+        pvRestante: { A: res.A ? res.pv.A / res.A : null, B: res.B ? res.pv.B / res.B : null },
+        quedas: { ...res.quedas },
+        exemplos: { ...res.exemplos },
+        combatentes: res.combatentes || [],
+      };
+    },
   };
+}
+
+/**
+ * Roda a mesma luta `vezes` vezes de uma vez (testes e scripts). Devolve as porcentagens de
+ * vitória, a média de rodadas, o PV médio restante do vencedor e quantas vezes cada combatente
+ * caiu; o mesmo que `criarLote` em fatias.
+ */
+export function simulate(luta, opcoes = {}) {
+  const lote = criarLote(luta, opcoes);
+  lote.rodar();
+  return lote.resultado();
 }
 
 // ---------------------------------------------------------------------------------------------

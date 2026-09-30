@@ -174,7 +174,8 @@ store.subscribe(event => {
   }
   if (event.type === 'external' && !arenaOcupada) {
     const onForm = ['create', 'edit'].includes(router.current?.name);
-    toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : 'A tela foi atualizada.' });
+    const loteCancelado = router.current?.name === 'arena' && cleanup?.loteRodando?.();
+    toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : `A tela foi atualizada.${loteCancelado ? ' A simulação em lote foi cancelada.' : ''}` });
     if (!onForm) router.reload();
   }
   refreshChrome();
@@ -192,8 +193,9 @@ document.addEventListener('click', async event => {
     glyph: 'restore',
   });
   if (!ok) return;
+  const loteCancelado = router.current?.name === 'arena' && !cleanup?.ocupada?.() && cleanup?.loteRodando?.();
   store.restoreAll();
-  toast({ type: 'info', title: 'Dados originais restaurados', message: 'Todas as tabelas voltaram ao estado original.' });
+  toast({ type: 'info', title: 'Dados originais restaurados', message: `Todas as tabelas voltaram ao estado original.${loteCancelado ? ' A simulação em lote foi cancelada.' : ''}` });
   if (router.current?.name === 'arena' && cleanup?.ocupada?.()) cleanup.adiar(); // recarrega quando a luta ou o diálogo terminar
   else if (!['create', 'edit'].includes(router.current?.name)) router.reload();
 });

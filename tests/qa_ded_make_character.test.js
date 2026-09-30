@@ -808,6 +808,154 @@ async function run() {
     await page.evaluate(() => window.__dmc.store.restore('fichas'));
   });
 
+  await step('arena: simulação em lote (fatias com progresso, cancelar, resultado, assistir a uma luta do lote)', async () => {
+    await go('#/arena?a=ogro*2&b=troll&semente=580669');
+    await sleep(400);
+    await domClick('[data-action="lote"][data-vezes="1000"]');
+    await sleep(80);
+    const meio = await page.$eval('[data-slot="lote-barra"]', el => Number(el.getAttribute('aria-valuenow')));
+    assert.ok(meio > 0 && meio < 1000, `em fatias, com progresso (${meio} de 1.000)`);
+    assert.ok(await page.$eval('[data-action="comecar"]', el => el.disabled), 'sem luta enquanto o lote roda');
+    await domClick('[data-action="lote-cancelar"]');
+    await sleep(100);
+    assert.match(await text('.arena-lote__h3'), /^Parcial: [\d.]+ de 1\.000 lutas$/);
+    await domClick('[data-action="lote"][data-vezes="100"]');
+    await page.waitForSelector('#arena-lote-res', { timeout: 20000 });
+    await sleep(50);
+    assert.match(await text('.arena-lote__h3'), /^100 lutas$/);
+    assert.match(await text('.arena-lote__sub'), /Sementes 580669 a 580768/);
+    const pcts = await page.$$eval('.arena-lote__nums dd', els => els.slice(0, 3).map(e => parseFloat(e.textContent.replace(',', '.'))));
+    assert.ok(Math.abs(pcts.reduce((a, b) => a + b, 0) - 100) < 0.2, `A + B + empates = 100%: ${pcts}`);
+    assert.strictEqual(await page.$$eval('.arena-lote__quedas li', els => els.length), 3);
+    assert.strictEqual(await page.evaluate(() => document.activeElement.id), 'arena-lote-res', 'o foco vai para o resultado');
+    // assistir a uma vitória do lado B: a semente dela vira a da montagem
+    const semente = await page.$eval('[data-action="ver-semente"][data-resultado="B"]', el => el.dataset.semente);
+    await domClick('[data-action="ver-semente"][data-resultado="B"]');
+    await sleep(150);
+    await domClick('[data-action="fim"]');
+    await sleep(200);
+    assert.match(await logDaArena(), /Fim da luta: vence o lado B/);
+    assert.match(page.url(), new RegExp(`semente=${semente}`));
+    await domClick('[data-action="montagem"]');
+    await sleep(200);
+    assert.match(await text('.arena-lote__h3'), /^100 lutas$/, 'o resultado do lote continua na montagem');
+    // mudar a semente depois do lote: o resultado segue valendo (ele guarda as dele) e diz de onde partiu
+    await page.$eval('#arena-semente', el => {
+      el.value = 'outra';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await sleep(100);
+    assert.match(await text('.arena-lote__sub'), /a partir da semente “580669”; a da montagem mudou depois/);
+    assert.ok(await page.$('[data-action="ver-semente"]'), 'mudar a semente não invalida o resultado');
+    // o limite muda depois do lote: o resultado fica marcado como antigo na hora, sem os "Ver…"
+    await page.$eval('#arena-limite', el => {
+      el.value = '1';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await sleep(100);
+    assert.match(await text('.arena-lote__aviso'), /montagem mudou/);
+    assert.strictEqual(await page.$('[data-action="ver-semente"]'), null);
+    await page.$eval('#arena-limite', el => {
+      el.value = '50';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await sleep(100);
+    assert.ok(await page.$('[data-action="ver-semente"]'), 'voltando à montagem do lote, o resultado vale de novo');
+    // com o resultado na tela, editar uma opção e clicar com o mouse de verdade (mousedown → blur →
+    // change): o 1º clique vale, em "Ver…" e em "Começar"
+    await page.$eval('#arena-semente', el => {
+      el.focus();
+      el.select();
+    });
+    await page.keyboard.type('mouse-1');
+    await page.click('[data-action="ver-semente"][data-resultado="B"]');
+    await sleep(200);
+    assert.ok(await page.$('[data-slot="situacao"]'), 'o 1º clique em "Ver…" abriu a luta');
+    await domClick('[data-action="montagem"]');
+    await sleep(200);
+    await page.$eval('#arena-distancia', el => {
+      el.focus();
+      el.select();
+    });
+    await page.keyboard.type('12');
+    await page.click('[data-action="comecar"]');
+    await sleep(200);
+    assert.ok(await page.$('[data-slot="situacao"]'), 'o 1º clique em "Começar" abriu a luta');
+    assert.match(await text('.arena-bar__info'), /Começa a 12 m/);
+    await domClick('[data-action="montagem"]');
+    await sleep(200);
+    await page.$eval('#arena-distancia', el => {
+      el.value = '9';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await sleep(100);
+    // mudar a montagem marca o resultado como de uma montagem anterior
+    await domClick('[data-qtd="1"][data-ref="ogro"]');
+    assert.match(await text('.arena-lote__aviso'), /montagem mudou/);
+    assert.strictEqual(await page.$('[data-action="ver-semente"]'), null);
+  });
+
+  await step('arena: lote com mudanças no meio (distância cancela sem travar, digitar a semente, equipamento, outra aba)', async () => {
+    const lenta = '#/arena?a=ha-lisandra&b=ha-lisandra&limite=200&semente=1';
+    // a distância muda com o lote rodando: cancela e destrava a tela
+    await go(lenta);
+    await sleep(400);
+    await domClick('[data-action="lote"][data-vezes="1000"]');
+    await sleep(80);
+    await page.$eval('#arena-distancia', el => {
+      el.value = '30';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await sleep(100);
+    assert.match(await text('.arena-lote__h3'), /^Parcial: /);
+    assert.match(await text('.arena-lote__sub'), /cancelada: a montagem mudou/);
+    assert.ok(!(await page.$eval('[data-action="comecar"]', el => el.disabled)), 'Começar volta a funcionar');
+    assert.ok(!(await page.$eval('[data-action="lote"][data-vezes="100"]', el => el.disabled)));
+    // digitar a semente enquanto o lote termina: o campo e o foco ficam
+    await go(lenta);
+    await sleep(400);
+    await domClick('[data-action="lote"][data-vezes="100"]');
+    await page.$eval('#arena-semente', el => {
+      el.focus();
+      el.select();
+    });
+    await page.keyboard.type('777');
+    await page.waitForSelector('#arena-lote-res', { timeout: 30000 });
+    await sleep(100);
+    assert.strictEqual(await page.$eval('#arena-semente', el => el.value), '777');
+    assert.strictEqual(await page.evaluate(() => document.activeElement.id), 'arena-semente', 'o foco segue no campo');
+    assert.match(await text('.arena-lote__h3'), /^100 lutas$/, 'mudar a semente não cancela o lote (ele guarda as dele)');
+    // o equipamento muda depois do lote: o resultado fica marcado como antigo e sem "Ver…"
+    await go('#/arena?a=p:1&b=ogro*2&semente=580669');
+    await sleep(400);
+    await domClick('[data-action="lote"][data-vezes="100"]');
+    await page.waitForSelector('#arena-lote-res', { timeout: 20000 });
+    assert.ok(await page.$('[data-action="ver-semente"]'));
+    await domClick('[data-action="equipamento"][data-ref="p:1"]');
+    await sleep(300);
+    await domClick('[data-action="salvar"]'); // salvar o mesmo kit não muda a luta
+    await sleep(400);
+    assert.strictEqual(await page.$('.arena-lote__aviso'), null, 'salvar o mesmo equipamento não marca o resultado como antigo');
+    assert.ok(await page.$('[data-action="ver-semente"]'));
+    await domClick('[data-action="equipamento"][data-ref="p:1"]');
+    await sleep(300);
+    await page.select('[data-item="principal"]', 'clava');
+    await domClick('[data-action="salvar"]');
+    await sleep(400);
+    assert.match(await text('.arena-lote__aviso'), /montagem mudou/);
+    assert.strictEqual(await page.$('[data-action="ver-semente"]'), null);
+    // dados mudados em outra aba com o lote rodando: recarrega na hora e avisa que cancelou
+    await domClick('[data-action="lote"][data-vezes="1000"]');
+    await sleep(80);
+    await page.evaluate(() => { document.querySelector('.page').dataset.marca = 'antes'; });
+    await page.evaluate(() => window.__dmc.store.handleExternalChange('dmc:v1:personagens'));
+    await sleep(400);
+    assert.strictEqual(await page.$eval('.page', el => el.dataset.marca || null), null, 'recarregou');
+    assert.ok(await page.$$eval('.toast', els => els.some(e => /simulação em lote foi cancelada/.test(e.textContent))));
+    assert.strictEqual(await page.$('.arena-lote__res, [data-slot="lote-barra"]'), null, 'o lote não continua depois da recarga');
+    await page.evaluate(() => window.__dmc.store.restore('fichas'));
+  });
+
   await step('arena @375px: montagem, seletor e luta sem rolagem horizontal; abas numa linha', async () => {
     // viewport simples (sem isMobile): com isMobile o Chrome encolhe a página e esconde o overflow
     await page.setViewport({ width: 375, height: 812 });
@@ -833,6 +981,12 @@ async function run() {
     await domClick('[data-action="fim"]');
     await sleep(200);
     assert.ok(await overflow() <= 0, 'semente longa no resultado');
+    // o resultado do lote cabe a 375 px
+    await domClick('[data-action="montagem"]');
+    await sleep(200);
+    await domClick('[data-action="lote"][data-vezes="100"]');
+    await page.waitForSelector('#arena-lote-res', { timeout: 20000 });
+    assert.ok(await overflow() <= 0, 'resultado do lote');
     await page.setViewport({ width: 1440, height: 900 });
   });
 

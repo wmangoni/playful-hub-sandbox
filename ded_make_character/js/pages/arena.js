@@ -5,11 +5,12 @@
  * A montagem fica na URL (#/arena?a=ogro*2,p:1&b=troll&semente=…): recarregar ou compartilhar o
  * link repete a mesma luta. Os personagens do jogador ("p:<id>", etapa E4) vêm do store, passam
  * pelo adaptador (`personagem30.js`) e têm o equipamento salvo em `fichas.equipamento`. A
- * simulação em lote é da E6.
+ * simulação em lote (etapa E6) roda a mesma luta 100 ou 1.000 vezes em fatias de ~12 ms, para não
+ * travar a tela, e mostra quem costuma vencer.
  */
 import { html, render } from '../core/dom.js';
 import { normalize, plural } from '../core/format.js';
-import { createBattle, fromCatalog, gap, nextRound, nextTurn, podeLutar, rules, runBattle } from '../rules/combat30.js';
+import { createBattle, criarLote, fromCatalog, gap, nextRound, nextTurn, podeLutar, rules, runBattle } from '../rules/combat30.js';
 import { computeSheet } from '../rules/dnd30.js';
 import { dificuldade, nivelDeEncontro } from '../rules/encontro30.js';
 import { rotuloItem } from '../rules/equipamento30.js';
@@ -123,6 +124,7 @@ export async function renderArena({ root, router, query, store }) {
     ignoradosPersonagens: montagem.ignoradosRefs.filter(ehPersonagem).length,
     excedentes: montagem.excedentes,
     recarregarDepois: false, // o app adiou um recarregamento (dados mudaram com a luta ou um diálogo aberto)
+    lote: null, // simulação em lote: { lote, rodando, cancelada, assinatura, resultado, timer }
     b: null,
     mostrados: 0, // eventos do registro já desenhados
     ultimo: null, // uid de quem agiu por último
@@ -137,7 +139,11 @@ export async function renderArena({ root, router, query, store }) {
     root.querySelector('[data-slot="avisos"]').textContent = texto;
   };
 
-  const salvarNaUrl = () => router.replaceQuery(escreverMontagem(state));
+  /** Grava a montagem na URL; devolve true se isso cancelou um lote em andamento. */
+  const salvarNaUrl = () => {
+    router.replaceQuery(escreverMontagem(state));
+    return conferirLote('a montagem mudou');
+  };
   salvarNaUrl();
 
   const fichas = new Map();
@@ -221,12 +227,26 @@ export async function renderArena({ root, router, query, store }) {
     return html`<p class="arena-difficulty is-${d.nivel}">${icon('info')}<span>Para o lado A, a luta parece <strong>${d.rotulo}</strong> (ND do grupo ${ndTexto(neA)} contra ${ndTexto(neB)}). É só uma orientação pelo nível de encontro da 3.0: quem decide são os dados.</span></p>`;
   }
 
-  function desenharMontagem() {
+  /** Se dá para começar a luta e rodar o lote e, se não, por quê. */
+  function situacao() {
     const bloqueados = [...new Set([...state.A, ...state.B].map(x => porId.get(x.ref)).filter(e => e.erros?.length))];
-    const pronto = state.A.length && state.B.length && !bloqueados.length;
+    const montado = Boolean(state.A.length && state.B.length && !bloqueados.length);
+    const rodando = Boolean(state.lote?.rodando);
     const motivo = !state.A.length || !state.B.length
       ? 'Ponha pelo menos um combatente em cada lado.'
-      : `${bloqueados.map(e => e.nome).join(', ')} não ${bloqueados.length === 1 ? 'pode' : 'podem'} lutar: veja o aviso no lado.`;
+      : bloqueados.length
+        ? `${bloqueados.map(e => e.nome).join(', ')} não ${bloqueados.length === 1 ? 'pode' : 'podem'} lutar: veja o aviso no lado.`
+        : 'A simulação em lote está rodando: espere terminar ou cancele.';
+    return { montado, rodando, pronto: montado && !rodando, motivo };
+  }
+
+  function inicioHtml({ pronto, motivo }) {
+    return html`<button type="button" class="btn btn--primary" data-action="comecar" data-focus="comecar" ${pronto ? '' : html`disabled aria-describedby="arena-start-dica"`}>${icon('swords')}Começar a luta</button>
+      ${pronto ? '' : html`<p class="arena-start__hint" id="arena-start-dica">${motivo}</p>`}`;
+  }
+
+  function desenharMontagem() {
+    const sit = situacao();
     const doCatalogo = state.ignorados - state.ignoradosPersonagens;
     const avisosDoLink = [
       doCatalogo === 1 && 'Um combatente do link não existe mais no catálogo e ficou de fora.',
@@ -265,11 +285,222 @@ export async function renderArena({ root, router, query, store }) {
           </div>
         </div>
         ${dicaDeDificuldade()}
-        <div class="arena-start">
-          <button type="button" class="btn btn--primary" data-action="comecar" data-focus="comecar" ${pronto ? '' : html`disabled aria-describedby="arena-start-dica"`}>${icon('swords')}Começar a luta</button>
-          ${pronto ? '' : html`<p class="arena-start__hint" id="arena-start-dica">${motivo}</p>`}
-        </div>
-      </section>`);
+        <div class="arena-start">${inicioHtml(sit)}</div>
+      </section>
+      ${secaoDoLote(sit)}`);
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // simulação em lote (E6)
+
+  /**
+   * A montagem que o lote simulou, sem a semente (o lote guarda as dele, que aparecem no resultado)
+   * e com o equipamento dos personagens do jogador (mudá-lo muda a luta).
+   */
+  const assinatura = () => JSON.stringify({
+    ...escreverMontagem(state),
+    semente: null,
+    equipamento: [...state.A, ...state.B].filter(x => ehPersonagem(x.ref)).map(x => {
+      const eq = porId.get(x.ref)?.equipamento;
+      return [x.ref, SLOTS_EQUIPAMENTO.map(k => (eq?.[k] ? [eq[k].id, eq[k].melhoria || 0, eq[k].material || null] : null))];
+    }),
+  });
+  const pct = x => `${(x * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  const inteiro = n => n.toLocaleString('pt-BR');
+
+  function secaoDoLote({ montado, rodando }) {
+    return html`<section class="card card--pad arena-lote" aria-labelledby="arena-lote-titulo">
+      <h2 class="arena-h2" id="arena-lote-titulo">Simulação em lote</h2>
+      <p class="arena-lote__lead">Roda a mesma luta muitas vezes, sem desenhar o registro, com sementes seguidas a partir da semente acima (uma semente de texto vira um número). Mostra quem costuma vencer.</p>
+      <div class="arena-lote__acoes">
+        ${[100, 1000].map(n => html`<button type="button" class="btn btn--outline" data-action="lote" data-vezes="${n}" data-focus="lote-${n}" ${montado && !rodando ? '' : 'disabled'} ${montado ? '' : html`aria-describedby="arena-start-dica"`}>${icon('fast-forward')}Simular ${inteiro(n)} vezes</button>`)}
+      </div>
+      <div data-slot="lote" data-chave="${chaveDoLote()}">${corpoDoLote()}</div>
+    </section>`;
+  }
+
+  function corpoDoLote() {
+    const l = state.lote;
+    if (!l) return '';
+    if (l.rodando) {
+      const { feitas: f, vezes: n } = l.lote;
+      return html`<div class="arena-lote__progresso">
+        <div class="arena-lote__trilho" role="progressbar" aria-label="Lutas simuladas" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${f}" aria-valuetext="${inteiro(f)} de ${inteiro(n)} lutas" data-slot="lote-barra"><span class="arena-lote__preenchido" style="width: ${((f / n) * 100).toFixed(1)}%"></span></div>
+        <p class="arena-lote__contagem" data-slot="lote-contagem">${inteiro(f)} de ${inteiro(n)} lutas…</p>
+        <button type="button" class="btn btn--ghost btn--sm" data-action="lote-cancelar" data-focus="lote-cancelar">${icon('x')}Cancelar a simulação</button>
+      </div>`;
+    }
+    const r = l.resultado;
+    if (!r) return html`<p class="arena-lote__nota">Cancelada antes da primeira luta.</p>`;
+    const antiga = l.assinatura !== assinatura();
+    const quedas = r.combatentes.map(c => ({ ...c, n: r.quedas[c.uid] || 0 })).sort((x, y) => y.n - x.n);
+    const fatia = (cls, v) => (v > 0 ? html`<span class="arena-lote__fatia ${cls}" style="width: ${(v * 100).toFixed(2)}%"></span>` : '');
+    const pv = ['A', 'B'].filter(x => r.pvRestante[x] != null).map(x => `lado ${x}: ${pct(r.pvRestante[x])}`).join(' · ') || '—';
+    const exemplos = [['A', 'Ver uma vitória do lado A'], ['B', 'Ver uma vitória do lado B'], ['empate', 'Ver um empate']].filter(([k]) => r.exemplos[k] != null);
+    return html`<div class="arena-lote__res">
+      <h3 class="arena-lote__h3" id="arena-lote-res" tabindex="-1">${l.cancelada ? `Parcial: ${inteiro(r.vezes)} de ${inteiro(r.pedidas)} lutas` : plural(r.vezes, 'luta', 'lutas')}</h3>
+      <p class="arena-lote__sub">${textoDasSementes(l)}</p>
+      ${antiga ? html`<p class="arena-lote__aviso">${icon('info')}<span>A montagem mudou depois desta simulação: os números são da montagem anterior.</span></p>` : ''}
+      <div class="arena-lote__barra" role="img" aria-label="Lado A vence ${pct(r.vitoriasA)}, lado B vence ${pct(r.vitoriasB)}, empates ${pct(r.empates)}">${fatia('is-a', r.vitoriasA)}${fatia('is-b', r.vitoriasB)}${fatia('is-empate', r.empates)}</div>
+      <dl class="arena-lote__nums">
+        <div class="is-a"><dt>Lado A vence</dt><dd>${pct(r.vitoriasA)}</dd></div>
+        <div class="is-b"><dt>Lado B vence</dt><dd>${pct(r.vitoriasB)}</dd></div>
+        <div><dt>Empates</dt><dd>${pct(r.empates)}</dd></div>
+        <div><dt>Rodadas, em média</dt><dd>${r.mediaRodadas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</dd></div>
+        <div class="arena-lote__largo"><dt>PV que sobram ao vencedor, em média</dt><dd>${pv}</dd></div>
+      </dl>
+      <h4 class="arena-lote__h4">Quem caiu</h4>
+      <ul class="arena-lote__quedas">${quedas.map(c => html`<li>
+        <span class="arena-tag arena-tag--${c.lado.toLowerCase()}" aria-hidden="true">${c.lado}</span>
+        <span class="arena-lote__quem"><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}</span>
+        <span class="arena-lote__qn">${pct(c.n / r.vezes)} das lutas</span>
+      </li>`)}</ul>
+      ${exemplos.length && !antiga ? html`<div class="arena-lote__ver">${exemplos.map(([k, rotulo]) => html`<button type="button" class="btn btn--ghost btn--sm" data-action="ver-semente" data-semente="${r.exemplos[k]}" data-resultado="${k}">${icon('play')}${rotulo}</button>`)}</div>` : ''}
+    </div>`;
+  }
+
+  function atualizarProgresso() {
+    const barra = root.querySelector('[data-slot="lote-barra"]');
+    if (!barra || !state.lote) return;
+    const { feitas: f, vezes: n } = state.lote.lote;
+    barra.setAttribute('aria-valuenow', String(f));
+    barra.setAttribute('aria-valuetext', `${inteiro(f)} de ${inteiro(n)} lutas`);
+    barra.firstElementChild.style.width = `${((f / n) * 100).toFixed(1)}%`;
+    root.querySelector('[data-slot="lote-contagem"]').textContent = `${inteiro(f)} de ${inteiro(n)} lutas…`;
+  }
+
+  /** Roda em fatias de ~12 ms com setTimeout (o requestIdleCallback não existe no Safari). */
+  function iniciarLote(vezes) {
+    const lado = l => state[l].flatMap(x => Array.from({ length: x.qtd }, () => fichaDe(x.ref)));
+    const lote = criarLote({ ladoA: lado('A'), ladoB: lado('B'), distancia: state.distancia, limiteRodadas: state.limite }, { vezes, semente: state.semente });
+    state.lote = { lote, rodando: true, cancelada: null, assinatura: assinatura(), semente: state.semente, resultado: null, timer: null };
+    atualizarLote();
+    root.querySelector('[data-action="lote-cancelar"]')?.focus();
+    avisar(`Simulando ${inteiro(vezes)} lutas.`);
+    const fatia = () => {
+      const l = state.lote;
+      if (!l || l.lote !== lote || !l.rodando) return;
+      const inicio = performance.now();
+      try {
+        do lote.rodar(1);
+        while (lote.feitas < vezes && performance.now() - inicio < 12);
+      } catch (err) {
+        console.error(err);
+        l.rodando = false;
+        l.cancelada = 'interrompida por um erro';
+        l.resultado = lote.feitas ? lote.resultado() : null;
+        const focoNoLote = Boolean(root.querySelector('[data-slot="lote"]')?.contains(document.activeElement));
+        atualizarLote();
+        if (focoNoLote) root.querySelector(`[data-action="lote"][data-vezes="${vezes}"]`)?.focus();
+        avisar('A simulação em lote parou por um erro.');
+        toast({ type: 'error', title: 'A simulação em lote parou', message: err.message });
+        return;
+      }
+      if (lote.feitas < vezes) {
+        atualizarProgresso();
+        l.timer = setTimeout(fatia, 0);
+        return;
+      }
+      l.rodando = false;
+      l.resultado = lote.resultado();
+      // o foco só vai para o resultado se estava no lote (no "Cancelar"): quem está digitando segue
+      const ativo = document.activeElement;
+      const focoNoLote = !ativo || ativo === document.body || Boolean(root.querySelector('[data-slot="lote"]')?.contains(ativo));
+      atualizarLote();
+      if (focoNoLote) root.querySelector('#arena-lote-res')?.focus();
+      const r = l.resultado;
+      avisar(`Simulação terminada: lado A vence ${pct(r.vitoriasA)}, lado B vence ${pct(r.vitoriasB)}, empates ${pct(r.empates)}.`);
+    };
+    state.lote.timer = setTimeout(fatia, 0);
+  }
+
+  function cancelarLote(motivo = 'cancelada') {
+    const l = state.lote;
+    if (!l?.rodando) return;
+    clearTimeout(l.timer);
+    l.rodando = false;
+    l.cancelada = motivo;
+    l.resultado = l.lote.feitas ? l.lote.resultado() : null;
+  }
+
+  /** "Sementes 580669 a 580768 · cancelada… (a partir da semente “x”; …)". */
+  function textoDasSementes(l) {
+    const r = l.resultado;
+    const faixa = r.sementes[1] >= r.sementes[0] ? `Sementes ${r.sementes[0]} a ${r.sementes[1]}` : `${inteiro(r.vezes)} sementes a partir de ${r.sementes[0]}`;
+    const nota = l.semente !== state.semente ? ` (a partir da semente “${l.semente}”; a da montagem mudou depois)` : '';
+    return `${faixa}${l.cancelada ? ` · ${l.cancelada}` : ''}${nota}.`;
+  }
+
+  /** O que a seção do lote mostra, fora o progresso e a nota da semente (que mudam no lugar). */
+  const chaveDoLote = () => {
+    const l = state.lote;
+    return l ? JSON.stringify([l.rodando, l.cancelada, Boolean(l.resultado), l.resultado?.vezes, l.assinatura !== assinatura()]) : '';
+  };
+
+  /**
+   * Atualiza a seção do lote e os botões que dependem dele. Nada que possa estar recebendo um
+   * clique é trocado sem necessidade: o `change` de um campo chega no `mousedown` do botão (no
+   * blur), e trocar o botão ali faria o clique se perder. Por isso "Começar", "Simular" e a dica
+   * mudam no lugar, e o resultado só é redesenhado quando o que ele mostra muda.
+   */
+  function atualizarLote() {
+    const slot = root.querySelector('[data-slot="lote"]');
+    if (!slot) return;
+    const chave = chaveDoLote();
+    if (slot.dataset.chave !== chave) {
+      // se o foco estava num botão do resultado que sai (um "Ver…"), ele vai para o título do resultado
+      const focoDentro = slot.contains(document.activeElement);
+      render(slot, corpoDoLote());
+      slot.dataset.chave = chave;
+      if (focoDentro) root.querySelector('#arena-lote-res')?.focus();
+    } else if (state.lote?.resultado) {
+      const sub = slot.querySelector('.arena-lote__sub');
+      if (sub) sub.textContent = textoDasSementes(state.lote);
+    }
+    const sit = situacao();
+    for (const b of root.querySelectorAll('[data-action="lote"]')) {
+      b.disabled = !sit.montado || sit.rodando;
+      if (sit.montado) b.removeAttribute('aria-describedby');
+      else b.setAttribute('aria-describedby', 'arena-start-dica');
+    }
+    const comecar = root.querySelector('[data-action="comecar"]');
+    if (comecar) {
+      comecar.disabled = !sit.pronto;
+      if (sit.pronto) comecar.removeAttribute('aria-describedby');
+      else comecar.setAttribute('aria-describedby', 'arena-start-dica');
+    }
+    let dica = root.querySelector('#arena-start-dica');
+    if (sit.pronto) dica?.remove();
+    else {
+      if (!dica) {
+        dica = document.createElement('p');
+        dica.className = 'arena-start__hint';
+        dica.id = 'arena-start-dica';
+        root.querySelector('.arena-start')?.append(dica);
+      }
+      dica.textContent = sit.motivo;
+    }
+  }
+
+  /**
+   * A montagem (ou o equipamento) mudou. Com o lote rodando, cancela e avisa (devolve true); com um
+   * resultado na tela, redesenha a seção do lote, que marca o resultado como de uma montagem
+   * anterior e tira os "Ver…" (sem tocar nos campos da montagem).
+   */
+  function conferirLote(motivo) {
+    const l = state.lote;
+    if (!l) return false;
+    if (!l.rodando) {
+      if (l.resultado) atualizarLote();
+      return false;
+    }
+    if (l.assinatura === assinatura()) return false;
+    const focoNoLote = Boolean(root.querySelector('[data-slot="lote"]')?.contains(document.activeElement));
+    cancelarLote(`cancelada: ${motivo}`);
+    atualizarLote();
+    if (focoNoLote) root.querySelector(`[data-action="lote"][data-vezes="${l.lote.vezes}"]`)?.focus();
+    avisar(`Simulação em lote cancelada: ${motivo}.`);
+    return true;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -665,6 +896,7 @@ export async function renderArena({ root, router, query, store }) {
       const nova = entradaDePersonagem(e.personagem);
       porId.set(nova.id, nova);
       personagens.splice(personagens.findIndex(x => x.id === nova.id), 1, nova);
+      conferirLote('o equipamento mudou');
       desenharMontagem();
       toast({ type: 'success', title: 'Equipamento salvo', message: `${nova.nome}: ${textoDoEquipamento(nova.equipamento)}.` });
     } catch (err) {
@@ -684,18 +916,18 @@ export async function renderArena({ root, router, query, store }) {
       const x = lista.find(y => y.ref === qtd.dataset.ref);
       if (!x) return;
       mudarQuantidade(lista, x.ref, x.qtd + Number(qtd.dataset.qtd));
-      salvarNaUrl();
+      const cancelou = salvarNaUrl();
       comFoco(desenharMontagem);
       const n = lista.find(y => y.ref === x.ref)?.qtd || 0;
-      avisar(`${porId.get(x.ref).nome}: ${n} no lado ${qtd.dataset.lado}.`);
+      avisar(`${porId.get(x.ref).nome}: ${n} no lado ${qtd.dataset.lado}.${cancelou ? ' A simulação em lote foi cancelada.' : ''}`);
       return;
     }
     const remover = t.closest('[data-remover]');
     if (remover) {
       mudarQuantidade(state[remover.dataset.lado], remover.dataset.ref, 0);
-      salvarNaUrl();
+      const cancelou = salvarNaUrl();
       comFoco(desenharMontagem);
-      avisar(`${porId.get(remover.dataset.ref).nome} saiu do lado ${remover.dataset.lado}.`);
+      avisar(`${porId.get(remover.dataset.ref).nome} saiu do lado ${remover.dataset.lado}.${cancelou ? ' A simulação em lote foi cancelada.' : ''}`);
       return;
     }
     const acao = t.closest('[data-action]')?.dataset.action;
@@ -715,12 +947,43 @@ export async function renderArena({ root, router, query, store }) {
         },
       });
     }
+    else if (acao === 'lote') {
+      confirmarCampos();
+      const vezes = Number(t.closest('[data-vezes]').dataset.vezes);
+      if (state.lote?.rodando || !state.A.length || !state.B.length) return;
+      iniciarLote(vezes);
+    } else if (acao === 'lote-cancelar') {
+      const vezes = state.lote?.lote.vezes;
+      cancelarLote();
+      atualizarLote();
+      root.querySelector(`[data-action="lote"][data-vezes="${vezes}"]`)?.focus();
+      avisar('Simulação cancelada.');
+    } else if (acao === 'ver-semente') {
+      // assiste a uma luta do lote: a semente dela vira a da montagem
+      const botao = t.closest('[data-semente]');
+      confirmarCampos();
+      if (state.lote?.assinatura !== assinatura()) {
+        atualizarLote();
+        avisar('A montagem mudou depois da simulação: esta luta não daria o mesmo resultado.');
+        root.querySelector('#arena-lote-res')?.focus();
+        return;
+      }
+      state.semente = botao.dataset.semente;
+      salvarNaUrl();
+      iniciarLuta();
+      state.fase = 'luta';
+      desenharLuta();
+      root.querySelector('[data-action="acao"]').focus();
+      const esperado = { A: 'vence o lado A', B: 'vence o lado B', empate: 'termina empatada' }[botao.dataset.resultado];
+      avisar(`Luta da semente ${state.semente}: no lote, ela ${esperado}.`);
+    }
     else if (acao === 'nova-semente') {
       state.semente = novaSemente();
       salvarNaUrl();
       root.querySelector('#arena-semente').value = state.semente;
     } else if (acao === 'comecar') {
-      if (!state.A.length || !state.B.length) return;
+      confirmarCampos();
+      if (!state.A.length || !state.B.length || state.lote?.rodando) return;
       iniciarLuta();
       state.fase = 'luta';
       desenharLuta();
@@ -738,6 +1001,21 @@ export async function renderArena({ root, router, query, store }) {
     }
   });
 
+  /**
+   * Vale o que está escrito nas opções mesmo que o campo ainda não tenha perdido o foco (o
+   * "change" só vem no blur; um clique por teclado ou por script não tira o foco do campo).
+   */
+  function confirmarCampos() {
+    const campo = id => root.querySelector(id);
+    const semente = campo('#arena-semente') && sementeValida(campo('#arena-semente').value);
+    const distancia = campo('#arena-distancia') && distanciaValida(campo('#arena-distancia').value);
+    const limite = campo('#arena-limite') && rodadasValidas(campo('#arena-limite').value);
+    const novo = { semente: semente || state.semente, distancia: distancia ?? state.distancia, limite: limite ?? state.limite };
+    if (novo.semente === state.semente && novo.distancia === state.distancia && novo.limite === state.limite) return;
+    Object.assign(state, novo);
+    salvarNaUrl();
+  }
+
   root.addEventListener('change', event => {
     const opt = event.target.dataset?.opt;
     if (!opt) return;
@@ -752,12 +1030,15 @@ export async function renderArena({ root, router, query, store }) {
   desenharMontagem();
   function cleanup() {
     saindo = true;
+    cancelarLote();
     seletor?.fechar();
     equipando?.fechar();
   }
   // o app não recarrega a Arena (evento de outra aba, "Restaurar tudo") com luta ou diálogo aberto:
   // marca a recarga (`adiar`), que acontece ao voltar à montagem ou ao fechar o diálogo
   cleanup.ocupada = () => state.fase === 'luta' || Boolean(seletor) || Boolean(equipando);
+  // o lote não segura a recarga (os dados dele ficariam velhos): ela o cancela, e o app avisa
+  cleanup.loteRodando = () => Boolean(state.lote?.rodando);
   cleanup.adiar = () => {
     state.recarregarDepois = true;
   };

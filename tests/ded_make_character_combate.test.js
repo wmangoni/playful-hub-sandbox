@@ -650,6 +650,27 @@ async function run() {
     assert.notStrictEqual(lutar('arena-7'), lutar('arena-8'));
   });
 
+  test('lote em fatias (E6): o mesmo resultado que simulate; a semente de exemplo reproduz o resultado; o parcial conta só o que rodou', () => {
+    const lutaDoLote = { ladoA: [ficha('ogro'), ficha('ogro')], ladoB: [ficha('troll')] };
+    const deUmaVez = C.simulate(lutaDoLote, { vezes: 60, semente: 'lote' });
+    const lote = C.criarLote(lutaDoLote, { vezes: 60, semente: 'lote' });
+    while (lote.feitas < 60) lote.rodar(7);
+    assert.deepStrictEqual(lote.resultado(), deUmaVez);
+    assert.strictEqual(deUmaVez.sementes[1] - deUmaVez.sementes[0], 59, 'sementes seguidas');
+    assert.ok(Object.keys(deUmaVez.exemplos).length >= 1);
+    for (const [quem, s] of Object.entries(deUmaVez.exemplos)) {
+      const fim = C.runBattle(C.createBattle({ ...lutaDoLote, semente: String(s) })); // a tela usa a semente como texto
+      assert.strictEqual(fim.vencedor || 'empate', quem, `semente ${s}`);
+    }
+    assert.deepStrictEqual(deUmaVez.combatentes.map(c => c.nome), ['Ogro 1', 'Ogro 2', 'Troll']);
+    const parcial = C.criarLote(lutaDoLote, { vezes: 60, semente: 'lote' });
+    parcial.rodar(10);
+    const r = parcial.resultado();
+    assert.deepStrictEqual([r.vezes, r.pedidas], [10, 60]);
+    assert.ok(Math.abs(r.vitoriasA + r.vitoriasB + r.empates - 1) < 1e-9);
+    assert.strictEqual(C.criarLote(lutaDoLote, { vezes: 5 }).resultado().sementes, null, 'antes de rodar, nada');
+  });
+
   test('sanidade em lote: o Tarrasque sempre vence o carniçal; lutas espelhadas ficam perto de 50%', () => {
     const t = ficha('tarrasque');
     const g = ficha('carnical');

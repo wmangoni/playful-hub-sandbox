@@ -11,7 +11,7 @@ Forja de heróis de D&D migrada do sistema legado `D-D-Make-Character` (CodeIgni
   - popup de **talentos e perícias**: "Salvar e gerar ficha" abre a ficha com `?escolher=1`, e o botão "Talentos e perícias" reabre;
   - acrescentou os 74 talentos do Livro do Jogador 3.0 (320 no total).
 - `TASKS/TASK_005.md`: integração no menu principal do hub pelo padrão do gerador de páginas SEO.
-- `TASKS/TASK_006.md` (em andamento): **simulador de combate** (Arena). Feitos o catálogo `data/catalogo-combate.json`, o motor de combate (E1 a E3), os personagens do jogador com equipamento (E4) e a tela `#/arena` (E5); faltam a simulação em lote, as magias e a ficha com o equipamento (E6 a E8).
+- `TASKS/TASK_006.md` (em andamento): **simulador de combate** (Arena). Feitos o catálogo `data/catalogo-combate.json`, o motor de combate (E1 a E3), os personagens do jogador com equipamento (E4), a tela `#/arena` (E5) e a simulação em lote (E6); faltam as magias e a ficha com o equipamento (E7 e E8).
 
 ## 🏗️ Arquitetura do Código
 
@@ -77,7 +77,7 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
   - **Tabela `fichas`** (`AUX_TABLES` em `js/entities/index.js`): as escolhas por personagem, na forma `{ personagem_id, pericias: {id da perícia: graduações}, talentos: [{talento_id, parametro}], equipamento }` (o equipamento é da Arena, TASK_006 E4). `computeSheet(..., { escolhas })` soma as graduações e os efeitos de `T30.efeitosTalentos`.
   - **Simulador de combate** (TASK_006):
     - `js/rules/dice.js`: dados com semente (mulberry32) e `scriptedRng` para testes;
-    - `js/rules/combat30.js`: o motor. `fromCatalog` gera a ficha de combate; `createBattle`, `nextTurn`, `nextRound`, `runBattle` e `simulate` rodam a luta; `rules` expõe as regras;
+    - `js/rules/combat30.js`: o motor. `fromCatalog` gera a ficha de combate; `createBattle`, `nextTurn`, `nextRound` e `runBattle` rodam a luta; `criarLote` roda a mesma luta N vezes em fatias (a tela), e `simulate` de uma vez; `rules` expõe as regras;
     - `js/rules/combat30-specials.js`: as habilidades especiais do vocabulário do catálogo, chamadas pelo núcleo por ganchos. Não importa o núcleo: recebe `K` (= `rules`);
     - as regras seguem a 3.0 e o §5 da TASK_006; as aproximações da distância abstrata estão no §8.1. Toda mudança exige ajustar `tests/ded_make_character_combate.test.js`, que fixa os dados com `scriptedRng`;
     - **Arena** (`#/arena`, §8.2 da TASK_006): `js/pages/arena.js` + `css/arena.css`. A rota vem antes de `/:module` no `app.js`, e o item do menu vem de `NAV_PAGES` (`js/entities/index.js`).
@@ -86,6 +86,7 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
       - O `app.js` recarrega a Arena no evento `external` (outra aba) e em "Restaurar tudo" só na montagem. Com luta em andamento ou diálogo aberto (`cleanup.ocupada()`), marca a recarga (`cleanup.adiar()`), que acontece ao voltar à montagem ou ao fechar o diálogo; o reload na hora apagaria a luta. Ao salvar o equipamento, a Arena relê o personagem e as fichas do store e não grava se ele mudou ou sumiu.
       - O catálogo é lido por `fetch`, uma vez por sessão.
       - A dica de dificuldade usa o nível de encontro da 3.0 (`js/rules/encontro30.js`).
+      - A simulação em lote (E6) roda `criarLote` em fatias de ~12 ms com `setTimeout` e redesenha só a seção dela (`atualizarLote`). Mudar a montagem ou o equipamento cancela o lote. O lote não segura a recarga: o evento de outra aba e "Restaurar tudo" o cancelam e recarregam (`cleanup.loteRodando()` entra no aviso).
   - **`css/sheet.css`**: 2 páginas A4 de largura fixa (794 × 1123 px), reduzidas com `zoom` em telas estreitas. `@media print` imprime só a ficha. Fontes livres no lugar das originais: Scala Sans → Alegreya Sans e Alegreya Sans SC; Celestia Antiqua → Alegreya; Pterra → Grenze e Marcellus SC.
 - **`js/core/`**:
   - `router.js`: hash router com guarda assíncrona para formulários com alterações não salvas;
