@@ -14,12 +14,15 @@
  *   dobra a margem;
  * - habilidades de classe no vocabulário do catálogo: fúria, ataque furtivo, evasão, destruir
  *   o mal, cura pelas mãos, inspirar coragem, esquiva sobrenatural;
- * - talentos que o motor lê pelo nome: Ataque Poderoso, Trespassar, Esquiva, Tiro Preciso.
+ * - talentos que o motor lê pelo nome: Ataque Poderoso, Trespassar, Esquiva, Tiro Preciso;
+ * - magias (E7): a lista curada de magias30.js, com os espaços do dia e a escolha salva em
+ *   `fichas.magias`, e a falha arcana da armadura e do escudo.
  * Funções puras, sem DOM.
  */
 import { normalize as loose } from '../core/format.js';
 import { T30 } from './tables30.js';
-import { ARMAS, armaPorId, armaduraPorId, empunhadura, mesmaArma, normalizarEquipamento, problemasDoEquipamento, proficienciasDeTalentos, proficienteArma, proficienteArmadura } from './equipamento30.js';
+import { ARMAS, armaPorId, armaduraPorId, empunhadura, mesmaArma, normalizarEquipamento, problemasDoEquipamento, proficienciasDeTalentos, proficienteArma, proficienteArmadura, proibidoAoDruida, rotuloItem } from './equipamento30.js';
+import { magiasDeCombate } from './magias30.js';
 
 const chave = nome => loose(nome).replace(/\s+/g, ' ').replace(/\s*\(.*\)\s*$/, '');
 
@@ -40,10 +43,12 @@ export function pvMedios(dadoVida, nivel, modCon) {
 /**
  * Ficha de combate do personagem. `sheet`: `computeSheet` já com as escolhas; `talentos`:
  * [{ nome, parametro }] escolhidos (nomes do compêndio); `equipamento`: o salvo em
- * `fichas.equipamento` (ou null, que vale o kit padrão da classe).
- * Devolve `{ ficha, equipamento, erros, avisos }`; com erros, `ficha` é null (não dá para lutar).
+ * `fichas.equipamento` (ou null, que vale o kit padrão da classe); `magias`: a escolha salva em
+ * `fichas.magias` (ou null, que vale a preparação padrão).
+ * Devolve `{ ficha, equipamento, erros, avisos, ctxMagias }`; com erros, `ficha` é null (não dá
+ * para lutar). `ctxMagias` é o que as magias precisam do equipamento (o diálogo de magias usa).
  */
-export function fromPersonagem({ personagem, sheet, talentos = [], equipamento = null }) {
+export function fromPersonagem({ personagem, sheet, talentos = [], equipamento = null, magias = null }) {
   const erros = [];
   const avisos = [];
   const L = sheet.nivel;
@@ -137,6 +142,9 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     const nome = `${arma.nome}${melhoria ? ` +${melhoria}` : ''}${x?.material ? ` de ${x.material}` : ''}${arremesso ? ' arremessada' : ''}${mao === 'inabil' ? ' (mão inábil)' : ''}`;
     const ataque = {
       nome,
+      // a arma e a mão (Arma Mágica encanta só a da mão principal)
+      arma_id: arma.id,
+      mao: distancia ? 'distancia' : mao,
       tipo: aDistancia ? 'distancia' : 'corpo a corpo',
       bonus,
       dano: dado(danoBase, forca + melhoria + (aDistancia ? 0 : especializacao)),
@@ -229,7 +237,19 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     pal: L >= 3 ? ['Expulsar mortos-vivos'] : [],
   }[ck] || [];
   naoSimuladas.forEach((nome, i) => esp(`nao-simulado-${i}`, nome, 'Ext', null, 'ataque'));
-  if (sheet.magias?.niveis.some(n => n.total > 0)) esp('magias-e7', 'Magias (chegam na etapa E7)', 'SM', null, 'ataque');
+
+  // ---- magias (E7): a lista curada, com os espaços do dia; o druida de metal ou com arma
+  // proibida não conjura (3.0; o aviso vem de problemasDoEquipamento)
+  const semMagia = ck === 'dru' && proibidoAoDruida(eq);
+  // o que as magias precisam saber do equipamento (Armadura Arcana, Arma Mágica, falha arcana)
+  const ctxMagias = {
+    bonusArmadura,
+    armaPrincipal: { id: principal.id, nome: rotuloItem(eq.principal) || principal.nome, desarmado: Boolean(principal.desarmado), melhoria: eq.principal?.melhoria || 0 },
+    falhaArcana: (armadura?.falhaArcana || 0) + (escudo?.falhaArcana || 0),
+  };
+  const conjuracao = semMagia ? { magias: null, especiais: [], avisos: [] } : magiasDeCombate({ sheet, escolha: magias, tendencia: personagem.tendencia, ctx: ctxMagias });
+  especiais.push(...conjuracao.especiais);
+  avisos.push(...conjuracao.avisos);
 
   // ---- defesas e o resto
   const rd = sheet.reducaoDano ? { valor: Number(sheet.reducaoDano.split('/')[0]), exceto: sheet.reducaoDano.split('/')[1] } : null;
@@ -277,7 +297,7 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     ataqueTotal,
     ataqueTotalDistancia,
     especiais,
-    magias: null,
+    magias: conjuracao.magias,
     rd,
     rm: sheet.resistenciaMagia,
     resistEnergia: {},
@@ -293,5 +313,5 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     armaduraLeve,
     esquivaSobrenatural: (ck === 'bar' && L >= 2) || (ck === 'lad' && L >= 3),
   };
-  return { ficha, equipamento: eq, erros, avisos };
+  return { ficha, equipamento: eq, erros, avisos, ctxMagias };
 }

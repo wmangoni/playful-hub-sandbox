@@ -145,7 +145,7 @@ const router = createRouter({
 });
 
 /**
- * Fichas (talentos, perícias e equipamento) sem personagem são apagadas. Isso cobre a exclusão
+ * Fichas (talentos, perícias, equipamento e magias) sem personagem são apagadas. Isso cobre a exclusão
  * e "Restaurar originais" em Personagens: a restauração volta o AUTO_INCREMENT, e um personagem
  * novo com o id antigo não pode herdar as escolhas de outro.
  */

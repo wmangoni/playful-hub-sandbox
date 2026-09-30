@@ -1,8 +1,8 @@
 # ⚔️ Tarefa 006 - D&D Make Character: Simulador de combate (Arena) + catálogo de monstros e de Holy Avenger
 
-**Status**: 💻 In Progress — E1 a E6 prontos (catálogo, motor, personagens do jogador, tela da Arena e simulação em lote); faltam E7 e E8
+**Status**: 💻 In Progress — E1 a E7 prontos (catálogo, motor, personagens do jogador, tela da Arena, simulação em lote e magias); falta a E8
 **Responsável**: Claude (TL)
-**Branch**: `feat/ded-simulador-combate` (E1 a E3, PR #50) e `feat/ded-arena` (E5, empilhado sobre ele)
+**Branch**: `feat/ded-simulador-combate` (E1 a E6, PR #50, já no main) e `feat/ded-magias` (E7)
 **Depende de**: TASK_003 (motor de regras `dnd30.js`), TASK_004 (talentos e perícias escolhidos)
 
 ---
@@ -360,7 +360,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 | **E4 Personagens** | Tabelas de armas e armaduras, kit por classe, `fichas.equipamento`, adaptador de `computeSheet`, talentos e habilidades de classe *(feito depois da E5, §8.3)* |
 | **E5 Arena** | Tela `#/arena` (montar a luta, luta passo a passo com log), rota antes das genéricas, item no menu lateral e atalho a partir da ficha e da lista *(feito antes da E4, com os combatentes do catálogo, §8.2)* |
 | **E6 Lote** | Simular N vezes sem travar, com o painel de resultados *(feito, §8.4)* |
-| **E7 Magias** | Lista curada com números do SRD 3.0, espaços por dia, IA dos conjuradores |
+| **E7 Magias** | Lista curada com números do SRD 3.0, espaços por dia, IA dos conjuradores *(feito, §8.5)* |
 | **E8 Ficha** | Blocos de arma, armadura e escudo preenchidos, e CA e ataques com o equipamento |
 
 Cada etapa segue o fluxo do hub: testes, verificação no navegador e revisão por subagente até aprovar.
@@ -562,7 +562,7 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
     - bardo: inspirar coragem com 3 graduações em Atuação;
     - druida: imune a veneno no 9º;
     - elfo e meio-elfo: imunes a sono.
-    - Expulsar mortos-vivos, forma selvagem, companheiro animal, ataque atordoante, inimigo predileto e as magias (E7) aparecem como "não simulado".
+    - Expulsar mortos-vivos, forma selvagem, companheiro animal, ataque atordoante e inimigo predileto aparecem como "não simulado". As magias chegaram na E7 (§8.5).
   - **For mudada na luta (fúria, dano de atributo):** o adaptador marca em cada ataque o peso da For no dano (`for_mult`: ×1,5, ×1, ×0,5 ou 0; `for_negativa` para arco e funda) e o atributo do ataque (`atributo_ataque`, a Des da Acuidade). O motor recalcula com a For de agora: a fúria soma +3 no dano do machado grande e +1 na mão inábil.
   - **Talentos que o motor lê pelo nome:** Ataque Poderoso, Trespassar, Trespassar Maior, Esquiva e Tiro Preciso. Iniciativa Aprimorada e as resistências já vêm da ficha.
   - **PV:** os cadastrados. Sem eles, o máximo do dado no 1º nível e a média arredondada para cima nos demais, + Con, com mínimo de 1 por nível e um aviso.
@@ -650,6 +650,94 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
     - mudar a semente mantém os "Ver…" e diz de que semente o lote partiu;
     - o limite 1 marca o resultado como antigo, e voltar a 50 o faz valer de novo;
     - com o mouse de verdade (`page.click`, que passa pelo mousedown, blur e change), editar um campo e clicar em "Ver…" ou em "Começar" funciona no primeiro clique.
+
+### 8.5 E7: as magias dos seus personagens
+
+- **Lista curada** (`js/rules/magias30.js`): as 22 magias de §5.7, cada uma com o nome em português, o nível em cada classe (3.0), a URL da página do SRD 3.0 e a mecânica calculada pelo nível de conjurador:
+  - dano:
+    - Mísseis Mágicos: 1d4+1 por míssil, 1 míssil a mais a cada 2 níveis depois do 1º (máx. 5), acerta sempre;
+    - Mãos Flamejantes: 1d4 por nível (máx. 5d4), semicírculo de 3 m;
+    - Bola de Fogo e Relâmpago: 1d6 por nível (máx. 10d6); o relâmpago é a linha de 1,5 m até o alcance médio;
+    - Cone de Frio: 1d6 por nível (máx. 15d6), cone até o alcance curto;
+    - Coluna de Chamas: 1d6 por nível (máx. 15d6), metade fogo e metade divino;
+    - Tempestade Glacial: 3d6 de impacto + 2d6 de frio, sem teste;
+    - Flecha Ácida, Esfera Flamejante e Produzir Chamas (que continuam, veja o motor);
+  - cura: Curar Ferimentos Leves, Moderados, Graves e Críticos, 1d8 a 4d8 + 1 por nível (máx. +5, +10, +15 e +20);
+  - reforço: Armadura Arcana, Escudo Arcano, Arma Mágica, Bênção, Força do Touro (1d4+1, rolado) e Pele de Árvore (+3, +4 no 6º e +5 no 12º);
+  - controle: Sono (2d4 DV) e Imobilizar Pessoa (humanoide Médio ou menor).
+- **Nível de conjurador:** o nível da classe; o do paladino e o do ranger é a metade (3.0). A CD é 10 + mod. do atributo + nível da magia, também quando ela sai de um espaço maior.
+- **Espaços do dia:** os de `spellcasting()`, com os adicionais do atributo. Ficam de fora as magias de nível 0 e o espaço de domínio do clérigo.
+  - Quem prepara (mago, clérigo, druida, paladino, ranger) recebe uma preparação padrão por classe e pode trocar. Uma magia menor cabe num espaço maior. O ranger do 4º ao 7º tem só espaços de 1º nível, e as magias dele na lista começam no 2º: o cartão diz que nenhuma cabe, sem o botão.
+  - Quem conhece (feiticeiro, bardo) escolhe as conhecidas pela tabela da classe e as lança com qualquer espaço do nível delas ou maior, o menor livre primeiro. O registro diz quando a magia saiu de um espaço maior.
+  - O clérigo bom ou neutro troca uma magia preparada por uma cura do mesmo nível ou menor (3.0).
+    - Só troca uma magia que preparou: na luta, cada nível tem tantos espaços quanto magias preparadas nele (também as que o simulador deixa de fora, como Arma Mágica com arma +1), e um espaço vazio não vira cura. A troca gasta um desses espaços, e a preparada que se perde é a que sobrar no fim.
+    - O clérigo maligno trocaria por infligir, que não está na lista.
+    - O neutro de divindade neutra escolhe na 3.0; o simulador considera a cura.
+  - A escolha é salva em `fichas.magias`: `{ preparadas: { "1": { "misseis-magicos": 2 } } }` ou `{ conhecidas: ["misseis-magicos", …] }`. Ao ler, sai o que não vale (id desconhecido ou de outra classe, magia maior que o espaço) e o excesso é cortado. Sem nada salvo, vale o padrão. A ordem sai sempre a da lista curada: desmarcar e marcar de novo não deixa o diálogo "sujo" nem marca o lote como antigo.
+- **Equipamento:**
+  - falha arcana: armadura + escudo, para mago, feiticeiro e bardo (na 3.0 o bardo também falha de armadura leve);
+  - Armadura Arcana: +4 de armadura, que não vale contra toque e não soma com a armadura vestida (só entra o que passa dela);
+  - Arma Mágica: só na arma da mão principal, se ela não tiver melhoria, e vence RD x/+1;
+  - druida de armadura ou escudo de metal, ou com arma fora da lista dele, não conjura (3.0: "unable to use any of her magical powers"). O aviso do equipamento, que dizia que as magias chegavam na E7, agora diz isso.
+- **Motor** (as mudanças valem também para o catálogo):
+  - espaços por nível compartilhados: `magias.espacos` e, em cada magia da lista, `espaco`;
+  - `continuo` (Flecha Ácida): 2d4 no início de cada um dos próximos turnos do alvo, sem teste, 1 rodada a mais a cada 3 níveis;
+  - `persistente` (Esfera Flamejante): a esfera queima de novo a cada turno do conjurador, pela duração, com Reflexos para anular. Vai no mesmo alvo ou, se ele caiu (ou ela não o fere), no inimigo mais perto que ela fere; sem nenhum, fica parada. A RM é testada uma vez por alvo, e quem ela barrou não é mais escolhido. Só há uma esfera de cada vez;
+  - `repete` (Produzir Chamas): enquanto dura, o conjurador arremessa de novo sem gastar a magia e sem falha arcana;
+  - `limite_dv` (Sono): 2d4 DV, os de menos DV primeiro (e, empatados, os mais perto do alvo); quem não pode ser afetado não gasta DV, e o DV que não dá para o próximo se perde;
+  - quem dorme por Sono acorda ao ser ferido;
+  - reforços:
+    - atributo com dado (Força do Touro) é rolado;
+    - a mesma magia de novo renova a duração em vez de somar;
+    - bônus do mesmo `tipo_bonus` não somam: a Bênção e o inspirar coragem são de moral, e vale o maior;
+    - `ca_armadura` (Armadura Arcana) não vale contra toque, como a `ca_natural`;
+    - `ref_area` (Escudo Arcano) dá +3 em Reflexos só contra área;
+    - o bônus de ataque que não é de uma arma (Bênção) vale também no toque das magias;
+  - IA:
+    - reforço na 1ª e na 2ª rodada se ninguém está em corpo a corpo com o conjurador. Antes, qualquer ataque que alcançasse o inimigo contava, e como todo kit de personagem tem arma à distância, ninguém se reforçava;
+    - entre os reforços, o que dá mais (CA, ataque e dano vezes os aliados, Força);
+    - na cura, a que mais cura sem sobrar e, empatadas, a do espaço menor;
+    - o que continua (esfera, chamas na mão) vale até o dobro de um golpe só (heurística);
+    - Mísseis Mágicos não valem nada contra quem tem Escudo Arcano, e a esfera só troca para um alvo que ela fere (fica parada diante do golem de ferro, que o fogo cura);
+  - catálogo (versão 3) com os campos novos:
+    - Escudo Arcano (`ref_area` e `anula`) na naga, nos dragões e nos personagens de Holy Avenger;
+    - Flecha Ácida de Vladislav e Deenar (`continuo`);
+    - Produzir Chamas de Lisandra (`repete`);
+    - Sono de Niele e Luigi (`limite_dv`).
+- **Na tela:**
+  - o cartão do conjurador (do nível em que ele tem espaços) mostra as magias escolhidas e ganha o botão "Magias";
+  - o diálogo tem um grupo por nível:
+    - quem prepara usa um contador por magia, com o "+" desligado quando os espaços acabam. As de nível menor ficam num "Magias de nível menor neste espaço" (aberto quando o nível não tem magia da lista ou já tem uma menor);
+    - quem conhece marca caixas, com o limite de cada nível;
+    - cada magia mostra os números dela neste personagem (dano, CD, área, duração), o resumo e o link para o SRD 3.0;
+    - acessibilidade: o rótulo da caixa é só o nome da magia, e os números vão como descrição; os botões do contador dizem quantas estão preparadas; só o corpo do diálogo é redesenhado, e uma região `aria-live` no rodapé, que fica, anuncia a contagem nova;
+  - a prévia "Na luta" mostra o nível de conjurador, a CD, os espaços, a troca por curas e os avisos (falha arcana, Arma Mágica de fora, druida de metal);
+  - "Preparação padrão" (ou "Escolha padrão") volta ao padrão;
+  - salvar grava em `fichas.magias`. Como no equipamento, a Arena relê o personagem antes, e mudar as magias cancela o lote ou marca o resultado como antigo.
+- **Simplificações:**
+  - Mísseis Mágicos vão todos no mesmo alvo;
+  - Escudo Arcano protege de todas as direções;
+  - dirigir a esfera não gasta a ação de movimento;
+  - Produzir Chamas é só à distância, com um arremesso por rodada (sem ataques iterativos), e o primeiro sai junto com a conjuração;
+  - os reforços de toque (Armadura Arcana, Arma Mágica, Força do Touro, Pele de Árvore) vão só no próprio conjurador;
+  - a cura não fere mortos-vivos (a IA só cura aliados);
+  - o cilindro da Coluna de Chamas e da Tempestade Glacial é um raio, e as áreas não pegam aliados (§5.6).
+- **Validação:**
+  - `tests/ded_make_character_magias.test.js` (18 testes):
+    - o nível de cada classe igual à linha "Level:" do SRD 3.0, transcrita no teste, e a URL de cada magia;
+    - as fórmulas por nível de conjurador, com os limites;
+    - os espaços (Int baixo, domínio, paladino e ranger);
+    - a preparação padrão, as conhecidas e a normalização da escolha salva;
+    - no adaptador: a CD num espaço maior (também a que o motor usa no teste), a troca por curas (bom, neutro, maligno; só onde há magia preparada, e nada preparado não cura), a ordem fixa da escolha, o ranger 5 sem magia da lista, a falha arcana, a Arma Mágica com arma +1, a Armadura Arcana com couro, o druida de metal e com espada;
+    - no motor: os espaços compartilhados, a troca por cura, Força do Touro, moral, renovar, Armadura Arcana contra toque, Escudo Arcano (e a IA não gastar Mísseis Mágicos contra ele), Arma Mágica na mão certa e contra RD, Flecha Ácida, Esfera Flamejante (parada diante do golem, e sem ficar presa em quem a RM barrou), Produzir Chamas, Sono, falha arcana;
+    - a IA: reforço antes, área em vários e cura no aliado ferido;
+    - no lote, o mago 5 com as magias vence os ogros bem mais vezes do que sem elas;
+  - `tests/ded_make_character_personagem.test.js`: o bardo agora tem as magias no motor, sem o "não simulado";
+  - E2E, passo novo (40 verificações ao todo):
+    - o mago: a preparação padrão no cartão, os espaços de Int 17, o "+" desligado sem espaço, as trocas com o mouse de verdade (inclusive uma magia menor no espaço maior), a gravação em `fichas`, o lote marcado como antigo, e a luta com o Escudo Arcano na 1ª rodada e a Bola de Fogo, sem o Relâmpago tirado;
+    - a feiticeira: o limite das conhecidas, o rótulo só com o nome, o anúncio, desmarcar e marcar de novo sem perguntar ao sair, e mudar e sair com "Continuar editando" e "Descartar" (que não grava);
+  - sem erros nem texto quebrado no registro: 2.800 lutas de conjuradores (7 classes × níveis 1 a 20 × 10 inimigos) e 2.312 lutas do catálogo.
+- **Fica para a E8:** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
 
 ## 🧪 9. Testes planejados
 

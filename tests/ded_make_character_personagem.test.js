@@ -225,7 +225,8 @@ async function run() {
     assert.ok(semAtuacao.avisos.some(a => /Atuação/.test(a)));
     const comAtuacao = montar({ classe: 'bardo', nivel: 5, ranks: { atuacao: 3 } }).ficha;
     assert.strictEqual(comAtuacao.especiais.find(e => e.id === 'musica-de-bardo').mecanica.usos, '5/dia');
-    assert.ok(comAtuacao.especiais.some(e => e.id === 'magias-e7' && e.mecanica === null), 'as magias aparecem como não simuladas até a E7');
+    // E7: as magias do bardo vêm da lista curada (ded_make_character_magias.test.js), sem o "não simulado"
+    assert.ok(comAtuacao.magias?.lista.length > 0 && !comAtuacao.especiais.some(e => /magias/.test(e.id)), 'as magias entram no motor');
   });
 
   test('PV: os cadastrados; sem eles, o máximo do dado no 1º nível e a média para cima depois, + Con, com aviso; sem classe, não luta', () => {
