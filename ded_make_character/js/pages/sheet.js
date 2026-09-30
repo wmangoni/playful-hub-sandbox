@@ -7,9 +7,15 @@
  * perícias com checkbox de "outra classe" e, na página 2, equipamento,
  * habilidades especiais/talentos, carga, idiomas e magias. Não reproduz o
  * logotipo oficial (marca registrada): o cabeçalho é textual.
+ *
+ * O equipamento (TASK_006 E8) vem de `fichas.equipamento` (o escolhido na Arena) ou do kit padrão
+ * da classe: preenche os blocos de arma, armadura e escudo, e entra na CA, no deslocamento, no
+ * ataque e nas perícias com penalidade de armadura, com as mesmas contas da Arena
+ * (`fromPersonagem().naFicha`).
  */
 import { html, render } from '../core/dom.js';
 import { computeSheet, signed, skillKey } from '../rules/dnd30.js';
+import { fromPersonagem } from '../rules/personagem30.js';
 import { buildContext, grantedFeats, validateFeats, validateSkills } from '../rules/choices30.js';
 import { T30 } from '../rules/tables30.js';
 import { SEXOS, TENDENCIAS, labelOf } from '../entities/options.js';
@@ -36,6 +42,8 @@ const field = (label, value, span = 1) => html`<span class="sf-field" style="--s
 /** Valores longos (ex.: RD "20/+1") usam corpo menor para caber na caixinha. */
 const compact = value => (String(value ?? '').length > 3 ? 'is-compact' : '');
 const bar = (title, cls = '') => html`<h3 class="sf-bar ${cls}" data-fit>${title}</h3>`;
+const kg = n => (n == null ? '' : `${String(n).replace('.', ',')} kg`);
+const metros = n => (n == null ? '' : `${String(n).replace('.', ',')} m`);
 
 /* ------------------------------------------------------------ página 1 */
 function identity(sheet, p) {
@@ -72,7 +80,8 @@ function abilities(sheet) {
   </section>`;
 }
 
-function hpRow(sheet) {
+function hpRow(sheet, eqf) {
+  const deslocamento = eqf ? eqf.deslocamento : sheet.deslocamento;
   return html`<div class="sf-row sf-row--hp">
     ${plate('PV', 'pontos de vida')}
     ${cell(sheet.pv.total, 'total', { labelTop: true, cls: 'is-total' })}
@@ -80,12 +89,12 @@ function hpRow(sheet) {
     ${cell('', 'dano por contusão', { labelTop: true, cls: 'is-wide' })}
     ${cell(sheet.reducaoDano, 'redução de dano', { labelTop: true, cls: compact(sheet.reducaoDano) })}
     ${cell(sheet.pv.dadoVida, 'tipo de dado de vida', { labelTop: true })}
-    <span class="sf-speed"><b>Deslocamento</b><span class="sf-cell__box">${sheet.deslocamento ? `${String(sheet.deslocamento).replace('.', ',')} m` : ''}</span></span>
+    <span class="sf-speed"><b>Deslocamento</b><span class="sf-cell__box">${deslocamento ? metros(deslocamento) : ''}</span></span>
   </div>`;
 }
 
-function acRow(sheet) {
-  const { ca } = sheet;
+function acRow(sheet, eqf) {
+  const ca = eqf?.ca || sheet.ca;
   return html`<div class="sf-row sf-row--ac">
     ${plate('CA', 'classe de armadura')}
     ${cell(ca.total, 'total', { cls: 'is-total' })}${eq('= 10 +')}
@@ -96,7 +105,7 @@ function acRow(sheet) {
     ${cell(ca.natural || '', 'armadura natural')}${eq('+')}
     ${cell(ca.diversos ? sg(ca.diversos) : '', 'mod. diversos')}
     <span class="sf-row__gap"></span>
-    ${cell('', 'chance de falha', { cls: 'is-extra' })}${cell('', 'falha de magia arcana', { cls: 'is-extra' })}${cell('', 'penal. de armadura', { cls: 'is-extra' })}
+    ${cell('', 'chance de falha', { cls: 'is-extra' })}${cell(eqf?.falhaArcana ? `${eqf.falhaArcana}%` : '', 'falha de magia arcana', { cls: 'is-extra' })}${cell(eqf?.penalidadeArmadura ? sg(eqf.penalidadeArmadura) : '', 'penal. de armadura', { cls: 'is-extra' })}
     ${cell(sheet.resistenciaMagia, 'resist. à magia', { cls: 'is-extra' })}
   </div>`;
 }
@@ -140,28 +149,58 @@ function saves(sheet) {
 
 function attackRow(title, a, abilityLabel, labelsTop) {
   const labels = ['total', 'bônus base de ataque', abilityLabel, 'mod. de tamanho', 'mod. diversos', 'mod. temporário'];
-  const values = [sg(a.total), sg(a.bba), sg(a.mod), a.tamanho ? sg(a.tamanho) : '', '', ''];
+  const values = [sg(a.total), sg(a.bba), sg(a.mod), a.tamanho ? sg(a.tamanho) : '', a.diversos ? sg(a.diversos) : '', ''];
   return html`<div class="sf-row sf-row--attack ${labelsTop ? 'is-top' : ''}">
     ${plate(title, 'bônus de ataque', 'is-wider')}
     ${values.map((val, i) => html`${i === 1 ? eq('=') : i > 1 ? eq('+') : ''}${cell(val, labels[i], { labelTop: labelsTop, cls: i < 2 ? 'is-total' : '', temp: i === 5 })}`)}
   </div>`;
 }
 
-const strip = cols => html`<span class="sf-strip">${cols.map(([label, w]) => html`<span style="--w:${w}" data-fit>${label}</span>`)}</span>`;
-const writeCells = cols => html`<span class="sf-cells">${cols.map(([, w]) => html`<span style="--w:${w}"></span>`)}</span>`;
+const strip = (cols, { oculta = false } = {}) => html`<span class="sf-strip" ${oculta ? html`aria-hidden="true"` : ''}>${cols.map(([label, w]) => html`<span style="--w:${w}" data-fit>${label}</span>`)}</span>`;
+/**
+ * Células de escrever; com `valores`, preenchidas. Cada valor leva o rótulo da faixa, escondido
+ * (o leitor de tela lê "dano: 1d8+4"). A última, "propriedades especiais", quebra em até 3 linhas.
+ */
+const writeCells = (cols, valores = null, { prop = false } = {}) => html`<span class="sf-cells">${cols.map(([label, w], i) => {
+  const valor = valores?.[i];
+  if (valor == null || valor === '') return html`<span style="--w:${w}"></span>`;
+  const rotulo = html`<span class="visually-hidden">${label}: </span>`;
+  if (prop && i === cols.length - 1) return html`<span style="--w:${w}" class="sf-val is-prop"><span class="sf-val__txt" data-fit-lines>${rotulo}${valor}</span></span>`;
+  return html`<span style="--w:${w}" class="sf-val" data-fit>${rotulo}${valor}</span>`;
+})}</span>`;
 
-function gearBlock(tab, top, bottom, wideTab = false) {
-  return html`<div class="sf-gearblock">
-    <div class="sf-gearblock__top"><span class="sf-tab ${wideTab ? 'is-wide' : ''}">${tab}</span>${strip(top)}</div>
-    <div class="sf-gearblock__write"><span class="sf-gearblock__name ${wideTab ? 'is-wide' : ''}"></span>${writeCells(top)}</div>
-    ${strip(bottom)}
-    ${writeCells(bottom)}
+/**
+ * Bloco de arma, armadura ou escudo; `dados` = { nome, cima: [...], baixo: [...] } para preenchê-lo.
+ * Preenchido, as faixas de rótulos saem do leitor de tela (cada valor já leva o seu).
+ */
+function gearBlock(tab, top, bottom, wideTab = false, dados = null) {
+  const faixa = cols => strip(cols, { oculta: Boolean(dados) });
+  return html`<div class="sf-gearblock ${dados ? 'is-filled' : ''}">
+    <div class="sf-gearblock__top"><span class="sf-tab ${wideTab ? 'is-wide' : ''}">${tab}</span>${faixa(top)}</div>
+    <div class="sf-gearblock__write"><span class="sf-gearblock__name ${wideTab ? 'is-wide' : ''}" ${dados ? 'data-fit' : ''}>${dados?.nome || ''}</span>${writeCells(top, dados?.cima)}</div>
+    ${faixa(bottom)}
+    ${writeCells(bottom, dados?.baixo, { prop: true })}
   </div>`;
 }
 
-const weapon = () => gearBlock('Arma', [['bônus de ataque total', 5], ['dano', 3], ['decisivo', 3]], [['alcance', 2], ['peso', 2], ['tipo', 3], ['tamanho', 2], ['propriedades especiais', 8]]);
-const armor = () => gearBlock('Armadura / item de proteção', [['tipo', 3], ['bônus de armadura', 3], ['bônus máx. de des', 3]], [['penalidade', 3], ['falha de magia', 3], ['deslocamento', 3], ['peso', 2], ['propriedades especiais', 6]], true);
-const shield = () => gearBlock('Escudo / item de proteção', [['bônus de armadura', 4], ['peso', 2], ['penalidade', 3], ['falha de magia', 3]], [['propriedades especiais', 1]], true);
+const props = lista => (lista?.length ? lista.join('; ') : '');
+/** "1d6-1" → "1d6−1" (o sinal de menos da ficha). */
+const menos = t => (t == null ? '' : String(t).replace(/-(?=\d)/g, '−'));
+const weapon = b => gearBlock('Arma', [['bônus de ataque total', 5], ['dano', 3], ['decisivo', 3]], [['alcance', 2], ['peso', 2], ['tipo', 3], ['tamanho', 2], ['propriedades especiais', 8]], false, b && {
+  nome: b.nome,
+  cima: [b.ataque, menos(b.dano), b.decisivo],
+  baixo: [b.alcance, kg(b.peso), b.tipo, b.tamanho, props(b.propriedades)],
+});
+const armor = b => gearBlock('Armadura / item de proteção', [['tipo', 3], ['bônus de armadura', 3], ['bônus máx. de des', 3]], [['penalidade', 3], ['falha de magia', 3], ['deslocamento', 3], ['peso', 2], ['propriedades especiais', 6]], true, b && {
+  nome: b.nome,
+  cima: [b.tipo, sg(b.bonus), b.desMax == null ? '—' : sg(b.desMax)],
+  baixo: [b.penalidade ? sg(b.penalidade) : '0', `${b.falhaArcana}%`, metros(b.deslocamento), kg(b.peso), props(b.propriedades)],
+});
+const shield = b => gearBlock('Escudo / item de proteção', [['bônus de armadura', 4], ['peso', 2], ['penalidade', 3], ['falha de magia', 3]], [['propriedades especiais', 1]], true, b && {
+  nome: b.nome,
+  cima: [sg(b.bonus), kg(b.peso), b.penalidade ? sg(b.penalidade) : '0', `${b.falhaArcana}%`],
+  baixo: [props(b.propriedades)],
+});
 
 /** Munição como na ficha oficial: nome à esquerda e duas fileiras de 10 marcas à direita (4 × 20). */
 function ammunition() {
@@ -173,14 +212,21 @@ const checkLabel = classe => (classe == null ? 'perícia (classe não definida)'
 
 const halfRank = n => String(n).replace('.5', '½').replace(/^0½$/, '½');
 
-function skills(sheet) {
+function skills(sheet, eqf) {
   const { graduacaoMaxima: ranks, pontosPericia: pts } = sheet;
+  const acp = eqf?.penalidadeArmadura || 0;
+  // sem proficiência, a penalidade vale também "em todas as perícias que envolvem movimento,
+  // inclusive Cavalgar" (SRD 3.0); as outras dessas já são as marcadas com *
+  const acpCavalgar = eqf?.penalidadeNoAtaque || 0;
   const spent = sheet.pericias.reduce((sum, p) => sum + (p.graduacoes || 0) * (p.classe === false ? 2 : 1), 0);
   const half = String(ranks.cruzada).replace('.5', '½');
   const blanks = Math.max(1, 50 - sheet.pericias.length);
-  const row = p => {
-    const key = skillKey(p.nome);
+  const row = pericia => {
+    const key = skillKey(pericia.nome);
     const armorMark = key === 'natacao' ? '**' : ARMOR_PENALTY.has(key) ? '*' : '';
+    // com armadura ou escudo, a penalidade entra nos diversos das perícias marcadas com * (3.0)
+    const extra = ARMOR_PENALTY.has(key) ? acp : key === 'cavalgar' ? acpCavalgar : 0;
+    const p = extra ? { ...pericia, diversos: (pericia.diversos ?? 0) + extra, total: pericia.total == null ? null : pericia.total + extra } : pericia;
     return html`<li class="sf-skill">
       <span class="sf-check ${p.classe === false ? 'is-cross' : ''}" role="img" aria-label="${checkLabel(p.classe)}"></span>
       <span class="sf-skill__name"><span class="sf-skill__label" data-fit>${p.nome}${p.semTreinamento ? html`<span class="sf-untrained" title="pode ser usada sem graduações">■</span>` : ''}</span>${SPECIALTY.has(key) ? html`<span class="sf-skill__spec" aria-hidden="true">(<i></i>)</span>` : ''}</span>
@@ -199,27 +245,33 @@ function skills(sheet) {
       <span class="sf-skills__name-head">nome da perícia</span><span>habil. chave</span><span>mod. da perícia</span><span></span><span>mod. de habil.</span><span></span><span>gradu&shy;ações</span><span></span><span>mod. diversos</span>
     </div>
     <ol class="sf-skills__list">${sheet.pericias.map(row)}${range(blanks).map(blank)}</ol>
-    <p class="sf-skills__note">${pts ? html`<b>${pts.total} pontos de perícia</b> até o ${sheet.nivel}º nível (${pts.first} no 1º e ${pts.perLevel} por nível seguinte)${spent ? `, ${halfRank(spent)} distribuídos` : ''}. ` : ''}Perícias marcadas com ■ podem ser usadas normalmente mesmo com zero (0) graduações. Perícias marcadas com ☒ são de outra classe. *<i>Penalidade de armadura</i>, se houver, se aplica. **−1 a cada 2,5 kg de equipamento.</p>
+    <p class="sf-skills__note">${pts ? html`<b>${pts.total} pontos de perícia</b> até o ${sheet.nivel}º nível (${pts.first} no 1º e ${pts.perLevel} por nível seguinte)${spent ? `, ${halfRank(spent)} distribuídos` : ''}. ` : ''}Perícias marcadas com ■ podem ser usadas normalmente mesmo com zero (0) graduações. Perícias marcadas com ☒ são de outra classe. ${acp ? html`*A <i>penalidade de armadura</i> (${sg(acp)}) já está somada${acpCavalgar ? `; sem proficiência, também em Cavalgar (${sg(acpCavalgar)})` : ''}.` : html`*<i>Penalidade de armadura</i>, se houver, se aplica.`} **−1 a cada 2,5 kg de equipamento.</p>
   </section>`;
 }
 
-function pageOne(sheet, p, revisar = 0) {
+/** Linha de ataque com os diversos do equipamento (penalidade de armadura sem proficiência, 3.0). */
+function comDiversos(a, mod, eqf) {
+  const diversos = eqf?.penalidadeNoAtaque || 0;
+  return { ...a, mod, diversos, total: a.total == null ? null : a.total + diversos };
+}
+
+function pageOne(sheet, p, revisar = 0, eqf = null) {
   return html`<article class="sf-page sf-page--one" aria-labelledby="sf-page-1">
     <h2 class="visually-hidden" id="sf-page-1">Ficha de personagem, página 1: atributos, combate e perícias</h2>
     ${identity(sheet, p)}
     <div class="sf-p1">
       <div class="sf-p1__abilities">${abilities(sheet)}</div>
-      <div class="sf-p1__hp">${hpRow(sheet)}</div>
-      <div class="sf-p1__ac">${acRow(sheet)}</div>
+      <div class="sf-p1__hp">${hpRow(sheet, eqf)}</div>
+      <div class="sf-p1__ac">${acRow(sheet, eqf)}</div>
       <div class="sf-p1__initbab">${initBab(sheet)}</div>
-      <div class="sf-p1__skills">${skills(sheet)}</div>
+      <div class="sf-p1__skills">${skills(sheet, eqf)}</div>
       <div class="sf-p1__left">
         ${saves(sheet)}
         <section class="sf-attacks" aria-label="Bônus de ataque">
-          ${attackRow('Corpo a corpo', { ...sheet.corpoACorpo, mod: sheet.corpoACorpo.forca }, 'mod. de força', true)}
-          ${attackRow('À distância', { ...sheet.distancia, mod: sheet.distancia.destreza }, 'mod. de destreza', false)}
+          ${attackRow('Corpo a corpo', comDiversos(sheet.corpoACorpo, sheet.corpoACorpo.forca, eqf), 'mod. de força', true)}
+          ${attackRow('À distância', comDiversos(sheet.distancia, sheet.distancia.destreza, eqf), 'mod. de destreza', false)}
         </section>
-        <section class="sf-weapons" aria-label="Armas e proteção">${range(3).map(weapon)}${armor()}${shield()}</section>
+        <section class="sf-weapons" aria-label="Armas e proteção">${range(3).map(i => weapon(eqf?.armas[i]))}${armor(eqf?.armadura)}${shield(eqf?.escudo)}</section>
         ${ammunition()}
       </div>
     </div>
@@ -370,6 +422,12 @@ function fitTexts(scope) {
     const ratio = Math.max(0.72, (el.clientWidth / el.scrollWidth) * 0.98);
     el.style.fontSize = `${(base * ratio).toFixed(2)}px`;
   }
+  // Propriedades dos blocos de equipamento: até 3 linhas; se ainda passar, a letra encolhe (até 72%)
+  for (const el of scope.querySelectorAll('[data-fit-lines]')) {
+    el.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    for (let f = base; el.scrollHeight > el.clientHeight + 0.5 && f > base * 0.72; f -= 0.25) el.style.fontSize = `${f.toFixed(2)}px`;
+  }
   // Rede de segurança: se as habilidades especiais (ou a coluna delas) não couberem, a pauta
   // encolhe até 13px; abaixo disso, a letra também diminui (pauta até 11px).
   for (const box of scope.querySelectorAll('.sf-ruled')) {
@@ -431,6 +489,7 @@ export async function renderSheet({ root, store, id, query = new URLSearchParams
   // Cópia local de Talentos anterior à TASK_004: não tem os 74 talentos do Livro do Jogador 3.0.
   const ldjMissing = async () => !talentos.some(f => /Livro do Jogador 3\.0/.test(f.fonte || '')) && (await store.info('talentos')).outdated;
   let catalogoDesatualizado = await ldjMissing();
+  const nomesDeTalentos = choice => choice.talentos.map(t => ({ nome: byId.get(String(t.talento_id))?.nome || '', parametro: t.parametro })).filter(t => t.nome);
   // Ficha calculada com as escolhas (graduações por id da perícia, talentos por id do compêndio).
   const sheetFor = choice => computeSheet(personagem, {
     race,
@@ -439,7 +498,7 @@ export async function renderSheet({ root, store, id, query = new URLSearchParams
     pericias,
     escolhas: {
       ranks: ranksToKeys(pericias, choice.pericias),
-      talentos: choice.talentos.map(t => ({ nome: byId.get(String(t.talento_id))?.nome || '', parametro: t.parametro })).filter(t => t.nome),
+      talentos: nomesDeTalentos(choice),
     },
   });
   document.title = `Ficha de ${personagem.nome} · D&D Make Character`;
@@ -467,6 +526,10 @@ export async function renderSheet({ root, store, id, query = new URLSearchParams
   function draw() {
     const sheet = sheetFor(escolhas);
     const check = checkChoices(sheet);
+    // o equipamento escolhido na Arena (ou o kit da classe), com as contas da Arena
+    const noEquip = fromPersonagem({ personagem, sheet, talentos: nomesDeTalentos(escolhas), equipamento: ficha?.equipamento ?? null });
+    const eqf = sheet.classKey || ficha?.equipamento ? noEquip.naFicha : null;
+    const errosDoEquip = eqf?.errosDoEquipamento || [];
     const feats = {
       escolhidos: check.lista,
       livres: check.livres,
@@ -484,6 +547,8 @@ export async function renderSheet({ root, store, id, query = new URLSearchParams
       problemas ? html`<strong class="sheet-toolbar__warn">As escolhas salvas não valem mais para este personagem</strong> (${problemas === 1 ? '1 problema' : `${problemas} problemas`}: ${check.erros.slice(0, 2).join(' ')}${problemas > 2 ? ' …' : ''}). Abra "Talentos e perícias" para corrigir.` : null,
       check.removidos ? `${check.removidos === 1 ? '1 escolha salva não existe' : `${check.removidos} escolhas salvas não existem`} mais no compêndio (talento ou perícia removidos) e ${check.removidos === 1 ? 'foi ignorada' : 'foram ignoradas'}.` : null,
       catalogoDesatualizado ? 'Sua cópia local de Talentos é anterior aos 74 talentos do Livro do Jogador 3.0: restaure os Talentos originais (pelo popup "Talentos e perícias") para escolhê-los.' : null,
+      eqf && !ficha?.equipamento ? html`Equipamento: o kit padrão da classe. Para trocar, use "Equipamento" na <a href="#/arena?a=p:${personagem.id}">Arena</a>.` : null,
+      errosDoEquip.length ? html`<strong class="sheet-toolbar__warn">O equipamento salvo tem um problema</strong> (${errosDoEquip.join(' ')}): os ataques das armas ficaram em branco. Corrija em "Equipamento" na <a href="#/arena?a=p:${personagem.id}">Arena</a>.` : null,
     ].filter(Boolean);
 
     render(root, html`
@@ -502,7 +567,7 @@ export async function renderSheet({ root, store, id, query = new URLSearchParams
         <ul class="sheet-toolbar__notes">${notes.map(n => html`<li>${n}</li>`)}</ul>
       </div>
       <div class="sheet ${eco ? 'is-eco' : ''}" data-sheet>
-        ${pageOne(sheet, personagem, problemas)}
+        ${pageOne(sheet, personagem, problemas, eqf)}
         ${pageTwo(sheet, feats)}
       </div>`);
     sheetEl = root.querySelector('[data-sheet]');

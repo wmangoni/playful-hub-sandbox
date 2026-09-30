@@ -16,18 +16,69 @@
  *   o mal, cura pelas mãos, inspirar coragem, esquiva sobrenatural;
  * - talentos que o motor lê pelo nome: Ataque Poderoso, Trespassar, Esquiva, Tiro Preciso;
  * - magias (E7): a lista curada de magias30.js, com os espaços do dia e a escolha salva em
- *   `fichas.magias`, e a falha arcana da armadura e do escudo.
+ *   `fichas.magias`, e a falha arcana da armadura e do escudo;
+ * - a ficha impressa (E8): `naFicha` traz a CA com o equipamento, o deslocamento, as penalidades e
+ *   os blocos de arma, armadura e escudo, com os mesmos números da luta.
  * Funções puras, sem DOM.
  */
 import { normalize as loose } from '../core/format.js';
 import { T30 } from './tables30.js';
-import { ARMAS, armaPorId, armaduraPorId, empunhadura, mesmaArma, normalizarEquipamento, problemasDoEquipamento, proficienciasDeTalentos, proficienteArma, proficienteArmadura, proibidoAoDruida, rotuloItem } from './equipamento30.js';
+import { ARMAS, armaPorId, armaduraPorId, empunhadura, mesmaArma, normalizarEquipamento, penalidadeDoItem, pesoKg, problemasDoEquipamento, proficienciasDeTalentos, proficienteArma, proficienteArmadura, proibidoAoDruida, rotuloItem } from './equipamento30.js';
 import { magiasDeCombate } from './magias30.js';
 
 const chave = nome => loose(nome).replace(/\s+/g, ' ').replace(/\s*\(.*\)\s*$/, '');
 
 /** Deslocamento com armadura média ou pesada (3.0: 9 m → 6 m; 6 m → 4,5 m). */
 const comArmadura = m => ({ 9: 6, 6: 4.5, 12: 9 })[m] ?? Math.round((m * 2) / 3 / 1.5) * 1.5;
+
+/** Soma que propaga o valor ausente (atributo ou tamanho sem cadastro), como a ficha. */
+const soma = (...xs) => (xs.some(x => x == null) ? null : xs.reduce((s, x) => s + x, 0));
+
+/**
+ * CA com o equipamento (3.0), na leitura da ficha "TOTAL = 10 + armadura + escudo + Des + tamanho +
+ * natural + diversos": armadura e escudo com a melhoria; a Des limitada pela armadura; o monge só
+ * soma a CA de monge (Sab e nível) sem armadura. O que depende de um valor ausente fica null.
+ * `tamanho`: o modificador de tamanho da CA (a luta usa 0 quando a raça não diz o tamanho).
+ */
+export function caComEquipamento(sheet, eq, { tamanho = sheet.ca.tamanho } = {}) {
+  const armadura = armaduraPorId(eq?.armadura?.id);
+  const escudo = armaduraPorId(eq?.escudo?.id);
+  const bonusArmadura = armadura ? armadura.bonus + (eq.armadura.melhoria || 0) : 0;
+  const bonusEscudo = escudo ? escudo.bonus + (eq.escudo.melhoria || 0) : 0;
+  const des = sheet.ca.destreza == null ? null : Math.min(sheet.ca.destreza, armadura ? armadura.desMax : Infinity);
+  // monge de armadura (3.0): perde a CA de monge (o texto 3.0 fala só em armadura; o escudo não tira)
+  const diversos = sheet.classKey === 'mon' && armadura ? 0 : sheet.ca.diversos;
+  const total = soma(10, bonusArmadura, bonusEscudo, des, tamanho, 0, diversos);
+  return {
+    base: 10,
+    armadura: bonusArmadura,
+    escudo: bonusEscudo,
+    destreza: des,
+    tamanho,
+    natural: 0,
+    diversos,
+    total,
+    toque: soma(10, des, tamanho, diversos),
+    surpresa: total == null || des == null ? null : total - Math.max(0, des),
+  };
+}
+
+/**
+ * Deslocamento com a armadura (3.0): a média e a pesada levam 9 m a 6 m (e 6 m a 4,5 m); o bárbaro
+ * mantém o movimento rápido (+3 m) na média; o monge de armadura perde o deslocamento de monge.
+ */
+export function deslocamentoComArmadura(sheet, eq) {
+  const armadura = armaduraPorId(eq?.armadura?.id);
+  const racial = T30.racas[sheet.raceKey]?.deslocamento ?? sheet.deslocamento ?? 9;
+  const d = sheet.deslocamento ?? racial;
+  if (sheet.classKey === 'mon' && armadura) return armadura.tipo !== 'leve' ? comArmadura(racial) : racial;
+  if (armadura && armadura.tipo !== 'leve') return comArmadura(racial) + (sheet.classKey === 'bar' && armadura.tipo === 'média' ? 3 : 0);
+  return d;
+}
+
+const sinal = n => (n < 0 ? `−${-n}` : `+${n}`);
+const decisivo = c => `${c.margem < 20 ? `${c.margem}–20` : '20'}/×${c.multiplicador}`;
+const metros = m => `${String(m).replace('.', ',')} m`;
 
 const dado = (dano, bonus) => (bonus ? `${dano}${bonus > 0 ? '+' : ''}${bonus}` : dano);
 
@@ -45,8 +96,10 @@ export function pvMedios(dadoVida, nivel, modCon) {
  * [{ nome, parametro }] escolhidos (nomes do compêndio); `equipamento`: o salvo em
  * `fichas.equipamento` (ou null, que vale o kit padrão da classe); `magias`: a escolha salva em
  * `fichas.magias` (ou null, que vale a preparação padrão).
- * Devolve `{ ficha, equipamento, erros, avisos, ctxMagias }`; com erros, `ficha` é null (não dá
- * para lutar). `ctxMagias` é o que as magias precisam do equipamento (o diálogo de magias usa).
+ * Devolve `{ ficha, equipamento, erros, avisos, ctxMagias, naFicha }`; com erros, `ficha` é null
+ * (não dá para lutar). `ctxMagias` é o que as magias precisam do equipamento (o diálogo de magias
+ * usa). `naFicha` é o equipamento na ficha impressa: CA, deslocamento, penalidades e os blocos de
+ * arma, armadura e escudo; com erros, as armas vêm sem os números de ataque.
  */
 export function fromPersonagem({ personagem, sheet, talentos = [], equipamento = null, magias = null }) {
   const erros = [];
@@ -77,31 +130,102 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
   const problemas = problemasDoEquipamento(eq, { classKey: ck, raceKey: sheet.raceKey, tamanho, extras });
   erros.push(...problemas.erros);
   avisos.push(...problemas.avisos);
-  if (erros.length) return { ficha: null, equipamento: eq, erros, avisos };
+
+  // ---- a ficha impressa (E8): a CA, o deslocamento, as penalidades e os blocos, mesmo que o
+  // personagem não possa lutar (os ataques das armas ficam em branco sem atributos ou com erro)
+  const principal = armaPorId(eq.principal?.id) || ARMAS[0];
+  const secundaria = armaPorId(eq.secundaria?.id);
+  const distancia = armaPorId(eq.distancia?.id);
+  const proficienteEm = a => proficienteArmadura(a, { classKey: ck, extras });
+  const penalidadeTotal = [[armadura, eq.armadura], [escudo, eq.escudo]].filter(([a]) => a).reduce((s, [a, x]) => s + penalidadeDoItem(a, x), 0);
+  // sem proficiência com armadura ou escudo: a penalidade de armadura vale no ataque (3.0)
+  const penalidadeArmadura = [[armadura, eq.armadura], [escudo, eq.escudo]].filter(([a]) => a && !proficienteEm(a)).reduce((s, [a, x]) => s + penalidadeDoItem(a, x), 0);
+  const falhaArcana = (armadura?.falhaArcana || 0) + (escudo?.falhaArcana || 0);
+  const naFicha = {
+    ca: caComEquipamento(sheet, eq),
+    deslocamento: sheet.deslocamento == null ? null : deslocamentoComArmadura(sheet, eq),
+    penalidadeArmadura: penalidadeTotal,
+    penalidadeNoAtaque: penalidadeArmadura,
+    falhaArcana,
+    armas: [['principal', principal], ['secundaria', secundaria], ['distancia', distancia]].map(([slot, arma]) => (arma ? blocoDeArma(slot, arma) : null)),
+    armadura: armadura ? blocoDeProtecao(armadura, eq.armadura) : null,
+    escudo: escudo ? blocoDeProtecao(escudo, eq.escudo) : null,
+    // o que impede o equipamento (arma de duas mãos com escudo…): sem isso, os ataques ficam em branco
+    errosDoEquipamento: problemas.erros,
+  };
+
+  /** O que a arma é, sem os números de quem a usa (esses vêm depois, se ele pode lutar). */
+  function blocoDeArma(slot, arma) {
+    const x = eq[slot];
+    const aDistancia = slot === 'distancia';
+    const arremesso = aDistancia && arma.uso === 'corpo a corpo';
+    const incremento = aDistancia ? (arremesso ? arma.arremesso_m : arma.incremento_m) : null;
+    const grip = empunhadura(arma, tamanho);
+    const margem = temCom('sucesso decisivo aprimorado', arma) ? 21 - 2 * (21 - arma.critico.margem) : arma.critico.margem;
+    let dano = arma.dano;
+    if (arma.desarmado && ck === 'mon') dano = (tamanho === 'Pequeno' ? T30.monge.danoDesarmadoPequeno : T30.monge.danoDesarmado)[L - 1];
+    else if (arma.desarmado && tamanho === 'Pequeno') dano = '1d2';
+    const propriedades = [];
+    if (slot === 'secundaria') propriedades.push('mão inábil');
+    // arma de uma mão sem escudo nem segunda arma vai com as duas mãos (For ×1,5), como na luta
+    const comAsDuas = !aDistancia && grip === 'uma mão' && slot === 'principal' && !escudo && !secundaria;
+    if (!aDistancia && !arma.desarmado && grip !== 'grande demais') propriedades.push(comAsDuas ? 'uma mão, com as duas (For ×1,5)' : grip === 'duas mãos' ? 'duas mãos (For ×1,5)' : grip);
+    if (!aDistancia && arma.alcance_m) propriedades.push(`haste: alcance ${metros(arma.alcance_m)}`);
+    if (arremesso) propriedades.push('arremessada');
+    if (!proficienteArma(arma, { classKey: ck, raceKey: sheet.raceKey, tamanho, extras, duasMaos: grip === 'duas mãos' || comAsDuas })) propriedades.push('sem proficiência (−4)');
+    return {
+      slot,
+      nome: arma.desarmado ? (ck === 'mon' ? 'Desarmado (monge)' : 'Desarmado') : `${rotuloItem(x) || arma.nome}${arremesso ? ' (arremesso)' : ''}`,
+      ataque: null,
+      dano,
+      decisivo: decisivo({ margem, multiplicador: arma.critico.multiplicador }),
+      // "alcance" da ficha 3.0: o incremento de distância; corpo a corpo, só a arma de haste
+      alcance: aDistancia ? metros(incremento) : arma.alcance_m ? metros(arma.alcance_m) : '—',
+      peso: pesoKg(arma, tamanho),
+      // arma de dois tipos é dos dois (SRD 3.0: "B and P"): só quem é imune aos dois ignora o dano
+      tipo: arma.tipo_dano.join(' e '),
+      tamanho: arma.tamanho || '—',
+      propriedades,
+    };
+  }
+
+  /** Armadura ou escudo: bônus (com a melhoria), Des máxima, penalidade (1 menor se mágica), falha arcana, peso. */
+  function blocoDeProtecao(base, x) {
+    const propriedades = [];
+    const penalidade = penalidadeDoItem(base, x);
+    if (!proficienteEm(base)) propriedades.push(penalidade < 0 ? `sem proficiência (${sinal(penalidade)} no ataque)` : 'sem proficiência');
+    if (x?.melhoria && base.penalidade < 0) propriedades.push('obra-prima (penalidade 1 menor)');
+    if (ck === 'dru' && base.metal) propriedades.push('metal: o druida não conjura');
+    if (ck === 'mon' && base.tipo !== 'escudo') propriedades.push('monge: perde CA e deslocamento');
+    return {
+      nome: rotuloItem(x) || base.nome,
+      tipo: base.tipo,
+      bonus: base.bonus + (x?.melhoria || 0),
+      desMax: base.desMax,
+      penalidade,
+      falhaArcana: base.falhaArcana,
+      deslocamento: base.tipo === 'escudo' || sheet.deslocamento == null ? null : deslocamentoComArmadura(sheet, eq),
+      peso: pesoKg(base, tamanho),
+      propriedades,
+    };
+  }
+
+  if (erros.length) return { ficha: null, equipamento: eq, erros, avisos, naFicha };
 
   const tamanhoAtaque = sheet.corpoACorpo.tamanho ?? 0;
-  const tamanhoCA = sheet.ca.tamanho ?? 0;
   const bba = sheet.bba.valor;
 
-  // ---- CA
+  // ---- CA (a mesma conta da ficha impressa)
   // monge de armadura (3.0): perde a CA de monge, o deslocamento e os ataques desarmados extras
   // (o texto 3.0 fala só em armadura: com escudo, que ele não sabe usar, vale só a penalidade)
   const mongeLivre = ck === 'mon' && !armadura;
   const bonusArmadura = armadura ? armadura.bonus + (eq.armadura.melhoria || 0) : 0;
-  const bonusEscudo = escudo ? escudo.bonus + (eq.escudo.melhoria || 0) : 0;
-  const des = Math.min(mods.des, armadura ? armadura.desMax : Infinity);
-  const monge = mongeLivre ? sheet.ca.diversos || 0 : 0;
-  const caTotal = 10 + bonusArmadura + bonusEscudo + des + tamanhoCA + monge;
-  const ca = { total: caTotal, toque: 10 + des + tamanhoCA + monge, surpresa: caTotal - Math.max(0, des) };
-
-  // sem proficiência com armadura ou escudo: a penalidade de armadura vale no ataque (3.0)
-  const penalidadeArmadura = [armadura, escudo].filter(a => a && !proficienteArmadura(a, { classKey: ck, extras })).reduce((s, a) => s + a.penalidade, 0);
+  const { total: caTotal, toque: caToque, surpresa: caSurpresa } = caComEquipamento(sheet, eq, { tamanho: sheet.ca.tamanho ?? 0 });
+  const ca = { total: caTotal, toque: caToque, surpresa: caSurpresa };
 
   // ---- ataques
   const monk = ck === 'mon';
   const rajada = mongeLivre;
-  const principal = armaPorId(eq.principal?.id) || ARMAS[0];
-  const secundaria = armaPorId(eq.secundaria?.id);
   // a arma de monge (kama, nunchaku, siangham) só usa a coluna própria se for leve para ele (3.0)
   const desarmadoDeMonge = arma => monk && (arma.desarmado || (arma.monge && empunhadura(arma, tamanho) === 'leve'));
 
@@ -115,7 +239,7 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     // (portador Médio ou maior); a penalidade do escudo vale no ataque
     const cabeAcuidade = grip === 'leve' || (arma.id === 'rapieira' && grip === 'uma mão') || (arma.id === 'corrente-com-cravos' && tamanho !== 'Pequeno');
     const acuidade = !aDistancia && temCom('acuidade com arma', arma) && cabeAcuidade && mods.des > mods.for;
-    const penalidadeEscudo = acuidade && escudo ? escudo.penalidade : 0;
+    const penalidadeEscudo = acuidade && escudo ? penalidadeDoItem(escudo, eq.escudo) : 0;
     const melhoria = x?.melhoria || 0;
     const foco = temCom('foco em arma', arma) ? 1 : 0;
     const semProficiencia = proficienteArma(arma, { classKey: ck, raceKey: sheet.raceKey, tamanho, extras, duasMaos }) ? 0 : -4;
@@ -190,7 +314,7 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
   ataques.push(golpe(eq.principal, principal, { bonusIterativo: iterativos[0] }));
 
   let ataqueTotalDistancia = null;
-  const distancia = armaPorId(eq.distancia?.id);
+  let sequenciaDistancia = null;
   if (distancia) {
     const x = eq.distancia;
     const unico = golpe(x, distancia, { distancia: true });
@@ -200,6 +324,7 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     // na 3.0 (a recarga dela é da 3.5)
     const recarrega = /^besta/.test(distancia.id) || (!distancia.projetil && !tem('saque rapido'));
     const seq = recarrega ? [bba] : sheet.bba.ataques;
+    sequenciaDistancia = { recarrega, bonus: seq.map(it => golpe(x, distancia, { distancia: true, bonusIterativo: it }).bonus) };
     const rapido = tem('tiro rapido') && !recarrega ? -2 : 0;
     ataqueTotalDistancia = [
       ...(rapido ? [golpe(x, distancia, { distancia: true, bonusIterativo: sheet.bba.ataques[0], penalidade: rapido })] : []),
@@ -207,6 +332,30 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     ];
   }
   if (principal.desarmado && !monk) avisos.push('desarmado: o soco (1d3) deveria causar dano por contusão, mas o simulador o trata como dano normal');
+
+  // ---- os números das armas na ficha impressa: ataque total (sem duas armas nem rajada, que vão
+  // nas propriedades), dano e decisivo com quem a usa
+  const serie = lista => lista.map(sinal).join('/');
+  const [bP, bS, bD] = naFicha.armas;
+  const unicoP = ataques[0];
+  Object.assign(bP, { ataque: serie(iterativos.map(it => golpe(eq.principal, principal, { bonusIterativo: it }).bonus)), dano: unicoP.dano, decisivo: decisivo(unicoP.critico) });
+  if (unicoP.atributo_ataque === 'des') bP.propriedades.push('Acuidade com Arma');
+  if (temCom('foco em arma', principal)) bP.propriedades.push('Foco em Arma');
+  if (temCom('especializacao em arma', principal)) bP.propriedades.push('Especialização em Arma');
+  if (rajada && desarmadoDeMonge(principal)) bP.propriedades.push(`rajada de golpes: ${serie(ataqueTotal.map(a => a.bonus))}`);
+  if (monk && principal.desarmado && unicoP.magico) bP.propriedades.push(`golpe ki (${unicoP.magico})`);
+  if (bS) {
+    const inabeis = ataqueTotal.filter(a => a.mao === 'inabil');
+    Object.assign(bS, { ataque: serie(inabeis.map(a => a.bonus)), dano: inabeis[0].dano, decisivo: decisivo(inabeis[0].critico) });
+    bP.propriedades.push(`com duas armas: ${serie(ataqueTotal.filter(a => a.mao === 'principal').map(a => a.bonus))}`);
+  }
+  if (bD) {
+    const unicoD = ataques.find(a => a.mao === 'distancia');
+    Object.assign(bD, { ataque: serie(sequenciaDistancia.bonus), dano: unicoD.dano, decisivo: decisivo(unicoD.critico) });
+    if (sequenciaDistancia.recarrega) bD.propriedades.push(/^besta/.test(distancia.id) ? 'recarga: um disparo por rodada' : 'sem Saque Rápido: um por rodada');
+    if (ataqueTotalDistancia.length > sequenciaDistancia.bonus.length) bD.propriedades.push(`Tiro Rápido: ${serie(ataqueTotalDistancia.map(a => a.bonus))}`);
+    if (unicoD.ate_9m) bD.propriedades.push(`até 9 m: ${[unicoD.ate_9m.ataque ? `+${unicoD.ate_9m.ataque} ataque` : null, `+${unicoD.ate_9m.dano} dano`].filter(Boolean).join(', ')}`);
+  }
   if (distancia && /^besta-pesada/.test(distancia.id)) avisos.push('besta pesada: na 3.0 recarregar leva uma rodada inteira; o simulador dispara toda rodada');
 
   // ---- habilidades de classe (vocabulário do catálogo)
@@ -245,7 +394,7 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
   const ctxMagias = {
     bonusArmadura,
     armaPrincipal: { id: principal.id, nome: rotuloItem(eq.principal) || principal.nome, desarmado: Boolean(principal.desarmado), melhoria: eq.principal?.melhoria || 0 },
-    falhaArcana: (armadura?.falhaArcana || 0) + (escudo?.falhaArcana || 0),
+    falhaArcana,
   };
   const conjuracao = semMagia ? { magias: null, especiais: [], avisos: [] } : magiasDeCombate({ sheet, escolha: magias, tendencia: personagem.tendencia, ctx: ctxMagias });
   especiais.push(...conjuracao.especiais);
@@ -258,16 +407,13 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
   if ((ck === 'dru' && L >= 9) || (ck === 'mon' && L >= 11)) imunidades.push('veneno');
   if (ck === 'pal' && L >= 2) imunidades.push('medo'); // aura de coragem: imune a medo (3.0)
 
-  const racial = T30.racas[sheet.raceKey]?.deslocamento ?? sheet.deslocamento ?? 9;
-  let deslocamento = sheet.deslocamento ?? racial;
-  if (monk && armadura) deslocamento = armadura.tipo !== 'leve' ? comArmadura(racial) : racial;
-  else if (armadura && armadura.tipo !== 'leve') deslocamento = comArmadura(racial) + (ck === 'bar' && armadura.tipo === 'média' ? 3 : 0);
+  const deslocamento = deslocamentoComArmadura(sheet, eq);
 
   const pvCadastrado = Number(personagem.pvs);
   let pvMax = Number.isFinite(pvCadastrado) && pvCadastrado > 0 ? pvCadastrado : null;
   if (pvMax == null) {
     pvMax = pvMedios(Number(String(sheet.pv.dadoVida || '').replace('d', '')) || null, L, mods.con);
-    if (pvMax == null) return { ficha: null, equipamento: eq, erros: ['sem PV cadastrados e sem dado de vida para calcular'], avisos };
+    if (pvMax == null) return { ficha: null, equipamento: eq, erros: ['sem PV cadastrados e sem dado de vida para calcular'], avisos, naFicha };
     avisos.push(`PV não cadastrados: a luta usa ${pvMax}, a média por nível`);
   }
   const grapple = { 'Pequeno': -4, 'Médio': 0, 'Grande': 4 }[tamanho] ?? 0;
@@ -313,5 +459,5 @@ export function fromPersonagem({ personagem, sheet, talentos = [], equipamento =
     armaduraLeve,
     esquivaSobrenatural: (ck === 'bar' && L >= 2) || (ck === 'lad' && L >= 3),
   };
-  return { ficha, equipamento: eq, erros, avisos, ctxMagias };
+  return { ficha, equipamento: eq, erros, avisos, ctxMagias, naFicha };
 }

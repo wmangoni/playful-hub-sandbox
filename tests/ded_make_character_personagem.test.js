@@ -287,6 +287,72 @@ async function run() {
     assert.strictEqual(C.simulate({ ladoA: [novato], ladoB: [tarrasque] }, { vezes: 200, semente: 2 }).vitoriasB, 1);
   });
 
+  test('ficha impressa (E8): CA com armadura e escudo, penalidades, falha arcana, deslocamento e os blocos, com os números da luta', () => {
+    const r = montar({
+      classe: 'guerreiro', nivel: 5, talentos: [T('FOCO EM ARMA', 'espada longa')],
+      equipamento: { principal: item('espada-longa', 1), secundaria: null, escudo: item('escudo-grande-aco'), armadura: item('cota-de-malha', 1), distancia: item('arco-longo') },
+    });
+    const f = r.naFicha;
+    // TOTAL = 10 + armadura 5+1 + escudo 2 + Des 2 (máx. 2 na cota); a CA da luta é a mesma
+    assert.deepStrictEqual([f.ca.armadura, f.ca.escudo, f.ca.destreza, f.ca.total, f.ca.toque, f.ca.surpresa], [6, 2, 2, 20, 12, 18]);
+    assert.deepStrictEqual(r.ficha.ca, { total: 20, toque: 12, surpresa: 18 });
+    // a cota +1 é obra-prima (−5 + 1); com o escudo grande (−2): −6; falha arcana 30% + 15%
+    assert.deepStrictEqual([f.penalidadeArmadura, f.penalidadeNoAtaque, f.falhaArcana, f.deslocamento], [-6, 0, 45, 6]);
+    const [principal, segunda, distancia] = f.armas;
+    assert.deepStrictEqual(principal, { slot: 'principal', nome: 'Espada longa +1', ataque: '+10', dano: '1d8+4', decisivo: '19–20/×2', alcance: '—', peso: 2, tipo: 'cortante', tamanho: 'Médio', propriedades: ['uma mão', 'Foco em Arma'] });
+    assert.strictEqual(segunda, null);
+    assert.deepStrictEqual([distancia.nome, distancia.ataque, distancia.dano, distancia.decisivo, distancia.alcance, distancia.peso, distancia.tamanho], ['Arco longo', '+7', '1d8', '20/×3', '30 m', 1.5, 'Grande']);
+    assert.deepStrictEqual(f.armadura, { nome: 'Cota de malha +1', tipo: 'média', bonus: 6, desMax: 2, penalidade: -4, falhaArcana: 30, deslocamento: 6, peso: 20, propriedades: ['obra-prima (penalidade 1 menor)'] });
+    assert.deepStrictEqual([f.escudo.bonus, f.escudo.penalidade, f.escudo.peso, f.escudo.falhaArcana], [2, -2, 7.5, 15]);
+    assert.deepStrictEqual(f.errosDoEquipamento, []);
+  });
+
+  test('ficha impressa (E8): pesos do SRD (armadura de Pequeno pesa a metade), obra-prima também no ataque sem proficiência, monge e duas armas', () => {
+    // 1 libra ≈ 0,5 kg; a arma tem tamanho próprio e pesa o mesmo para o halfling
+    assert.deepStrictEqual([E.pesoKg(E.armaduraPorId('couro')), E.pesoKg(E.armaduraPorId('couro'), 'Pequeno'), E.pesoKg(E.armaPorId('espada-curta'), 'Pequeno'), E.pesoKg(E.armaPorId('desarmado'))], [7.5, 3.75, 1.5, null]);
+    assert.ok(E.ARMAS.every(a => a.desarmado || Number.isFinite(a.peso_lb)) && E.ARMADURAS.every(a => Number.isFinite(a.peso_lb)), 'toda arma e armadura tem peso');
+    // o mago sem proficiência: a penalidade da armadura vale no ataque, e a cota +1 é 1 menor
+    const comum = montar({ classe: 'mago', equipamento: { principal: item('adaga'), armadura: item('cota-de-malha') } });
+    const magica = montar({ classe: 'mago', equipamento: { principal: item('adaga'), armadura: item('cota-de-malha', 1) } });
+    assert.deepStrictEqual([comum.naFicha.penalidadeNoAtaque, magica.naFicha.penalidadeNoAtaque], [-5, -4]);
+    assert.strictEqual(magica.ficha.ataques[0].bonus - comum.ficha.ataques[0].bonus, 1);
+    assert.ok(comum.naFicha.armadura.propriedades.includes('sem proficiência (−5 no ataque)'));
+    assert.ok(magica.naFicha.armadura.propriedades.includes('sem proficiência (−4 no ataque)'));
+    // o monge livre: a coluna desarmada, a rajada e o golpe ki nas propriedades; de armadura, perde a CA de monge
+    const monge = montar({ classe: 'monge' }).naFicha;
+    assert.deepStrictEqual([monge.armas[0].nome, monge.armas[0].ataque, monge.armas[0].dano, monge.ca.diversos], ['Desarmado (monge)', '+10/+7/+4', '1d10+3', 4]);
+    assert.deepStrictEqual(monge.armas[0].propriedades, ['rajada de golpes: +8/+8/+5/+2', 'golpe ki (+1)']);
+    const blindado = montar({ classe: 'monge', equipamento: { principal: item('desarmado'), armadura: item('couro') } }).naFicha;
+    assert.deepStrictEqual([blindado.ca.diversos, blindado.ca.total, blindado.armas[0].ataque, blindado.deslocamento], [0, 14, '+10/+5', 9]);
+    assert.ok(blindado.armadura.propriedades.includes('monge: perde CA e deslocamento'));
+    // o material vai só no nome; arma de dois tipos é dos dois (SRD 3.0: "B and P")
+    const prata = montar({ classe: 'guerreiro', equipamento: { principal: item('espada-longa', 1, 'prata') } }).naFicha.armas[0];
+    assert.deepStrictEqual([prata.nome, prata.propriedades.some(p => /prata/.test(p))], ['Espada longa +1 de prata', false]);
+    assert.strictEqual(montar({ classe: 'guerreiro', equipamento: { principal: item('maca-estrela') } }).naFicha.armas[0].tipo, 'concussão e perfurante');
+    // o ranger de duas armas: a série normal na principal, a de duas armas nas propriedades, a inábil no bloco dela
+    const ranger = montar({ classe: 'ranger' }).naFicha;
+    assert.deepStrictEqual([ranger.armas[0].ataque, ranger.armas[1].nome, ranger.armas[1].ataque, ranger.armas[1].dano], ['+13/+8', 'Espada curta', '+11', '1d6+1']);
+    assert.ok(ranger.armas[0].propriedades.includes('com duas armas: +11/+6'));
+    assert.ok(ranger.armas[1].propriedades.includes('mão inábil'));
+    // arma de haste; arma de uma mão sem escudo vai com as duas
+    const glaive = montar({ classe: 'guerreiro', equipamento: { principal: item('glaive'), escudo: null } }).naFicha.armas[0];
+    assert.deepStrictEqual([glaive.alcance, glaive.propriedades], ['3 m', ['duas mãos (For ×1,5)', 'haste: alcance 3 m']]);
+    const espada = montar({ classe: 'guerreiro', equipamento: { principal: item('espada-longa'), escudo: null } }).naFicha.armas[0];
+    assert.deepStrictEqual([espada.dano, espada.propriedades], ['1d8+4', ['uma mão, com as duas (For ×1,5)']]);
+  });
+
+  test('ficha impressa (E8): sem atributo ou com erro no equipamento, os blocos vêm sem os ataques; sem Des, a CA fica em branco', () => {
+    const semFor = montar({ classe: 'guerreiro', for: null });
+    assert.strictEqual(semFor.ficha, null);
+    assert.deepStrictEqual([semFor.naFicha.armas[0].nome, semFor.naFicha.armas[0].ataque, semFor.naFicha.armas[0].dano, semFor.naFicha.ca.total], ['Espada longa', null, '1d8', 19]);
+    const semDes = montar({ classe: 'guerreiro', des: null }).naFicha.ca;
+    assert.deepStrictEqual([semDes.destreza, semDes.total, semDes.toque], [null, null, null]);
+    const errado = montar({ classe: 'guerreiro', equipamento: { principal: item('espada-grande'), escudo: item('escudo-grande-madeira') } });
+    assert.match(errado.naFicha.errosDoEquipamento.join(' '), /pede as duas mãos/);
+    assert.strictEqual(errado.naFicha.armas[0].ataque, null);
+    assert.strictEqual(errado.naFicha.ca.escudo, 2, 'a CA soma o escudo mesmo assim');
+  });
+
   console.log(`\n${passed} testes passaram.`);
 }
 
