@@ -38,7 +38,11 @@ export default {
   lookups: ['races', 'classes'],
   // Ficha de personagem D&D 3.0 (TASK_003): botão "Salvar e gerar ficha" e ação por linha.
   sheet: true,
-  rowLinks: [{ icon: 'scroll', label: 'Ficha', href: r => `#/personagens/${r.id}/ficha` }],
+  rowLinks: [
+    { icon: 'scroll', label: 'Ficha', href: r => `#/personagens/${r.id}/ficha` },
+    // "Levar à arena" (TASK_006, E4): abre a Arena com o personagem no lado A
+    { icon: 'arena', label: 'Arena', href: r => `#/arena?a=p:${r.id}` },
+  ],
   names: { singular: 'Personagem', plural: 'Personagens', newLabel: 'Novo Personagem', created: 'Personagem criado', updated: 'Personagem atualizado', removed: 'Personagem excluído' },
   numLinks: 5,
   texts: {

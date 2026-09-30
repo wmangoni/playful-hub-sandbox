@@ -4,6 +4,7 @@ import { icon } from './icons.js';
 const ICON_BY_TYPE = { success: 'check', error: 'alert', info: 'info' };
 const MAX_VISIBLE = 3;
 let container;
+let seq = 0; // ordem de criação: a região de alerta vem antes da polida no DOM
 let politeRegion;
 let alertRegion;
 
@@ -64,9 +65,11 @@ export function toast({ type = 'success', title, message = '', timeout } = {}) {
       <button type="button" class="icon-btn toast__close" aria-label="Fechar notificação">${icon('x')}</button>
     </div>`);
   node.querySelector('.toast__close').addEventListener('click', () => dismiss(node));
+  node.dataset.seq = String(++seq);
   (type === 'error' ? alert : polite).append(node);
 
-  const visible = [...container.querySelectorAll('.toast:not(.is-leaving)')];
+  // descarta os mais antigos (nunca o que acabou de chegar, mesmo que seja um erro)
+  const visible = [...container.querySelectorAll('.toast:not(.is-leaving)')].sort((a, b) => Number(a.dataset.seq) - Number(b.dataset.seq));
   visible.slice(0, Math.max(0, visible.length - MAX_VISIBLE)).forEach(dismiss);
 
   const ttl = timeout ?? (type === 'error' ? 7000 : 4200);
