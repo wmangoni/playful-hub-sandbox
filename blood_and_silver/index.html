@@ -1251,6 +1251,53 @@
             80% { transform: translateX(2px); }
         }
 
+        /* Botão da trilha sonora: canto de cima das telas (some durante a caçada) */
+        .music-ctl {
+            position: fixed;
+            top: 14px;
+            right: 16px;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .music-ctl.hidden {
+            display: none;
+        }
+
+        .music-name {
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            letter-spacing: 1px;
+            color: #c79aa4;
+            text-shadow: 0 1px 3px #000;
+            white-space: nowrap;
+        }
+
+        .music-ctl.muted .music-name {
+            opacity: 0.45;
+        }
+
+        .music-btn {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+            line-height: 1;
+            color: #f3e6d3;
+            background: linear-gradient(180deg, #302636, #1c1422);
+            border: 1.5px solid #7d6b8d;
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(120, 100, 150, 0.3), 0 3px 8px #000;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .music-btn:hover {
+            box-shadow: 0 0 18px rgba(160, 130, 200, 0.55), 0 4px 10px #000;
+        }
+
         /* Aviso de fase liberada: moldura verde-musgo no lugar do dourado das conquistas */
         .achievement-toast.phase-toast {
             border-color: #7fbf8a;
@@ -1842,6 +1889,11 @@
         <div class="hint" style="margin-top: 10px;">Pressione <span class="key">ENTER</span> ou <span class="key">ESC</span> para continuar</div>
     </div>
 
+    <div class="music-ctl" id="musicCtl">
+        <span class="music-name" id="musicName"></span>
+        <button class="music-btn" id="musicBtn" type="button" aria-pressed="true" title="Música (N)">🎵</button>
+    </div>
+
     <div class="tooltip" id="tooltip"></div>
     <div class="toast-container" id="toastContainer"></div>
 
@@ -1994,6 +2046,7 @@
         const PHASES = {
             1: {
                 id: 1, numeral: 'I', name: 'Dunas do Crepúsculo', theme: 'deserto', boss: 'vampire',
+                music: 'dunes', bossMusic: 'dunesBoss',   // temas de MUSIC_TRACKS
                 blurb: 'O deserto noturno onde os vampiros caçam.',
                 cast: ['v1', 'v2', 'v3'],   // quem aparece na miniatura do menu
                 spawn: [
@@ -2005,6 +2058,7 @@
             },
             2: {
                 id: 2, numeral: 'II', name: 'Floresta Amaldiçoada', theme: 'floresta', boss: 'lich',
+                music: 'forest', bossMusic: 'forestBoss',
                 blurb: 'Esqueletos, zumbis, múmias, morcegos e o Rei Lich sob as copas malditas.',
                 cast: ['skeleton', 'zombie', 'mummy', 'bat'],
                 // mais dura que a I de propósito: ≈ +25% de vida por sorteio depois dos 140 s e
@@ -2169,6 +2223,9 @@
         const goPhase = document.getElementById('goPhase');
         const phasePicker = document.getElementById('phasePicker');
         const phaseMenuBtn = document.getElementById('phaseMenuBtn');
+        const musicCtl = document.getElementById('musicCtl');
+        const musicBtn = document.getElementById('musicBtn');
+        const musicName = document.getElementById('musicName');
         const tooltip = document.getElementById('tooltip');
         const pauseScreen = document.getElementById('pauseScreen');
         const pauseLevel = document.getElementById('pauseLevel');
@@ -5532,7 +5589,9 @@
             achievementsScreen.classList.add('hidden');
             resetModalScreen.classList.add('hidden');
             omenScreen.classList.add('hidden');
+            musicCtl.classList.toggle('hidden', s === 'playing');   // o botão da música some durante a caçada
             if (s === 'menu') {
+                if (audio) audio.music.play('menu', 'now');
                 startScreen.classList.remove('hidden');
                 updateOmenTeaser();
                 renderPhasePicker();
@@ -5588,6 +5647,7 @@
             if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
             resetGame();
             setStatus('playing');
+            if (audio) audio.music.play(PHASES[currentPhase].music, 'now');
         }
 
         function endGame() {
@@ -5595,7 +5655,10 @@
             updatePhaseBest();
             checkAchievements();
             saveProgression();
-            if (audio) audio.play('gameover');
+            if (audio) {
+                audio.music.stop(1.6);   // a trilha some e fica só o lamento do game over
+                audio.play('gameover');
+            }
             setStatus('gameover');
         }
 
@@ -5719,6 +5782,21 @@
             }
         }
 
+        function toggleMusic() {
+            if (!audio) return;
+            audio.resume();
+            audio.music.setEnabled(!audio.music.enabled);
+            updateMusicCtl();
+        }
+
+        function updateMusicCtl() {
+            const on = !!audio && audio.music.enabled;
+            musicBtn.textContent = on ? '🎵' : '🔇';
+            musicBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            musicBtn.title = (on ? 'Música ligada' : 'Música desligada') + ' (N)';
+            musicCtl.classList.toggle('muted', !on);
+        }
+
         function togglePause() {
             if (game.status === 'playing') {
                 renderPauseScreen();
@@ -5780,6 +5858,7 @@
             else if (game.status === 'chest' && chestChoice) { if (k === '1' || k === '2') chooseChestBonus(parseInt(k, 10) - 1); }
             else if (game.status === 'chest' && (k === 'enter' || k === ' ')) closeChest();
             else if ((game.status === 'playing' || game.status === 'paused') && (k === 'enter' || k === 'escape')) togglePause();
+            if (k === 'n') toggleMusic();
             if (game.status === 'playing') {
                 if (k === '+' || k === '=') setMinimapZoom(minimap.zoom - 1);
                 else if (k === '-' || k === '_') setMinimapZoom(minimap.zoom + 1);
@@ -6420,6 +6499,7 @@
             levelupOptions = [];
             game.status = 'playing';
             hud.style.opacity = '1';
+            musicCtl.classList.add('hidden');
             levelupScreen.classList.add('hidden');
             updateHud();
         }
@@ -6589,7 +6669,10 @@
             e.alive = true;
             game.activeBoss = e;
             shake = 10;
-            if (audio) audio.play('boss');
+            if (audio) {
+                audio.play('boss');
+                audio.music.play(PHASES[currentPhase].bossMusic, 'bar');   // o tema do chefe entra na virada do compasso
+            }
         }
 
         function updateBoss(dt) {
@@ -6635,6 +6718,7 @@
                 progression.bossKills += 1;
                 game.bossKillsRun += 1;
                 game.activeBoss = null;
+                if (audio) audio.music.play(PHASES[currentPhase].music, 'bar');
                 shake = 20;
                 for (let i = 0; i < 10; i++) dropOrb(e.x + (Math.random() - 0.5) * 60, e.y + (Math.random() - 0.5) * 60);
                 spawnChest(e.x, e.y, Math.random() < 0.5 ? 'legendary' : 'rare');
@@ -6869,6 +6953,7 @@
             chestScreen.classList.add('hidden');
             game.status = 'playing';
             hud.style.opacity = '1';
+            musicCtl.classList.add('hidden');
             updateHud();
         }
 
@@ -11131,6 +11216,600 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // =====================================================================
+        // TRILHA SONORA — rock gótico em chiptune (no espírito de Vampire Survivors e dos
+        // Castlevania de 8 bits), composta aqui e tocada por um sequenciador procedural em Web
+        // Audio: cravo, órgão, baixo, lead de onda quadrada, xilofone de ossos, sino, coro e
+        // bateria, sintetizados nota a nota. Cada fase tem o seu tema e cada chefe, o dele; a
+        // trilha cresce com a caçada (órgão/coro, bateria cheia e dobras a partir de
+        // MUSIC_FULL_AT), fica abafada nas pausas e troca de tema na virada do compasso.
+        // Sequenciador e sintetizador rodam num AudioWorklet (thread de áudio, precisão de amostra):
+        // a thread do jogo só manda comandos — nenhum nó por nota, nenhum custo nos quadros.
+        // =====================================================================
+        const MUSIC_VOLUME = 0.28;          // volume da música: fica por baixo dos efeitos (master deles, 0,35)
+        const MUSIC_FULL_AT = 120;          // s de caçada até a trilha ficar "cheia"
+        const MUSIC_STORAGE_KEY = 'blood_and_silver_music';
+
+        // Composições. chords = um acorde por compasso ("Dm", "A7", "C#dim"…); melody = um
+        // compasso por texto: "D5/2" = ré 5 por 2 semicolcheias, "-/4" = pausa. style gera o
+        // acompanhamento (baixo, cravo/pizzicato, órgão/coro, bateria) a partir das cifras.
+        const MUSIC_TRACKS = {
+            // Tela inicial: órgão, cravo e sino, devagar (ré menor)
+            menu: {
+                name: 'A Noite Sem Fim', bpm: 92, beats: 4, style: 'menu', lead: 'bell',
+                chords: ['Dm', 'Bb', 'Gm', 'A', 'Dm', 'F', 'Gm', 'A'],
+                melody: [
+                    'A4/4 D5/4 F5/6 E5/2', 'D5/12 -/4', 'G4/4 Bb4/4 D5/6 C5/2', 'C#5/12 -/4',
+                    'F5/4 A5/4 D6/6 C6/2', 'A5/8 G5/4 F5/4', 'G5/4 F5/4 E5/4 D5/4', 'C#5/8 E5/4 A4/4'
+                ]
+            },
+            // Fase I: rock gótico em ré menor harmônica (a 2ª aumentada Bb–C# dá o ar de deserto)
+            dunes: {
+                name: 'Dança Rubra das Dunas', bpm: 152, beats: 4, style: 'rock', lead: 'lead',
+                double: { inst: 'harpsi', shift: -12, vel: 0.7 },
+                chords: [
+                    'Dm', 'Dm', 'Bb', 'A', 'Dm', 'Dm', 'Gm', 'A',
+                    'Bb', 'C', 'Dm', 'Dm', 'Gm', 'A', 'Dm', 'A7',
+                    'Gm', 'A', 'Dm', 'Bb', 'Gm', 'Eb', 'A7', 'A7'
+                ],
+                melody: [
+                    'D5/2 A4/2 D5/2 E5/2 F5/4 E5/2 D5/2', 'C#5/2 D5/2 E5/2 F5/2 A5/6 -/2',
+                    'Bb5/4 A5/2 G5/2 F5/4 D5/4', 'E5/2 F5/2 E5/2 D5/2 C#5/6 -/2',
+                    'D5/2 A4/2 D5/2 E5/2 F5/4 G5/2 A5/2', 'Bb5/2 A5/2 G5/2 F5/2 A5/8',
+                    'G5/2 F5/2 E5/2 D5/2 Bb4/4 D5/4', 'C#5/2 D5/2 E5/2 C#5/2 A4/8',
+                    'F5/4 Bb5/4 A5/4 G5/4', 'E5/4 G5/4 C6/6 Bb5/2', 'A5/6 F5/2 D5/4 F5/4', 'A5/12 -/4',
+                    'Bb5/4 A5/2 G5/2 D6/6 C6/2', 'Bb5/2 A5/2 G5/2 F5/2 E5/4 C#5/4',
+                    'D5/2 F5/2 A5/2 D6/2 C#6/2 A5/2 F5/2 E5/2', 'C#5/4 E5/4 A4/8',
+                    'G5/2 A5/2 Bb5/2 D6/2 Bb5/2 A5/2 G5/2 F5/2', 'E5/2 F5/2 G5/2 A5/2 C#6/4 A5/4',
+                    'D6/4 A5/4 F5/4 D5/4', 'F5/2 G5/2 A5/2 Bb5/2 D6/8',
+                    'D6/2 C6/2 Bb5/2 A5/2 G5/4 Bb5/4', 'G5/4 Eb5/4 Bb4/4 Eb5/4',
+                    'C#5/2 E5/2 G5/2 A5/2 Bb5/2 A5/2 G5/2 E5/2', 'C#5/4 -/4 A4/2 C#5/2 E5/2 G5/2'
+                ]
+            },
+            // Chefe da Fase I: o Vampiro Ancião (ostinato, bumbo reto e o bII de Mi bemol)
+            dunesBoss: {
+                name: 'O Ancião Desperta', bpm: 164, beats: 4, style: 'rock', boss: true, lead: 'lead',
+                double: { inst: 'organ', shift: -12, vel: 0.9 },
+                chords: [
+                    'Dm', 'Dm', 'Eb', 'Eb', 'Dm', 'Dm', 'C#dim', 'A',
+                    'Gm', 'Gm', 'Dm', 'Dm', 'Eb', 'Eb', 'A', 'A7'
+                ],
+                melody: [
+                    'D5/2 -/2 D5/2 F5/2 A5/4 D6/4', 'C#6/2 D6/2 C#6/2 A5/2 F5/4 E5/4',
+                    'Eb5/2 -/2 Eb5/2 G5/2 Bb5/4 Eb6/4', 'D6/2 Eb6/2 D6/2 Bb5/2 G5/4 F5/4',
+                    'D5/2 F5/2 A5/2 D6/2 F6/4 E6/4', 'D6/2 C#6/2 D6/2 E6/2 F6/8',
+                    'E6/2 C#6/2 G5/2 E5/2 C#5/4 E5/4', 'A5/2 G5/2 F5/2 E5/2 C#5/8',
+                    'G5/4 Bb5/4 D6/4 G6/4', 'F6/2 E6/2 D6/2 C6/2 Bb5/4 A5/4',
+                    'A5/4 D6/4 F6/4 A6/4', 'A6/2 F6/2 E6/2 D6/2 C#6/4 A5/4',
+                    'Bb5/4 Eb6/4 G6/6 F6/2', 'Eb6/2 D6/2 C6/2 Bb5/2 G5/8',
+                    'A5/2 Bb5/2 C#6/2 E6/2 G6/4 F6/4', 'E6/2 C#6/2 A5/2 E5/2 C#5/2 E5/2 A5/4'
+                ]
+            },
+            // Fase II: valsa macabra em mi menor — o xilofone faz os ossos dançarem
+            forest: {
+                name: 'Danse Macabre da Floresta', bpm: 168, beats: 3, style: 'waltz', lead: 'xylo',
+                double: { inst: 'bell', shift: 12, vel: 0.35 },
+                chords: [
+                    'Em', 'Em', 'Am', 'Am', 'B7', 'B7', 'Em', 'Em',
+                    'Em', 'Em', 'Am', 'C', 'Am', 'B7', 'Em', 'Em',
+                    'C', 'D', 'G', 'Em', 'Am', 'D', 'B7', 'B7',
+                    'Em', 'G', 'Am', 'B7', 'Em', 'C', 'B7', 'Em'
+                ],
+                melody: [
+                    'B4/2 E5/2 G5/2 B5/4 A5/2', 'G5/2 F#5/2 E5/2 F#5/2 G5/4', 'A5/2 C6/2 E6/4 D6/2 C6/2', 'B5/4 A5/4 -/4',
+                    'D#5/2 F#5/2 A5/2 B5/2 A5/2 F#5/2', 'D#5/4 B4/4 D#5/4', 'E5/2 G5/2 B5/2 E6/2 D6/2 B5/2', 'E5/8 -/4',
+                    'B5/4 E6/4 D6/2 B5/2', 'G5/4 E5/4 G5/2 B5/2', 'C6/4 A5/4 E5/4', 'G5/2 A5/2 G5/2 E5/2 C5/4',
+                    'E5/2 A5/2 C6/2 B5/2 A5/2 G5/2', 'F#5/4 D#5/4 B4/4', 'G5/2 F#5/2 E5/2 D#5/2 E5/4', 'E5/6 -/6',
+                    'E5/4 G5/4 C6/4', 'F#5/4 A5/4 D6/4', 'D6/2 C6/2 B5/2 A5/2 G5/4', 'B5/6 G5/2 E5/4',
+                    'C6/2 B5/2 A5/2 G5/2 A5/4', 'F#5/2 G5/2 A5/2 B5/2 C6/4', 'B5/2 A5/2 F#5/2 D#5/2 F#5/4', 'B5/12',
+                    'E6/2 B5/2 G5/2 E5/2 G5/2 B5/2', 'D6/2 B5/2 G5/2 D5/2 G5/2 B5/2', 'C6/2 A5/2 E5/2 C5/2 E5/2 A5/2', 'B5/2 F#5/2 D#5/2 B4/2 D#5/2 F#5/2',
+                    'G5/4 E5/2 G5/2 B5/4', 'C6/4 G5/2 E5/2 C6/4', 'B5/2 C6/2 B5/2 A5/2 F#5/2 D#5/2', 'E5/6 B4/6'
+                ]
+            },
+            // Chefe da Fase II: o Rei Lich (4/4 frenético, com o bII de Fá e o coro)
+            forestBoss: {
+                name: 'Coroação do Rei Lich', bpm: 172, beats: 4, style: 'rock', boss: true, lead: 'xylo', pad: 'choir',
+                double: { inst: 'lead', shift: -12, vel: 0.6 },
+                chords: [
+                    'Em', 'C', 'Am', 'B', 'Em', 'F', 'B', 'B',
+                    'Em', 'D', 'C', 'B', 'Am', 'F', 'B', 'B7'
+                ],
+                melody: [
+                    'E5/2 G5/2 B5/2 E6/2 D#6/2 E6/2 B5/4', 'C6/2 B5/2 A5/2 G5/2 E5/4 G5/4',
+                    'A5/2 C6/2 E6/2 A6/2 G6/2 F#6/2 E6/4', 'D#6/4 B5/4 F#5/4 D#5/4',
+                    'E6/2 D6/2 B5/2 G5/2 E5/2 G5/2 B5/4', 'F5/2 A5/2 C6/2 F6/2 E6/2 C6/2 A5/4',
+                    'B5/2 A5/2 G5/2 F#5/2 D#5/4 F#5/4', 'B5/8 A5/2 F#5/2 D#5/4',
+                    'G5/4 B5/4 E6/4 G6/4', 'F#6/2 E6/2 D6/2 C6/2 B5/4 A5/4',
+                    'G5/4 C6/4 E6/4 G6/4', 'F#6/2 E6/2 D#6/2 C#6/2 B5/8',
+                    'A5/2 C6/2 E6/2 A6/2 G6/4 E6/4', 'F6/4 C6/4 A5/4 F5/4',
+                    'B5/2 C6/2 B5/2 A5/2 G5/2 F#5/2 D#5/4', 'E5/4 B4/4 E5/2 G5/2 B5/2 D#6/2'
+                ]
+            }
+        };
+
+        const NOTE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+        function noteMidi(name) {   // "C#5" → 73
+            const m = /^([A-G])([#b]?)(\d)$/.exec(name);
+            if (!m) throw new Error('Nota inválida na trilha: ' + name);
+            return NOTE_PC[m[1]] + (m[2] === '#' ? 1 : (m[2] === 'b' ? -1 : 0)) + (Number(m[3]) + 1) * 12;
+        }
+        function parseChord(sym) {  // "C#dim" → { root: 1, iv: [0, 3, 6] }
+            const m = /^([A-G][#b]?)(m7|m|dim|7)?$/.exec(sym);
+            if (!m) throw new Error('Cifra inválida na trilha: ' + sym);
+            const q = m[2] || '';
+            return {
+                root: (noteMidi(m[1] + '0') + 12) % 12,
+                iv: q === 'm' ? [0, 3, 7] : (q === 'dim' ? [0, 3, 6] : (q === '7' ? [0, 4, 7, 10] : (q === 'm7' ? [0, 3, 7, 10] : [0, 4, 7])))
+            };
+        }
+        // i-ésima nota do acorde a partir da oitava oct (índices além do acorde sobem de oitava)
+        function chordNote(ch, oct, i) {
+            const n = ch.iv.length;
+            return ch.root + 12 * (oct + 1 + Math.floor(i / n)) + ch.iv[((i % n) + n) % n];
+        }
+
+        // Acompanhamento gerado das cifras. add(passo, instrumento, midi, duração, intensidade, só-cheio)
+        const MUSIC_STYLES = {
+            // 4/4 em semicolcheias: baixo pulando de oitava, cravo em arpejo, órgão, bateria de rock
+            rock: function (add, ch, b, tr) {
+                const last = b % 8 === 7, boss = !!tr.boss;
+                for (let s = 0; s < 16; s += boss ? 1 : 2) {
+                    const up = boss ? s % 2 === 1 : (s / 2) % 2 === 1;
+                    let n = chordNote(ch, 2, 0) + (up ? 12 : 0);
+                    if (last && s >= 12 && !up) n = chordNote(ch, 2, 2);   // quinta puxando para o próximo compasso
+                    add(s, 'bass', n, boss ? 1 : 2, s % 4 === 0 ? 1 : 0.8);
+                }
+                const ARP = [0, 2, 1, 2, 3, 2, 1, 2];
+                for (let s = 0; s < 16; s++) add(s, 'harpsi', chordNote(ch, 4, ARP[s % 8]), 1, s % 4 === 0 ? 0.9 : 0.6);
+                const pad = tr.pad || 'organ';
+                add(0, pad, chordNote(ch, 3, 0), 16, 1, !boss);
+                add(0, pad, chordNote(ch, 4, 1), 16, 1, !boss);
+                add(0, pad, chordNote(ch, 4, 2), 16, 1, !boss);
+                const dv = boss ? 1.3 : 1;                  // chefe: bateria mais pesada
+                if (b % 8 === 0) add(0, 'crash', 0, 1, dv, b > 0);
+                for (const s of boss ? [0, 4, 8, 12] : [0, 8]) add(s, 'kick', 0, 1, dv);
+                if (!boss) { add(6, 'kick', 0, 1, 0.65, true); add(10, 'kick', 0, 1, 0.75, true); }
+                add(4, 'snare', 0, 1, dv);
+                if (last) for (let s = 12; s < 16; s++) add(s, 'snare', 0, 1, (0.55 + 0.12 * (s - 12)) * dv, s !== 12);
+                else add(12, 'snare', 0, 1, dv);
+                for (let s = 0; s < 16; s++) add(s, 'hat', 0, 1, (s % 4 === 0 ? 0.8 : (s % 2 === 0 ? 0.55 : 0.35)) * dv, s % 2 === 1 && !boss);
+            },
+            // 3/4 (valsa): "tum-pá-pá" — pizzicato no 1, cravo no 2 e no 3; coro, estalo de ossos
+            waltz: function (add, ch, b) {
+                const last = b % 8 === 7;
+                add(0, 'pizz', chordNote(ch, 2, 0), 4, 1);
+                add(8, 'pizz', chordNote(ch, 2, 2), 3, 0.7, true);
+                for (const s of [4, 8]) for (let i = 0; i < 3; i++) add(s, 'harpsi', chordNote(ch, 4, i), 2, s === 4 ? 1 : 0.85);
+                add(0, 'choir', chordNote(ch, 3, 0), 12, 1, true);
+                add(0, 'choir', chordNote(ch, 4, 1), 12, 1, true);
+                add(0, 'choir', chordNote(ch, 4, 2), 12, 1, true);
+                if (b % 8 === 0) add(0, 'crash', 0, 1, 0.8, b > 0);
+                add(0, 'kick', 0, 1, 1.3);
+                add(4, 'clack', 0, 1, 1.25);
+                add(8, 'clack', 0, 1, 1.05);
+                for (const s of [2, 6, 10]) add(s, 'hat', 0, 1, 0.75);
+                for (const s of [1, 3, 5, 7, 9, 11]) add(s, 'hat', 0, 1, 0.3, true);
+                if (last) { add(6, 'tom', 47, 1, 0.8, true); add(8, 'tom', 43, 1, 0.85, true); add(10, 'tom', 40, 1, 0.9, true); }
+            },
+            // Menu: órgão sustentado, baixo longo e cravo em colcheias, sem bateria
+            menu: function (add, ch) {
+                add(0, 'bass', chordNote(ch, 2, 0), 16, 0.55);
+                add(0, 'organ', chordNote(ch, 3, 0), 16, 0.6);
+                add(0, 'organ', chordNote(ch, 4, 1), 16, 0.6);
+                add(0, 'organ', chordNote(ch, 4, 2), 16, 0.6);
+                const ARP = [0, 1, 2, 3, 2, 1, 2, 1];
+                for (let s = 0; s < 16; s += 2) add(s, 'harpsi', chordNote(ch, 4, ARP[s / 2]), 2, 0.4);
+            }
+        };
+
+        // Compassos → eventos por passo (feito uma vez; o sequenciador só lê)
+        function compileTrack(tr) {
+            const steps = tr.beats * 4;
+            return tr.chords.map(function (sym, b) {
+                const bar = [];
+                for (let s = 0; s < steps; s++) bar.push([]);
+                const add = function (s, inst, midi, dur, vel, full) { bar[s].push({ inst: inst, midi: midi, dur: dur, vel: vel, full: !!full }); };
+                let s = 0;
+                for (const tok of tr.melody[b].split(' ')) {
+                    const parts = tok.split('/'), dur = Number(parts[1]);
+                    if (parts[0] !== '-') {
+                        const midi = noteMidi(parts[0]);
+                        add(s, tr.lead, midi, dur, 1);
+                        if (tr.double) add(s, tr.double.inst, midi + tr.double.shift, dur, tr.double.vel, !tr.boss);
+                    }
+                    s += dur;
+                }
+                if (s !== steps) throw new Error('Compasso ' + (b + 1) + ' de "' + tr.name + '" tem ' + s + ' passos (esperado ' + steps + ')');
+                MUSIC_STYLES[tr.style](add, parseChord(sym), b, tr);
+                return bar;
+            });
+        }
+
+        // Roda DENTRO do AudioWorklet (serializada por musicWorkletSource; não é chamada aqui).
+        // Sequenciador + sintetizador na thread de áudio, com precisão de amostra: a thread do
+        // jogo só manda comandos (tocar, trocar na virada do compasso, parar, cheia, ligada).
+        // Saídas: 0 = mistura seca, 1 = mandada para o reverb (convolução nativa, fora daqui).
+        function musicProcessorMain() {
+            const SR = sampleRate, TAU = Math.PI * 2, TN = 2048;
+            // Tabelas de um ciclo, normalizadas no pico (como a PeriodicWave do Web Audio)
+            function table(harm) {
+                const t = new Float32Array(TN + 1);
+                let peak = 0;
+                for (let i = 0; i < TN; i++) {
+                    let v = 0;
+                    for (const h of harm) v += h[1] * Math.sin(TAU * h[0] * i / TN);
+                    t[i] = v;
+                    peak = Math.max(peak, Math.abs(v));
+                }
+                for (let i = 0; i <= TN; i++) t[i] = t[i % TN] / peak;
+                return t;
+            }
+            const SINE = table([[1, 1]]);
+            const ORGAN = table([[1, 1], [2, 0.55], [3, 0.4], [4, 0.22], [6, 0.14], [8, 0.1]]);   // registros de órgão
+            const BASS = table([[1, 1], [2, 0.5], [3, 0.3], [4, 0.14], [5, 0.08]]);
+            function look(tb, ph) { const x = ph * TN, i = x | 0; return tb[i] + (tb[i + 1] - tb[i]) * (x - i); }
+            // PolyBLEP: serra e pulso sem o serrilhado das ondas ingênuas
+            function blep(t, dt) {
+                if (t < dt) { t /= dt; return t + t - t * t - 1; }
+                if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; }
+                return 0;
+            }
+            let seed = 0x2545f491;
+            function noise() { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 2147483648 - 1; }
+            // Filtro de variáveis de estado (TPT): 0 = passa-baixa, 1 = passa-banda (0 dB no centro), 2 = passa-alta
+            function svfSet(s, type, f, q) {
+                const g = Math.tan(Math.PI * Math.min(f, SR * 0.45) / SR);
+                s.type = type; s.k = 1 / q; s.a1 = 1 / (1 + g * (g + s.k)); s.a2 = g * s.a1; s.a3 = g * s.a2;
+            }
+            function svfRun(s, x) {
+                const v3 = x - s.ic2, v1 = s.a1 * s.ic1 + s.a2 * v3, v2 = s.ic2 + s.a2 * s.ic1 + s.a3 * v3;
+                s.ic1 = 2 * v1 - s.ic1; s.ic2 = 2 * v2 - s.ic2;
+                return s.type === 0 ? v2 : (s.type === 1 ? v1 * s.k : x - s.k * v1 - v2);
+            }
+            // Envelope: ataque linear até peak, queda exponencial (constante d) até sus·peak,
+            // soltura exponencial (constante r) a partir de end s; sus = 0 → percussivo
+            function envStart(e, a, peak, d, sus, end, r) {
+                e.n = 0; e.lvl = 0; e.aN = Math.max(1, Math.round(a * SR)); e.aInc = peak / e.aN;
+                e.target = peak * sus; e.cd = Math.exp(-1 / (d * SR)); e.cr = Math.exp(-1 / (r * SR));
+                e.relAt = sus > 0 ? Math.max(e.aN, Math.round(end * SR)) : 1e12;
+            }
+            function envNext(e) {
+                if (e.n < e.aN) e.lvl += e.aInc;
+                else if (e.n < e.relAt) e.lvl = e.target + (e.lvl - e.target) * e.cd;
+                else e.lvl *= e.cr;
+                e.n++;
+                return e.lvl;
+            }
+            function envDone(e) { return e.n > e.aN && e.lvl < 2e-5 && (e.n >= e.relAt || e.target === 0); }
+            const newEnv = function () { return { n: 0, lvl: 0, aN: 1, aInc: 0, target: 0, cd: 0, cr: 0, relAt: 0 }; };
+            const newSvf = function () { return { type: 0, k: 1, a1: 0, a2: 0, a3: 0, ic1: 0, ic2: 0 }; };
+            const SEND = { lo: 0.16, hi: 0.42 };
+            const INST_SEND = { lead: 'hi', harpsi: 'lo', pizz: 'lo', organ: 'hi', choir: 'hi', xylo: 'lo', bell: 'hi', snare: 'lo', crash: 'hi', tom: 'lo' };
+            const MAX_VOICES = 128;
+
+            class Trilha extends AudioWorkletProcessor {
+                constructor(options) {
+                    super();
+                    const o = options.processorOptions;
+                    this.tracks = o.tracks;
+                    this.only = o.only;
+                    this.enabled = o.enabled !== false;
+                    this.full = !!o.full;
+                    this.cur = null;
+                    this.voices = [];
+                    for (let i = 0; i < MAX_VOICES; i++) {
+                        this.voices.push({ on: false, inst: '', slot: 0, wait: 0, age: 0, f: 0, dt: 0, dt2: 0, ph: 0, ph2: 0, lph: 0, dur: 0, vel: 0, send: 0, e: newEnv(), e2: newEnv(), fl: newSvf() });
+                    }
+                    this.slotGain = new Float32Array(4).fill(1);
+                    this.slotStep = new Float32Array(4);
+                    this.slot = 0;
+                    this.port.onmessage = (ev) => this.command(ev.data);
+                    if (o.autoplay) this.begin(o.autoplay, currentFrame + Math.round(0.02 * SR));
+                }
+                command(m) {
+                    if (m.type === 'play') this.play(m.id, m.when);
+                    else if (m.type === 'stop') { if (this.cur) { this.fade(this.slot, m.secs); this.cur = null; this.port.postMessage({ type: 'track', id: null }); } }
+                    else if (m.type === 'full') this.full = m.on;
+                    else if (m.type === 'enabled') this.enabled = m.on;
+                }
+                play(id, when) {
+                    if (!this.tracks[id]) return;
+                    if (this.cur && this.cur.id === id) { this.cur.pending = null; this.port.postMessage({ type: 'pending', id: null }); return; }
+                    if (this.cur && when === 'bar') { this.cur.pending = id; this.port.postMessage({ type: 'pending', id: id }); return; }
+                    if (this.cur) this.fade(this.slot, 0.3);
+                    this.begin(id, currentFrame + Math.round(0.03 * SR));
+                }
+                fade(slot, secs) { this.slotStep[slot] = -this.slotGain[slot] / Math.max(1, secs * SR); }
+                begin(id, frame) {
+                    this.slot = (this.slot + 1) % 4;
+                    for (const v of this.voices) if (v.on && v.slot === this.slot) v.on = false;   // cauda muito antiga no slot reusado
+                    this.slotGain[this.slot] = 1;
+                    this.slotStep[this.slot] = 0;
+                    const tr = this.tracks[id];
+                    this.cur = { id: id, tr: tr, bar: 0, step: 0, next: frame, stepN: SR * 60 / tr.bpm / 4, steps: tr.beats * 4, full: false, pending: null };
+                    this.port.postMessage({ type: 'track', id: id });
+                }
+                // Um passo do tema na posição off (amostras) do bloco atual
+                step(off) {
+                    const c = this.cur;
+                    if (c.step === 0) {
+                        if (c.pending) {                    // troca de tema na virada do compasso
+                            const id = c.pending, frame = c.next;
+                            this.fade(this.slot, 0.35);
+                            this.begin(id, frame);
+                            return;
+                        }
+                        c.full = c.tr.boss || c.tr.style === 'menu' || this.full;
+                    }
+                    if (this.enabled) {
+                        const sec = c.stepN / SR;
+                        for (const ev of c.tr.bars[c.bar][c.step]) {
+                            if ((ev.full && !c.full) || (this.only && this.only.indexOf(ev.inst) < 0)) continue;
+                            if (ev.inst === 'xylo' && ev.dur * sec > 0.36) {   // xilofone: nota longa em trêmulo
+                                const hits = Math.floor(ev.dur * sec / 0.09);
+                                for (let h = 0; h < hits; h++) this.trigger('xylo', off + Math.round(h * 0.09 * SR), ev.midi, 0.09, ev.vel * (h ? 0.55 - 0.25 * h / hits : 1));
+                            } else {
+                                this.trigger(ev.inst, off, ev.midi, ev.dur * sec, ev.vel);
+                            }
+                        }
+                    }
+                    c.next += c.stepN;
+                    if (++c.step >= c.steps) { c.step = 0; c.bar = (c.bar + 1) % c.tr.bars.length; }
+                }
+                trigger(inst, wait, midi, dur, vel) {
+                    let v = null, quiet = null;
+                    for (const x of this.voices) {
+                        if (!x.on) { v = x; break; }
+                        if (!quiet || x.e.lvl < quiet.e.lvl) quiet = x;
+                    }
+                    v = v || quiet;                          // polifonia cheia: rouba a voz mais baixa
+                    const f = 440 * Math.pow(2, (midi - 69) / 12);
+                    v.on = true; v.inst = inst; v.slot = this.slot; v.wait = wait; v.age = 0;
+                    v.f = f; v.dt = f / SR; v.ph = 0; v.ph2 = 0; v.lph = 0; v.dur = dur; v.vel = vel;
+                    v.send = SEND[INST_SEND[inst]] || 0;
+                    v.fl.ic1 = 0; v.fl.ic2 = 0;
+                    const e = v.e, e2 = v.e2;
+                    e2.n = 0; e2.lvl = 0;                     // 2º envelope só nos instrumentos que o usam
+                    switch (inst) {
+                        case 'lead': envStart(e, 0.006, 0.13 * vel, 0.08, 0.7, dur - 0.02, 0.03); break;
+                        case 'harpsi': envStart(e, 0.002, 0.075 * vel, 0.13, 0, 0, 0); break;
+                        case 'bass': envStart(e, 0.004, 0.27 * vel, 0.08, 0.55, dur - 0.015, 0.025); break;
+                        case 'pizz': envStart(e, 0.003, 0.62 * vel, 0.12, 0, 0, 0); break;
+                        case 'organ': envStart(e, 0.04, 0.028 * vel, 0.3, 0.85, dur - 0.02, 0.1); break;
+                        case 'choir':
+                            envStart(e, 0.35, 0.035 * vel, 0.5, 0.9, dur - 0.05, 0.25);
+                            v.dt2 = v.dt * Math.pow(2, 7 / 1200); v.dt *= Math.pow(2, -7 / 1200);
+                            svfSet(v.fl, 1, 1000, 0.9);
+                            break;
+                        case 'xylo': envStart(e, 0.002, 0.2 * vel, 0.08, 0, 0, 0); envStart(e2, 0.001, 0.06 * vel, 0.02, 0, 0, 0); v.dt2 = v.dt * 3.93; break;
+                        case 'bell': envStart(e, 0.003, 0.08 * vel, 0.45, 0, 0, 0); envStart(e2, 0.002, 0.03 * vel, 0.15, 0, 0, 0); v.dt2 = v.dt * 2.76; break;
+                        case 'kick': envStart(e, 0.002, 1.0 * vel, 0.08, 0, 0, 0); break;
+                        case 'snare': envStart(e, 0.001, 0.56 * vel, 0.05, 0, 0, 0); envStart(e2, 0.001, 0.28 * vel, 0.03, 0, 0, 0); svfSet(v.fl, 1, 1900, 0.8); break;
+                        case 'hat': envStart(e, 0.001, 0.12 * vel, 0.016, 0, 0, 0); svfSet(v.fl, 2, 7200, 0.7); break;
+                        case 'crash': envStart(e, 0.002, 0.16 * vel, 0.45, 0, 0, 0); svfSet(v.fl, 2, 4500, 0.7); break;
+                        case 'clack': envStart(e, 0.001, 0.62 * vel, 0.012, 0, 0, 0); envStart(e2, 0.001, 0.06 * vel, 0.01, 0, 0, 0); svfSet(v.fl, 1, 3000, 4); break;
+                        case 'tom': envStart(e, 0.002, 0.55 * vel, 0.08, 0, 0, 0); break;
+                    }
+                }
+                // Soma a voz no bloco [s0, n): dry/wet são as saídas; g = ganho do slot (tema)
+                render(v, dry, wet, s0, n) {
+                    const e = v.e, e2 = v.e2, fl = v.fl, sg = this.slotGain[v.slot], send = v.send;
+                    for (let s = s0; s < n; s++, v.age++) {
+                        let y = 0, w = 0;
+                        switch (v.inst) {
+                            case 'lead': {                    // pulso 25% com vibrato nas notas longas
+                                let dt = v.dt;
+                                if (v.dur > 0.3) {
+                                    v.lph += 5.6 / SR; if (v.lph >= 1) v.lph -= 1;
+                                    dt *= 1 + Math.min(1, v.age / (0.3 * SR)) * 0.008 * look(SINE, v.lph);
+                                }
+                                v.ph += dt; if (v.ph >= 1) v.ph -= 1;
+                                let p2 = v.ph - 0.25; if (p2 < 0) p2 += 1;
+                                y = ((v.ph < 0.25 ? 1 : -1) + blep(v.ph, dt) - blep(p2, dt) + 0.5) * 0.667 * envNext(e);
+                                w = y;
+                                break;
+                            }
+                            case 'harpsi': {                  // cravo: serra com filtro fechando rápido
+                                if ((v.age & 31) === 0) svfSet(fl, 0, 1400 * Math.pow(6000 / 1400, Math.max(0, 1 - v.age / (0.14 * SR))), 1.2);
+                                v.ph += v.dt; if (v.ph >= 1) v.ph -= 1;
+                                y = svfRun(fl, 2 * v.ph - 1 - blep(v.ph, v.dt)) * envNext(e);
+                                w = y;
+                                break;
+                            }
+                            case 'bass': case 'pizz':
+                                v.ph += v.dt; if (v.ph >= 1) v.ph -= 1;
+                                y = look(BASS, v.ph) * envNext(e);
+                                w = y;
+                                break;
+                            case 'organ':
+                                v.ph += v.dt; if (v.ph >= 1) v.ph -= 1;
+                                y = look(ORGAN, v.ph) * envNext(e);
+                                w = y;
+                                break;
+                            case 'choir': {                   // coro: duas serras desafinadas num formante
+                                v.ph += v.dt; if (v.ph >= 1) v.ph -= 1;
+                                v.ph2 += v.dt2; if (v.ph2 >= 1) v.ph2 -= 1;
+                                const x = 2 * v.ph - 1 - blep(v.ph, v.dt) + 2 * v.ph2 - 1 - blep(v.ph2, v.dt2);
+                                y = svfRun(fl, x) * envNext(e);
+                                w = y;
+                                break;
+                            }
+                            case 'xylo': case 'bell':         // parcial inarmônico (3,93× xilofone, 2,76× sino)
+                                v.ph += v.dt; if (v.ph >= 1) v.ph -= 1;
+                                v.ph2 += v.dt2; if (v.ph2 >= 1) v.ph2 -= 1;
+                                w = look(SINE, v.ph) * envNext(e);
+                                y = w + look(SINE, v.ph2) * envNext(e2);
+                                break;
+                            case 'kick': {
+                                const dt = 150 * Math.pow(44 / 150, Math.min(1, v.age / (0.12 * SR))) / SR;
+                                v.ph += dt; if (v.ph >= 1) v.ph -= 1;
+                                y = look(SINE, v.ph) * envNext(e);
+                                break;
+                            }
+                            case 'snare': {
+                                const dt = 190 * Math.pow(140 / 190, Math.min(1, v.age / (0.08 * SR))) / SR;
+                                v.ph += dt; if (v.ph >= 1) v.ph -= 1;
+                                w = svfRun(fl, noise()) * envNext(e);
+                                y = w + (1 - 4 * Math.abs(v.ph - 0.5)) * envNext(e2);
+                                break;
+                            }
+                            case 'hat': case 'crash':
+                                y = w = svfRun(fl, noise()) * envNext(e);
+                                break;
+                            case 'clack':                     // estalo de ossos
+                                v.ph += 720 / SR; if (v.ph >= 1) v.ph -= 1;
+                                y = svfRun(fl, noise()) * envNext(e) + (v.ph < 0.5 ? 1 : -1) * envNext(e2);
+                                break;
+                            case 'tom': {
+                                const dt = v.f * Math.pow(0.6, Math.min(1, v.age / (0.2 * SR))) / SR;
+                                v.ph += dt; if (v.ph >= 1) v.ph -= 1;
+                                y = w = look(SINE, v.ph) * envNext(e);
+                                break;
+                            }
+                        }
+                        dry[s] += y * sg;
+                        if (send) wet[s] += w * send * sg;
+                    }
+                    if (envDone(e) && (e2.n === 0 || envDone(e2))) v.on = false;
+                }
+                process(inputs, outputs) {
+                    const dry = outputs[0][0], wet = outputs[1][0], n = dry.length;
+                    const start = currentFrame, end = start + n;
+                    while (this.cur && this.cur.next < end) this.step(Math.max(0, Math.floor(this.cur.next - start)));
+                    for (const v of this.voices) {
+                        if (!v.on) continue;
+                        if (v.wait >= n) { v.wait -= n; continue; }
+                        const s0 = v.wait;
+                        v.wait = 0;
+                        this.render(v, dry, wet, s0, n);
+                    }
+                    for (let i = 0; i < 4; i++) {         // rampas de fade dos temas
+                        if (!this.slotStep[i]) continue;
+                        this.slotGain[i] = Math.max(0, this.slotGain[i] + this.slotStep[i] * n);
+                        if (this.slotGain[i] === 0) this.slotStep[i] = 0;
+                    }
+                    return true;
+                }
+            }
+            registerProcessor('sangue-prata-trilha', Trilha);
+        }
+
+        function musicWorkletSource() {
+            return '(' + musicProcessorMain.toString() + ')();';
+        }
+
+        // Motor da trilha sobre um AudioContext (ou OfflineAudioContext, para prévias): monta o
+        // AudioWorklet e a cadeia nativa (abafador das pausas → compressor → volume; reverb de
+        // igreja por convolução na mandada). opts.full() = trilha cheia; opts.muffle() = 0 jogando,
+        // 1 popup, 2 pausa. Sem AudioWorklet no navegador, o jogo segue sem trilha.
+        function createMusic(ctx, opts) {
+            const compiled = {};
+            Object.keys(MUSIC_TRACKS).forEach(function (id) {
+                const tr = MUSIC_TRACKS[id];
+                compiled[id] = { bpm: tr.bpm, beats: tr.beats, boss: !!tr.boss, style: tr.style, bars: compileTrack(tr) };
+            });
+            let enabled = opts.offline ? true : readMusicSetting();
+            const state = { track: null, pending: null };
+            let onTrack = null;
+            const out = ctx.createGain();
+            out.gain.value = enabled ? MUSIC_VOLUME : 0;
+            const tone = ctx.createBiquadFilter();           // abafa a trilha nas pausas
+            tone.type = 'lowpass';
+            tone.frequency.value = 18000;
+            tone.Q.value = 0.5;
+            const comp = ctx.createDynamicsCompressor();     // cola a mistura e segura os picos
+            comp.threshold.value = -16;
+            comp.knee.value = 10;
+            comp.ratio.value = 3.5;
+            comp.attack.value = 0.004;
+            comp.release.value = 0.2;
+            tone.connect(comp);
+            comp.connect(out);
+            out.connect(ctx.destination);
+            const len = Math.floor(ctx.sampleRate * 2.2), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let c = 0; c < 2; c++) {
+                const d = ir.getChannelData(c);
+                for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-5.5 * i / len);
+            }
+            const verb = ctx.createConvolver(), wet = ctx.createGain();
+            verb.buffer = ir;
+            wet.gain.value = 0.3;
+            verb.connect(wet);
+            wet.connect(tone);
+
+            let node = null;
+            const queued = [];
+            const post = function (m) { if (node) node.port.postMessage(m); else queued.push(m); };
+            const ready = !ctx.audioWorklet ? Promise.reject(new Error('sem AudioWorklet')) : (function () {
+                const url = URL.createObjectURL(new Blob([musicWorkletSource()], { type: 'application/javascript' }));
+                return ctx.audioWorklet.addModule(url).then(function () {
+                    URL.revokeObjectURL(url);
+                    node = new AudioWorkletNode(ctx, 'sangue-prata-trilha', {
+                        numberOfInputs: 0, numberOfOutputs: 2, outputChannelCount: [1, 1],
+                        processorOptions: { tracks: compiled, only: opts.only || null, enabled: enabled, full: opts.full(), autoplay: opts.autoplay || null }
+                    });
+                    node.connect(tone, 0);
+                    node.connect(verb, 1);
+                    node.port.onmessage = function (e) {
+                        const m = e.data;
+                        if (m.type === 'pending') state.pending = m.id;
+                        else if (m.type === 'track') {
+                            state.track = m.id;
+                            state.pending = null;
+                            if (onTrack) onTrack(m.id ? MUSIC_TRACKS[m.id].name : '');
+                        }
+                    };
+                    queued.forEach(post);
+                    queued.length = 0;
+                });
+            })();
+            ready.catch(function () { /* navegador sem AudioWorklet: o jogo segue sem trilha */ });
+
+            // Cheia e abafador: conferidos 4× por segundo (só avisa o worklet quando mudam)
+            let full = opts.full(), muffle = 0;
+            if (!opts.offline) {
+                setInterval(function () {
+                    const f = opts.full();
+                    if (f !== full) { full = f; post({ type: 'full', on: f }); }
+                    const m = opts.muffle();
+                    if (m !== muffle) {
+                        muffle = m;
+                        tone.frequency.setTargetAtTime(m === 2 ? 700 : (m === 1 ? 2400 : 18000), ctx.currentTime, 0.08);
+                    }
+                }, 250);
+            }
+
+            return {
+                // Toca um tema: 'now' troca já (fade curto); 'bar' espera a virada do compasso
+                play: function (id, when) { if (MUSIC_TRACKS[id]) post({ type: 'play', id: id, when: when }); },
+                stop: function (secs) { post({ type: 'stop', secs: secs || 1 }); },
+                setEnabled: function (on) {
+                    enabled = on;
+                    post({ type: 'enabled', on: on });
+                    out.gain.setTargetAtTime(on ? MUSIC_VOLUME : 0, ctx.currentTime, 0.05);
+                    try { localStorage.setItem(MUSIC_STORAGE_KEY, on ? '1' : '0'); } catch (e) {}
+                },
+                get enabled() { return enabled; },
+                get track() { return state.track; },
+                get pending() { return state.pending; },
+                set onTrack(fn) { onTrack = fn; },
+                ready: ready
+            };
+        }
+
+        function readMusicSetting() {
+            try { return localStorage.getItem(MUSIC_STORAGE_KEY) !== '0'; } catch (e) { return true; }
+        }
+
+        // Prévia de um tema renderizada fora do tempo real (testes e para ouvir fora do jogo), no
+        // mesmo AudioWorklet do jogo. only (opcional): instrumentos a tocar (mixagem por instrumento).
+        function renderMusic(id, seconds, full, only) {
+            const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            const off = new Off(2, Math.ceil(44100 * seconds), 44100);
+            const m = createMusic(off, { offline: true, autoplay: id, only: only, full: function () { return !!full; }, muffle: function () { return 0; } });
+            return m.ready.then(function () { return off.startRendering(); });
+        }
+
         function initAudio() {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) return null;
@@ -11222,7 +11901,16 @@
                 }
             }
 
-            return { ctx: ctx, resume: function () { if (ctx.state === 'suspended') ctx.resume(); }, play: play };
+            // Trilha: cheia depois de MUSIC_FULL_AT s de caçada; abafada nos popups e mais ainda na pausa
+            const music = createMusic(ctx, {
+                full: function () { return game.time >= MUSIC_FULL_AT; },
+                muffle: function () {
+                    const st = game.status;
+                    return st === 'paused' ? 2 : ((st === 'levelup' || st === 'chest' || st === 'omen') ? 1 : 0);
+                }
+            });
+
+            return { ctx: ctx, resume: function () { if (ctx.state === 'suspended') ctx.resume(); }, play: play, music: music };
         }
 
         startBtn.addEventListener('click', requestStart);
@@ -11254,6 +11942,15 @@
         pauseAchBtn.addEventListener('click', openAchievementsModal);
         resumeBtn.addEventListener('click', togglePause);
         mobilePauseBtn.addEventListener('click', togglePause);
+        musicBtn.addEventListener('click', function () { toggleMusic(); musicBtn.blur(); });
+        // 1º toque/clique em qualquer lugar libera o áudio (a trilha do menu começa)
+        window.addEventListener('pointerdown', function () { if (audio) audio.resume(); }, { passive: true });
+        // aba em segundo plano: o áudio dorme junto com o jogo (o rAF para) e volta ao retornar
+        document.addEventListener('visibilitychange', function () {
+            if (!audio) return;
+            if (document.hidden) { if (audio.ctx.state === 'running') { audio.wasRunning = true; audio.ctx.suspend(); } }
+            else if (audio.wasRunning) { audio.wasRunning = false; audio.ctx.resume(); }
+        });
         minimapZoomIn.addEventListener('click', function () { setMinimapZoom(minimap.zoom - 1); });
         minimapZoomOut.addEventListener('click', function () { setMinimapZoom(minimap.zoom + 1); });
         window.addEventListener('resize', resizeMinimap);
@@ -11273,6 +11970,8 @@
         initDamageZonePool();
         initChestPool();
         audio = initAudio();
+        if (audio) audio.music.onTrack = function (name) { musicName.textContent = name ? '♪ ' + name : ''; };
+        updateMusicCtl();
         loadBest();
         applyTheme(isPhaseUnlocked(progression.lastPhase) ? progression.lastPhase : 1);
         generateScenery();
@@ -11282,7 +11981,7 @@
         initMapPickups();
         setStatus('menu');
         fxPrewarm();
-        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, get sceneryTheme() { return THEME.id; }, get phase() { return currentPhase; }, PHASES: PHASES, PHASE_UNLOCK_TIME: PHASE_UNLOCK_TIME, setPhase: setPhase, selectPhase: selectPhase, isPhaseUnlocked: isPhaseUnlocked, monsterSheet: monsterSheet, spawnEnemy: spawnEnemy, bonePiles: bonePiles, get pendingPhase() { return pendingPhase; }, get sceneryBuilding() { return !!sceneryBuild; }, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, OMENS: OMENS, hasOmen: hasOmen, hitEnemy: hitEnemy, step: function (dt) { const st = game.status; game.status = 'playing'; update(dt); if (game.status === 'playing') game.status = st; render(); }, fx: { sparks: fxSparks, glows: fxGlows, rings: fxRings, slashes: fxSlashes, decals: fxDecals, bolts: fxBolts, ghosts: fxGhosts, standins: fxStandins, cracks: fxCracks, pillars: fxPillars, events: fxEvents, silhouette: fxSilhouette, budget: fxBudget, quality: function () { return fxQ; }, prewarmed: function () { return fxWarmReady && !fxWarmList.length && fxSilCache.size >= 3 && fxRuneCache.size >= 2; } }, damageTexts: damageTexts, damageZones: damageZones, recomputeStats: recomputeStats, fireWeapon: fireWeapon, chestPityTime: chestPityTime, getProgression: function () { return progression; }, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
+        window.__game = { player: player, game: game, enemies: enemies, projectiles: projectiles, chests: chests, pickups: pickups, xpOrbs: xpOrbs, scenery: scenery, flora: flora, chunkStats: chunkStats, chunkCache: chunkCache, PONDS: PONDS, get sceneryTheme() { return THEME.id; }, get phase() { return currentPhase; }, PHASES: PHASES, PHASE_UNLOCK_TIME: PHASE_UNLOCK_TIME, setPhase: setPhase, selectPhase: selectPhase, isPhaseUnlocked: isPhaseUnlocked, monsterSheet: monsterSheet, spawnEnemy: spawnEnemy, bonePiles: bonePiles, get pendingPhase() { return pendingPhase; }, get sceneryBuilding() { return !!sceneryBuild; }, get music() { return audio && audio.music; }, renderMusic: renderMusic, MUSIC_TRACKS: MUSIC_TRACKS, CONFIG: CONFIG, ENEMY_TYPES: ENEMY_TYPES, CHEST_TIERS: CHEST_TIERS, openChest: openChest, chooseChestBonus: chooseChestBonus, makeWeapon: makeWeapon, makePassive: makePassive, grantUpgrade: grantUpgrade, minimap: minimap, OMENS: OMENS, hasOmen: hasOmen, hitEnemy: hitEnemy, step: function (dt) { const st = game.status; game.status = 'playing'; update(dt); if (game.status === 'playing') game.status = st; render(); }, fx: { sparks: fxSparks, glows: fxGlows, rings: fxRings, slashes: fxSlashes, decals: fxDecals, bolts: fxBolts, ghosts: fxGhosts, standins: fxStandins, cracks: fxCracks, pillars: fxPillars, events: fxEvents, silhouette: fxSilhouette, budget: fxBudget, quality: function () { return fxQ; }, prewarmed: function () { return fxWarmReady && !fxWarmList.length && fxSilCache.size >= 3 && fxRuneCache.size >= 2; } }, damageTexts: damageTexts, damageZones: damageZones, recomputeStats: recomputeStats, fireWeapon: fireWeapon, chestPityTime: chestPityTime, getProgression: function () { return progression; }, WARD_LEVELS: WARD_LEVELS, WEAPONS: WEAPONS, PASSIVES: PASSIVES, spawnEnemyProjectile: spawnEnemyProjectile, initMapPickups: initMapPickups, collectPickup: collectPickup, damagePlayer: damagePlayer };
         requestAnimationFrame(gameLoop);
     })();
     </script>
