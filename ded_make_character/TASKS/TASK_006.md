@@ -1,6 +1,6 @@
 # ⚔️ Tarefa 006 - D&D Make Character: Simulador de combate (Arena) + catálogo de monstros e de Holy Avenger
 
-**Status**: 💻 In Progress — E1 a E3 prontos (catálogo e motor de combate, aprovados pela revisão rigorosa) e E5 (tela da Arena, com os combatentes do catálogo); faltam E4 e E6 a E8
+**Status**: 💻 In Progress — E1 a E5 prontos (catálogo, motor, personagens do jogador e tela da Arena); faltam E6 a E8
 **Responsável**: Claude (TL)
 **Branch**: `feat/ded-simulador-combate` (E1 a E3, PR #50) e `feat/ded-arena` (E5, empilhado sobre ele)
 **Depende de**: TASK_003 (motor de regras `dnd30.js`), TASK_004 (talentos e perícias escolhidos)
@@ -357,7 +357,7 @@ O motor não sabe nada da tela: recebe os combatentes e a semente e devolve os e
 | **E1 Catálogo** | `data/catalogo-combate.json`, `tools/catalogo-combate.md`, `tools/validar-catalogo.js` e o teste de validação *(feito no refinamento)* |
 | **E2 Motor** | `combat30.js`: RNG com semente, iniciativa, distância, ataque/crítico/dano, defesas, estados e fim da luta, com testes determinísticos *(feito, §8.1)* |
 | **E3 Especiais** | Mecânicas do vocabulário do catálogo, com testes (ex.: Tarrasque engole, troll regenera, dragão sopra em vários alvos) *(feito, §8.1)* |
-| **E4 Personagens** | Tabelas de armas e armaduras, kit por classe, `fichas.equipamento`, adaptador de `computeSheet`, talentos e habilidades de classe |
+| **E4 Personagens** | Tabelas de armas e armaduras, kit por classe, `fichas.equipamento`, adaptador de `computeSheet`, talentos e habilidades de classe *(feito depois da E5, §8.3)* |
 | **E5 Arena** | Tela `#/arena` (montar a luta, luta passo a passo com log), rota antes das genéricas, item no menu lateral e atalho a partir da ficha e da lista *(feito antes da E4, com os combatentes do catálogo, §8.2)* |
 | **E6 Lote** | Simular N vezes sem travar, com o painel de resultados |
 | **E7 Magias** | Lista curada com números do SRD 3.0, espaços por dia, IA dos conjuradores |
@@ -496,7 +496,7 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
   - o resultado mostra o vencedor ou o empate com o motivo e, por combatente, a situação, os PV (e a contusão), o dano causado e recebido, a rodada em que caiu e os abates. No resumo do motor, "fugiu" vale só para quem fugiu de pé; quem caiu fugindo conta como caído.
 - **Acessibilidade:** o seletor é um `<dialog>` com abas ARIA (setas, Home e End), e Esc fecha. O foco é preservado nos redesenhos (`data-focus`), e uma região `aria-live` anuncia as últimas ações e o resultado, sem ler o registro inteiro.
 - **Fica para depois:**
-  - a aba Meus personagens e o atalho "Levar à arena" da ficha e da lista entram na E4, com o adaptador de personagem. Por ora, a aba explica isso;
+  - a aba Meus personagens e o atalho "Levar à arena" da ficha e da lista entraram na E4 (§8.3);
   - a simulação em lote fica para a E6.
 - **Validação:**
   - `tests/ded_make_character_arena.test.js` (7 testes): nível de encontro, faixas de dificuldade, leitura e escrita da montagem, limites e semente;
@@ -504,6 +504,106 @@ A E5 veio antes da E4 (decisão do usuário), para dar para testar o motor pela 
     - seletor (busca sem acento, abas com teclado, ND, quantidade, Esc e foco devolvido, lado cheio, Voltar com o seletor aberto, URL);
     - passo a passo, até o fim, recomeçar repete o registro, outra aba não apaga a luta, e recarregar mantém a montagem;
     - a 375 px, sem rolagem horizontal e com as abas numa linha.
+
+### 8.3 E4: os personagens do jogador na Arena
+
+- **Arquivos:**
+  - `js/rules/equipamento30.js`: armas, armaduras e escudos, empunhadura, proficiências, kit padrão e problemas de uma combinação;
+  - `js/rules/personagem30.js`: o adaptador `fromPersonagem`, que faz de `computeSheet`, do equipamento e dos talentos uma ficha de combate no formato de `fromCatalog`;
+  - `js/pages/arena-equipamento.js`: o diálogo de equipamento.
+- **Tabelas (SRD 3.0, "Equipment, Weapons" e "Equipment, Armor"):** 50 armas (simples, comuns e as exóticas mais usadas) e o ataque desarmado, 12 armaduras e 5 escudos, com os números extraídos do SRD.
+  - Ficaram de fora a shuriken (dano fixo 1), a rede, o chicote, as manoplas e o escudo de corpo.
+  - As armas duplas entram como armas de duas mãos (o bordão, por exemplo).
+  - Ficam num módulo próprio, e não em `tables30.js`, porque são dados de equipamento e não da ficha.
+- **3.0, não 3.5: o dano é da arma, não de quem a usa.** A §6 falava em dano "Pequeno/Médio", que é regra da 3.5. Na 3.0, o tamanho da arma em relação ao do portador decide:
+  - arma menor que o portador: leve;
+  - do mesmo tamanho: de uma mão;
+  - uma categoria maior: de duas mãos;
+  - duas ou mais categorias maior: grande demais.
+  - Um halfling com espada curta a usa com uma mão; com espada longa, com as duas; a espada grande não serve.
+- **Equipamento:** `{ principal, secundaria, escudo, armadura, distancia }`, cada um `{ id, melhoria (0 a 5), material (null ou "prata") }` ou null.
+  - Fica em `fichas.equipamento`, gravado por merge: talentos e perícias da ficha continuam lá. A versão da tabela não muda (§6).
+  - Sem equipamento salvo, vale o kit padrão da classe. Um campo que falta no salvo também vem do kit, e um id que não existe vira null.
+  - Kits: guerreiro com espada longa, escudo grande de madeira, cota de malha e arco longo; mago com bordão e besta leve; ranger com espada longa e espada curta. Para quem é Pequeno, a arma grande troca pela menor equivalente (espada longa → espada curta), e a segunda arma do ranger é a adaga, que é leve para ele.
+  - O diálogo mostra a prévia (CA, deslocamento, ataque, ataque total, à distância) e os problemas da combinação:
+    - são **erros** e impedem salvar: arma grande demais, arma de duas mãos com escudo ou segunda arma, segunda arma com escudo;
+    - são **avisos**: falta de proficiência, druida com armadura de metal, monge de armadura.
+- **Proficiências (SRD 3.0, "Weapon and Armor Proficiency" de cada classe):** listas de armas por classe (druida, monge, ladino, mago, bardo) e raça (elfo).
+  - Os talentos escolhidos também contam: Usar Armadura (leve, média, pesada), Usar Escudo e Usar Arma Simples; Usar Arma Comum e Usar Arma Exótica valem só para a arma do parâmetro (3.0: uma arma por talento).
+  - Sem proficiência com a arma: −4 no ataque.
+  - Sem proficiência com armadura ou escudo: a penalidade de armadura vale no ataque. O aviso só aparece quando a penalidade existe (couro e acolchoada têm 0).
+  - A espada bastarda com as duas mãos conta como comum.
+  - Classes de prestígio: não dá para saber, e o simulador considera que sabem usar.
+- **Adaptador:**
+  - **CA:** 10 + armadura + escudo (com melhoria) + Des (limitada pela armadura) + tamanho + monge (Sab positiva e nível, só sem armadura; vale também no toque).
+  - **Ataque:** BBA iterativo + For (corpo a corpo) ou Des (à distância, arremesso incluído) + tamanho + melhoria + Foco em Arma, com os −4 sem proficiência.
+    - Acuidade com Arma (3.0) usa a Des na arma escolhida: arma leve, rapieira usada com uma mão ou corrente com cravos para quem é Médio ou maior. A penalidade do escudo vale no ataque.
+    - Foco, Especialização, Sucesso Decisivo Aprimorado e Acuidade valem só na arma exata do parâmetro: Foco (arco longo composto) não vale no arco longo.
+  - **Dano:** dado da arma + For + melhoria + Especialização em Arma.
+    - A For entra ×1,5 com as duas mãos: arma de duas mãos, ou de uma mão com a outra livre (sem escudo nem segunda arma), como manda a 3.0.
+    - Na mão inábil entra ×0,5.
+    - O arco e a funda só somam a For negativa, e a besta não soma nenhuma.
+    - Sucesso Decisivo Aprimorado dobra a margem.
+  - **Duas armas (tabela 3.0):** −6/−10; com a inábil leve, −4/−8; Ambidestria tira 4 da inábil; Combater com Duas Armas tira 2 das duas; o aprimorado dá o segundo golpe com a inábil a −5. O ranger tem os dois talentos só com armadura leve ou sem armadura.
+  - **Monge:** coluna própria de ataque desarmado, dano desarmado da tabela e golpe ki (+1 a +3 contra a RD). A rajada dá +1 ataque no maior bônus, com −2 em todos (3.0: o −2 não diminui com o nível). As armas de monge (kama, nunchaku, siangham) usam a coluna desarmada se forem leves para ele (a kama Pequena não é leve para um monge Pequeno).
+    - De armadura (3.0), o monge perde a CA de monge, o deslocamento e os ataques desarmados extras: sem a coluna própria e sem a rajada, fica com o BBA da classe.
+    - O texto 3.0 fala só em armadura: com escudo (sem proficiência), o monge fica só com a penalidade no ataque.
+  - **À distância:**
+    - Tiro Rápido: +1 disparo com −2 em todos;
+    - besta: um disparo por rodada (recarregar é ação de movimento, ou rodada inteira na pesada). A funda dispara com os iterativos: na 3.0 ela não tem regra de recarga (a recarga da funda é da 3.5);
+    - armas de arremesso: também um por rodada, sem Saque Rápido (sacar a próxima é ação de movimento);
+    - o alcance máximo é de 10 incrementos para projétil e 5 para arremesso;
+    - Tiro Certeiro (+1 no ataque e no dano) e Especialização à distância (+2 no dano) só valem até 9 m. Isso usa um campo novo do ataque no motor, `ate_9m`.
+  - **Habilidades de classe** no vocabulário do catálogo:
+    - bárbaro: fúria (maior no 15º; no 20º não fica fatigado, `sem_fadiga`), 3 + Con da fúria rodadas, e esquiva sobrenatural;
+    - ladino: ataque furtivo, evasão e esquiva sobrenatural;
+    - monge: evasão (aprimorada no 9º), veneno no 11º;
+    - paladino: destruir o mal (2º; só num golpe corpo a corpo, 3.0), cura pelas mãos (Car × nível, similar a magia) e imunidade a medo pela aura de coragem (2º);
+    - bardo: inspirar coragem com 3 graduações em Atuação;
+    - druida: imune a veneno no 9º;
+    - elfo e meio-elfo: imunes a sono.
+    - Expulsar mortos-vivos, forma selvagem, companheiro animal, ataque atordoante, inimigo predileto e as magias (E7) aparecem como "não simulado".
+  - **For mudada na luta (fúria, dano de atributo):** o adaptador marca em cada ataque o peso da For no dano (`for_mult`: ×1,5, ×1, ×0,5 ou 0; `for_negativa` para arco e funda) e o atributo do ataque (`atributo_ataque`, a Des da Acuidade). O motor recalcula com a For de agora: a fúria soma +3 no dano do machado grande e +1 na mão inábil.
+  - **Talentos que o motor lê pelo nome:** Ataque Poderoso, Trespassar, Trespassar Maior, Esquiva e Tiro Preciso. Iniciativa Aprimorada e as resistências já vêm da ficha.
+  - **PV:** os cadastrados. Sem eles, o máximo do dado no 1º nível e a média arredondada para cima nos demais, + Con, com mínimo de 1 por nível e um aviso.
+  - **Deslocamento:** a armadura média ou pesada leva 9 m a 6 m e 6 m a 4,5 m. O monge de armadura perde a tabela própria, e o bárbaro perde o +3 m em armadura pesada.
+  - **Não luta** quem não tem atributos, classe (BBA e resistências) ou PV calculáveis, nem quem tem uma combinação de equipamento com erro. A Arena mostra o motivo e não deixa começar.
+- **Aproximações:**
+  - o soco de quem não é monge (1d3 de contusão) causa dano normal;
+  - a IA não pesa o dano extra de `ate_9m` (pesa o +1 no ataque) nem se posiciona para ficar a 9 m;
+  - a aura de coragem do paladino não dá o +4 contra medo aos aliados;
+  - a besta pesada, que na 3.0 leva uma rodada inteira para recarregar, dispara toda rodada;
+  - os bônus raciais condicionais (anão contra gigantes, halfling com arremesso) não entram;
+  - o arco composto potente não soma a For;
+  - o bardo usa qualquer das armas comuns da sua lista, e não só a escolhida.
+- **Na Arena:**
+  - a aba Meus personagens lista os personagens do store com nível, classe, raça, PV, CA e equipamento; a busca e o filtro valem para ela;
+  - o mesmo personagem entra uma vez por lado, mas pode estar nos dois (espelho);
+  - no lado, o cartão tem o botão "Equipamento", o equipamento atual e os avisos do adaptador;
+  - na URL, o personagem é `p:<id>`;
+  - "Levar à arena" (lista de Personagens e barra da ficha) abre `#/arena?a=p:<id>`.
+- **Recarregar com dados novos:** agora que a Arena lê o store, o evento de outra aba e "Restaurar tudo" a recarregam na montagem (os personagens podem ter mudado).
+  - Com luta em andamento ou diálogo aberto (`cleanup.ocupada()`), não recarregam na hora, o que apagaria a luta. O app marca a recarga (`cleanup.adiar()`) e avisa, e ela acontece ao voltar à montagem ou ao fechar o diálogo.
+  - Ao salvar o equipamento, a Arena relê o personagem e as fichas do store. Se o personagem mudou ou foi excluído, não grava e recarrega: assim nenhuma ficha órfã fica para um personagem novo que herdaria o mesmo id.
+- **Validação:**
+  - `tests/ded_make_character_personagem.test.js` (15 testes), com os números conferidos à mão:
+    - guerreiro 5 com espada longa +1, cota de malha e escudo;
+    - monge 10 com rajada, e de armadura;
+    - bárbaro 8 com fúria;
+    - a tabela de duas armas e o ranger;
+    - à distância (Tiro Rápido, besta, arremesso, arco com For baixa);
+    - halfling;
+    - proficiências;
+    - classes (paladino, ladino, bardo);
+    - PV pela média;
+    - equipamento salvo com lixo e os kits de todas as classes sem erro;
+    - `ate_9m` no motor, destruir o mal só corpo a corpo, a fúria com duas mãos e na inábil, o 20º sem fadiga;
+    - Acuidade 3.0 (escudo, rapieira) e Foco na arma exata;
+    - proficiências por talento; a funda com iterativos; o monge de armadura e com escudo;
+    - a sanidade em lote (guerreiro 20 vence sempre um ogro; guerreiro 1 perde sempre para o Tarrasque).
+  - `tests/ded_make_character_arena.test.js` (8 testes): o limite de um por lado para o personagem.
+  - E2E, passo novo: os atalhos da lista e da ficha, o kit do Jonh, o limite de um por lado, o erro da espada grande com escudo, salvar sem escudo com melhoria +1, a gravação em `fichas`, recarregar mantém, a luta usa o equipamento salvo, e o evento de outra aba com a luta aberta só recarrega ao voltar à montagem.
+- **Fica para a E8:** os blocos de arma, armadura e escudo da ficha impressa, e a CA e os ataques da ficha com o equipamento.
 
 ## 🧪 9. Testes planejados
 

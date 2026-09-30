@@ -468,9 +468,9 @@ async function run() {
   test('Destruir o Mal só contra maligno; evasão aprimorada; dano maciço', () => {
     let b = luta(ficha('ha-paladino-de-arton'), [boneco({ tendencia: 'CM' }), boneco({ tendencia: 'LB' })]);
     const pal = b.get('A1');
-    SP.beforeAttacks(K, b, pal, b.get('B2'));
+    SP.beforeAttacks(K, b, pal, b.get('B2'), pal.ataqueTotal);
     assert.strictEqual(pal._destruir, undefined);
-    SP.beforeAttacks(K, b, pal, b.get('B1'));
+    SP.beforeAttacks(K, b, pal, b.get('B1'), pal.ataqueTotal);
     assert.strictEqual(pal._destruir.bonus_dano, 19);
     // evasão aprimorada: passar em Reflexos anula; falhar dá metade
     b = luta(boneco(), ficha('ha-leon-galtran', { pvMax: 1000 }), [20, 1]);

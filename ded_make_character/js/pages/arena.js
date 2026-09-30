@@ -2,20 +2,26 @@
  * Arena (TASK_006 §4, etapa E5): monta a luta com o catálogo de combate e a mostra passo a
  * passo, com a ordem de iniciativa e o registro das rolagens.
  *
- * A montagem fica na URL (#/arena?a=ogro*2&b=troll&semente=…): recarregar ou compartilhar o
- * link repete a mesma luta. Os personagens do jogador entram na etapa E4; a simulação em lote,
- * na E6.
+ * A montagem fica na URL (#/arena?a=ogro*2,p:1&b=troll&semente=…): recarregar ou compartilhar o
+ * link repete a mesma luta. Os personagens do jogador ("p:<id>", etapa E4) vêm do store, passam
+ * pelo adaptador (`personagem30.js`) e têm o equipamento salvo em `fichas.equipamento`. A
+ * simulação em lote é da E6.
  */
 import { html, render } from '../core/dom.js';
 import { normalize, plural } from '../core/format.js';
 import { createBattle, fromCatalog, gap, nextRound, nextTurn, podeLutar, rules, runBattle } from '../rules/combat30.js';
+import { computeSheet } from '../rules/dnd30.js';
 import { dificuldade, nivelDeEncontro } from '../rules/encontro30.js';
+import { rotuloItem } from '../rules/equipamento30.js';
+import { fromPersonagem } from '../rules/personagem30.js';
 import { icon } from '../ui/icons.js';
 import { emptyState, loadingState, pageHead } from '../ui/page.js';
 import { toast } from '../ui/toast.js';
+import { abrirEquipamento } from './arena-equipamento.js';
 import {
-  LIMITES, adicionar, distanciaValida, escreverMontagem, lerMontagem, mudarQuantidade, novaSemente, rodadasValidas, sementeValida, totalDoLado,
+  LIMITES, adicionar, distanciaValida, ehPersonagem, escreverMontagem, lerMontagem, maximoDe, mudarQuantidade, novaSemente, rodadasValidas, sementeValida, totalDoLado,
 } from './arena-setup.js';
+import { ranksToKeys } from './choices.js';
 
 const LADOS = ['A', 'B'];
 
@@ -36,9 +42,13 @@ function carregarCatalogo() {
 
 const metros = m => `${m.toLocaleString('pt-BR')} m`;
 
-/** "Gigante grande" (monstro) ou "Paladino 19 · Humano meio-celestial" (Holy Avenger). */
+const SLOTS_EQUIPAMENTO = ['principal', 'secundaria', 'escudo', 'armadura', 'distancia'];
+const textoDoEquipamento = eq => SLOTS_EQUIPAMENTO.map(k => rotuloItem(eq[k])).filter(Boolean).join(' · ') || 'Desarmado';
+
+/** "Gigante grande" (monstro), "Paladino 19 · Humano meio-celestial" (Holy Avenger) ou "Guerreiro 4 · Humano" (seu personagem). */
 function descricao(e) {
   if (e.categoria === 'monstro') return `${e.tipo} ${e.tamanho.toLowerCase()}`;
+  if (e.categoria === 'personagem') return [e.sheet.identidade.classe ? `${e.sheet.identidade.classe} ${e.nd}` : `${e.nd}º nível, sem classe`, e.sheet.identidade.raca || 'sem raça'].join(' · ');
   return [e.classes.map(c => `${c.classe} ${c.nivel}`).join(' / '), e.raca].filter(Boolean).join(' · ');
 }
 
@@ -52,11 +62,11 @@ function cabecalho() {
     eyebrow: 'Aventura · regras 3.0',
     eyebrowIcon: 'swords',
     title: 'Arena',
-    lead: 'Ponha monstros do Livro dos Monstros 3.0 e heróis de Holy Avenger para lutar e acompanhe cada rolagem. A mesma semente repete a mesma luta.',
+    lead: 'Ponha seus personagens, monstros do Livro dos Monstros 3.0 e heróis de Holy Avenger para lutar e acompanhe cada rolagem. A mesma semente repete a mesma luta.',
   });
 }
 
-export async function renderArena({ root, router, query }) {
+export async function renderArena({ root, router, query, store }) {
   render(root, html`${cabecalho()}${loadingState(4)}`);
   let cat;
   try {
@@ -72,10 +82,35 @@ export async function renderArena({ root, router, query }) {
     root.querySelector('[data-action="recarregar"]').addEventListener('click', () => router.reload());
     return undefined;
   }
+  // seus personagens, calculados como na ficha (sem eles, a arena segue só com o catálogo)
+  let dados = null;
+  try {
+    const tabelas = ['personagens', 'races', 'classes', 'bba', 'pericias', 'talentos', 'fichas'];
+    const lidas = await Promise.all(tabelas.map(t => store.all(t)));
+    dados = Object.fromEntries(tabelas.map((t, i) => [t, lidas[i]]));
+  } catch {
+    dados = null;
+  }
   if (!root.isConnected) return undefined;
 
   const entradas = [...cat.monstros, ...cat.holy_avenger];
   const porId = new Map(entradas.map(e => [e.id, e]));
+  const talentoPorId = new Map((dados?.talentos || []).map(t => [String(t.id), t]));
+  function entradaDePersonagem(p) {
+    const race = dados.races.find(r => String(r.id) === String(p.race_id)) || null;
+    const classe = dados.classes.find(c => String(c.id) === String(p.classe_id)) || null;
+    const salva = dados.fichas.find(f => String(f.personagem_id) === String(p.id)) || null;
+    const talentos = (salva?.talentos || []).map(t => ({ nome: talentoPorId.get(String(t.talento_id))?.nome || '', parametro: t.parametro })).filter(t => t.nome);
+    const sheet = computeSheet(p, { race, classe, bbaRows: dados.bba, pericias: dados.pericias, escolhas: { ranks: ranksToKeys(dados.pericias, salva?.pericias || {}), talentos } });
+    const calcular = eq => fromPersonagem({ personagem: p, sheet, talentos, equipamento: eq });
+    const r = calcular(salva?.equipamento || null);
+    return {
+      id: `p:${p.id}`, categoria: 'personagem', nome: p.nome, nd: sheet.nivel, sheet, personagem: p, salva, calcular, talentos,
+      ficha: r.ficha, equipamento: r.equipamento, erros: r.erros, avisos: r.avisos, pv: r.ficha?.pvMax ?? '—', ca: { total: r.ficha?.ca.total ?? '—' },
+    };
+  }
+  const personagens = (dados?.personagens || []).map(entradaDePersonagem).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+  for (const e of personagens) porId.set(e.id, e);
   const montagem = lerMontagem(query, id => porId.has(id));
   const state = {
     fase: 'montagem',
@@ -85,12 +120,15 @@ export async function renderArena({ root, router, query }) {
     limite: montagem.limite,
     semente: montagem.semente || novaSemente(),
     ignorados: montagem.ignorados,
+    ignoradosPersonagens: montagem.ignoradosRefs.filter(ehPersonagem).length,
     excedentes: montagem.excedentes,
+    recarregarDepois: false, // o app adiou um recarregamento (dados mudaram com a luta ou um diálogo aberto)
     b: null,
     mostrados: 0, // eventos do registro já desenhados
     ultimo: null, // uid de quem agiu por último
   };
   let seletor = null;
+  let equipando = null;
 
   // o cabeçalho e a região de avisos ficam; só a fase (montagem ou luta) é redesenhada
   render(root, html`${cabecalho()}<div data-slot="fase"></div><p class="visually-hidden" aria-live="polite" data-slot="avisos"></p>`);
@@ -104,10 +142,12 @@ export async function renderArena({ root, router, query }) {
 
   const fichas = new Map();
   const fichaDe = ref => {
+    if (ehPersonagem(ref)) return porId.get(ref).ficha; // sempre com o equipamento atual
     if (!fichas.has(ref)) fichas.set(ref, fromCatalog(porId.get(ref)));
     return fichas.get(ref);
   };
-  const ndDoLado = lado => nivelDeEncontro(state[lado].flatMap(x => Array(x.qtd).fill(porId.get(x.ref).nd)));
+  // quem não pode lutar (personagem sem classe, equipamento com erro) não conta para a dica
+  const ndDoLado = lado => nivelDeEncontro(state[lado].filter(x => !porId.get(x.ref).erros?.length).flatMap(x => Array(x.qtd).fill(porId.get(x.ref).nd)));
   const ndTexto = ne => (ne == null ? '—' : String(Math.round(ne)));
 
   /** Redesenha preservando o foco no controle equivalente (data-focus). */
@@ -128,6 +168,19 @@ export async function renderArena({ root, router, query }) {
     const e = porId.get(x.ref);
     const cheio = totalDoLado(state[lado]) >= LIMITES.porLado;
     const chave = `${lado}-${x.ref}`;
+    if (e.categoria === 'personagem') {
+      return html`<li class="arena-roster__item arena-roster__item--pc">
+        <div class="arena-roster__info">
+          <p class="arena-roster__name">${e.nome}</p>
+          <p class="arena-roster__meta">${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
+          <p class="arena-roster__equip">${textoDoEquipamento(e.equipamento)}</p>
+          ${e.erros.length ? html`<p class="arena-roster__erro">${icon('alert')}<span>Não pode lutar: ${e.erros.join('; ')}.</span></p>` : ''}
+          ${e.avisos.length ? html`<ul class="arena-roster__avisos">${e.avisos.map(a => html`<li>${a[0].toUpperCase()}${a.slice(1)}</li>`)}</ul>` : ''}
+        </div>
+        <button type="button" class="btn btn--outline btn--sm" data-action="equipamento" data-lado="${lado}" data-ref="${x.ref}" data-focus="equip-${chave}" aria-label="Equipamento de ${e.nome}">${icon('shield')}Equipamento</button>
+        <button type="button" class="icon-btn icon-btn--danger" data-remover data-lado="${lado}" data-ref="${x.ref}" data-focus="remover-${chave}" data-focus-fallback="adicionar-${lado}" aria-label="Tirar ${e.nome} do lado ${lado}">${icon('trash')}</button>
+      </li>`;
+    }
     return html`<li class="arena-roster__item">
       <div class="arena-roster__info">
         <p class="arena-roster__name">${e.nome}</p>
@@ -169,10 +222,17 @@ export async function renderArena({ root, router, query }) {
   }
 
   function desenharMontagem() {
-    const pronto = state.A.length && state.B.length;
+    const bloqueados = [...new Set([...state.A, ...state.B].map(x => porId.get(x.ref)).filter(e => e.erros?.length))];
+    const pronto = state.A.length && state.B.length && !bloqueados.length;
+    const motivo = !state.A.length || !state.B.length
+      ? 'Ponha pelo menos um combatente em cada lado.'
+      : `${bloqueados.map(e => e.nome).join(', ')} não ${bloqueados.length === 1 ? 'pode' : 'podem'} lutar: veja o aviso no lado.`;
+    const doCatalogo = state.ignorados - state.ignoradosPersonagens;
     const avisosDoLink = [
-      state.ignorados === 1 && 'Um combatente do link não existe mais no catálogo e ficou de fora.',
-      state.ignorados > 1 && `${state.ignorados} combatentes do link não existem mais no catálogo e ficaram de fora.`,
+      doCatalogo === 1 && 'Um combatente do link não existe mais no catálogo e ficou de fora.',
+      doCatalogo > 1 && `${doCatalogo} combatentes do link não existem mais no catálogo e ficaram de fora.`,
+      state.ignoradosPersonagens === 1 && 'Um personagem do link não existe neste navegador e ficou de fora.',
+      state.ignoradosPersonagens > 1 && `${state.ignoradosPersonagens} personagens do link não existem neste navegador e ficaram de fora.`,
       state.excedentes > 0 && `O link pedia ${plural(state.excedentes, 'combatente', 'combatentes')} além do máximo de ${LIMITES.porLado} por lado, que ${state.excedentes === 1 ? 'ficou' : 'ficaram'} de fora.`,
     ].filter(Boolean);
     render(fase(), html`
@@ -207,7 +267,7 @@ export async function renderArena({ root, router, query }) {
         ${dicaDeDificuldade()}
         <div class="arena-start">
           <button type="button" class="btn btn--primary" data-action="comecar" data-focus="comecar" ${pronto ? '' : html`disabled aria-describedby="arena-start-dica"`}>${icon('swords')}Começar a luta</button>
-          ${pronto ? '' : html`<p class="arena-start__hint" id="arena-start-dica">Ponha pelo menos um combatente em cada lado.</p>`}
+          ${pronto ? '' : html`<p class="arena-start__hint" id="arena-start-dica">${motivo}</p>`}
         </div>
       </section>`);
   }
@@ -230,9 +290,10 @@ export async function renderArena({ root, router, query }) {
 
     const qtdNoLado = id => state[lado].find(x => x.ref === id)?.qtd || 0;
     const cheio = () => totalDoLado(state[lado]) >= LIMITES.porLado;
+    const podeAdicionar = e => !cheio() && qtdNoLado(e.id) < maximoDe(e.id) && !e.erros?.length;
 
     function filtrados() {
-      const base = s.aba === 'monstros' ? cat.monstros : cat.holy_avenger;
+      const base = s.aba === 'monstros' ? cat.monstros : s.aba === 'holy' ? cat.holy_avenger : personagens;
       const termo = normalize(s.busca);
       const [min, max] = FAIXAS[s.nd];
       return base
@@ -247,20 +308,23 @@ export async function renderArena({ root, router, query }) {
     }
 
     function lista() {
-      if (s.aba === 'meus') {
-        return html`<div class="arena-picker__empty">${icon('hero')}<p>Seus personagens entram na arena na próxima etapa, com as armas, as armaduras e as magias escolhidas aqui. Por enquanto, a luta é com os monstros e os heróis de Holy Avenger.</p></div>`;
+      if (s.aba === 'meus' && !dados) return html`<div class="arena-picker__empty">${icon('alert')}<p>Não foi possível ler seus personagens neste navegador.</p></div>`;
+      if (s.aba === 'meus' && !personagens.length) {
+        return html`<div class="arena-picker__empty">${icon('hero')}<p>Você ainda não tem personagens. <a href="#/personagens/novo">Crie um em Personagens</a> e volte para pô-lo na arena.</p></div>`;
       }
       const itens = filtrados();
       if (!itens.length) return html`<div class="arena-picker__empty">${icon('search')}<p>Nenhum combatente com esses filtros.</p></div>`;
       return html`<ul class="arena-picker__list">${itens.map(e => html`<li class="arena-pick">
         <div class="arena-pick__info">
           <p class="arena-pick__name">${e.nome}</p>
-          <p class="arena-pick__meta"><span class="badge badge--neutral">ND ${e.nd}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
-          <p class="arena-pick__lore">${e.resumo}</p>
+          <p class="arena-pick__meta"><span class="badge badge--neutral">${e.categoria === 'personagem' ? `Nível ${e.nd}` : `ND ${e.nd}`}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
+          ${e.categoria === 'personagem'
+            ? html`<p class="arena-pick__lore">${textoDoEquipamento(e.equipamento)}</p>${e.erros.length ? html`<p class="arena-pick__erro">${icon('alert')}Não pode lutar: ${e.erros.join('; ')}.</p>` : ''}`
+            : html`<p class="arena-pick__lore">${e.resumo}</p>`}
         </div>
         <div class="arena-pick__side">
           <span class="arena-pick__count" data-contagem="${e.id}">${contagem(e.id)}</span>
-          <button type="button" class="btn btn--outline btn--sm" data-add="${e.id}" aria-label="Adicionar ${e.nome} ao lado ${lado}" ${cheio() ? 'disabled' : ''}>${icon('plus')}Adicionar</button>
+          <button type="button" class="btn btn--outline btn--sm" data-add="${e.id}" aria-label="Adicionar ${e.nome} ao lado ${lado}" ${podeAdicionar(e) ? '' : 'disabled'}>${icon('plus')}Adicionar</button>
         </div>
       </li>`)}</ul>`;
     }
@@ -276,8 +340,8 @@ export async function renderArena({ root, router, query }) {
             ${ABAS.map(a => html`<button type="button" role="tab" id="aba-${a.key}" aria-controls="painel-combatentes" aria-selected="${String(s.aba === a.key)}" tabindex="${s.aba === a.key ? 0 : -1}" data-aba="${a.key}">${icon(a.icone)}${a.label}</button>`)}
           </div>
         </header>
-        <section class="arena-picker__body" role="tabpanel" id="painel-combatentes" aria-labelledby="aba-${s.aba}" ${s.aba === 'meus' ? html`tabindex="0"` : ''}>
-          ${s.aba === 'meus' ? '' : html`<div class="arena-picker__filters">
+        <section class="arena-picker__body" role="tabpanel" id="painel-combatentes" aria-labelledby="aba-${s.aba}">
+          ${html`<div class="arena-picker__filters">
             <div class="search">
               <label class="visually-hidden" for="arena-busca">Buscar combatente</label>
               <div class="search__field">${icon('search')}<input class="search__input" id="arena-busca" type="search" placeholder="Buscar por nome, tipo ou classe…" value="${s.busca}" autocomplete="off" data-busca></div>
@@ -304,6 +368,7 @@ export async function renderArena({ root, router, query }) {
       if (dialog.open) dialog.close();
       dialog.remove();
       seletor = null;
+      if (recarregarSePendente()) return;
       // de volta ao "Adicionar" deste lado; se ele está desabilitado (lado cheio), ao do outro lado,
       // a "Começar" ou, em último caso, ao título do lado
       const outro = lado === 'A' ? 'B' : 'A';
@@ -330,7 +395,7 @@ export async function renderArena({ root, router, query }) {
         desenharMontagem();
         const e = porId.get(id);
         dialog.querySelector(`[data-contagem="${id}"]`).textContent = contagem(id);
-        if (cheio()) for (const b of dialog.querySelectorAll('[data-add]')) b.disabled = true;
+        for (const b of dialog.querySelectorAll('[data-add]')) b.disabled = !podeAdicionar(porId.get(b.dataset.add));
         dialog.querySelector('[data-slot="status"]').textContent = `${e.nome} entrou no lado ${lado}. ${plural(totalDoLado(state[lado]), 'combatente', 'combatentes')} no lado (máximo ${LIMITES.porLado}).`;
         if (add.disabled) dialog.querySelector('[data-action="fechar"].btn')?.focus();
         return undefined;
@@ -569,6 +634,45 @@ export async function renderArena({ root, router, query }) {
     }
   }
 
+  /** Recarrega a página se o app adiou um recarregamento e a Arena já está livre. */
+  let saindo = false; // a rota está mudando: fechar os diálogos não deve recarregar a página
+  function recarregarSePendente() {
+    if (saindo || !state.recarregarDepois || cleanup.ocupada()) return false;
+    state.recarregarDepois = false;
+    router.reload();
+    return true;
+  }
+
+  /**
+   * Grava o equipamento em `fichas.equipamento` (merge: talentos e perícias da ficha ficam). Relê
+   * o store antes: se o personagem foi excluído ou trocado (outra aba, "Restaurar tudo"), não grava,
+   * para não deixar uma ficha que outro personagem herdaria pelo mesmo id.
+   */
+  async function salvarEquipamento(e, eq) {
+    const linha = { equipamento: eq, atualizado_em: new Date().toISOString() };
+    try {
+      const [agora, fichasAgora] = await Promise.all([store.get('personagens', e.personagem.id), store.all('fichas')]);
+      const mesmo = agora && ['nome', 'classe_id', 'race_id', 'nivel'].every(k => String(agora[k]) === String(e.personagem[k]));
+      if (!mesmo) {
+        state.recarregarDepois = true;
+        toast({ type: 'error', title: 'Equipamento não salvo', message: `${e.nome} mudou ou não existe mais neste navegador. A Arena recarregou com os dados atuais.` });
+        equipando?.fechar(); // ao fechar, a recarga pendente acontece
+        return;
+      }
+      const existente = fichasAgora.find(f => String(f.personagem_id) === String(e.personagem.id));
+      const salva = existente ? await store.update('fichas', existente.id, linha) : await store.insert('fichas', { personagem_id: e.personagem.id, pericias: {}, talentos: [], ...linha });
+      dados.fichas = [...fichasAgora.filter(f => f.id !== salva.id), salva];
+      const nova = entradaDePersonagem(e.personagem);
+      porId.set(nova.id, nova);
+      personagens.splice(personagens.findIndex(x => x.id === nova.id), 1, nova);
+      desenharMontagem();
+      toast({ type: 'success', title: 'Equipamento salvo', message: `${nova.nome}: ${textoDoEquipamento(nova.equipamento)}.` });
+    } catch (err) {
+      toast({ type: 'error', title: 'Não foi possível salvar o equipamento', message: err.message });
+      throw err;
+    }
+  }
+
   // ------------------------------------------------------------------------------------------
   // eventos
 
@@ -596,6 +700,21 @@ export async function renderArena({ root, router, query }) {
     }
     const acao = t.closest('[data-action]')?.dataset.action;
     if (acao === 'adicionar') seletor = abrirSeletor(t.closest('[data-lado]').dataset.lado);
+    else if (acao === 'equipamento') {
+      const botao = t.closest('[data-action]');
+      const e = porId.get(botao.dataset.ref);
+      const foco = botao.dataset.focus;
+      equipando = abrirEquipamento({
+        entrada: e,
+        calcular: e.calcular,
+        salvar: eq => salvarEquipamento(e, eq),
+        aoFechar: () => {
+          equipando = null;
+          if (recarregarSePendente()) return;
+          root.querySelector(`[data-focus="${foco}"]`)?.focus();
+        },
+      });
+    }
     else if (acao === 'nova-semente') {
       state.semente = novaSemente();
       salvarNaUrl();
@@ -613,6 +732,7 @@ export async function renderArena({ root, router, query }) {
     else if (acao === 'montagem') {
       state.fase = 'montagem';
       state.b = null;
+      if (recarregarSePendente()) return;
       desenharMontagem();
       root.querySelector('[data-action="comecar"]')?.focus();
     }
@@ -630,5 +750,16 @@ export async function renderArena({ root, router, query }) {
   });
 
   desenharMontagem();
-  return () => seletor?.fechar();
+  function cleanup() {
+    saindo = true;
+    seletor?.fechar();
+    equipando?.fechar();
+  }
+  // o app não recarrega a Arena (evento de outra aba, "Restaurar tudo") com luta ou diálogo aberto:
+  // marca a recarga (`adiar`), que acontece ao voltar à montagem ou ao fechar o diálogo
+  cleanup.ocupada = () => state.fase === 'luta' || Boolean(seletor) || Boolean(equipando);
+  cleanup.adiar = () => {
+    state.recarregarDepois = true;
+  };
+  return cleanup;
 }

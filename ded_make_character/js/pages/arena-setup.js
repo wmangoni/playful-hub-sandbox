@@ -31,16 +31,21 @@ export const sementeValida = valor => String(valor ?? '').trim().slice(0, LIMITE
 /** Semente nova, de 6 dígitos (fácil de ler e de copiar). */
 export const novaSemente = (random = Math.random) => String(100000 + Math.floor(random() * 900000));
 
+/** Personagem do jogador ("p:<id>") entra uma vez por lado; os do catálogo, quantos couberem. */
+export const ehPersonagem = ref => String(ref).startsWith('p:');
+export const maximoDe = ref => (ehPersonagem(ref) ? 1 : LIMITES.porLado);
+
 /** Quantos combatentes há num lado. */
 export const totalDoLado = lado => lado.reduce((s, x) => s + x.qtd, 0);
 
 /**
  * Adiciona um combatente ao lado (soma na entrada que já existe). Devolve false se o lado
- * já está cheio.
+ * já está cheio ou se o personagem do jogador já está nele.
  */
 export function adicionar(lado, ref) {
   if (totalDoLado(lado) >= LIMITES.porLado) return false;
   const atual = lado.find(x => x.ref === ref);
+  if (atual && atual.qtd >= maximoDe(ref)) return false;
   if (atual) atual.qtd++;
   else lado.push({ ref, qtd: 1 });
   return true;
@@ -51,7 +56,7 @@ export function mudarQuantidade(lado, ref, qtd) {
   const i = lado.findIndex(x => x.ref === ref);
   if (i < 0) return;
   const outros = totalDoLado(lado) - lado[i].qtd;
-  const n = Math.max(0, Math.min(Math.round(qtd), LIMITES.porLado - outros));
+  const n = Math.max(0, Math.min(Math.round(qtd), LIMITES.porLado - outros, maximoDe(ref)));
   if (n === 0) lado.splice(i, 1);
   else lado[i].qtd = n;
 }
@@ -65,7 +70,7 @@ function lerLado(texto, existe) {
     if (!ref || !existe(ref)) continue;
     const qtd = vezes == null ? 1 : Math.max(0, Math.round(Number(vezes)) || 0);
     pedidos += qtd;
-    for (let i = 0; i < Math.min(qtd, LIMITES.porLado); i++) adicionar(lado, ref);
+    for (let i = 0; i < Math.min(qtd, maximoDe(ref)); i++) adicionar(lado, ref);
   }
   return { lado, excedentes: pedidos - totalDoLado(lado) };
 }
@@ -89,6 +94,7 @@ export function lerMontagem(query, existe) {
     limite: rodadasValidas(get('limite') || LIMITES.rodadas.padrao),
     semente: semente || null,
     ignorados: refs.filter(r => !existe(r)).length,
+    ignoradosRefs: refs.filter(r => !existe(r)),
   };
 }
 

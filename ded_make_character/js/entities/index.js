@@ -26,7 +26,7 @@ export const TABLES = ENTITIES.map(e => e.table);
 export const REFERENCE_TABLES = ['bba'];
 
 /** Tabelas sem CRUD próprio que o app grava (copy-on-write, como as demais), com o rótulo do status de dados. */
-export const AUX_TABLES = { fichas: 'Fichas (talentos e perícias escolhidos)' };
+export const AUX_TABLES = { fichas: 'Fichas (talentos, perícias e equipamento)' };
 
 export const entityBySlug = slug => ENTITIES.find(e => e.slug === slug) || null;
 export const entityByTable = table => ENTITIES.find(e => e.table === table) || null;

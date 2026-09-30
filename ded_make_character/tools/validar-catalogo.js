@@ -70,7 +70,7 @@ const EFEITOS = {
   queimar: { obrigatorios: ['gatilho', 'resistencia', 'cd', 'dano', 'tipo_energia'], opcionais: ['duracao', 'apagar', 'ao_ser_atingido'] },
   'ataque-furtivo': { obrigatorios: ['dano'], opcionais: [] },
   evasao: { obrigatorios: [], opcionais: ['aprimorada'] },
-  furia: { obrigatorios: ['usos', 'for', 'con', 'von', 'ca', 'duracao_rodadas'], opcionais: ['maior'] },
+  furia: { obrigatorios: ['usos', 'for', 'con', 'von', 'ca', 'duracao_rodadas'], opcionais: ['maior', 'sem_fadiga'] },
   destruir: { obrigatorios: ['usos', 'bonus_ataque', 'bonus_dano', 'alvo'], opcionais: [] },
   'inspirar-coragem': { obrigatorios: ['usos', 'bonus_ataque', 'bonus_dano'], opcionais: ['bonus_contra_medo', 'duracao'] },
   camuflagem: { obrigatorios: ['chance_pct'], opcionais: [] },

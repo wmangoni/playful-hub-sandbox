@@ -99,6 +99,19 @@ async function run() {
     assert.deepStrictEqual(S.escreverMontagem({ ...montagem, distancia: 30, limite: 20 }).dist, '30');
   });
 
+  test('personagem do jogador ("p:<id>") entra uma vez por lado; na URL, o excesso é contado', () => {
+    const lado = [];
+    assert.strictEqual(S.adicionar(lado, 'p:1'), true);
+    assert.strictEqual(S.adicionar(lado, 'p:1'), false);
+    S.mudarQuantidade(lado, 'p:1', 3);
+    assert.deepStrictEqual(lado, [{ ref: 'p:1', qtd: 1 }]);
+    const m = S.lerMontagem(new URLSearchParams('a=p:1*3,ogro&b=p:1'), id => ['p:1', 'ogro'].includes(id));
+    assert.deepStrictEqual(m.A, [{ ref: 'p:1', qtd: 1 }, { ref: 'ogro', qtd: 1 }]);
+    assert.deepStrictEqual(m.B, [{ ref: 'p:1', qtd: 1 }], 'o mesmo personagem pode estar nos dois lados (espelho)');
+    assert.strictEqual(m.excedentes, 2);
+    assert.strictEqual(S.escreverMontagem({ A: m.A, B: m.B, distancia: 9, limite: 50, semente: '1' }).a, 'p:1,ogro');
+  });
+
   test('semente nova: 6 dígitos', () => {
     assert.strictEqual(S.novaSemente(() => 0), '100000');
     assert.strictEqual(S.novaSemente(() => 0.999999), '999999');

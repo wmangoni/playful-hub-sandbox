@@ -181,7 +181,7 @@ Esta tabela é gerada por `tools/gerar-tabela-efeitos.js` a partir de `EFEITOS` 
 | `queimar` | **`gatilho`**, **`resistencia`**, **`cd`**, **`dano`**, **`tipo_energia`** | — | `duracao`, `apagar`, `ao_ser_atingido` | quem pega fogo; `ao_ser_atingido`: quem acerta o monstro com arma natural também pode pegar fogo |
 | `ataque-furtivo` | **`dano`** | — | — | vale quando o alvo perde a Des na CA; nunca contra imunes a crítico; à distância só até 9 m |
 | `evasao` | — | — | `aprimorada` | só com armadura leve ou sem armadura |
-| `furia` | **`usos`**, **`for`**, **`con`**, **`von`**, **`ca`**, **`duracao_rodadas`** | — | `maior` |  |
+| `furia` | **`usos`**, **`for`**, **`con`**, **`von`**, **`ca`**, **`duracao_rodadas`** | — | `maior`, `sem_fadiga` |  |
 | `destruir` | **`usos`**, **`bonus_ataque`**, **`bonus_dano`**, **`alvo`** | — | — | `alvo`: `maligno` \| `bom` \| `leal` \| `caótico` \| `qualquer` |
 | `inspirar-coragem` | **`usos`**, **`bonus_ataque`**, **`bonus_dano`** | — | `bonus_contra_medo`, `duracao` |  |
 | `camuflagem` | **`chance_pct`** | — | — | chance de o ataque errar (ex.: deslocamento 50) |

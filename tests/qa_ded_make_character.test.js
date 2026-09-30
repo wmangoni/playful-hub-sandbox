@@ -624,7 +624,11 @@ async function run() {
     assert.deepStrictEqual(await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim())), ['Mestre Arsenal', 'Nekapeth', 'Paladino de Arton']);
     await domClick('[data-aba="meus"]');
     await sleep(100);
-    assert.match(await text('.arena-picker__empty'), /próxima etapa/);
+    assert.match(await text('.arena-picker__empty'), /Nenhum combatente com esses filtros/, 'o filtro de ND vale também para os seus personagens');
+    await page.select('[data-nd]', 'todos');
+    await sleep(100);
+    assert.deepStrictEqual(await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim())), ['Jonh']);
+    assert.match(await text('.arena-pick__meta'), /Nível 4.*Guerreiro 4 · Humano/);
     await page.focus('[data-aba="meus"]');
     await page.keyboard.press('ArrowRight');
     await sleep(100);
@@ -704,7 +708,7 @@ async function run() {
     await domClick('[data-action="fim"]');
     await sleep(150);
     assert.strictEqual(await logDaArena(), final, 'a mesma semente repete a luta');
-    // dados mudados em outra aba não apagam a luta (a Arena não lê o store)
+    // dados mudados em outra aba não apagam a luta em andamento (a recarga fica para a volta à montagem)
     await page.evaluate(() => window.__dmc.store.handleExternalChange('dmc:v1:races'));
     await sleep(300);
     assert.strictEqual(await logDaArena(), final, 'o evento de outra aba não recarrega a Arena');
@@ -715,6 +719,93 @@ async function run() {
     await sleep(300);
     assert.deepStrictEqual(await page.$$eval('.arena-roster__name', els => els.map(e => e.textContent.trim())), ['Ogro', 'Troll'], 'recarregar mantém a montagem');
     assert.strictEqual(await text('.arena-side--a .arena-qty__n'), '2');
+  });
+
+  await step('arena: seus personagens (aba, equipamento salvo em fichas e usado na luta, atalhos da lista e da ficha)', async () => {
+    await go('#/personagens');
+    assert.strictEqual(await page.$eval('tr[data-id="1"] a[href="#/arena?a=p:1"]', el => el.getAttribute('aria-label')), 'Arena de Jonh');
+    await go('#/personagens/1/ficha');
+    await sleep(300);
+    assert.ok(await page.$('.sheet-toolbar a[href="#/arena?a=p:1"]'), 'ficha: Levar à arena');
+    await go('#/arena?a=p:1&semente=580669');
+    await sleep(400);
+    assert.match(await text('.arena-side--a .arena-roster__name'), /Jonh/);
+    assert.match(await text('.arena-side--a .arena-roster__equip'), /^Espada longa · Escudo grande de madeira · Cota de malha · Arco longo$/, 'kit padrão do guerreiro');
+    assert.match(await text('.arena-side--a .arena-roster__meta'), /PV 42 · CA 19/);
+    // a mesma pessoa só entra uma vez por lado
+    await domClick('[data-action="adicionar"][data-lado="A"]');
+    await sleep(300);
+    await domClick('[data-aba="meus"]');
+    await sleep(100);
+    assert.ok(await page.$eval('[data-add="p:1"]', el => el.disabled));
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    // equipamento: espada grande com escudo é erro; sem escudo, salva
+    await domClick('[data-action="equipamento"][data-ref="p:1"]');
+    await sleep(300);
+    assert.ok(await page.$('dialog.arena-equip[open]'));
+    await page.select('[data-item="principal"]', 'espada-grande');
+    await sleep(100);
+    assert.match(await text('.arena-equip__erros'), /pede as duas mãos/);
+    assert.ok(await page.$eval('[data-action="salvar"]', el => el.disabled));
+    await page.select('[data-item="escudo"]', '');
+    await page.select('[data-melhoria="principal"]', '1');
+    await sleep(100);
+    assert.ok(!(await page.$eval('[data-action="salvar"]', el => el.disabled)));
+    assert.match(await text('.arena-equip__nums'), /CA\s*17.*Espada grande \+1 \+9 \(2d6\+7, 19–20\/×2\)/s, 'prévia: CA sem escudo e a espada com as duas mãos');
+    await domClick('[data-action="salvar"]');
+    await sleep(400);
+    assert.strictEqual(await page.$('dialog.arena-equip'), null);
+    assert.match(await text('.arena-side--a .arena-roster__equip'), /^Espada grande \+1 · Cota de malha · Arco longo$/);
+    const salvo = await page.evaluate(async () => (await window.__dmc.store.all('fichas')).find(f => f.personagem_id === 1)?.equipamento);
+    assert.deepStrictEqual(salvo.principal, { id: 'espada-grande', melhoria: 1, material: null });
+    assert.strictEqual(salvo.escudo, null);
+    await page.reload({ waitUntil: 'networkidle0' });
+    await sleep(300);
+    assert.match(await text('.arena-side--a .arena-roster__equip'), /^Espada grande \+1/, 'o equipamento fica salvo');
+    // a luta usa o equipamento salvo
+    await domClick('[data-action="adicionar"][data-lado="B"]');
+    await sleep(300);
+    await page.type('[data-busca]', 'ogro');
+    await sleep(150);
+    await domClick('[data-add="ogro"]');
+    // (com a busca preenchida, o primeiro Esc só limpa o campo, que é o comportamento nativo)
+    await domClick('dialog.arena-picker .btn--primary[data-action="fechar"]');
+    await sleep(200);
+    assert.strictEqual(await page.$('dialog.arena-picker'), null);
+    await domClick('[data-action="comecar"]');
+    await domClick('[data-action="fim"]');
+    await sleep(200);
+    assert.match(await logDaArena(), /Jonh ataca Ogro com Espada grande \+1: /);
+    // dados mudados em outra aba com a luta em andamento: a luta fica, e a Arena recarrega ao voltar à montagem
+    const final = await logDaArena();
+    await page.evaluate(() => { document.querySelector('.page').dataset.marca = 'antes'; });
+    await page.evaluate(() => window.__dmc.store.handleExternalChange('dmc:v1:personagens'));
+    await sleep(300);
+    assert.strictEqual(await logDaArena(), final);
+    assert.strictEqual(await page.$eval('.page', el => el.dataset.marca), 'antes', 'não recarregou com a luta aberta');
+    await domClick('[data-action="montagem"]');
+    await sleep(400);
+    assert.strictEqual(await page.$eval('.page', el => el.dataset.marca || null), null, 'recarregou ao voltar à montagem');
+    assert.match(await text('.arena-side--a .arena-roster__name'), /Jonh/);
+    // o personagem é excluído em outra aba com o diálogo aberto: o salvar não grava e a Arena recarrega
+    await domClick('[data-action="equipamento"][data-ref="p:1"]');
+    await sleep(300);
+    await page.evaluate(async () => {
+      await window.__dmc.store.remove('personagens', 1);
+      window.__dmc.store.handleExternalChange('dmc:v1:personagens');
+    });
+    await sleep(300);
+    assert.ok(await page.$('dialog.arena-equip[open]'), 'o diálogo continua aberto (a recarga fica para depois)');
+    await page.select('[data-melhoria="principal"]', '2');
+    await domClick('[data-action="salvar"]');
+    await sleep(700);
+    assert.strictEqual(await page.$('dialog.arena-equip'), null);
+    const depois = await page.evaluate(() => window.__dmc.store.all('fichas'));
+    assert.ok(!depois.some(f => f.equipamento?.principal?.melhoria === 2), 'não gravou para um personagem que não existe mais');
+    assert.match(await text('.notice'), /personagem do link não existe neste navegador/);
+    await page.evaluate(() => window.__dmc.store.restore('personagens'));
+    await page.evaluate(() => window.__dmc.store.restore('fichas'));
   });
 
   await step('arena @375px: montagem, seletor e luta sem rolagem horizontal; abas numa linha', async () => {
@@ -761,7 +852,7 @@ async function run() {
   });
 
   await step('nenhum erro de console durante a jornada', async () => {
-    assert.deepStrictEqual(consoleErrors, []);
+    assert.deepStrictEqual(consoleErrors, [], JSON.stringify(consoleErrors));
   });
 
   console.log(`\n${passed} verificações passaram.`);

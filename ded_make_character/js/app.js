@@ -112,7 +112,7 @@ const router = createRouter({
     }
     if (name === 'arena') {
       const page = mountPage('Arena', 'arena');
-      cleanup = await renderArena({ root: page, router, query }) || null;
+      cleanup = await renderArena({ root: page, router, query, store }) || null;
       focusTitle();
       return;
     }
@@ -145,7 +145,7 @@ const router = createRouter({
 });
 
 /**
- * Fichas (talentos e perícias escolhidos) sem personagem são apagadas. Isso cobre a exclusão
+ * Fichas (talentos, perícias e equipamento) sem personagem são apagadas. Isso cobre a exclusão
  * e "Restaurar originais" em Personagens: a restauração volta o AUTO_INCREMENT, e um personagem
  * novo com o id antigo não pode herdar as escolhas de outro.
  */
@@ -165,8 +165,14 @@ store.subscribe(event => {
   if (event.type === 'corrupted') {
     toast({ type: 'error', title: 'Cópia local descartada', message: 'Os dados salvos neste navegador estavam corrompidos. Voltamos aos dados originais.' });
   }
-  // a Arena não lê o store (E5): recarregar só apagaria a luta em andamento e o seletor aberto
-  if (event.type === 'external' && router.current?.name !== 'arena') {
+  // a Arena lê os personagens do store: recarrega na montagem, mas não com luta ou diálogo aberto
+  // (recarregar apagaria a luta em andamento)
+  const arenaOcupada = router.current?.name === 'arena' && cleanup?.ocupada?.();
+  if (event.type === 'external' && arenaOcupada) {
+    cleanup.adiar();
+    toast({ type: 'info', title: 'Dados alterados em outra aba', message: 'A Arena se atualiza quando você voltar à montagem ou fechar o diálogo.' });
+  }
+  if (event.type === 'external' && !arenaOcupada) {
     const onForm = ['create', 'edit'].includes(router.current?.name);
     toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : 'A tela foi atualizada.' });
     if (!onForm) router.reload();
@@ -188,7 +194,8 @@ document.addEventListener('click', async event => {
   if (!ok) return;
   store.restoreAll();
   toast({ type: 'info', title: 'Dados originais restaurados', message: 'Todas as tabelas voltaram ao estado original.' });
-  if (!['create', 'edit', 'arena'].includes(router.current?.name)) router.reload();
+  if (router.current?.name === 'arena' && cleanup?.ocupada?.()) cleanup.adiar(); // recarrega quando a luta ou o diálogo terminar
+  else if (!['create', 'edit'].includes(router.current?.name)) router.reload();
 });
 
 refreshChrome();

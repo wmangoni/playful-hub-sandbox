@@ -57,7 +57,7 @@ export async function renderHome({ root, store }) {
             <span class="tile__icon">${icon('arena')}</span>
             <span class="tile__body">
               <span class="tile__title">Arena</span>
-              <span class="tile__text">Monstros do Livro dos Monstros 3.0 e heróis de Holy Avenger lutam pelas regras 3.0, rolagem por rolagem.</span>
+              <span class="tile__text">Seus personagens, monstros do Livro dos Monstros 3.0 e heróis de Holy Avenger lutam pelas regras 3.0, rolagem por rolagem.</span>
             </span>
             <span class="tile__meta"><span class="badge badge--ember">Simulador de combate</span></span>
             <span class="tile__go" aria-hidden="true">${icon('chevron-right')}</span>

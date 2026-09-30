@@ -137,8 +137,9 @@ export function extraDamage(K, b, c, alvo, a) {
 // ---------------------------------------------------------------------------------------------
 // antes e depois dos golpes
 
-/** Destruir (o Mal): usado no primeiro golpe contra um alvo válido. */
-export function beforeAttacks(K, b, c, alvo) {
+/** Destruir (o Mal): usado no primeiro golpe contra um alvo válido, se for corpo a corpo (3.0: "one normal melee attack"). */
+export function beforeAttacks(K, b, c, alvo, golpes = []) {
+  if (!golpes.length || !K.isMelee(golpes[0])) return;
   for (const e of comEfeito(c, 'destruir')) {
     if (!disponivel(b, K, c, e) || !alvoDeDestruir(K, alvo, e.m.alvo)) continue;
     gastarUso(K, b, c, e);
@@ -713,7 +714,7 @@ export function freeActions(K, b, c) {
     const pvExtra = (conDepois - conAntes) * c.dv;
     c.pvMax += pvExtra;
     c.pv += pvExtra;
-    c.buffs.push({ nome: 'furia', rotulo: e.nome, atributos: { for: m.for, con: m.con }, bonus: { von: m.von, ca: m.ca }, pvExtra, expira: K.expiraEm(b, m.duracao_rodadas, c, c) });
+    c.buffs.push({ nome: 'furia', rotulo: e.nome, atributos: { for: m.for, con: m.con }, bonus: { von: m.von, ca: m.ca }, pvExtra, semFadiga: Boolean(m.sem_fadiga), expira: K.expiraEm(b, m.duracao_rodadas, c, c) });
     K.log(b, c, 'especial', `${c.nome} entra em ${e.nome}: +${m.for} For, +${m.con} Con (+${pvExtra} PV), +${m.von} Vontade, ${m.ca < 0 ? `−${-m.ca}` : `+${m.ca}`} CA, por ${m.duracao_rodadas} rodadas.`);
   }
 }
@@ -722,8 +723,8 @@ export function onBuffEnd(K, b, c, bf) {
   if (bf.nome === 'furia') {
     c.pvMax = Math.max(1, c.pvMax - bf.pvExtra);
     c.pv -= bf.pvExtra;
-    K.log(b, c, 'especial', `A fúria de ${c.nome} acaba: perde os ${bf.pvExtra} PV extras (fatigado até o fim da luta).`);
-    K.aplicarCondicao(b, c, 'fatigado', Infinity, { fonte: c });
+    K.log(b, c, 'especial', `A fúria de ${c.nome} acaba: perde os ${bf.pvExtra} PV extras${bf.semFadiga ? ' (no 20º nível, não fica fatigado)' : ' (fatigado até o fim da luta)'}.`);
+    if (!bf.semFadiga) K.aplicarCondicao(b, c, 'fatigado', Infinity, { fonte: c });
     K.atualizarEstado(b, c);
   } else if (bf.rotulo) K.log(b, c, 'condicao-fim', `${bf.rotulo} acaba para ${c.nome}.`);
 }

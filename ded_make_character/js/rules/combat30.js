@@ -558,13 +558,18 @@ function modsDeAtaque(b, c, alvo, a, { investida = false, poderoso = 0 } = {}) {
   if (hasCond(c, 'lento') && isMelee(a)) add(-2, 'lento');
   if (hasCond(c, 'derrubado') && isMelee(a)) add(-4, 'caído');
   if (c.niveisNegativos) add(-c.niveisNegativos, 'níveis negativos');
-  add(isMelee(a) ? deltaMod(c, 'for') : deltaMod(c, 'des'), isMelee(a) ? 'Força' : 'Destreza');
+  // atributo do ataque: For corpo a corpo, Des à distância; o adaptador de personagem marca a Des
+  // da Acuidade com Arma (`atributo_ataque`)
+  const atributo = a.atributo_ataque || (isMelee(a) ? 'for' : 'des');
+  add(deltaMod(c, atributo), atributo === 'for' ? 'Força' : 'Destreza');
   for (const bf of c.buffs) add(bf.bonus?.ataque || 0, bf.rotulo || 'reforço');
   if (investida) add(2, 'investida');
   if (poderoso) add(-poderoso, 'Ataque Poderoso');
   if (isRanged(a)) {
     const d = gap(c, alvo);
     if (a.incremento_m && d > a.incremento_m) add(-2 * (Math.ceil(d / a.incremento_m - 1e-9) - 1), 'distância');
+    // Tiro Certeiro dos personagens: +1 até 9 m (o adaptador põe em `ate_9m`)
+    if (a.ate_9m?.ataque && d <= 9) add(a.ate_9m.ataque, a.ate_9m.rotulo || 'até 9 m');
     // disparar contra alvo em combate corpo a corpo com um aliado: −4 (3.0), salvo Tiro Preciso
     const emMelee = aliados(b, c).some(x => x !== c && podeLutar(x) && gap(x, alvo) <= Math.max(x.alcance || 1.5, alvo.alcance || 1.5));
     if (emMelee && !talento(c, 'tiro preciso')) add(-4, 'alvo em corpo a corpo');
@@ -578,7 +583,18 @@ function modsDeAtaque(b, c, alvo, a, { investida = false, poderoso = 0 } = {}) {
 
 function modsDeDano(b, c, alvo, a, { poderoso = 0 } = {}) {
   let v = 0;
-  if (isMelee(a) || /arremess/i.test(a.nome)) v += deltaMod(c, 'for');
+  if (a.for_mult != null) {
+    // personagem: a For de agora (fúria, dano de atributo) com o mesmo peso do adaptador (×1,5 com as
+    // duas mãos, ×0,5 na inábil; arco e funda só a negativa, besta nenhuma)
+    const d = deltaMod(c, 'for');
+    if (d) {
+      const peso = x => (a.for_mult === 0 ? (a.for_negativa ? Math.min(0, x) : 0) : x < 0 ? x : Math.floor(x * a.for_mult));
+      const base = mod(c.atributos.for ?? 10);
+      v += peso(base + d) - peso(base);
+    }
+  } else if (isMelee(a) || /arremess/i.test(a.nome)) v += deltaMod(c, 'for');
+  // Tiro Certeiro (+1) e Especialização em Arma à distância (+2) só até 9 m (3.0)
+  if (isRanged(a) && a.ate_9m?.dano && alvo && gap(c, alvo) <= 9) v += a.ate_9m.dano;
   if (hasCond(c, 'enjoado')) v -= 2;
   if (hasCond(c, 'lento') && isMelee(a)) v -= 2;
   v += somaBuff(c, 'dano');
@@ -887,7 +903,7 @@ function sequencia(b, c, alvoInicial, golpes, opts = {}) {
   const acertos = new Map();
   let trespassou = false;
   c.alvoEsquiva = alvoInicial.uid;
-  SP.beforeAttacks(K, b, c, alvoInicial);
+  SP.beforeAttacks(K, b, c, alvoInicial, golpes);
   const fila = [...golpes];
   const primeiroMelee = golpes.find(isMelee);
   const poderosoDaRodada = opts.poderoso ?? (primeiroMelee ? ataquePoderoso(b, c, alvoInicial, primeiroMelee) : 0);
@@ -1370,7 +1386,7 @@ const K = {
   log, anunciarCondicao, roll: (b, expr, o) => roll(b.rng, expr, o), average, parseDice, isZero, parseDuracao, parseArea,
   gap, mover, velocidade, inimigos, aliados, alvosNaArea, alvoValido, podeLutar, atende, eixos,
   inicioDoTurno, venceRD, furaRegeneracao, teste, resistido, agarrarDe, aplicarCondicao, imuneACondicao, efeitoNaoAfeta, categoriaDaCondicao, removerCondicao, causarDano, curar, morrer, atualizarEstado,
-  efeitoComTeste, venceRM, golpe, sequencia, caContra, modsDeAtaque, deltaMod, somaBuff, expiraEm, tick,
+  efeitoComTeste, venceRM, golpe, sequencia, caContra, modsDeAtaque, modsDeDano, deltaMod, somaBuff, expiraEm, tick,
   soltarAgarrao, imuneCritico, semDestreza, esperado, pAcerto, isMelee, isRanged, isTouch, ataqueAlcanca, alcanceDe,
   hasCond, talento, sizeIdx, mod, sinal, num, MEDO, TIPOS_SEM_CRITICO,
 };
