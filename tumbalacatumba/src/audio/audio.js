@@ -241,17 +241,28 @@ export class Audio {
     src.start();
     this.windFilter = f;
   }
+  /** dentro da mansão: vento abafado atrás das paredes e rangidos da casa velha */
+  setIndoors(v) {
+    this.indoors = v;
+  }
   update(dt, game) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.night = game.dayNight.night;
     const p = game.player.pos;
-    this.windGain.gain.setTargetAtTime(0.035 + 0.03 * Math.sin(t * 0.21) + 0.02 * Math.sin(t * 0.07), t, 0.5);
-    this.windFilter.frequency.setTargetAtTime(300 + 150 * Math.sin(t * 0.13), t, 0.5);
+    // voando rápido, o vento aumenta
+    const fly = game.player.flying ? Math.min(1, game.player.speedNow / 10) + Math.max(0, game.player.vel.y) * 0.05 : 0;
+    const wind = this.indoors ? 0.018 + 0.01 * Math.sin(t * 0.19) : 0.035 + 0.03 * Math.sin(t * 0.21) + 0.02 * Math.sin(t * 0.07) + fly * 0.09;
+    this.windGain.gain.setTargetAtTime(wind, t, 0.5);
+    this.windFilter.frequency.setTargetAtTime(this.indoors ? 160 : 300 + 150 * Math.sin(t * 0.13) + fly * 500, t, 0.5);
     const A = this._amb;
     A.t -= dt;
     if (A.t > 0) return;
     A.t = 0.25 + Math.random() * 0.5;
+    if (this.indoors) {
+      if (Math.random() < 0.035) this.sfx('creak', 0.5 + Math.random() * 0.5);
+      return;
+    }
     const dSwamp = Math.hypot(p.x - SWAMP.x, p.z - SWAMP.z);
     const dWoods = Math.hypot(p.x - WOODS.x, p.z - WOODS.z);
     const dCem = Math.hypot(p.x - CEMETERY.x, p.z - CEMETERY.z);
@@ -377,6 +388,41 @@ export class Audio {
       case 'hiss': this.noise(t, 0.55, 0.07 * v, { type: 'highpass', f: 3200, a: 0.06 }); break;
       case 'screech': [0, 0.07, 0.14].forEach((d, i) => this.osc('sine', 2600 + i * 300, t + d, 0.06, 0.05 * v, { f2: 3600 })); break;
       case 'glub': [0, 0.13, 0.24].forEach((d, i) => this.osc('sine', 260 + i * 60, t + d, 0.09, 0.09 * v, { f2: 620 + i * 80 })); break;
+      // ---------------- mansão e voo
+      case 'door':
+        // dobradiça rangendo + baque da folha
+        this.osc('sawtooth', 190, t, 0.55, 0.035 * v, { f2: 330, a: 0.08, rev: 0.4 });
+        this.osc('sawtooth', 240, t + 0.12, 0.4, 0.025 * v, { f2: 170, a: 0.05, rev: 0.4 });
+        this.noise(t + 0.62, 0.22, 0.16 * v, { type: 'lowpass', f: 420 });
+        this.osc('sine', 70, t + 0.62, 0.3, 0.14 * v, { f2: 45 });
+        break;
+      case 'creak': {
+        const f = 150 + Math.random() * 90;
+        this.osc('sawtooth', f, t, 0.35, 0.018 * v, { f2: f * (1.2 + Math.random() * 0.4), a: 0.06, dest: this.ambBus, rev: 0.6 });
+        break;
+      }
+      case 'tick': this.noise(t, 0.025, 0.06 * v, { type: 'bandpass', f: 3200, q: 6 }); break;
+      case 'tock': this.noise(t, 0.03, 0.06 * v, { type: 'bandpass', f: 2100, q: 6 }); break;
+      case 'chime': [659, 523, 587, 392].forEach((f, i) => this.bell(f, t + i * 0.5, 0.07 * v, 2.2, this.sfxBus, 0.7)); break;
+      case 'organ': {
+        // acorde de órgão de tubos (Ré menor com a quinta embaixo)
+        const notes = [38, 50, 57, 62, 65, 69];
+        for (const n of notes) for (const det of [-4, 4]) this.osc('square', midi(n), t, 2.4, 0.012 * v, { a: 0.18, detune: det, rev: 0.9 });
+        this.osc('sine', midi(26), t, 2.6, 0.06 * v, { a: 0.3, rev: 0.6 });
+        break;
+      }
+      case 'organNote': {
+        const n = [62, 65, 69, 74, 72, 70, 69, 65][Math.floor(Math.random() * 8)];
+        this.osc('square', midi(n), t, 0.9, 0.012 * v, { a: 0.06, rev: 0.9 });
+        this.osc('square', midi(n - 12), t, 0.9, 0.01 * v, { a: 0.06, rev: 0.9 });
+        break;
+      }
+      case 'fire': for (let i = 0; i < 3; i++) this.noise(t + Math.random() * 0.25, 0.03, 0.05 * v, { type: 'highpass', f: 2200 + Math.random() * 1800 }); break;
+      case 'flap': this.noise(t, 0.12, 0.09 * v, { type: 'bandpass', f: 520, q: 0.9, f2: 260 }); break;
+      case 'whoosh': this.noise(t, 0.6, 0.12 * v, { type: 'bandpass', f: 400, q: 0.7, f2: 1800 }); this.osc('sine', 220, t, 0.4, 0.04 * v, { f2: 660 }); break;
+      case 'clue': [784, 988, 1175, 1568].forEach((f, i) => this.bell(f, t + i * 0.07, 0.07 * v, 1.1, this.sfxBus, 0.6)); break;
+      case 'chest': this.osc('sawtooth', 140, t, 0.5, 0.03 * v, { f2: 260, a: 0.1, rev: 0.3 }); this.noise(t + 0.45, 0.12, 0.1 * v, { type: 'lowpass', f: 600 }); break;
+      case 'yawn': this.osc('sine', 900, t, 0.7, 0.04 * v, { f2: 420, a: 0.1 }); break;
       default: break;
     }
   }

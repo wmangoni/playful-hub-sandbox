@@ -111,6 +111,10 @@ export class Abilities {
       g.audio?.sfx('mount');
       return true;
     }
+    if (p.flying || p.gliding) {
+      g.ui.error('Pouse antes de montar na vassoura.');
+      return false;
+    }
     if (!p.grounded || p.isMoving) {
       g.ui.error('Você não pode fazer isso enquanto se move.');
       return false;
@@ -142,6 +146,7 @@ export class Abilities {
       onDone: () => {
         g.fx.hearthFx(p.pos);
         g.fade(0.35, () => {
+          if (p.flying || p.gliding) p.stopFlying(true);
           p.teleport(HOME_SPOT.x, HOME_SPOT.z, HOME_SPOT.yaw);
           g.cam.snapBehind(p);
           g.fx.hearthFx(p.pos);
@@ -157,8 +162,40 @@ export class Abilities {
 
   sit() {
     const p = this.game.player;
-    if (p.mounted || !p.grounded || p.dead) return false;
+    if (p.mounted || p.flying || !p.grounded || p.dead) return false; // voando, o X é "descer"
     p.sitting = !p.sitting;
+    return true;
+  }
+
+  /** Voar com a Capinha de Morcego Filhote (tecla 8) */
+  fly() {
+    const g = this.game, p = g.player;
+    if (!g.progress.hasItem('capinha')) {
+      g.ui.error('Você ainda não tem isso.');
+      return false;
+    }
+    if (p.flying) {
+      if (p.overDeepWater()) {
+        g.ui.error('Não dá para pousar na água funda!');
+        return false;
+      }
+      p.stopFlying();
+      g.audio?.sfx('whiff');
+      return true;
+    }
+    if (g.indoors?.active) {
+      g.ui.error('Aqui dentro o teto é baixo demais para voar.');
+      return false;
+    }
+    if (p.dead) return false;
+    if (p.mounted) g.fx.poof(p.pos, '#8a6aff');
+    p.startFlying();
+    g.fx.poof(p.pos, '#6a4a8a', 0.8);
+    g.audio?.sfx('whoosh');
+    if (!g.progress.flags.flewOnce) {
+      g.progress.setFlag('flewOnce');
+      g.ui.chat('Voando! Espaço sobe, X desce. Segure X rente ao chão para pousar, ou aperte 8 no ar para descer planando.', 'system');
+    }
     return true;
   }
 

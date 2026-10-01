@@ -122,6 +122,11 @@ export async function populateWorld(world, plan, progress = () => {}) {
   await SG.buildSignAtlas();
 
   const hAt = (x, z) => T.heightAt(x, z);
+  /** cerca/muro de altura h acima do chão (sem faixa de altura, o colisor ia até 99 m e barrava quem voa) */
+  const fenceSeg = (ax, az, bx, bz, thick, h) => {
+    const ys = [hAt(ax, az), hAt(bx, bz), hAt((ax + bx) / 2, (az + bz) / 2)];
+    return C.addSegment(ax, az, bx, bz, thick, { y0: Math.min(...ys) - 1, y1: Math.max(...ys) + h });
+  };
   const regColliders = (model, x, y, z, rot, s = 1) => {
     const c = Math.cos(rot), sn = Math.sin(rot);
     for (const cl of model.colliders) {
@@ -315,7 +320,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
         const wx = hp.x + lx * c + fz * s, wz = hp.z - lx * s + fz * c;
         if (T.roadDistAt(wx, wz) < 0.6) continue;
         place(fence, wx, wz, hp.rot, { collide: false });
-        C.addSegment(wx - 1.1 * c, wz + 1.1 * s, wx + 1.1 * c, wz - 1.1 * s, 0.15);
+        fenceSeg(wx - 1.1 * c, wz + 1.1 * s, wx + 1.1 * c, wz - 1.1 * s, 0.15, 1.6);
         M.lines.push({ x0: wx - 1.1 * c, z0: wz + 1.1 * s, x1: wx + 1.1 * c, z1: wz - 1.1 * s, c: '#b8b0a0', w: 0.5 });
       }
     }
@@ -474,11 +479,11 @@ export async function populateWorld(world, plan, progress = () => {}) {
       const [wx0, wz0] = cemToWorld(ax, az), [wx1, wz1] = cemToWorld(bx, bz);
       if (e === 2) {
         const [g0x, g0z] = cemToWorld(3.2, CEMETERY.hd), [g1x, g1z] = cemToWorld(-3.2, CEMETERY.hd);
-        C.addSegment(wx0, wz0, g0x, g0z, 0.25);
-        C.addSegment(g1x, g1z, wx1, wz1, 0.25);
+        fenceSeg(wx0, wz0, g0x, g0z, 0.25, 2.6);
+        fenceSeg(g1x, g1z, wx1, wz1, 0.25, 2.6);
         M.lines.push({ x0: wx0, z0: wz0, x1: g0x, z1: g0z, c: '#16121c', w: 0.8 }, { x0: g1x, z0: g1z, x1: wx1, z1: wz1, c: '#16121c', w: 0.8 });
       } else {
-        C.addSegment(wx0, wz0, wx1, wz1, 0.25);
+        fenceSeg(wx0, wz0, wx1, wz1, 0.25, 2.6);
         M.lines.push({ x0: wx0, z0: wz0, x1: wx1, z1: wz1, c: '#16121c', w: 0.8 });
       }
     }
@@ -563,7 +568,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
           const [x, z] = W(lx, lz);
           const rot = fld.rot + Math.atan2(-(bz - az), bx - ax);
           wset.add(0, matrixFrom(x, hAt(x, z), z, rot, [len / n / 2.6, 1, 1], 0, rng.range(-0.08, 0.08)));
-          C.addSegment(x - (Math.cos(rot) * len) / n / 2, z + (Math.sin(rot) * len) / n / 2, x + (Math.cos(rot) * len) / n / 2, z - (Math.sin(rot) * len) / n / 2, 0.2);
+          fenceSeg(x - (Math.cos(rot) * len) / n / 2, z + (Math.sin(rot) * len) / n / 2, x + (Math.cos(rot) * len) / n / 2, z - (Math.sin(rot) * len) / n / 2, 0.2, 1.8);
         }
         const [x0, z0] = W(ax, az), [x1, z1] = W(bx, bz);
         M.lines.push({ x0, z0, x1, z1, c: '#5a4232', w: 0.5 });
@@ -598,7 +603,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
       coals.position.set(x, p.y, z);
       coals.rotation.y = a;
       scene.add(coals);
-      C.addCircle(x, z, 0.4);
+      C.addCircle(x, z, 0.4, { y0: p.y - 1, y1: p.y + 1.8 });
       out.braziers.push({ mesh: coals, pos: V3(x, p.y + 1.3, z), lit: false });
     }
   }
@@ -624,7 +629,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
     }
     for (const sd of [-1, 1]) {
       const x0 = g.x + sd * 2.8 * c, z0 = g.z - sd * 2.8 * s, x1 = g.x + sd * 19.6 * c, z1 = g.z - sd * 19.6 * s;
-      C.addSegment(x0, z0, x1, z1, 0.25);
+      fenceSeg(x0, z0, x1, z1, 0.25, 2.4);
       M.lines.push({ x0, z0, x1, z1, c: '#16121c', w: 0.8 });
     }
     fset.build();

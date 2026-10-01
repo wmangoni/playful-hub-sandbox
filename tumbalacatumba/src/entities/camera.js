@@ -61,13 +61,14 @@ export class WowCamera {
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     const dir = this._dir.set(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp);
 
-    // colisão: chão ao longo do raio + paredes das casas
+    // colisão: chão (e forro, dentro da mansão) ao longo do raio + paredes das casas
     let maxT = this.dist;
     const w = this.world;
-    for (let t = 0.5; t <= this.dist; t += 0.35) {
+    const indoor = w.interior?.active;
+    for (let t = 0.5; t <= this.dist; t += indoor ? 0.2 : 0.35) {
       const px = this.pivot.x + dir.x * t, py = this.pivot.y + dir.y * t, pz = this.pivot.z + dir.z * t;
-      if (py < w.groundHeight(px, pz) + 0.4) {
-        maxT = Math.max(0.5, t - 0.35);
+      if (py < w.groundHeight(px, pz, py + 0.3) + 0.4 || (indoor && py > w.ceilingHeight(px, pz, this.pivot.y) - 0.3)) {
+        maxT = Math.max(0.5, t - (indoor ? 0.2 : 0.35));
         break;
       }
     }
