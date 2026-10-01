@@ -11,7 +11,7 @@ Forja de heróis de D&D migrada do sistema legado `D-D-Make-Character` (CodeIgni
   - popup de **talentos e perícias**: "Salvar e gerar ficha" abre a ficha com `?escolher=1`, e o botão "Talentos e perícias" reabre;
   - acrescentou os 74 talentos do Livro do Jogador 3.0 (320 no total).
 - `TASKS/TASK_005.md`: integração no menu principal do hub pelo padrão do gerador de páginas SEO.
-- `TASKS/TASK_006.md` (em andamento): **simulador de combate** (Arena). Feitos o catálogo `data/catalogo-combate.json`, o motor de combate (E1 a E3), os personagens do jogador com equipamento (E4), a tela `#/arena` (E5), a simulação em lote (E6) e as magias dos seus personagens (E7); falta a ficha com o equipamento (E8).
+- `TASKS/TASK_006.md`: **simulador de combate** (Arena), com as 8 etapas prontas. Feitos o catálogo `data/catalogo-combate.json`, o motor de combate (E1 a E3), os personagens do jogador com equipamento (E4), a tela `#/arena` (E5), a simulação em lote (E6), as magias dos seus personagens (E7) e o equipamento na ficha impressa (E8).
 
 ## 🏗️ Arquitetura do Código
 
@@ -88,6 +88,7 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
       - A dica de dificuldade usa o nível de encontro da 3.0 (`js/rules/encontro30.js`).
       - As magias (E7, §8.5 da TASK_006) vêm de `js/rules/magias30.js`: a lista curada de 22 magias do Livro do Jogador 3.0, com a URL do SRD 3.0 e a mecânica calculada pelo nível de conjurador, os espaços do dia (os de `spellcasting()`), a preparação padrão e `magiasDeCombate`, que monta `ficha.magias` no formato do catálogo com os espaços por nível (`espacos` e `espaco` de cada magia). O diálogo fica em `js/pages/arena-magias.js`, e a escolha é gravada em `fichas.magias` (merge): `{ preparadas: { "1": { id: quantas } } }` ou `{ conhecidas: [ids] }`, normalizada ao ler. Toda mudança nas fórmulas exige ajustar `tests/ded_make_character_magias.test.js`, que confere o nível de cada classe com a linha "Level:" do SRD.
       - A simulação em lote (E6) roda `criarLote` em fatias de ~12 ms com `setTimeout` e redesenha só a seção dela (`atualizarLote`). Mudar a montagem, o equipamento ou as magias cancela o lote. O lote não segura a recarga: o evento de outra aba e "Restaurar tudo" o cancelam e recarregam (`cleanup.loteRodando()` entra no aviso).
+  - **Equipamento na ficha** (E8, §8.6 da TASK_006): `sheet.js` chama `fromPersonagem` e desenha `naFicha` (CA com armadura e escudo, deslocamento, penalidades, blocos de arma, armadura e escudo), com as mesmas contas da Arena (`caComEquipamento`, `deslocamentoComArmadura`, `penalidadeDoItem`). Os pesos vêm de `peso_lb` nas tabelas de `equipamento30.js` (`pesoKg`).
   - **`css/sheet.css`**: 2 páginas A4 de largura fixa (794 × 1123 px), reduzidas com `zoom` em telas estreitas. `@media print` imprime só a ficha. Fontes livres no lugar das originais: Scala Sans → Alegreya Sans e Alegreya Sans SC; Celestia Antiqua → Alegreya; Pterra → Grenze e Marcellus SC.
 - **`js/core/`**:
   - `router.js`: hash router com guarda assíncrona para formulários com alterações não salvas;

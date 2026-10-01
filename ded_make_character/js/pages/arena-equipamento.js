@@ -132,7 +132,7 @@ export function abrirEquipamento({ entrada, calcular, salvar, aoFechar }) {
         </div>
       </header>
       <div class="arena-picker__body">
-        <p class="arena-equip__lead">Fica salvo com o personagem e vale nas próximas lutas. Kit padrão da classe: ${['principal', 'secundaria', 'escudo', 'armadura', 'distancia'].map(k => rotuloItem(kitPadrao(ck, tamanho)[k])).filter(Boolean).join(', ')}.</p>
+        <p class="arena-equip__lead">Fica salvo com o personagem e vale nas próximas lutas e na ficha. Kit padrão da classe: ${['principal', 'secundaria', 'escudo', 'armadura', 'distancia'].map(k => rotuloItem(kitPadrao(ck, tamanho)[k])).filter(Boolean).join(', ')}.</p>
         <div class="arena-equip__grid">${SLOTS.map(linha)}</div>
         <section class="arena-equip__preview" aria-labelledby="equip-previa-titulo">
           <h3 class="arena-equip__h3" id="equip-previa-titulo">Na luta</h3>

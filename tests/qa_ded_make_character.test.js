@@ -268,7 +268,8 @@ async function run() {
     });
     assert.deepStrictEqual(sheet, {
       title: 'Ficha de Thora · D&D Make Character',
-      pv: '38', ca: '10', bab: '+3', speed: '6 m', con: '16', fort: '+7',
+      // com o kit do clérigo (E8): brunea +4 e escudo grande +2; o anão de armadura média anda 4,5 m
+      pv: '38', ca: '16', bab: '+3', speed: '4,5 m', con: '16', fort: '+7',
       spell1: ['14', '3+1', '1'], // CD 10+1+Sab 3; 3 do clérigo 5º + 1 de domínio; 1 adicional (Sab 17)
       overflow: false,
     });
@@ -423,8 +424,15 @@ async function run() {
       const talentos = await window.__dmc.store.all('talentos');
       const nomes = ['ESQUIVA', 'MOBILIDADE', 'ATAQUE EM MOVIMENTO', 'REFLEXOS DE COMBATE', 'INICIATIVA APRIMORADA', 'VONTADE DE FERRO', 'VITALIDADE'];
       const escolhidos = nomes.map(n => ({ talento_id: talentos.find(t => t.nome === n).id, parametro: null }));
-      await window.__dmc.store.insert('fichas', { personagem_id: personagemId, pericias: {}, talentos: escolhidos, atualizado_em: new Date().toISOString() });
+      // de cota de malha +1 (E8): três propriedades na armadura (sem proficiência, obra-prima, monge)
+      const equipamento = { principal: { id: 'desarmado', melhoria: 0, material: null }, armadura: { id: 'cota-de-malha', melhoria: 1, material: null } };
+      await window.__dmc.store.insert('fichas', { personagem_id: personagemId, pericias: {}, talentos: escolhidos, equipamento, atualizado_em: new Date().toISOString() });
     }, ids[5]);
+    // o druida de armadura completa +1: sem proficiência, obra-prima e metal
+    await page.evaluate(personagemId => window.__dmc.store.insert('fichas', {
+      personagem_id: personagemId, pericias: {}, talentos: [], atualizado_em: new Date().toISOString(),
+      equipamento: { principal: { id: 'cimitarra', melhoria: 0, material: null }, armadura: { id: 'armadura-completa', melhoria: 1, material: null }, escudo: null, distancia: { id: 'funda', melhoria: 0, material: null } },
+    }), ids[2]);
     for (const id of ids) {
       await go(`#/personagens/${id}/ficha`);
       await sleep(250);
@@ -437,6 +445,12 @@ async function run() {
         document.querySelectorAll('.sf-p2__col').forEach((col, i) => {
           if (col.scrollHeight > col.clientHeight + 1) out.push(`coluna ${i + 1} da página 2 transborda (${col.scrollHeight - col.clientHeight}px)`);
         });
+        // os valores dos blocos de equipamento (E8) cabem: sem reticências nem linha cortada
+        for (const el of document.querySelectorAll('.sf-val:not(.is-prop), .sf-gearblock__name[data-fit]')) if (el.scrollWidth > el.clientWidth + 1) out.push(`equipamento cortado: ${el.textContent.trim()}`);
+        for (const el of document.querySelectorAll('.sf-val__txt')) {
+          const cell = el.parentElement.getBoundingClientRect();
+          if (el.scrollHeight > el.clientHeight + 1 || el.getBoundingClientRect().bottom > cell.bottom + 0.5) out.push(`propriedades cortadas: ${el.textContent.trim()}`);
+        }
         const foot = document.querySelector('.sf-page--two .sf-foot').getBoundingClientRect();
         const lastLang = [...document.querySelectorAll('.sf-page--two .sf-written li')].at(-1).getBoundingClientRect();
         if (lastLang.bottom > foot.top + 1) out.push('Idiomas invade o rodapé da página 2');
@@ -463,6 +477,15 @@ async function run() {
       });
       assert.deepStrictEqual(problems, [], `personagem ${id}`);
     }
+    // o monge de cota +1 sem proficiência: −4 nas perícias com * e, pela 3.0, também em Cavalgar
+    await go(`#/personagens/${ids[5]}/ficha`);
+    await sleep(250);
+    const mongeDeCota = await page.evaluate(() => ({
+      nota: document.querySelector('.sf-skills__note').textContent,
+      props: [...document.querySelectorAll('.sf-val__txt')].map(e => e.textContent.replace(/^propriedades especiais: /, '').trim()),
+    }));
+    assert.match(mongeDeCota.nota, /penalidade de armadura \(−4\) já está somada; sem proficiência, também em Cavalgar \(−4\)/);
+    assert.ok(mongeDeCota.props.includes('sem proficiência (−4 no ataque); obra-prima (penalidade 1 menor); monge: perde CA e deslocamento'), JSON.stringify(mongeDeCota.props));
     await go(`#/personagens/${ids[4]}/ficha`);
     const notes = await page.$eval('.sheet-toolbar__notes', el => el.textContent);
     assert.match(notes, /Raça e classe ausentes: os valores que dependem delas ficaram em branco/);
@@ -763,6 +786,32 @@ async function run() {
     await page.reload({ waitUntil: 'networkidle0' });
     await sleep(300);
     assert.match(await text('.arena-side--a .arena-roster__equip'), /^Espada grande \+1/, 'o equipamento fica salvo');
+    // E8: a ficha usa o mesmo equipamento (blocos, CA sem o escudo, ataque da espada com as duas mãos)
+    await go('#/personagens/1/ficha');
+    await sleep(400);
+    const naFicha = await page.evaluate(() => {
+      const t = el => el?.textContent.replace(/\s+/g, ' ').trim();
+      // o valor de cada célula, sem o rótulo escondido para o leitor de tela
+      const valor = celula => {
+        const c = celula.cloneNode(true);
+        c.querySelectorAll('.visually-hidden').forEach(h => h.remove());
+        return c.textContent.trim();
+      };
+      const bloco = b => [t(b.querySelector('.sf-gearblock__name')), ...[...b.querySelectorAll('.sf-cells > span')].map(valor)].filter(Boolean).join(' | ');
+      const rotulos = [...document.querySelectorAll('.sf-gearblock.is-filled .sf-val')].slice(0, 3).map(v => v.querySelector('.visually-hidden')?.textContent);
+      const faixasOcultas = [...document.querySelectorAll('.sf-gearblock.is-filled .sf-strip')].every(s => s.getAttribute('aria-hidden') === 'true');
+      return { blocos: [...document.querySelectorAll('.sf-gearblock')].map(bloco), ca: t(document.querySelector('.sf-row--ac .is-total .sf-cell__box')), notas: t(document.querySelector('.sheet-toolbar__notes')), rotulos, faixasOcultas };
+    });
+    assert.deepStrictEqual(naFicha.rotulos, ['bônus de ataque total: ', 'dano: ', 'decisivo: '], 'cada valor leva o rótulo para o leitor de tela');
+    assert.ok(naFicha.faixasOcultas, 'preenchido, a faixa de rótulos sai do leitor de tela');
+    assert.strictEqual(naFicha.blocos[0], 'Espada grande +1 | +9 | 2d6+7 | 19–20/×2 | — | 7,5 kg | cortante | Grande | duas mãos (For ×1,5)');
+    assert.strictEqual(naFicha.blocos[2], 'Arco longo | +6 | 1d8 | 20/×3 | 30 m | 1,5 kg | perfurante | Grande');
+    assert.strictEqual(naFicha.blocos[3], 'Cota de malha | média | +5 | +2 | −5 | 30% | 6 m | 20 kg');
+    assert.strictEqual(naFicha.blocos[4], '', 'sem escudo');
+    assert.strictEqual(naFicha.ca, '17', '10 + 5 + Des 2 (máx. da cota)');
+    assert.doesNotMatch(naFicha.notas, /kit padrão/, 'com equipamento salvo, sem a nota do kit');
+    await go('#/arena?a=p:1&semente=580669');
+    await sleep(400);
     // a luta usa o equipamento salvo
     await domClick('[data-action="adicionar"][data-lado="B"]');
     await sleep(300);
