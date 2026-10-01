@@ -393,6 +393,7 @@ export class Menu {
       <div class="row">Sensibilidade do mouse <input type="range" min="0.0015" max="0.009" step="0.0005" data-k="sens"></div>
       <div class="row">Inverter eixo Y <input type="checkbox" data-k="invertY"></div>
       <div class="row">Travar cursor ao arrastar (pointer lock) <input type="checkbox" data-k="pointerLock"></div>
+      <div class="row">Controles de toque <select data-k="controls"><option value="auto">Automático</option><option value="on">Sempre</option><option value="off">Nunca</option></select></div>
       <h3>Vídeo</h3>
       <div class="row">Qualidade gráfica <select data-k="quality"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></div>
       <div class="row">Escala da interface <input type="range" min="0.7" max="1.3" step="0.05" data-k="uiScale"></div>
@@ -413,6 +414,13 @@ export class Menu {
         <div><b>L</b> diário de missões</div><div><b>M</b> mapa</div>
         <div><b>B</b> mochila</div><div><b>Enter</b> chat</div>
         <div><b>Esc</b> menu / fechar</div><div><b>Z</b> esconder interface</div>
+      </div>
+      <h3>Na tela de toque</h3>
+      <div class="keys">
+        <div><b>Lado esquerdo</b> arrastar: andar</div><div><b>Lado direito</b> arrastar: câmera</div>
+        <div><b>Pinça</b> zoom</div><div><b>Toque</b> conversar / pegar</div>
+        <div><b>Toque</b> em criatura: alvo; de novo: atacar</div><div><b>Toque longo</b> o que é isso?</div>
+        <div><b>Pular</b> (no voo: subir)</div><div><b>Descer</b> (no voo)</div>
       </div></div>
       <div class="foot"><button class="wbtn small ok">Fechar</button></div></div>`;
     const close = () => this.ui.hideWin(this.opt);
@@ -424,7 +432,7 @@ export class Menu {
       if (inp.type === 'checkbox') inp.checked = !!cur;
       else inp.value = cur;
       inp.addEventListener(inp.tagName === 'SELECT' || inp.type === 'checkbox' ? 'change' : 'input', () => {
-        const v = inp.type === 'checkbox' ? inp.checked : inp.tagName === 'SELECT' && k === 'quality' ? inp.value : parseFloat(inp.value);
+        const v = inp.type === 'checkbox' ? inp.checked : inp.tagName === 'SELECT' && (k === 'quality' || k === 'controls') ? inp.value : parseFloat(inp.value);
         g.applySetting(k, v);
       });
     });

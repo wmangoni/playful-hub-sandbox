@@ -244,8 +244,10 @@ export class MansionQuest {
     setTimeout(() => (c.action = null), 5000);
     setTimeout(() => c.say('Veludo carmim! Olhem só como eu fico DRAMÁTICO!', 4), 1200);
     setTimeout(() => {
-      g.ui.chat('Você aprendeu a VOAR! Aperte 8 (ou use a Capinha na mochila). Espaço sobe, X desce; segure X rente ao chão para pousar.', 'system');
-      g.ui.info('Novo poder: Voar (tecla 8)');
+      g.ui.chat(g.touchMode
+        ? 'Você aprendeu a VOAR! Toque no 8 da barra (ou use a Capinha na mochila). Os botões Subir e Descer controlam a altura; segure Descer rente ao chão para pousar.'
+        : 'Você aprendeu a VOAR! Aperte 8 (ou use a Capinha na mochila). Espaço sobe, X desce; segure X rente ao chão para pousar.', 'system');
+      g.ui.info(g.touchMode ? 'Novo poder: Voar (botão 8)' : 'Novo poder: Voar (tecla 8)');
     }, 2200);
   }
   applyState() {

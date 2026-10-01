@@ -3,6 +3,8 @@ import { clamp, damp, dampAngle, wrapAngle } from '../util/math.js';
 import { createPlayerModel, createBroomModel } from './models.js';
 import { WATER_LEVEL } from '../world/layout.js';
 
+const STICK_DEAD = 0.12; // zona morta do joystick de toque
+
 export class Player {
   constructor(game) {
     this.game = game;
@@ -150,10 +152,28 @@ export class Player {
     if (rmb) strafe += (right ? 1 : 0) - (left ? 1 : 0);
     else turn = (left ? 1 : 0) - (right ? 1 : 0);
     strafe = clamp(strafe, -1, 1);
-    if (this.frozen) { fwd = 0; strafe = 0; turn = 0; }
+    // joystick (toque): anda para onde aponta, relativo à câmera, e o personagem vira para lá.
+    // O teclado e o mouse têm prioridade (tablet com teclado continua funcionando igual)
+    const mv = input.move;
+    let stickYaw = null;
+    this.analog = 1;
+    this.camFollow = 1;
+    if (allowInput && mv && mv.m > STICK_DEAD && fwd === 0 && strafe === 0 && turn === 0 && !rmb) {
+      stickYaw = wrapAngle(cam.yaw + Math.atan2(-mv.x, mv.y));
+      fwd = 1;
+      this.autorun = false;
+      // pouco empurrão = anda devagar
+      this.analog = clamp((mv.m - STICK_DEAD) / 0.55, 0.35, 1);
+      // a câmera volta para trás do personagem só com o joystick para a frente; o peso cai suave até zero
+      // a ~37° (de lado, ela giraria junto e o personagem andaria em círculos)
+      const ahead = clamp((mv.y / mv.m - 0.8) / 0.2, 0, 1);
+      this.camFollow = 0.5 * ahead * ahead;
+    }
+    if (this.frozen) { fwd = 0; strafe = 0; turn = 0; stickYaw = null; }
 
     this.turnDelta = turn * this.turnSpeed * dt;
     if (rmb && !this.frozen) this.yaw = cam.yaw;
+    else if (stickYaw !== null) this.yaw = stickYaw; // o modelo vira suave (visualYaw)
     else this.yaw += this.turnDelta;
     this.yaw = wrapAngle(this.yaw);
 
@@ -186,6 +206,7 @@ export class Player {
       if (this.mounted) speed *= 1.65;
       if (this.flying) speed = fwd < 0 ? this.flyBack : this.flySpeed;
       else speed *= 1 - this.wading * 0.4;
+      speed *= this.analog;
     }
     this.wantMove = speed > 0 && fwd > 0; // quer andar para a frente (mesmo encostado numa porta)
     if (this.flying) return this.updateFlight(dt, k, K, mx, mz, speed, fwd, strafe);

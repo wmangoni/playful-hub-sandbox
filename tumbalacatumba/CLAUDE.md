@@ -20,7 +20,8 @@ RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Bur
 
 ## Mapa do código
 
-- `src/game.js`: orquestra render, loop, título → jogo, presets `QUALITY` (baixa/media/alta), opções, atalhos e resolução adaptativa (`_adapt`).
+- `src/game.js`: orquestra render, loop, título → jogo, presets `QUALITY` (baixa/media/alta), opções, atalhos, resolução adaptativa (`_adapt`) e o modo toque (`setupTouch`, `touchMode`).
+- `src/core/`: `input.js` (mouse e teclado; também guarda o que o toque preenche: `move`, `touchLook`, `hold`, `lastPointer`) e `touch.js` (`TouchControls`: joystick, câmera no dedo, pinça, toque, toque longo e botões Pular/Subir/Descer).
 - `src/render/`: `toon.js` (neblina global, `toonMat`, `MAT.vc`/`MAT.vcDouble`, brilhos `glowMat`/`flameMat` e o registro `GLOW`), `postfx.js` (composer e `LAYER_FX`), `builder.js` e `bake.js` (texturas assadas na GPU).
 - `src/world/`: `terrain.js`, `sky.js`, `daynight.js` (keyframes de luz, neblina e gradação por hora), `water.js`, `world.js` (movimento, colisão e água), `colliders.js`, `populate.js` (espalha os props) e `props/` (`batch.js` com o `StaticBatch`, árvores, casas, placas).
 - `src/entities/`: jogador, câmera de terceira pessoa, `rig.js` (animação procedural, com as chaves da Lanternada em `K_ATTACK`), `npc.js` (`NPC`, `Pickup`), modelos de PNJs e criaturas (`mobModels.js` tem as 5 criaturas hostis), vida ambiente.
@@ -39,10 +40,11 @@ RPG de missões em mundo aberto feito com three.js r186. Visual cartoon "Tim Bur
 - `window.__game.tick(dt)` renderiza um quadro manualmente. `window.__game.cam.override = { pos, look }` dá uma câmera livre.
 - `window.__errors` acumula os erros e avisos do console (`src/main.js`).
 - localStorage: `tumbalacatumba-save-v1` (save), `tbl-settings`, `tbl-quality`.
+- Modo toque: opção `controls` (`auto`, `on`, `off`; Opções → Controles de toque). `auto` liga quando a tela de toque é a entrada principal (`pointer: coarse`) e depois segue o último jeito usado (dedo ou mouse, `input.lastPointer`). No painel do navegador, viewport com largura < 768 emula celular (toque e `pointer: coarse`); 740×360 é um celular deitado.
 
 ## Como testar
 
-- **e2e**: abrir `Tumbalacatumba.html?play&notut&t=12` via `file://` (sem HMR), esperar `__game.state === 'play'`, injetar `tools/e2e_sync.js` e chamar `__T.run(passo)` na ordem descrita no arquivo. Resultado esperado: as 17 missões concluídas, nível 7 (máximo), o passo `combate` vencendo um marujo, o passo `fogo` com o Belzebuzinho acertando um rato, o passo `capa` com as 3 pistas, o baú, a capa nova no Conde e o voo (sobe mais de 10 m e pousa) e `window.__errors` vazio. Os passos de caça esperam as criaturas renascerem (70 s simulados). Rode contra o HTML final, porque um erro de TDZ já apareceu só no build. O e2e liga o modo pacífico: sem isso, criaturas hostis e os 15% de neutros incomodados atrapalham os teleportes.
+- **e2e**: abrir `Tumbalacatumba.html?play&notut&t=12` via `file://` (sem HMR), esperar `__game.state === 'play'`, injetar `tools/e2e_sync.js` e chamar `__T.run(passo)` na ordem descrita no arquivo. Resultado esperado: as 17 missões concluídas, nível 7 (máximo), o passo `combate` vencendo um marujo, o passo `fogo` com o Belzebuzinho acertando um rato, o passo `capa` com as 3 pistas, o baú, a capa nova no Conde e o voo (sobe mais de 10 m e pousa) e `window.__errors` vazio. Os passos de caça esperam as criaturas renascerem (70 s simulados). O passo `toque` simula dedos (`new Touch`/`TouchEvent` no canvas) e confere o joystick relativo à câmera, o arrasto e a pinça da câmera, o toque longo, o toque que conversa e o botão de pular; roda em qualquer viewport, porque liga `controls: 'on'` e depois volta. Rode contra o HTML final, porque um erro de TDZ já apareceu só no build. O e2e liga o modo pacífico: sem isso, criaturas hostis e os 15% de neutros incomodados atrapalham os teleportes.
 - **Aba em segundo plano** (browser-harness): o Chrome pausa o `requestAnimationFrame` e segura `setTimeout`/`setInterval`. Por isso o e2e avança só a simulação (`update(1/30)`), sem render e sem timers, e o carregamento cede com `setTimeout` em vez de rAF. Screenshots funcionam depois de um `tick()` manual.
 - Screenshot de PNJ: tire o cursor de cima dele antes. O destaque de hover (`rig.highlight`, emissive 0,09) acinzenta roupas escuras e já fez a capa do Conde parecer salmão.
 - FPS só vale com a aba visível. Para simular 1080p, use `Emulation.setDeviceMetricsOverride` e depois `Emulation.clearDeviceMetricsOverride`.
@@ -86,6 +88,19 @@ Referência: 60 FPS a 1592×818 na qualidade média, com ~318 draw calls por qua
 - PNJs do interior têm `indoorLevel` e só aparecem no andar certo (senão a placa de nome atravessa o piso). O save grava a posição de fora (`outsidePos`) quando o jogador está dentro, e o jogo sempre recomeça do lado de fora.
 - Nada de `setTimeout` em sequências de missão (o baú do sótão): o e2e avança só a simulação. Use temporizadores no `update`.
 - O `renderer.compile` do carregamento liga o interior só para compilar e depois restaura a visibilidade anterior.
+
+**Toque (versão mobile)**
+- O canvas chama `preventDefault()` em todo `touchstart/move/end`: sem isso o navegador ainda gera `mousedown`/`click` de compatibilidade e um toque vira dois cliques (e a página rola ou dá zoom).
+- Toque rápido e toque longo são medidos no tempo do jogo (`TouchControls.update(dt)`), não com `setTimeout`, para o e2e conseguir simular. Dedo que não saiu 12 px do ponto inicial: solto antes de 0,5 s é toque, parado depois disso é toque longo, nos dois lados da tela (no lado do joystick ele só começa a andar depois de sair dos 12 px).
+- Modo mouse volta só com `pointermove` de `pointerType === 'mouse'`: tocar num botão da interface gera `mousemove` de compatibilidade, e ele derrubava o modo toque no meio da corrida.
+- Opção "Nunca" (`TouchControls.setEnabled(false)`): os handlers saem antes do `preventDefault`, e o navegador volta a cuidar dos dedos.
+- Cada `touchstart` confere os dedos contra `e.touches`: um `touchend` perdido (alerta do sistema, gesto da borda) deixava o joystick preso. Nos testes, cada evento sintético precisa levar a lista completa de dedos na tela, como no aparelho.
+- Dois dedos encostando perto um do outro (< 30% da largura) e quase juntos (< 0,15 s) viram pinça, mesmo que o primeiro tenha caído no lado do joystick. Com o polegar já no joystick, o 2º dedo é a outra mão (toca e gira a câmera, mesmo do lado esquerdo); só um 3º dedo nesse lado é ignorado.
+- O centro lógico do joystick é o ponto do toque; só o desenho da base é empurrado para caber na tela (`_drawStick`). Limitar o centro fazia o polegar que encosta na borda de baixo começar andando para trás.
+- Áudio no iOS: `navigator.audioSession.type = 'ambient'` (respeita a chave de silencioso e não pausa a música do jogador) e o `AudioContext` é retomado em qualquer estado diferente de `running` (inclui `interrupted`, depois de ligação ou bloqueio de tela).
+- Joystick: o teclado e o mouse têm prioridade (tablet com teclado continua igual). A câmera só volta para trás do personagem com o joystick para a frente (`player.camFollow`, peso contínuo que zera a ~37°); de lado, ele andaria em círculos.
+- No toque não existe "mouse por cima": `interact.update` só destaca e mostra a dica durante o toque longo. Com `lastPointer` errado, o PNJ no centro da tela fica destacado (acinzentado) o tempo todo.
+- Textos de ajuda com tecla ou clique têm versão de toque (`ui.hintText`, dicas do chat e do voo).
 
 **Voo (capinha)**
 - Todo colisor precisa de faixa de altura (`y0`/`y1`). Sem ela o padrão é 99 m e, voando, o jogador bate numa parede invisível no céu. Cercas e muros usam o `fenceSeg` de `populate.js`; o e2e voa a ~20 m por cima da cerca da mansão para pegar isso.

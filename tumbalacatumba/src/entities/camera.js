@@ -23,9 +23,9 @@ export class WowCamera {
     this.override = null; // cinematográfica (tela de título)
   }
 
-  /** aplica arrasto do mouse e roda (antes do jogador se mover) */
+  /** aplica arrasto do mouse (ou do dedo) e roda/pinça (antes do jogador se mover) */
   handleInput(input) {
-    if (input.dragging) {
+    if (input.dragging || input.touchLook) {
       this.yaw -= input.dx * this.sens;
       this.pitch += input.dy * this.sens * (this.invertY ? -1 : 1);
       this.pitch = clamp(this.pitch, -1.15, 1.48);
@@ -49,7 +49,7 @@ export class WowCamera {
     // teclado A/D gira a câmera junto; "seguir de forma inteligente" quando anda
     const leftDrag = input.left && !input.right;
     if (!leftDrag) this.yaw += player.turnDelta;
-    if (!input.anyButton && player.isMoving && !player.backpedal) this.yaw = dampAngle(this.yaw, player.yaw, this.followRate, dt);
+    if (!input.looking && player.isMoving && !player.backpedal) this.yaw = dampAngle(this.yaw, player.yaw, this.followRate * (player.camFollow ?? 1), dt);
 
     this.dist = damp(this.dist, this.targetDist, 10, dt);
     const tx = player.pos.x, tz = player.pos.z, ty = player.pos.y + (player.mounted ? 2.0 : 1.55);

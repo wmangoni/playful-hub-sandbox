@@ -6,6 +6,7 @@ import { DayNight } from './world/daynight.js';
 import { PostFX, LAYER_FX } from './render/postfx.js';
 import { SHARED } from './render/toon.js';
 import { Input } from './core/input.js';
+import { TouchControls, prefersTouch } from './core/touch.js';
 import { Player } from './entities/player.js';
 import { WowCamera } from './entities/camera.js';
 import { Ambience } from './fx/ambience.js';
@@ -29,7 +30,8 @@ export const QUALITY = {
   alta: { scale: 1.0, shadow: 2048, bloom: true, msaa: true, maxPR: 1.5, grass: 1.0 },
 };
 
-const DEFAULT_SETTINGS = { master: 0.8, music: 0.45, sfx: 0.8, sens: 0.0045, invertY: false, pointerLock: false, uiScale: 1, showFps: false, daySpeed: 1 };
+// controls: 'auto' (toque quando a tela de toque é a entrada principal), 'on' (sempre) ou 'off' (nunca)
+const DEFAULT_SETTINGS = { master: 0.8, music: 0.45, sfx: 0.8, sens: 0.0045, invertY: false, pointerLock: false, uiScale: 1, showFps: false, daySpeed: 1, controls: 'auto' };
 const START = { x: 1.5, z: 19.5, yaw: Math.PI - 0.25 };
 
 function lsGet(k) {
@@ -133,6 +135,8 @@ export class Game {
     }
     scene.add(this.outdoor);
     this.input = new Input(renderer.domElement);
+    this.input.lastPointer = prefersTouch() ? 'touch' : 'mouse';
+    this.setupTouch();
     this.input.pointerLock = this.settings.pointerLock;
     this.player = new Player(this);
     scene.add(this.player.object);
@@ -223,7 +227,8 @@ export class Game {
     const has = Progress.hasSave();
     el.innerHTML = `<div class="logo"><h1>Tumbalacatumba</h1><p>Contos do Vale Assombrado</p></div>
       <div class="menu">${has ? '<button class="wbtn" data-a="cont">Continuar</button>' : ''}<button class="wbtn" data-a="new">${has ? 'Novo Jogo' : 'Jogar'}</button></div>
-      <div class="hint">Controles de <b>MMO clássico</b>: <b>W A S D</b> para andar · segure o <b>botão direito</b> do mouse para girar câmera e personagem · <b>botão esquerdo</b> gira só a câmera · <b>clique direito</b> em alguém para conversar · roda do mouse = zoom.</div>
+      <div class="hint hint-mouse">Controles de <b>MMO clássico</b>: <b>W A S D</b> para andar · segure o <b>botão direito</b> do mouse para girar câmera e personagem · <b>botão esquerdo</b> gira só a câmera · <b>clique direito</b> em alguém para conversar · roda do mouse = zoom.</div>
+      <div class="hint hint-touch">Arraste o <b>lado esquerdo</b> da tela para andar · arraste o <b>lado direito</b> para girar a câmera · <b>pinça</b> = zoom · <b>toque</b> em alguém para conversar · <b>toque longo</b> mostra o que é.</div>
       <div class="credit">feito com three.js · 100% procedural</div>`;
     document.body.appendChild(el);
     this.titleEl = el;
@@ -233,6 +238,7 @@ export class Game {
       for (const k of ['master', 'music', 'sfx']) this.audio.setVolume(k, this.settings[k]);
     };
     window.addEventListener('pointerdown', wake, { once: true });
+    window.addEventListener('touchend', wake, { once: true }); // iOS só libera áudio em touchend/click
     window.addEventListener('keydown', wake, { once: true });
     el.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => {
       if (b.dataset.a === 'new' && has) {
@@ -348,6 +354,7 @@ export class Game {
       return;
     }
     s[k] = v;
+    if (k === 'controls') this.setupTouch();
     if (k === 'master' || k === 'music' || k === 'sfx') this.audio.setVolume(k, v);
     if (k === 'sens') this.cam.sens = v;
     if (k === 'invertY') this.cam.invertY = v;
@@ -400,7 +407,35 @@ export class Game {
     }
   }
 
+  /** cria (ou desliga) os controles de toque conforme a opção 'controls' */
+  setupTouch() {
+    const c = this.settings.controls;
+    const capable = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!this.touch && (c === 'on' || (c === 'auto' && capable))) this.touch = new TouchControls(this.input, this);
+    this.touch?.setEnabled(c !== 'off');
+    if (c === 'off') this.input.lastPointer = 'mouse';
+  }
+  /** joystick e botões na tela? ('auto' segue o último jeito que o jogador usou: dedo ou mouse) */
+  get touchMode() {
+    const c = this.settings.controls;
+    return !!this.touch?.enabled && (c === 'on' || (c === 'auto' && this.input.lastPointer === 'touch'));
+  }
+  _syncTouchMode() {
+    const tm = this.touchMode, show = tm && this.state === 'play';
+    if (tm !== this._tm) {
+      this._tm = tm;
+      document.body.classList.toggle('touch', tm);
+      if (!tm) this.touch?.reset();
+    }
+    if (show !== this._tmShow) {
+      this._tmShow = show;
+      this.touch?.root.classList.toggle('show', show);
+    }
+  }
+
   update(dt) {
+    this.touch?.update(dt);
+    this._syncTouchMode();
     const blocking = this.ui.blocking();
     if (this.state === 'play') {
       if (!blocking) this.cam.handleInput(this.input);

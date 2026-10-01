@@ -33,6 +33,20 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 | Esconder a interface | `Z` |
 | Menu, opções e controles | `Esc` |
 
+### No celular ou tablet (tela de toque)
+
+Jogue com o aparelho deitado. O modo toque liga sozinho em telas de toque, e dá para mudar em Opções → Controles de toque.
+
+| Ação | Toque |
+|---|---|
+| Andar | arrastar o **lado esquerdo** da tela (joystick): o personagem anda para onde você aponta |
+| Girar a câmera | arrastar o **lado direito** da tela |
+| Zoom | pinça com dois dedos |
+| Conversar / pegar / usar | **tocar** em alguém ou em algo perto (longe: só seleciona) |
+| Atacar | tocar na criatura para selecionar e de novo para atacar, ou o `7` da barra |
+| O que é isso? | **toque longo** mostra a dica |
+| Pular / voar | botão **Pular** (voando: **Subir** e **Descer**; segure Descer rente ao chão para pousar) |
+
 ## O que tem no vale
 
 - **17 missões** com PNJs: o Prefeito Abóbora (cuja cabeça gira entre a cara feliz e a preocupada),

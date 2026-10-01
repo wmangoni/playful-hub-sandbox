@@ -314,7 +314,9 @@ export class UI {
     });
     this.chatInput.addEventListener('blur', () => setTimeout(() => this.closeChat(), 50));
     this.chat('Bem-vindo ao Vale Tumbalacatumba!', 'system');
-    this.chat('Dica: segure o botão direito do mouse e use W A S D para andar. Enter abre o chat.', 'system');
+    this.chat(this.game.touchMode
+      ? 'Dica: arraste o lado esquerdo da tela para andar e o lado direito para olhar em volta. Toque em alguém para conversar.'
+      : 'Dica: segure o botão direito do mouse e use W A S D para andar. Enter abre o chat.', 'system');
   }
   openChat() {
     this.chatOpen = true;
@@ -418,6 +420,12 @@ export class UI {
     this.tooltip.classList.add('hidden');
     this.ttOwner = null;
   }
+  /** no toque, "Clique com o botão direito para X" vira "Toque para X" (criatura: "Toque de novo para atacar") */
+  hintText(hint) {
+    if (!this.game.touchMode) return hint;
+    if (hint === 'Clique com o botão direito para atacar') return 'Toque para selecionar, de novo para atacar';
+    return hint.replace(/^Clique com o botão direito/, 'Toque');
+  }
   tooltipFor(it) {
     if (!it) return this.hideTooltip('world');
     if (it.kind === 'mob') {
@@ -426,7 +434,7 @@ export class UI {
       h += `<div class="tt-lvl"><span style="color:${this.levelColor(m.level)}">Nível ${m.level}</span> ${esc(it.family)}</div>`;
       h += `<div class="tt-sub">${it.reaction === 'hostile' ? 'Hostil: ataca quem chega perto' : 'Neutro: só briga se provocado'}</div>`;
       if (m.hp < m.maxHp) h += `<div class="tt-sub">Vida: ${Math.ceil(m.hp)} / ${m.maxHp}</div>`;
-      if (it.hint) h += `<div class="tt-hint">${esc(it.hint)}</div>`;
+      if (it.hint) h += `<div class="tt-hint">${esc(this.hintText(it.hint))}</div>`;
       if (this.game.interaction.distTo(it) > it.range) h += `<div class="tt-far">Longe demais</div>`;
       return this.showTooltip('world', h);
     }
@@ -446,7 +454,7 @@ export class UI {
         if (o) h += `<div class="tt-flavor">${esc(q.title)}</div>`;
       }
     }
-    if (it.hint) h += `<div class="tt-hint">${esc(it.hint)}</div>`;
+    if (it.hint) h += `<div class="tt-hint">${esc(this.hintText(it.hint))}</div>`;
     if (this.game.interaction.distTo(it) > it.range) h += `<div class="tt-far">Longe demais</div>`;
     this.showTooltip('world', h);
   }
@@ -456,7 +464,7 @@ export class UI {
     if (it.quality === 'quest') h += '<div class="tt-sub">Item de missão</div>';
     if (it.desc) h += `<div class="tt-desc">${esc(it.desc)}</div>`;
     if (it.flavor) h += `<div class="tt-flavor">"${esc(it.flavor)}"</div>`;
-    if (inBag && it.use) h += `<div class="tt-hint">Clique para usar</div>`;
+    if (inBag && it.use) h += `<div class="tt-hint">${this.game.touchMode ? 'Toque para usar' : 'Clique para usar'}</div>`;
     this.showTooltip('item', h, x, y);
   }
 
