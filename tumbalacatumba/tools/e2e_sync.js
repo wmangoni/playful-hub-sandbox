@@ -1,4 +1,4 @@
-// Teste ponta a ponta que joga as 16 missões avançando só a simulação (sem render e sem timers).
+// Teste ponta a ponta que joga as 17 missões avançando só a simulação (sem render e sem timers).
 // Funciona mesmo com a aba em segundo plano, onde o Chrome pausa o rAF e segura os timers.
 //
 // Uso (browser-harness, console do DevTools ou CDP):
@@ -6,7 +6,7 @@
 //   2. executar este arquivo na página;
 //   3. chamar __T.run(passo) para cada passo, nesta ordem:
 //        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate,
-//        cuspe, fogo, baile, pelos, sotao, casamento, final
+//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final
 //      Cada chamada devolve 'ok' ou 'ERRO ...' (uma chamada por passo cabe no timeout do Runtime.evaluate);
 //      As missões rodam em modo pacífico (as criaturas não atacam); o passo "combate" liga a briga de volta.
 //   4. conferir __T.log (o passo final registra nível, XP, dinheiro, itens e o status de cada missão)
@@ -130,6 +130,52 @@ window.__T = (() => {
     baile() { accept('juvenal', 'baile'); hunt('Caveira Saltitante', 'caveira'); turnIn('juvenal', 'baile'); },
     pelos() { accept('vesga', 'pelo'); hunt('Aranha Cabeluda', 'pelo'); turnIn('vesga', 'pelo'); },
     sotao() { accept('conde', 'sotao'); hunt('Morcego Dentuço', 'morcego'); turnIn('conde', 'sotao'); },
+    capa() {
+      // A Capa Sumida: entra pela porta, segue as 3 pistas, abre o baú do sótão, sai e entrega; depois voa
+      const io = g.indoors, M = QW.mansion;
+      accept('conde', 'capa');
+      const door = g.interaction.list.find((i) => i.name === 'Porta da Mansão');
+      tp(io.outSpot.x, io.outSpot.z); wait(100);
+      if (!door || g.interaction.distTo(door) > door.range) throw new Error('porta da mansão fora de alcance');
+      io.enter({ instant: true }); wait(200);
+      if (!io.active) throw new Error('não entrou na mansão');
+      const goTo = (w) => { g.player.teleport(w.x + 0.5, w.z + 0.4, 0, w.y + 0.3); g.cam.snapBehind(g.player); wait(150); };
+      for (let i = 0; i < 3; i++) {
+        const c = M.clues[i];
+        goTo(c.pos);
+        g.interaction.tryInteract(c.inter); wait(200);
+        g.ui.dialog.close();
+      }
+      goTo(M.trunk.pos);
+      g.interaction.tryInteract(M.trunk.inter); wait(3600);
+      L.push(`capa: pistas ${P.count('capa', 'pista')} capa ${P.count('capa', 'capanova')} item ${P.hasItem('capanova')} status ${P.status('capa')}`);
+      io.exit({ instant: true }); wait(200);
+      if (io.active) throw new Error('não saiu da mansão');
+      turnIn('conde', 'capa');
+      L.push(`capa nova no Conde: ${QW.npcs.conde.rig.capeNew.visible} capinha: ${P.hasItem('capinha')}`);
+      // voo: decola, sobe 2 s, avança 2 s e pousa segurando X
+      const p = g.player, y0 = p.pos.y;
+      g.abilities.use('fly');
+      g.input.keys.add('Space'); wait(2000); g.input.keys.delete('Space');
+      const up = p.pos.y - y0;
+      g.input.keys.add('KeyW'); wait(2000); g.input.keys.delete('KeyW');
+      const speed = p.speedNow;
+      g.input.keys.add('KeyX'); let n = 0; while (p.flying && n++ < 400) wait(33); g.input.keys.delete('KeyX');
+      L.push(`voo: subiu ${up.toFixed(1)} m, ${speed.toFixed(1)} m/s, pousou ${!p.flying}`);
+      if (up < 8 || p.flying) throw new Error('voo não funcionou');
+      // cruza a cerca da mansão a ~20 m de altura (colisor sem faixa de altura virava parede invisível no céu)
+      const G = { x: 101, z: 13 }, rot = Math.atan2(103 - 93, 12 - 16), c = Math.cos(rot), s = Math.sin(rot);
+      const fx = G.x + 10 * c, fz = G.z - 10 * s;
+      tp(fx - 8 * s, fz - 8 * c); p.yaw = rot; wait(100);
+      g.abilities.use('fly');
+      g.input.keys.add('Space'); wait(3000); g.input.keys.delete('Space');
+      const alt = p.pos.y - g.world.groundHeight(p.pos.x, p.pos.z), from = p.pos.clone();
+      g.input.keys.add('KeyW'); wait(2000); g.input.keys.delete('KeyW');
+      const crossed = Math.hypot(p.pos.x - from.x, p.pos.z - from.z);
+      g.input.keys.add('KeyX'); n = 0; while (p.flying && n++ < 600) wait(33); g.input.keys.delete('KeyX');
+      L.push(`voo alto: ${alt.toFixed(1)} m acima do chão, avançou ${crossed.toFixed(1)} m por cima da cerca, pousou ${!p.flying}`);
+      if (alt < 12 || crossed < 15 || p.flying) throw new Error('voo alto barrado pela cerca da mansão');
+    },
     casamento() {
       accept('suspiro', 'casamento');
       hunt('Marujo Afogado', 'marujo');

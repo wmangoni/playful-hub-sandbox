@@ -17,6 +17,8 @@ export const ITEMS = {
   tonico: { name: 'Tônico Capilar da Vesga', quality: 'rare', icon: 'potion', desc: 'Usar: Restaura 40 de vida. Recarga de 60 s.', flavor: 'Efeito colateral: sobrancelha nova.', use: 'tonic' },
   capa: { name: 'Capa de Veludo Roída', quality: 'rare', icon: 'cape', desc: '+7 de Drama Noturno.', flavor: 'Os buracos são de traça. Ou de morcego. Ou do tataravô.' },
   buque: { name: 'Buquê da Lady Névoa', quality: 'epic', icon: 'bouquet', desc: 'Não murcha. Já veio murcho.', flavor: 'Quem pega o buquê é o próximo a morrer de amor.' },
+  capanova: { name: 'Capa Nova do Conde', quality: 'quest', icon: 'capanova', desc: 'Item de missão.', flavor: 'Veludo carmim, gola até as orelhas. Ainda quentinha de morceguinho.' },
+  capinha: { name: 'Capinha de Morcego Filhote', quality: 'epic', icon: 'batcape', desc: 'Usar: Você VOA! Espaço sobe, X desce. Segure X rente ao chão para pousar (tecla 8). Não funciona debaixo de teto.', flavor: 'Tamanho P. Muito P. Veio de brinde no embrulho da Tia Morcegália.', use: 'fly' },
 };
 
 export const QUALITY_COLORS = {
@@ -283,6 +285,42 @@ export const QUESTS = [
     rewards: { xp: 750, money: 15000, items: ['buque'] },
     area: 'casamento',
   },
+  {
+    id: 'capa',
+    title: 'A Capa Sumida',
+    level: 6,
+    minLevel: 5,
+    giver: 'conde',
+    turnIn: 'conde',
+    requires: ['sotao'],
+    text:
+      'Mortal! Que bom que você veio. Estou... desolado.\n\nMinha tia-avó Morcegália mandou da Transilvânia um presente de aniversário: uma capa NOVA. Veludo carmim, gola até as orelhas, forro que brilha no escuro. Pendurei no cabideiro do saguão para admirar... e hoje ela SUMIU.\n\nSuspeito do Anselmo, meu mordomo. É um fantasma muito organizado: guarda tudo no lugar certo. O lugar certo DELE.\n\nA porta está aberta, eu nunca tranco (quem tranca porta é quem tem medo de vampiro). Procure pela mansão cômodo por cômodo e siga as pistas. E limpe os pés: o tapete é de 1703.',
+    summary: 'Entre na Mansão Dentúcio, siga as 3 pistas do sumiço e encontre a capa nova do Conde.',
+    objectives: [{ key: 'pista', need: 3, label: 'Pistas seguidas' }, { key: 'capanova', need: 1, label: 'Capa nova encontrada' }],
+    progress: 'Nada ainda? Sem a capa nova eu tenho que usar a velha. A de 1703. Que vexame.',
+    complete: 'MINHA CAPA!\n\n...Um morceguinho estava dormindo nela? Pelo menos ele tem bom gosto.\n\nA tia sempre manda um brinde no embrulho: uma capinha tamanho filhote. Em mim não serve nem de cachecol. Mas em você... dizem que quem veste capinha de morcego com fé sai VOANDO.\n\nExperimente! Aperte 8: Espaço sobe, X desce. Só não tente debaixo de um teto.',
+    rewards: { xp: 900, money: 20000, items: ['capinha'] },
+    area: 'capa',
+  },
+];
+
+// Pistas da missão "A Capa Sumida" (na ordem em que aparecem)
+export const CAPE_CLUES = [
+  {
+    title: 'Etiqueta do Presente',
+    text: 'Um cartãozinho caído perto do cabideiro, preso num laço roxo:\n\n"Para o meu sobrinho mais dentuço. Veludo carmim legítimo da Transilvânia. NÃO deixe o Anselmo lavar! Com amor e presas, Tia Morcegália."\n\nNo chão, um rastro fino de pó de talco sobe a escadaria... rumo à biblioteca.',
+    hint: 'O rastro de talco sobe a escadaria até a biblioteca.',
+  },
+  {
+    title: 'Manual do Mordomo Perfeito',
+    text: 'Um livro aberto na escrivaninha, com uma página marcada:\n\n"Capítulo 13: Capas de veludo devem ser lavadas à mão, em água fria, no porão. Nunca, jamais, sob hipótese alguma, no sol."\n\nNa margem, com letra caprichada: "Lavar a capa nova do patrão ANTES que ele use. — A."',
+    hint: 'O Anselmo levou a capa para lavar na lavanderia do porão (a escada fica na cozinha).',
+  },
+  {
+    title: 'Bilhete do Anselmo',
+    text: 'Um bilhete espetado na tábua de passar, ao lado de um cabide vazio:\n\n"Capa lavada, passada e perfumada. Guardei no baú do sótão, bem longe das traças. As traças não sabem subir escadas. — A."\n\nAs traças não sabem. Mas os morcegos sabem voar...',
+    hint: 'A capa está num baú do sótão (a escada fica na biblioteca, perto da parede leste).',
+  },
 ];
 
 // XP necessária para passar de cada nível
@@ -342,6 +380,25 @@ export const NPC_INFO = {
     greet: 'Quem ousa perturbar meu luto eterno? Ah, é só um vivo.',
     barks: ['Estou de luto há 300 anos. Por mim mesma.', 'Alguém tem uma flor que não esteja murcha?'],
   },
+  anselmo: {
+    name: 'Anselmo', title: 'Mordomo Fantasma', level: 20,
+    greet: 'Seja bem-vindo à Mansão Dentúcio. Limpe os pés, por favor. E não repare: a casa é maior por dentro. Coisa de vampiro.',
+    barks: ['Limpe os pés, por favor.', 'Tudo no seu devido lugar. O meu devido lugar.', 'O patrão acorda às seis. Da tarde.', 'Cuidado com o terceiro degrau. Ele morde.'],
+    gossip: [
+      { text: 'Me mostre a mansão.', reply: 'Com prazer. Aqui é o Saguão. À esquerda, a Sala de Jantar e a Sala da Lareira; à direita, a Cozinha e a Sala de Música, onde o órgão toca sozinho de madrugada.\n\nLá em cima, pela escadaria, ficam a Biblioteca e o Quarto do Conde, com o Banheiro. Da biblioteca sobe a escada do Sótão. E da cozinha desce a do Porão: Adega, Lavanderia (a MINHA lavanderia) e a Cripta da família. Não acordem o Vovô.' },
+      { text: 'Por que a casa é maior por dentro?', reply: 'Economia de terreno, senhor. Os vampiros inventaram isso muito antes dos arquitetos.' },
+    ],
+  },
+  vovo: {
+    name: 'Vovô Dentúcio I', title: 'Fundador da Família (falecido, mas presente)', level: 30,
+    greet: 'Quem está pisando na minha tampa?! Ah, um vivo. Pode ficar, mas não mexa nos ossos da estante.',
+    barks: ['No meu tempo, sótão era para guardar parentes!', 'Esses morcegos lá em cima fazem festa toda noite!', 'Meu bisneto usa capa de brinquedo agora? Hmpf.', 'Ai, a minha coluna... ah, é mesmo, não tenho coluna.'],
+  },
+  bisa: {
+    name: 'Bisa Dentúcia', title: 'Matriarca Assombrada', level: 28,
+    greet: 'Querido! Você come direitinho? Está tão corado. Corado demais. Que horror.',
+    barks: ['Esse penteado levou 80 anos para ficar pronto.', 'Anselmo! Tem pó na minha lápide!', 'No meu tempo, a gente voava de verdade. Sem capinha.'],
+  },
 };
 
 export const ZONE_FLAVOR = {
@@ -367,4 +424,5 @@ export const TIPS = [
   'Dica: A Lápide de Regresso (tecla 6) leva você de volta à praça.',
   'Dica: Vaga-lumes só aparecem à noite. O Coveiro Tonico pode ajudar você a esperar.',
   'Dica: Terminou uma missão? Volte a quem pediu: muita história tem continuação.',
+  'Dica: A porta da Mansão Dentúcio vive aberta. Entre e conheça os cômodos (o mordomo faz o tour).',
 ];

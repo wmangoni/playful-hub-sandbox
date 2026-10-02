@@ -35,6 +35,16 @@ export class Player {
     this.courage = 100;
     this.dead = false;
     this.hitStop = 0; // congela o golpe por um instante quando acerta (dá peso à pancada)
+    // voo com a Capinha de Morcego Filhote
+    this.flying = false;
+    this.gliding = false; // desligou o voo no ar: desce planando
+    this.flySpeed = 10.5;
+    this.flyBack = 6.5;
+    this.flyUp = 6.5;
+    this.flyDown = 8;
+    this.landT = 0;
+    this.flapT = 0;
+    this.onFlap = null;
 
     this.rig = createPlayerModel();
     this.object = this.rig.root;
@@ -85,11 +95,43 @@ export class Player {
     this.actionDur = duration;
   }
 
-  teleport(x, z, yaw) {
-    this.pos.set(x, this.world.groundHeight(x, z), z);
+  /** y = altura de referência para achar o piso (dentro da mansão há vários andares) */
+  teleport(x, z, yaw, y) {
+    this.pos.set(x, this.world.groundHeight(x, z, y), z);
     this.vel.set(0, 0, 0);
     if (yaw !== undefined) this.yaw = yaw;
     this.visualYaw = this.yaw;
+  }
+
+  // ------------------------------------------------------------ voo
+  /** abre a capinha e decola */
+  startFlying() {
+    if (this.mounted) this.setMounted(false);
+    if (this.seat) this.leaveSeat(false);
+    this.flying = true;
+    this.gliding = false;
+    this.sitting = false;
+    this.autorun = false;
+    this.landT = 0;
+    if (this.grounded) this.vel.y = 5.5;
+    this.grounded = false;
+    this.rig.cape.visible = true;
+  }
+  /** fecha a capinha: no ar, desce planando; now = some na hora (entrar em casa, morrer) */
+  stopFlying(now = false) {
+    this.flying = false;
+    this.landT = 0;
+    const high = this.pos.y - this.world.groundHeight(this.pos.x, this.pos.z, this.pos.y) > 0.6;
+    this.gliding = !now && high;
+    if (!this.gliding) this.rig.cape.visible = false;
+  }
+  /** chão sob o voo: sobre água funda, a superfície da água */
+  flyFloor(x, z) {
+    const g = this.world.groundHeight(x, z, this.pos.y);
+    return WATER_LEVEL - g > 0.9 ? WATER_LEVEL + 0.35 : g;
+  }
+  overDeepWater() {
+    return WATER_LEVEL - this.world.groundHeight(this.pos.x, this.pos.z, this.pos.y) > 0.9;
   }
 
   update(dt, input, cam, allowInput = true) {
@@ -142,8 +184,11 @@ export class Player {
       mz /= ml;
       speed = fwd < 0 ? this.backSpeed : this.runSpeed;
       if (this.mounted) speed *= 1.65;
-      speed *= 1 - this.wading * 0.4;
+      if (this.flying) speed = fwd < 0 ? this.flyBack : this.flySpeed;
+      else speed *= 1 - this.wading * 0.4;
     }
+    this.wantMove = speed > 0 && fwd > 0; // quer andar para a frente (mesmo encostado numa porta)
+    if (this.flying) return this.updateFlight(dt, k, K, mx, mz, speed, fwd, strafe);
     const moving = speed > 0;
     if (moving && (this.sitting || this.action === 'dance')) {
       this.sitting = false;
@@ -162,11 +207,13 @@ export class Player {
         this.game.audio?.sfx('jump');
       }
     } else {
-      // WoW preserva o impulso no ar; um pouquinho de controle deixa mais gostoso
-      this.vel.x = damp(this.vel.x, mx * speed, 0.9, dt);
-      this.vel.z = damp(this.vel.z, mz * speed, 0.9, dt);
+      // WoW preserva o impulso no ar; um pouquinho de controle deixa mais gostoso (planando, bem mais)
+      const air = this.gliding ? 2.6 : 0.9;
+      this.vel.x = damp(this.vel.x, mx * speed * (this.gliding ? 1.2 : 1), air, dt);
+      this.vel.z = damp(this.vel.z, mz * speed * (this.gliding ? 1.2 : 1), air, dt);
     }
     this.vel.y -= 20 * dt;
+    if (this.gliding) this.vel.y = Math.max(this.vel.y, -3.2);
 
     // XZ com colisão
     const w = this.world;
@@ -178,7 +225,7 @@ export class Player {
     this.isMoving = moving && this.speedNow > 0.5;
 
     // Y
-    const g = w.groundHeight(this.pos.x, this.pos.z);
+    const g = w.groundHeight(this.pos.x, this.pos.z, this.pos.y);
     const floor = this.mounted ? g + 0.55 + Math.sin(this.rig.t * 2.6) * 0.08 : g;
     this.pos.y += this.vel.y * dt;
     if (this.pos.y <= floor) {
@@ -199,6 +246,16 @@ export class Player {
     } else {
       this.grounded = false;
       this.airTime += dt;
+    }
+    // dentro da mansão: a cabeça bate no forro
+    const ceil = w.ceilingHeight(this.pos.x, this.pos.z, this.pos.y + 0.2);
+    if (this.pos.y + 1.85 > ceil) {
+      this.pos.y = Math.max(floor, ceil - 1.85);
+      this.vel.y = Math.min(this.vel.y, 0);
+    }
+    if (this.gliding && this.grounded) {
+      this.gliding = false;
+      this.rig.cape.visible = false;
     }
 
     this.wading = clamp((WATER_LEVEL - g) / 0.9, 0, 1) * (this.pos.y < WATER_LEVEL + 0.2 ? 1 : 0);
@@ -230,15 +287,87 @@ export class Player {
       speed: this.grounded ? this.speedNow : 0,
       back: this.backpedal,
       strafe: offset === 0 ? strafe : 0,
-      air: !this.grounded && !this.mounted,
+      air: !this.grounded && !this.mounted && !this.gliding,
       vy: this.vel.y,
       action: this.action,
       actionT: this.actionT,
       sit: this.sitting,
       mounted: this.mounted,
       snap: this.action === 'attack',
+      fly: this.gliding,
+      flyMove: Math.min(1, this.speedNow / 8),
     });
+    this.updateLantern(dt);
+  }
 
+  /** física do voo: sem gravidade, sobe no Espaço, desce no X, pousa segurando X rente ao chão */
+  updateFlight(dt, k, K, mx, mz, speed, fwd, strafe) {
+    const w = this.world;
+    this.backpedal = fwd < 0;
+    this.strafe = strafe;
+    this.vel.x = damp(this.vel.x, mx * speed, 3.2, dt);
+    this.vel.z = damp(this.vel.z, mz * speed, 3.2, dt);
+    const up = !this.frozen && K('Space'), down = !this.frozen && K('KeyX');
+    const vyT = (up ? this.flyUp : 0) - (down ? this.flyDown : 0);
+    this.vel.y = damp(this.vel.y, vyT, 5, dt);
+    const [nx, nz] = w.moveCircle(this.pos, this.pos.x + this.vel.x * dt, this.pos.z + this.vel.z * dt, this.radius, true);
+    const moved = Math.hypot(nx - this.pos.x, nz - this.pos.z);
+    this.pos.x = nx;
+    this.pos.z = nz;
+    this.speedNow = dt > 0 ? moved / dt : 0;
+    this.isMoving = this.speedNow > 0.5;
+    // altura: paira rente ao chão, sobe o morro sozinho, respeita o teto de voo
+    const floor = this.flyFloor(this.pos.x, this.pos.z) + 0.35;
+    this.pos.y += this.vel.y * dt;
+    if (this.pos.y < floor) {
+      this.pos.y = Math.max(floor - 0.25, damp(this.pos.y, floor, 14, dt));
+      if (this.vel.y < 0) this.vel.y = 0;
+    }
+    const top = Math.min(floor + 48, 78);
+    if (this.pos.y > top) {
+      this.pos.y = top;
+      this.vel.y = Math.min(this.vel.y, 0);
+    }
+    // segurando X rente ao chão (e fora d'água): pousa
+    const low = this.pos.y - floor < 0.12;
+    this.landT = down && low && !this.overDeepWater() ? this.landT + dt : 0;
+    this.grounded = false;
+    this.airTime = 0;
+    // bater de "asas" quando sobe (som)
+    if (up) {
+      this.flapT -= dt;
+      if (this.flapT <= 0) {
+        this.flapT = 0.32;
+        this.onFlap?.();
+      }
+    } else this.flapT = 0;
+    const moving = this.speedNow > 0.5;
+    const offset = moving && fwd >= 0 && strafe !== 0 ? -strafe * 0.7 : 0;
+    this.visualYaw = dampAngle(this.visualYaw, this.yaw + offset, 10, dt);
+    this.object.position.copy(this.pos);
+    this.object.rotation.y = this.visualYaw;
+    this.courage = Math.min(100, this.courage + dt * 4);
+    if (this.action) {
+      this.actionT += dt;
+      if (this.actionDur && this.actionT > this.actionDur) this.action = null;
+    }
+    this.rig.animate(dt, {
+      speed: 0,
+      vy: this.vel.y,
+      action: this.action === 'attack' ? this.action : null,
+      actionT: this.actionT,
+      fly: true,
+      flyMove: Math.min(1, this.speedNow / this.flySpeed),
+      flyBack: this.backpedal,
+    });
+    if (this.landT > 0.25) {
+      this.stopFlying(true);
+      this.game.fx?.poof(this.pos, '#6a4a8a', 0.7);
+    }
+    this.updateLantern(dt);
+  }
+
+  updateLantern(dt) {
     // lanterna: acende sozinha à noite ou pelo botão
     const night = this.game.dayNight?.night ?? 0;
     const target = (this.lanternOn ? 1 : 0) * (0.35 + 0.65 * night);

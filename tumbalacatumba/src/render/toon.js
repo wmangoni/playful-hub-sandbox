@@ -78,7 +78,9 @@ function addRim(m, strength) {
         '#include <lights_fragment_end>',
         `#include <lights_fragment_end>
         float rimF = pow(1.0 - clamp(dot(geometryNormal, geometryViewDir), 0.0, 1.0), 3.0);
-        reflectedLight.indirectDiffuse += uRim * rimF * (diffuseColor.rgb * 1.5 + 0.08) * ${strength.toFixed(2)};`
+        reflectedLight.indirectDiffuse += uRim * rimF * (diffuseColor.rgb * 1.5 + 0.08) * ${strength.toFixed(2)};
+        // segurança: luz pontual a milímetros de uma superfície passa do limite do half-float e o bloom espalharia o Inf
+        reflectedLight.directDiffuse = min(reflectedLight.directDiffuse, vec3(24.0));`
       );
   };
   m.customProgramCacheKey = () => 'rim-' + strength;

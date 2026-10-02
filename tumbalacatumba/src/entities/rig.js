@@ -154,6 +154,42 @@ export class Rig {
       P.headX = -0.2;
       P.bodyY = 0;
     }
+    // voo com a capinha: corpo deitado para a frente quando avança, braços batendo quando sobe
+    let pitch = 0;
+    if (s.fly) {
+      const mv = clamp(s.flyMove || 0, 0, 1);
+      const up = clamp((s.vy || 0) / 6, -1, 1);
+      const flap = Math.sin(this.t * 11);
+      const bob = Math.sin(this.t * 2.4);
+      P.legL = 0.12 + bob * 0.08 * (1 - mv) + 0.25 * mv;
+      P.legR = 0.3 - bob * 0.08 * (1 - mv) + 0.2 * mv;
+      P.legLz = 0.06;
+      P.legRz = -0.06;
+      if (up > 0.35) {
+        P.armL = -0.35;
+        P.armR = -0.35;
+        P.armLz = 1.15 + flap * 0.55;
+        P.armRz = -(1.15 + flap * 0.55);
+      } else if (mv > 0.35 && !s.flyBack) {
+        P.armL = 0.5;
+        P.armR = 0.5;
+        P.armLz = 0.32 + Math.sin(this.t * 3) * 0.05;
+        P.armRz = -P.armLz;
+      } else {
+        P.armL = -0.25 + Math.sin(this.t * 3) * 0.15;
+        P.armR = -0.25 - Math.sin(this.t * 3) * 0.15;
+        P.armLz = 0.85;
+        P.armRz = -0.85;
+      }
+      P.torsoX = 0.04;
+      P.headX = -0.55 * mv;
+      P.bodyY = bob * 0.05 * (1 - mv * 0.5);
+      pitch = s.flyBack ? -0.2 : mv * 1.1 - Math.max(0, up) * 0.35 + Math.max(0, -up) * 0.25;
+    }
+    // inclinação do corpo inteiro, girando em volta do quadril (não dos pés)
+    this.flyPitch = damp(this.flyPitch ?? 0, pitch, 6, dt);
+    const fp = this.flyPitch;
+    if (Math.abs(fp) > 1e-3) P.bodyY += 0.95 * (1 - Math.cos(fp));
     const at = s.actionT || 0;
     switch (s.action) {
       case 'dance': {
@@ -284,7 +320,14 @@ export class Rig {
     set(j.head, 'z', P.headZ);
     this.body.position.y = damp(this.body.position.y, P.bodyY, k, dt);
     const dying = s.action === 'die';
-    if (dying || this.body.rotation.x) this.body.rotation.x = damp(this.body.rotation.x, dying ? -1.45 : 0, dying ? 5 : 9, dt);
+    if (dying) this.body.rotation.x = damp(this.body.rotation.x, -1.45, 5, dt);
+    else if (Math.abs(fp) > 1e-3) {
+      this.body.rotation.x = fp;
+      this.body.position.z = -0.95 * Math.sin(fp);
+    } else if (this.body.rotation.x || this.body.position.z) {
+      this.body.rotation.x = damp(this.body.rotation.x, 0, 9, dt);
+      this.body.position.z = damp(this.body.position.z, 0, 9, dt);
+    }
 
     // mola do squash & stretch
     this.squashV += (-this.squash * 90 - this.squashV * 11) * dt;
