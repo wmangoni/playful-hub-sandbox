@@ -465,7 +465,11 @@ export const grassMat = (() => {
         float ph = gw.x * 0.31 + gw.z * 0.23 + uTime * 1.6;
         float wv = sin( ph ) * 0.6 + sin( ph * 2.3 + 1.3 ) * 0.3;
         transformed.x += wv * sway * 0.13;
-        transformed.z += cos( ph * 0.7 ) * sway * 0.07;`
+        transformed.z += cos( ph * 0.7 ) * sway * 0.07;
+        #ifdef GRASS_FAR
+          // celular: longe da câmera a ponta afunda no chão, antes de a célula da grama deixar de ser desenhada
+          transformed.y -= smoothstep( GRASS_FAR - 16.0, GRASS_FAR, distance( gw.xyz, cameraPosition ) ) * sway * 1.5;
+        #endif`
       );
   };
   m.customProgramCacheKey = () => 'grass-v1';

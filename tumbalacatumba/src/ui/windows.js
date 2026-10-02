@@ -399,7 +399,7 @@ export class Menu {
       <div class="row desk-only">Travar cursor ao arrastar (pointer lock) <input type="checkbox" data-k="pointerLock"></div>
       <div class="row">Controles de toque <select data-k="controls"><option value="auto">Automático</option><option value="on">Sempre</option><option value="off">Nunca</option></select></div>
       <h3>Vídeo</h3>
-      <div class="row">Qualidade gráfica <select data-k="quality"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></div>
+      <div class="row">Qualidade gráfica <select data-k="quality"><option value="movel">Celular</option><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></div>
       <div class="row">Escala da interface <input type="range" min="0.7" max="1.3" step="0.05" data-k="uiScale"></div>
       <div class="row">Mostrar FPS <input type="checkbox" data-k="showFps"></div>
       <h3>Tempo</h3>

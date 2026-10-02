@@ -4,7 +4,10 @@ import { planWorld, populateWorld } from './world/populate.js';
 import { Sky } from './world/sky.js';
 import { DayNight } from './world/daynight.js';
 import { PostFX, LAYER_FX } from './render/postfx.js';
-import { SHARED } from './render/toon.js';
+import { SHARED, useRadialFog } from './render/toon.js';
+import { FarCull } from './render/farCull.js';
+import { InstanceSet } from './world/props/batch.js';
+import { grassMat } from './world/props/small.js';
 import { Input } from './core/input.js';
 import { TouchControls, prefersTouch } from './core/touch.js';
 import { TouchBar } from './ui/touchBar.js';
@@ -29,7 +32,18 @@ export const QUALITY = {
   baixa: { scale: 0.7, shadow: 1024, bloom: false, msaa: false, maxPR: 1, grass: 0.45 },
   media: { scale: 1.0, shadow: 2048, bloom: true, msaa: false, maxPR: 1, grass: 0.75 },
   alta: { scale: 1.0, shadow: 2048, bloom: true, msaa: true, maxPR: 1.5, grass: 1.0 },
+  // celular: sombra menor e mais curta; grama rala que afunda no chão e some com a distância; cenário longe
+  // cortado (a neblina fica um pouco mais densa e esconde o corte) e fora do contorno; PNJs, criaturas e bichos
+  // aparecem mais perto (lod); no máximo 60 quadros (telas de 90/120 Hz) e resolução adaptativa que só cai abaixo
+  // dos 30 FPS. O bloom fica: roda em meia resolução ou menos e é o que faz a noite brilhar
+  movel: {
+    scale: 1.0, shadow: 1024, shadowBox: 30, bloom: true, msaa: false, maxPR: 1, grass: 0.35,
+    grassFar: 55, outlineFar: 100, viewFar: 170, fogMin: 0.0068, lod: 0.75, cap: 60,
+    adapt: { min: 0.75, down: 28, up: 42 },
+  },
 };
+// resolução adaptativa dos presets de desktop: mira 60, aceita 48
+const ADAPT = { min: 0.62, down: 48, up: 58.5 };
 
 // controls: 'auto' (toque quando a tela de toque é a entrada principal), 'on' (sempre) ou 'off' (nunca)
 const DEFAULT_SETTINGS = { master: 0.8, music: 0.45, sfx: 0.8, sens: 0.0045, invertY: false, pointerLock: false, uiScale: 1, showFps: false, daySpeed: 1, controls: 'auto' };
@@ -54,7 +68,8 @@ export class Game {
   constructor(container) {
     this.container = container;
     this.params = new URLSearchParams(location.search);
-    this.qualityName = this.params.get('q') || lsGet('tbl-quality') || 'media';
+    // sem qualidade escolhida: no celular/tablet (tela de toque como entrada principal) o preset leve
+    this.qualityName = this.params.get('q') || lsGet('tbl-quality') || (prefersTouch() ? 'movel' : 'media');
     if (!QUALITY[this.qualityName]) this.qualityName = 'media';
     this.quality = QUALITY[this.qualityName];
     try {
@@ -83,6 +98,7 @@ export class Game {
     renderer.info.autoReset = false;
     this.container.appendChild(renderer.domElement);
     this.renderer = renderer;
+    this._watchContext(renderer.domElement);
 
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x221c40, 0.008, 0.5);
@@ -95,7 +111,8 @@ export class Game {
     sun.castShadow = true;
     sun.shadow.mapSize.set(q.shadow, q.shadow);
     const sc = sun.shadow.camera;
-    sc.left = -44; sc.right = 44; sc.top = 44; sc.bottom = -44; sc.near = 1; sc.far = 260;
+    const sb = q.shadowBox ?? 44;
+    sc.left = -sb; sc.right = sb; sc.top = sb; sc.bottom = -sb; sc.near = 1; sc.far = 260;
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.05;
     scene.add(sun, sun.target);
@@ -104,6 +121,10 @@ export class Game {
     this.sun = sun;
     this.hemi = hemi;
 
+    // celular (antes de compilar qualquer material): a grama afunda no chão com a distância e a neblina conta a
+    // distância até a câmera, igual ao corte do cenário longe
+    if (q.grassFar) grassMat.defines = { ...grassMat.defines, GRASS_FAR: q.grassFar.toFixed(1) };
+    if (q.viewFar) useRadialFog();
     progress(0.05, 'Cavando o terreno…');
     await nextFrame();
     this.world = new World(this);
@@ -125,6 +146,7 @@ export class Game {
     this.post = new PostFX(renderer, scene, camera, { msaa: q.msaa, bloom: q.bloom });
     this.dayNight = new DayNight({ scene, sky: this.sky, sun, hemi, post: this.post, renderer, terrain: this.world.terrain });
     this.dayNight.speed = this.settings.daySpeed;
+    this.dayNight.fogMin = q.fogMin ?? 0;
 
     this.ambience = new Ambience(this, this.populated);
     // tudo o que é cenário de fora vai para um grupo: dentro da mansão ele nem é desenhado
@@ -135,6 +157,11 @@ export class Game {
       this.outdoor.add(o);
     }
     scene.add(this.outdoor);
+    if (q.viewFar) {
+      this.farCull = new FarCull(InstanceSet.batch.meshes, { viewFar: q.viewFar, grassFar: q.grassFar, outlineFar: q.outlineFar, grassMat, loose: this.populated.loose });
+      this.post.normalPass.cull = this.farCull;
+      this.post.setOutlineFar(q.outlineFar);
+    }
     this.input = new Input(renderer.domElement);
     this.input.lastPointer = prefersTouch() ? 'touch' : 'mouse';
     this.setupTouch();
@@ -205,18 +232,51 @@ export class Game {
     this.post.setSize(w, h);
   }
 
+  /**
+   * o sistema pode tirar a placa de vídeo do jogo (no celular: outro app pesado, muito tempo em segundo plano).
+   * Salva, avisa e recarrega quando ela volta: o que foi desenhado só na GPU (como a luz dos postes no chão)
+   * não voltaria sozinho
+   */
+  _watchContext(cv) {
+    cv.addEventListener('webglcontextlost', (e) => this._onContextLost(e));
+    cv.addEventListener('webglcontextrestored', () => location.reload());
+  }
+  _onContextLost(e) {
+    e.preventDefault(); // deixa o navegador devolver o contexto depois
+    this.contextLost = true;
+    if (this.state === 'play') this.progress?.save();
+    if (document.getElementById('ctxlost')) return;
+    const el = document.createElement('div');
+    el.id = 'ctxlost';
+    el.innerHTML = '<b>O vale piscou…</b><span>O aparelho precisou da placa de vídeo para outra coisa. Seu progresso foi salvo.</span><button class="wbtn">Recarregar</button>';
+    el.querySelector('button').onclick = () => location.reload();
+    document.body.appendChild(el);
+  }
+
   start() {
     this.last = performance.now();
     const loop = (now) => {
       this._raf = requestAnimationFrame(loop);
-      const raw = (now - this.last) / 1000;
-      this.last = now;
-      this.tick(Math.min(0.05, Math.max(0, raw)), raw);
+      this._frame(now);
     };
     this._raf = requestAnimationFrame(loop);
     const p = this.params;
     if (p.has('play') || p.has('pos')) this.beginPlay(p.has('cont'));
     else this.showTitle();
+  }
+
+  /**
+   * um quadro do requestAnimationFrame. Celular com tela de 90/120 Hz: no máximo q.cap quadros (bateria e
+   * aquecimento), sempre no mesmo ritmo (120 Hz → 60, 90 Hz → 45). A folga de 22% deixa passar todo quadro de
+   * uma tela de até 75 Hz (com 2 ms, uma tela de 75 Hz caía para 37,5) e segura a variação do relógio a 60 Hz.
+   * Devolve se desenhou
+   */
+  _frame(now) {
+    const raw = (now - this.last) / 1000;
+    if (this.quality.cap && raw < 0.78 / this.quality.cap) return false;
+    this.last = now;
+    this.tick(Math.min(0.05, Math.max(0, raw)), raw);
+    return true;
   }
 
   // ------------------------------------------------------------ fluxo
@@ -290,7 +350,14 @@ export class Game {
     if (!restored && !this.params.has('notut')) setTimeout(() => this.ui.startTutorial(), 2500);
     clearInterval(this._saveTimer);
     this._saveTimer = setInterval(() => this.progress.save(), 15000);
-    window.addEventListener('beforeunload', () => this.progress.save());
+    if (!this._saveHooks) {
+      this._saveHooks = true;
+      // no celular o beforeunload quase nunca chega (o sistema mata a aba em segundo plano): salva ao sair do app
+      const save = () => this.state === 'play' && this.progress.save();
+      window.addEventListener('beforeunload', save);
+      window.addEventListener('pagehide', save);
+      document.addEventListener('visibilitychange', () => document.hidden && save());
+    }
   }
 
   titleCamera(dt) {
@@ -376,9 +443,11 @@ export class Game {
 
   // ------------------------------------------------------------ loop
   tick(dt, raw = dt) {
+    if (this.contextLost) return;
     this.time += dt;
     SHARED.uTime.value = this.time;
     this.update(dt);
+    if (this.farCull && !this.indoors?.active) this.farCull.update(this.camera.position);
     // antes de desenhar: se a resolução adaptativa mudar, o redimensionamento limpa o canvas, e depois do
     // render o quadro apresentado saía todo preto (uma piscada a cada troca de escala)
     // em pé não desenha: os quadros ficariam baratos e a resolução adaptativa subiria à toa
@@ -389,6 +458,13 @@ export class Game {
   }
 
   _trackPerf(raw) {
+    // quadro de volta do segundo plano (ou de um travamento longo) não é medida de desempenho: no celular ele
+    // derrubava a média e a resolução a cada volta ao app
+    if (raw > 0.25) {
+      this._fpsAcc = 0;
+      this._fpsN = 0;
+      return;
+    }
     this._fpsAcc += raw;
     this._fpsN++;
     if (this._fpsAcc > 0.5) {
@@ -405,10 +481,10 @@ export class Game {
     this._fpsHist = [...(this._fpsHist ?? []), this.fps].slice(-6);
     if (this._fpsHist.length < 6) return;
     const avg = this._fpsHist.reduce((a, b) => a + b, 0) / 6;
-    const cur = this.dynScale ?? 1;
+    const cur = this.dynScale ?? 1, A = this.quality.adapt ?? ADAPT;
     let next = cur;
-    if (avg < 48 && cur > 0.62) next = Math.max(0.62, cur - 0.1);
-    else if (avg > 58.5 && cur < 1) next = Math.min(1, cur + 0.05);
+    if (avg < A.down && cur > A.min) next = Math.max(A.min, cur - 0.1);
+    else if (avg > A.up && cur < 1) next = Math.min(1, cur + 0.05);
     if (next !== cur) {
       this.dynScale = next;
       this._fpsHist = [];

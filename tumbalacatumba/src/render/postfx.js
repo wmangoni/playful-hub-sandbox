@@ -22,6 +22,7 @@ class NormalDepthPass extends Pass {
     this.rt.depthTexture = new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
     this._clear = new THREE.Color(0.5, 0.5, 1.0);
     this._old = new THREE.Color();
+    this.cull = null; // FarCull do celular: o cenário longe não entra no contorno
   }
   setSize(w, h) {
     this.rt.setSize(w, h);
@@ -39,7 +40,9 @@ class NormalDepthPass extends Pass {
     renderer.setClearColor(this._clear, 1);
     renderer.setRenderTarget(this.rt);
     renderer.clear();
+    this.cull?.beginOutline();
     renderer.render(scene, camera);
+    this.cull?.endOutline();
     renderer.setClearColor(this._old, oldAlpha);
     renderer.shadowMap.autoUpdate = oldAuto;
     camera.layers.mask = oldMask;
@@ -68,6 +71,7 @@ const OutlineShader = {
     uFogDensity: { value: 0.008 },
     uTime: { value: 0 },
     uBoil: { value: 0.0 },
+    uTanHalf: { value: new THREE.Vector2(1, 1) }, // tangente da metade do campo de visão (x, y)
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -76,7 +80,7 @@ const OutlineShader = {
   fragmentShader: /* glsl */ `
     #include <packing>
     uniform sampler2D tDiffuse, tNormal, tDepth;
-    uniform vec2 resolution;
+    uniform vec2 resolution, uTanHalf;
     uniform float cameraNear, cameraFar, uStrength, uThickness, uFogDensity, uTime, uBoil;
     uniform vec3 uColor, uFogColor;
     varying vec2 vUv;
@@ -105,8 +109,16 @@ const OutlineShader = {
       float zmin = min(z0, min(min(zL, zR), min(zD, zU)));
       float e = max(eDepth, eNormal * (1.0 - smoothstep(40.0, 110.0, zmin)));
       e *= 1.0 - smoothstep(170.0, 320.0, zmin);
+      #ifdef OUTLINE_FAR
+        // celular: o passe de normais só tem o cenário até OUTLINE_FAR da câmera (distância, não profundidade).
+        // A tinta se apaga antes disso: o corte por célula não aparece, nem a crista do terreno atrás do que saiu
+        float dmin = zmin * length(vec3((vUv * 2.0 - 1.0) * uTanHalf, 1.0));
+        e *= 1.0 - smoothstep(OUTLINE_FAR - 30.0, OUTLINE_FAR, dmin);
+      #else
+        float dmin = zmin;
+      #endif
       // a linha também "entra" na neblina
-      float fogF = 1.0 - exp(-uFogDensity * uFogDensity * zmin * zmin);
+      float fogF = 1.0 - exp(-uFogDensity * uFogDensity * dmin * dmin);
       vec3 ink = mix(uColor, uFogColor, fogF * 0.92);
       vec3 col = mix(base.rgb, ink, e * uStrength);
       gl_FragColor = vec4(col, base.a);
@@ -171,8 +183,12 @@ export class PostFX {
     this.camera = camera;
     const size = renderer.getSize(new THREE.Vector2());
     const pr = renderer.getPixelRatio();
+    // half-float (HDR) quando o aparelho consegue desenhar nele (todo desktop e quase todo celular); senão 8 bits,
+    // sem bloom (os alvos dele são sempre half-float, e em 8 bits nada passa do limiar de brilho)
+    const ext = renderer.extensions, hdr = ext.has('EXT_color_buffer_half_float') || ext.has('EXT_color_buffer_float');
+    this.hdr = hdr;
     const rt = new THREE.WebGLRenderTarget(Math.max(1, size.x * pr), Math.max(1, size.y * pr), {
-      type: THREE.HalfFloatType,
+      type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
       samples: msaa ? 4 : 0,
     });
     this.composer = new EffectComposer(renderer, rt);
@@ -182,7 +198,7 @@ export class PostFX {
     this.outlinePass.uniforms.tNormal.value = this.normalPass.rt.texture;
     this.outlinePass.uniforms.tDepth.value = this.normalPass.rt.depthTexture;
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.55, 0.5, 1.0);
-    this.bloomPass.enabled = bloom;
+    this.bloomPass.enabled = bloom && hdr;
     this.outputPass = new OutputPass();
     this.fxaaPass = new FXAAPass();
     this.gradePass = new ShaderPass(GradeShader);
@@ -205,8 +221,17 @@ export class PostFX {
     this.outline.uThickness.value = Math.max(1, Math.min(2, ph / 900));
   }
 
+  /** celular: a tinta do contorno some até d metros da câmera (o FarCull tira do passe de normais o que passa disso) */
+  setOutlineFar(d) {
+    const m = this.outlinePass.material;
+    m.defines.OUTLINE_FAR = d.toFixed(1);
+    m.needsUpdate = true;
+  }
+
   render(dt, time) {
     const cam = this.camera;
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    this.outline.uTanHalf.value.set(tan * cam.aspect, tan);
     this.outline.cameraNear.value = cam.near;
     this.outline.cameraFar.value = cam.far;
     this.outline.uTime.value = time;

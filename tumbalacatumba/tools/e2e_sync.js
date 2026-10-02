@@ -6,9 +6,11 @@
 //   2. executar este arquivo na página;
 //   3. chamar __T.run(passo) para cada passo, nesta ordem:
 //        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate,
-//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final, toque, toqueHud
+//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final, toque, toqueHud, contexto, desktop
 //      (toque = controles de toque com dedos simulados; toqueHud = interface de toque, com o layout conferido
-//       só em tela de celular deitado; os dois podem rodar sozinhos depois de qualquer passo)
+//       só em tela de celular deitado; contexto = placa de vídeo perdida e salvar ao sair do app; desktop = o
+//       preset de desktop sem nada do celular; os quatro podem rodar sozinhos depois de qualquer passo)
+//      Preset de celular: numa página aberta com &q=movel, rodar movel (e de novo toque, toqueHud e contexto).
 //      Cada chamada devolve 'ok' ou 'ERRO ...' (uma chamada por passo cabe no timeout do Runtime.evaluate);
 //      As missões rodam em modo pacífico (as criaturas não atacam); o passo "combate" liga a briga de volta.
 //   4. conferir __T.log (o passo final registra nível, XP, dinheiro, itens e o status de cada missão)
@@ -446,7 +448,8 @@ window.__T = (() => {
       g.interaction.setTarget(null); C.autoAttack = false;
       press(atk); wait(60);
       const warned = g.interaction.target === null && ui.errors.textContent.includes('Nenhuma criatura');
-      const m = C.mobs.filter((mb) => mb.alive && mb.targetable && mb.inter.enabled()).sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
+      // (no preset de celular as criaturas longe ficam invisíveis e só viram miráveis de perto)
+      const m = C.mobs.filter((mb) => mb.alive && mb.state !== 'flee').sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
       let aimed = 'sem criatura no mapa';
       if (m) {
         const dir = Math.atan2(p.pos.x - m.pos.x, p.pos.z - m.pos.z);
@@ -561,7 +564,7 @@ window.__T = (() => {
       const cleared = g.interaction.target === null;
       // ...mas não no meio da briga: o polegar reencostando no joystick (ou errando a criatura) não desliga a Lanternada
       let fightKept = 'sem criatura no mapa';
-      const foe = C.mobs.filter((mb) => mb.alive && mb.targetable && mb.inter.enabled()).sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
+      const foe = C.mobs.filter((mb) => mb.alive && mb.state !== 'flee').sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
       if (foe) {
         // perto dela (alvo a mais de 60 m o jogo solta sozinho)
         const fd = Math.atan2(p.pos.x - foe.pos.x, p.pos.z - foe.pos.z);
@@ -632,6 +635,163 @@ window.__T = (() => {
       ok.push(`aviso de retrato ${!!rot}; de volta ao desktop ${back}`);
       if (!rot || !back) fail('volta ao modo desktop falhou');
       L.push('toqueHud: ' + ok.join('; '));
+    },
+    contexto() {
+      // placa de vídeo perdida: chama o handler do jogo direto (um evento no canvas também chegaria ao three, que
+      // pararia de desenhar de vez), confere que salva, para o jogo e avisa, e depois volta ao normal
+      const ok = [], fail = (m) => { throw new Error(m + ' | ' + ok.join('; ')); };
+      const s0 = P.save;
+      let saves = 0, prevented = false;
+      P.save = () => { saves++; };
+      try {
+        g._onContextLost({ preventDefault: () => { prevented = true; } });
+        const t0 = g.time;
+        g.tick(1 / 30);
+        const el = document.getElementById('ctxlost'), b = el?.querySelector('button')?.getBoundingClientRect();
+        const lost = g.contextLost && prevented && g.time === t0 && saves === 1 && !!el && b.height >= 43.5;
+        el?.remove();
+        g.contextLost = false;
+        g.tick(1 / 30);
+        const drawing = g.renderer.info.render.calls > 0;
+        ok.push(`depois volta a desenhar ${drawing}`);
+        if (!drawing) fail('o renderer parou depois do teste de contexto');
+        ok.push(`contexto perdido: para, salva e avisa ${lost}`);
+        // celular: o sistema mata a aba em segundo plano sem beforeunload; salva no pagehide
+        saves = 0;
+        window.dispatchEvent(new Event('pagehide'));
+        ok.push(`salva no pagehide ${saves === 1}`);
+        if (!lost || saves !== 1) fail('contexto perdido ou pagehide');
+      } finally {
+        P.save = s0;
+      }
+      L.push('contexto: ' + ok.join('; '));
+    },
+    desktop() {
+      // os presets de desktop não levam nada do celular (regra: desktop sem mudança e ≥ 48 FPS em Full HD)
+      const ok = [], fail = (m) => { throw new Error(m + ' | ' + ok.join('; ')); };
+      if (g.qualityName === 'movel') fail('abra a página com uma qualidade de desktop (&q=media, por exemplo)');
+      const Q = g.quality, sc = g.sun.shadow.camera;
+      wait(30);
+      const grass = [];
+      g.outdoor.traverse((o) => { if (o.material?.defines?.GRASS_FAR) grass.push(o); });
+      const inv = {
+        corte: !g.farCull && !g.post.normalPass.cull,
+        contorno: !('OUTLINE_FAR' in g.post.outlinePass.material.defines),
+        grama: grass.length === 0,
+        neblina: g.scene.fog.near === g.dayNight.cur.fd || !!g.indoors.active,
+        sombra: sc.right === 44 && g.sun.shadow.mapSize.x === Q.shadow,
+        bloom: g.post.bloomPass.enabled === Q.bloom,
+        lod: Q.lod === undefined,
+        adaptativa: Q.adapt === undefined && Q.cap === undefined,
+        aranhas: g.life.spiders.every((s) => s.g.children.length === 2 && s.g.visible),
+      };
+      // a neblina continua contando a profundidade (no celular ela conta a distância até a câmera)
+      const gl = g.renderer.getContext();
+      const vsrc = g.renderer.info.programs.map((pr) => gl.getAttachedShaders(pr.program).map((sh) => gl.getShaderSource(sh)).join('\n')).filter((src) => src.includes('vFogDepth ='));
+      inv.neblinaPorProfundidade = vsrc.length > 0 && vsrc.every((src) => src.includes('vFogDepth = - mvPosition.z') && !src.includes('length( mvPosition.xyz )'));
+      // criatura a ~20 m à frente do jogador com a câmera afastada (30 m): sombra, contorno e visibilidade contam
+      // só a câmera, como antes do celular (contar o jogador dava sombra e contorno a mais)
+      const foe = C.mobs.filter((mb) => mb.alive && mb.state === 'idle').sort((a, b) => a.pos.distanceTo(g.player.pos) - b.pos.distanceTo(g.player.pos))[0];
+      const cam = g.cam, d0 = [cam.targetDist, cam.dist, cam.curDist];
+      let lodBad = 'sem criatura';
+      if (foe) {
+        const yaw = Math.atan2(foe.pos.x - g.player.pos.x, foe.pos.z - g.player.pos.z);
+        tp(foe.pos.x - Math.sin(yaw) * 20, foe.pos.z - Math.cos(yaw) * 20);
+        g.player.yaw = yaw;
+        cam.targetDist = cam.dist = cam.curDist = 30;
+        cam.snapBehind(g.player);
+        wait(200);
+        const cp = g.camera.position, near = (v, t) => Math.abs(v - t) < 1.5;
+        lodBad = C.mobs.filter((mb) => {
+          if (mb.state === 'gone' || mb.engaged) return false;
+          const cd = cp.distanceTo(mb.pos), pd = Math.hypot(g.player.pos.x - mb.pos.x, g.player.pos.z - mb.pos.z);
+          if (mb.state === 'idle' && pd > 95) return false;
+          if (near(cd, 22) || near(cd, 36) || near(cd, 80)) return false;
+          const vis = cd < 80;
+          return mb.rig.root.visible !== vis || (vis && mb.lod !== (cd < 22 ? 0 : cd < 36 ? 1 : 2));
+        }).length;
+        [cam.targetDist, cam.dist, cam.curDist] = d0;
+        cam.snapBehind(g.player);
+        wait(60);
+      }
+      inv.lodPelaCamera = lodBad === 0;
+      // sem limite de quadros: a 144 Hz desenha todos
+      let t = g.last + 1000, n = 0;
+      g.last = t;
+      for (let i = 0; i < 72; i++) { t += 1000 / 144; if (g._frame(t)) n++; }
+      g.last = performance.now();
+      inv.quadros = n === 72;
+      const bad = Object.entries(inv).filter(([, v]) => !v).map(([k2]) => k2);
+      ok.push(`${g.qualityName}: ${Object.keys(inv).length} invariantes, falhas [${bad}]; programas com neblina ${vsrc.length}; criaturas fora do LOD antigo ${lodBad}`);
+      if (bad.length) fail('o desktop pegou algo do celular');
+      L.push('desktop: ' + ok.join('; '));
+    },
+    movel() {
+      // preset de celular: corte por distância, neblina, sombra, LOD, limite de quadros e resolução adaptativa
+      const ok = [], fail = (m) => { throw new Error(m + ' | ' + ok.join('; ')); };
+      if (g.qualityName !== 'movel') fail('abra a página com &q=movel');
+      const Q = g.quality, F = g.farCull, R = g.renderer, sc = g.sun.shadow.camera;
+      if (!F || g.post.normalPass.cull !== F) fail('sem corte por distância');
+      if (g.sun.shadow.mapSize.x !== Q.shadow || sc.right !== Q.shadowBox || g.post.bloomPass.enabled !== g.post.hdr) fail('sombra ou bloom fora do preset');
+      if (g.post.outlinePass.material.defines.OUTLINE_FAR !== Q.outlineFar.toFixed(1)) fail('contorno sem apagar a tinta com a distância');
+      const gm = F.items.find((it) => it.far === Q.grassFar)?.m.material;
+      if (gm?.defines?.GRASS_FAR !== Q.grassFar.toFixed(1)) fail('grama sem afundar com a distância');
+      // vista mais pesada do mapa: do farol, olhando o vale todo
+      const h0 = g.dayNight.time;
+      g.dayNight.setTime(12);
+      tp(44, -124); g.player.yaw = 0; g.cam.snapBehind(g.player);
+      for (let i = 0; i < 8; i++) g.tick(1 / 30);
+      const calls = R.info.render.calls;
+      const farDrawn = F.items.filter((it) => it.m.visible && it.d > it.far).length;
+      const nearHidden = F.items.filter((it) => !it.m.visible && it.d <= it.far).length;
+      const fog = g.scene.fog.near >= Q.fogMin;
+      ok.push(`farol: ${calls} chamadas de desenho; células além do corte desenhadas ${farDrawn}, aquém escondidas ${nearHidden}; contorno devolveu as células ${F._hidden.length === 0}; neblina ${g.scene.fog.near.toFixed(4)}`);
+      if (calls < 100 || calls > 400 || farDrawn || nearHidden || F._hidden.length || !fog) fail('corte por distância');
+      // PNJs, criaturas e bichos aparecem mais perto
+      // (PNJs e criaturas contam o mais perto entre câmera e jogador)
+      const cp = g.camera.position, pp = g.player.pos, k = Q.lod;
+      const near = (q) => Math.min(cp.distanceTo(q), Math.hypot(pp.x - q.x, pp.z - q.z));
+      const npcFar = QW.npcList.filter((n) => !n.indoorLevel && n.rig.root.visible && near(n.pos) > 110 * k + 1).length;
+      const mobFar = C.mobs.filter((m) => m.rig.root.visible && !m.engaged && near(m.pos) > 80 * k + 1).length;
+      const sp = g.life.spiders;
+      const spFar = sp.filter((s) => s.g.visible && Math.hypot(cp.x - s.x, cp.y - s.top, cp.z - s.z) > 70 * k).length;
+      const spMerged = sp.every((s) => s.g.children.length === 2);
+      ok.push(`longe e visíveis: PNJs ${npcFar}, criaturas ${mobFar}, aranhas ${spFar}; aranha em 2 malhas ${spMerged}`);
+      if (npcFar || mobFar || spFar || !spMerged) fail('LOD do celular');
+      g.dayNight.setTime(h0);
+      // no máximo 60 quadros, sempre no mesmo ritmo
+      let t = g.last + 1000;
+      const rate = (hz, n, jit = 0) => {
+        g.last = t;
+        let c = 0;
+        for (let i = 0; i < n; i++) { t += 1000 / hz + (i % 2 ? jit : -jit); if (g._frame(t)) c++; }
+        return c;
+      };
+      const r120 = rate(120, 120), r90 = rate(90, 90), r75 = rate(75, 75), r60 = rate(60, 60, 0.6);
+      g.last = performance.now();
+      ok.push(`quadros por segundo: 120 Hz → ${r120}, 90 Hz → ${r90}, 75 Hz → ${r75}, 60 Hz → ${r60}`);
+      if (r120 !== 60 || r90 !== 45 || r75 !== 75 || r60 !== 60) fail('limite de quadros');
+      // resolução adaptativa: estável a 29 FPS fica; abaixo de 28 cai 0,1 por vez até 0,75; acima de 42 sobe
+      let ad = 'aba escondida';
+      if (!document.hidden) {
+        const fps0 = g.fps;
+        const adapt = (fps) => { g._fpsHist = []; for (let i = 0; i < 6; i++) { g.fps = fps; g._adapt(); } return g.dynScale ?? 1; };
+        g.dynScale = 1;
+        const a = [adapt(29), adapt(25), adapt(25), adapt(25), adapt(25), adapt(50)];
+        ad = a.map((v) => v.toFixed(2)).join(' → ');
+        g.fps = fps0; g.dynScale = 1; g._fpsHist = [];
+        R.setPixelRatio(Math.min(window.devicePixelRatio, Q.maxPR) * Q.scale);
+        g.resize();
+        if (ad !== '1.00 → 0.90 → 0.80 → 0.75 → 0.75 → 0.80') fail('resolução adaptativa do celular: ' + ad);
+      }
+      // o quadro de volta do segundo plano (segundos) não entra na média
+      g._fpsAcc = 0.2; g._fpsN = 7;
+      const fpsB = g.fps;
+      g._trackPerf(3);
+      const bg = g._fpsAcc === 0 && g._fpsN === 0 && g.fps === fpsB;
+      ok.push(`resolução adaptativa ${ad}; volta do segundo plano ignorada ${bg}`);
+      if (!bg) fail('quadro de volta do segundo plano entrou na medida');
+      L.push('movel: ' + ok.join('; '));
     },
   };
   return { run(name) { try { steps[name](); return 'ok'; } catch (err) { return 'ERRO ' + String(err); } }, log: L };

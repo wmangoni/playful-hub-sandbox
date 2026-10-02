@@ -36,6 +36,8 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 ### No celular ou tablet (tela de toque)
 
 Jogue com o aparelho deitado. O modo toque liga sozinho em telas de toque, e dá para mudar em Opções → Controles de toque.
+Nesses aparelhos o jogo também começa na qualidade gráfica **Celular**, mais leve (Opções → Qualidade gráfica): o cenário
+bem longe some na neblina, a grama é mais rala e o jogo fica em até 60 quadros por segundo para poupar bateria.
 
 | Ação | Toque |
 |---|---|
@@ -108,7 +110,7 @@ npm run build    # gera dist/index.html e Tumbalacatumba.html (arquivo único)
 ```
 
 Parâmetros úteis de URL no modo dev: `?play` (pula o título), `?t=21.5` (hora do dia),
-`?pos=x,z` (posição inicial), `?q=baixa|media|alta` (qualidade gráfica), `?notut` (sem tutorial),
+`?pos=x,z` (posição inicial), `?q=movel|baixa|media|alta` (qualidade gráfica; `movel` é a do celular), `?notut` (sem tutorial),
 `?peaceful` (criaturas não atacam).
 
 ### Estrutura
