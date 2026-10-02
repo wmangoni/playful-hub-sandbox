@@ -165,11 +165,62 @@ export function createPlayerModel() {
     rig.hat = hat;
   }
 
-  // balanço do cachecol
+  // Capinha de Morcego Filhote (recompensa: aparece só voando ou planando)
+  rig.joint('cape', 'torso', [0, 0.52, -0.17]);
+  {
+    const W = 0.56, L = 0.64, cols = 8, rows = 6;
+    const make = (flip) => {
+      const g = new THREE.PlaneGeometry(W, L, cols, rows);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i);
+        let y = p.getY(i) - L / 2; // pendura a partir do ombro (y = 0 em cima)
+        const t = -y / L; // 0 no ombro, 1 na barra
+        // barra recortada em asinhas de morcego
+        if (t > 0.98) y += Math.abs(Math.sin((x / W + 0.5) * Math.PI * 4)) * 0.1;
+        const spread = 1 + t * 0.55; // alarga para baixo
+        const bend = (1 - Math.cos((x / W) * Math.PI * 0.9)) * 0.09; // as pontas abraçam as costas
+        p.setXYZ(i, x * spread, y, bend - t * 0.04);
+      }
+      // espelhar inverte o sentido dos triângulos: a face passa a olhar para trás (-z)
+      if (flip) g.applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
+      g.computeVertexNormals();
+      return g;
+    };
+    const outer = new Builder();
+    outer.add(make(true), (x, y) => new THREE.Color('#2e1a44').lerp(new THREE.Color('#4a2a6a'), Math.max(0, Math.min(1, -y * 1.3))));
+    // gola alta e fecho de morcego
+    for (const s of [-1, 1]) outer.add(S.box(0.2, 0.16, 0.02), '#3a2254', { p: [s * 0.16, 0.07, 0.04], r: [-0.4, s * 0.6, s * 0.35] });
+    const inner = new Builder();
+    inner.add(make(false), '#b0203a', { p: [0, 0, 0.006] });
+    for (const s of [-1, 1]) inner.add(S.box(0.19, 0.15, 0.02), '#c82a44', { p: [s * 0.16, 0.07, 0.05], r: [-0.4, s * 0.6, s * 0.35] });
+    const clasp = new Builder();
+    clasp.add(S.sphere(0.035, 8, 6), '#e0b048', { p: [0, 0.02, 0.2] });
+    for (const s of [-1, 1]) clasp.add(S.cone(0.03, 0.09, 3), '#e0b048', { p: [s * 0.055, 0.03, 0.2], r: [0, 0, s * 1.2] });
+    const mat = toonMat({ vertexColors: true, side: THREE.FrontSide });
+    rig.attach('cape', outer.build(), mat);
+    rig.attach('cape', inner.build(), mat);
+    rig.attach('cape', clasp.build());
+    rig.cape = rig.j.cape;
+    rig.cape.visible = false;
+  }
+
+  // balanço do cachecol (e da capinha)
   rig.extra = (dt, s, r) => {
     const sp = s.speed || 0;
     r.j.scarf.rotation.x = lerp(r.j.scarf.rotation.x, -0.25 - Math.min(sp, 9) * 0.1 + Math.sin(r.t * 9) * 0.06 * (sp > 0.5 ? 1 : 0.3), 0.15);
     r.j.scarf.rotation.z = Math.sin(r.t * 2.3) * 0.08;
+    if (r.cape.visible) {
+      const mv = s.fly ? s.flyMove || 0 : Math.min(1, sp / 8);
+      const up = Math.max(0, (s.vy || 0) / 6);
+      const down = Math.max(0, -(s.vy || 0) / 6);
+      // voando rápido a capa estica para trás (rotação positiva afasta a barra das costas);
+      // subindo ela bate; caindo ela infla para cima
+      const target = 0.12 + mv * 1.25 + down * 0.9 + Math.sin(r.t * (8 + mv * 10)) * (0.06 + mv * 0.1) + up * Math.sin(r.t * 11) * 0.25;
+      r.cape.rotation.x = lerp(r.cape.rotation.x, target, 0.2);
+      r.cape.rotation.z = Math.sin(r.t * 3.1) * 0.06;
+      r.cape.scale.x = 1 + Math.sin(r.t * 7) * 0.03 * (0.5 + mv);
+    }
   };
   rig.height = 1.9;
   rig.portraitY = 1.62;

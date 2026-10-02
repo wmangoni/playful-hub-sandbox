@@ -163,6 +163,18 @@ export class Dialog {
     else this.close();
   }
 
+  /** lê um bilhete/pista no pergaminho (sem PNJ) */
+  openNote(title, text, btn = 'Fechar') {
+    if (this.npc) this.npc.talking = false;
+    this.npc = null;
+    this.titleEl.textContent = title;
+    this.body.innerHTML = `<div class="note">${text.split('\n\n').map((p) => `<p>${esc(p)}</p>`).join('')}</div>`;
+    this.body.scrollTop = 0;
+    this.setButtons([{ label: btn, fn: () => this.close() }]);
+    this.ui.showWin(this.el);
+    this.game.audio?.sfx('open');
+  }
+
   close() {
     if (this.npc) this.npc.talking = false;
     this.npc = null;

@@ -133,6 +133,7 @@ export const QUEST_AREAS = {
   pelo: { x: -82, z: 98, r: 26 },
   sotao: { x: 126, z: 3, r: 16 },
   casamento: { x: 45, z: -122, r: 12 },
+  capa: { x: 118, z: 3, r: 7 }, // porta da mansão (as pistas ficam lá dentro)
 };
 
 // Nível das criaturas por região: fácil perto da vila e das primeiras missões, difícil nos cantos mais sinistros.

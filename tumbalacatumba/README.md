@@ -25,7 +25,8 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 | Conversar / pegar / usar | **clique direito** (ou `F` perto do alvo) |
 | Selecionar alvo | clique esquerdo · `Tab` alterna alvos (criaturas primeiro) |
 | Atacar | `7` (Lanternada) ou **clique direito** na criatura · liga o ataque automático |
-| Barra de ações | `1`–`7` (Buu!, Dança, Lanterna, Pet, Vassoura, Lápide de Regresso, Lanternada) |
+| Barra de ações | `1`–`8` (Buu!, Dança, Lanterna, Pet, Vassoura, Lápide de Regresso, Lanternada, Voar) |
+| Voar (com a capinha) | `8` · no ar, `Espaço` sobe e `X` desce · segure `X` rente ao chão para pousar, ou `8` para descer planando |
 | Diário de missões / Mapa / Mochila | `L` / `M` / `B` |
 | Chat | `Enter` (comandos: `/ajuda`, `/dançar`, `/buu`, `/sentar`, `/acenar`, `/hora`) |
 | Sentar | `X` |
@@ -34,7 +35,7 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 
 ## O que tem no vale
 
-- **16 missões** com PNJs: o Prefeito Abóbora (cuja cabeça gira entre a cara feliz e a preocupada),
+- **17 missões** com PNJs: o Prefeito Abóbora (cuja cabeça gira entre a cara feliz e a preocupada),
   Dona Aranhilda e seu gato de três olhos, o esqueleto Juvenal que se desmontou no baile,
   o Seu Custódio e o ovo de avestruz demônio que você precisa **chocar sentando nele**,
   o espantalho insone, o Conde Dentúcio que perdeu a dentadura (um sapo está usando),
@@ -43,6 +44,13 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
   *Baile de Arromba* (Juvenal, caveiras no cemitério), *Poção Cabeluda* (Vesga, pelos das aranhas do bosque),
   *Despejo no Sótão* (Conde, morcegos da mansão) e *Casamento no Farol* (Suspiro e Lady Névoa: marujos e
   o farol apagado há cem anos).
+- **A Mansão Dentúcio por dentro**: entre pela porta da frente e conheça os 12 cômodos em 4 andares —
+  saguão com escadaria, armaduras e vitral, sala de jantar, sala da lareira, cozinha, sala de música com órgão,
+  biblioteca, quarto do Conde com cama-caixão, banheiro, cripta da família, lavanderia do Anselmo, adega e
+  sótão —, cheios de móveis e objetos para examinar (clique direito) e com minimapa por andar.
+- ***A Capa Sumida*** (Conde, depois de *Despejo no Sótão*): a capa nova que o Conde ganhou de presente sumiu
+  dentro da mansão. Siga as 3 pistas (com a ajuda do mordomo Anselmo e dos antepassados na cripta) até o baú do
+  sótão e ganhe a **capinha**, que dá o poder de **voar**.
 - Recompensas que mudam o jogo: **chapéu de abóbora**, **pet** Belzebuzinho que te segue e, depois do
   mingau ardido, **cospe bolas de fogo** nas criaturas que brigam com você (dano baixo, só uma ajudinha),
   **vassoura voadora** (+65% de velocidade), lanterna de vaga-lumes, **tônico** que cura 40 de vida
@@ -97,6 +105,7 @@ src/
   entities/            jogador, câmera de terceira pessoa, rig de animação, modelos de PNJs e criaturas
   combat/              golpe do jogador, atributos por nível, IA e tipos das criaturas
   quests/              dados das missões, progresso/salvamento, interação, lógica das missões no mundo
+  world/interior/      a Mansão Dentúcio por dentro: planta, arquitetura, móveis e decoração dos cômodos
   ui/                  HUD (quadros, minimapa, rastreador, chat, janelas), ícones e retratos 3D
   fx/                  partículas, halos de luz, varal de luzinhas
   audio/               música e efeitos procedurais
