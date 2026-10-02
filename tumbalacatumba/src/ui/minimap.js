@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { WORLD_SIZE, HALF, SUBZONES, QUEST_AREAS, SWAMP, ZONE_LEVELS } from '../world/layout.js';
 import { clamp, lerp, TAU } from '../util/math.js';
 import { drawMarker } from './icons.js';
+import { MAP_PX, MAP_X0, MAP_Z0 } from '../world/interior/plan-map.js';
 import { RNG } from '../util/rng.js';
 
 const MAP_RES = 1280;
@@ -294,6 +295,7 @@ export class Minimap {
     const g = this.game, P = g.progress;
     const out = [];
     for (const npc of g.questWorld.npcList) {
+      if (g.indoors?.contains(npc.pos.x, npc.pos.z)) continue;
       const mk = P.markerFor(npc.id);
       out.push({ x: npc.pos.x, z: npc.pos.z, kind: mk ?? 'npc', title: npc.info.name, sub: npc.info.title });
     }
@@ -321,6 +323,14 @@ export class Minimap {
     ctx.clip();
     ctx.fillStyle = '#0c0a10';
     ctx.fillRect(0, 0, S, S);
+    this.icons.length = 0;
+    if (g.indoors?.active) {
+      this.drawIndoor(ctx, S);
+      this.drawSelf(ctx, S);
+      ctx.restore();
+      this.drawDial();
+      return;
+    }
     const sx = (p.x - R + HALF) * PX, sy = (p.z - R + HALF) * PX, sw = 2 * R * PX;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.map, sx, sy, sw, sw, 0, 0, S, S);
@@ -402,6 +412,80 @@ export class Minimap {
       }
       this.icons.push({ sx: x / this.res, sy: y / this.res, title: m.title, sub: m.sub, color: m.kind === 'npc' || m.kind === 'pet' ? '#b4f05a' : '#ffb86a' });
     }
+    this.drawSelf(ctx, S);
+    ctx.restore();
+    this.drawDial();
+  }
+
+  /** planta do andar atual da mansão, centrada no jogador */
+  drawIndoor(ctx, S) {
+    const g = this.game, io = g.indoors;
+    const R = [13, 11, 9, 7.5, 6][this.zoom] ?? 9; // metros até a borda
+    const scale = S / (2 * R);
+    const p = g.player.pos;
+    const [lx, lz] = io.toLocal(p.x, p.z);
+    const img = io.maps[io.level];
+    const k = scale / MAP_PX;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, S / 2 - (lx - MAP_X0) * MAP_PX * k, S / 2 - (lz - MAP_Z0) * MAP_PX * k, img.width * k, img.height * k);
+    const toS = (wx, wz) => [S / 2 + (wx - p.x) * scale, S / 2 + (wz - p.z) * scale];
+    // pista/baú, PNJs do mesmo andar e a porta de saída
+    const marks = g.questWorld.mansion?.indoorMarkers() ?? [];
+    for (const n of g.questWorld.npcList) {
+      if (!io.contains(n.pos.x, n.pos.z) || io.levelAt(n.pos.y + 0.3) !== io.level) continue;
+      marks.push({ pos: n.pos, kind: 'npc', title: n.info.name, sub: n.info.title });
+    }
+    if (io.level === 'G') marks.push({ pos: io.doorIn, kind: 'door', title: 'Porta da Frente', sub: 'Saída da mansão' });
+    const edge = S / 2 - 12 * this.res;
+    for (const m of marks) {
+      let [x, y] = toS(m.pos.x, m.pos.z);
+      const dx = x - S / 2, dy = y - S / 2, d = Math.hypot(dx, dy);
+      const sameLevel = io.levelAt(m.pos.y + 0.3) === io.level;
+      if (d > edge) {
+        if (m.kind !== 'clue') continue;
+        x = S / 2 + (dx / d) * edge;
+        y = S / 2 + (dy / d) * edge;
+      }
+      if (m.kind === 'npc') {
+        ctx.fillStyle = '#b4f05a';
+        ctx.strokeStyle = '#16101d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 3.4 * this.res, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      } else if (m.kind === 'door') {
+        ctx.fillStyle = '#ffb86a';
+        ctx.fillRect(x - 5 * this.res, y - 3 * this.res, 10 * this.res, 6 * this.res);
+      } else {
+        // pista: estrela; em outro andar ganha uma seta (sobe/desce)
+        drawMarker(ctx, 'area', x, y, 15 * this.res);
+        ctx.fillStyle = '#ffd84a';
+        ctx.strokeStyle = '#16101d';
+        ctx.lineWidth = 2 * this.res;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * TAU - Math.PI / 2, r = (i % 2 ? 3 : 7) * this.res;
+          ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+        if (!sameLevel) {
+          const up = m.pos.y > p.y;
+          ctx.fillStyle = '#efe6d2';
+          ctx.font = `700 ${11 * this.res}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText(up ? '▲' : '▼', x, y - 10 * this.res);
+        }
+      }
+      this.icons.push({ sx: x / this.res, sy: y / this.res, title: m.title, sub: m.sub ?? (sameLevel ? '' : m.pos.y > p.y ? 'No andar de cima' : 'No andar de baixo'), color: m.kind === 'npc' ? '#b4f05a' : '#ffb86a' });
+    }
+  }
+
+  /** seta do jogador + cone de visão da câmera */
+  drawSelf(ctx, S) {
+    const g = this.game;
     // seta do jogador
     const yaw = g.player.visualYaw;
     ctx.save();
@@ -435,8 +519,6 @@ export class Minimap {
     ctx.closePath();
     ctx.fill();
     ctx.restore();
-    ctx.restore();
-    this.drawDial();
   }
 
   drawDial() {
@@ -604,8 +686,8 @@ export class WorldMap {
         drawMarker(c, m.kind, x, y, 44);
       }
     }
-    // jogador
-    const p = g.player.pos, yaw = g.player.visualYaw;
+    // jogador (dentro da mansão: aparece na porta)
+    const p = g.indoors?.active ? g.indoors.outDoor : g.player.pos, yaw = g.player.visualYaw;
     c.save();
     c.translate(W(p.x), W(p.z));
     c.rotate(Math.atan2(Math.cos(yaw), Math.sin(yaw)));

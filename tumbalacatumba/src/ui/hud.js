@@ -216,7 +216,11 @@ export class UI {
         },
       },
     ];
-    for (let i = 8; i <= 12; i++) this.slots.push({ key: i <= 9 ? String(i) : i === 10 ? '0' : i === 11 ? '-' : '=', empty: true });
+    this.slots.push({
+      key: '8', code: 'Digit8', id: 'fly', name: 'Voar', icon: 'batcape', cd: 0.8, locked: () => !P.hasItem('capinha'),
+      desc: 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). Espaço sobe, X desce; segure X rente ao chão para pousar. Use de novo no ar para descer planando. Não funciona debaixo de teto.',
+    });
+    for (let i = 9; i <= 12; i++) this.slots.push({ key: i <= 9 ? String(i) : i === 10 ? '0' : i === 11 ? '-' : '=', empty: true });
     const bar = this.q('#bottom .bar-frame');
     for (const s of this.slots) {
       const e = document.createElement('div');
@@ -261,7 +265,7 @@ export class UI {
       s.el.classList.toggle('cooling', cool);
       if (cool) s.el.querySelector('.cd').style.background = `conic-gradient(rgba(0,0,0,0.7) ${(s.cdLeft / s.cd) * 360}deg, transparent 0)`;
       s.el.classList.toggle('locked', !!s.locked?.());
-      const active = (s.id === 'lantern' && g.player.lanternOn) || (s.id === 'dance' && g.player.action === 'dance') || (s.id === 'pet' && g.questWorld.pet.active) || (s.id === 'mount' && g.player.mounted) || (s.id === 'attack' && g.combat.autoAttack);
+      const active = (s.id === 'lantern' && g.player.lanternOn) || (s.id === 'dance' && g.player.action === 'dance') || (s.id === 'pet' && g.questWorld.pet.active) || (s.id === 'mount' && g.player.mounted) || (s.id === 'attack' && g.combat.autoAttack) || (s.id === 'fly' && (g.player.flying || g.player.gliding));
       s.el.classList.toggle('active', active);
     }
   }
@@ -370,13 +374,15 @@ export class UI {
     d.innerHTML = html;
     b.appendChild(d);
   }
-  zoneText(name, sub) {
+  /** letreiro de zona; room = cômodo da mansão (menor e mais alto, para não brigar com as placas dos PNJs) */
+  zoneText(name, sub, room = false) {
     const z = this.q('#zonetext');
     z.querySelector('.z1').textContent = name;
     z.querySelector('.z2').textContent = sub ?? '';
+    z.classList.toggle('room', room);
     z.classList.add('on');
     clearTimeout(this._zt);
-    this._zt = setTimeout(() => z.classList.remove('on'), 3800);
+    this._zt = setTimeout(() => z.classList.remove('on'), room ? 2600 : 3800);
   }
   floaty(text, cls, worldPos) {
     const d = document.createElement('div');
@@ -619,6 +625,7 @@ export class UI {
       this.info('Você bebe o tônico. Sua nuca fica toda arrepiada.');
     } else if (it.use === 'pet') g.abilities.use('pet');
     else if (it.use === 'mount') g.abilities.use('mount');
+    else if (it.use === 'fly') this.useSlot(this.slots.find((s) => s.id === 'fly'));
     else if (it.use === 'hearth') this.useSlot(this.slots.find((s) => s.id === 'hearth'));
   }
 
@@ -787,9 +794,17 @@ export class UI {
         if (a) target = { x: a.x, y: g.world.groundHeight(a.x, a.z) + 3, z: a.z };
       }
     }
+    // dentro da mansão: aponta para a próxima pista (ou para a porta, se já está tudo pronto)
+    const io = g.indoors;
+    if (io?.active) {
+      const t = g.questWorld.mansion?.indoorTarget();
+      if (t) target = { x: t.x, y: t.y + 0.9, z: t.z };
+      else if (q && P.status(q.id) === 'complete') target = { x: io.doorIn.x, y: io.doorIn.y + 2.6, z: io.doorIn.z };
+      else target = null;
+    }
     const p = g.player.pos;
-    const d = target ? Math.hypot(target.x - p.x, target.z - p.z) : 0;
-    if (!target || d < 14 || this.anyWindowOpen()) {
+    const d = target ? Math.hypot(target.x - p.x, target.z - p.z) + (io?.active ? Math.abs(target.y - p.y) : 0) : 0;
+    if (!target || d < (io?.active ? 2.5 : 14) || this.anyWindowOpen()) {
       this.wp.style.display = 'none';
       return;
     }
@@ -836,7 +851,7 @@ export class UI {
       const d = cam.position.distanceTo(n.pos);
       const mk = P.markerFor(n.id);
       const showName = d < 34 || tgt?.npc === n;
-      const show = (showName || (mk && d < 90)) && n.rig.root.visible;
+      const show = (showName || (mk && d < 90)) && n.rig.root.visible && !n.occluded;
       if (!show) {
         if (p.vis !== false) p.el.style.display = 'none';
         p.vis = false;
@@ -936,7 +951,7 @@ export class UI {
       (this._clockEl ??= this.q('#minimap .clock')).textContent = clock;
     }
     // zona
-    const z = g.world.zoneAt(g.player.pos.x, g.player.pos.z);
+    const z = g.world.zoneAt(g.player.pos.x, g.player.pos.z, g.player.pos.y);
     const zid = z?.id ?? 'wild';
     if (zid !== this.lastZone) {
       this.q('#minimap .zone').textContent = z?.name ?? ZONE_NAME;
@@ -944,7 +959,7 @@ export class UI {
       const now = g.time;
       if (this.lastZone !== null && z && !(now - (this.zoneSeen[z.id] ?? -999) < 45)) {
         const lv = ZONE_LEVELS[z.id];
-        this.zoneText(z.name, (ZONE_FLAVOR[z.id] ?? '') + (lv ? ` · Criaturas de nível ${lv[0] === lv[1] ? lv[0] : `${lv[0]}–${lv[1]}`}` : ''));
+        this.zoneText(z.name, (z.flavor ?? ZONE_FLAVOR[z.id] ?? '') + (lv ? ` · Criaturas de nível ${lv[0] === lv[1] ? lv[0] : `${lv[0]}–${lv[1]}`}` : ''), z.id.startsWith('m-'));
         g.audio?.sfx('zone');
       }
       if (z) this.zoneSeen[z.id] = now;

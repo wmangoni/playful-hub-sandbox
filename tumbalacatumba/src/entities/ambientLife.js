@@ -71,7 +71,7 @@ export class AmbientLife {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, y + 0.3, 6), new THREE.MeshToonMaterial({ color: '#2f2733' }));
       post.position.set(x + Math.cos(r.root.rotation.y) * 0.6, gy + (y + 0.3) / 2 - 0.3, z - Math.sin(r.root.rotation.y) * 0.6);
       scene.add(post);
-      game.world.colliders.addCircle(post.position.x, post.position.z, 0.25);
+      game.world.colliders.addCircle(post.position.x, post.position.z, 0.25, { y0: gy - 1, y1: gy + y + 0.6 });
       this.owls.push(r);
     }
     // aranhas penduradas

@@ -18,6 +18,7 @@ import { QuestWorld } from './quests/questWorld.js';
 import { UI } from './ui/hud.js';
 import { AmbientLife } from './entities/ambientLife.js';
 import { Combat } from './combat/combat.js';
+import { Indoors } from './world/interior/indoors.js';
 import { ZONE_NAME } from './world/layout.js';
 
 const nextFrame = () => new Promise((r) => setTimeout(r, 16));
@@ -123,6 +124,14 @@ export class Game {
     this.dayNight.speed = this.settings.daySpeed;
 
     this.ambience = new Ambience(this, this.populated);
+    // tudo o que é cenário de fora vai para um grupo: dentro da mansão ele nem é desenhado
+    this.outdoor = new THREE.Group();
+    this.outdoor.name = 'mundo-de-fora';
+    for (const o of [...scene.children]) {
+      if (o.isLight || o === sun.target) continue;
+      this.outdoor.add(o);
+    }
+    scene.add(this.outdoor);
     this.input = new Input(renderer.domElement);
     this.input.pointerLock = this.settings.pointerLock;
     this.player = new Player(this);
@@ -135,14 +144,31 @@ export class Game {
     this.fx = new Effects(this);
     this.audio = new Audio();
     this.abilities = new Abilities(this);
+    for (const k of ['fireflies', 'wisps', 'leaves', 'embers', 'bubbles', 'bats']) if (this.fx[k]?.points) this.outdoor.add(this.fx[k].points);
+    progress(0.91, 'Arrumando a mansão do Conde…');
+    await nextFrame();
+    this.indoors = new Indoors(this);
+    await this.indoors.build((m) => progress(0.92, m));
+    this.world.interior = this.indoors;
     progress(0.93, 'Acordando os vizinhos…');
     await nextFrame();
+    const early = new Set(scene.children);
     this.questWorld = new QuestWorld(this);
     this.life = new AmbientLife(this);
     this.combat = new Combat(this);
     this.questWorld.npcList.push(this.life.zombie);
+    // o que as missões, a vida ambiente e o combate puseram na cena também é de fora (menos os PNJs da mansão)
+    const indoorNpcs = new Set(this.questWorld.npcList.filter((n) => n.indoorLevel).map((n) => n.rig.root));
+    for (const o of [...scene.children]) {
+      if (!early.has(o) && !o.isLight && !indoorNpcs.has(o)) this.outdoor.add(o);
+    }
     this.ui = new UI(this);
-    this.progress.extraSave = () => ({ pos: [+this.player.pos.x.toFixed(2), +this.player.pos.z.toFixed(2)], yaw: +this.player.yaw.toFixed(3), time: +this.dayNight.time.toFixed(2) });
+    this.progress.extraSave = () => {
+      // salvou dentro da mansão: volta na frente da porta (o interior não é carregado direto)
+      const o = this.indoors?.active ? this.indoors.outsidePos() : null;
+      const x = o ? o.x : this.player.pos.x, z = o ? o.z : this.player.pos.z, yaw = o ? o.yaw : this.player.yaw;
+      return { pos: [+x.toFixed(2), +z.toFixed(2)], yaw: +yaw.toFixed(3), time: +this.dayNight.time.toFixed(2) };
+    };
     this.player.onStep = () => {
       const p = this.player;
       if (p.wading > 0.1) this.fx.splash(p.pos);
@@ -150,6 +176,7 @@ export class Game {
       this.audio.sfx(p.wading > 0.1 ? 'stepWater' : 'step', 0.7);
     };
     this.player.onLand = (k) => this.audio.sfx('land', 0.4 + k);
+    this.player.onFlap = () => this.audio.sfx('flap', 0.8);
     this.input.onKey = (code, e) => this.onKey(code, e);
 
     this.player.teleport(START.x, START.z, START.yaw);
@@ -157,7 +184,11 @@ export class Game {
     window.addEventListener('resize', () => this.resize());
     progress(0.97, 'Afiando as presas do Conde…');
     await nextFrame();
+    // compila também os materiais do interior (senão a primeira entrada dá um tranco)
+    const wasIn = this.indoors.root.visible;
+    this.indoors.root.visible = true;
     renderer.compile(scene, camera);
+    this.indoors.root.visible = wasIn;
     progress(1, 'Pronto!');
   }
 
@@ -331,10 +362,12 @@ export class Game {
     this.time += dt;
     SHARED.uTime.value = this.time;
     this.update(dt);
+    // antes de desenhar: se a resolução adaptativa mudar, o redimensionamento limpa o canvas, e depois do
+    // render o quadro apresentado saía todo preto (uma piscada a cada troca de escala)
+    this._trackPerf(raw);
     this.renderer.info.reset();
     this.post.render(dt, this.time);
     this.input.endFrame();
-    this._trackPerf(raw);
   }
 
   _trackPerf(raw) {
@@ -379,6 +412,7 @@ export class Game {
       this.player.update(dt, this.input, this.cam, false);
     }
     this.dayNight.update(dt);
+    this.indoors.update(dt);
     this.sky.update(this.camera, this.time);
     this.world.water.update(this.dayNight);
     this.world.update(dt, this.time);
@@ -428,6 +462,10 @@ export class Game {
       /** liga/desliga o modo pacífico (criaturas não atacam) */
       peace: (v = !this.combat.peaceful) => (this.combat.peaceful = v),
       tp: (x, z) => this.player.teleport(x, z),
+      /** entra/sai da mansão sem fade; room('biblioteca') leva ao centro do cômodo */
+      enter: () => this.indoors.enter({ instant: true }),
+      exit: () => this.indoors.exit({ instant: true }),
+      room: (id) => this.indoors.debugGo(id),
       cam: (yaw, pitch, dist) => {
         if (yaw !== undefined) this.cam.yaw = this.player.yaw = yaw;
         if (pitch !== undefined) this.cam.pitch = pitch;

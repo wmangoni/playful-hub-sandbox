@@ -229,6 +229,48 @@ const DRAW = {
     g.beginPath(); g.moveTo(44, 22); g.lineTo(40, 10); g.lineTo(37, 20); g.fill();
     glow(g, 32, 12, 10, 'rgba(255,170,60,0.9)');
   },
+  batcape(g) {
+    // capinha de morcego abrindo as "asas" sob a lua, com rabiscos de vento
+    bg(g, '#3a4a9a', '#0c0a2a');
+    g.fillStyle = '#f4ecc4';
+    g.beginPath(); g.arc(46, 16, 8, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3a4a9a';
+    g.beginPath(); g.arc(50, 13, 7, 0, Math.PI * 2); g.fill();
+    ink(g, 3);
+    g.fillStyle = '#4a2a6a';
+    g.beginPath();
+    g.moveTo(32, 18);
+    g.quadraticCurveTo(20, 20, 8, 32);
+    g.quadraticCurveTo(12, 38, 14, 46);
+    g.quadraticCurveTo(19, 41, 23, 46);
+    g.quadraticCurveTo(27, 41, 32, 50);
+    g.quadraticCurveTo(37, 41, 41, 46);
+    g.quadraticCurveTo(45, 41, 50, 46);
+    g.quadraticCurveTo(52, 38, 56, 32);
+    g.quadraticCurveTo(44, 20, 32, 18);
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#c8203a';
+    g.beginPath(); g.moveTo(32, 22); g.quadraticCurveTo(26, 30, 24, 42); g.lineTo(32, 46); g.lineTo(40, 42); g.quadraticCurveTo(38, 30, 32, 22); g.closePath(); g.fill();
+    g.fillStyle = '#e0b048';
+    g.beginPath(); g.arc(32, 20, 3.4, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(230,240,255,0.7)';
+    g.lineWidth = 2;
+    for (const y of [54, 58]) { g.beginPath(); g.moveTo(14, y); g.quadraticCurveTo(26, y - 4, 36, y); g.stroke(); }
+  },
+  capanova(g) {
+    // capa nova dobrada: veludo carmim, forro dourado e fecho de morcego
+    bg(g, '#8a1a2a', '#1a0408');
+    ink(g);
+    g.fillStyle = '#b01a30';
+    g.beginPath(); g.moveTo(14, 20); g.lineTo(50, 20); g.lineTo(56, 50); g.quadraticCurveTo(32, 56, 8, 50); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#e8b848';
+    g.beginPath(); g.moveTo(20, 24); g.lineTo(44, 24); g.lineTo(48, 44); g.quadraticCurveTo(32, 48, 16, 44); g.closePath(); g.fill();
+    g.fillStyle = '#b01a30';
+    g.beginPath(); g.moveTo(14, 20); g.lineTo(8, 10); g.lineTo(24, 18); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(50, 20); g.lineTo(56, 10); g.lineTo(40, 18); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#ffd84a';
+    g.beginPath(); g.arc(32, 20, 4, 0, Math.PI * 2); g.fill(); g.stroke();
+  },
   broom(g) {
     bg(g, '#4a3a8a', '#10082a');
     g.fillStyle = '#fff8c0';

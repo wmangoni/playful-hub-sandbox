@@ -553,9 +553,43 @@ export function createVampire() {
       cape.add(S.box(0.36, 0.5, 0.02), C.cape, { p: [s * 0.2, 0.9, -0.1], r: [-0.35, s * 0.5, s * 0.25] });
       cape.add(S.box(0.34, 0.48, 0.02), C.capeIn, { p: [s * 0.2, 0.9, -0.085], r: [-0.35, s * 0.5, s * 0.25] });
     }
-    const capeMat = toonMat({ vertexColors: true, side: THREE.DoubleSide });
+    // contorno de luar fraco: forte, ele acinzentava o veludo escuro das capas à noite
+    const capeMat = toonMat({ vertexColors: true, side: THREE.DoubleSide }, 0.3);
     rig.extraMats = [capeMat];
-    rig.attach('torso', cape.build(), capeMat);
+    rig.capeOld = rig.attach('torso', cape.build(), capeMat);
+    // capa nova (presente da Tia Morcegália): veludo carmim com pregas que se abrem na barra, gola curva rente à
+    // nuca com debrum dourado e forro de cetim vinho. Carmim saturado e escuro: o NeutralToneMapping desbota
+    // vermelho muito iluminado, e com o forro todo dourado ela parecia laranja de frente
+    const CAPE = '#8a0a1e', LINING = '#5a0a1a', TRIM = '#e8b848';
+    const pleated = (r, k) => {
+      const g = new THREE.ConeGeometry(r, 1.78, 40, 5, true, Math.PI * 0.6, Math.PI * 0.8);
+      const a = g.attributes.position;
+      for (let i = 0; i < a.count; i++) {
+        const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
+        const t = (0.89 - y) / 1.78, th = Math.atan2(x, z);
+        const f = (1 + 0.075 * t * Math.sin(th * 15)) * k;
+        a.setXYZ(i, x * f, y, z * f);
+      }
+      g.computeVertexNormals();
+      return g;
+    };
+    const nc = new Builder();
+    nc.add(pleated(0.66, 1), CAPE, { p: [0, -0.17, -0.05] });
+    nc.add(pleated(0.66, 0.97), LINING, { p: [0, -0.17, -0.04] });
+    // gola: pedaço de cilindro aberto em volta da nuca (140°), abrindo para cima
+    const TH = 2.44, T0 = Math.PI - TH / 2, gc = [0, 0.93, -0.03];
+    nc.add(new THREE.CylinderGeometry(0.33, 0.24, 0.42, 20, 1, true, T0, TH), CAPE, { p: gc, r: [-0.18, 0, 0] });
+    nc.add(new THREE.CylinderGeometry(0.318, 0.228, 0.42, 20, 1, true, T0, TH), LINING, { p: gc, r: [-0.18, 0, 0] });
+    const rim = [];
+    for (let i = 0; i <= 16; i++) {
+      const th = T0 + (TH * i) / 16;
+      rim.push(new THREE.Vector3(Math.sin(th) * 0.33, 0.21, Math.cos(th) * 0.33));
+    }
+    nc.add(S.tube(rim, 0.016, 5, { segments: 24 }), TRIM, { p: gc, r: [-0.18, 0, 0] });
+    nc.add(S.sphere(0.05, 8, 6), '#ffd84a', { p: [0, 0.66, 0.16] });
+    for (const s of [-1, 1]) nc.add(S.cone(0.04, 0.12, 3), '#ffd84a', { p: [s * 0.07, 0.67, 0.16], r: [0, 0, s * 1.25] });
+    rig.capeNew = rig.attach('torso', nc.build(), capeMat);
+    rig.capeNew.visible = false;
   }
   for (const [n, x] of [['armL', 0.21], ['armR', -0.21]]) {
     rig.joint(n, 'torso', [x, 0.64, 0]);
@@ -755,6 +789,179 @@ export function createGhost(name = 'Suspiro', { lady = false } = {}) {
   rig.height = lady ? 2.4 : 1.95;
   rig.portraitY = lady ? 2.12 : 1.3;
   rig.portraitDist = lady ? 1.4 : 2.1;
+  return rig;
+}
+
+// ---------------------------------------------------------------------------
+// ANSELMO — mordomo fantasma (fraque, gravata-borboleta, luvas, monóculo e espanador)
+// ---------------------------------------------------------------------------
+export function createButler() {
+  const rig = new Rig('Anselmo');
+  rig.material = ghostMat();
+  const col = '#dce8ff';
+  rig.joint('torso', null, [0, 0.35, 0]);
+  {
+    const b = new Builder();
+    sheetGhost(b, 1.7, 0.46, col, 2.4);
+    for (const s of [-1, 1]) b.add(S.sphere(0.06, 8, 6), '#e8b0c8', { p: [s * 0.22, 1.2, 0.37], s: [1, 0.6, 0.4] });
+    rig.attach('torso', b.build(), rig.material);
+    // fraque preto por cima do lençol (com as abas de trás), camisa, gravata e botões
+    const t = new Builder();
+    t.add(new THREE.CylinderGeometry(0.42, 0.52, 0.72, 16, 1, true, Math.PI * 0.18, Math.PI * 1.64), '#16141c', { p: [0, 0.95, 0], s: [1, 1, 0.95] });
+    for (const s of [-1, 1]) t.add(S.box(0.2, 0.62, 0.03), '#16141c', { p: [s * 0.14, 0.34, -0.43], r: [0.12, s * 0.2, s * 0.08] });
+    t.add(S.box(0.26, 0.52, 0.02), '#f4f0e8', { p: [0, 1.0, 0.47], r: [-0.12, 0, 0] });
+    for (const s of [-1, 1]) t.add(S.cone(0.07, 0.14, 3), '#1a1418', { p: [s * 0.07, 1.26, 0.47], r: [0, 0, s * -Math.PI / 2], s: [1, 1, 0.4] });
+    t.add(S.sphere(0.03, 6, 5), '#1a1418', { p: [0, 1.26, 0.48] });
+    for (let i = 0; i < 3; i++) t.add(S.sphere(0.018, 5, 4), '#c8a24a', { p: [0, 1.12 - i * 0.12, 0.49] });
+    rig.attach('torso', t.build(), toonMat({ vertexColors: true, side: THREE.DoubleSide }));
+  }
+  for (const [n, x] of [['armL', 0.44], ['armR', -0.44]]) {
+    rig.joint(n, 'torso', [x, 1.12, 0]);
+    const b = new Builder();
+    b.add(S.cyl(0.07, 0.09, 0.42, 8), '#16141c', { p: [0, -0.2, 0.02] });
+    b.add(S.sphere(0.09, 8, 6), '#f4f0e8', { p: [0, -0.45, 0.04], s: [0.9, 1.1, 0.85] });
+    rig.attach(n, b.build());
+  }
+  // espanador de penas na mão direita
+  {
+    const b = new Builder();
+    b.add(S.cyl(0.015, 0.015, 0.4, 5), '#5a3a26', { p: [0, 0.1, 0.05], r: [0.4, 0, 0] });
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * TAU;
+      b.add(S.cone(0.05, 0.22, 4), i % 2 ? '#3a2a4a' : '#6a3a8a', { p: [Math.cos(a) * 0.04, 0.38, 0.13 + Math.sin(a) * 0.04], r: [0.4 + Math.sin(a) * 0.5, 0, Math.cos(a) * 0.5] });
+    }
+    const d = rig.attach('armR', b.build());
+    d.position.set(0, -0.45, 0.06);
+  }
+  rig.joint('head', 'torso', [0, 1.35, 0.3]);
+  rig.joint('eyes', 'head', [0, 0.05, 0.08]);
+  {
+    const b = new Builder();
+    for (const s of [-1, 1]) {
+      b.add(S.sphere(0.075, 10, 8), '#0e0e1e', { p: [s * 0.13, 0, 0], s: [0.8, 1.15, 0.4] });
+      b.add(S.sphere(0.02, 5, 4), '#ffffff', { p: [s * 0.11, 0.035, 0.035] });
+    }
+    rig.attach('eyes', b.build(), rig.material);
+    const m = new Builder();
+    m.add(S.torus(0.075, 0.012, 4, 14), '#d8b04a', { p: [0.13, 0, 0.05] });
+    m.add(S.cyl(0.004, 0.004, 0.4, 3), '#d8b04a', { p: [0.2, -0.2, 0.04], r: [0, 0, 0.2] });
+    // bigodinho fino
+    for (const s of [-1, 1]) m.add(S.tube(curlPoints(V3(0, -0.12, 0.09), V3(s, 0.1, 0).normalize(), V3(0, 1, 0), 0.05, 0.8, 6, 0.6), 0.008, 3), '#2a2230');
+    rig.attach('head', m.build());
+  }
+  rig.float = true;
+  rig.extra = (dt, s, r) => {
+    r.body.position.y = 0.2 + Math.sin(r.t * 1.4) * 0.1;
+    r.j.torso.rotation.z = Math.sin(r.t * 0.9) * 0.04;
+    // espana o ar de vez em quando
+    r.j.armR.rotation.x = -0.9 + Math.sin(r.t * 7) * 0.25 * (Math.sin(r.t * 0.6) > 0.3 ? 1 : 0);
+    r.j.armR.rotation.z = -0.3;
+  };
+  for (const m of rig.meshes) m.layers.set(LAYER_FX);
+  rig.fixedPose = true;
+  rig.height = 2.1;
+  rig.portraitY = 1.5;
+  rig.portraitDist = 2.1;
+  return rig;
+}
+
+/** antepassados fantasmas da cripta: 'vovo' (cartola e bigodão) ou 'bisa' (penteado altíssimo) */
+export function createAncestor(kind = 'vovo') {
+  const rig = new Rig(kind === 'vovo' ? 'Vovô Dentúcio I' : 'Bisa Dentúcia');
+  rig.material = ghostMat();
+  const col = kind === 'vovo' ? '#c8e8d8' : '#e0d8ff';
+  rig.joint('torso', null, [0, 0.35, 0]);
+  const b = new Builder();
+  sheetGhost(b, 1.55, 0.44, col, kind === 'vovo' ? 3.1 : 4.2);
+  // colarinho de vampiro
+  for (const s of [-1, 1]) b.add(S.box(0.34, 0.4, 0.02), kind === 'vovo' ? '#6a8a7a' : '#8a7aa8', { p: [s * 0.2, 1.18, -0.05], r: [-0.35, s * 0.5, s * 0.3] });
+  rig.attach('torso', b.build(), rig.material);
+  const acc = new Builder();
+  if (kind === 'vovo') {
+    acc.add(S.cylB(0.2, 0.22, 0.46, 12), '#16141c', { p: [0, 1.52, 0] });
+    acc.add(S.cyl(0.36, 0.36, 0.03, 16), '#16141c', { p: [0, 1.53, 0] });
+    acc.add(S.cyl(0.21, 0.23, 0.07, 12), '#6a1a2a', { p: [0, 1.6, 0] });
+    for (const s of [-1, 1]) acc.add(S.tube([V3(0, 0.95, 0.44), V3(s * 0.2, 0.93, 0.45), V3(s * 0.34, 1.0, 0.38), V3(s * 0.4, 1.1, 0.3)], (t) => 0.045 * (1 - t * 0.6), 5), '#f0f0f0');
+    acc.add(S.torus(0.07, 0.012, 4, 14), '#d8b04a', { p: [0.14, 1.1, 0.44] });
+  } else {
+    acc.add(S.sphere(0.3, 12, 10), '#6a5a8a', { p: [0, 1.75, -0.05], s: [0.9, 1.6, 0.9] });
+    for (let i = 0; i < 4; i++) acc.add(S.torus(0.24 - i * 0.03, 0.03, 4, 14), '#8a7aa8', { p: [0, 1.6 + i * 0.16, -0.05], r: [Math.PI / 2, 0, 0] });
+    acc.add(S.sphere(0.05, 6, 5), '#e8b0d0', { p: [0.1, 2.2, 0.05] });
+    for (let i = 0; i < 8; i++) acc.add(S.sphere(0.03, 5, 4), '#f0ece0', { p: [Math.cos(i * 0.4 - 1.4) * 0.32, 1.02 + Math.sin(i * 0.4 - 1.4) * 0.05, 0.3] });
+  }
+  rig.attach('torso', acc.build(), toonMat({ vertexColors: true }));
+  for (const [n, x] of [['armL', 0.42], ['armR', -0.42]]) {
+    rig.joint(n, 'torso', [x, 0.95, 0]);
+    const a = new Builder();
+    a.add(S.sphere(0.12, 8, 6), col, { p: [0, -0.1, 0.05], s: [0.8, 1.3, 0.8] });
+    rig.attach(n, a.build(), rig.material);
+  }
+  rig.joint('head', 'torso', [0, 1.2, 0.34]);
+  rig.joint('eyes', 'head', [0, 0.04, 0.06]);
+  const e = new Builder();
+  for (const s of [-1, 1]) {
+    e.add(S.sphere(0.08, 10, 8), '#0e0e1e', { p: [s * 0.13, 0, 0], s: [0.8, kind === 'vovo' ? 0.7 : 1.2, 0.4] });
+    e.add(S.sphere(0.02, 5, 4), '#b8ffe0', { p: [s * 0.11, 0.03, 0.035] });
+  }
+  rig.attach('eyes', e.build(), rig.material);
+  rig.float = true;
+  const ph = kind === 'vovo' ? 0 : 2;
+  rig.extra = (dt, s, r) => {
+    r.body.position.y = 0.3 + Math.sin(r.t * 1.2 + ph) * 0.14;
+    r.j.torso.rotation.z = Math.sin(r.t * 0.8 + ph) * 0.06;
+  };
+  for (const m of rig.meshes) m.layers.set(LAYER_FX);
+  rig.fixedPose = true;
+  rig.height = kind === 'vovo' ? 2.1 : 2.4;
+  rig.portraitY = 1.35;
+  rig.portraitDist = 2.2;
+  return rig;
+}
+
+/** morceguinho filhote (dorme enrolado na capa nova, dentro do baú) */
+export function createBabyBat() {
+  const rig = new Rig('Morceguinho');
+  rig.joint('torso', null, [0, 0.1, 0]);
+  const b = new Builder();
+  b.add(S.sphere(0.13, 12, 10), '#2a2232', { s: [1, 0.9, 1.1] });
+  b.add(S.sphere(0.1, 10, 8), '#3a3044', { p: [0, 0.14, 0.08] });
+  for (const s of [-1, 1]) {
+    // orelhinhas redondas (de morcego, não de gato) e asas de membrana dobradas por cima como cobertor
+    b.add(S.sphere(0.045, 8, 6), '#3a3044', { p: [s * 0.075, 0.23, 0.06], s: [0.7, 1.2, 0.35], r: [0, 0, s * -0.45] });
+    b.add(S.sphere(0.03, 6, 5), '#d8a0b8', { p: [s * 0.075, 0.23, 0.075], s: [0.6, 1.0, 0.25], r: [0, 0, s * -0.45] });
+    const wing = new THREE.Shape();
+    wing.moveTo(0, 0.1);
+    wing.quadraticCurveTo(0.14, 0.12, 0.2, 0.02);
+    wing.quadraticCurveTo(0.15, -0.02, 0.14, -0.08);
+    wing.quadraticCurveTo(0.09, -0.04, 0.07, -0.1);
+    wing.quadraticCurveTo(0.03, -0.05, 0, -0.08);
+    wing.lineTo(0, 0.1);
+    b.add(S.extrude(wing, 0.012, 5), '#1e1826', { p: [s * 0.02, 0.02, 0.1], r: [0.35, s * -0.25, 0], s: [s, 1, 1] });
+    b.add(S.cone(0.012, 0.05, 3), '#1e1826', { p: [s * 0.2, 0.14, 0.12], r: [0, 0, s * -0.8] });
+  }
+  b.add(S.cone(0.012, 0.035, 3), '#ffffff', { p: [-0.02, 0.1, 0.17], r: [Math.PI, 0, 0] });
+  b.add(S.cone(0.012, 0.035, 3), '#ffffff', { p: [0.02, 0.1, 0.17], r: [Math.PI, 0, 0] });
+  rig.attach('torso', b.build());
+  rig.joint('eyes', 'torso', [0, 0.16, 0.17]);
+  // olhos fechados (dormindo) = tracinhos
+  const e = new Builder();
+  for (const s of [-1, 1]) e.add(S.box(0.045, 0.01, 0.01), '#0e0a12', { p: [s * 0.045, 0, 0] });
+  rig.eyesClosed = rig.attach('eyes', e.build());
+  const o = new Builder();
+  for (const s of [-1, 1]) {
+    o.add(S.sphere(0.03, 8, 6), '#fff4e0', { p: [s * 0.045, 0, 0] });
+    o.add(S.sphere(0.015, 6, 5), '#b01020', { p: [s * 0.045, 0, 0.02] });
+  }
+  rig.eyesOpen = rig.attach('eyes', o.build());
+  rig.eyesOpen.visible = false;
+  rig.fixedPose = true;
+  rig.extra = (dt, s, r) => {
+    const br = Math.sin(r.t * 2.2);
+    r.j.torso.scale.set(1 + br * 0.03, 1 - br * 0.03, 1 + br * 0.03);
+  };
+  rig.height = 0.5;
+  rig.portraitY = 0.25;
+  rig.portraitDist = 1.0;
   return rig;
 }
 

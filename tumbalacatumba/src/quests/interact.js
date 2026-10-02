@@ -140,7 +140,7 @@ export class Interaction {
     this.ring.visible = !!it && it.enabled();
     if (!this.ring.visible) return;
     const w = this.game.world;
-    const gy = w.groundHeight(it.pos.x, it.pos.z);
+    const gy = w.groundHeight(it.pos.x, it.pos.z, it.pos.y + 0.5);
     const y = it.ringGround ? Math.max(gy, WATER_LEVEL) : Math.max(gy, it.pos.y - (it.npc?.rig?.float ? 0.6 : 0));
     this.ring.position.set(it.pos.x, y + 0.06, it.pos.z);
     this.ring.rotation.y += 0.01;
@@ -160,7 +160,8 @@ export class Interaction {
       it.onInteract?.(g, it);
       return;
     }
-    if (this.distTo(it) > it.range) {
+    // voando bem acima (ou em outro andar da mansão) também é longe
+    if (this.distTo(it) > it.range || Math.abs(g.player.pos.y - it.pos.y) > (it.vRange ?? 4.5)) {
       g.ui.error('Você está muito longe.');
       return;
     }

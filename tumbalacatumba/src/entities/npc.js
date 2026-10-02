@@ -48,7 +48,7 @@ export class NPC {
     this.id = id;
     this.info = NPC_INFO[id] ?? { name: rig.root.name, title: '', level: 1, barks: [] };
     this.rig = rig;
-    this.pos = new THREE.Vector3(spot.x, game.world.groundHeight(spot.x, spot.z), spot.z);
+    this.pos = new THREE.Vector3(spot.x, spot.y ?? game.world.groundHeight(spot.x, spot.z), spot.z);
     this.homeYaw = spot.yaw ?? 0;
     this.yaw = this.homeYaw;
     this.canTurn = opts.canTurn ?? !rig.fixedPose;
@@ -78,8 +78,21 @@ export class NPC {
     const p = g.player.pos;
     const d = Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
     const camD = g.camera.position.distanceTo(this.pos);
-    this.rig.root.visible = camD < 110;
+    // PNJ de dentro da mansão só aparece quando estamos no mesmo andar (senão a placa atravessa o piso)
+    const io = g.indoors;
+    const sameLv = io?.active && (io.level === this.indoorLevel || (this.indoorLevel === 'G' && io.level === 'U' && io.room?.id === 'saguao'));
+    this.rig.root.visible = camD < 110 && (!this.indoorLevel || sameLv);
     if (!this.rig.root.visible) return;
+    // lá dentro, a placa de nome some quando há parede entre a câmera e o PNJ (a placa é HTML e não tem profundidade)
+    if (this.indoorLevel) {
+      this._occT = (this._occT ?? 0) - dt;
+      if (this._occT <= 0) {
+        this._occT = 0.2;
+        const c = g.camera.position, hx = this.pos.x - c.x, hy = this.pos.y + 1.6 - c.y, hz = this.pos.z - c.z;
+        const L = Math.hypot(hx, hy, hz) || 1;
+        this.occluded = g.world.colliders.raycast(c.x, c.y, c.z, hx / L, hy / L, hz / L, L) < L - 0.7;
+      }
+    }
     this.rig.lookTarget = d < 10 && !this.rig.fixedPose ? _t.set(p.x, p.y + 1.5, p.z) : null;
     if (this.canTurn) {
       const face = this.talking || (d < 6 && this.game.interaction.target === this.inter);
