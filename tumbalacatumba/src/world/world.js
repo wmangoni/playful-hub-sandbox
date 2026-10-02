@@ -51,7 +51,9 @@ export class World {
     return d.h + (d.arch ? Math.sin(t * Math.PI) * d.arch : 0);
   }
 
-  groundHeight(x, z) {
+  /** y = altura de onde se procura o chão (só importa dentro da mansão, que tem vários andares) */
+  groundHeight(x, z, y = Infinity) {
+    if (this.interior?.contains(x, z)) return this.interior.floorAt(x, z, y);
     let h = this.terrain.heightAt(x, z);
     for (const d of this.decks) {
       const dh = this.deckHeightAt(d, x, z);
@@ -60,13 +62,24 @@ export class World {
     return h;
   }
 
+  /** forro acima de y (Infinity ao ar livre) */
+  ceilingHeight(x, z, y) {
+    return this.interior?.contains(x, z) ? this.interior.ceilAt(x, z, y) : Infinity;
+  }
+
   onDeck(x, z) {
     for (const d of this.decks) if (this.deckHeightAt(d, x, z) > this.terrain.heightAt(x, z)) return true;
     return false;
   }
 
   /** move um círculo com colisão, rampa máxima, água funda e limites do mapa */
-  moveCircle(from, tx, tz, r) {
+  moveCircle(from, tx, tz, r, flying = false) {
+    if (this.interior?.contains(from.x, from.z)) return this.interior.moveCircle(from, tx, tz, r);
+    // voando bem acima do chão: sem rampa nem água funda, só os colisores (que conhecem a altura)
+    if (flying) {
+      const [rx, rz] = this.colliders.resolve(tx, tz, r, from.y);
+      return [clamp(rx, -PLAY_LIMIT, PLAY_LIMIT), clamp(rz, -PLAY_LIMIT, PLAY_LIMIT)];
+    }
     const tryMove = (x, z) => {
       const g0 = this.groundHeight(from.x, from.z);
       const g1 = this.groundHeight(x, z);
@@ -96,7 +109,8 @@ export class World {
     return [x, z];
   }
 
-  zoneAt(x, z) {
+  zoneAt(x, z, y) {
+    if (this.interior?.contains(x, z)) return this.interior.zoneAt(x, z, y);
     for (const s of SUBZONES) if (Math.hypot(x - s.x, z - s.z) < s.r) return s;
     return null;
   }

@@ -3,6 +3,7 @@ import { NPC, Walker, Pickup, makeSparkle } from '../entities/npc.js';
 import * as NM from '../entities/npcModels.js';
 import * as CM from '../entities/creatureModels.js';
 import { Interactable } from './interact.js';
+import { MansionQuest } from './mansionQuest.js';
 import { RNG } from '../util/rng.js';
 import { damp, dampAngle, clamp, TAU } from '../util/math.js';
 import {
@@ -51,6 +52,8 @@ export class QuestWorld {
     this.setupPickups();
     this.setupLighthouse();
     this.pet = new Pet(game);
+    // missão da capa (mordomo, pistas e baú dentro da mansão)
+    if (game.indoors?.decor) this.mansion = new MansionQuest(this);
     P.on((type, data) => this.onEvent(type, data));
     this.applyState();
   }
@@ -473,6 +476,7 @@ export class QuestWorld {
       s.rig.root.position.copy(s.pos);
     }
     if (P.flags.hatched && P.flags.petOut !== false) this.pet.summon();
+    this.mansion?.applyState();
   }
 
   update(dt, t) {
@@ -486,6 +490,7 @@ export class QuestWorld {
       this.lhSparkle.material.rotation = t * 0.8;
     }
     this.pet.update(dt);
+    this.mansion?.update(dt, t);
     if (this.frog.rig.root.visible) this.frog.rig.animate(dt, {});
   }
 }

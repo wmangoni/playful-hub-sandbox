@@ -297,6 +297,7 @@ export class Combat {
     this.swingT = -1;
     if (p.seat) p.leaveSeat(false);
     p.setMounted(false);
+    if (p.flying || p.gliding) p.stopFlying(true);
     p.sitting = false;
     p.autorun = false;
     p.dead = true;
