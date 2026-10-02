@@ -2,7 +2,7 @@
 //  - Lanternada grande: sem alvo, mira na criatura mais próxima (preferindo as da frente)
 //  - arco com 3 habilidades, escolhidas entre as que o jogador já tem (a lista muda sozinha)
 //  - "⋯" abre o grimório com todas as habilidades e o Sentar
-//  - botão contextual Falar / Pegar / Usar quando há algo ao alcance
+//  - botão contextual quando há algo ao alcance, com o verbo do objeto (Falar, Pegar, Sentar, Abrir, Entrar...)
 // Tudo com eventos de ponteiro: com um dedo no joystick, o navegador nem sempre gera click para o outro dedo.
 // Toque longo num botão de habilidade (ou num item da mochila, do diálogo e do diário) mostra a descrição,
 // medido no tempo do jogo, como os toques da tela. Cada dedo segura o seu botão (dois botões ao mesmo tempo).
@@ -230,7 +230,10 @@ export class TouchBar {
     });
   }
 
-  /** Falar / Pegar / Usar: o alvo selecionado (se estiver ao alcance) ou o mais perto; criatura não conta */
+  /**
+   * Falar / Pegar / Usar: o alvo selecionado (se estiver ao alcance) ou o mais perto; criatura não conta.
+   * O verbo vem do objeto (`verb`, texto ou função: Sentar, Abrir, Entrar...) ou do cursor dele
+   */
   refreshContext() {
     const g = this.game, it = g.interaction;
     const ok = (x) => x && x.kind !== 'mob' && x.enabled() && it.distTo(x) <= x.range && Math.abs(g.player.pos.y - x.pos.y) <= (x.vRange ?? 4.5);
@@ -249,7 +252,7 @@ export class TouchBar {
     this.ctxTarget = t;
     this.ctx.classList.toggle('hidden', !t || g.player.mounted && t.kind !== 'npc');
     if (!t) return;
-    const label = CTX_LABEL[t.cursor] ?? 'Usar';
+    const label = (typeof t.verb === 'function' ? t.verb() : t.verb) ?? CTX_LABEL[t.cursor] ?? 'Usar';
     if (label !== this._ctxLabel) {
       this._ctxLabel = label;
       this.ctxLabel.textContent = label;

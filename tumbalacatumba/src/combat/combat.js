@@ -344,8 +344,13 @@ export class Combat {
     }
     if (!quiet && !this.peaceful && !g.progress.flags.tipCombat) {
       g.progress.setFlag('tipCombat');
-      g.ui.info('Uma criatura quer briga! Aperte 7 ou clique nela com o botão direito.');
-      g.ui.chat('Dica: clique com o botão direito numa criatura (ou aperte 7) para dar uma Lanternada. O "Buu!" (1) faz os inimigos fugirem de medo por alguns segundos.', 'system');
+      if (g.touchMode) {
+        g.ui.info('Uma criatura quer briga! Toque na Lanternada, o botão grande à direita.');
+        g.ui.chat('Dica: a Lanternada (o botão grande à direita) mira sozinha na criatura mais perto. O "Buu!" faz os inimigos fugirem de medo por alguns segundos.', 'system');
+      } else {
+        g.ui.info('Uma criatura quer briga! Aperte 7 ou clique nela com o botão direito.');
+        g.ui.chat('Dica: clique com o botão direito numa criatura (ou aperte 7) para dar uma Lanternada. O "Buu!" (1) faz os inimigos fugirem de medo por alguns segundos.', 'system');
+      }
     }
   }
 

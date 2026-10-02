@@ -42,9 +42,10 @@ bem longe some na neblina, a grama é mais rala e o jogo fica em até 60 quadros
 | Ação | Toque |
 |---|---|
 | Andar | arrastar o **lado esquerdo** da tela (joystick): o personagem anda para onde você aponta |
+| Correr sozinho | arrastar o joystick para cima até o **cadeado** e soltar: ele segue para onde a câmera aponta (toque no joystick para parar) |
 | Girar a câmera | arrastar o **lado direito** da tela |
 | Zoom | pinça com dois dedos |
-| Conversar / pegar / usar | **tocar** em alguém ou em algo perto (longe: só seleciona), ou o botão **Falar / Pegar / Usar** que aparece quando há algo ao alcance |
+| Conversar / pegar / usar | **tocar** em alguém ou em algo perto (longe: só seleciona), ou o botão **Falar / Pegar / Sentar / Abrir…** que aparece quando há algo ao alcance |
 | Atacar | botão grande da **Lanternada** (sem alvo, mira na criatura mais próxima), ou tocar na criatura duas vezes |
 | Habilidades | três botões em volta da Lanternada (mudam conforme o que você já tem) e **⋯** com todas, inclusive Sentar |
 | O que é isso? | **toque longo** na tela ou num botão mostra a dica |

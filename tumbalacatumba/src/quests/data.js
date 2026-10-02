@@ -18,7 +18,7 @@ export const ITEMS = {
   capa: { name: 'Capa de Veludo Roída', quality: 'rare', icon: 'cape', desc: '+7 de Drama Noturno.', flavor: 'Os buracos são de traça. Ou de morcego. Ou do tataravô.' },
   buque: { name: 'Buquê da Lady Névoa', quality: 'epic', icon: 'bouquet', desc: 'Não murcha. Já veio murcho.', flavor: 'Quem pega o buquê é o próximo a morrer de amor.' },
   capanova: { name: 'Capa Nova do Conde', quality: 'quest', icon: 'capanova', desc: 'Item de missão.', flavor: 'Veludo carmim, gola até as orelhas. Ainda quentinha de morceguinho.' },
-  capinha: { name: 'Capinha de Morcego Filhote', quality: 'epic', icon: 'batcape', desc: 'Usar: Você VOA! Espaço sobe, X desce. Segure X rente ao chão para pousar (tecla 8). Não funciona debaixo de teto.', flavor: 'Tamanho P. Muito P. Veio de brinde no embrulho da Tia Morcegália.', use: 'fly' },
+  capinha: { name: 'Capinha de Morcego Filhote', quality: 'epic', icon: 'batcape', desc: 'Usar: Você VOA! Espaço sobe, X desce. Segure X rente ao chão para pousar (tecla 8). Não funciona debaixo de teto.', descTouch: 'Usar: Você VOA! O botão Subir sobe e o Descer desce; segure Descer rente ao chão para pousar. Não funciona debaixo de teto.', flavor: 'Tamanho P. Muito P. Veio de brinde no embrulho da Tia Morcegália.', use: 'fly' },
 };
 
 export const QUALITY_COLORS = {
@@ -127,7 +127,10 @@ export const QUESTS = [
     turnIn: 'zepalha',
     text:
       'Psiu... ei... aqui em cima. É, o espantalho falante.\n\nTem uns corvos aqui que ficam rindo de mim a noite inteira. "Crá crá crá, olha o espantalho que não espanta". Eu não durmo há três colheitas!\n\nVocê parece assustador o bastante... com essa cara. Chegue perto deles e use seu melhor "BUU!" (tecla 1). Espante 6 corvos.',
+    textTouch:
+      'Psiu... ei... aqui em cima. É, o espantalho falante.\n\nTem uns corvos aqui que ficam rindo de mim a noite inteira. "Crá crá crá, olha o espantalho que não espanta". Eu não durmo há três colheitas!\n\nVocê parece assustador o bastante... com essa cara. Chegue perto deles e use seu melhor "BUU!" (nos botões à direita ou no ⋯). Espante 6 corvos.',
     summary: 'Use "Buu!" (tecla 1) perto dos corvos do sítio para espantar 6 deles.',
+    summaryTouch: 'Use o "Buu!" (nos botões à direita ou no ⋯) perto dos corvos do sítio para espantar 6 deles.',
     objectives: [{ key: 'corvo', need: 6, label: 'Corvos espantados' }],
     progress: 'Ainda ouço "crá crá"... isso é tortura psicológica, sabia?',
     complete: 'Silêncio... finalmente... zzz...\n\nAh! Desculpe, cochilei. Obrigado! Toma, achei isso no meu bolso de palha.',
@@ -163,6 +166,7 @@ export const QUESTS = [
     objectives: [{ key: 'cogumelo', need: 7, label: 'Cogumelos Risonhos' }],
     progress: 'Hihi... hihihi... desculpe, cheirei a poção antes da hora. Cadê meus cogumelos?',
     complete: 'Perfeito! Agora é só mexer, mexer e... HIHIHIHI!\n\nComo pagamento, leve minha vassoura velha. Ela é temperamental, mas voa baixinho. Aperte 5 para montar.',
+    completeTouch: 'Perfeito! Agora é só mexer, mexer e... HIHIHIHI!\n\nComo pagamento, leve minha vassoura velha. Ela é temperamental, mas voa baixinho. Toque no botão da vassoura, à direita, para montar.',
     rewards: { xp: 500, money: 6000, items: ['vassoura'] },
     area: 'cogumelos',
   },
@@ -299,6 +303,7 @@ export const QUESTS = [
     objectives: [{ key: 'pista', need: 3, label: 'Pistas seguidas' }, { key: 'capanova', need: 1, label: 'Capa nova encontrada' }],
     progress: 'Nada ainda? Sem a capa nova eu tenho que usar a velha. A de 1703. Que vexame.',
     complete: 'MINHA CAPA!\n\n...Um morceguinho estava dormindo nela? Pelo menos ele tem bom gosto.\n\nA tia sempre manda um brinde no embrulho: uma capinha tamanho filhote. Em mim não serve nem de cachecol. Mas em você... dizem que quem veste capinha de morcego com fé sai VOANDO.\n\nExperimente! Aperte 8: Espaço sobe, X desce. Só não tente debaixo de um teto.',
+    completeTouch: 'MINHA CAPA!\n\n...Um morceguinho estava dormindo nela? Pelo menos ele tem bom gosto.\n\nA tia sempre manda um brinde no embrulho: uma capinha tamanho filhote. Em mim não serve nem de cachecol. Mas em você... dizem que quem veste capinha de morcego com fé sai VOANDO.\n\nExperimente! Toque no botão da capinha, à direita: Subir sobe, Descer desce. Só não tente debaixo de um teto.',
     rewards: { xp: 900, money: 20000, items: ['capinha'] },
     area: 'capa',
   },
@@ -415,14 +420,31 @@ export const ZONE_FLAVOR = {
   farol: '(Território Inclinado)',
 };
 
-export const TIPS = [
-  'Dica: Segure o botão direito do mouse para girar a câmera e o personagem ao mesmo tempo.',
-  'Dica: Clique com o botão direito em um personagem para conversar.',
-  'Dica: Um ! cor de abóbora indica uma missão disponível. Um ? cor de abóbora indica uma missão pronta para entregar.',
-  'Dica: Pressione M para abrir o mapa e L para abrir o Diário de Missões.',
-  'Dica: Pressione R para correr automaticamente.',
-  'Dica: A Lápide de Regresso (tecla 6) leva você de volta à praça.',
-  'Dica: Vaga-lumes só aparecem à noite. O Coveiro Tonico pode ajudar você a esperar.',
-  'Dica: Terminou uma missão? Volte a quem pediu: muita história tem continuação.',
-  'Dica: A porta da Mansão Dentúcio vive aberta. Entre e conheça os cômodos (o mordomo faz o tour).',
-];
+/** texto com versão de toque (campo `<k>Touch`): no modo toque, sem tecla nem clique */
+export function txt(o, k, touch) {
+  return (touch && o[k + 'Touch']) || o[k];
+}
+
+/** dicas da tela de carregamento (no celular sem tecla nem clique) */
+export const BOOT_TIPS = {
+  touch: [
+    'Dica: arraste o lado direito da tela para olhar em volta; a pinça com dois dedos dá zoom.',
+    'Dica: um ! cor de abóbora sobre alguém indica uma missão. Um ? cor de abóbora, missão pronta para entregar.',
+    'Dica: vaga-lumes só aparecem à noite. O coveiro deixa você cochilar até escurecer.',
+    'Dica: a Lápide de Regresso (no botão ⋯, à direita) leva você de volta à praça.',
+    'Dica: arraste o joystick bem para cima, até o cadeado, e solte para correr sozinho.',
+    'Dica: a Lanternada (o botão grande à direita) mira sozinha na criatura mais perto.',
+    'Dica: o nível das criaturas de cada região aparece no mapa. Comece pela Colina Espiral e pelo Sítio.',
+    'Curiosidade: o Prefeito Abóbora tem duas caras. Literalmente.',
+  ],
+  desk: [
+    'Dica: segure o botão direito do mouse para girar a câmera e o personagem ao mesmo tempo.',
+    'Dica: um ! cor de abóbora sobre alguém indica uma missão. Um ? cor de abóbora, missão pronta para entregar.',
+    'Dica: vaga-lumes só aparecem à noite. O coveiro deixa você cochilar até escurecer.',
+    'Dica: a Lápide de Regresso (tecla 6) leva você de volta à praça.',
+    'Dica: aperte R para correr sozinho e M para abrir o mapa.',
+    'Dica: aperte 7 (ou clique com o botão direito numa criatura) para dar uma Lanternada.',
+    'Dica: o nível das criaturas de cada região aparece no mapa (M). Comece pela Colina Espiral e pelo Sítio.',
+    'Curiosidade: o Prefeito Abóbora tem duas caras. Literalmente.',
+  ],
+};

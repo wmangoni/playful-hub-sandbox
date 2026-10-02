@@ -4,6 +4,7 @@ import { clamp, lerp, TAU } from '../util/math.js';
 import { drawMarker } from './icons.js';
 import { MAP_PX, MAP_X0, MAP_Z0 } from '../world/interior/plan-map.js';
 import { RNG } from '../util/rng.js';
+import { txt } from '../quests/data.js';
 
 const MAP_RES = 1280;
 const PX = MAP_RES / WORLD_SIZE; // pixels por metro
@@ -302,7 +303,7 @@ export class Minimap {
     for (const q of P.activeQuests()) {
       if (P.status(q.id) !== 'active' || !q.area) continue;
       const a = QUEST_AREAS[q.area] ?? (q.area === 'ovo' ? { x: -40, z: 115, r: 4 } : null);
-      if (a) out.push({ x: a.x, z: a.z, r: a.r, kind: 'area', title: q.title, sub: q.summary, tracked: P.tracked.has(q.id) });
+      if (a) out.push({ x: a.x, z: a.z, r: a.r, kind: 'area', title: q.title, sub: txt(q, 'summary', g.touchMode), tracked: P.tracked.has(q.id) });
     }
     if (g.questWorld.pet.active) out.push({ x: g.questWorld.pet.w.pos.x, z: g.questWorld.pet.w.pos.z, kind: 'pet', title: 'Belzebuzinho' });
     return out;

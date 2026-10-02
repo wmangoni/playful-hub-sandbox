@@ -25,6 +25,7 @@ import { AmbientLife } from './entities/ambientLife.js';
 import { Combat } from './combat/combat.js';
 import { Indoors } from './world/interior/indoors.js';
 import { ZONE_NAME } from './world/layout.js';
+import { BOOT_TIPS } from './quests/data.js';
 
 const nextFrame = () => new Promise((r) => setTimeout(r, 16));
 
@@ -588,6 +589,8 @@ export class Game {
   get debug() {
     return {
       setTime: (h) => this.dayNight.setTime(h),
+      /** dicas da tela de carregamento (o e2e confere as de toque) */
+      bootTips: () => BOOT_TIPS,
       /** liga/desliga o modo pacífico (criaturas não atacam) */
       peace: (v = !this.combat.peaceful) => (this.combat.peaceful = v),
       tp: (x, z) => this.player.teleport(x, z),

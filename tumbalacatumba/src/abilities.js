@@ -195,7 +195,7 @@ export class Abilities {
     if (!g.progress.flags.flewOnce) {
       g.progress.setFlag('flewOnce');
       g.ui.chat(g.touchMode
-        ? 'Voando! O botão Subir sobe e o Descer desce. Segure Descer rente ao chão para pousar, ou toque no 8 no ar para descer planando.'
+        ? 'Voando! O botão Subir sobe e o Descer desce. Segure Descer rente ao chão para pousar, ou toque de novo em Voar para descer planando.'
         : 'Voando! Espaço sobe, X desce. Segure X rente ao chão para pousar, ou aperte 8 no ar para descer planando.', 'system');
     }
     return true;

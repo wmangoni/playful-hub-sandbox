@@ -1,4 +1,4 @@
-import { QUESTS, ITEMS, QUALITY_COLORS } from '../quests/data.js';
+import { QUESTS, ITEMS, QUALITY_COLORS, txt } from '../quests/data.js';
 import { icon, coinsHTML } from './icons.js';
 
 const CHAT_ICON = '<svg width="20" height="18" viewBox="0 0 20 18"><path d="M3 2h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-5 4v-4H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#f4ecd8" stroke="#3a2410" stroke-width="1.5"/><circle cx="6" cy="7.5" r="1.2" fill="#3a2410"/><circle cx="10" cy="7.5" r="1.2" fill="#3a2410"/><circle cx="14" cy="7.5" r="1.2" fill="#3a2410"/></svg>';
@@ -102,7 +102,7 @@ export class Dialog {
     const P = this.game.progress;
     let h = `<h1>${esc(q.title)}</h1>`;
     if (kind === 'avail') {
-      h += `<p>${esc(q.text)}</p><h2>Objetivos</h2><p>${esc(q.summary)}</p>`;
+      h += `<p>${esc(txt(q, 'text', this.game.touchMode))}</p><h2>Objetivos</h2><p>${esc(txt(q, 'summary', this.game.touchMode))}</p>`;
       if (q.night) h += `<p style="color:#4a2a8a"><i>Só pode ser feita à noite.</i></p>`;
       h += rewardsHTML(q);
       this.body.innerHTML = h;
@@ -122,7 +122,7 @@ export class Dialog {
         { label: 'Adeus', fn: () => this.close() },
       ]);
     } else {
-      h += `<p>${esc(q.complete)}</p>` + rewardsHTML(q);
+      h += `<p>${esc(txt(q, 'complete', this.game.touchMode))}</p>` + rewardsHTML(q);
       this.body.innerHTML = h;
       this.setButtons([{ label: 'Completar Missão', fn: () => this.complete(q) }]);
     }
@@ -263,14 +263,14 @@ export class QuestLog {
       this.detail.innerHTML = '<p style="opacity:.6;margin-top:40%;text-align:center">Nenhuma missão selecionada.</p>';
       return;
     }
-    let d = `<h1>${esc(q.title)}</h1><p>${esc(q.summary)}</p>`;
+    let d = `<h1>${esc(q.title)}</h1><p>${esc(txt(q, 'summary', this.game.touchMode))}</p>`;
     for (const o of q.objectives) {
       const c = P.count(q.id, o.key);
       d += `<div class="req ${c >= o.need ? 'ok' : ''}">- ${esc(o.label)}: ${c}/${o.need}</div>`;
     }
     const turn = this.game.questWorld.npcs[q.turnIn];
     if (P.status(q.id) === 'complete') d += `<p style="margin-top:8px;color:#1a6a10"><b>Volte para ${esc(turn.info.name)}.</b></p>`;
-    d += `<h2>Descrição</h2><p>${esc(q.text)}</p>` + rewardsHTML(q);
+    d += `<h2>Descrição</h2><p>${esc(txt(q, 'text', this.game.touchMode))}</p>` + rewardsHTML(q);
     this.detail.innerHTML = d;
     this.el.querySelector('.tr').textContent = P.tracked.has(q.id) ? 'Parar de rastrear' : 'Rastrear';
   }
@@ -406,7 +406,7 @@ export class Menu {
       <div class="row">Velocidade do dia <select data-k="daySpeed"><option value="0.5">Lenta (24 min)</option><option value="1">Normal (12 min)</option><option value="2">Rápida (6 min)</option><option value="4">Muito rápida (3 min)</option></select></div>
       <div class="row">Hora do dia <input type="range" min="0" max="23.9" step="0.1" data-k="hour"></div>
       </div>
-      <div class="keys-sec" style="display:none"><div class="keys">
+      <div class="keys-sec" style="display:none"><div class="keys kb">
         <div><b>W / S</b> andar / recuar</div><div><b>A / D</b> girar (ou lateral c/ botão dir.)</div>
         <div><b>Q / E</b> passo lateral</div><div><b>Espaço</b> pular</div>
         <div><b>R / NumLock</b> correr sozinho</div><div><b>Botão esq.</b> girar câmera</div>
@@ -419,12 +419,22 @@ export class Menu {
         <div><b>B</b> mochila</div><div><b>Enter</b> chat</div>
         <div><b>Esc</b> menu / fechar</div><div><b>Z</b> esconder interface</div>
       </div>
-      <h3>Na tela de toque</h3>
-      <div class="keys">
+      <h3 class="kb">Na tela de toque</h3>
+      <!-- duas listas de gestos, mantidas juntas: a curta (tc-desk) é a do desktop de sempre, para a janela caber sem
+           rolagem; a completa (tc) só aparece no toque (touch.css) -->
+      <div class="keys tc-desk">
         <div><b>Lado esquerdo</b> arrastar: andar</div><div><b>Lado direito</b> arrastar: câmera</div>
         <div><b>Pinça</b> zoom</div><div><b>Toque</b> conversar / pegar</div>
         <div><b>Toque</b> em criatura: alvo; de novo: atacar</div><div><b>Toque longo</b> o que é isso?</div>
         <div><b>Pular</b> (no voo: subir)</div><div><b>Descer</b> (no voo)</div>
+      </div>
+      <div class="keys tc">
+        <div><b>Lado esquerdo</b> arrastar: andar</div><div><b>Lado direito</b> arrastar: câmera</div>
+        <div><b>Pinça</b> zoom</div><div><b>Cadeado</b> joystick para cima até ele e soltar: corre sozinho (toque no joystick para parar)</div>
+        <div><b>Toque</b> conversar / pegar</div><div><b>Criatura</b> toque: alvo; de novo: atacar</div>
+        <div><b>Falar, Pegar…</b> o que está ao alcance</div><div><b>Lanternada</b> ataca a criatura mais perto</div>
+        <div><b>⋯</b> todas as habilidades e Sentar</div><div><b>Toque longo</b> o que é isso?</div>
+        <div><b>Pular</b> no voo: subir</div><div><b>Descer</b> só no voo</div>
       </div></div>
       <div class="foot"><button class="wbtn small ok">Fechar</button></div></div>`;
     const close = () => this.ui.hideWin(this.opt);

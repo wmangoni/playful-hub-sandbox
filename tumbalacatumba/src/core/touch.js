@@ -4,6 +4,8 @@
 //  - em qualquer lado, dedo que não anda: solto logo vira um clique 'tap'; parado vira input.hold
 //    (mostra a dica, como o mouse por cima)
 //  - botões de pular / subir / descer viram teclas virtuais (Espaço e X)
+//  - joystick arrastado para cima até o cadeado e solto: corre sozinho (o R do teclado), para onde a câmera
+//    aponta (girar a câmera muda o rumo); encostar o polegar no joystick de novo faz parar
 // Os tempos (toque rápido, toque longo) correm no tempo do jogo (update), então o e2e consegue simular.
 
 const STICK_ZONE = 0.42; // fração da largura onde o dedo vira joystick
@@ -13,6 +15,8 @@ const HOLD_T = 0.5; // parado por mais que isso: toque longo (antes disso, solto
 const PINCH_PX = 45; // px de pinça por "clique" da roda
 const PINCH_NEAR = 0.3; // dois dedos mais perto que isso (fração da largura) são pinça, não joystick + câmera
 const PINCH_T = 0.15; // ...e encostando quase juntos (em segundos); depois disso, o 2º dedo é a outra mão
+const LOCK_RISE = 1.9; // o cadeado da corrida fica a isso × raio acima de onde o polegar encostou (e é preciso subir tudo isso)
+const LOCK_ICON = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.5v11h-13V10zm2.5 0h5V8a2.5 2.5 0 0 0-5 0z"/></svg>';
 
 const UP_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4l7 8h-4.5v8h-5v-8H5z"/></svg>';
 const DOWN_ICON = '<svg viewBox="0 0 24 24"><path d="M12 20l-7-8h4.5V4h5v8H19z"/></svg>';
@@ -27,7 +31,8 @@ export class TouchControls {
   constructor(input, game) {
     this.input = input;
     this.game = game;
-    // identifier → { role: 'stick'|'look'|'ignore', sx, sy (início), x0, y0 (centro lógico do joystick), x, y, t0, dist, held, pinch, drag }
+    // identifier → { role: 'stick'|'look'|'ignore', sx, sy (início), x0, y0 (centro lógico do joystick), x, y, t0, dist, held, pinch, drag,
+    //                lockArmed (em cima do cadeado), noTap (o toque que destravou a corrida não vira toque no mundo) }
     this.fingers = new Map();
     this.time = 0;
     this.pinchD = 0;
@@ -42,7 +47,8 @@ export class TouchControls {
     el.id = 'touch';
     el.innerHTML = `
       <div class="ghost"></div>
-      <div class="stick"><div class="knob"></div></div>
+      <div class="stick"><div class="knob">${LOCK_ICON}</div></div>
+      <div class="runlock" aria-hidden="true">${LOCK_ICON}</div>
       <div class="tbtns">
         <button class="tbtn down" data-key="KeyX" aria-label="Descer">${DOWN_ICON}<span>Descer</span></button>
         <button class="tbtn jump" data-key="Space" aria-label="Pular">${UP_ICON}<span>Pular</span></button>
@@ -56,6 +62,8 @@ export class TouchControls {
     document.body.appendChild(rot);
     this.stick = el.querySelector('.stick');
     this.knob = el.querySelector('.knob');
+    this.lockEl = el.querySelector('.runlock');
+    this.runLock = false;
     this.jumpBtn = el.querySelector('.jump');
     this.jumpLabel = this.jumpBtn.querySelector('span');
     this.downBtn = el.querySelector('.down');
@@ -157,6 +165,12 @@ export class TouchControls {
         role = 'look';
       }
       const f = { role, sx: t.clientX, sy: t.clientY, x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, t0: this.time, dist: 0, held: false, pinch: false, drag: false };
+      if (role === 'stick' && this.runLock) {
+        // o polegar voltou ao joystick: a corrida travada acaba e ele assume. Esse toque só para: não conversa nem
+        // ataca o que estiver embaixo do dedo
+        this.setRunLock(false);
+        f.noTap = true;
+      }
       if (role === 'stick') {
         // o centro lógico é onde o dedo encostou; só o desenho da base é empurrado para caber na tela
         this.stick.classList.add('on');
@@ -177,6 +191,7 @@ export class TouchControls {
   _clearStick() {
     const mv = this.input.move;
     mv.x = mv.y = mv.m = 0;
+    this.lockEl.classList.remove('show', 'armed');
     this.stick.classList.remove('on');
     this.root.classList.remove('sticking');
   }
@@ -246,9 +261,11 @@ export class TouchControls {
     const f = this.fingers.get(id);
     if (!f) return;
     this.fingers.delete(id);
+    // soltou em cima do cadeado: corre sozinho
+    if (f.role === 'stick' && f.lockArmed && !cancel) return this.setRunLock(true, f);
     if (f.role === 'stick') this._clearStick();
     if (f.role === 'ignore') return;
-    const tap = !cancel && !f.pinch && !f.held && !f.drag && this.time - f.t0 < HOLD_T;
+    const tap = !cancel && !f.noTap && !f.pinch && !f.held && !f.drag && this.time - f.t0 < HOLD_T;
     if (tap) this.input.clicks.push({ button: 'tap', x: f.sx, y: f.sy, stick: f.role === 'stick' });
     if (f.held) this.input.hold = null;
   }
@@ -278,6 +295,46 @@ export class TouchControls {
       mv.y = -dy / STICK_R;
       mv.m = Math.min(1, Math.hypot(dx, dy) / STICK_R);
     }
+    // cadeado da corrida: aparece quando o polegar sobe e arma quando ele sobe LOCK_RISE × raio inteiro (o
+    // passo normal de andar fica em 1–1,25 raio). O alvo fica parado acima de onde o polegar encostou, mesmo com
+    // a base do joystick seguindo o dedo; perto do topo ele é só desenhado mais baixo, a subida exigida é a mesma
+    const up = f.drag && mv.m > 0.5 && mv.y > 0.85 * mv.m && this.canLock();
+    const rise = f.sy - f.y;
+    f.lockArmed = up && rise >= STICK_R * LOCK_RISE - 8;
+    this.lockEl.classList.toggle('show', up && rise > STICK_R * 0.6);
+    this.lockEl.classList.toggle('armed', f.lockArmed);
+    const ly = Math.max(30, f.sy - STICK_R * LOCK_RISE);
+    this.lockEl.style.transform = `translate(${Math.min(window.innerWidth - 40, Math.max(40, f.sx))}px, ${ly}px)`;
+  }
+
+  /** dá para correr sozinho agora? (no voo, sentado, conversando, conjurando, preso ou morto a trava cairia já) */
+  canLock() {
+    const g = this.game, p = g.player;
+    return !!p && !(p.sitting || p.seat || p.frozen || p.flying || g.combat?.dead || g.ui?.dialog?.open || g.ui?.casting || g.portraitPaused);
+  }
+
+  /**
+   * corrida travada: o personagem segue em frente (para onde a câmera aponta) sem o polegar na tela. A base volta
+   * para onde o polegar encostou (subindo ela ficava em cima do quadro do alvo) e o knob, em cima, vira o cadeado
+   */
+  setRunLock(v, f = null) {
+    if (v && !this.canLock()) v = false;
+    if (this.runLock === v) {
+      if (!v) this._clearStick();
+      return;
+    }
+    this.runLock = v;
+    this.root.classList.toggle('runlocked', v);
+    this.lockEl.classList.remove('show', 'armed');
+    if (!v) return this._clearStick();
+    if (f) this._drawStick({ x0: f.sx, y0: f.sy, x: f.sx, y: f.sy - STICK_R });
+    const mv = this.input.move;
+    mv.x = 0;
+    mv.y = mv.m = 1;
+    if (!this._lockHint) {
+      this._lockHint = true;
+      this.game.ui?.info('Correndo sozinho: toque no joystick para parar.');
+    }
   }
 
   /** desenha a base (empurrada para caber na tela) e o knob onde o dedo está, relativo a essa base */
@@ -295,9 +352,22 @@ export class TouchControls {
     this.knob.style.transform = `translate(${kx}px, ${ky}px)`;
   }
 
-  /** chamado a cada quadro (tempo do jogo): toque longo e botões do voo */
+  /** chamado a cada quadro (tempo do jogo): toque longo, corrida travada e botões do voo */
   update(dt) {
     this.time += dt;
+    if (this.runLock) {
+      // como o R do teclado: sentar, voar, conversar, conjurar (abrir o baú, acender o farol; montar e a lápide já
+      // recusam com o jogador andando, igual no desktop), morrer, ficar preso (porta da mansão), pôr o celular em pé
+      // ou andar pelo teclado (tablet) param a corrida
+      const K = this.input.keys;
+      const keyMove = ['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown'].some((k) => K.has(k));
+      if (!this.canLock() || keyMove) this.setRunLock(false);
+      else {
+        const mv = this.input.move;
+        mv.x = 0;
+        mv.y = mv.m = 1;
+      }
+    }
     for (const f of this.fingers.values()) {
       if (f.role === 'ignore' || f.held || f.pinch || f.drag || this.time - f.t0 < HOLD_T) continue;
       f.held = true;
@@ -315,6 +385,7 @@ export class TouchControls {
 
   /** solta tudo (janela perdeu o foco, troca de modo) */
   reset() {
+    this.setRunLock(false);
     this.fingers.clear();
     this.pinchD = 0;
     const i = this.input;

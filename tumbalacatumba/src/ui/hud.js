@@ -4,7 +4,7 @@ import { Minimap, WorldMap, paintWorldMap } from './minimap.js';
 import { Portraits } from './portrait.js';
 import { Dialog, QuestLog, Bags, Menu, esc } from './windows.js';
 import { CombatHud } from './combatHud.js';
-import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR, XP_TABLE } from '../quests/data.js';
+import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR, XP_TABLE, txt } from '../quests/data.js';
 import { createPlayerModel } from '../entities/models.js';
 import * as NM from '../entities/npcModels.js';
 import * as CM from '../entities/creatureModels.js';
@@ -245,7 +245,9 @@ export class UI {
     ];
     this.slots.push({
       key: '8', code: 'Digit8', id: 'fly', name: 'Voar', icon: 'batcape', cd: 0.8, locked: () => !P.hasItem('capinha'),
-      desc: 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). Espaço sobe, X desce; segure X rente ao chão para pousar. Use de novo no ar para descer planando. Não funciona debaixo de teto.',
+      desc: () => g.touchMode
+        ? 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). O botão Subir sobe e o Descer desce; segure Descer rente ao chão para pousar. Toque de novo no ar para descer planando. Não funciona debaixo de teto.'
+        : 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). Espaço sobe, X desce; segure X rente ao chão para pousar. Use de novo no ar para descer planando. Não funciona debaixo de teto.',
     });
     for (let i = 9; i <= 12; i++) this.slots.push({ key: i <= 9 ? String(i) : i === 10 ? '0' : i === 11 ? '-' : '=', empty: true });
     const bar = this.q('#bottom .bar-frame');
@@ -319,7 +321,8 @@ export class UI {
         this.game.audio?.sfx('click');
         fn();
       };
-      b.onmousemove = (e) => this.showTooltip('micro', `<div class="tt-name" style="color:#fff">${tip}</div>`, e.clientX, e.clientY);
+      // (no toque não: o mousemove de compatibilidade mostraria o atalho de teclado)
+      b.onmousemove = (e) => !this.game.touchMode && this.showTooltip('micro', `<div class="tt-name" style="color:#fff">${tip}</div>`, e.clientX, e.clientY);
       b.onmouseleave = () => this.hideTooltip('micro');
       m.appendChild(b);
     }
@@ -327,7 +330,7 @@ export class UI {
     bag.className = 'bag';
     bag.style.backgroundImage = `url(${icon('bag')})`;
     bag.onclick = () => this.bags.toggle();
-    bag.onmousemove = (e) => this.showTooltip('micro', `<div class="tt-name" style="color:#fff">Mochila de Caixão (B)</div>`, e.clientX, e.clientY);
+    bag.onmousemove = (e) => !this.game.touchMode && this.showTooltip('micro', `<div class="tt-name" style="color:#fff">Mochila de Caixão (B)</div>`, e.clientX, e.clientY);
     bag.onmouseleave = () => this.hideTooltip('micro');
     m.appendChild(bag);
   }
@@ -499,7 +502,7 @@ export class UI {
     const it = ITEMS[id];
     let h = `<div class="tt-name" style="color:${QUALITY_COLORS[it.quality]}">${esc(it.name)}</div>`;
     if (it.quality === 'quest') h += '<div class="tt-sub">Item de missão</div>';
-    if (it.desc) h += `<div class="tt-desc">${esc(it.desc)}</div>`;
+    if (it.desc) h += `<div class="tt-desc">${esc(txt(it, 'desc', this.game.touchMode))}</div>`;
     if (it.flavor) h += `<div class="tt-flavor">"${esc(it.flavor)}"</div>`;
     if (inBag && it.use) h += `<div class="tt-hint">${this.game.touchMode ? 'Toque para usar' : 'Clique para usar'}</div>`;
     return h;
@@ -956,7 +959,11 @@ export class UI {
   // ------------------------------------------------------------ tutorial
   startTutorial() {
     this.tipIndex = 0;
-    this.tipSteps = [
+    this.tipSteps = this.game.touchMode ? [
+      { text: 'Bem-vindo a <b>Tumbalacatumba</b>! Arraste o <b>lado esquerdo</b> da tela para andar e o <b>lado direito</b> para olhar ao redor.' },
+      { text: 'Personagens com um <b>!</b> cor de abóbora têm missões. O <b>Prefeito Abóbora</b> está logo ali na praça: <b>toque nele</b> (ou no botão <b>Falar</b>, quando estiver perto) para conversar.' },
+      { text: 'Suas missões aparecem embaixo do seu retrato e as áreas de objetivo ficam em <b>laranja no minimapa</b>. O <b>mapa</b> e o <b>diário</b> ficam nos botões do topo.', on: 'accept' },
+    ] : [
       { text: 'Bem-vindo a <b>Tumbalacatumba</b>! Use <b>W A S D</b> para andar. Segure o <b>botão direito do mouse</b> e arraste para olhar ao redor.' },
       { text: 'Personagens com um <b>!</b> cor de abóbora têm missões. O <b>Prefeito Abóbora</b> está logo ali na praça: clique nele com o <b>botão direito</b> para conversar.' },
       { text: 'Suas missões aparecem à direita e as áreas de objetivo ficam em <b>laranja no minimapa</b>. Aperte <b>M</b> para o mapa e <b>L</b> para o diário.', on: 'accept' },

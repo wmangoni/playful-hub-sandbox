@@ -6,10 +6,11 @@
 //   2. executar este arquivo na página;
 //   3. chamar __T.run(passo) para cada passo, nesta ordem:
 //        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate,
-//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final, toque, toqueHud, contexto, desktop
+//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final, toque, toqueHud, toqueJogo, contexto, desktop
 //      (toque = controles de toque com dedos simulados; toqueHud = interface de toque, com o layout conferido
-//       só em tela de celular deitado; contexto = placa de vídeo perdida e salvar ao sair do app; desktop = o
-//       preset de desktop sem nada do celular; os quatro podem rodar sozinhos depois de qualquer passo)
+//       só em tela de celular deitado; toqueJogo = corrida travada no joystick, verbos do botão contextual e
+//       textos sem tecla nem clique no toque; contexto = placa de vídeo perdida e salvar ao sair do app;
+//       desktop = o preset de desktop sem nada do celular; os cinco podem rodar sozinhos depois de qualquer passo)
 //      Preset de celular: numa página aberta com &q=movel, rodar movel (e de novo toque, toqueHud e contexto).
 //      Cada chamada devolve 'ok' ou 'ERRO ...' (uma chamada por passo cabe no timeout do Runtime.evaluate);
 //      As missões rodam em modo pacífico (as criaturas não atacam); o passo "combate" liga a briga de volta.
@@ -635,6 +636,278 @@ window.__T = (() => {
       ok.push(`aviso de retrato ${!!rot}; de volta ao desktop ${back}`);
       if (!rot || !back) fail('volta ao modo desktop falhou');
       L.push('toqueHud: ' + ok.join('; '));
+    },
+    toqueJogo() {
+      // fase 4 (ajustes de jogo no toque): corrida travada, verbos do botão contextual, abóboras caçadas com o
+      // polegar e textos sem tecla nem clique no toque (lidos do que a interface desenha)
+      const ok = [], fail = (m) => { throw new Error(m + ' | ' + ok.join('; ')); };
+      const prevMode = g.settings.controls;
+      g.applySetting('controls', 'on');
+      g.input.lastPointer = 'touch';
+      wait(60);
+      const T = g.touch, B = g.touchBar, ui = g.ui, cv = g.renderer.domElement, p = g.player, cam = g.cam;
+      if (!T || !B) fail('controles de toque não foram criados');
+      const on = new Map();
+      const mk = (q) => new Touch({ identifier: q.id, target: cv, clientX: q.x, clientY: q.y });
+      const fire = (type, pts) => {
+        if (type === 'touchstart' || type === 'touchmove') for (const q of pts) on.set(q.id, q);
+        else for (const q of pts) on.delete(q.id);
+        const all = [...on.values()].map(mk), ch = pts.map(mk);
+        cv.dispatchEvent(new TouchEvent(type, { touches: all, targetTouches: all, changedTouches: ch, bubbles: true, cancelable: true }));
+      };
+      const SX = innerWidth * 0.2, SY = innerHeight * 0.72, SR = 56;
+      const lockShown = () => getComputedStyle(T.lockEl).display !== 'none';
+      // arrasta o joystick para cima (rise × raio a partir de y0) e solta
+      const flick = (id, rise, y0 = SY) => {
+        fire('touchstart', [{ id, x: SX, y: y0 }]); wait(60);
+        for (let k = 1; k <= 10; k++) { fire('touchmove', [{ id, x: SX, y: y0 - SR * rise * k / 10 }]); wait(33); }
+        const armed = T.lockEl.classList.contains('armed');
+        fire('touchend', [{ id, x: SX, y: y0 - SR * rise }]); wait(33);
+        return armed;
+      };
+      const open = () => { tp(5, 40); p.yaw = cam.yaw = 0; cam.snapBehind(p); wait(150); };
+
+      // 1. corrida travada: arrastar até o cadeado e soltar corre sozinho; a câmera muda o rumo; tocar no joystick para
+      open();
+      const armed = flick(1, 1.95);
+      const locked = T.runLock && T.root.classList.contains('runlocked');
+      let a = p.pos.clone();
+      wait(2000);
+      const speed = p.pos.distanceTo(a) / 2;
+      const y0 = p.yaw, LX = innerWidth * 0.7, LY = innerHeight * 0.45;
+      fire('touchstart', [{ id: 2, x: LX, y: LY }]);
+      for (let k = 1; k <= 10; k++) { fire('touchmove', [{ id: 2, x: LX + k * 12, y: LY }]); wait(33); }
+      fire('touchend', [{ id: 2, x: LX + 120, y: LY }]); wait(600);
+      const turned = Math.abs(Math.atan2(Math.sin(p.yaw - y0), Math.cos(p.yaw - y0)));
+      const stillLocked = T.runLock;
+      fire('touchstart', [{ id: 3, x: SX, y: SY }]); wait(60);
+      fire('touchend', [{ id: 3, x: SX, y: SY }]); wait(600);
+      a = p.pos.clone(); wait(1000);
+      const stopped = !T.runLock && p.pos.distanceTo(a) < 0.05 && !T.root.classList.contains('runlocked') && !lockShown();
+      // passada normal para a frente (1,25 raio) e arrasto que quase chega: não travam e o cadeado some ao soltar
+      const short = flick(4, 1.25) || T.runLock || lockShown();
+      const almost = flick(4, 1.6) || T.runLock || lockShown();
+      // polegar encostando alto (y = 100): a subida exigida é a mesma (um arrasto de 60 px não arma)
+      const high = flick(4, 60 / SR, 100) || T.runLock;
+      ok.push(`corrida travada: cadeado arma ${armed}, trava ${locked}, ${speed.toFixed(1)} m/s, câmera vira o rumo ${turned.toFixed(2)} rad (segue travada ${stillLocked}), toque no joystick para e apaga o cadeado ${stopped}; não travam nem deixam cadeado: passada ${!short}, quase lá ${!almost}, polegar alto ${!high}`);
+      if (!armed || !locked || speed < 5.5 || turned < 0.2 || !stillLocked || !stopped || short || almost || high) fail('corrida travada no joystick');
+      // o toque que destrava só para: com um PNJ embaixo do polegar, não abre conversa
+      const n = QW.npcs.prefeito;
+      open(); flick(5, 1.95);
+      // trava ligada, de frente para o prefeito a 7 m e com a câmera virada para ele cair no lado do joystick
+      let nx = 0, ny = 0;
+      for (const off of [0.45, -0.45, 0.35, -0.35, 0.55, -0.55]) {
+        tp(n.pos.x + Math.sin(n.homeYaw) * 7, n.pos.z + Math.cos(n.homeYaw) * 7);
+        cam.yaw = p.yaw = n.homeYaw + Math.PI + off; cam.snapBehind(p); wait(33);
+        const sp = n.pos.clone(); sp.y += 1.2; sp.project(g.camera);
+        nx = (sp.x + 1) / 2 * innerWidth; ny = (1 - sp.y) / 2 * innerHeight;
+        if (nx > innerWidth * 0.08 && nx < innerWidth * 0.36 && ny > 40 && ny < innerHeight - 40) break;
+      }
+      const npcLeft = nx > innerWidth * 0.08 && nx < innerWidth * 0.36 && T.runLock;
+      fire('touchstart', [{ id: 6, x: nx, y: ny }]); wait(60);
+      fire('touchend', [{ id: 6, x: nx, y: ny }]); wait(120);
+      const quietStop = !T.runLock && !ui.dialog.open;
+      ui.dialog.close(); wait(30);
+      // conversar, sentar, conjurar, andar pelo teclado e soltar tudo derrubam a trava; voando ela nem arma
+      tp(n.pos.x + Math.sin(n.homeYaw) * 2.5, n.pos.z + Math.cos(n.homeYaw) * 2.5); wait(100);
+      flick(7, 1.95);
+      g.interaction.tryInteract(n.inter); wait(60);
+      const byTalk = !T.runLock;
+      ui.dialog.close(); wait(60);
+      open(); flick(8, 1.95);
+      g.abilities.sit(); wait(100);
+      const bySit = !T.runLock;
+      p.sitting = false; p.seat = null; wait(60);
+      open(); flick(9, 1.95);
+      ui.cast('Teste', 0.5); wait(60);
+      const byCast = !T.runLock && !!ui.casting;
+      wait(600);
+      open(); flick(10, 1.95);
+      g.input.keys.add('KeyW'); wait(60); g.input.keys.delete('KeyW'); wait(30);
+      const byKey = !T.runLock;
+      open(); flick(11, 1.95);
+      T.reset();
+      const byReset = !T.runLock && g.input.move.m === 0;
+      const hadCape = P.hasItem('capinha'), flew = P.flags.flewOnce;
+      if (!hadCape) P.addItem('capinha', 1, true);
+      open();
+      const said = [], chat0 = ui.chat, info0 = ui.info;
+      ui.chat = (t) => said.push(t); ui.info = (t) => said.push(t);
+      let flyArm = 'não voou';
+      try {
+        delete P.flags.flewOnce;
+        if (g.abilities.use('fly')) {
+          wait(200);
+          const hint0 = said.length;
+          flyArm = flick(12, 1.95) || T.runLock || said.slice(hint0).some((t) => t.includes('Correndo sozinho'));
+          p.stopFlying(true); wait(300);
+        }
+      } finally {
+        ui.chat = chat0; ui.info = info0;
+        if (flew) P.flags.flewOnce = flew;
+        if (!hadCape) P.removeItem('capinha');
+      }
+      ok.push(`toque que destrava não conversa ${quietStop} (PNJ no lado do joystick ${npcLeft}); solta ao conversar ${byTalk}, sentar ${bySit}, conjurar ${byCast}, W ${byKey}, soltar tudo ${byReset}; voando não arma ${flyArm === false}`);
+      if (!quietStop || !npcLeft || !byTalk || !bySit || !byCast || !byKey || !byReset || flyArm !== false) fail('a corrida travada não soltou (ou armou onde não devia)');
+
+      // 2. botão contextual: verbo do objeto, que cabe no botão; todo objeto de "sentar/abrir/entrar..." tem verbo
+      const io = g.indoors;
+      tp(io.outSpot.x, io.outSpot.z); wait(300);
+      const door = B.ctxTarget?.name === 'Porta da Mansão' && B.ctxLabel.textContent;
+      const verbs = ['Falar', 'Pegar', 'Usar', 'Sentar', 'Abrir', 'Entrar', 'Sair', 'Examinar', 'Acender'];
+      const label = B.ctxLabel, txt0 = label.textContent, room = label.getBoundingClientRect().width - 4;
+      const widths = {};
+      for (const v of verbs) {
+        label.textContent = v;
+        const r = document.createRange();
+        r.selectNodeContents(label);
+        widths[v] = r.getBoundingClientRect().width;
+      }
+      label.textContent = txt0;
+      const wide = verbs.filter((v) => widths[v] > room);
+      const noVerb = g.interaction.list.filter((x) => x.kind !== 'mob' && /sentar|abrir|entrar|sair|examinar|acender|capturar|pegar o gato/i.test(x.hint ?? '') && !x.verb).map((x) => x.name);
+      const frogVerb = (() => { const f = g.interaction.list.find((x) => x.name === 'Sapo Sorridente'); return f && f.verb(); })();
+      ok.push(`porta: "${door}"; mais largo Examinar ${widths.Examinar.toFixed(1)} de ${room.toFixed(0)} px; largos demais [${wide}]; sem verbo [${noVerb}]; sapo ${frogVerb}`);
+      if (door !== 'Entrar' || wide.length || noVerb.length || frogVerb !== (P.wants('dentadura') ? 'Pegar' : 'Falar')) fail('verbos do botão contextual');
+
+      // 3. abóboras fujonas só com o polegar no joystick e o botão contextual (sem mexer no equilíbrio do desktop).
+      // O robô empurra o joystick reto para a abóbora; quando ela sai da cerca do campo (pelas falhas da cerca), uma
+      // pessoa contornaria pelo portão (igual no desktop), então essa perseguição não conta: mede só o que é do
+      // toque, com ela dentro do campo
+      const saved = JSON.stringify(P.quests.aboboras ?? null);
+      const f = QW.pumpkins;
+      const F = QW.pumpkinField, fc = Math.cos(F.rot), fs = Math.sin(F.rot);
+      const inField = (w) => {
+        const dx = w.pos.x - F.x, dz = w.pos.z - F.z;
+        return Math.abs(dx * fc - dz * fs) < F.hw + 0.6 && Math.abs(dx * fs + dz * fc) < F.hd + 0.6;
+      };
+      const catches = [];
+      let fled = 0, lost = 0;
+      try {
+        for (let k = 0; k < 8 && catches.length < 3; k++) {
+          P.quests.aboboras = { status: 'active', counts: { abobora: 0 } };
+          QW.resetPumpkins();
+          tp(F.x, F.z); wait(30);
+          const w = f.filter((u) => u.rig.root.visible).sort((u, v) => u.pos.distanceTo(p.pos) - v.pos.distanceTo(p.pos))[k % 3];
+          let t = 0, mx = 0, my = 0, out = false;
+          fire('touchstart', [{ id: 20, x: SX, y: SY }]); wait(33);
+          while (t < 8 && !w.caught) {
+            if (!inField(w)) { out = true; break; }
+            // reação humana: corrige a mira a cada ~0,27 s e toca no botão quando ele aparece
+            if (Math.round(t * 30) % 8 === 0) {
+              const rel = Math.atan2(w.pos.x - p.pos.x, w.pos.z - p.pos.z) - cam.yaw;
+              mx = -Math.sin(rel); my = Math.cos(rel);
+              if (!B.ctx.classList.contains('hidden') && B.ctxTarget === w.inter) {
+                B.ctx.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 40 }));
+                B.ctx.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 40 }));
+              }
+            }
+            fire('touchmove', [{ id: 20, x: SX + mx * SR * 1.1, y: SY - my * SR * 1.1 }]);
+            wait(33); t += 1 / 30;
+          }
+          fire('touchend', [{ id: 20, x: SX, y: SY }]); wait(60);
+          if (w.caught) catches.push(+t.toFixed(1));
+          else if (out) fled++;
+          else lost++;
+        }
+      } finally {
+        if (saved === 'null') delete P.quests.aboboras;
+        else P.quests.aboboras = JSON.parse(saved);
+        QW.resetPumpkins();
+        wait(30);
+      }
+      ok.push(`abóboras com o polegar: pegou em ${catches.join(', ')} s; saíram da cerca ${fled}; escaparam no campo ${lost}`);
+      if (catches.length < 3 || lost || catches.some((c) => c > 4)) fail('abóbora fujona escapou do polegar');
+
+      // 4. opções do diálogo: alvos de 44 px, sem encostar uma na outra
+      tp(n.pos.x + Math.sin(n.homeYaw) * 2.5, n.pos.z + Math.cos(n.homeYaw) * 2.5); wait(100);
+      g.interaction.tryInteract(n.inter); wait(200);
+      const lis = [...ui.root.querySelectorAll('#quest .opts li')].map((l) => l.getBoundingClientRect());
+      const optsOk = lis.length > 0 && lis.every((r, i) => r.height >= 43.5 && (i === 0 || r.top >= lis[i - 1].bottom - 0.5));
+      ui.dialog.close(); wait(60);
+      ok.push(`opções do diálogo: ${lis.length}, todas ≥ 44 px e separadas ${optsOk}`);
+      if (!optsOk) fail('opções do diálogo pequenas ou encostadas');
+
+      // 5. textos no toque: nada de tecla, clique, mouse nem atalho; no desktop, os de antes
+      const BAD = /tecla|clique|clicar|botão (direito|esquerdo)|aperte|pressione|\bEspaço\b|mouse|W A S D|\(\d\)|\b(no|botão|tecla) \d\b|\((?:[A-Z]|Esc)\)/i;
+      const plain = (h) => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent; };
+      const ids = ['aboboras', 'gato', 'ossos', 'brasas', 'chocar', 'corvos', 'carta', 'resposta', 'dentadura', 'cogumelos', 'vagalumes', 'cuspe', 'baile', 'pelo', 'sotao', 'capa', 'casamento'];
+      const texts = (touch) => {
+        g.input.lastPointer = touch ? 'touch' : 'mouse';
+        if (!touch) g.applySetting('controls', 'auto');
+        wait(30);
+        const out = [];
+        ui.startTutorial();
+        out.push(...ui.tipSteps.map((s2) => s2.text));
+        ui.hideWin(ui.tut);
+        for (const sl of ui.slots) if (!sl.empty) out.push(ui.slotTooltip(sl));
+        const items = new Set(['capinha', 'vassoura', 'belzebu', 'lanterna', 'biscoito']);
+        // o que o diálogo e o diário desenham (oferta, conclusão e detalhe), não os dados crus
+        for (const id of ids) {
+          const q = P.quest(id);
+          if (!q) fail('missão sem definição: ' + id);
+          for (const it of q.rewards?.items ?? []) items.add(it);
+          for (const kind of ['avail', 'done']) {
+            ui.dialog.showQuest({ kind, q });
+            out.push(ui.dialog.body.innerHTML);
+          }
+          out.push(q.progress);
+          const st = JSON.stringify(P.quests[id] ?? null);
+          P.quests[id] = { status: 'active', counts: {} };
+          ui.qlog.sel = id;
+          ui.qlog.render();
+          out.push(ui.qlog.detail.innerHTML);
+          if (st === 'null') delete P.quests[id];
+          else P.quests[id] = JSON.parse(st);
+        }
+        ui.qlog.sel = null;
+        ui.qlog.render();
+        for (const it of items) out.push(ui.itemTooltipHTML(it, true));
+        // mensagens: primeira briga, primeiro voo e o Voar aprendido na mansão
+        const said2 = [], c0 = ui.chat, i0 = ui.info, f0 = P.flags.tipCombat, peace0 = C.peaceful, fl0 = P.flags.flewOnce, cape = P.hasItem('capinha');
+        ui.chat = (t) => said2.push(t); ui.info = (t) => said2.push(t);
+        delete P.flags.tipCombat; C.peaceful = false;
+        try {
+          C.onAggro(C.mobs.find((m) => !m.type.social) ?? C.mobs[0], false);
+          delete P.flags.flewOnce;
+          if (!cape) P.addItem('capinha', 1, true);
+          tp(5, 40); wait(30);
+          if (g.abilities.use('fly')) { wait(60); p.stopFlying(true); wait(200); }
+        } finally {
+          ui.chat = c0; ui.info = i0; P.flags.tipCombat = f0; C.peaceful = peace0;
+          if (fl0) P.flags.flewOnce = fl0;
+          if (!cape) P.removeItem('capinha');
+        }
+        out.push(...said2, ...QW.mansion.flyLearnedText(touch));
+        out.push(...g.debug.bootTips()[touch ? 'touch' : 'desk']);
+        // dicas do menu do topo: no toque o mousemove de compatibilidade não mostra o atalho
+        const mb = ui.root.querySelector('#micro button');
+        mb.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 10, clientY: 10 }));
+        out.push(ui.tooltip.classList.contains('hidden') ? '' : ui.tooltip.innerHTML);
+        ui.hideTooltip('micro');
+        // janela de controles: no toque só a lista de gestos (a do teclado fica escondida)
+        ui.menu.showOptions('keys'); wait(30);
+        const opt = ui.menu.opt, kb = opt.querySelector('.keys.kb');
+        const shownKeys = [...opt.querySelectorAll('.keys-sec .keys')].filter((l) => getComputedStyle(l).display !== 'none');
+        out.push(...shownKeys.map((l) => l.textContent));
+        const inner = opt.querySelector('.inner');
+        const res = out.filter(Boolean).map(plain);
+        res.kbShown = getComputedStyle(kb).display !== 'none';
+        res.fits = inner.scrollHeight <= inner.clientHeight + 1;
+        res.innerH = `${inner.scrollHeight}/${inner.clientHeight}`;
+        ui.hideWin(opt); wait(30);
+        return res;
+      };
+      const touchTexts = texts(true);
+      const badTouch = touchTexts.filter((t) => BAD.test(t)).map((t) => t.slice(0, 60));
+      const deskTexts = texts(false);
+      const deskKeys = ['W A S D', 'Espaço sobe', 'Aperte 5', 'Aperte 8', '(tecla 1)', 'Aperte 7', 'Diário de Missões (L)', 'tecla 6'].filter((k) => !deskTexts.some((t) => t.includes(k)));
+      ok.push(`textos no toque ${touchTexts.length}, com tecla ou clique [${badTouch.join(' / ')}]; no desktop faltando [${deskKeys}]; lista do teclado nos controles: toque ${touchTexts.kbShown}, desktop ${deskTexts.kbShown}; controles do desktop sem rolagem ${deskTexts.fits} (${deskTexts.innerH})`);
+      g.applySetting('controls', prevMode);
+      g.input.lastPointer = 'mouse';
+      wait(60);
+      if (badTouch.length || deskKeys.length || touchTexts.kbShown || !deskTexts.kbShown || !deskTexts.fits) fail('textos de toque');
+      L.push('toqueJogo: ' + ok.join('; '));
     },
     contexto() {
       // placa de vídeo perdida: chama o handler do jogo direto (um evento no canvas também chegaria ao three, que
