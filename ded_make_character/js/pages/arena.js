@@ -13,7 +13,7 @@ import { html, render } from '../core/dom.js';
 import { normalize, plural } from '../core/format.js';
 import { createBattle, criarLote, fromCatalog, gap, nextRound, nextTurn, podeLutar, rules, runBattle } from '../rules/combat30.js';
 import { computeSheet } from '../rules/dnd30.js';
-import { dificuldade, nivelDeEncontro } from '../rules/encontro30.js';
+import { dificuldade, ndRotulo, neTexto, nivelDeEncontro } from '../rules/encontro30.js';
 import { rotuloItem } from '../rules/equipamento30.js';
 import { MODO, espacosDoDia, normalizarMagias, resumoDasMagias, temMagiasDaLista } from '../rules/magias30.js';
 import { fromPersonagem } from '../rules/personagem30.js';
@@ -57,11 +57,13 @@ function textoDasMagias(e) {
   return resumo ? `${resumo}${cura}` : `Nenhuma magia escolhida${cura}`;
 }
 
-/** "Gigante grande" (monstro), "Paladino 19 · Humano meio-celestial" (Holy Avenger) ou "Guerreiro 4 · Humano" (seu personagem). */
+/** "Gigante grande" (monstro), "Paladino 20 · Humano meio-celestial" (Holy Avenger) ou "Guerreiro 4 · Humano" (seu personagem). */
 function descricao(e) {
   if (e.categoria === 'monstro') return `${e.tipo} ${e.tamanho.toLowerCase()}`;
   if (e.categoria === 'personagem') return [e.sheet.identidade.classe ? `${e.sheet.identidade.classe} ${e.nd}` : `${e.nd}º nível, sem classe`, e.sheet.identidade.raca || 'sem raça'].join(' · ');
-  return [e.classes.map(c => `${c.classe} ${c.nivel}`).join(' / '), e.raca].filter(Boolean).join(' · ');
+  const partes = [e.classes.map(c => `${c.classe} ${c.nivel}`).join(' / '), e.raca].filter(Boolean);
+  // criatura de Holy Avenger sem classe nem raça (Helena): tipo e tamanho, como os monstros
+  return partes.length ? partes.join(' · ') : `${e.tipo} ${e.tamanho.toLowerCase()}`;
 }
 
 /** A CA "agora" é a que o motor usaria contra um golpe corpo a corpo comum (reforços, surpresa, condições). */
@@ -170,7 +172,6 @@ export async function renderArena({ root, router, query, store }) {
   };
   // quem não pode lutar (personagem sem classe, equipamento com erro) não conta para a dica
   const ndDoLado = lado => nivelDeEncontro(state[lado].filter(x => !porId.get(x.ref).erros?.length).flatMap(x => Array(x.qtd).fill(porId.get(x.ref).nd)));
-  const ndTexto = ne => (ne == null ? '—' : String(Math.round(ne)));
 
   /** Redesenha preservando o foco no controle equivalente (data-focus). */
   function comFoco(desenhar) {
@@ -208,7 +209,7 @@ export async function renderArena({ root, router, query, store }) {
     return html`<li class="arena-roster__item">
       <div class="arena-roster__info">
         <p class="arena-roster__name">${e.nome}</p>
-        <p class="arena-roster__meta">ND ${e.nd} · ${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
+        <p class="arena-roster__meta">ND ${ndRotulo(e.nd)} · ${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
       </div>
       <span class="stepper arena-qty" role="group" aria-label="Quantidade de ${e.nome}">
         <button type="button" class="stepper__btn" data-qtd="-1" data-lado="${lado}" data-ref="${x.ref}" data-focus="menos-${chave}" data-focus-fallback="${x.qtd === 1 ? `adicionar-${lado}` : `mais-${chave}`}" aria-label="Um ${e.nome} a menos no lado ${lado}">−</button>
@@ -226,7 +227,7 @@ export async function renderArena({ root, router, query, store }) {
     return html`<section class="card arena-side arena-side--${lado.toLowerCase()}" aria-labelledby="lado-${lado}-titulo">
       <header class="arena-side__head">
         <h2 class="arena-side__title" id="lado-${lado}-titulo" tabindex="-1"><span class="arena-tag arena-tag--${lado.toLowerCase()}" aria-hidden="true">${lado}</span>Lado ${lado}</h2>
-        <p class="arena-side__meta">${plural(total, 'combatente', 'combatentes')} de ${LIMITES.porLado} · ND do grupo ${ndTexto(ndDoLado(lado))}</p>
+        <p class="arena-side__meta">${plural(total, 'combatente', 'combatentes')} de ${LIMITES.porLado} · ND do grupo ${neTexto(ndDoLado(lado))}</p>
       </header>
       ${lista.length
         ? html`<ul class="arena-roster">${lista.map(x => itemDoLado(lado, x))}</ul>`
@@ -242,7 +243,7 @@ export async function renderArena({ root, router, query, store }) {
     const neB = ndDoLado('B');
     const d = dificuldade(neA, neB);
     if (!d) return html`<p class="arena-difficulty">${icon('info')}<span>Com um combatente de cada lado, aparece aqui uma dica de dificuldade pelo nível de encontro da 3.0.</span></p>`;
-    return html`<p class="arena-difficulty is-${d.nivel}">${icon('info')}<span>Para o lado A, a luta parece <strong>${d.rotulo}</strong> (ND do grupo ${ndTexto(neA)} contra ${ndTexto(neB)}). É só uma orientação pelo nível de encontro da 3.0: quem decide são os dados.</span></p>`;
+    return html`<p class="arena-difficulty is-${d.nivel}">${icon('info')}<span>Para o lado A, a luta parece <strong>${d.rotulo}</strong> (ND do grupo ${neTexto(neA)} contra ${neTexto(neB)}). É só uma orientação pelo nível de encontro da 3.0: quem decide são os dados.</span></p>`;
   }
 
   /** Se dá para começar a luta e rodar o lote e, se não, por quê. */
@@ -536,7 +537,9 @@ export async function renderArena({ root, router, query, store }) {
       { key: 'holy', label: 'Holy Avenger', icone: 'shield' },
       { key: 'meus', label: 'Meus personagens', icone: 'hero' },
     ];
-    const FAIXAS = { todos: [1, 20], '1-5': [1, 5], '6-10': [6, 10], '11-15': [11, 15], '16-20': [16, 20] };
+    // acima do 20 só há Holy Avenger (o Paladino vai até o ND 55, Tarso tem 50); abaixo de 1, o ND 1/2 (TASK_007, TASK_008)
+    const FAIXAS = { todos: [0, Infinity], '1-5': [0, 5], '6-10': [6, 10], '11-15': [11, 15], '16-20': [16, 20], '21+': [21, Infinity] };
+    const rotuloFaixa = k => (k === 'todos' ? 'Todos os ND' : k === '21+' ? 'ND 21 ou mais' : k === '1-5' ? 'ND até 5' : `ND ${k.replace('-', ' a ')}`);
 
     const qtdNoLado = id => state[lado].find(x => x.ref === id)?.qtd || 0;
     const cheio = () => totalDoLado(state[lado]) >= LIMITES.porLado;
@@ -567,7 +570,7 @@ export async function renderArena({ root, router, query, store }) {
       return html`<ul class="arena-picker__list">${itens.map(e => html`<li class="arena-pick">
         <div class="arena-pick__info">
           <p class="arena-pick__name">${e.nome}</p>
-          <p class="arena-pick__meta"><span class="badge badge--neutral">${e.categoria === 'personagem' ? `Nível ${e.nd}` : `ND ${e.nd}`}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
+          <p class="arena-pick__meta"><span class="badge badge--neutral">${e.categoria === 'personagem' ? `Nível ${e.nd}` : `ND ${ndRotulo(e.nd)}`}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
           ${e.categoria === 'personagem'
             ? html`<p class="arena-pick__lore">${textoDoEquipamento(e.equipamento)}</p>${e.erros.length ? html`<p class="arena-pick__erro">${icon('alert')}Não pode lutar: ${e.erros.join('; ')}.</p>` : ''}`
             : html`<p class="arena-pick__lore">${e.resumo}</p>`}
@@ -598,7 +601,7 @@ export async function renderArena({ root, router, query, store }) {
             </div>
             <label class="visually-hidden" for="arena-nd">Faixa de ND</label>
             <select class="select arena-picker__nd" id="arena-nd" data-nd>
-              ${Object.keys(FAIXAS).map(k => html`<option value="${k}" ${s.nd === k ? 'selected' : ''}>${k === 'todos' ? 'Todos os ND' : `ND ${k.replace('-', ' a ')}`}</option>`)}
+              ${Object.keys(FAIXAS).map(k => html`<option value="${k}" ${s.nd === k ? 'selected' : ''}>${rotuloFaixa(k)}</option>`)}
             </select>
           </div>`}
           <div data-slot="lista">${lista()}</div>

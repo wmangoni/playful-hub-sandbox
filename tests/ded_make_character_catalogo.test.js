@@ -57,18 +57,53 @@ function run() {
     }
   });
 
-  test('Holy Avenger: personagens com classes, nível até 20 e fonte na wiki', () => {
+  test('Holy Avenger: as 54 fichas do livro Tormenta D20 – Holy Avenger (TASK_008), com as versões de cada personagem', () => {
     const ha = catalogo.holy_avenger;
-    assert.ok(ha.length >= 12, `${ha.length} personagens`);
+    assert.strictEqual(ha.length, 54);
+    const por = id => ha.find(c => c.id === id);
     for (const c of ha) {
       assert.ok(c.id.startsWith('ha-'), c.id);
       assert.strictEqual(c.categoria, 'holy_avenger');
-      assert.ok(c.classes.length > 0, `${c.id} sem classes`);
-      assert.ok(c.nivel >= 1 && c.nivel <= 20, `${c.id}: nível ${c.nivel}`);
+      // personagem com classe, ou criatura sem classe (Helena, Aspis, Raschid…), com o nível nos DV
+      assert.ok(c.classes.length > 0 || c.tipo !== 'Humanoide', `${c.id} sem classes`);
+      assert.ok(c.nivel >= c.classes.reduce((s, k) => s + k.nivel, 0), `${c.id}: nível ${c.nivel}`);
       assert.ok(/tormenta\.fandom\.com/.test(c.fonte.url), `${c.id}: ${c.fonte.url}`);
+      // a origem é a ficha oficial do livro; o Mestre Arsenal, que o livro não traz, vem da ficha d20 da wiki
+      assert.ok(/Holy Avenger \(Talismã\), p\. \d+/.test(c.fonte.referencia) || c.id === 'ha-mestre-arsenal', `${c.id}: ${c.fonte.referencia}`);
     }
-    const nomes = ha.map(c => c.nome);
-    for (const heroi of ['Sandro Galtran', 'Lisandra', 'Tork']) assert.ok(nomes.includes(heroi), heroi);
+    // uma entrada por ficha; a primeira ficha de cada um fica com o id que já existia
+    const versoes = prefixo => ha.filter(c => c.id === prefixo || c.id.startsWith(`${prefixo}-`)).length;
+    assert.deepStrictEqual(['ha-lisandra', 'ha-tork', 'ha-sandro', 'ha-niele', 'ha-paladino'].map(versoes), [5, 4, 3, 2, 6]);
+    assert.deepStrictEqual(['ha-lisandra', 'ha-tork', 'ha-sandro-galtran', 'ha-niele'].map(id => [por(id).nome, por(id).nd]),
+      [['Lisandra, Druida', 4], ['Tork, Troglodita Anão', 5], ['Sandro Galtran, Ladrão', 3], ['Niele, Arquimaga', 3]]);
+    // ND fracionário, como no livro
+    assert.deepStrictEqual([por('ha-petra-tpish').nd, por('ha-hipolita').nd], [0.5, 0.5]);
+    // os mais fortes passam do 20: Tarso (43 DV de dragão + Mago 20) tem nível 63 e ND 50
+    assert.deepStrictEqual([por('ha-tarso').nd, por('ha-tarso').nivel], [50, 63]);
+  });
+
+  test('Paladino de Arton: a ficha das lendas e as 5 formas oficiais do livro', () => {
+    const ids = ['ha-paladino-de-arton', 'ha-paladino-desperto', 'ha-paladino-matador-de-dragoes', 'ha-paladino-completo', 'ha-paladino-avancado', 'ha-paladino-extremo'];
+    const formas = ids.map(id => catalogo.holy_avenger.find(c => c.id === id));
+    assert.ok(formas.every(Boolean), 'as 6 fichas existem');
+    assert.deepStrictEqual(formas.map(c => [c.nd, c.nivel, c.classes[0].nivel, c.tamanho, c.tendencia]), [
+      [22, 20, 20, 'Médio', 'LB'], [20, 19, 4, 'Médio', 'LN'], [25, 24, 9, 'Médio', 'LN'], [36, 35, 20, 'Médio', 'LN'], [40, 40, 20, 'Imenso', 'LN'], [55, 50, 20, 'Colossal', 'LN'],
+    ]);
+    // os DV extraplanares dos rubis somam aos níveis de paladino
+    assert.deepStrictEqual(formas.map(c => c.dados_vida), ['20d10+60', '15d8+4d10+114', '15d8+9d10+144', '15d8+20d10+210', '20d8+20d10+480', '30d8+20d10+700']);
+    assert.deepStrictEqual(formas.map(c => c.reducao_dano && `${c.reducao_dano.valor}/${c.reducao_dano.exceto}`), [null, '30/+5', '30/+5', '30/+5', '15/+3', '40/+5']);
+    const efeitos = c => [...c.ataques_especiais, ...c.qualidades_especiais].map(e => e.mecanica?.efeito).filter(Boolean);
+    for (const c of formas) {
+      assert.ok(efeitos(c).includes('retribuicao'), `${c.id}: Retribuição`);
+      assert.ok(efeitos(c).includes('imunidade-magia'), `${c.id}: imunidade a magia`);
+      assert.doesNotMatch(c.adaptacao || '', /16 \+ n/, `${c.id}: nada da adaptação antiga (nível 16 + rubis)`);
+    }
+    // a ficha das lendas: PV 164 do livro, Car 17, Destruir o Mal +3/+20, cura pelas mãos 60
+    const [lendas] = formas;
+    assert.deepStrictEqual([lendas.pv, lendas.atributos.car], [164, 17]);
+    const destruir = lendas.ataques_especiais.find(e => e.id === 'destruir-o-mal').mecanica;
+    assert.deepStrictEqual([destruir.bonus_ataque, destruir.bonus_dano], [3, 20]);
+    assert.strictEqual(lendas.qualidades_especiais.find(e => e.id === 'cura-pelas-maos').mecanica.pv_por_dia, 60);
   });
 
   test('o validador pega os erros que deve pegar', () => {
@@ -94,6 +129,30 @@ function run() {
     const multiclasse = clone(catalogo.holy_avenger);
     multiclasse[0].dados_vida = '10d10+10d8+60';
     assert.deepStrictEqual(validarSecao(multiclasse, 'holy_avenger').erros, []);
+
+    // o teto de ND: 20 para monstro, 80 para Holy Avenger; ND fracionário só em Holy Avenger;
+    // as classes não passam do nível (DV raciais à parte)
+    const ndAlto = clone(catalogo.monstros);
+    ndAlto.find(m => m.id === 'tarrasque').nd = 21;
+    assert.ok(validarSecao(ndAlto, 'monstros').erros.some(e => e.includes('nd 1–20')));
+    const ndMeio = clone(catalogo.monstros);
+    ndMeio.find(m => m.id === 'carnical').nd = 0.5;
+    assert.ok(validarSecao(ndMeio, 'monstros').erros.some(e => e.includes('nd 1–20')));
+    const haAlto = clone(catalogo.holy_avenger);
+    haAlto.find(c => c.id === 'ha-paladino-extremo').nd = 81;
+    haAlto.find(c => c.id === 'ha-petra-tpish').nd = 0.4;
+    const errosAlto = validarSecao(haAlto, 'holy_avenger').erros;
+    assert.ok(errosAlto.some(e => e.includes('ha-paladino-extremo: nd 1–80')), errosAlto.join(' | '));
+    assert.ok(errosAlto.some(e => e.includes('ha-petra-tpish: nd 1–80 ou fração')), errosAlto.join(' | '));
+    const classes = clone(catalogo.holy_avenger);
+    classes.find(c => c.id === 'ha-tarso').classes[0].nivel = 64;
+    assert.ok(validarSecao(classes, 'holy_avenger').erros.some(e => e.includes('soma dos níveis de classe > nivel')));
+    const condicao = clone(catalogo.holy_avenger);
+    condicao.find(c => c.id === 'ha-tork-guerreiro-cego').condicoes_iniciais = ['cegueta'];
+    assert.ok(validarSecao(condicao, 'holy_avenger').erros.some(e => e.includes('condicoes_iniciais')));
+    const semClasse = clone(catalogo.holy_avenger);
+    semClasse.find(c => c.id === 'ha-anne').classes = [];
+    assert.ok(validarSecao(semClasse, 'holy_avenger').avisos.some(a => a.includes('ha-anne: humanoide sem classes')));
   });
 
   test('o validador pega os erros de mecânica, listas fechadas e regras do formato', () => {

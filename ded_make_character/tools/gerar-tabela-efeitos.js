@@ -24,6 +24,7 @@ const notas = {
   camuflagem: 'chance de o ataque errar (ex.: deslocamento 50)',
   'falha-de-magia': 'chance de a magia falhar; `aplica_a` = ids dos especiais afetados (sem ele, vale para todas as magias)',
   vorpal: '`quando`: `critico-confirmado` \\| `natural-20`',
+  retribuicao: 'quem tira PV do dono (vencendo imunidade, RD e resistência) testa Fortitude (CD `cd_base` + o dano) ou morre (efeito de morte); passando, sofre o mesmo dano em `tipo_energia` (padrão `divino`). Não dispara com o dano de outra retribuição. `afeta` restringe quem ela atinge (o Paladino: `exceto_moral: ["B"]`, o "bom coração")',
   'explosao-ao-morrer': '`quando: "ao-morrer"`',
   'imunidade-magia': '`excecoes` = `[{ "tipo_energia": "eletricidade", "efeito": "lento 3 rodadas" }]` ou `[{ "magia": "de deuses maiores" }]`',
   'refletir-magia': '`afeta` = array (ex.: `["raios", "linhas", "cones", "Mísseis Mágicos"]`)',

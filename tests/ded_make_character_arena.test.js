@@ -11,7 +11,7 @@ const root = path.join(__dirname, '..', 'ded_make_character');
 const load = rel => import(pathToFileURL(path.join(root, ...rel.split('/'))).href);
 
 async function run() {
-  const { nivelDeEncontro, dificuldade } = await load('js/rules/encontro30.js');
+  const { nivelDeEncontro, dificuldade, ndRotulo, neTexto } = await load('js/rules/encontro30.js');
   const S = await load('js/pages/arena-setup.js');
   let passed = 0;
   const test = (name, fn) => {
@@ -31,6 +31,18 @@ async function run() {
     const misto = nivelDeEncontro([7, 2, 2]);
     assert.ok(misto > 7 && misto < 8, String(misto));
     assert.strictEqual(nivelDeEncontro([]), null);
+  });
+
+  test('ND fracionário (TASK_008): as criaturas de ND menor que 1 contam juntas, e a tela mostra a fração', () => {
+    // Livro do Mestre 3.0: duas de ND 1/2 valem uma de ND 1; quatro, duas de ND 1 (NE 3); três, uma de ND 1 e uma de ND 1/2
+    assert.ok(perto(nivelDeEncontro([0.5]), 0.5));
+    assert.ok(perto(nivelDeEncontro([0.5, 0.5]), 1));
+    assert.ok(perto(nivelDeEncontro([0.5, 0.5, 0.5, 0.5]), nivelDeEncontro([1, 1])));
+    assert.ok(perto(nivelDeEncontro([0.5, 0.5, 0.5, 0.5]), 3));
+    assert.ok(perto(nivelDeEncontro([0.5, 0.5, 0.5]), nivelDeEncontro([1, 0.5])));
+    assert.ok(perto(nivelDeEncontro([3, 0.5, 0.5]), nivelDeEncontro([3, 1])));
+    assert.deepStrictEqual([ndRotulo(0.5), ndRotulo(22)], ['1/2', '22']);
+    assert.deepStrictEqual([nivelDeEncontro([0.5]), nivelDeEncontro([0.5, 0.5]), nivelDeEncontro([2.5]), null].map(neTexto), ['1/2', '1', '3', '—']);
   });
 
   test('dificuldade para o lado A pela diferença de NE: fácil, justa, difícil, mortal', () => {

@@ -28,7 +28,7 @@
 - **Formato**: documentado em `tools/catalogo-combate.md`.
   - Cada combatente traz identificação, ND e nível, tipo, tamanho, tendência, PV, iniciativa, deslocamento, espaço e alcance, e CA (total, toque e surpresa).
   - Traz também BBA e agarrar, ataque único e ataque total (bônus, dano, crítico, tipo de dano e se é natural ou secundário).
-  - Os especiais usam um vocabulário fechado de 32 mecânicas (tabela em `tools/catalogo-combate.md`). Ele vai de sopro, agarrar, engolir e veneno a condição ao acertar, magia e aura, e inclui os poderes de classe que o motor também usa nos personagens do jogador (ataque furtivo, evasão, fúria, destruir…). `outro` marca o que não é simulado.
+  - Os especiais usam um vocabulário fechado de 33 mecânicas (32 na E1, mais a Retribuição na TASK_007) (tabela em `tools/catalogo-combate.md`). Ele vai de sopro, agarrar, engolir e veneno a condição ao acertar, magia e aura, e inclui os poderes de classe que o motor também usa nos personagens do jogador (ataque furtivo, evasão, fúria, destruir…). `outro` marca o que não é simulado.
   - Restrições por tendência dizem o eixo (`etico` L/N/C, `moral` B/N/M), para uma criatura NB não ser confundida com "N".
   - Completam o bloco: RD, RM, resistências a energia, imunidades, regeneração e cura acelerada, resistências, atributos, perícias, talentos, equipamento e magias.
   - Por fim, a tática (para a IA), a fonte e o que foi adaptado.
@@ -88,17 +88,20 @@ Os números de combate foram conferidos um a um contra o bloco do SRD 3.0 no dra
   | Seção | Com efeito do vocabulário (simulados) | `mecanica: null` | `outro` (não simulado) |
   |---|---|---|---|
   | Monstros | 59 | 58 | 5 |
-  | Holy Avenger | 32 | 24 | 21 |
+  | Holy Avenger | 33 | 24 | 20 |
 
   - `null` são sentidos, traços de tipo, invocações e efeitos fora do tempo de combate, além das regenerações, que já estão no campo `regeneracao`.
   - Os 5 `outro` dos monstros são resistência à expulsão (carniçal), transparência (cubo), absorver eletricidade (arbusto), apanhar rochas (gigante) e arrancada (Tarrasque).
-  - Os 21 de Holy Avenger são forma selvagem, expulsar ou fascinar mortos-vivos, teletransporte, disfarces, retribuição do Paladino, poderes do martelo do Arsenal, inimigo predileto, entre outros.
+  - Os 20 de Holy Avenger são forma selvagem, expulsar ou fascinar mortos-vivos, teletransporte, disfarces, poderes do martelo do Arsenal, inimigo predileto, entre outros. A retribuição do Paladino deixou de ser `outro` na TASK_007.
   - Todos ficam de fora do motor de propósito e aparecem no log como "não simulado".
+  - Com as 54 fichas do livro *Tormenta D20 – Holy Avenger* (TASK_008), Holy Avenger passa a 93 / 141 / 79.
 - **Nomes em PT-BR.** São os usados pela Devir 3.5 e por fontes em português, porque não foi possível confirmar a tradução 3.0. Os nomes de talentos, perícias e magias dos blocos são traduções usuais.
 
 ### 3.2 Holy Avenger
 
 São 14 personagens da HQ. Os fatos (nome, raça, papel, equipamento icônico e poderes) vêm das wikis de Tormenta (`fonte.url`). Os números estão em regras 3.0.
+
+> **Substituído na TASK_008:** as fichas abaixo eram adaptações. Agora o catálogo usa as fichas oficiais do livro *Tormenta D20 – Holy Avenger*, com 54 entradas (uma por versão de cada personagem). A tabela fica como registro do primeiro corte.
 
 | Personagem | Papel | Raça | Classes (ND) | PV | CA | Estatísticas |
 |---|---|---|---|---|---|---|
@@ -113,7 +116,7 @@ São 14 personagens da HQ. Os fatos (nome, raça, papel, equipamento icônico e 
 | Vladislav Tpish | aliado | Humano | Mago necromante 10 (10) | 41 | 17 | adaptadas (nível da wiki) |
 | Deenar Dhanariatis | vilão | Elfo-do-mar | Ranger 6/Mago 5 (11) | 66 | 17 | adaptadas (classes do *Trog!*) |
 | Camaleão (Lucas Moldvay) | vilão | Meio-elfo | Ladino 9/Mago 5 (14) | 66 | 20 | adaptadas |
-| Paladino de Arton | aliado, corrompido no fim | Humano meio-celestial | Paladino 19 (20) | 175 | 25 | **oficial**, reduzida ao teto de ND 20 |
+| Paladino de Arton | aliado, corrompido no fim | Humano meio-celestial | Paladino 19 (20) | 175 | 25 | **oficial**, reduzida ao teto de ND 20 (a ficha inteira, PV 164, voltou na TASK_008) |
 | Mestre Arsenal | vilão | Humano | Guerreiro 10/Clérigo 10 (20) | 240 | 24 | **oficial**, reduzida ao teto de ND 20 |
 | Nekapeth | vilão | Homem-serpente | 8 DV + Clérigo 12 (20) | 183 | 23 | adaptadas (níveis da wiki) |
 
@@ -121,9 +124,9 @@ São 14 personagens da HQ. Os fatos (nome, raça, papel, equipamento icônico e 
 - **Fichas oficiais.**
   - Existem fichas d20 transcritas na wiki para o Paladino (Paladino 20, ND 22), o Arsenal (Guerreiro 10/Clérigo 12, ND 26) e o Luigi.
   - Elas já usam termos 3.0, então não houve conversão da 3.5.
-  - O Paladino e o Arsenal perderam níveis para caber no teto de ND 20, e os números foram recalculados.
+  - O Paladino e o Arsenal perderam níveis para caber no teto de ND 20, e os números foram recalculados. Na TASK_007 o teto caiu para Holy Avenger, e na TASK_008 os dois voltaram às fichas inteiras (ND 22 e 26).
   - Erros aritméticos das fichas oficiais foram corrigidos e registrados em `adaptacao`: iniciativa sem Iniciativa Aprimorada, Ouvir, ataque e CA do Arsenal.
-- **Suplemento *Holy Avenger d20* (Talismã).** Existe, mas não foi consultado, porque só havia cópias piratas.
+- **Suplemento *Holy Avenger d20* (Talismã).** Existe, mas não foi consultado, porque só havia cópias piratas. Na TASK_008 o usuário forneceu a cópia dele, e o catálogo passou a usar as fichas, que o livro declara Open Game Content.
 - **Adaptados:**
   - raça do Livro do Jogador ou do SRD 3.0 (troglodita, centauro, elfo aquático, abominação yuan-ti para o homem-serpente);
   - classes 3.0;

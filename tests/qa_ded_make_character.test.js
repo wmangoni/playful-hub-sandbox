@@ -644,7 +644,24 @@ async function run() {
     });
     await page.select('[data-nd]', '16-20');
     await sleep(100);
-    assert.deepStrictEqual(await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim())), ['Mestre Arsenal', 'Nekapeth', 'Paladino de Arton']);
+    assert.deepStrictEqual(await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim())),
+      ['Lisandra, Druida Guerreira', 'Razlen Greenleaf, Sumo-Sacerdote de Allihanna', 'Helena, Enguia Rainha', 'Lisandra, ex-Druida', 'Paladino, Desperto']);
+    // criatura sem classe nem raça: tipo e tamanho, como os monstros
+    assert.match(await page.$$eval('.arena-pick__meta', els => els[2].textContent.replace(/\s+/g, ' ')), /ND 19 ?Besta Mágica colossal ?PV/);
+    // acima do 20 só Holy Avenger: as fichas do livro vão até o ND 55 (TASK_007, TASK_008)
+    assert.strictEqual(await page.$eval('[data-nd] option[value="21+"]', el => el.textContent.trim()), 'ND 21 ou mais');
+    await page.select('[data-nd]', '21+');
+    await sleep(100);
+    assert.deepStrictEqual(await page.$$eval('.arena-pick__meta .badge', els => els.map(e => e.textContent.trim())),
+      ['ND 22', 'ND 25', 'ND 25', 'ND 26', 'ND 27', 'ND 35', 'ND 36', 'ND 40', 'ND 46', 'ND 50', 'ND 55']);
+    assert.ok((await page.$$eval('.arena-pick__name', els => els.map(e => e.textContent.trim()))).includes('Tarso'));
+    // abaixo de 1, o ND fracionário do livro aparece como fração, na faixa mais baixa
+    assert.strictEqual(await page.$eval('[data-nd] option[value="1-5"]', el => el.textContent.trim()), 'ND até 5');
+    await page.select('[data-nd]', '1-5');
+    await sleep(100);
+    assert.deepStrictEqual((await page.$$eval('.arena-pick__meta .badge', els => els.map(e => e.textContent.trim()))).slice(0, 3), ['ND 1/2', 'ND 1/2', 'ND 1']);
+    await page.select('[data-nd]', '16-20');
+    await sleep(100);
     await domClick('[data-aba="meus"]');
     await sleep(100);
     assert.match(await text('.arena-picker__empty'), /Nenhum combatente com esses filtros/, 'o filtro de ND vale também para os seus personagens');
@@ -1039,7 +1056,8 @@ async function run() {
   });
 
   await step('arena: lote com mudanças no meio (distância cancela sem travar, digitar a semente, equipamento, outra aba)', async () => {
-    const lenta = '#/arena?a=ha-lisandra&b=ha-lisandra&limite=200&semente=1';
+    // Razlen contra Razlen: curas do 1º ao 5º nível, 23 rodadas em média (o lote de 1000 leva uns 3 s)
+    const lenta = '#/arena?a=ha-razlen-greenleaf&b=ha-razlen-greenleaf&limite=200&semente=1';
     // a distância muda com o lote rodando: cancela e destrava a tela
     await go(lenta);
     await sleep(400);
