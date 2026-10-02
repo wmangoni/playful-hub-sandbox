@@ -23,7 +23,7 @@ const EIXOS = { etico: ['L', 'N', 'C'], moral: ['B', 'N', 'M'] };
 /** Duração: dado ou número + unidade, ou uma das formas por extenso. */
 const DURACAO = /^((\d+d\d+([+-]\d+)?|\d+) (rodadas?|minutos?|horas?)\b|permanente|instantânea|concentração|até |enquanto )/;
 /** Campos aceitos no combatente, no ataque e no dano extra (qualquer outro é erro). */
-const CAMPOS_COMBATENTE = ['id', 'nome', 'nome_original', 'categoria', 'nd', 'nivel', 'classes', 'raca', 'tipo', 'subtipos', 'tamanho', 'tendencia', 'resumo', 'dados_vida', 'pv', 'iniciativa', 'deslocamento', 'espaco', 'alcance', 'ca', 'bba', 'agarrar', 'ataques', 'ataque_total', 'ataque_total_distancia', 'ataques_especiais', 'qualidades_especiais', 'reducao_dano', 'resistencia_magia', 'resistencias_energia', 'imunidades', 'vulnerabilidades', 'regeneracao', 'cura_acelerada', 'resistencias', 'atributos', 'pericias', 'talentos', 'equipamento', 'magias', 'tatica', 'fonte', 'adaptacao'];
+const CAMPOS_COMBATENTE = ['id', 'nome', 'nome_original', 'categoria', 'nd', 'nivel', 'classes', 'raca', 'tipo', 'subtipos', 'tamanho', 'tendencia', 'resumo', 'dados_vida', 'pv', 'iniciativa', 'deslocamento', 'espaco', 'alcance', 'ca', 'bba', 'agarrar', 'ataques', 'ataque_total', 'ataque_total_distancia', 'ataques_especiais', 'qualidades_especiais', 'reducao_dano', 'resistencia_magia', 'resistencias_energia', 'imunidades', 'vulnerabilidades', 'regeneracao', 'cura_acelerada', 'resistencias', 'atributos', 'pericias', 'talentos', 'equipamento', 'magias', 'tatica', 'fonte', 'adaptacao', 'condicoes_iniciais'];
 const CAMPOS_ATAQUE = ['nome', 'tipo', 'bonus', 'dano', 'critico', 'tipo_dano', 'natural', 'secundario', 'alcance_m', 'incremento_m', 'magico', 'material', 'dano_extra', 'efeitos'];
 const CAMPOS_DANO_EXTRA = ['dano', 'tipo', 'afeta'];
 /** Chaves aceitas em `bonus` (efeitos de magias e auras). */
@@ -37,8 +37,19 @@ const AREAS_SOPRO = ['cone', 'linha', 'cubo', 'raio'];
 const MARGENS = [15, 17, 18, 19, 20];
 /** Monstros que são Product Identity da Wizards e ficaram fora do SRD 3.0 (nome em inglês). */
 const PRODUCT_IDENTITY = ['beholder', 'mind flayer', 'illithid', 'githyanki', 'githzerai', 'displacer beast', 'carrion crawler', 'yuan-ti', 'kuo-toa', 'slaad', 'umber hulk', 'gauth', 'beholder mage'];
-/** Talentos fora do compêndio aceitos: de monstro (Monster Manual 3.0) e de Tormenta usados por fichas oficiais. */
-const TALENTOS_EXTRAS = ['ATAQUES MÚLTIPLOS', 'ATAQUE EM VOO', 'MULTIDESTREZA', 'COMBATER COM MÚLTIPLAS ARMAS', 'TRAPACEIRO NATO', 'FÚRIA GUERREIRA'];
+/**
+ * Talentos fora do compêndio aceitos: de monstro (Monster Manual 3.0) e de Tormenta usados por fichas oficiais
+ * (as do livro Tormenta D20 – Holy Avenger entraram na TASK_008, com o nome que o livro usa).
+ */
+const TALENTOS_EXTRAS = [
+  'ATAQUES MÚLTIPLOS', 'ATAQUE EM VOO', 'MULTIDESTREZA', 'COMBATER COM MÚLTIPLAS ARMAS', 'TRAPACEIRO NATO', 'FÚRIA GUERREIRA',
+  'APARÊNCIA INOFENSIVA', 'ARREBATAR', 'AVENTUREIRO NATO', 'DESLOCAMENTO', 'FOCO EM HABILIDADE', 'FORMA DO MAR', 'FORMA FEROZ DO MAR',
+  'FORMA MONSTRUOSA DO MAR', 'IMPOSTOR', 'INTOLERÂNCIA', 'INVOCAR FAMILIAR', 'MEMÓRIA RACIAL', 'PROSPERIDADE', 'RELIGIOSO',
+  'TERRENO FAMILIAR', 'TORCIDA', 'VOZ DE ALLIHANNA',
+];
+/** ND fracionário (criaturas e personagens muito fracos): 1/2, 1/3, 1/4, 1/6, 1/8, gravados como número. */
+const ND_FRACOES = [1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8];
+const ndFracionario = v => typeof v === 'number' && ND_FRACOES.some(f => Math.abs(v - f) < 1e-3);
 
 /**
  * Campos por efeito: `obrigatorios` sempre; `algum` = pelo menos um destes grupos (cada grupo é uma lista de campos
@@ -49,7 +60,7 @@ const EFEITOS = {
   sopro: { obrigatorios: ['area', 'tamanho_m', 'resistencia', 'cd', 'recarga'], algum: [['dano', 'tipo_energia'], ['condicao'], ['veneno']], opcionais: ['metade_se_passar', 'duracao', 'afeta', 'condicao_afeta', 'compartilhada_com', 'acao', 'primeiro_uso', 'nuvem_dura'] },
   'agarrar-aprimorado': { obrigatorios: ['gatilho'], opcionais: ['tamanho_max', 'dano_por_rodada', 'requer'] },
   constricao: { obrigatorios: ['dano', 'tipo_dano'], opcionais: ['tamanho_max'] },
-  engolir: { obrigatorios: ['tamanho_max', 'dano_por_rodada', 'ca_interna', 'pv_para_sair'], opcionais: ['dano_extra', 'capacidade'] },
+  engolir: { obrigatorios: ['tamanho_max', 'dano_por_rodada', 'ca_interna', 'pv_para_sair'], opcionais: ['dano_extra', 'capacidade', 'rd_se_aplica'] },
   engolfar: { obrigatorios: ['tamanho_max', 'resistencia', 'cd'], opcionais: ['dano_por_rodada', 'tipo_energia', 'condicao', 'duracao', 'paralisia', 'acao'] },
   rasgar: { obrigatorios: ['requer', 'dano'], opcionais: [] },
   bote: { obrigatorios: [], opcionais: [] },
@@ -76,6 +87,7 @@ const EFEITOS = {
   camuflagem: { obrigatorios: ['chance_pct'], opcionais: [] },
   'falha-de-magia': { obrigatorios: ['chance_pct'], opcionais: ['aplica_a', 'retorna_ao_dono'] },
   vorpal: { obrigatorios: ['gatilho', 'quando'], opcionais: ['resultado'] },
+  retribuicao: { obrigatorios: ['cd_base'], opcionais: ['tipo_energia', 'afeta'] },
   'explosao-ao-morrer': { obrigatorios: ['quando', 'raio_m', 'dano', 'resistencia', 'cd'], opcionais: ['tipo_energia', 'metade_se_passar'] },
   'imunidade-magia': { obrigatorios: [], opcionais: ['abrange', 'excecoes'] },
   'refletir-magia': { obrigatorios: ['afeta', 'chance_pct'], opcionais: ['senao', 'ordem'] },
@@ -166,7 +178,7 @@ function validarSecao(lista, secao) {
     switch (k) {
       case 'dano': case 'dano_por_rodada':
         if (!DADO.test(String(v))) erros.push(`${onde}: ${k} "${v}"`); break;
-      case 'cd': case 'ca_interna': case 'pv_para_sair': case 'niveis': case 'chance_pct': case 'pv_por_dia': case 'bonus_ataque': case 'bonus_dano': case 'duracao_rodadas':
+      case 'cd': case 'cd_base': case 'ca_interna': case 'pv_para_sair': case 'niveis': case 'chance_pct': case 'pv_por_dia': case 'bonus_ataque': case 'bonus_dano': case 'duracao_rodadas':
       case 'for': case 'con': case 'von': case 'ca':
         if (!isInt(v)) erros.push(`${onde}: ${k} deve ser inteiro`); break;
       case 'tamanho_m': case 'alcance_m':
@@ -256,7 +268,7 @@ function validarSecao(lista, secao) {
         if (v !== true) erros.push(`${onde}: ${k} (true)`);
         else if (!isStr(m.duracao)) erros.push(`${onde}: ${k} precisa de duracao`);
         break;
-      case 'metade_se_passar': case 'acerto_automatico': case 'aprimorada': case 'maior': case 'permanente': case 'retorna_ao_dono':
+      case 'metade_se_passar': case 'acerto_automatico': case 'aprimorada': case 'maior': case 'permanente': case 'retorna_ao_dono': case 'rd_se_aplica':
         if (typeof v !== 'boolean') erros.push(`${onde}: ${k} (bool)`); break;
       case 'inicial': case 'secundario':
         if (!isObj(v)) { erros.push(`${onde}: ${k} (objeto)`); break; }
@@ -309,8 +321,12 @@ function validarSecao(lista, secao) {
     for (const k of ['nome', 'tipo', 'tamanho', 'tendencia', 'resumo', 'dados_vida', 'tatica']) if (!isStr(c[k])) erros.push(`${onde}: ${k}`);
     const cat = secao === 'monstros' ? 'monstro' : 'holy_avenger';
     if (c.categoria !== cat) erros.push(`${onde}: categoria deve ser "${cat}"`);
-    if (!isInt(c.nd) || c.nd < 1 || c.nd > 20) erros.push(`${onde}: nd 1–20`);
-    if (!isInt(c.nivel) || c.nivel < 1 || c.nivel > 20) erros.push(`${onde}: nivel 1–20`);
+    // monstros: ND 1–20; Holy Avenger pode passar do 20 (no livro, o Paladino vai até o ND 55 e Tarso, nível 63,
+    // tem ND 50; TASK_007 e TASK_008) e pode ter ND fracionário (Petra e Hipólita, ND 1/2)
+    const teto = secao === 'monstros' ? 20 : 80;
+    const ndOk = (isInt(c.nd) && c.nd >= 1 && c.nd <= teto) || (secao === 'holy_avenger' && ndFracionario(c.nd));
+    if (!ndOk) erros.push(`${onde}: nd 1–${teto}${secao === 'holy_avenger' ? ' ou fração (1/2, 1/3, 1/4, 1/6, 1/8)' : ''}`);
+    if (!isInt(c.nivel) || c.nivel < 1 || c.nivel > teto) erros.push(`${onde}: nivel 1–${teto}`);
     if (secao === 'monstros') {
       if (c.nivel !== c.nd) erros.push(`${onde}: nivel deve ser igual ao nd`);
       if (PRODUCT_IDENTITY.some(p => String(c.nome_original || '').toLowerCase().includes(p))) erros.push(`${onde}: "${c.nome_original}" é Product Identity, fora do SRD`);
@@ -323,8 +339,10 @@ function validarSecao(lista, secao) {
     else {
       for (const k of c.classes) if (!isObj(k) || !isStr(k.classe) || !isInt(k.nivel)) erros.push(`${onde}: classes ${JSON.stringify(k)}`);
       if (secao === 'holy_avenger') {
-        if (!c.classes.length) avisos.push(`${onde}: personagem sem classes`);
-        else if (c.classes.reduce((s, k) => s + (k?.nivel || 0), 0) > 20) erros.push(`${onde}: soma dos níveis de classe > 20`);
+        // criatura sem classe (Helena, Aspis, Raschid…) é legítima; humanoide sem classe, quase sempre um esquecimento
+        if (!c.classes.length && c.tipo === 'Humanoide') avisos.push(`${onde}: humanoide sem classes`);
+        // DV raciais (Tarso, Tork como dragão) contam no nível, mas não são classe
+        else if (isInt(c.nivel) && c.classes.reduce((s, k) => s + (k?.nivel || 0), 0) > c.nivel) erros.push(`${onde}: soma dos níveis de classe > nivel`);
       }
     }
     if (typeof c.resumo === 'string' && c.resumo.length > 300) erros.push(`${onde}: resumo com ${c.resumo.length} caracteres (máx. 300)`);
@@ -420,6 +438,7 @@ function validarSecao(lista, secao) {
     }
     if (!isObj(c.fonte) || !isStr(c.fonte.referencia) || !/^https?:\/\//.test(c.fonte.url || '')) erros.push(`${onde}: fonte { referencia, url }`);
     if (c.adaptacao !== null && !isStr(c.adaptacao)) erros.push(`${onde}: adaptacao (string ou null)`);
+    if (c.condicoes_iniciais !== undefined && (!Array.isArray(c.condicoes_iniciais) || c.condicoes_iniciais.some(x => !CONDICOES.includes(x)))) erros.push(`${onde}: condicoes_iniciais (lista de condições)`);
   });
 
   if (secao === 'monstros') {

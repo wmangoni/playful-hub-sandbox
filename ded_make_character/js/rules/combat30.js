@@ -175,6 +175,7 @@ export function fromCatalog(e) {
     resistencias: { ...e.resistencias },
     atributos: { ...e.atributos },
     talentos: e.talentos.map(t => loose(String(t).replace(/\s*\(.*\)\s*$/, ''))),
+    condicoesIniciais: [...(e.condicoes_iniciais || [])],
     tatica: e.tatica || '',
     // o catálogo não descreve a armadura: a evasão vale (3.0: só com armadura leve ou nenhuma)
     armaduraLeve: true,
@@ -195,7 +196,8 @@ function instanciar(ficha, lado, indice, pos) {
     contusao: 0,
     pvTemp: 0,
     estado: 'ativo',
-    cond: {},
+    // condição que a ficha já traz (Tork cego): dura a luta toda
+    cond: Object.fromEntries((ficha.condicoesIniciais || []).map(nome => [nome, { expira: Infinity, fonte: null }])),
     agiu: false,
     investidaAte: null,
     usos: {},
@@ -709,9 +711,10 @@ function danoDeEnergia(b, alvo, valor, tipo, { passou = null } = {}) {
 /**
  * Causa dano. `partes`: [{ valor, tipo: 'fisico' | energia, passou }]. O físico passa pela RD
  * (salvo `ignoraRD`, de magias); a energia pela resistência. Com regeneração, o que não fura
- * vira dano por contusão. Devolve o total que efetivamente tirou do alvo.
+ * vira dano por contusão. Devolve o total que efetivamente tirou do alvo. O dano que tirou PV
+ * dispara a Retribuição do alvo (`SP.onDamaged`), salvo o da própria retribuição (`retribuicao`).
  */
-function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = false, info = null } = {}) {
+function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = false, info = null, retribuicao = false } = {}) {
   if (alvo.estado === 'morto') return 0;
   const notas = [];
   let absorvidoRD = 0;
@@ -770,10 +773,12 @@ function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = f
     const r = teste(b, alvo, 'fort', 15, { rotulo: 'dano maciço' });
     if (!r.passou) {
       morrer(b, alvo, fonte, 'morto (dano maciço)');
+      if (!retribuicao) SP.onDamaged(K, b, alvo, fonte, letal);
       return total;
     }
   }
   atualizarEstado(b, alvo, fonte);
+  if (!retribuicao) SP.onDamaged(K, b, alvo, fonte, letal);
   return total;
 }
 
@@ -866,7 +871,12 @@ function golpeInterno(b, c, alvo, a, opts) {
   }
   // chance de falha: camuflagem do alvo, atacante cego
   const falha = Math.max(SP.missChance(K, b, c, alvo, a), hasCond(c, 'cego') ? 50 : 0);
-  if (falha && b.rng.chance(falha)) {
+  let errou = Boolean(falha && b.rng.chance(falha));
+  if (errou && isMelee(a) && talento(c, 'lutar as cegas')) {
+    errou = b.rng.chance(falha);
+    texto.push(errou ? 'Lutar às Cegas: rola a chance de falha de novo e erra também' : 'Lutar às Cegas: rola a chance de falha de novo e passa');
+  }
+  if (errou) {
     texto.push(`acertaria, mas erra por ${falha}% de chance de falha.`);
     log(b, c, 'ataque', () => texto.join(' — '));
     return { acertou: false, critico: false, dano: 0, derrubou: false };

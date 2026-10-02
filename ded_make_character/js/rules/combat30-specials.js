@@ -76,6 +76,9 @@ export function onBattleStart(K, b, c) {
     ...(c.magias?.lista || []).filter(s => !s.mecanica).map(s => `${s.nome} (magia)`),
   ];
   if (semSimular.length) K.log(b, c, 'nao-simulado', `${c.nome}: não simulado — ${semSimular.join(', ')}.`);
+  // condição que a ficha já traz (Tork, Guerreiro Cego): avisa no começo da luta
+  const iniciais = Object.keys(c.cond).filter(nome => c.cond[nome].expira === Infinity);
+  if (iniciais.length) K.log(b, c, 'condicao', `${c.nome} começa a luta ${iniciais.join(' e ')} (condição da ficha, dura a luta toda).`);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -170,6 +173,8 @@ function acertouTodos(requer, nomes) {
  * agarrar aprimorado que exige mais de um golpe (as duas pancadas do arbusto errante).
  */
 export function afterAttacks(K, b, c, acertos) {
+  // quem caiu no meio da sequência (a Retribuição do Paladino mata o atacante) não age mais
+  if (!K.podeLutar(c)) return;
   for (const e of comEfeito(c, 'agarrar-aprimorado')) {
     if (!e.m.requer) continue;
     for (const [uid, nomes] of acertos) {
@@ -242,7 +247,8 @@ export function onHit(K, b, c, alvo, a, { critico, natural, anuladoPorRD = false
         envenenar(K, b, c, alvo, { inicial: m.inicial, secundario: m.secundario, resistencia: m.resistencia, cd: m.cd, nome: e.nome });
         break;
       case 'agarrar-aprimorado':
-        if (!m.requer) agarrarAprimorado(K, b, c, alvo, e); // com "requer", depois da sequência
+        // com "requer", depois da sequência; quem morreu com o golpe (Retribuição) não agarra
+        if (!m.requer && K.podeLutar(c)) agarrarAprimorado(K, b, c, alvo, e);
         break;
       case 'queimar':
         pegarFogo(K, b, c, alvo, m, e.nome);
@@ -422,15 +428,19 @@ function turnoAgarrando(K, b, c) {
   if (!r.venceu) return true;
   const partes = [];
   const garra = primeiro(c, 'agarrar-aprimorado');
-  // o dano do ataque que agarrou (o catálogo pode trazê-lo pronto em dano_por_rodada)
+  // o dano do ataque que agarrou (o catálogo pode trazê-lo pronto em dano_por_rodada; "0d0+0" = o agarrão não fere,
+  // como o bote de Aspis, que só prende e deixa o dano para a constrição)
   const armaDaGarra = garra && [...c.ataqueTotal, ...c.ataques].find(a => (garra.m.requer || garra.m.gatilho || []).includes(a.nome));
-  const danoGarra = garra?.m.dano_por_rodada || (armaDaGarra && !K.isZero(armaDaGarra.dano) ? armaDaGarra.dano : null);
+  const danoGarra = garra?.m.dano_por_rodada != null
+    ? (K.isZero(garra.m.dano_por_rodada) ? null : garra.m.dano_por_rodada)
+    : (armaDaGarra && !K.isZero(armaDaGarra.dano) ? armaDaGarra.dano : null);
   if (danoGarra) partes.push(K.roll(b, danoGarra).total);
   const constricao = primeiro(c, 'constricao');
   if (constricao) partes.push(K.roll(b, constricao.m.dano).total);
   if (!partes.length) partes.push(Math.max(1, K.roll(b, '1d3').total + K.mod(c.atributos.for ?? 10) + K.deltaMod(c, 'for')));
   const total = partes.reduce((s, v) => s + v, 0);
-  K.log(b, c, 'dano', `Dano do agarrão${danoGarra ? ` (${danoGarra})` : ''}${constricao ? ` e da constrição (${constricao.m.dano})` : ''}: ${total}.`);
+  const rotulo = danoGarra || !constricao ? `Dano do agarrão${danoGarra ? ` (${danoGarra})` : ''}${constricao ? ` e da constrição (${constricao.m.dano})` : ''}` : `Dano da constrição (${constricao.m.dano})`;
+  K.log(b, c, 'dano', `${rotulo}: ${total}.`);
   K.causarDano(b, alvo, [{ valor: total, tipo: 'fisico' }], { fonte: c, ataque: { nome: 'agarrão', natural: true, magico: null } });
   return true;
 }
@@ -482,8 +492,10 @@ function turnoEngolido(K, b, c) {
   let texto = `${c.nome} ataca de dentro de ${quem.nome} com ${golpe.nome}: ${d} ${K.sinal(bonus)} = ${K.num(d + bonus)} contra CA ${engolir.m.ca_interna}`;
   if (acerta && !K.isZero(golpe.dano)) {
     const r = K.roll(b, golpe.dano);
-    c.danoInterno += Math.max(1, r.total);
-    texto += ` — acerta, ${Math.max(1, r.total)} de dano (${c.danoInterno} de ${engolir.m.pv_para_sair} para sair).`;
+    const rd = engolir.m.rd_se_aplica && quem.rd && !K.venceRD(c, golpe, quem.rd) ? quem.rd.valor : 0;
+    const dano = rd ? Math.max(0, r.total - rd) : Math.max(1, r.total);
+    c.danoInterno += dano;
+    texto += ` — acerta, ${dano} de dano${rd ? ` (RD ${quem.rd.valor}/${quem.rd.exceto} absorve ${r.total - dano})` : ''} (${c.danoInterno} de ${engolir.m.pv_para_sair} para sair).`;
   } else texto += ' — erra.';
   K.log(b, c, 'ataque', texto);
   if (c.danoInterno >= engolir.m.pv_para_sair) {
@@ -772,6 +784,48 @@ export function onBuffEnd(K, b, c, bf) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// ao sofrer dano: Retribuição (Paladino de Arton)
+
+/**
+ * Retribuição (Sob): quem efetivamente tira PV do dono (vencendo imunidades, RD e resistência; os
+ * PV temporários não contam) testa Fortitude (CD `cd_base` + o dano) ou morre, num efeito de morte.
+ * Passando (ou imune à morte, ou sem morrer, como o Tarrasque), sofre o mesmo dano, como dano divino.
+ * O efeito do mesmo golpe (veneno, vorpal) ainda vale, simultâneo; o que viria depois dele (agarrar,
+ * rasgar, os golpes seguintes) não, porque o atacante morreu. Vale contra qualquer oponente
+ * e qualquer fonte de dano, golpe a golpe. O dano da retribuição não dispara outra retribuição
+ * (dois Paladinos não se matam num vaivém), e quem é imune a efeitos sobrenaturais (o golem de
+ * ferro) não sofre nada.
+ */
+export function onDamaged(K, b, alvo, fonte, dano) {
+  if (!fonte || fonte === alvo || fonte.lado === alvo.lado || !(dano > 0)) return;
+  for (const e of comEfeito(alvo, 'retribuicao')) {
+    if (fonte.estado === 'morto') break;
+    if (e.m.afeta && !K.atende(fonte, e.m.afeta)) {
+      const motivo = e.m.afeta.exceto_moral?.includes('B') && K.eixos(fonte.tendencia).moral === 'B' ? 'criatura bondosa' : 'fora da restrição';
+      K.log(b, fonte, 'imune', `A ${e.nome} de ${alvo.nome} não atinge ${fonte.nome} (${motivo}).`);
+      continue;
+    }
+    const cd = (e.m.cd_base ?? 15) + dano;
+    const tipo = e.m.tipo_energia || 'divino';
+    if (imuneAMagia(fonte, e.natureza)) {
+      K.log(b, fonte, 'imune', `A ${e.nome} de ${alvo.nome} não afeta ${fonte.nome} (imune a efeitos sobrenaturais).`);
+      continue;
+    }
+    K.log(b, alvo, 'especial', `${e.nome}: ${fonte.nome} tirou ${dano} PV de ${alvo.nome} e testa Fortitude (CD ${cd}) ou morre.`);
+    // efeito de morte: constructo e morto-vivo (imunes a efeitos de Fortitude) e quem é imune a morte não testam
+    const imune = fonte.imuneFortitude ? 'imune a efeitos de Fortitude' : K.imuneACondicao(fonte, 'morto') ? 'imune a efeitos de morte' : null;
+    if (imune) K.log(b, fonte, 'imune', `${fonte.nome} não testa (${imune}).`);
+    else if (!K.teste(b, fonte, 'fort', cd, { rotulo: e.nome }).passou) {
+      // falhou: morre. O Tarrasque, que regenera mesmo morto, só cai, e sofre o dano como quem passou
+      K.aplicarCondicao(b, fonte, 'morto', null, { fonte: alvo });
+      if (fonte.estado === 'morto') continue;
+    }
+    K.log(b, alvo, 'dano', `${e.nome}: ${fonte.nome} sofre o mesmo dano, ${dano} de dano ${tipo}.`);
+    K.causarDano(b, fonte, [{ valor: dano, tipo }], { fonte: alvo, retribuicao: true });
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // ao morrer: explosão (espasmos da morte do balor)
 
 export function onDeath(K, b, c) {
@@ -1037,9 +1091,12 @@ export function options(K, b, c, alvo) {
       const alvos = K.inimigos(b, c).filter(x => K.alvoValido(x) && K.gap(c, x) <= Math.max(1.5, c.alcance) && K.sizeIdx(x.tamanho) <= K.sizeIdx(max));
       if (!alvos.length) continue;
       const pf = x => pFalha(x, e.m.resistencia, e.m.cd);
+      // esmagar e atropelar são o corpo (arma natural): a RD que ele não vence sai do dano, como na execução
+      const rd = x => (x.rd && !K.venceRD(c, corpoDe(e), x.rd) ? x.rd.valor : 0);
+      const dano = e.m.dano ? K.average(e.m.dano) : 0;
       const ev = efeito === 'engolfar'
         ? alvos.reduce((s, x) => s + pf(x) * (x.pv * 0.8 + (e.m.dano_por_rodada ? K.average(e.m.dano_por_rodada) : 0)), 0)
-        : alvos.reduce((s, x) => s + K.average(e.m.dano) * (pf(x) + (1 - pf(x)) * (e.m.metade_se_passar ? 0.5 : 0)), 0);
+        : alvos.reduce((s, x) => s + pf(x) * Math.max(0, dano - rd(x)) + (1 - pf(x)) * (e.m.metade_se_passar ? Math.max(0, dano / 2 - rd(x)) : 0), 0);
       out.push({ tipo: efeito, e, alvos, ev, prioridade: efeito === 'engolfar' ? 1 : 0 });
     }
   }
@@ -1333,7 +1390,7 @@ function aplicarReforco(K, b, c, x, s) {
     ...(m.somente_arma ? { somente_arma: { ...m.somente_arma } } : {}),
     ...(m.melhoria_arma ? { melhoria_arma: m.melhoria_arma } : {}),
   });
-  const detalhes = [...(m.somente_arma?.nome ? [m.somente_arma.nome] : []), ...rolados, ...(rodadas === Infinity ? [] : [`${rodadas} rodadas`]), ...(renova ? ['renova a duração'] : [])];
+  const detalhes = [...(m.somente_arma?.nome ? [m.somente_arma.nome] : []), ...rolados, ...(rodadas === Infinity ? [] : [`${rodadas} ${rodadas === 1 ? 'rodada' : 'rodadas'}`]), ...(renova ? ['renova a duração'] : [])];
   K.log(b, c, 'magia', `${c.nome} ${verbo(s)} ${s.rotulo || s.nome}${x === c ? '' : ` em ${x.nome}`}${detalhes.length ? ` (${detalhes.join('; ')})` : ''}.`);
 }
 
@@ -1379,9 +1436,12 @@ function engolfar(K, b, c, acao) {
   }
 }
 
+/** O "ataque" de esmagar e atropelar: o corpo da criatura, arma natural sem bônus de melhoria. */
+const corpoDe = e => ({ nome: e.nome, natural: true, magico: null });
+
 function esmagar(K, b, c, acao) {
   const e = acao.e;
   K.log(b, c, 'especial', `${c.nome} usa ${e.nome} sobre ${acao.alvos.map(x => x.nome).join(', ')}.`);
-  const corpo = { nome: e.nome, natural: true, magico: null };
+  const corpo = corpoDe(e);
   for (const x of acao.alvos) K.efeitoComTeste(b, c, x, { dano: e.m.dano, resistencia: e.m.resistencia, cd: e.m.cd, metade_se_passar: Boolean(e.m.metade_se_passar) }, { rotulo: e.nome, ignoraRD: false, ataque: corpo });
 }

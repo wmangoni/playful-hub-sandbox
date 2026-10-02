@@ -409,6 +409,66 @@ async function run() {
     assert.match(textos(b), /Dano do agarrão \(2d6\+5\) e da constrição/);
   });
 
+  test('fichas do livro (TASK_008): Helena engole quem a mordida agarrou e digere com ácido; quem cabe é até Enorme', () => {
+    const b = luta(ficha('ha-helena'), [boneco(), ficha('tarrasque')], [20, 1, 1, 1, 1, 1, 1, 1]);
+    const [h, alvo, tarrasque] = [b.get('A1'), b.get('B1'), b.get('B2')];
+    const mordida = h.ataqueTotal.find(a => a.nome === 'Mordida');
+    SP.onHit(K, b, h, tarrasque, mordida, { critico: false, natural: 15 });
+    assert.strictEqual(h.agarrando, null, 'o Tarrasque (Colossal) não cabe');
+    h.agarrando = alvo.uid;
+    alvo.agarradoPor = h.uid;
+    assert.strictEqual(SP.forcedTurn(K, b, h), true); // teste de agarrar 20 contra 1: engole
+    assert.strictEqual(alvo.engolidoPor, h.uid);
+    SP.startOfTurn(K, b, h); // 4d6+17 (4×1 + 17) de esmagamento e 2d8 (1+1) de ácido
+    assert.strictEqual(1000 - alvo.pv, 21 + 2);
+  });
+
+  test('fichas do livro (TASK_008): Tork começa cego e o Lutar às Cegas rola a falha de novo; dentro de Helena a RD vale; o agarrão de Aspis não soma a mordida', () => {
+    // Tork, Guerreiro Cego: a condição vem da ficha e dura a luta; anda a metade dos 4,5 m
+    let b = luta(ficha('ha-tork-guerreiro-cego'), boneco(), [15, 10, 90, 1, 1]);
+    const tork = b.get('A1');
+    assert.ok(tork.cond.cego && tork.cond.cego.expira === Infinity);
+    assert.strictEqual(K.velocidade(tork), 2.25);
+    const foice = tork.ataques.find(a => /Foice/.test(a.nome));
+    K.golpe(b, tork, b.get('B1'), foice); // 15 acerta; falha 10 (≤ 50) erraria, mas a nova rolagem dá 90
+    assert.match(textos(b), /Lutar às Cegas: rola a chance de falha de novo e passa/);
+    assert.ok(b.get('B1').pv < 1000);
+    // Helena: "a RD ainda se aplica" no dano feito por dentro (RD 15/+3 contra a espada curta comum)
+    b = luta(ficha('ha-helena'), ficha('ha-sandro-gladiador'), [20, 1, 20, 6]);
+    const [h, sandro] = [b.get('A1'), b.get('B1')];
+    h.agarrando = sandro.uid;
+    sandro.agarradoPor = h.uid;
+    assert.strictEqual(SP.forcedTurn(K, b, h), true);
+    assert.strictEqual(sandro.engolidoPor, h.uid);
+    SP.forcedTurn(K, b, sandro); // 20 acerta, 1d6+3 = 9, a RD 15 absorve tudo
+    assert.strictEqual(sandro.danoInterno, 0);
+    assert.match(textos(b), /RD 15\/\+3 absorve 9/);
+    // Aspis: o agarrão não soma o dano da mordida, só a constrição (2d6+10)
+    b = luta(ficha('ha-aspis'), boneco(), [20, 1, 20, 1, 1, 1]);
+    const [aspis, alvo] = [b.get('A1'), b.get('B1')];
+    SP.onHit(K, b, aspis, alvo, aspis.ataqueTotal.find(a => a.nome === 'Mordida'), { critico: false, natural: 15 });
+    assert.strictEqual(aspis.agarrando, alvo.uid);
+    SP.forcedTurn(K, b, aspis);
+    assert.match(textos(b), /Dano da constrição \(2d6\+10\): 12\./);
+    assert.doesNotMatch(textos(b), /Dano do agarrão/);
+  });
+
+  test('IA: o valor de esmagar e atropelar desconta a RD que o corpo não vence (Tarso contra o Paladino Desperto)', () => {
+    // a rasteira de Tarso (2d8+21, média 30) não passa da RD 30/+5 do Desperto: vale 0; sem RD, vale o dano
+    const b = luta(ficha('ha-tarso'), [ficha('ha-paladino-desperto'), boneco({ tamanho: 'Médio' })]); // a rasteira pega até Médio
+    const [tarso, paladino, semRD] = [b.get('A1'), b.get('B1'), b.get('B2')];
+    paladino.pos = semRD.pos = tarso.pos;
+    const rasteira = () => SP.options(K, b, tarso, paladino).find(o => o.tipo === 'atropelar');
+    semRD.estado = 'morto';
+    assert.strictEqual(rasteira().ev, 0, 'RD 30 absorve a média de 30');
+    semRD.estado = 'ativo';
+    paladino.estado = 'morto';
+    assert.ok(rasteira().ev > 0, 'quem não tem RD sofre o dano');
+    // com o valor certo, Tarso usa o ataque total e vence (antes empatava em 50 rodadas)
+    const lote = C.simulate({ ladoA: [ficha('ha-tarso')], ladoB: [ficha('ha-paladino-desperto')] }, { vezes: 20, semente: 3 });
+    assert.ok(lote.vitoriasA >= 0.9, `Tarso vence o Desperto (${lote.vitoriasA})`);
+  });
+
   test('Raio do Enfraquecimento: nada se o alvo passa em Fortitude; se falha, penalidade temporária que não zera a Força', () => {
     const vlad = entrada('ha-vladislav-tpish');
     const idx = vlad.magias.lista.findIndex(s => /Enfraquec/.test(s.nome));
@@ -471,7 +531,7 @@ async function run() {
     SP.beforeAttacks(K, b, pal, b.get('B2'), pal.ataqueTotal);
     assert.strictEqual(pal._destruir, undefined);
     SP.beforeAttacks(K, b, pal, b.get('B1'), pal.ataqueTotal);
-    assert.strictEqual(pal._destruir.bonus_dano, 19);
+    assert.strictEqual(pal._destruir.bonus_dano, 20, 'o nível de paladino (20, a ficha oficial)');
     // evasão aprimorada: passar em Reflexos anula; falhar dá metade
     b = luta(boneco(), ficha('ha-leon-galtran', { pvMax: 1000 }), [20, 1]);
     const leon = b.get('B1');
@@ -541,12 +601,15 @@ async function run() {
     assert.match(textos(b2), /anula Cone de Frio/);
   });
 
-  test('falha de magia do Olho de Sszzaas (50%): a magia se perde', () => {
-    const b = luta(ficha('ha-niele'), boneco(), [40]);
+  test('falha de magia do Olho de Sszzaas (a chance de o Blefar de Niele não vencer a CD): a magia se perde', () => {
+    // livro (TASK_008): Mísseis maximizados com CD 24 de Blefar; a chance de falha está no catálogo (55%)
+    const chance = entrada('ha-niele').qualidades_especiais.concat(entrada('ha-niele').ataques_especiais)
+      .find(e => e.mecanica?.efeito === 'falha-de-magia' && e.mecanica.aplica_a.includes('olho-misseis')).mecanica.chance_pct;
+    const b = luta(ficha('ha-niele'), boneco(), [chance - 10]);
     const niele = b.get('A1');
     const olho = niele._esp.find(e => e.id === 'olho-misseis');
-    SP.execute(K, b, niele, { tipo: 'magia', s: { tipo: 'especial', e: olho, nome: olho.nome, m: olho.m, natureza: olho.natureza, cl: 10, cd: 16 }, alvo: b.get('B1'), alvos: [b.get('B1')] });
-    assert.match(textos(b), /falha \(50% de chance de falha\)/);
+    SP.execute(K, b, niele, { tipo: 'magia', s: { tipo: 'especial', e: olho, nome: olho.nome, m: olho.m, natureza: olho.natureza, cl: 3, cd: null }, alvo: b.get('B1'), alvos: [b.get('B1')] });
+    assert.match(textos(b), new RegExp(`falha \\(${chance}% de chance de falha\\)`));
     assert.strictEqual(b.get('B1').pv, 1000);
   });
 
@@ -638,6 +701,87 @@ async function run() {
     assert.match(textos(b), /tira 8 e se volta contra Tarrasque/);
     assert.match(textos(b), /ataca de dentro de Tarrasque/);
     assert.doesNotMatch(textos(b), /ataca Ogro 2/);
+  });
+
+  test('Retribuição do Paladino de Arton (TASK_007): quem tira PV dele testa Fortitude (CD 15 + dano) ou morre; passando, sofre o mesmo dano divino', () => {
+    const pal = () => ficha('ha-paladino-de-arton', { pvMax: 500 });
+    // falha (1 natural): o atacante morre (efeito de morte)
+    let b = luta(pal(), boneco({ nome: 'Ogro' }), [1]);
+    let [p, o] = [b.get('A1'), b.get('B1')];
+    K.causarDano(b, p, [{ valor: 20, tipo: 'fisico' }], { fonte: o });
+    assert.strictEqual(p.pv, 480);
+    assert.strictEqual(o.estado, 'morto');
+    assert.match(textos(b), /Retribuição: Ogro tirou 20 PV de Paladino de Arton e testa Fortitude \(CD 35\) ou morre/);
+    // passa (20 natural): sofre os mesmos 20, como dano divino
+    b = luta(pal(), boneco({ nome: 'Ogro' }), [20]);
+    [p, o] = [b.get('A1'), b.get('B1')];
+    K.causarDano(b, p, [{ valor: 20, tipo: 'fisico' }], { fonte: o });
+    assert.strictEqual(o.pv, 980);
+    assert.match(textos(b), /Ogro sofre o mesmo dano, 20 de dano divino/);
+    // o que não tira PV não dispara: imunidade (frio, meio-celestial) e PV temporários
+    b = luta(pal(), boneco({ nome: 'Ogro' }));
+    [p, o] = [b.get('A1'), b.get('B1')];
+    K.causarDano(b, p, [{ valor: 20, tipo: 'frio' }], { fonte: o });
+    p.pvTemp = 30;
+    K.causarDano(b, p, [{ valor: 20, tipo: 'fisico' }], { fonte: o });
+    assert.deepStrictEqual([p.pv, p.pvTemp, o.pv], [500, 10, 1000]);
+    assert.doesNotMatch(textos(b), /Retribuição/);
+    // qualquer fonte de dano vale: o fogo de uma área
+    b = luta(pal(), boneco({ nome: 'Ogro' }), [20]);
+    [p, o] = [b.get('A1'), b.get('B1')];
+    K.efeitoComTeste(b, o, p, { dano: '0d0+12', tipo_energia: 'fogo', resistencia: null }, { rotulo: 'Sopro' });
+    assert.strictEqual(o.pv, 988);
+  });
+
+  test('Retribuição: constructo e morto-vivo não testam (só sofrem o dano); o golem, imune a efeitos sobrenaturais, nada; o Tarrasque só cai; sem vaivém entre dois Paladinos', () => {
+    const pal = (over = {}) => ficha('ha-paladino-de-arton', { pvMax: 500, ...over });
+    // carniçal (morto-vivo): imune a efeitos de Fortitude e de morte, sofre os 5
+    let b = luta(pal(), ficha('carnical', { pvMax: 100 }));
+    K.causarDano(b, b.get('A1'), [{ valor: 5, tipo: 'fisico' }], { fonte: b.get('B1') });
+    assert.strictEqual(b.get('B1').pv, 95);
+    assert.match(textos(b), /Carniçal não testa \(imune a efeitos de Fortitude\)/);
+    // golem de ferro: imune a efeitos sobrenaturais
+    b = luta(pal(), ficha('golem-de-ferro'));
+    const golem = b.get('B1');
+    K.causarDano(b, b.get('A1'), [{ valor: 30, tipo: 'fisico' }], { fonte: golem });
+    assert.strictEqual(golem.pv, golem.pvMax);
+    assert.match(textos(b), /não afeta Golem de Ferro \(imune a efeitos sobrenaturais\)/i);
+    // o Tarrasque falha e regenera mesmo assim: cai sem morrer, e sofre o dano (que a regeneração vira contusão)
+    b = luta(pal(), ficha('tarrasque'), [1]);
+    const t = b.get('B1');
+    K.causarDano(b, b.get('A1'), [{ valor: 40, tipo: 'fisico' }], { fonte: t });
+    assert.notStrictEqual(t.estado, 'morto');
+    assert.strictEqual(t.contusao, t.pvMax + 10 + 40, '−10 de contusão pela "morte" e mais os 40 da retribuição');
+    assert.ok(!K.podeLutar(t), 'caído pela contusão');
+    // dois Paladinos: o dano da retribuição não dispara a do outro (quem ataca, aqui, não é bondoso)
+    b = luta(pal({ nome: 'Um', tendencia: 'LN' }), pal({ nome: 'Dois' }), [20]);
+    K.causarDano(b, b.get('B1'), [{ valor: 10, tipo: 'fisico' }], { fonte: b.get('A1') });
+    assert.strictEqual((textos(b).match(/testa Fortitude/g) || []).length, 1);
+    assert.deepStrictEqual([b.get('A1').pv, b.get('B1').pv], [490, 490]);
+    // o "bom coração" (livro, p. 111 e 118): a Retribuição não atinge criaturas bondosas (Lisandra é NB)
+    b = luta(pal(), ficha('ha-lisandra-rainha-do-mal'));
+    K.causarDano(b, b.get('A1'), [{ valor: 30, tipo: 'fisico' }], { fonte: b.get('B1') });
+    assert.match(textos(b), /A Retribuição de Paladino de Arton não atinge Lisandra, Rainha do Mal \(criatura bondosa\)/);
+    assert.strictEqual(b.get('B1').pv, b.get('B1').pvMax);
+    assert.doesNotMatch(textos(b), /testa Fortitude/);
+    // aliado não dispara
+    b = luta([pal(), boneco({ nome: 'Aliado' })], boneco());
+    K.causarDano(b, b.get('A1'), [{ valor: 10, tipo: 'fisico' }], { fonte: b.get('A2') });
+    assert.doesNotMatch(textos(b), /Retribuição/);
+  });
+
+  test('Retribuição: o atacante morto no meio do ataque total não rasga nem agarra depois (o troll)', () => {
+    // garra 1 acerta (Paladino 500 PV): o troll passa no teste; garra 2 acerta: falha e morre; sem o rasgar
+    const pal = ficha('ha-paladino-de-arton', { pvMax: 500, ca: { total: 5, toque: 5, surpresa: 5 } });
+    const troll = ficha('troll');
+    // garra 1: d20 19 acerta, dano 1d6 = 6, Fortitude 20 natural (passa); garra 2: 19, 6, Fortitude 1 (falha)
+    const b = luta(pal, troll, [19, 6, 20, 19, 6, 1]);
+    const [p, t] = [b.get('A1'), b.get('B1')];
+    t.pos = p.pos; // lado a lado: as garras alcançam
+    const garras = t.ataqueTotal.filter(a => /Garra/.test(a.nome));
+    K.sequencia(b, t, p, garras);
+    assert.strictEqual(t.estado, 'morto');
+    assert.doesNotMatch(textos(b), /rasga/);
   });
 
   test('a mesma semente repete a luta; outra semente muda o registro', () => {

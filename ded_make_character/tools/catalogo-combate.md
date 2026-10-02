@@ -65,16 +65,16 @@ Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
 | `nome` | string | nome em PT-BR (tradução Devir quando houver) |
 | `nome_original` | string \| null | nome em inglês do monstro; `null` para Holy Avenger |
 | `categoria` | ✔ `"monstro"` \| `"holy_avenger"` | |
-| `nd` | inteiro 1–20 ✔ | Nível de Desafio. Monstros: um por ND, sem repetir, com o Tarrasque no 20 ✔ |
-| `nivel` | inteiro 1–20 ✔ | o que o seletor mostra: igual ao `nd` para monstro ✔; nível de personagem para Holy Avenger |
-| `classes` | array ✔ | `[{ "classe": "Guerreiro", "nivel": 8 }]`, com nomes PT das classes do Livro do Jogador 3.0; `[]` para monstro sem classe; soma ≤ 20 ✔ |
+| `nd` | número ✔ | Nível de Desafio. Monstros: inteiro 1–20, um por ND, sem repetir, com o Tarrasque no 20 ✔. Holy Avenger: inteiro 1–80 ou fração 1/2, 1/3, 1/4, 1/6, 1/8, gravada como número (`0.5`) ✔. No livro, o Paladino vai do ND 20 ao 55 e Tarso tem ND 50 |
+| `nivel` | inteiro ✔ | o que o seletor mostra: igual ao `nd` para monstro ✔ (1–20); nível de personagem para Holy Avenger (1–80 ✔), com os DV raciais (Tarso: 43 DV de dragão + Mago 20 = 63); criatura sem classe: os DV |
+| `classes` | array ✔ | `[{ "classe": "Guerreiro", "nivel": 8 }]`, com nomes PT das classes do Livro do Jogador 3.0, das classes de PdM do Livro do Mestre (Plebeu, Combatente, Aristocrata, Especialista) ou dos nomes do livro de Holy Avenger (Assassino, Gladiador Imperial, Samurai de Tamu-ra, ex-Druida, Xamã Aprendiz); `[]` para monstro e para criatura de Holy Avenger sem classe (Helena, Aspis); soma ≤ `nivel` ✔ (DV raciais não são classe) |
 | `raca` | string \| null | para Holy Avenger (ex.: `Humano`, `Elfo`) |
 | `tipo` | string ✔ | tipo 3.0 em PT-BR: Aberração, Animal, Besta, Besta Mágica, Constructo, Dragão, Elemental, Fada, Gigante, Humanoide, Humanoide Monstruoso, Limo, Extra-Planar, Planta, Morto-Vivo, Verme |
 | `subtipos` | string[] | ex.: `["Fogo"]`, `["Mau", "Leal"]` |
 | `tamanho`, `tendencia` | string ✔ | ver as listas acima |
 | `resumo` | string ✔ | ≤ 300 caracteres, texto próprio |
 | `dados_vida` | string ✔ | ex.: `"4d8+8"`, `"48d10+576"`; com mais de um dado (raça com DV, multiclasse), a soma: `"10d10+10d8+60"` |
-| `pv` | inteiro ✔ | monstros: a média dos dados do bloco oficial ✔ (aviso); personagens: máximo no 1º nível, média arredondada para cima nos demais, + Con |
+| `pv` | inteiro ✔ | monstros: a média dos dados do bloco oficial ✔ (aviso); Holy Avenger: o PV da ficha oficial do livro; personagem adaptado sem ficha: máximo no 1º nível, média arredondada para cima nos demais, + Con |
 | `iniciativa` | inteiro ✔ | bônus total |
 | `deslocamento` | objeto ✔ | `{ "terrestre": 9, "voo": null, "voo_manobrabilidade": null, "natacao": null, "escalada": null, "escavacao": null }`, em metros |
 | `espaco` | número ✔ | **maior** lado ocupado em metros (*Face* 3.0): 1,5 para Médio; 3 para "1,5 m × 3 m" |
@@ -101,6 +101,7 @@ Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
 | `tatica` | string ✔ | 1 ou 2 frases de como o combatente luta, para a IA do simulador |
 | `fonte` | objeto ✔ | `{ "referencia": "SRD 3.0 — Monster Manual 3.0", "url": "http://…" }`; para Holy Avenger, a página da wiki do personagem e a origem das estatísticas |
 | `adaptacao` | string \| null ✔ | o que foi estimado ou adaptado e por quê (`null` quando os números são oficiais sem mudança) |
+| `condicoes_iniciais` | array (opcional) ✔ | condições da lista fechada com que o combatente começa e que duram a luta toda, ex.: `["cego"]` (Tork, Guerreiro Cego) |
 
 ## Ataque
 
@@ -164,7 +165,7 @@ Esta tabela é gerada por `tools/gerar-tabela-efeitos.js` a partir de `EFEITOS` 
 | `sopro` | **`area`**, **`tamanho_m`**, **`resistencia`**, **`cd`**, **`recarga`** | `dano` + `tipo_energia` ou `condicao` ou `veneno` | `metade_se_passar`, `duracao`, `afeta`, `condicao_afeta`, `compartilhada_com`, `acao`, `primeiro_uso`, `nuvem_dura` | área `cone` \| `linha` \| `cubo` \| `raio`; `recarga` `"1d4"` ou inteiro; `veneno` = `{ inicial, secundario }` |
 | `agarrar-aprimorado` | **`gatilho`** | — | `tamanho_max`, `dano_por_rodada`, `requer` | `tamanho_max` padrão: uma categoria menor que o monstro |
 | `constricao` | **`dano`**, **`tipo_dano`** | — | `tamanho_max` |  |
-| `engolir` | **`tamanho_max`**, **`dano_por_rodada`**, **`ca_interna`**, **`pv_para_sair`** | — | `dano_extra`, `capacidade` |  |
+| `engolir` | **`tamanho_max`**, **`dano_por_rodada`**, **`ca_interna`**, **`pv_para_sair`** | — | `dano_extra`, `capacidade`, `rd_se_aplica` |  |
 | `engolfar` | **`tamanho_max`**, **`resistencia`**, **`cd`** | — | `dano_por_rodada`, `tipo_energia`, `condicao`, `duracao`, `paralisia`, `acao` | `paralisia` = `{ resistencia, cd, duracao }` (toque paralisante do cubo) |
 | `rasgar` | **`requer`**, **`dano`** | — | — |  |
 | `bote` | — | — | — | ataque total ao fim de uma investida |
@@ -187,6 +188,7 @@ Esta tabela é gerada por `tools/gerar-tabela-efeitos.js` a partir de `EFEITOS` 
 | `camuflagem` | **`chance_pct`** | — | — | chance de o ataque errar (ex.: deslocamento 50) |
 | `falha-de-magia` | **`chance_pct`** | — | `aplica_a`, `retorna_ao_dono` | chance de a magia falhar; `aplica_a` = ids dos especiais afetados (sem ele, vale para todas as magias) |
 | `vorpal` | **`gatilho`**, **`quando`** | — | `resultado` | `quando`: `critico-confirmado` \| `natural-20` |
+| `retribuicao` | **`cd_base`** | — | `tipo_energia`, `afeta` | quem tira PV do dono (vencendo imunidade, RD e resistência) testa Fortitude (CD `cd_base` + o dano) ou morre (efeito de morte); passando, sofre o mesmo dano em `tipo_energia` (padrão `divino`). Não dispara com o dano de outra retribuição. `afeta` restringe quem ela atinge (o Paladino: `exceto_moral: ["B"]`, o "bom coração") |
 | `explosao-ao-morrer` | **`quando`**, **`raio_m`**, **`dano`**, **`resistencia`**, **`cd`** | — | `tipo_energia`, `metade_se_passar` | `quando: "ao-morrer"` |
 | `imunidade-magia` | — | — | `abrange`, `excecoes` | `excecoes` = `[{ "tipo_energia": "eletricidade", "efeito": "lento 3 rodadas" }]` ou `[{ "magia": "de deuses maiores" }]` |
 | `refletir-magia` | **`afeta`**, **`chance_pct`** | — | `senao`, `ordem` | `afeta` = array (ex.: `["raios", "linhas", "cones", "Mísseis Mágicos"]`) |

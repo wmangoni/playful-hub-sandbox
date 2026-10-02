@@ -12,6 +12,8 @@ Forja de heróis de D&D migrada do sistema legado `D-D-Make-Character` (CodeIgni
   - acrescentou os 74 talentos do Livro do Jogador 3.0 (320 no total).
 - `TASKS/TASK_005.md`: integração no menu principal do hub pelo padrão do gerador de páginas SEO.
 - `TASKS/TASK_006.md`: **simulador de combate** (Arena), com as 8 etapas prontas. Feitos o catálogo `data/catalogo-combate.json`, o motor de combate (E1 a E3), os personagens do jogador com equipamento (E4), a tela `#/arena` (E5), a simulação em lote (E6), as magias dos seus personagens (E7) e o equipamento na ficha impressa (E8).
+- `TASKS/TASK_007.md`: a **Retribuição** do Paladino de Arton no motor (efeito `retribuicao`) e o ND acima de 20 para Holy Avenger, com a faixa "ND 21 ou mais" na Arena.
+- `TASKS/TASK_008.md`: o catálogo de Holy Avenger com as **fichas oficiais do livro *Tormenta D20 – Holy Avenger***: 54 entradas, uma por versão de cada personagem (as 6 do Paladino, as 5 de Lisandra…), com ND fracionário e teto 80.
 
 ## 🏗️ Arquitetura do Código
 
@@ -31,7 +33,7 @@ A aplicação é vanilla, com ES Modules e sem build. `index.html` carrega `js/a
   - Ao mudar o conteúdo, incremente `DATA_VERSION`. As cópias locais antigas passam a ser marcadas como desatualizadas.
   - O conversor não exporta `usuarios`: o dump contém e-mail real e hash de senha. Tabelas removidas entram em `RETIRED_TABLES` (`js/entities/index.js`), que apaga as cópias locais órfãs.
 - **`data/catalogo-combate.json`**: a exceção à regra acima. É o catálogo do simulador de combate, **mantido à mão** e fora do formato de tabela do store.
-  - Traz 20 monstros do SRD 3.0 (ND 1–20, Tarrasque no 20) e os personagens de Holy Avenger em regras 3.0.
+  - Traz 20 monstros do SRD 3.0 (ND 1–20, Tarrasque no 20) e 54 fichas de Holy Avenger, do livro *Tormenta D20 – Holy Avenger* (as fichas são Open Game Content; nomes e históricos, não: os textos do catálogo são reescritos). Só Holy Avenger passa do ND 20 (até o 55) ou tem ND fracionário (1/2).
   - Formato em `tools/catalogo-combate.md`. Ao mudar o conteúdo, incremente `versao` e valide com `node ded_make_character/tools/validar-catalogo.js`, que também é usado por `tests/ded_make_character_catalogo.test.js`.
   - O vocabulário de efeitos (`EFEITOS` no validador) é a fonte única. Ao mudá-lo, rode `node ded_make_character/tools/gerar-tabela-efeitos.js` para regravar a tabela do formato; o teste falha se as duas divergirem.
   - Números vêm do SRD 3.0 (dragon.ee); textos são próprios. Nos personagens de Holy Avenger, `adaptacao` separa o que é oficial do que foi adaptado.
