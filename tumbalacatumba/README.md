@@ -42,10 +42,12 @@ Jogue com o aparelho deitado. O modo toque liga sozinho em telas de toque, e dá
 | Andar | arrastar o **lado esquerdo** da tela (joystick): o personagem anda para onde você aponta |
 | Girar a câmera | arrastar o **lado direito** da tela |
 | Zoom | pinça com dois dedos |
-| Conversar / pegar / usar | **tocar** em alguém ou em algo perto (longe: só seleciona) |
-| Atacar | tocar na criatura para selecionar e de novo para atacar, ou o `7` da barra |
-| O que é isso? | **toque longo** mostra a dica |
+| Conversar / pegar / usar | **tocar** em alguém ou em algo perto (longe: só seleciona), ou o botão **Falar / Pegar / Usar** que aparece quando há algo ao alcance |
+| Atacar | botão grande da **Lanternada** (sem alvo, mira na criatura mais próxima), ou tocar na criatura duas vezes |
+| Habilidades | três botões em volta da Lanternada (mudam conforme o que você já tem) e **⋯** com todas, inclusive Sentar |
+| O que é isso? | **toque longo** na tela ou num botão mostra a dica |
 | Pular / voar | botão **Pular** (voando: **Subir** e **Descer**; segure Descer rente ao chão para pousar) |
+| Diário, mapa, controles, opções, mochila | botões no topo da tela |
 
 ## O que tem no vale
 

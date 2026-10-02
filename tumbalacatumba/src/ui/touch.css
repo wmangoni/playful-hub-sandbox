@@ -1,0 +1,180 @@
+/* ================================================================
+   Modo toque (celular e tablet deitados): tudo aqui vale só com body.touch.
+   A interface do desktop continua igual. A escala (--s) é calculada para ~560 px de altura
+   (hud.js applyScale), e as letras pequenas crescem aqui para continuar legíveis depois dela.
+   ================================================================ */
+
+/* ---------- camada de toque: joystick, botões de pular/descer e o grupo do polegar direito ---------- */
+#touch { position: fixed; inset: 0; z-index: 9; pointer-events: none; display: none; }
+#touch.show { display: block; }
+/* grimório aberto: a camada de toque passa por cima do HUD (placas de nome, chat) */
+#touch.booking { z-index: 26; }
+#touch .stick { position: absolute; left: 0; top: 0; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50% 47% 52% 49%;
+  background: radial-gradient(circle, rgba(22, 16, 29, 0.2), rgba(22, 16, 29, 0.55)); border: 3px solid var(--ink);
+  box-shadow: 0 0 0 2px rgba(239, 230, 210, 0.22); outline: 2px dashed rgba(239, 230, 210, 0.35); outline-offset: -11px; opacity: 0; transition: opacity 0.15s; }
+#touch .stick.on { opacity: 1; }
+#touch .knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50% 46% 52% 48%;
+  background: radial-gradient(circle at 38% 32%, #fbf4e2, #c9bd9d); border: 2.5px solid var(--ink); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6); }
+/* anel fantasma: mostra onde fica o joystick enquanto nenhum dedo está nele */
+#touch .ghost { position: absolute; left: calc(18vw + env(safe-area-inset-left)); top: 66vh; width: 104px; height: 104px; margin: -52px 0 0 -52px; border-radius: 50% 47% 52% 49%;
+  border: 2px dashed rgba(239, 230, 210, 0.28); box-shadow: inset 0 0 0 2px rgba(22, 16, 29, 0.35); transition: opacity 0.2s; }
+#touch .ghost::after { content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: rgba(239, 230, 210, 0.16); }
+#touch.sticking .ghost { opacity: 0; }
+
+/* botões redondos de tinta com costura (pular, descer e o grupo do polegar direito) */
+#touch .tbtn, #touch .tb { pointer-events: auto; touch-action: none; padding: 0; border-radius: 50% 46% 52% 48%; border: 3px solid var(--ink);
+  background: radial-gradient(circle at 38% 32%, #3a2c48, #1d1628); color: var(--bone); box-shadow: 0 0 0 2px rgba(239, 230, 210, 0.22), 0 3px 8px rgba(0, 0, 0, 0.65);
+  outline: 2px dashed rgba(239, 230, 210, 0.4); outline-offset: -9px; opacity: 0.94; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+#touch .tbtn { width: 62px; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font: 400 13px/13px var(--chat-font); }
+#touch .tbtn svg { width: 24px; height: 24px; fill: var(--bone); }
+#touch .tbtn.on, #touch .tb.on { transform: scale(0.92); background: radial-gradient(circle at 38% 32%, #ffb04a, #b8501a); color: var(--ink); outline-color: rgba(22, 16, 29, 0.5); }
+#touch .tbtn.on svg { fill: var(--ink); }
+#touch .tbtn.down { display: none; }
+#touch .tbtn.down.show { display: flex; }
+/* Pular (e Descer, voando) à esquerda da Lanternada */
+#touch .tbtns { position: absolute; right: calc(104px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 12px; align-items: flex-end; }
+
+/* grupo do polegar direito: Lanternada grande no canto, arco de 3 habilidades, "⋯" e o botão contextual.
+   Posições contadas a partir do centro da Lanternada (right 55, bottom 55), em arco de raio ~108 px */
+#touch .tbar { position: absolute; right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); width: 0; height: 0; }
+#touch .tb { position: absolute; display: grid; place-items: center; overflow: visible; }
+#touch .tb img { width: 64%; height: 64%; border-radius: 30%; pointer-events: none; }
+#touch .tb .cd { position: absolute; inset: 3px; border-radius: 50%; display: none; pointer-events: none; }
+#touch .tb.cooling .cd { display: block; }
+#touch .tb.locked img { filter: grayscale(1) brightness(0.35); }
+#touch .tb.active { box-shadow: 0 0 0 3px var(--pumpkin), 0 0 12px var(--pumpkin); }
+#touch .tb.hidden { display: none; }
+#touch .tb.atk { right: 18px; bottom: 18px; width: 74px; height: 74px; }
+#touch .tb.sk { width: 52px; height: 52px; }
+#touch .tb.s0 { right: 122px; bottom: 83px; }
+#touch .tb.s1 { right: 80px; bottom: 124px; }
+#touch .tb.s2 { right: 21px; bottom: 137px; }
+#touch .tb.more { right: 147px; bottom: 159px; width: 44px; height: 44px; font: 700 26px/20px var(--title-font); }
+#touch .tb.ctx { right: 220px; bottom: 97px; width: 58px; height: 58px; }
+#touch .tb.ctx img { width: 26px; height: 26px; border-radius: 0; margin-top: -10px; }
+#touch .tb.ctx span { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font: 400 13px/13px var(--chat-font); }
+/* grimório: todas as habilidades (e o Sentar) num painel no meio da tela */
+#touch .tbook { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: auto; padding: 30px 14px 14px; }
+#touch .tbook.hidden { display: none; }
+#touch .tbook .ttl { position: absolute; left: 50%; top: -14px; transform: translateX(-50%) rotate(-1.5deg); padding: 1px 22px 2px; font: 700 19px var(--title-font); color: var(--ink);
+  white-space: nowrap; text-shadow: none; background: linear-gradient(#f5ecd8, #d6c9ab); border: 2px solid var(--ink); border-radius: 4px 12px 5px 13px / 11px 4px 13px 5px; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6); }
+#touch .tbook .grid { display: grid; grid-template-columns: repeat(4, 84px); gap: 8px; }
+#touch .tb.bk { position: relative; width: 84px; height: 62px; border-radius: 12px 6px 13px 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+#touch .tb.bk img { width: 30px; height: 30px; border-radius: 6px; }
+#touch .tb.bk .cd { border-radius: 10px 4px 11px 5px; }
+#touch .tb.bk b { font: 400 12px/12px var(--chat-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 78px; }
+#touch .tb .glyph { width: 28px; height: 28px; fill: var(--bone); }
+
+/* ---------- a página não rola, não dá zoom nem abre o menu de "copiar" com o dedo ---------- */
+body.touch, body.touch #game-canvas { touch-action: none; overscroll-behavior: none; -webkit-touch-callout: none; }
+body.touch button, body.touch .pe { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+#title .hint-touch { display: none; }
+body.touch #title .hint-touch { display: block; }
+body.touch #title .hint-mouse { display: none; }
+
+/* ---------- HUD compacto (margens do notch em todas as âncoras) ---------- */
+body.touch .anchor.tl { left: calc(8px + env(safe-area-inset-left)); top: calc(6px + env(safe-area-inset-top)); }
+body.touch .anchor.tr { right: calc(8px + env(safe-area-inset-right)); top: calc(4px + env(safe-area-inset-top)); transform: scale(calc(var(--s) * 0.82)); }
+body.touch .anchor.bl { left: calc(8px + env(safe-area-inset-left)); bottom: calc(6px + env(safe-area-inset-bottom)); }
+body.touch .anchor.bc { bottom: calc(2px + env(safe-area-inset-bottom)); }
+/* retrato do jogador e do alvo empilhados (o topo do meio fica para o menu) */
+body.touch .frames { flex-direction: column; }
+body.touch .unit.target { margin: 2px 0 0; }
+body.touch .unit .name { font-size: 22px; line-height: 23px; }
+body.touch .bar { height: 16px; }
+body.touch .bar span { font-size: 16px; line-height: 15px; }
+body.touch .unit .level { font-size: 19px; }
+body.touch .unit.target .sub { font-size: 16px; }
+/* rastreador embaixo do retrato: compacto (só a primeira missão) até tocar em [+] */
+body.touch #tracker { width: 300px; margin-top: 16px; pointer-events: none; }
+body.touch #tracker .head { font-size: 23px; pointer-events: auto; }
+/* [+] com área de toque ≥ 44 px depois da escala (margens negativas: o cabeçalho não cresce) */
+body.touch #tracker .head .tog { display: inline-flex; align-items: center; justify-content: center; min-width: 72px; min-height: 72px; margin: -24px -14px -24px 0; font-size: 22px; }
+/* a lista fica na área do polegar esquerdo: só recebe toque expandida (para rolar); compacta, o dedo vai para o joystick */
+body.touch #tracker .list { pointer-events: none; max-height: 52vh; overflow-y: auto; }
+body.touch #tracker.open .list { pointer-events: auto; }
+body.touch #tracker .q .t { font-size: 19px; line-height: 22px; }
+body.touch #tracker .q .t .lv { font-size: 15px; }
+body.touch #tracker .q .o { font-size: 18px; line-height: 21px; }
+/* minimapa: sem os botões pequenos (tocar no mapa abre o mapa-múndi) */
+body.touch #minimap .btn { display: none; }
+body.touch #minimap .zone { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.touch #minimap .clock { font-size: 20px; line-height: 24px; }
+/* chat: três linhas, só leitura, por cima do joystick (o dedo passa direto) */
+body.touch #chat { width: 470px; pointer-events: none; }
+body.touch #chat .tabs, body.touch #chat input { display: none; }
+body.touch #chat .log { height: 82px; font-size: 19px; line-height: 24px; padding: 4px 8px; pointer-events: none; background: linear-gradient(transparent, rgba(22, 16, 29, 0.35)); }
+/* barra de ações do desktop some: no toque ficam o grupo do polegar e a barra de XP */
+body.touch #bottom { height: 22px; width: 560px; }
+body.touch #bottom .bar-frame, body.touch #bottom .curl { display: none; }
+body.touch #bottom .xp { left: 0; right: 0; height: 10px; }
+/* menu (diário, mapa, ajuda, opções, mochila) no topo do meio, com alvos de 44 px e sem escala */
+body.touch .anchor.br { top: calc(6px + env(safe-area-inset-top)); bottom: auto; right: 50%; transform: translateX(50%); transform-origin: 50% 0; }
+body.touch #micro { gap: 6px; align-items: center; }
+body.touch #micro button { width: 44px; height: 46px; }
+body.touch #micro .bag { width: 46px; height: 46px; margin-left: 4px; }
+body.touch #micro .money { position: absolute; right: auto; left: 50%; top: 50px; bottom: auto; transform: translateX(-50%); font-size: 14px; }
+/* avisos, barra de conjuração, dica e letreiro abaixo do menu e longe dos polegares */
+body.touch #errors { top: calc(76px + env(safe-area-inset-top)); font-size: 17px; }
+body.touch #castbar { bottom: calc(118px + env(safe-area-inset-bottom)); }
+body.touch #tooltip { left: 50%; right: auto; top: calc(76px + env(safe-area-inset-top)); bottom: auto; transform: translateX(-50%); max-width: 58vw; min-width: 220px;
+  font-size: 17px; line-height: 21px; }
+body.touch #tooltip .tt-name { font-size: 22px; line-height: 24px; }
+/* no topo do meio as placas de nome e os balões passariam por cima da dica */
+body.touch #tooltip { z-index: 5; }
+body.touch #tooltip.follow { left: 50% !important; top: calc(76px + env(safe-area-inset-top)) !important; }
+body.touch #zonetext { top: 24%; }
+body.touch #zonetext.room { top: 19%; }
+body.touch #zonetext .z1 { font-size: 40px; }
+body.touch #zonetext .z2 { font-size: 16px; }
+
+/* ---------- janelas encaixadas na tela (sem a escala do desktop), botões e "×" de 44 px ---------- */
+body.touch .win:not(#worldmap) { transform: none !important; }
+body.touch .win .close { width: 44px; height: 44px; right: -6px; top: -6px; font-size: 27px; line-height: 38px; }
+body.touch .wbtn { min-height: 44px; height: auto; font-size: 20px; line-height: 38px; }
+body.touch .wbtn.small { min-height: 44px; font-size: 18px; line-height: 38px; }
+body.touch #quest { left: 0; right: 0; top: calc(18px + env(safe-area-inset-top)); width: min(560px, 92vw); margin: 0 auto; }
+body.touch #quest .inner { height: calc(100vh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); height: calc(100dvh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+body.touch #quest .scroll { padding: 18px 20px 8px; }
+body.touch #quest .opts li { min-height: 44px; }
+body.touch #quest .btns { padding: 8px 14px 10px; gap: 12px; }
+body.touch #qlog { left: calc(3vw + env(safe-area-inset-left)); right: calc(3vw + env(safe-area-inset-right)); top: calc(18px + env(safe-area-inset-top)); bottom: calc(8px + env(safe-area-inset-bottom));
+  width: auto; height: auto; margin: 0; }
+body.touch #qlog .inner { padding: 22px 12px 58px; }
+body.touch #qlog .list { width: 38%; }
+body.touch #qlog .list .qi { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+body.touch #qlog .list .qi .st { float: none; margin-left: auto; }
+body.touch #bags { right: calc(10px + env(safe-area-inset-right)); top: calc(62px + env(safe-area-inset-top)); bottom: auto; width: 290px; }
+body.touch #bags .grid { grid-template-columns: repeat(5, 48px); gap: 6px; }
+body.touch #bags .grid .slot { width: 48px; height: 48px; }
+body.touch #menu { left: 0; right: 0; top: calc(20px + env(safe-area-inset-top)); width: min(300px, 80vw); margin: 0 auto; }
+body.touch #menu .inner { max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; }
+body.touch #options { left: 0; right: 0; top: calc(18px + env(safe-area-inset-top)); width: min(560px, 94vw); margin: 0 auto; }
+body.touch #options .inner { max-height: calc(100vh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+/* "travar cursor" não faz nada sem mouse */
+body.touch #options .desk-only { display: none; }
+/* controles das opções com alvo de 44 px */
+body.touch #options .row { min-height: 44px; font-size: 17px; }
+body.touch #options .row input[type=range] { height: 44px; width: 220px; }
+body.touch #options .row input[type=checkbox] { -webkit-appearance: none; appearance: none; width: 44px; height: 44px; margin: 0; display: grid; place-items: center; cursor: pointer;
+  border: 3px solid var(--ink); border-radius: 10px 4px 11px 5px; background: radial-gradient(circle at 38% 32%, #3a2c48, #1d1628);
+  outline: 2px dashed rgba(239, 230, 210, 0.35); outline-offset: -8px; box-shadow: 0 0 0 1px rgba(239, 230, 210, 0.25); }
+body.touch #options .row input[type=checkbox]:checked { background: radial-gradient(circle at 38% 32%, #ffb04a, #b8501a); outline-color: rgba(22, 16, 29, 0.45); }
+body.touch #options .row input[type=checkbox]:checked::after { content: '✓'; font: 700 28px/1 var(--title-font); color: var(--ink); }
+body.touch #options .row select { min-height: 44px; font-size: 18px; padding: 4px 8px; }
+body.touch #tutorial { left: 0; right: 0; top: calc(76px + env(safe-area-inset-top)); bottom: auto; width: min(440px, 62vw); margin: 0 auto; }
+body.touch #popup { left: 0; right: 0; width: min(420px, 86vw); margin: 0 auto; }
+/* mapa-múndi: legenda ao lado do mapa (deitado sobra largura e falta altura); o hud.js centraliza pelo tamanho real */
+body.touch #worldmap .inner { display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 12px; }
+body.touch #worldmap .legend { flex-direction: column; align-items: flex-start; gap: 10px; padding: 0; font-size: 16px; }
+
+/* ---------- celular em pé: o jogo é para jogar deitado ---------- */
+#rotate { display: none; }
+@media (orientation: portrait) {
+  body.touch #rotate { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: radial-gradient(circle at 50% 40%, #2b2138, #07060d); color: var(--bone); text-align: center; padding: 24px; touch-action: none; }
+  body.touch #rotate svg { width: 96px; height: 96px; animation: rotphone 2.4s ease-in-out infinite; }
+  body.touch #rotate b { font: 700 30px var(--title-font); color: var(--pumpkin-hi); }
+  body.touch #rotate span { font: 400 18px/24px var(--chat-font); color: var(--bone-2); max-width: 280px; }
+}
+@keyframes rotphone { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }

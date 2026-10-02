@@ -186,9 +186,16 @@ export class Interaction {
    * toque rápido: perto o bastante, conversa/pega/abre (o clique direito); longe, só seleciona.
    * Criatura: o primeiro toque seleciona, o segundo ataca.
    */
-  tap(x, y) {
+  tap(x, y, fromStick = false) {
     const it = this.pick(x, y, TOUCH_PAD);
-    if (!it) return;
+    if (!it) {
+      // toque no chão/céu vazio solta o alvo (no toque não há Esc à mão), menos quando é o polegar
+      // reencostando no joystick ou quando a briga está rolando (sem alvo, o ataque automático desliga)
+      const C = this.game.combat;
+      if (fromStick || (this.target?.kind === 'mob' && (C?.autoAttack || C?.inCombat))) return;
+      this.setTarget(null);
+      return;
+    }
     if (it.kind === 'mob') {
       if (this.target === it) this.tryInteract(it);
       else this.setTarget(it);
@@ -222,7 +229,7 @@ export class Interaction {
     if (g.ui.blocking()) return;
     for (const c of input.clicks) {
       if (c.button === 'tap') {
-        this.tap(c.x, c.y);
+        this.tap(c.x, c.y, c.stick);
         continue;
       }
       const it = this.pick(c.x, c.y);

@@ -314,12 +314,16 @@ export class Bags {
     this.grid.querySelectorAll('[data-item]').forEach((e) => {
       e.onmousemove = (ev) => this.ui.itemTooltip(e.dataset.item, ev.clientX, ev.clientY, true);
       e.onmouseleave = () => this.ui.hideTooltip('item');
+      // no toque o touchBar cuida (toque usa, toque longo mostra a dica); o toque longo do Android também
+      // gera contextmenu, que aqui usaria o item
       e.oncontextmenu = (ev) => {
         ev.preventDefault();
+        if (this.game.touchMode) return;
         this.ui.useItem(e.dataset.item);
         this.render();
       };
       e.onclick = () => {
+        if (this.game.touchMode) return;
         this.ui.useItem(e.dataset.item);
         this.render();
       };
@@ -390,9 +394,9 @@ export class Menu {
       <div class="row">Música <input type="range" min="0" max="1" step="0.05" data-k="music"></div>
       <div class="row">Efeitos <input type="range" min="0" max="1" step="0.05" data-k="sfx"></div>
       <h3>Controles</h3>
-      <div class="row">Sensibilidade do mouse <input type="range" min="0.0015" max="0.009" step="0.0005" data-k="sens"></div>
+      <div class="row">Sensibilidade da câmera <input type="range" min="0.0015" max="0.009" step="0.0005" data-k="sens"></div>
       <div class="row">Inverter eixo Y <input type="checkbox" data-k="invertY"></div>
-      <div class="row">Travar cursor ao arrastar (pointer lock) <input type="checkbox" data-k="pointerLock"></div>
+      <div class="row desk-only">Travar cursor ao arrastar (pointer lock) <input type="checkbox" data-k="pointerLock"></div>
       <div class="row">Controles de toque <select data-k="controls"><option value="auto">Automático</option><option value="on">Sempre</option><option value="off">Nunca</option></select></div>
       <h3>Vídeo</h3>
       <div class="row">Qualidade gráfica <select data-k="quality"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></div>

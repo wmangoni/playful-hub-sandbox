@@ -34,6 +34,7 @@ export class TouchControls {
     this.enabled = true; // false com a opção "Nunca": os dedos voltam a ser do navegador
     this._buildDom();
     this._bind();
+    this._bindHudTaps();
   }
 
   _buildDom() {
@@ -47,6 +48,12 @@ export class TouchControls {
         <button class="tbtn jump" data-key="Space" aria-label="Pular">${UP_ICON}<span>Pular</span></button>
       </div>`;
     document.body.appendChild(el);
+    // celular em pé: o jogo é para jogar deitado (o touch.css só mostra isso em retrato)
+    const rot = document.createElement('div');
+    rot.id = 'rotate';
+    rot.innerHTML = `<svg viewBox="0 0 64 64"><rect x="20" y="6" width="24" height="44" rx="5" fill="none" stroke="#efe6d2" stroke-width="3"/><circle cx="32" cy="43" r="2.5" fill="#efe6d2"/><path d="M50 44a18 18 0 0 1-12 12" fill="none" stroke="#ff8a2a" stroke-width="3" stroke-linecap="round"/><path d="M36 52l2 4 4-2" fill="none" stroke="#ff8a2a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <b>Vire o celular</b><span>O Vale Assombrado é para jogar com o aparelho deitado.</span>`;
+    document.body.appendChild(rot);
     this.stick = el.querySelector('.stick');
     this.knob = el.querySelector('.knob');
     this.jumpBtn = el.querySelector('.jump');
@@ -84,6 +91,39 @@ export class TouchControls {
     // trocou de aba ou de app no meio de um gesto: solta tudo (senão o personagem segue andando sozinho)
     window.addEventListener('blur', () => this.reset());
     document.addEventListener('visibilitychange', () => document.hidden && this.reset());
+  }
+
+  /**
+   * Com um dedo já na tela (o polegar no joystick), o navegador costuma não gerar click para o toque do outro
+   * dedo num botão da interface (menu do topo, janelas, minimapa). Aqui o toque rápido vira click; o
+   * preventDefault no touchend garante que não saia um segundo click quando o navegador gerar o dele.
+   */
+  _bindHudTaps() {
+    const starts = new Map();
+    const inUi = (el) => !!el?.closest?.('#hud, #popup');
+    const cap = { capture: true, passive: false };
+    document.addEventListener('touchstart', (e) => {
+      if (!this.enabled) return;
+      for (const t of e.changedTouches) if (inUi(t.target)) starts.set(t.identifier, { x: t.clientX, y: t.clientY, t: performance.now() });
+    }, cap);
+    document.addEventListener('touchend', (e) => {
+      if (!this.enabled) return;
+      for (const t of e.changedTouches) {
+        const st = starts.get(t.identifier);
+        starts.delete(t.identifier);
+        if (!st || e.touches.length === 0) continue; // dedo sozinho: o click normal do navegador resolve
+        const el = t.target;
+        if (!inUi(el) || /^(INPUT|SELECT|TEXTAREA|OPTION)$/.test(el.tagName)) continue;
+        if (Math.hypot(t.clientX - st.x, t.clientY - st.y) > 12 || performance.now() - st.t > 600) continue;
+        e.preventDefault();
+        // o ícone da opção de conversa é um <svg>, que não tem .click(): sobe até o que é clicável
+        const hit = el.closest?.('button, li, .qi, .q, .slot, .tog, [data-a], [data-item], canvas, a') ?? el;
+        hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: t.clientX, clientY: t.clientY }));
+      }
+    }, cap);
+    document.addEventListener('touchcancel', (e) => {
+      for (const t of e.changedTouches) starts.delete(t.identifier);
+    }, cap);
   }
 
   /** liga/desliga (opção "Nunca"): desligado, não segura nenhum evento e solta o que estava apertado */
@@ -209,7 +249,7 @@ export class TouchControls {
     if (f.role === 'stick') this._clearStick();
     if (f.role === 'ignore') return;
     const tap = !cancel && !f.pinch && !f.held && !f.drag && this.time - f.t0 < HOLD_T;
-    if (tap) this.input.clicks.push({ button: 'tap', x: f.sx, y: f.sy });
+    if (tap) this.input.clicks.push({ button: 'tap', x: f.sx, y: f.sy, stick: f.role === 'stick' });
     if (f.held) this.input.hold = null;
   }
 

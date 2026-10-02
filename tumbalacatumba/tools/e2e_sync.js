@@ -6,8 +6,9 @@
 //   2. executar este arquivo na página;
 //   3. chamar __T.run(passo) para cada passo, nesta ordem:
 //        aboboras, gato, ossos, brasas, chocar, corvos, cartas, dentadura, cogumelos, vagalumes, combate,
-//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final, toque
-//      (toque = controles de toque com dedos simulados; pode rodar sozinho depois de qualquer passo)
+//        cuspe, fogo, baile, pelos, sotao, capa, casamento, final, toque, toqueHud
+//      (toque = controles de toque com dedos simulados; toqueHud = interface de toque, com o layout conferido
+//       só em tela de celular deitado; os dois podem rodar sozinhos depois de qualquer passo)
 //      Cada chamada devolve 'ok' ou 'ERRO ...' (uma chamada por passo cabe no timeout do Runtime.evaluate);
 //      As missões rodam em modo pacífico (as criaturas não atacam); o passo "combate" liga a briga de volta.
 //   4. conferir __T.log (o passo final registra nível, XP, dinheiro, itens e o status de cada missão)
@@ -379,7 +380,7 @@ window.__T = (() => {
       if (!jumped || rose < 4 || !downShown || p.flying) fail('pular ou voar pelo toque falhou');
 
       // 8. opção "Nunca": os dedos voltam a ser do navegador; "Automático" segue o último ponteiro (dedo ou mouse)
-      g.applySetting('controls', 'off');
+      g.applySetting('controls', 'off', { confirmed: true });
       const free = down(40, SX, SY); move(40, SX, SY - 60); wait(200);
       const offOk = free && g.input.move.m === 0 && !g.touchMode && !T.root.classList.contains('show');
       up(40, SX, SY - 60);
@@ -401,6 +402,236 @@ window.__T = (() => {
       g.applySetting('controls', prevMode);
       g.input.lastPointer = 'mouse';
       wait(60);
+    },
+    toqueHud() {
+      const QIDS = ['aboboras', 'gato', 'ossos', 'brasas', 'chocar', 'corvos', 'carta', 'resposta', 'dentadura', 'cogumelos', 'vagalumes', 'cuspe', 'baile', 'pelo', 'sotao', 'capa', 'casamento'];
+      // versão mobile, fase 2: interface de toque (grupo do polegar, menu do topo, janelas encaixadas)
+      const prevMode = g.settings.controls;
+      g.applySetting('controls', 'on'); wait(100);
+      const T = g.touch, B = g.touchBar, ui = g.ui, p = g.player;
+      const ok = [], fail = (m) => { throw new Error(m + ' | ' + ok.join('; ')); };
+      if (!B) fail('grupo de botões do toque não foi criado');
+      const phone = innerWidth <= 960 && innerHeight <= 480;
+      const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+      const R = (el) => el.getBoundingClientRect();
+      const inside = (r) => r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
+      const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+      const press = (el, up = true) => {
+        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' }));
+        if (up) el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
+      };
+      tp(1.5, 19.5); g.cam.yaw = p.yaw = Math.PI - 0.25; wait(400);
+
+      // 1. layout (só faz sentido com tela de celular deitado)
+      if (phone) {
+        const btns = [...T.root.querySelectorAll('.tbar > .tb, .tbtn')].filter(shown);
+        const frames = ['.unit.player', '#minimap', '#micro', '#tracker'].map((q) => ui.root.querySelector(q)).filter(shown);
+        const out = [...btns, ...frames].filter((el) => !inside(R(el))).map((el) => el.className || el.id);
+        const clash = [];
+        btns.forEach((a, i) => btns.slice(i + 1).forEach((b) => {
+          const ra = R(a), rb = R(b);
+          const d = Math.hypot((ra.left + ra.right) / 2 - (rb.left + rb.right) / 2, (ra.top + ra.bottom) / 2 - (rb.top + rb.bottom) / 2);
+          if (d < (ra.width + rb.width) / 2 - 2) clash.push(`${a.className}×${b.className}`);
+        }));
+        for (const a of btns) for (const f of frames) if (hit(R(a), R(f))) clash.push(`${a.className}×${f.id || f.className}`);
+        const small = [...btns, ...ui.root.querySelectorAll('#micro button'), ...[ui.root.querySelector('#tracker .tog')].filter(shown)].filter((el) => Math.min(R(el).width, R(el).height) < 43.5).map((el) => el.className || el.tagName);
+        const deskBar = shown(ui.root.querySelector('#bottom .bar-frame'));
+        const trackerLeft = !!ui.root.querySelector('.anchor.tl #tracker');
+        ok.push(`layout ${innerWidth}×${innerHeight}: fora da tela [${out}], sobreposições [${clash}], alvos < 44 px [${small}], barra do desktop escondida ${!deskBar}, rastreador à esquerda ${trackerLeft}`);
+        if (out.length || clash.length || small.length || deskBar || !trackerLeft) fail('layout de toque com problema');
+      } else ok.push(`layout não conferido (tela ${innerWidth}×${innerHeight} não é de celular)`);
+
+      // 2. Lanternada: sem nada por perto avisa; com criatura a até 20 m, mira nela e liga o ataque automático
+      const atk = T.root.querySelector('.tb.atk');
+      g.interaction.setTarget(null); C.autoAttack = false;
+      press(atk); wait(60);
+      const warned = g.interaction.target === null && ui.errors.textContent.includes('Nenhuma criatura');
+      const m = C.mobs.filter((mb) => mb.alive && mb.targetable && mb.inter.enabled()).sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
+      let aimed = 'sem criatura no mapa';
+      if (m) {
+        const dir = Math.atan2(p.pos.x - m.pos.x, p.pos.z - m.pos.z);
+        tp(m.pos.x + Math.sin(dir) * 10, m.pos.z + Math.cos(dir) * 10); p.yaw = dir; wait(60); // de costas para ela
+        g.interaction.setTarget(null); C.autoAttack = false;
+        press(atk); wait(60);
+        aimed = g.interaction.target === m.inter && C.autoAttack;
+        C.autoAttack = false; g.interaction.setTarget(null); m.evade?.(); wait(60);
+      }
+      ok.push(`Lanternada: avisa sem criatura ${warned}, mira a 10 m (de costas) ${aimed}`);
+      if (!warned || aimed !== true) fail('mira automática da Lanternada falhou');
+
+      // 3. arco de habilidades acompanha o que o jogador tem (vassoura entra na frente)
+      tp(1.5, 19.5); wait(300);
+      const arc0 = B.arcIds.join();
+      const hadBroom = P.hasItem('vassoura');
+      if (!hadBroom) P.addItem('vassoura', 1, true);
+      wait(300);
+      const arc1 = B.arcIds.join();
+      if (!hadBroom) P.removeItem('vassoura');
+      wait(300);
+      ok.push(`arco: ${arc0} → com vassoura ${arc1} → ${B.arcIds.join()}`);
+      if (B.arcIds.length !== 3 || (!hadBroom && !arc1.split(',').includes('mount'))) fail('arco de habilidades não acompanhou os itens');
+
+      // 4. botão contextual: perto do prefeito vira "Falar" e abre a conversa
+      const n = QW.npcs.prefeito;
+      tp(n.pos.x + Math.sin(n.homeYaw) * 2.5, n.pos.z + Math.cos(n.homeYaw) * 2.5); g.interaction.setTarget(null); wait(400);
+      const ctx = T.root.querySelector('.tb.ctx');
+      const ctxShown = shown(ctx) && ctx.textContent.includes('Falar');
+      press(ctx); wait(300);
+      const talked = ui.dialog.open;
+      // janelas cabem na tela, com botões de 44 px
+      const winCheck = [];
+      const fits = (el, name) => {
+        if (!phone || !shown(el)) return;
+        const r = R(el);
+        // botões, caixinhas e listas: os dois lados ≥ 44; itens de lista e controles deslizantes: a altura
+        const both = [...el.querySelectorAll('button, input[type=checkbox], select')].filter(shown);
+        const tall = [...el.querySelectorAll('li, .qi, input[type=range]')].filter(shown);
+        const tiny = [...both.filter((b) => Math.min(R(b).width, R(b).height) < 43.5), ...tall.filter((b) => R(b).height < 43.5)];
+        if (!inside(r) || tiny.length) winCheck.push(`${name}${inside(r) ? '' : ' fora'}${tiny.length ? ` alvos < 44 px: ${tiny.map((b) => b.className || b.tagName).join('/')}` : ''}`);
+      };
+      fits(ui.root.querySelector('#quest'), 'diálogo');
+      ui.dialog.close(); wait(60);
+      ui.qlog.toggle(true); wait(30); fits(ui.root.querySelector('#qlog'), 'diário'); ui.qlog.toggle(false);
+      ui.bags.toggle(); wait(30); fits(ui.root.querySelector('#bags'), 'mochila'); ui.bags.toggle();
+      ui.menu.toggle(); wait(30); fits(ui.root.querySelector('#menu'), 'menu'); ui.menu.toggle();
+      ui.menu.showOptions(); wait(30); fits(ui.root.querySelector('#options'), 'opções'); ui.hideWin(ui.root.querySelector('#options'));
+      ui.toggleMap(true); wait(30); fits(ui.root.querySelector('#worldmap'), 'mapa'); ui.toggleMap(false);
+      wait(60);
+      ok.push(`contextual "Falar" ${ctxShown}, conversa ${talked}; janelas com problema [${winCheck}]`);
+      if (!ctxShown || !talked || winCheck.length) fail('botão contextual ou janelas falharam');
+
+      // 5. grimório: abre por cima do HUD, Sentar senta e fecha; toque longo mostra a dica sem usar a habilidade
+      tp(1.5, 19.5); wait(200);
+      press(T.root.querySelector('.tb.more')); wait(60);
+      const bookOpen = shown(B.book) && T.root.classList.contains('booking');
+      const sit = [...B.book.querySelectorAll('.tb.bk')].find((b) => b.textContent.includes('Sentar'));
+      press(sit); wait(100);
+      const sat = p.sitting && !shown(B.book) && !T.root.classList.contains('booking');
+      p.sitting = false; wait(60);
+      const v0 = B.arc[0], s0 = v0.slot, cd0 = s0.cdLeft;
+      press(v0.el, false); wait(700);
+      const tr = R(ui.tooltip), tipFont = parseFloat(getComputedStyle(ui.tooltip).fontSize);
+      const tip = !ui.tooltip.classList.contains('hidden') && ui.tooltip.textContent.includes(s0.name)
+        && inside(tr) && Math.abs((tr.left + tr.right) / 2 - innerWidth / 2) < 4 && tipFont >= 16 && !getComputedStyle(ui.tooltip).transform.includes('matrix(0');
+      v0.el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' })); wait(60);
+      const notUsed = s0.cdLeft === cd0 && ui.tooltip.classList.contains('hidden');
+      ok.push(`grimório abre ${bookOpen}, Sentar ${sat}; toque longo em "${s0.name}" mostra a dica ${tip} sem usar ${notUsed}`);
+      if (!bookOpen || !sat || !tip || !notUsed) fail('grimório ou toque longo falhou');
+
+      // 5b. com o polegar no joystick, o toque num botão do menu ainda abre a janela (vira click)
+      const cv = g.renderer.domElement, micro = [...ui.root.querySelectorAll('#micro button')];
+      const bagBtn = micro[micro.length - 1];
+      const tch = (id, target, x, y) => new Touch({ identifier: id, target, clientX: x, clientY: y });
+      const stickT = tch(90, cv, innerWidth * 0.2, innerHeight * 0.65), br = R(bagBtn), bagT = tch(91, bagBtn, (br.left + br.right) / 2, (br.top + br.bottom) / 2);
+      cv.dispatchEvent(new TouchEvent('touchstart', { touches: [stickT], targetTouches: [stickT], changedTouches: [stickT], bubbles: true, cancelable: true }));
+      bagBtn.dispatchEvent(new TouchEvent('touchstart', { touches: [stickT, bagT], targetTouches: [bagT], changedTouches: [bagT], bubbles: true, cancelable: true }));
+      bagBtn.dispatchEvent(new TouchEvent('touchend', { touches: [stickT], targetTouches: [], changedTouches: [bagT], bubbles: true, cancelable: true }));
+      wait(60);
+      const multiClick = ui.bags.open;
+      cv.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [stickT], bubbles: true, cancelable: true }));
+      // item da mochila: toque longo mostra a dica sem usar; toque usa
+      // conta a partir do que o jogador já tem (no fim do e2e ele já carrega biscoitos) e devolve a mochila como estava
+      const count = () => P.bag.find((b) => b.id === 'biscoito')?.count ?? 0;
+      const c0 = count();
+      P.addItem('biscoito', 2, true); ui.bags.render(); wait(30);
+      let it = ui.root.querySelector('#bags [data-item=biscoito]');
+      const pd = (el, id) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: id }));
+      const pu = (el, id) => el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: id }));
+      pd(it, 21); wait(700);
+      const itemTip = !ui.tooltip.classList.contains('hidden') && ui.tooltip.textContent.includes('Biscoito');
+      pu(it, 21); wait(30);
+      const keptOnHold = count() === c0 + 2 && ui.tooltip.classList.contains('hidden');
+      it = ui.root.querySelector('#bags [data-item=biscoito]');
+      pd(it, 22); pu(it, 22); wait(30);
+      const usedOnTap = count() === c0 + 1;
+      while (count() > c0) P.removeItem('biscoito');
+      ui.bags.toggle(false); ui.hideTooltip(); wait(30);
+      ok.push(`polegar no joystick + toque no menu abre a mochila ${multiClick}; item: toque longo mostra ${itemTip} sem usar ${keptOnHold}, toque usa ${usedOnTap}`);
+      if (!multiClick || !itemTip || !keptOnHold || !usedOnTap) fail('toque com outro dedo na tela ou item da mochila falhou');
+
+      // 5c. tocar no vazio solta o alvo...
+      const tapAt = (id, x, y) => {
+        const q = tch(id, cv, x, y);
+        cv.dispatchEvent(new TouchEvent('touchstart', { touches: [q], targetTouches: [q], changedTouches: [q], bubbles: true, cancelable: true }));
+        cv.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [q], bubbles: true, cancelable: true }));
+        wait(60);
+      };
+      g.interaction.setTarget(QW.npcs.prefeito.inter); wait(30);
+      tapAt(92, innerWidth * 0.5, innerHeight * 0.8);
+      const cleared = g.interaction.target === null;
+      // ...mas não no meio da briga: o polegar reencostando no joystick (ou errando a criatura) não desliga a Lanternada
+      let fightKept = 'sem criatura no mapa';
+      const foe = C.mobs.filter((mb) => mb.alive && mb.targetable && mb.inter.enabled()).sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
+      if (foe) {
+        // perto dela (alvo a mais de 60 m o jogo solta sozinho)
+        const fd = Math.atan2(p.pos.x - foe.pos.x, p.pos.z - foe.pos.z);
+        tp(foe.pos.x + Math.sin(fd) * 6, foe.pos.z + Math.cos(fd) * 6); p.yaw = g.cam.yaw = fd + Math.PI; wait(60);
+        g.interaction.setTarget(foe.inter); C.autoAttack = true;
+        tapAt(94, innerWidth * 0.15, innerHeight * 0.75); // zona do joystick
+        tapAt(95, innerWidth * 0.55, innerHeight * 0.8); // vazio fora do joystick, com a briga ligada
+        fightKept = g.interaction.target === foe.inter && C.autoAttack;
+        C.autoAttack = false; g.interaction.setTarget(null); foe.evade?.(); wait(60);
+      }
+      // 5c'. com o polegar no joystick, tocar no ícone (SVG) da opção de conversa responde e não dá erro
+      const nP = QW.npcs.prefeito, err0 = window.__errors.length;
+      tp(nP.pos.x + Math.sin(nP.homeYaw) * 2.5, nP.pos.z + Math.cos(nP.homeYaw) * 2.5); wait(100);
+      g.interaction.tryInteract(nP.inter); wait(200);
+      const svg = ui.root.querySelector('#quest .opts li svg');
+      let svgTap = 'sem opção com ícone';
+      if (svg) {
+        const before = ui.root.querySelector('#quest .scroll').innerHTML;
+        const sr = svg.getBoundingClientRect(), stk = tch(96, cv, innerWidth * 0.2, innerHeight * 0.65), sv = tch(97, svg, (sr.left + sr.right) / 2, (sr.top + sr.bottom) / 2);
+        cv.dispatchEvent(new TouchEvent('touchstart', { touches: [stk], targetTouches: [stk], changedTouches: [stk], bubbles: true, cancelable: true }));
+        svg.dispatchEvent(new TouchEvent('touchstart', { touches: [stk, sv], targetTouches: [sv], changedTouches: [sv], bubbles: true, cancelable: true }));
+        svg.dispatchEvent(new TouchEvent('touchend', { touches: [stk], targetTouches: [], changedTouches: [sv], bubbles: true, cancelable: true }));
+        wait(60);
+        cv.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [stk], bubbles: true, cancelable: true }));
+        svgTap = ui.root.querySelector('#quest .scroll').innerHTML !== before && window.__errors.length === err0;
+      }
+      ui.dialog.close(); wait(60);
+      ok.push(`briga continua com toque no joystick e no vazio ${fightKept}; ícone SVG da conversa com polegar no joystick ${svgTap}`);
+      if (fightKept === false || svgTap === false) fail('toque no meio da briga ou no ícone SVG falhou');
+      // 5d. à noite a lanterna entra no arco
+      const h0 = g.dayNight.time;
+      g.debug.setTime(22); wait(300);
+      const nightArc = B.arcIds[0] === 'lantern';
+      g.debug.setTime(h0); wait(300);
+      // 5e. dois botões apertados ao mesmo tempo (dois dedos): os dois disparam
+      const bk = (name) => [...B.book.querySelectorAll('.tb.bk')].find((b) => b.textContent.includes(name));
+      const sBoo = B.byId.boo, sDance = B.byId.dance;
+      sBoo.cdLeft = 0; sDance.cdLeft = 0; p.courage = 100;
+      pd(bk('Buu'), 31); pd(bk('Dança'), 32); pu(bk('Buu'), 31); pu(bk('Dança'), 32); wait(30);
+      const both = sBoo.cdLeft > 0 && sDance.cdLeft > 0;
+      for (const b of B.book.querySelectorAll('.tb.on')) b.classList.remove('on');
+      p.action = null; wait(30);
+      // 5f. rastreador expandido recolhe quando o joystick anda (ele cobre a área do polegar)
+      let collapsed = 'sem missão ativa';
+      // sem missão ativa o rastreador some: aceita uma disponível só para o teste (e abandona depois)
+      const tmpQ = P.activeQuests().length ? null : QIDS.find((id) => P.isAvailable(id));
+      if (tmpQ) P.accept(tmpQ);
+      if (P.activeQuests().length) {
+        ui.setTrackerCollapsed(false); wait(30);
+        const a = tch(93, cv, innerWidth * 0.2, innerHeight * 0.7), b2 = tch(93, cv, innerWidth * 0.2, innerHeight * 0.7 - 50);
+        cv.dispatchEvent(new TouchEvent('touchstart', { touches: [a], targetTouches: [a], changedTouches: [a], bubbles: true, cancelable: true }));
+        cv.dispatchEvent(new TouchEvent('touchmove', { touches: [b2], targetTouches: [b2], changedTouches: [b2], bubbles: true, cancelable: true }));
+        wait(100);
+        collapsed = ui.trackerCollapsed;
+        cv.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [b2], bubbles: true, cancelable: true }));
+        wait(60);
+      }
+      if (tmpQ) P.abandon(tmpQ);
+      ok.push(`toque no vazio solta o alvo ${cleared}; lanterna no arco à noite ${nightArc}; dois botões juntos ${both}; rastreador recolhe ao andar ${collapsed}`);
+      if (!cleared || !nightArc || !both || collapsed === false) fail('alvo, arco noturno, dois botões ou rastreador falharam');
+
+      // 6. aviso de "vire o celular" existe (o touch.css só mostra em retrato)
+      const rot = document.getElementById('rotate');
+      // 7. volta ao modo do desktop: barra de ações e rastreador no lugar
+      g.applySetting('controls', 'auto'); g.input.lastPointer = 'mouse'; wait(100);
+      const back = !g.touchMode && shown(ui.root.querySelector('#bottom .bar-frame')) && !!ui.root.querySelector('.anchor.tr #tracker');
+      g.applySetting('controls', prevMode); g.input.lastPointer = 'mouse'; wait(60);
+      ok.push(`aviso de retrato ${!!rot}; de volta ao desktop ${back}`);
+      if (!rot || !back) fail('volta ao modo desktop falhou');
+      L.push('toqueHud: ' + ok.join('; '));
     },
   };
   return { run(name) { try { steps[name](); return 'ok'; } catch (err) { return 'ERRO ' + String(err); } }, log: L };

@@ -7,6 +7,7 @@ import '@fontsource/patrick-hand/latin-400.css';
 import '@fontsource/griffy/latin-400.css';
 import './ui/styles.css';
 import './ui/hud.css';
+import './ui/touch.css';
 import { Game } from './game.js';
 
 // guarda erros para diagnóstico (window.__errors)

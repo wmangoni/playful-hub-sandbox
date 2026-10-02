@@ -7,6 +7,7 @@ import { PostFX, LAYER_FX } from './render/postfx.js';
 import { SHARED } from './render/toon.js';
 import { Input } from './core/input.js';
 import { TouchControls, prefersTouch } from './core/touch.js';
+import { TouchBar } from './ui/touchBar.js';
 import { Player } from './entities/player.js';
 import { WowCamera } from './entities/camera.js';
 import { Ambience } from './fx/ambience.js';
@@ -340,8 +341,17 @@ export class Game {
     return false;
   }
 
-  applySetting(k, v) {
+  applySetting(k, v, { confirmed = false } = {}) {
     const s = this.settings;
+    if (k === 'controls' && v === 'off' && this.touchMode && !confirmed) {
+      const sel = document.querySelector('#options [data-k=controls]');
+      if (sel) sel.value = s.controls; // só muda se o jogador confirmar
+      this.ui.confirm('Sem os controles de toque, só dá para jogar com teclado e mouse. Desligar mesmo?', () => {
+        this.applySetting('controls', 'off', { confirmed: true });
+        if (sel) sel.value = 'off';
+      }, { yes: 'Desligar', no: 'Cancelar' });
+      return;
+    }
     if (k === 'hour') return this.dayNight.setTime(v);
     if (k === 'quality') {
       lsSet('tbl-quality', v);
@@ -371,9 +381,10 @@ export class Game {
     this.update(dt);
     // antes de desenhar: se a resolução adaptativa mudar, o redimensionamento limpa o canvas, e depois do
     // render o quadro apresentado saía todo preto (uma piscada a cada troca de escala)
-    this._trackPerf(raw);
+    // em pé não desenha: os quadros ficariam baratos e a resolução adaptativa subiria à toa
+    if (!this.portraitPaused) this._trackPerf(raw);
     this.renderer.info.reset();
-    this.post.render(dt, this.time);
+    if (!this.portraitPaused) this.post.render(dt, this.time);
     this.input.endFrame();
   }
 
@@ -426,6 +437,10 @@ export class Game {
       this._tm = tm;
       document.body.classList.toggle('touch', tm);
       if (!tm) this.touch?.reset();
+      if (this.ui) {
+        if (tm && !this.touchBar) this.touchBar = new TouchBar(this, this.ui, this.touch.root);
+        this.ui.setTouchLayout(tm);
+      }
     }
     if (show !== this._tmShow) {
       this._tmShow = show;
@@ -436,6 +451,9 @@ export class Game {
   update(dt) {
     this.touch?.update(dt);
     this._syncTouchMode();
+    // celular em pé (aviso "Vire o celular" na tela): o mundo espera e o tick nem desenha (bateria)
+    this.portraitPaused = !!this._tm && this.state === 'play' && window.innerHeight > window.innerWidth;
+    if (this.portraitPaused) return;
     const blocking = this.ui.blocking();
     if (this.state === 'play') {
       if (!blocking) this.cam.handleInput(this.input);

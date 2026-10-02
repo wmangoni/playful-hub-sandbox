@@ -587,7 +587,9 @@ export class WorldMap {
     return { x: ((e.clientX - r.left) / r.width) * WORLD_SIZE - HALF, z: ((e.clientY - r.top) / r.height) * WORLD_SIZE - HALF };
   }
   resize() {
-    const s = Math.floor(Math.min(window.innerWidth * 0.8, window.innerHeight * 0.78));
+    // no toque (celular deitado) o mapa usa a altura toda menos o título (a legenda vai para o lado)
+    const touch = this.game.touchMode;
+    const s = Math.floor(touch ? Math.min(window.innerWidth - 230, window.innerHeight - 64) : Math.min(window.innerWidth * 0.8, window.innerHeight * 0.78));
     this.px = s;
     this.canvas.width = this.canvas.height = s * 2;
     this.canvas.style.width = this.canvas.style.height = s + 'px';
@@ -608,32 +610,37 @@ export class WorldMap {
     vg.addColorStop(1, 'rgba(60,30,10,0.55)');
     c.fillStyle = vg;
     c.fillRect(0, 0, S, S);
-    // nomes das zonas
+    // nomes das zonas: crescem com o mapa (em tamanho fixo, num mapa de celular eles se encavalavam);
+    // o nível das criaturas encolhe menos para continuar legível
     c.textAlign = 'center';
     c.textBaseline = 'middle';
+    const fk = clamp(this.px / 560, 0.72, 1), fkl = Math.max(fk, 0.86);
     for (const z of SUBZONES) {
       if (z.id === 'vila') continue;
       const hov = this.hoverZone?.id === z.id;
-      c.font = `700 ${hov ? 34 : 30}px "Mountains of Christmas", serif`;
-      c.lineWidth = 6;
+      c.font = `700 ${Math.round((hov ? 34 : 30) * fk)}px "Mountains of Christmas", serif`;
+      c.lineWidth = 6 * fk;
       c.strokeStyle = 'rgba(20,10,4,0.85)';
-      const y = W(z.z) - (z.id === 'praca' ? 70 : 0);
-      c.strokeText(z.name, W(z.x), y);
+      const y = W(z.z) - (z.id === 'praca' ? 70 * fk : 0);
+      // o nome inteiro fica dentro do mapa (perto da borda ele era cortado)
+      const half = c.measureText(z.name).width / 2 + 6;
+      const nx = clamp(W(z.x), half, S - half);
+      c.strokeText(z.name, nx, y);
       c.fillStyle = hov ? '#ffb86a' : '#f3ead6';
-      c.fillText(z.name, W(z.x), y);
+      c.fillText(z.name, nx, y);
       // faixa de nível das criaturas da região
       const lv = ZONE_LEVELS[z.id];
       if (lv) {
         const t = lv[0] === lv[1] ? `Nível ${lv[0]}` : `Níveis ${lv[0]}–${lv[1]}`;
-        c.font = '400 21px "Patrick Hand", sans-serif';
-        c.lineWidth = 5;
-        c.strokeText(t, W(z.x), y + 27);
+        c.font = `400 ${Math.round(21 * fkl)}px "Patrick Hand", sans-serif`;
+        c.lineWidth = 5 * fkl;
+        c.strokeText(t, nx, y + 27 * fk);
         c.fillStyle = g.ui.levelColor(Math.round((lv[0] + lv[1]) / 2));
-        c.fillText(t, W(z.x), y + 27);
+        c.fillText(t, nx, y + 27 * fk);
       }
     }
-    c.font = '700 52px "Mountains of Christmas", serif';
-    c.lineWidth = 8;
+    c.font = `700 ${Math.round(52 * fk)}px "Mountains of Christmas", serif`;
+    c.lineWidth = 8 * fk;
     c.strokeStyle = 'rgba(20,10,4,0.9)';
     c.strokeText('Vale Tumbalacatumba', S / 2, 60);
     c.fillStyle = '#ffb86a';
