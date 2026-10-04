@@ -1,3 +1,3 @@
 # 📋 Backlog de Melhorias - Strategy Game
 
-- [ ] 001 - melhoria visual
+- [x] 001 - melhoria visual
