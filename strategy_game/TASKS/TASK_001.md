@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: Strategy Game (Realm Builder)
 
-**Status**: [ ] Pendente
+**Status**: [x] Concluído
 
 ---
 
@@ -23,12 +23,13 @@ Embora o design seja reativo e as mecânicas de jogo estejam bem implementadas, 
 
 ## 🛠️ Requisitos Técnicos Sugeridos
 
-- [ ] Importar fontes premium do Google Fonts (`MedievalSharp`, `Cinzel` e `Inter`).
-- [ ] Aplicar gradiente profundo em tons de pedra e madeira rústica medieval no plano de fundo e nas bordas do jogo.
-- [ ] Redesenhar as células do mapa (`.tile`) com gradientes suaves HSL simulando relevo, sombras de divisa e água em movimento animado.
-- [ ] Implementar animações elásticas de entrada (`@keyframes popIn`) ao construir edifícios na grade.
-- [ ] Adicionar filtros de sombra (`drop-shadow`) em todos os emojis de construções para criar um efeito 3D real de peças de tabuleiro físico.
-- [ ] Estilizar o painel lateral (`.info-panel`) e recursos com Glassmorphism e ornamentação dourada.
-- [ ] Reestilizar o painel de histórico de eventos (`.event-log`) com estilo de pergaminho rústico envelhecido e tipografia cursiva/medieval.
-- [ ] Criar efeitos de hover luminosos, escala física de 1.05x e transições fluidas nos botões de construção.
-- [ ] Melhorar o alinhamento centralizado de todo o layout do jogo e sua responsividade para telas de proporções diversas.
+- [x] Importar fontes premium do Google Fonts (`MedievalSharp`, `Cinzel` e `Outfit`).
+- [x] Aplicar gradiente profundo em tons de pedra e madeira rústica medieval no plano de fundo e nas bordas do jogo.
+- [x] Redesenhar as células do mapa (`.tile`) com gradientes suaves simulando relevo 3D, sombras de divisa e água em movimento animado.
+- [x] Implementar animações elásticas de entrada (`@keyframes buildPopIn`) ao construir edifícios na grade.
+- [x] Adicionar filtros de sombra (`drop-shadow`) em todos os emojis de construções para criar um efeito 3D real de peças de tabuleiro físico.
+- [x] Estilizar o painel lateral (`.info-panel`) e recursos com Glassmorphism e ornamentação dourada.
+- [x] Reestilizar o painel de histórico de eventos (`.event-log`) com estilo de pergaminho rústico envelhecido e tipografia de crônicas medievais.
+- [x] Criar efeitos de hover luminosos, escala física e transições fluidas nos botões de construção.
+- [x] Melhorar o alinhamento centralizado de todo o layout do jogo e sua responsividade para telas de proporções diversas.
+- [x] Adicionar textos flutuantes (floating text), cálculo de taxa de recursos (+X/5s) e banner imperial de eventos.
