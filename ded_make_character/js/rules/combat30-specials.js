@@ -848,7 +848,7 @@ const FORA = ['paralisado', 'imobilizado', 'inconsciente', 'petrificado', 'apavo
 const SEM_ACAO = ['atordoado', 'pasmo', 'nauseado'];
 
 /** Duração média, em rodadas, de um texto de duração (para a IA; sem rolar dados). */
-function duracaoMedia(K, texto) {
+export function duracaoMedia(K, texto) {
   const t = loose(texto || '');
   if (!t || t.startsWith('permanente') || t.startsWith('enquanto')) return 10;
   const m = /(\d+d\d+(?:[+-]\d+)?|\d+)\s*(rodada|minuto|hora)/.exec(t);

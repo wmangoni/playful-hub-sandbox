@@ -761,6 +761,43 @@ async function run() {
     assert.strictEqual(await text('.arena-side--a .arena-qty__n'), '2');
   });
 
+  await step('arena: IA treinada (TASK_009): seletor na montagem e na URL, "por que" no registro, mesma luta com a mesma semente, o lote diz a IA', async () => {
+    // o Mestre Arsenal com a treinada: ela troca a Favor Divino da clássica por uma investida
+    await go('#/arena?a=ha-nekapeth&b=ha-mestre-arsenal&semente=123');
+    await sleep(400);
+    assert.deepStrictEqual(await page.$$eval('select[data-opt^="ia"]', els => els.map(e => e.value)), ['classica', 'classica']);
+    await page.select('select[data-opt="iaB"]', 'rede');
+    await sleep(200);
+    assert.match(page.url(), /ia=B%3Arede/);
+    await domClick('[data-action="comecar"]');
+    await page.waitForSelector('[data-action="fim"]', { timeout: 10000 });
+    await domClick('[data-action="fim"]');
+    await sleep(300);
+    assert.match(await text('.arena-bar__info'), /IA A: clássica · B: treinada/);
+    // o "por que" só aparece quando a rede troca a escolha clássica
+    const porQue = await page.$$eval('.arena-log__item.is-ia', els => els.map(e => e.textContent.trim()));
+    assert.ok(porQue.length >= 1, 'a troca da rede aparece no registro');
+    for (const t of porQue) assert.match(t, /^IA treinada de Mestre-Arsenal: .+, com \d+% de vitória estimada\. A clássica (faria .+, \d+%|não teria o que fazer)\.$/);
+    const final = await logDaArena();
+    await domClick('[data-action="recomecar"]');
+    await sleep(80);
+    await domClick('[data-action="fim"]');
+    await sleep(300);
+    assert.strictEqual(await logDaArena(), final, 'com a treinada, a mesma semente repete a luta');
+    await domClick('[data-action="montagem"]');
+    await sleep(200);
+    assert.deepStrictEqual(await page.$$eval('select[data-opt^="ia"]', els => els.map(e => e.value)), ['classica', 'rede'], 'a escolha volta com a montagem');
+    await domClick('[data-action="lote"][data-vezes="100"]');
+    await page.waitForSelector('#arena-lote-res', { timeout: 60000 });
+    assert.match(await page.$$eval('.arena-lote__sub', els => els.map(e => e.textContent).join(' ')), /IA A: clássica · B: treinada/);
+    // um lado só de quem luta com armas: a treinada não age ali, e a barra diz isso
+    await go('#/arena?a=ogro&b=troll&ia=A%3Arede&semente=1');
+    await sleep(400);
+    await domClick('[data-action="comecar"]');
+    await page.waitForSelector('[data-action="fim"]', { timeout: 10000 });
+    assert.match(await text('.arena-bar__info'), /IA A: treinada \(sem efeito\) · B: clássica/);
+  });
+
   await step('arena: seus personagens (aba, equipamento salvo em fichas e usado na luta, atalhos da lista e da ficha)', async () => {
     await go('#/personagens');
     assert.strictEqual(await page.$eval('tr[data-id="1"] a[href="#/arena?a=p:1"]', el => el.getAttribute('aria-label')), 'Arena de Jonh');

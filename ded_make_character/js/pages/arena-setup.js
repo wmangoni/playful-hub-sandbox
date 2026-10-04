@@ -31,6 +31,21 @@ export const sementeValida = valor => String(valor ?? '').trim().slice(0, LIMITE
 /** Semente nova, de 6 dígitos (fácil de ler e de copiar). */
 export const novaSemente = (random = Math.random) => String(100000 + Math.floor(random() * 900000));
 
+/**
+ * IA de cada lado (TASK_009): 'classica' (a de sempre) ou 'rede' (a treinada). Na URL, só os lados com
+ * a treinada: `ia=A:rede`, `ia=A:rede,B:rede`; o que não se entende vale a clássica.
+ */
+export function lerIa(valor) {
+  const ia = { A: 'classica', B: 'classica' };
+  for (const parte of String(valor ?? '').split(',')) {
+    const [lado, qual] = parte.trim().split(':');
+    if ((lado === 'A' || lado === 'B') && qual === 'rede') ia[lado] = 'rede';
+  }
+  return ia;
+}
+
+export const escreverIa = ia => ['A', 'B'].filter(l => ia?.[l] === 'rede').map(l => `${l}:rede`).join(',') || null;
+
 /** Personagem do jogador ("p:<id>") entra uma vez por lado; os do catálogo, quantos couberem. */
 export const ehPersonagem = ref => String(ref).startsWith('p:');
 export const maximoDe = ref => (ehPersonagem(ref) ? 1 : LIMITES.porLado);
@@ -93,13 +108,14 @@ export function lerMontagem(query, existe) {
     distancia: distanciaValida(get('dist')),
     limite: rodadasValidas(get('limite') || LIMITES.rodadas.padrao),
     semente: semente || null,
+    ia: lerIa(get('ia')),
     ignorados: refs.filter(r => !existe(r)).length,
     ignoradosRefs: refs.filter(r => !existe(r)),
   };
 }
 
 /** Query da montagem (só o que difere do padrão, para a URL ficar curta). */
-export function escreverMontagem({ A, B, distancia, limite, semente }) {
+export function escreverMontagem({ A, B, distancia, limite, semente, ia }) {
   const lado = l => l.map(x => (x.qtd > 1 ? `${x.ref}*${x.qtd}` : x.ref)).join(',');
   return {
     a: lado(A) || null,
@@ -107,5 +123,6 @@ export function escreverMontagem({ A, B, distancia, limite, semente }) {
     dist: distancia === LIMITES.distancia.padrao ? null : String(distancia),
     limite: limite === LIMITES.rodadas.padrao ? null : String(limite),
     semente: semente || null,
+    ia: escreverIa(ia),
   };
 }

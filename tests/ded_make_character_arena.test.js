@@ -104,11 +104,23 @@ async function run() {
   test('escreve a query só com o que difere do padrão, e ler de volta dá a mesma montagem', () => {
     const montagem = { A: [{ ref: 'ogro', qtd: 2 }], B: [{ ref: 'troll', qtd: 1 }, { ref: 'tarrasque', qtd: 1 }], distancia: 9, limite: 50, semente: '123456' };
     const q = S.escreverMontagem(montagem);
-    assert.deepStrictEqual(q, { a: 'ogro*2', b: 'troll,tarrasque', dist: null, limite: null, semente: '123456' });
+    assert.deepStrictEqual(q, { a: 'ogro*2', b: 'troll,tarrasque', dist: null, limite: null, semente: '123456', ia: null });
     const params = new URLSearchParams(Object.entries(q).filter(([, v]) => v != null));
     const volta = S.lerMontagem(params, existe);
     assert.deepStrictEqual({ A: volta.A, B: volta.B, distancia: volta.distancia, limite: volta.limite, semente: volta.semente }, montagem);
     assert.deepStrictEqual(S.escreverMontagem({ ...montagem, distancia: 30, limite: 20 }).dist, '30');
+  });
+
+  test('IA de cada lado (TASK_009): na URL só os lados com a treinada; o resto vale a clássica', () => {
+    assert.deepStrictEqual(S.lerMontagem(new URLSearchParams(''), existe).ia, { A: 'classica', B: 'classica' });
+    assert.deepStrictEqual(S.lerIa('A:rede'), { A: 'rede', B: 'classica' });
+    assert.deepStrictEqual(S.lerIa('A:rede,B:rede'), { A: 'rede', B: 'rede' });
+    assert.deepStrictEqual(S.lerIa('C:rede,B:outra,lixo'), { A: 'classica', B: 'classica' }, 'o que não se entende vale a clássica');
+    assert.strictEqual(S.escreverIa({ A: 'classica', B: 'classica' }), null);
+    assert.strictEqual(S.escreverIa({ A: 'classica', B: 'rede' }), 'B:rede');
+    const ida = S.escreverMontagem({ A: [{ ref: 'ogro', qtd: 1 }], B: [{ ref: 'troll', qtd: 1 }], distancia: 9, limite: 50, semente: '1', ia: { A: 'rede', B: 'rede' } });
+    assert.strictEqual(ida.ia, 'A:rede,B:rede');
+    assert.deepStrictEqual(S.lerMontagem(new URLSearchParams(Object.entries(ida).filter(([, v]) => v != null)), existe).ia, { A: 'rede', B: 'rede' });
   });
 
   test('personagem do jogador ("p:<id>") entra uma vez por lado; na URL, o excesso é contado', () => {
