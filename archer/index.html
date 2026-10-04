@@ -349,6 +349,21 @@
             z-index: 7;
         }
 
+        /* Trajectory Preview Dots */
+        .trajectory-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #ffd700;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.9), 0 0 14px rgba(255, 235, 59, 0.6);
+            pointer-events: none;
+            z-index: 7;
+            display: none;
+            transform: translate(-50%, 50%);
+            transition: opacity 0.05s ease;
+        }
+
         /* Balloon */
         .balloon-entity {
             position: absolute;
@@ -658,6 +673,16 @@
         const stormCloudEl = document.getElementById('storm-cloud');
         const woodenShieldEl = document.getElementById('wooden-shield');
 
+        // Trajectory Preview Elements
+        const TRAJECTORY_DOTS_COUNT = 10;
+        const trajectoryDots = [];
+        for (let i = 0; i < TRAJECTORY_DOTS_COUNT; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'trajectory-dot';
+            gameContainer.appendChild(dot);
+            trajectoryDots.push(dot);
+        }
+
         // Web Audio API Procedural Synthesizer
         let audioCtx = null;
 
@@ -846,7 +871,7 @@
             const baseAngle = arrowAngle + angleOffset;
             const speed = arrowSpeed * speedMultiplier;
             const vx = Math.cos(baseAngle) * speed;
-            const vy = -Math.sin(baseAngle) * speed;
+            const vy = Math.sin(baseAngle) * speed; // FIX: vy positivo sobe em coordenadas CSS bottom
 
             const arrowEl = document.createElement('div');
             arrowEl.className = `arrow-entity type-${type}`;
@@ -915,19 +940,38 @@
 
             const dx = startX - clientX;
             const dy = clientY - startY;
+
+            // Se o usuário empurrar para frente do ponto de partida, não há tensão no arco (estilingue não empurra)
+            if (dx <= 0) {
+                powerIndicator.style.display = 'none';
+                powerBar.style.height = '0%';
+                bow.style.transform = 'rotate(0rad)';
+                aimArrow.style.display = 'none';
+                bowStringVisual.style.transform = 'translateX(-50%)';
+                trajectoryDots.forEach(d => d.style.display = 'none');
+                arrowSpeed = 0;
+                return;
+            }
+
             const maxPull = 150;
             const distance = Math.min(Math.hypot(dx, dy), maxPull);
 
-            arrowAngle = Math.atan2(dy, dx);
-            if (arrowAngle > Math.PI / 2) arrowAngle = Math.PI / 2;
-            if (arrowAngle < -Math.PI * 0.7) arrowAngle = -Math.PI * 0.7;
+            // Ângulo de mira frontal (entre -26° e +78°)
+            let angle = Math.atan2(dy, dx);
+            const minAngle = -Math.PI * 0.15; // -27° (tiro rasante)
+            const maxAngle = Math.PI * 0.44;  // +79° (arco parabólico alto)
+            if (angle > maxAngle) angle = maxAngle;
+            if (angle < minAngle) angle = minAngle;
+
+            arrowAngle = angle;
 
             bow.style.transform = `rotate(${-arrowAngle}rad)`;
-            aimArrow.style.transform = `rotate(${-arrowAngle}rad)`;
-
             const stringPull = -distance * 0.4;
             bowStringVisual.style.transform = `translateX(calc(-50% + ${stringPull}px))`;
-            aimArrow.style.left = `${135 + stringPull}px`;
+
+            // Alinhamento suave da nock da flecha ao longo do eixo angular de puxada
+            aimArrow.style.left = '135px';
+            aimArrow.style.transform = `rotate(${-arrowAngle}rad) translateX(${stringPull}px)`;
             aimArrow.style.display = 'block';
 
             arrowSpeed = distance * 0.22;
@@ -936,6 +980,34 @@
             powerBar.style.height = `${powerRatio * 100}%`;
 
             playTensionSound(powerRatio);
+
+            // Trajetória preditiva pontilhada em tempo real
+            if (arrowSpeed > 1) {
+                const simSpeed = arrowSpeed;
+                const simVx = Math.cos(arrowAngle) * simSpeed;
+                const simVy = Math.sin(arrowAngle) * simSpeed;
+                const startPointX = 135;
+                const startPointY = 90;
+
+                for (let i = 0; i < TRAJECTORY_DOTS_COUNT; i++) {
+                    const t = (i + 1) * 2.2;
+                    const windAcc = (selectedArrowType !== 'gravity') ? windSpeed * 0.03 : 0;
+                    const px = startPointX + simVx * t + 0.5 * windAcc * (t * t);
+                    const py = startPointY + simVy * t - 0.5 * 0.22 * (t * t);
+
+                    const dot = trajectoryDots[i];
+                    if (py < 45 || px < 0 || px > 800) {
+                        dot.style.display = 'none';
+                    } else {
+                        dot.style.left = `${px}px`;
+                        dot.style.bottom = `${py}px`;
+                        dot.style.opacity = `${1 - (i / TRAJECTORY_DOTS_COUNT) * 0.6}`;
+                        dot.style.display = 'block';
+                    }
+                }
+            } else {
+                trajectoryDots.forEach(d => d.style.display = 'none');
+            }
         }
 
         function handleAimRelease() {
@@ -946,6 +1018,7 @@
             bowStringVisual.style.transform = 'translateX(-50%)';
             powerIndicator.style.display = 'none';
             powerBar.style.height = '0%';
+            trajectoryDots.forEach(d => d.style.display = 'none');
 
             if (arrowSpeed > 1) {
                 fireArrows();
@@ -1263,6 +1336,7 @@
             generateNewWind();
             positionBalloon();
             deactivateBulletTime();
+            trajectoryDots.forEach(d => d.style.display = 'none');
 
             requestAnimationFrame(gameLoop);
         }
@@ -1276,6 +1350,7 @@
             gameOver = true;
             if (comboStreak === 0) playComboBreakSound();
             deactivateBulletTime();
+            trajectoryDots.forEach(d => d.style.display = 'none');
             finalScoreElement.textContent = score;
             gameOverElement.style.display = 'block';
         }
@@ -1283,7 +1358,7 @@
         // Start initial game
         initGame();
 
-        // Hook de depuração/QA (TASK_003)
+        // Hook de depuração/QA (TASK_003 & BUGFIX)
         window.__archer = {
             getState: () => ({
                 score,
@@ -1293,7 +1368,9 @@
                 isBulletTime,
                 timeScale,
                 activeArrowsCount: activeArrows.length,
-                ammo: { ...ammo }
+                ammo: { ...ammo },
+                arrowAngle,
+                arrowSpeed
             }),
             selectArrowType,
             spawnArrow,
@@ -1310,7 +1387,8 @@
             balloonData,
             initGame,
             setAmmo: (type, val) => { ammo[type] = val; updateAmmoHUD(); },
-            getActiveArrows: () => activeArrows
+            getActiveArrows: () => activeArrows,
+            getTrajectoryDots: () => trajectoryDots
         };
     </script>
 </body>
