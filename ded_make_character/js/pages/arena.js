@@ -21,6 +21,8 @@ import { icon } from '../ui/icons.js';
 import { emptyState, loadingState, pageHead } from '../ui/page.js';
 import { toast } from '../ui/toast.js';
 import { abrirEquipamento } from './arena-equipamento.js';
+import { carregarRedes, politicasDaArena } from './arena-ia.js';
+import { perfilDe } from '../rules/ia30.js';
 import { abrirMagias } from './arena-magias.js';
 import {
   LIMITES, adicionar, distanciaValida, ehPersonagem, escreverMontagem, lerMontagem, maximoDe, mudarQuantidade, novaSemente, rodadasValidas, sementeValida, totalDoLado,
@@ -138,6 +140,8 @@ export async function renderArena({ root, router, query, store }) {
     distancia: montagem.distancia,
     limite: montagem.limite,
     semente: montagem.semente || novaSemente(),
+    ia: montagem.ia, // { A, B }: 'classica' ou 'rede' (TASK_009)
+    redes: null, // as redes da IA treinada, carregadas sob demanda
     ignorados: montagem.ignorados,
     ignoradosPersonagens: montagem.ignoradosRefs.filter(ehPersonagem).length,
     excedentes: montagem.excedentes,
@@ -163,6 +167,28 @@ export async function renderArena({ root, router, query, store }) {
     return conferirLote('a montagem mudou');
   };
   salvarNaUrl();
+
+  // ------------------------------------------------------------------------------------------
+  // IA treinada (TASK_009 §8): as redes só são baixadas quando algum lado as usa
+
+  const usaRede = () => LADOS.some(l => state.ia[l] === 'rede');
+  /** Garante as redes antes de uma luta ou de um lote; sem elas, a luta segue com a clássica e avisa. */
+  async function garantirRedes({ lote = false } = {}) {
+    if (!usaRede() || state.redes) return;
+    try {
+      state.redes = await carregarRedes();
+    } catch (err) {
+      console.warn('IA treinada indisponível', err);
+      toast({ type: 'warning', title: 'IA treinada indisponível', message: `Não deu para carregar a rede: ${lote ? 'as lutas usam' : 'a luta usa'} a IA clássica.` });
+    }
+  }
+  if (usaRede()) carregarRedes().then(r => (state.redes = r), () => {});
+  /**
+   * "A: treinada · B: clássica", para a barra da luta e o lote. A treinada só decide por quem tem
+   * magias ou poderes: um lado sem ninguém assim fica "treinada (sem efeito)".
+   */
+  const ladoAge = l => state[l].some(x => perfilDe(fichaDe(x.ref)) === 'recursos');
+  const textoDaIa = ia => LADOS.map(l => `${l}: ${ia[l] === 'rede' ? (ladoAge(l) ? 'treinada' : 'treinada (sem efeito)') : 'clássica'}`).join(' · ');
 
   const fichas = new Map();
   const fichaDe = ref => {
@@ -302,6 +328,17 @@ export async function renderArena({ root, router, query, store }) {
             </div>
             <p class="field__hint" id="arena-semente-dica">Qualquer texto ou número. A mesma semente repete a mesma luta.</p>
           </div>
+          <div class="field" role="group" aria-labelledby="arena-ia-rotulo" aria-describedby="arena-ia-dica">
+            <span class="field__label" id="arena-ia-rotulo">IA de cada lado</span>
+            <div class="arena-ia">
+              ${LADOS.map(l => html`<label class="arena-ia__lado"><span class="arena-tag arena-tag--${l.toLowerCase()}" aria-hidden="true">${l}</span>
+                <select class="select" data-opt="ia${l}" data-focus="ia-${l}" aria-label="IA do lado ${l}">
+                  <option value="classica" ${state.ia[l] === 'rede' ? '' : 'selected'}>Clássica</option>
+                  <option value="rede" ${state.ia[l] === 'rede' ? 'selected' : ''}>Treinada (experimental)</option>
+                </select></label>`)}
+            </div>
+            <p class="field__hint" id="arena-ia-dica">A treinada é uma rede neural que aprendeu em lutas simuladas e decide por quem tem magias ou poderes. Experimental: vence mais em média, mas perde em alguns confrontos.</p>
+          </div>
         </div>
         ${dicaDeDificuldade()}
         <div class="arena-start">${inicioHtml(sit)}</div>
@@ -360,6 +397,7 @@ export async function renderArena({ root, router, query, store }) {
     return html`<div class="arena-lote__res">
       <h3 class="arena-lote__h3" id="arena-lote-res" tabindex="-1">${l.cancelada ? `Parcial: ${inteiro(r.vezes)} de ${inteiro(r.pedidas)} lutas` : plural(r.vezes, 'luta', 'lutas')}</h3>
       <p class="arena-lote__sub">${textoDasSementes(l)}</p>
+      ${l.ia.A === 'rede' || l.ia.B === 'rede' ? html`<p class="arena-lote__sub">IA ${textoDaIa(l.ia)}.</p>` : ''}
       ${antiga ? html`<p class="arena-lote__aviso">${icon('info')}<span>A montagem mudou depois desta simulação: os números são da montagem anterior.</span></p>` : ''}
       <div class="arena-lote__barra" role="img" aria-label="Lado A vence ${pct(r.vitoriasA)}, lado B vence ${pct(r.vitoriasB)}, empates ${pct(r.empates)}">${fatia('is-a', r.vitoriasA)}${fatia('is-b', r.vitoriasB)}${fatia('is-empate', r.empates)}</div>
       <dl class="arena-lote__nums">
@@ -392,8 +430,11 @@ export async function renderArena({ root, router, query, store }) {
   /** Roda em fatias de ~12 ms com setTimeout (o requestIdleCallback não existe no Safari). */
   function iniciarLote(vezes) {
     const lado = l => state[l].flatMap(x => Array.from({ length: x.qtd }, () => fichaDe(x.ref)));
-    const lote = criarLote({ ladoA: lado('A'), ladoB: lado('B'), distancia: state.distancia, limiteRodadas: state.limite }, { vezes, semente: state.semente });
-    state.lote = { lote, rodando: true, cancelada: null, assinatura: assinatura(), semente: state.semente, resultado: null, timer: null };
+    const politicas = politicasDaArena(state.ia, state.redes);
+    const lote = criarLote({ ladoA: lado('A'), ladoB: lado('B'), distancia: state.distancia, limiteRodadas: state.limite, politicas }, { vezes, semente: state.semente });
+    // a IA que valeu de fato (sem as redes, a clássica nos dois lados)
+    const ia = { A: politicas?.A ? 'rede' : 'classica', B: politicas?.B ? 'rede' : 'classica' };
+    state.lote = { lote, rodando: true, cancelada: null, assinatura: assinatura(), semente: state.semente, ia, resultado: null, timer: null };
     atualizarLote();
     root.querySelector('[data-action="lote-cancelar"]')?.focus();
     avisar(`Simulando ${inteiro(vezes)} lutas.`);
@@ -691,9 +732,11 @@ export async function renderArena({ root, router, query, store }) {
   // ------------------------------------------------------------------------------------------
   // luta
 
-  function iniciarLuta() {
+  function iniciarLuta(ia = state.ia) {
     const lado = l => state[l].flatMap(x => Array.from({ length: x.qtd }, () => fichaDe(x.ref)));
-    state.b = createBattle({ ladoA: lado('A'), ladoB: lado('B'), semente: state.semente, distancia: state.distancia, limiteRodadas: state.limite });
+    const politicas = politicasDaArena(ia, state.redes, { registrar: true });
+    state.b = createBattle({ ladoA: lado('A'), ladoB: lado('B'), semente: state.semente, distancia: state.distancia, limiteRodadas: state.limite, politicas });
+    state.iaDaLuta = { A: politicas?.A ? 'rede' : 'classica', B: politicas?.B ? 'rede' : 'classica' };
     state.mostrados = 0;
     state.ultimo = null;
   }
@@ -800,7 +843,7 @@ export async function renderArena({ root, router, query, store }) {
           <p class="arena-bar__round" data-slot="situacao"></p>
           <p class="arena-bar__seed">Semente <code data-slot="semente">${state.semente}</code>
             <button type="button" class="icon-btn" data-action="copiar-semente" aria-label="Copiar a semente">${icon('copy')}</button></p>
-          <p class="arena-bar__info">Começa a ${metros(state.distancia)} · até ${plural(state.limite, 'rodada', 'rodadas')}</p>
+          <p class="arena-bar__info">Começa a ${metros(state.distancia)} · até ${plural(state.limite, 'rodada', 'rodadas')}${state.iaDaLuta.A === 'rede' || state.iaDaLuta.B === 'rede' ? ` · IA ${textoDaIa(state.iaDaLuta)}` : ''}</p>
         </div>
         <div class="arena-bar__controls">
           <button type="button" class="btn btn--primary" data-action="acao" data-focus="acao" data-focus-fallback="recomecar">${icon('step-forward')}Próxima ação</button>
@@ -846,7 +889,7 @@ export async function renderArena({ root, router, query, store }) {
     const res = slot('resultado');
     if (b.fim && !res.firstElementChild) render(res, resultado(b));
     if (!b.fim && res.firstElementChild) render(res, '');
-    const falas = novos.filter(ev => ev.tipo !== 'rodada').map(ev => ev.texto);
+    const falas = novos.filter(ev => ev.tipo !== 'rodada' && ev.tipo !== 'ia').map(ev => ev.texto);
     if (b.fim) avisar(b.eventos.at(-1).texto);
     else if (falas.length) avisar(falas.slice(-3).join(' '));
   }
@@ -936,7 +979,7 @@ export async function renderArena({ root, router, query, store }) {
   // ------------------------------------------------------------------------------------------
   // eventos
 
-  root.addEventListener('click', event => {
+  root.addEventListener('click', async event => {
     const t = event.target;
     const qtd = t.closest('[data-qtd]');
     if (qtd) {
@@ -977,6 +1020,8 @@ export async function renderArena({ root, router, query, store }) {
       confirmarCampos();
       const vezes = Number(t.closest('[data-vezes]').dataset.vezes);
       if (state.lote?.rodando || !state.A.length || !state.B.length) return;
+      await garantirRedes({ lote: true });
+      if (state.lote?.rodando || state.fase !== 'montagem' || !situacao().pronto) return;
       iniciarLote(vezes);
     } else if (acao === 'lote-cancelar') {
       const vezes = state.lote?.lote.vezes;
@@ -996,7 +1041,9 @@ export async function renderArena({ root, router, query, store }) {
       }
       state.semente = botao.dataset.semente;
       salvarNaUrl();
-      iniciarLuta();
+      // a IA que valeu no lote (sem as redes, a clássica), para a luta ser a mesma; as redes, se
+      // valeram, já estão carregadas
+      iniciarLuta(state.lote.ia);
       state.fase = 'luta';
       desenharLuta();
       root.querySelector('[data-action="acao"]').focus();
@@ -1010,6 +1057,8 @@ export async function renderArena({ root, router, query, store }) {
     } else if (acao === 'comecar') {
       confirmarCampos();
       if (!state.A.length || !state.B.length || state.lote?.rodando) return;
+      await garantirRedes();
+      if (state.fase !== 'montagem' || !situacao().pronto) return;
       iniciarLuta();
       state.fase = 'luta';
       desenharLuta();
@@ -1045,6 +1094,12 @@ export async function renderArena({ root, router, query, store }) {
   root.addEventListener('change', event => {
     const opt = event.target.dataset?.opt;
     if (!opt) return;
+    if (opt === 'iaA' || opt === 'iaB') {
+      state.ia = { ...state.ia, [opt.slice(2)]: event.target.value === 'rede' ? 'rede' : 'classica' };
+      if (usaRede() && !state.redes) carregarRedes().then(r => (state.redes = r), () => {});
+      salvarNaUrl();
+      return;
+    }
     if (opt === 'distancia') state.distancia = distanciaValida(event.target.value);
     if (opt === 'limite') state.limite = rodadasValidas(event.target.value);
     // a semente vale ao sair do campo (o "change" vem antes do clique em "Começar"); vazia, fica a anterior

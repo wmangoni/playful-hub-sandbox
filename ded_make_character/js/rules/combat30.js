@@ -230,18 +230,48 @@ function instanciar(ficha, lado, indice, pos) {
 }
 
 /**
+ * Dados com um fluxo por combatente (TASK_009 §6.1, para o gerador de treino da IA): as rolagens do
+ * turno de cada um saem do fluxo dele (`usar(uid)` no começo do turno; a iniciativa sai de um fluxo
+ * próprio). Assim, mudar a ação de um combatente não muda os dados dos outros nos turnos seguintes.
+ * Os dados continuam uniformes e independentes; só a sequência é outra que a do gerador comum.
+ */
+function fluxosPorCombatente(semente) {
+  const base = createRng(semente).seed;
+  const fluxos = new Map();
+  let atual = '';
+  const fluxo = () => {
+    if (!fluxos.has(atual)) fluxos.set(atual, createRng(`${base}:${atual}`));
+    return fluxos.get(atual);
+  };
+  const rng = {
+    seed: base,
+    float: () => fluxo().float(),
+    die: n => fluxo().die(n),
+    chance: pct => rng.die(100) <= pct,
+    usar: uid => {
+      atual = uid;
+    },
+  };
+  return rng;
+}
+
+/**
  * Monta a luta. `ladoA` e `ladoB` são listas de fichas de combate (de `fromCatalog` ou do
  * adaptador de personagem). `registrar: false` pula o texto do registro (simulação em lote).
+ * `politicas` troca a IA de um lado (TASK_009); `rngPorCombatente` dá um fluxo de dados a cada
+ * combatente (o gerador de treino da IA).
  */
-export function createBattle({ ladoA, ladoB, semente = Date.now(), rng = null, distancia = 9, limiteRodadas = 50, registrar = true }) {
+export function createBattle({ ladoA, ladoB, semente = Date.now(), rng = null, distancia = 9, limiteRodadas = 50, registrar = true, politicas = null, rngPorCombatente = false }) {
   if (!ladoA?.length || !ladoB?.length) throw new Error('cada lado precisa de pelo menos um combatente');
-  const gerador = rng || createRng(semente);
+  const gerador = rng || (rngPorCombatente ? fluxosPorCombatente(semente) : createRng(semente));
   const b = {
     rng: gerador,
     semente: gerador.seed,
     distancia,
     limiteRodadas,
     registrar,
+    // quem decide por cada lado: uma função (b, c, IA) → ação; sem ela, a IA clássica
+    politicas: { A: politicas?.A || null, B: politicas?.B || null },
     rodada: 0,
     turno: -1,
     ordem: [],
@@ -1229,8 +1259,8 @@ function acaoArmada(b, c, alvo) {
   return opcoes;
 }
 
-function decidir(b, c) {
-  const alvo = escolherAlvo(b, c);
+/** As opções do combatente com `alvo` como alvo principal (o que a IA clássica considera). */
+function opcoesContra(b, c, alvo) {
   const opcoes = [];
   opcoes.push(...SP.options(K, b, c, alvo)); // curas, sopro, magias, engolfar, esmagar, inspirar…
   if (alvo) opcoes.push(...acaoArmada(b, c, alvo));
@@ -1241,10 +1271,80 @@ function decidir(b, c) {
     const falta = gap(c, alvo) - ate;
     if (falta > 0) opcoes.push({ tipo: 'mover', alvo, mover: Math.min(falta, 2 * velocidade(c)), ev: 0.01 });
   }
+  return opcoes;
+}
+
+/** A ordem da IA clássica: prioridade, depois `ev`; empatadas, a ordem em que foram listadas. */
+const ordemClassica = (x, y) => (y.prioridade || 0) - (x.prioridade || 0) || y.ev - x.ev;
+
+/** IA clássica: escolhe o alvo e, contra ele, a opção de maior prioridade e `ev`. */
+function decidir(b, c) {
+  const opcoes = opcoesContra(b, c, escolherAlvo(b, c));
   if (!opcoes.length) return null;
-  opcoes.sort((x, y) => (y.prioridade || 0) - (x.prioridade || 0) || y.ev - x.ev);
+  opcoes.sort(ordemClassica);
   return opcoes[0];
 }
+
+/**
+ * O que distingue uma ação de outra: tipo, magia ou especial, alvo, área, golpes (nome, mão, bônus,
+ * dano e efeitos) e quanto anda.
+ * - A mesma magia do mesmo espaço vale uma ação só, mesmo vinda de duas linhas da lista (o clérigo
+ *   tem a cura preparada e a convertida).
+ * - Uma área que pega mais de um combatente vale pelos que pega, não pelo alvo em que foi centrada:
+ *   centrada em outro inimigo, mas pegando os mesmos, é a mesma ação (a execução refaz a área). No
+ *   Sono, os atingidos listados usam o orçamento médio de DV: com uma rolagem alta, centros diferentes
+ *   poderiam pegar criaturas diferentes (raro; fica a do alvo da clássica).
+ * Na repetição fica a primeira, que é a que a IA clássica escolhe no empate.
+ */
+function chaveDaAcao(a) {
+  const s = a.s ? (a.s.tipo === 'lista' ? `lista:${a.s.nome}:${a.s.espaco ?? ''}:${a.s.cd}:${a.s.gratis ? 1 : 0}` : `esp:${a.s.e?.id}`) : '';
+  const area = (a.alvos?.length || 0) > 1;
+  const alvos = (a.alvos || []).map(x => x.uid).sort().join(',');
+  const golpes = (a.golpes || []).map(g => `${g.nome}:${g.mao ?? ''}:${g.bonus}:${g.dano}:${(g.efeitos || []).join('+')}`).join(',');
+  return [a.tipo, s, a.e?.id ?? '', area ? '' : a.alvo?.uid ?? '', alvos, golpes, a.mover ?? ''].join('|');
+}
+
+/**
+ * Todas as ações legais do combatente contra todos os alvos válidos (TASK_009 §4.1), para a política
+ * "rede". Usa os mesmos geradores da IA clássica, alvo por alvo, começando pelo alvo da clássica; as
+ * opções que não dependem do alvo (curas, inspirar, reforços, engolfar…) voltam iguais a cada alvo e
+ * entram uma vez só. Cada candidata leva `chave`, `origem` (o alvo da chamada que a gerou, ou null
+ * se ela vem igual de mais de um) e `ordem` (a de geração); a escolha da IA clássica vai marcada com
+ * `heuristica: true` (é a mesma ação que `IA.classica` devolve). Listar não rola dados nem muda a luta.
+ */
+export function candidatas(b, c) {
+  const alvoClassico = escolherAlvo(b, c);
+  const alvos = inimigos(b, c).filter(alvoValido).sort((x, y) => (y === alvoClassico) - (x === alvoClassico));
+  const listas = alvos.length ? alvos.map(alvo => [alvo, opcoesContra(b, c, alvo)]) : [[null, opcoesContra(b, c, null)]];
+  const out = [];
+  const porChave = new Map();
+  for (const [alvo, opcoes] of listas) {
+    for (const a of opcoes) {
+      const chave = chaveDaAcao(a);
+      const igual = porChave.get(chave);
+      if (igual) {
+        if (igual.origem !== (alvo?.uid ?? null)) igual.origem = null;
+        continue;
+      }
+      Object.assign(a, { chave, origem: alvo?.uid ?? null, ordem: out.length });
+      porChave.set(chave, a);
+      out.push(a);
+    }
+  }
+  // a escolha da clássica: a mesma ordenação, sobre a lista do alvo dela (a primeira gerada)
+  const escolha = [...listas[0][1]].sort(ordemClassica)[0];
+  if (escolha) porChave.get(chaveDaAcao(escolha)).heuristica = true;
+  return out;
+}
+
+/** A ação do combatente: a política do lado dele (TASK_009), ou a IA clássica. */
+function escolherAcao(b, c) {
+  const politica = b.politicas[c.lado];
+  return politica ? politica(b, c, IA) : decidir(b, c);
+}
+
+/** O que uma política recebe do motor: as candidatas e a escolha da IA clássica. */
+const IA = Object.freeze({ candidatas, classica: decidir });
 
 function executar(b, c, acao) {
   const texto = alvo => (alvo ? ` ${alvo.nome}` : '');
@@ -1328,6 +1428,7 @@ export function nextTurn(b) {
   }
   const c = b.get(b.ordem[b.turno]);
   // durações acabam no turno de quem causou o efeito: confere todos a cada turno
+  b.rng.usar?.(c.uid); // com um fluxo de dados por combatente, as rolagens do turno saem do fluxo dele
   for (const x of b.combatentes) expirarCondicoes(b, x);
   inicioDoTurno(b, c);
   if (c.estado !== 'morto' && c.fugindo) {
@@ -1338,7 +1439,7 @@ export function nextTurn(b) {
     else if (!SP.forcedTurn(K, b, c)) {
       // engolido, agarrado ou agarrando: o turno já foi resolvido pelos especiais
       SP.freeActions(K, b, c); // fúria…
-      const acao = decidir(b, c);
+      const acao = escolherAcao(b, c);
       if (acao) executar(b, c, acao);
       else log(b, c, 'sem-acao', `${c.nome} não tem o que fazer.`);
     }
@@ -1401,7 +1502,7 @@ function encerrar(b, vencedor, motivo) {
  * (semente + i) e sem texto de registro. `rodar(n)` roda até mais `n` lutas e devolve quantas já
  * foram; a tela chama aos poucos para não travar. `resultado()` resume o que já rodou.
  */
-export function criarLote({ ladoA, ladoB, distancia = 9, limiteRodadas = 50 }, { vezes = 100, semente = 1 } = {}) {
+export function criarLote({ ladoA, ladoB, distancia = 9, limiteRodadas = 50, politicas = null }, { vezes = 100, semente = 1 } = {}) {
   const base = createRng(semente).seed;
   const res = { A: 0, B: 0, empate: 0, rodadas: 0, pv: { A: 0, B: 0 }, quedas: {}, exemplos: {}, combatentes: null };
   let feitas = 0;
@@ -1415,7 +1516,7 @@ export function criarLote({ ladoA, ladoB, distancia = 9, limiteRodadas = 50 }, {
       const ate = Math.min(vezes, feitas + n);
       for (; feitas < ate; feitas++) {
         const s = (base + feitas) >>> 0;
-        const fim = runBattle(createBattle({ ladoA, ladoB, semente: s, distancia, limiteRodadas, registrar: false }));
+        const fim = runBattle(createBattle({ ladoA, ladoB, semente: s, distancia, limiteRodadas, registrar: false, politicas }));
         const quem = fim.vencedor || 'empate';
         res[quem]++;
         res.rodadas += fim.rodadas;
