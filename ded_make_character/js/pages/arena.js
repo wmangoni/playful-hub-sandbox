@@ -12,6 +12,8 @@
 import { html, render } from '../core/dom.js';
 import { normalize, plural } from '../core/format.js';
 import { createBattle, criarLote, fromCatalog, gap, nextRound, nextTurn, podeLutar, rules, runBattle } from '../rules/combat30.js';
+import { montarCardCatalogo, montarCardPersonagem } from '../rules/card30.js';
+import { grantedFeats } from '../rules/choices30.js';
 import { computeSheet } from '../rules/dnd30.js';
 import { dificuldade, ndRotulo, neTexto, nivelDeEncontro } from '../rules/encontro30.js';
 import { rotuloItem } from '../rules/equipamento30.js';
@@ -22,6 +24,8 @@ import { emptyState, loadingState, pageHead } from '../ui/page.js';
 import { toast } from '../ui/toast.js';
 import { abrirEquipamento } from './arena-equipamento.js';
 import { carregarRedes, politicasDaArena } from './arena-ia.js';
+import { AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND as FAIXAS, carregarCatalogo, contextoDoCard, rotuloFaixa } from './card-dados.js';
+import { abrirCard } from './ficha-card.js';
 import { perfilDe } from '../rules/ia30.js';
 import { abrirMagias } from './arena-magias.js';
 import {
@@ -30,21 +34,6 @@ import {
 import { ranksToKeys } from './choices.js';
 
 const LADOS = ['A', 'B'];
-
-/** O catálogo é somente leitura: uma busca por sessão, compartilhada entre as visitas. */
-let catalogo = null;
-function carregarCatalogo() {
-  catalogo ||= fetch(new URL('../../data/catalogo-combate.json', import.meta.url), { cache: 'no-cache' })
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
-    .catch(err => {
-      catalogo = null;
-      throw err;
-    });
-  return catalogo;
-}
 
 const metros = m => `${m.toLocaleString('pt-BR')} m`;
 
@@ -153,6 +142,7 @@ export async function renderArena({ root, router, query, store }) {
   };
   let seletor = null;
   let editando = null; // o diálogo de equipamento ou o de magias de um personagem
+  let cardAberto = null; // o popup do card de um combatente (TASK_010)
 
   // o cabeçalho e a região de avisos ficam; só a fase (montagem ou luta) é redesenhada
   render(root, html`${cabecalho()}<div data-slot="fase"></div><p class="visually-hidden" aria-live="polite" data-slot="avisos"></p>`);
@@ -199,6 +189,9 @@ export async function renderArena({ root, router, query, store }) {
   // quem não pode lutar (personagem sem classe, equipamento com erro) não conta para a dica
   const ndDoLado = lado => nivelDeEncontro(state[lado].filter(x => !porId.get(x.ref).erros?.length).flatMap(x => Array(x.qtd).fill(porId.get(x.ref).nd)));
 
+  /** O botão de ícone que abre o card do combatente; fica ao lado do nome, nunca dentro dele. */
+  const botaoDoCard = (ref, nome, foco = null) => html`<button type="button" class="card-btn" data-card="${ref}" ${foco ? html`data-focus="${foco}"` : ''} aria-label="Ver o card de ${nome}" aria-haspopup="dialog">${icon('card')}</button>`;
+
   /** Redesenha preservando o foco no controle equivalente (data-focus). */
   function comFoco(desenhar) {
     const chave = document.activeElement?.dataset?.focus;
@@ -220,7 +213,7 @@ export async function renderArena({ root, router, query, store }) {
     if (e.categoria === 'personagem') {
       return html`<li class="arena-roster__item arena-roster__item--pc">
         <div class="arena-roster__info">
-          <p class="arena-roster__name">${e.nome}</p>
+          <div class="arena-nome-linha"><p class="arena-roster__name">${e.nome}</p>${botaoDoCard(x.ref, e.nome, `card-${chave}`)}</div>
           <p class="arena-roster__meta">${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
           <p class="arena-roster__equip">${textoDoEquipamento(e.equipamento)}</p>
           ${e.temEspacos ? html`<p class="arena-roster__equip arena-roster__magias">${icon('sparkles')}<span>${textoDasMagias(e)}</span></p>` : ''}
@@ -234,7 +227,7 @@ export async function renderArena({ root, router, query, store }) {
     }
     return html`<li class="arena-roster__item">
       <div class="arena-roster__info">
-        <p class="arena-roster__name">${e.nome}</p>
+        <div class="arena-nome-linha"><p class="arena-roster__name">${e.nome}</p>${botaoDoCard(x.ref, e.nome, `card-${chave}`)}</div>
         <p class="arena-roster__meta">ND ${ndRotulo(e.nd)} · ${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
       </div>
       <span class="stepper arena-qty" role="group" aria-label="Quantidade de ${e.nome}">
@@ -410,7 +403,7 @@ export async function renderArena({ root, router, query, store }) {
       <h4 class="arena-lote__h4">Quem caiu</h4>
       <ul class="arena-lote__quedas">${quedas.map(c => html`<li>
         <span class="arena-tag arena-tag--${c.lado.toLowerCase()}" aria-hidden="true">${c.lado}</span>
-        <span class="arena-lote__quem"><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}</span>
+        <span class="arena-lote__quem"><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}</span>${botaoDoCard(l.refs[c.uid], c.nome)}
         <span class="arena-lote__qn">${pct(c.n / r.vezes)} das lutas</span>
       </li>`)}</ul>
       ${exemplos.length && !antiga ? html`<div class="arena-lote__ver">${exemplos.map(([k, rotulo]) => html`<button type="button" class="btn btn--ghost btn--sm" data-action="ver-semente" data-semente="${r.exemplos[k]}" data-resultado="${k}">${icon('play')}${rotulo}</button>`)}</div>` : ''}
@@ -434,7 +427,8 @@ export async function renderArena({ root, router, query, store }) {
     const lote = criarLote({ ladoA: lado('A'), ladoB: lado('B'), distancia: state.distancia, limiteRodadas: state.limite, politicas }, { vezes, semente: state.semente });
     // a IA que valeu de fato (sem as redes, a clássica nos dois lados)
     const ia = { A: politicas?.A ? 'rede' : 'classica', B: politicas?.B ? 'rede' : 'classica' };
-    state.lote = { lote, rodando: true, cancelada: null, assinatura: assinatura(), semente: state.semente, ia, resultado: null, timer: null };
+    const refs = Object.fromEntries(LADOS.flatMap(lado => state[lado].flatMap(x => Array(x.qtd).fill(x.ref)).map((ref, i) => [`${lado}${i + 1}`, ref])));
+    state.lote = { lote, rodando: true, cancelada: null, assinatura: assinatura(), semente: state.semente, ia, refs, resultado: null, timer: null };
     atualizarLote();
     root.querySelector('[data-action="lote-cancelar"]')?.focus();
     avisar(`Simulando ${inteiro(vezes)} lutas.`);
@@ -578,10 +572,6 @@ export async function renderArena({ root, router, query, store }) {
       { key: 'holy', label: 'Holy Avenger', icone: 'shield' },
       { key: 'meus', label: 'Meus personagens', icone: 'hero' },
     ];
-    // acima do 20 só há Holy Avenger (o Paladino vai até o ND 55, Tarso tem 50); abaixo de 1, o ND 1/2 (TASK_007, TASK_008)
-    const FAIXAS = { todos: [0, Infinity], '1-5': [0, 5], '6-10': [6, 10], '11-15': [11, 15], '16-20': [16, 20], '21+': [21, Infinity] };
-    const rotuloFaixa = k => (k === 'todos' ? 'Todos os ND' : k === '21+' ? 'ND 21 ou mais' : k === '1-5' ? 'ND até 5' : `ND ${k.replace('-', ' a ')}`);
-
     const qtdNoLado = id => state[lado].find(x => x.ref === id)?.qtd || 0;
     const cheio = () => totalDoLado(state[lado]) >= LIMITES.porLado;
     const podeAdicionar = e => !cheio() && qtdNoLado(e.id) < maximoDe(e.id) && !e.erros?.length;
@@ -610,7 +600,7 @@ export async function renderArena({ root, router, query, store }) {
       if (!itens.length) return html`<div class="arena-picker__empty">${icon('search')}<p>Nenhum combatente com esses filtros.</p></div>`;
       return html`<ul class="arena-picker__list">${itens.map(e => html`<li class="arena-pick">
         <div class="arena-pick__info">
-          <p class="arena-pick__name">${e.nome}</p>
+          <div class="arena-nome-linha"><p class="arena-pick__name">${e.nome}</p>${botaoDoCard(e.id, e.nome)}</div>
           <p class="arena-pick__meta"><span class="badge badge--neutral">${e.categoria === 'personagem' ? `Nível ${e.nd}` : `ND ${ndRotulo(e.nd)}`}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
           ${e.categoria === 'personagem'
             ? html`<p class="arena-pick__lore">${textoDoEquipamento(e.equipamento)}</p>${e.erros.length ? html`<p class="arena-pick__erro">${icon('alert')}Não pode lutar: ${e.erros.join('; ')}.</p>` : ''}`
@@ -681,6 +671,8 @@ export async function renderArena({ root, router, query, store }) {
       const t = event.target;
       const aba = t.closest('[data-aba]');
       if (aba) return trocarAba(aba.dataset.aba);
+      const cardBtn = t.closest('[data-card]');
+      if (cardBtn) return abrirCardDe(cardBtn.dataset.card);
       const add = t.closest('[data-add]');
       if (add) {
         const id = add.dataset.add;
@@ -790,7 +782,7 @@ export async function renderArena({ root, router, query, store }) {
     return html`<li class="arena-fighter arena-fighter--${c.lado.toLowerCase()} ${vez ? 'is-turn' : ''} ${fora ? 'is-down' : ''}" ${vez ? html`aria-current="true"` : ''}>
       <span class="arena-tag arena-tag--${c.lado.toLowerCase()}" aria-hidden="true">${c.lado}</span>
       <div class="arena-fighter__main">
-        <p class="arena-fighter__name"><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}${ESTADOS[estado] ? html` <span class="arena-fighter__state is-${estado}">${ESTADOS[estado]}</span>` : ''}${seguinte ? html` <span class="arena-fighter__next">a seguir</span>` : ''}</p>
+        <div class="arena-nome-linha"><p class="arena-fighter__name"><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}${ESTADOS[estado] ? html` <span class="arena-fighter__state is-${estado}">${ESTADOS[estado]}</span>` : ''}${seguinte ? html` <span class="arena-fighter__next">a seguir</span>` : ''}</p>${botaoDoCard(c.ref, c.nome)}</div>
         <div class="arena-hp arena-hp--${tom}" aria-hidden="true"><span class="arena-hp__fill" style="width: ${pct.toFixed(1)}%"></span>${contusao ? html`<span class="arena-hp__sub" style="width: ${contusao.toFixed(1)}%"></span>` : ''}</div>
         <p class="arena-fighter__meta">${meta}</p>
         ${chips.length ? html`<ul class="chip-list arena-fighter__chips" aria-label="Condições">${chips.map(([cor, texto]) => html`<li class="badge badge--${cor}">${texto}</li>`)}</ul>` : ''}
@@ -822,7 +814,7 @@ export async function renderArena({ root, router, query, store }) {
         ${fim.combatentes.map(c => {
           const estado = ESTADOS[c.estado] || 'de pé';
           return html`<li class="arena-stat arena-stat--${c.lado.toLowerCase()}">
-            <p class="arena-stat__name"><span class="arena-tag arena-tag--${c.lado.toLowerCase()}" aria-hidden="true">${c.lado}</span><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}</p>
+            <div class="arena-nome-linha"><p class="arena-stat__name"><span class="arena-tag arena-tag--${c.lado.toLowerCase()}" aria-hidden="true">${c.lado}</span><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}</p>${botaoDoCard(b.get(c.uid).ref, c.nome)}</div>
             <p class="arena-stat__state">${estado} · PV ${c.pv < 0 ? `−${-c.pv}` : c.pv}/${c.pvMax}${c.contusao ? ` (${c.contusao} de contusão)` : ''}</p>
             <dl class="arena-stat__nums">
               <div><dt>Dano causado</dt><dd>${c.danoCausado}</dd></div>
@@ -930,6 +922,31 @@ export async function renderArena({ root, router, query, store }) {
     }
   }
 
+  /**
+   * Abre o card do combatente (TASK_010): o do catálogo ou o do seu personagem como ele luta agora
+   * (equipamento e magias salvos). O popup é anexado ao body, por cima do seletor se ele estiver aberto.
+   */
+  async function abrirCardDe(ref) {
+    const e = porId.get(ref);
+    if (!e || cardAberto) return;
+    const origem = document.activeElement;
+    const ctx = await contextoDoCard(store);
+    if (saindo || cardAberto) return;
+    const modelo = ehPersonagem(ref)
+      ? montarCardPersonagem(e, { ...ctx, concedidos: grantedFeats(e.sheet.nivel, e.sheet.classKey, e.sheet.raceKey) })
+      : montarCardCatalogo(e, ctx);
+    cardAberto = abrirCard({
+      modelo,
+      aviso: ctx.semGlossario ? AVISO_SEM_GLOSSARIO : '',
+      aoFechar: () => {
+        cardAberto = null;
+        if (recarregarSePendente()) return;
+        // o botão pode ter sido redesenhado enquanto o card estava aberto
+        if (!origem?.isConnected) root.querySelector(`[data-card="${ref}"]`)?.focus();
+      },
+    });
+  }
+
   /** Recarrega a página se o app adiou um recarregamento e a Arena já está livre. */
   let saindo = false; // a rota está mudando: fechar os diálogos não deve recarregar a página
   function recarregarSePendente() {
@@ -999,6 +1016,11 @@ export async function renderArena({ root, router, query, store }) {
       const cancelou = salvarNaUrl();
       comFoco(desenharMontagem);
       avisar(`${porId.get(remover.dataset.ref).nome} saiu do lado ${remover.dataset.lado}.${cancelou ? ' A simulação em lote foi cancelada.' : ''}`);
+      return;
+    }
+    const cardBtn = t.closest('[data-card]');
+    if (cardBtn) {
+      abrirCardDe(cardBtn.dataset.card);
       return;
     }
     const acao = t.closest('[data-action]')?.dataset.action;
@@ -1114,14 +1136,16 @@ export async function renderArena({ root, router, query, store }) {
     cancelarLote();
     seletor?.fechar();
     editando?.fechar();
+    cardAberto?.fechar();
   }
   // o app não recarrega a Arena (evento de outra aba, "Restaurar tudo") com luta ou diálogo aberto:
   // marca a recarga (`adiar`), que acontece ao voltar à montagem ou ao fechar o diálogo
-  cleanup.ocupada = () => state.fase === 'luta' || Boolean(seletor) || Boolean(editando);
+  cleanup.ocupada = () => state.fase === 'luta' || Boolean(seletor) || Boolean(editando) || Boolean(cardAberto);
   // o lote não segura a recarga (os dados dele ficariam velhos): ela o cancela, e o app avisa
   cleanup.loteRodando = () => Boolean(state.lote?.rodando);
   cleanup.adiar = () => {
     state.recarregarDepois = true;
   };
+  cleanup.avisoAdiado = 'A Arena se atualiza quando você voltar à montagem ou fechar o diálogo.';
   return cleanup;
 }
