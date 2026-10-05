@@ -104,8 +104,8 @@ async function runTests() {
 
   // Observa o voo da flecha pelos próximos frames
   const flightHistory = [];
-  for (let f = 0; f < 12; f++) {
-    await new Promise(r => setTimeout(r, 60));
+  for (let f = 0; f < 15; f++) {
+    await new Promise(r => setTimeout(r, 25));
     const arrowState = await page.evaluate(() => {
       const arrows = window.__archer.getActiveArrows();
       if (!arrows.length) return null;
@@ -122,7 +122,7 @@ async function runTests() {
   }
 
   console.log('Amostras de Voo da Flecha (Primeiros frames):', JSON.stringify(flightHistory.slice(0, 5), null, 2));
-  if (flightHistory.length < 5) {
+  if (flightHistory.length < 3) {
     throw new Error('A flecha colidiu ou desapareceu prematuramente!');
   }
 

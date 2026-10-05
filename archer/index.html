@@ -174,6 +174,26 @@
             box-shadow: 0 0 35px rgba(255, 69, 0, 0.7);
         }
 
+        #game-container.frozen-active {
+            box-shadow: 0 0 40px rgba(0, 229, 255, 0.8), inset 0 0 30px rgba(0, 229, 255, 0.3);
+            filter: hue-rotate(170deg) saturate(1.2);
+        }
+
+        #frost-overlay {
+            position: absolute;
+            inset: 0;
+            border: 6px solid rgba(0, 229, 255, 0.6);
+            background: radial-gradient(circle, transparent 65%, rgba(0, 229, 255, 0.2) 100%);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 25;
+            transition: opacity 0.3s ease;
+        }
+
+        #game-container.frozen-active #frost-overlay {
+            opacity: 1;
+        }
+
         /* Dynamic Bullet Time Overlay Banner */
         #bullet-time-banner {
             position: absolute;
@@ -455,6 +475,85 @@
             100% { filter: drop-shadow(0 0 14px #ffffff); }
         }
 
+        /* Balloon Icon & Badge */
+        .balloon-icon {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* TNT Explosive Balloon */
+        .balloon-entity.tnt {
+            background: radial-gradient(circle at 30% 30%, #ff7043, #e64a19 60%, #bf360c 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.35), 0 0 18px rgba(255, 87, 34, 0.8);
+            border: 2px dashed #ffeb3b;
+            animation: tntPulse 0.75s infinite alternate;
+        }
+        .balloon-entity.tnt::after { background: #bf360c; }
+        @keyframes tntPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 4px #ff5722); }
+            100% { transform: scale(1.06); filter: drop-shadow(0 0 16px #ffeb3b); }
+        }
+
+        /* Ice Freezing Balloon */
+        .balloon-entity.ice {
+            background: radial-gradient(circle at 30% 30%, #e0f7fa, #00e5ff 60%, #0097a7 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2), 0 0 18px rgba(0, 229, 255, 0.85);
+            animation: iceGlow 1.4s infinite alternate;
+        }
+        .balloon-entity.ice::after { background: #00838f; }
+        @keyframes iceGlow {
+            0% { filter: drop-shadow(0 0 4px #00e5ff); }
+            100% { filter: drop-shadow(0 0 16px #ffffff); }
+        }
+
+        /* Armored Balloon (2 HP) */
+        .balloon-entity.armored {
+            background: radial-gradient(circle at 30% 30%, #cfd8dc, #78909c 60%, #37474f 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
+            border: 3px solid #b0bec5;
+        }
+        .balloon-entity.armored::after { background: #263238; }
+        .balloon-entity.armored.damaged {
+            border-color: #ef5350;
+            background: radial-gradient(circle at 30% 30%, #b0bec5, #546e7a 60%, #263238 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.5), 0 0 12px rgba(239, 83, 80, 0.7);
+        }
+        .balloon-entity .hp-badge {
+            position: absolute;
+            top: -10px;
+            right: -6px;
+            background: #263238;
+            border: 1.5px solid #ffd700;
+            color: #ffd700;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: 'Cinzel Decorative', cursive;
+            border-radius: 50%;
+            width: 17px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        /* Skull Penalty Balloon */
+        .balloon-entity.skull {
+            background: radial-gradient(circle at 30% 30%, #424242, #212121 60%, #0a0a0a 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.5), 0 0 14px rgba(186, 104, 200, 0.6);
+            border: 2px solid #ab47bc;
+            animation: skullPulse 1s infinite alternate;
+        }
+        .balloon-entity.skull::after { background: #000; }
+        @keyframes skullPulse {
+            0% { filter: drop-shadow(0 0 3px #8e24aa); }
+            100% { filter: drop-shadow(0 0 12px #e91e63); }
+        }
+
         #ground {
             position: absolute;
             bottom: 0;
@@ -587,6 +686,7 @@
 
     <div id="game-container">
         <div id="bullet-time-banner">⚡ BULLET-TIME ⚡</div>
+        <div id="frost-overlay"></div>
         <div id="wave-banner">
             <h3 id="wave-banner-title">✨ ONDA 1 CONCLUÍDA! ✨</h3>
             <p id="wave-banner-desc">+2 Flechas Bônus!</p>
@@ -606,9 +706,9 @@
 
         <div id="instructions">
             <p><strong>Controles:</strong></p>
-            <p>Arraste para mirar e carregar força.</p>
-            <p>Solte para disparar.</p>
+            <p>Arraste para mirar e carregar força. Solte para disparar.</p>
             <p><span class="key">1</span> Normal | <span class="key">2</span> Tripla | <span class="key">3</span> Fogo | <span class="key">4</span> Gravitacional</p>
+            <p style="margin-top: 4px; font-size: 11px; color: #5a2e0a;">💣 TNT | ❄️ Gelo | 🛡️ Blindado | ☠️ Perigo</p>
         </div>
 
         <!-- Clouds -->
@@ -732,6 +832,8 @@
         let waveTargetCount = WAVE_CONFIG[0].targets;
         let isWaveTransitioning = false;
         let isGameOverPending = false;
+        let gameOverTimer = null;
+        let isGameLoopRunning = false;
         let balloonOscTimer = 0;
         let gameOver = false;
         let isDragging = false;
@@ -739,6 +841,8 @@
         let arrowAngle = 0;
         let arrowSpeed = 0;
         let timeScale = 1.0;
+        let isFrozen = false;
+        let freezeTimer = null;
         let bulletTimeTimer = null;
         let isBulletTime = false;
         let windSpeed = 0;
@@ -753,7 +857,7 @@
 
         // Active Entities
         let activeArrows = []; // Array holding active arrow objects: { id, x, y, vx, vy, type, angle, isRicocheted, hasHit, element, extraEl }
-        let balloonData = { x: 600, y: 250, baseY: 250, isGolden: false };
+        let balloonData = { x: 600, y: 250, baseY: 250, type: 'normal', hp: 1, maxHp: 1, isGolden: false };
         let stormCloud = { x: 300, y: 60, vx: 1.2, width: 120, height: 45 };
         let woodenShield = { x: 480, y: 230, radius: 22, angle: 0, rotSpeed: 0.04 };
 
@@ -991,6 +1095,90 @@
             } catch (e) {}
         }
 
+        function playExplosionSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+
+                const bufferSize = audioCtx.sampleRate * 0.25;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                noise.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                noise.start();
+            } catch (e) {}
+        }
+
+        function playFreezeSound() {
+            if (!audioCtx) return;
+            try {
+                const freqs = [1046.50, 1318.51, 1567.98, 2093.00]; // C6, E6, G6, C7
+                freqs.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    const startTime = audioCtx.currentTime + idx * 0.03;
+                    osc.frequency.setValueAtTime(freq, startTime);
+                    gain.gain.setValueAtTime(0.15, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.22);
+                });
+            } catch (e) {}
+        }
+
+        function playMetalHitSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(820, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(240, audioCtx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+            } catch (e) {}
+        }
+
+        function playPenaltySound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(45, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch (e) {}
+        }
+
         // Arrow HUD Selection
         function selectArrowType(type) {
             initAudio();
@@ -1225,7 +1413,8 @@
         });
 
         // Balloon Management
-        function positionBalloon() {
+        function positionBalloon(forcedType) {
+            if (gameOver) return;
             const minX = 400;
             const maxX = 720;
             const minY = 140;
@@ -1234,18 +1423,66 @@
             balloonData.x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
             balloonData.y = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
             balloonData.baseY = balloonData.y;
-            const goldenChance = (typeof currentWave !== 'undefined' && currentWave >= 8) ? 0.35 : 0.22;
-            balloonData.isGolden = Math.random() < goldenChance;
+
+            // Pick balloon type based on current wave or forcedType
+            let chosenType = forcedType;
+            if (!chosenType) {
+                const rand = Math.random();
+                if (currentWave <= 2) {
+                    // Wave 1-2: Normal (78%), Golden (22%)
+                    chosenType = rand < 0.22 ? 'golden' : 'normal';
+                } else if (currentWave <= 4) {
+                    // Wave 3-4: Normal (50%), Golden (20%), TNT (15%), Ice (15%)
+                    if (rand < 0.20) chosenType = 'golden';
+                    else if (rand < 0.35) chosenType = 'tnt';
+                    else if (rand < 0.50) chosenType = 'ice';
+                    else chosenType = 'normal';
+                } else if (currentWave <= 6) {
+                    // Wave 5-6: Normal (35%), Golden (20%), TNT (15%), Ice (15%), Armored (15%)
+                    if (rand < 0.20) chosenType = 'golden';
+                    else if (rand < 0.35) chosenType = 'tnt';
+                    else if (rand < 0.50) chosenType = 'ice';
+                    else if (rand < 0.65) chosenType = 'armored';
+                    else chosenType = 'normal';
+                } else {
+                    // Wave 7-10: Normal (25%), Golden (20%), TNT (15%), Ice (15%), Armored (15%), Skull (10%)
+                    if (rand < 0.20) chosenType = 'golden';
+                    else if (rand < 0.35) chosenType = 'tnt';
+                    else if (rand < 0.50) chosenType = 'ice';
+                    else if (rand < 0.65) chosenType = 'armored';
+                    else if (rand < 0.75) chosenType = 'skull';
+                    else chosenType = 'normal';
+                }
+            }
+
+            balloonData.type = chosenType;
+            balloonData.isGolden = (chosenType === 'golden');
+            balloonData.maxHp = (chosenType === 'armored') ? 2 : 1;
+            balloonData.hp = balloonData.maxHp;
 
             balloon.style.left = `${balloonData.x}px`;
             balloon.style.bottom = `${balloonData.y}px`;
             balloonString.style.left = `${balloonData.x + 20}px`;
             balloonString.style.bottom = `${balloonData.y - 30}px`;
 
-            if (balloonData.isGolden) {
+            // Reset CSS classes & inner elements
+            balloon.className = 'balloon-entity';
+            balloon.innerHTML = '';
+
+            if (chosenType === 'golden') {
                 balloon.classList.add('golden');
-            } else {
-                balloon.classList.remove('golden');
+            } else if (chosenType === 'tnt') {
+                balloon.classList.add('tnt');
+                balloon.innerHTML = '<span class="balloon-icon">💣</span>';
+            } else if (chosenType === 'ice') {
+                balloon.classList.add('ice');
+                balloon.innerHTML = '<span class="balloon-icon">❄️</span>';
+            } else if (chosenType === 'armored') {
+                balloon.classList.add('armored');
+                balloon.innerHTML = '<span class="balloon-icon">🛡️</span><span class="hp-badge" id="balloon-hp-badge">2</span>';
+            } else if (chosenType === 'skull') {
+                balloon.classList.add('skull');
+                balloon.innerHTML = '<span class="balloon-icon">☠️</span>';
             }
 
             balloon.style.display = 'block';
@@ -1305,26 +1542,59 @@
             }
         }
 
+        // Freeze-Time System (Ice Balloon)
+        let savedWindSpeed = 0;
+
+        function activateFreezeTime(duration = 4500) {
+            isFrozen = true;
+            gameContainer.classList.add('frozen-active');
+            savedWindSpeed = windSpeed;
+            windSpeed = 0;
+            windVal.textContent = '❄️ 0.0';
+
+            if (freezeTimer) clearTimeout(freezeTimer);
+            freezeTimer = setTimeout(deactivateFreezeTime, duration);
+        }
+
+        function deactivateFreezeTime() {
+            if (!isFrozen && !freezeTimer) return;
+            isFrozen = false;
+            gameContainer.classList.remove('frozen-active');
+            generateNewWind();
+            if (freezeTimer) {
+                clearTimeout(freezeTimer);
+                freezeTimer = null;
+            }
+        }
+
         // Main Game Physics Loop
         function gameLoop() {
-            if (gameOver) return;
+            if (gameOver) {
+                isGameLoopRunning = false;
+                return;
+            }
+            isGameLoopRunning = true;
 
             const dt = 1.0 * timeScale;
             const currentWaveConfig = WAVE_CONFIG[currentWave - 1] || WAVE_CONFIG[WAVE_CONFIG.length - 1];
 
             // 1. Update Storm Cloud (horizontal bounce)
-            stormCloud.x += stormCloud.vx * dt;
-            if (stormCloud.x <= 200 || stormCloud.x >= 650) {
-                stormCloud.vx *= -1;
+            if (!isFrozen) {
+                stormCloud.x += stormCloud.vx * dt;
+                if (stormCloud.x <= 200 || stormCloud.x >= 650) {
+                    stormCloud.vx *= -1;
+                }
             }
             stormCloudEl.style.left = `${stormCloud.x}px`;
 
             // 2. Update Wooden Shield Rotation
-            woodenShield.angle += woodenShield.rotSpeed * dt;
+            if (!isFrozen) {
+                woodenShield.angle += woodenShield.rotSpeed * dt;
+            }
             woodenShieldEl.style.transform = `rotate(${woodenShield.angle}rad)`;
 
             // 3. Update Balloon Oscillation (Waves 4+)
-            if (currentWaveConfig.oscillation > 0 && balloon.style.display !== 'none') {
+            if (currentWaveConfig.oscillation > 0 && balloon.style.display !== 'none' && !isFrozen) {
                 balloonOscTimer += 0.04 * dt;
                 const offsetY = Math.sin(balloonOscTimer) * currentWaveConfig.oscillation;
                 balloonData.y = Math.max(70, Math.min(430, balloonData.baseY + offsetY));
@@ -1429,6 +1699,53 @@
                         arrowTipY >= balloonBoxBottom && arrowTipY <= balloonBoxTop
                     ) {
                         arrow.hasHit = true;
+
+                        // Case 1: Armored Balloon (2 HP)
+                        if (balloonData.type === 'armored') {
+                            if (arrow.type === 'fire') {
+                                balloonData.hp = 0;
+                                createFloaterText(balloonData.x, balloonData.y + 40, '🔥 ARMADURA DERRETIDA!', '#ff5722');
+                            } else {
+                                balloonData.hp--;
+                                if (balloonData.hp > 0) {
+                                    playMetalHitSound();
+                                    balloon.classList.add('damaged');
+                                    const hpBadge = document.getElementById('balloon-hp-badge');
+                                    if (hpBadge) hpBadge.textContent = '1';
+                                    createSparkEffect(arrowTipX, arrowTipY, '#b0bec5', 14);
+                                    createFloaterText(balloonData.x, balloonData.y + 36, '🛡️ RACHOU! (HP 1/2)', '#ffeb3b');
+                                    if (arrow.type !== 'fire') {
+                                        arrow.element.remove();
+                                        activeArrows.splice(i, 1);
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Case 2: Skull Balloon (Trap Penalty)
+                        if (balloonData.type === 'skull') {
+                            arrowsLeft = Math.max(0, arrowsLeft - 2);
+                            arrowsCounter.textContent = arrowsLeft;
+                            if (comboStreak > 0) playComboBreakSound();
+                            comboStreak = 0;
+                            comboCounter.textContent = comboStreak;
+                            playPenaltySound();
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#9c27b0', 25);
+                            createFloaterText(balloonData.x, balloonData.y + 36, '☠️ ARMADILHA! -2 FLECHAS', '#e91e63');
+
+                            balloon.style.display = 'none';
+                            balloonString.style.display = 'none';
+                            setTimeout(positionBalloon, 1000);
+
+                            if (arrow.type !== 'fire') {
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                            }
+                            continue;
+                        }
+
+                        // Standard Pop & Scoring Sequence:
                         comboStreak++;
                         if (comboStreak > maxCombo) maxCombo = comboStreak;
                         comboCounter.textContent = comboStreak;
@@ -1450,23 +1767,47 @@
                         const refundText = isBullseye ? '🎯 BULLSEYE! +2 FLECHAS' : '🏹 +1 FLECHA';
                         createFloaterText(balloonData.x, balloonData.y + 38, refundText, isBullseye ? '#ffff00' : '#76ff03');
 
-                        const pts = balloonData.isGolden ? 300 : (100 + (comboStreak - 1) * 20);
+                        // Base points by balloon type
+                        let pts = 100 + (comboStreak - 1) * 20;
+                        if (balloonData.type === 'golden') pts = 300;
+                        else if (balloonData.type === 'tnt') pts = 250;
+                        else if (balloonData.type === 'ice') pts = 180;
+                        else if (balloonData.type === 'armored') pts = 220;
+
                         score += pts;
                         scoreElement.textContent = score;
 
-                        // Golden balloon or Combo multiples of 4 gives +1 Ammo Refill!
-                        let refillMsg = '';
-                        if (balloonData.isGolden || comboStreak % 4 === 0) {
-                            const ammoTypes = ['split', 'fire', 'gravity'];
-                            const randomAmmo = ammoTypes[Math.floor(Math.random() * ammoTypes.length)];
-                            ammo[randomAmmo]++;
-                            updateAmmoHUD();
-                            refillMsg = ` +1 ${randomAmmo.toUpperCase()}!`;
+                        // Type-Specific Special Effects
+                        if (balloonData.type === 'tnt') {
+                            playExplosionSound();
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#ff5722', 40);
+                            createFloaterText(balloonData.x, balloonData.y + 18, `💥 BOOM TNT +${pts}!`, '#ff9800');
+                            waveTargetsPopped++; // Bonus pop from blast
+                            stormCloud.vx *= -1.5;
+                            woodenShield.rotSpeed *= -1.3;
+                        } else if (balloonData.type === 'ice') {
+                            playFreezeSound();
+                            activateFreezeTime(4500);
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#00e5ff', 30);
+                            createFloaterText(balloonData.x, balloonData.y + 18, `❄️ CONGELOU O TEMPO! +${pts}`, '#00e5ff');
+                        } else if (balloonData.type === 'armored') {
+                            playMetalHitSound();
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#cfd8dc', 25);
+                            createFloaterText(balloonData.x, balloonData.y + 18, `🛡️ DESTRUÍDO! +${pts}`, '#ffffff');
+                        } else {
+                            // Golden balloon or Combo multiples of 4 gives +1 Ammo Refill!
+                            let refillMsg = '';
+                            if (balloonData.isGolden || comboStreak % 4 === 0) {
+                                const ammoTypes = ['split', 'fire', 'gravity'];
+                                const randomAmmo = ammoTypes[Math.floor(Math.random() * ammoTypes.length)];
+                                ammo[randomAmmo]++;
+                                updateAmmoHUD();
+                                refillMsg = ` +1 ${randomAmmo.toUpperCase()}!`;
+                            }
+                            createFloaterText(balloonData.x, balloonData.y + 16, `+${pts}${refillMsg}`, balloonData.isGolden ? '#ffff00' : '#00ffcc');
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, balloonData.isGolden ? '#ffd700' : '#ff3333', 18);
+                            playPopSound(balloonData.isGolden);
                         }
-
-                        createFloaterText(balloonData.x, balloonData.y + 16, `+${pts}${refillMsg}`, balloonData.isGolden ? '#ffff00' : '#00ffcc');
-                        createSparkEffect(balloonData.x + 20, balloonData.y + 25, balloonData.isGolden ? '#ffd700' : '#ff3333', 18);
-                        playPopSound(balloonData.isGolden);
 
                         balloon.style.display = 'none';
                         balloonString.style.display = 'none';
@@ -1513,13 +1854,15 @@
             // Check Game Over Condition
             if (arrowsLeft === 0 && activeArrows.length === 0 && !gameOver && !isWaveTransitioning && !isGameOverPending) {
                 isGameOverPending = true;
-                setTimeout(endGame, 800);
+                if (gameOverTimer) clearTimeout(gameOverTimer);
+                gameOverTimer = setTimeout(endGame, 800);
             }
 
             requestAnimationFrame(gameLoop);
         }
 
         function completeWave() {
+            deactivateFreezeTime();
             if (currentWave >= maxWaves) {
                 setTimeout(triggerVictory, 600);
                 return;
@@ -1571,9 +1914,15 @@
         }
 
         function triggerVictory() {
+            if (gameOverTimer) {
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
             if (gameOver) return;
             gameOver = true;
+            isGameLoopRunning = false;
             deactivateBulletTime();
+            deactivateFreezeTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
 
             playWaveCompleteSound();
@@ -1599,6 +1948,10 @@
         }
 
         function initGame() {
+            if (gameOverTimer) {
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
             score = 0;
             arrowsLeft = 5;
             comboStreak = 0;
@@ -1633,11 +1986,15 @@
             woodenShield.rotSpeed = WAVE_CONFIG[0].shieldSpeed;
 
             generateNewWind();
+            deactivateFreezeTime();
             positionBalloon();
             deactivateBulletTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
 
-            requestAnimationFrame(gameLoop);
+            if (!isGameLoopRunning) {
+                isGameLoopRunning = true;
+                requestAnimationFrame(gameLoop);
+            }
         }
 
         function restartGame() {
@@ -1645,10 +2002,16 @@
         }
 
         function endGame() {
+            if (gameOverTimer) {
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
             if (gameOver) return;
             gameOver = true;
+            isGameLoopRunning = false;
             if (comboStreak === 0) playComboBreakSound();
             deactivateBulletTime();
+            deactivateFreezeTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
 
             gameOverTitle.textContent = 'Fim de Jogo!';
@@ -1685,16 +2048,62 @@
                 totalHits,
                 selectedArrowType,
                 isBulletTime,
+                isFrozen,
+                gameOver,
+                isGameLoopRunning,
+                balloonType: balloonData.type,
+                balloonHp: balloonData.hp,
                 timeScale,
                 activeArrowsCount: activeArrows.length,
                 ammo: { ...ammo },
                 arrowAngle,
-                arrowSpeed
+                arrowSpeed,
+                windSpeed
             }),
+            gameLoop,
+            step: (frames = 1) => {
+                for (let f = 0; f < frames; f++) {
+                    gameLoop();
+                }
+            },
             selectArrowType,
             spawnArrow,
+            spawnArrowAt: (x, y, vx, vy, type = 'normal') => {
+                const arrowEl = document.createElement('div');
+                arrowEl.className = `arrow-entity type-${type}`;
+                arrowEl.innerHTML = '<div class="arrowhead"></div>';
+                let extraEl = null;
+                if (type === 'gravity') {
+                    extraEl = document.createElement('div');
+                    extraEl.className = 'gravity-field';
+                    arrowEl.appendChild(extraEl);
+                }
+                arrowEl.style.left = `${x}px`;
+                arrowEl.style.bottom = `${y}px`;
+                const angle = Math.atan2(vy, vx);
+                arrowEl.style.transform = `rotate(${-angle}rad)`;
+                gameContainer.appendChild(arrowEl);
+                const arrowObj = {
+                    id: Math.random(),
+                    x: x,
+                    y: y,
+                    vx: vx,
+                    vy: vy,
+                    angle: angle,
+                    type: type,
+                    isRicocheted: false,
+                    hasHit: false,
+                    element: arrowEl,
+                    extraEl: extraEl
+                };
+                activeArrows.push(arrowObj);
+                return arrowObj;
+            },
+            fireArrows,
             activateBulletTime,
             deactivateBulletTime,
+            activateFreezeTime,
+            deactivateFreezeTime,
             initAudio,
             playPopSound,
             playBounceSound,
@@ -1703,10 +2112,16 @@
             playLaunchSound,
             playArrowRefundSound,
             playWaveCompleteSound,
+            playExplosionSound,
+            playFreezeSound,
+            playMetalHitSound,
+            playPenaltySound,
             stormCloud,
             woodenShield,
             balloonData,
             initGame,
+            positionBalloon,
+            setBalloonType: (type) => positionBalloon(type),
             setAmmo: (type, val) => { ammo[type] = val; updateAmmoHUD(); },
             getActiveArrows: () => activeArrows,
             getTrajectoryDots: () => trajectoryDots,
