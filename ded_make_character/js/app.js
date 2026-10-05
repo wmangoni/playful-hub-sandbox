@@ -4,6 +4,7 @@ import { createRouter } from './core/router.js';
 import { createStore } from './core/store.js';
 import { AUX_TABLES, ENTITIES, REFERENCE_TABLES, RETIRED_TABLES, TABLES, entityBySlug } from './entities/index.js';
 import { renderArena } from './pages/arena.js';
+import { renderBestiario } from './pages/bestiario.js';
 import { renderForm, renderList } from './pages/crud.js';
 import { renderHome } from './pages/home.js';
 import { renderSheet } from './pages/sheet.js';
@@ -98,6 +99,7 @@ const router = createRouter({
     { name: 'home', pattern: '/' },
     // antes das genéricas: '/:module' casaria com "arena"
     { name: 'arena', pattern: '/arena' },
+    { name: 'bestiario', pattern: '/bestiario' },
     { name: 'list', pattern: '/:module' },
     { name: 'create', pattern: '/:module/novo' },
     { name: 'edit', pattern: '/:module/:id/editar' },
@@ -113,6 +115,12 @@ const router = createRouter({
     if (name === 'arena') {
       const page = mountPage('Arena', 'arena');
       cleanup = await renderArena({ root: page, router, query, store }) || null;
+      focusTitle();
+      return;
+    }
+    if (name === 'bestiario') {
+      const page = mountPage('Bestiário', 'bestiario');
+      cleanup = await renderBestiario({ root: page, router, query, store }) || null;
       focusTitle();
       return;
     }
@@ -165,14 +173,14 @@ store.subscribe(event => {
   if (event.type === 'corrupted') {
     toast({ type: 'error', title: 'Cópia local descartada', message: 'Os dados salvos neste navegador estavam corrompidos. Voltamos aos dados originais.' });
   }
-  // a Arena lê os personagens do store: recarrega na montagem, mas não com luta ou diálogo aberto
-  // (recarregar apagaria a luta em andamento)
-  const arenaOcupada = router.current?.name === 'arena' && cleanup?.ocupada?.();
-  if (event.type === 'external' && arenaOcupada) {
+  // a Arena (e o Bestiário) leem o store: recarregam na montagem, mas não com luta, diálogo ou card aberto
+  // (recarregar apagaria a luta em andamento ou fecharia o card)
+  const telaOcupada = Boolean(cleanup?.ocupada?.());
+  if (event.type === 'external' && telaOcupada) {
     cleanup.adiar();
-    toast({ type: 'info', title: 'Dados alterados em outra aba', message: 'A Arena se atualiza quando você voltar à montagem ou fechar o diálogo.' });
+    toast({ type: 'info', title: 'Dados alterados em outra aba', message: cleanup.avisoAdiado ?? 'A tela se atualiza quando você fechar o diálogo.' });
   }
-  if (event.type === 'external' && !arenaOcupada) {
+  if (event.type === 'external' && !telaOcupada) {
     const onForm = ['create', 'edit'].includes(router.current?.name);
     const loteCancelado = router.current?.name === 'arena' && cleanup?.loteRodando?.();
     toast({ type: 'info', title: 'Dados alterados em outra aba', message: onForm ? 'Salve ou cancele este formulário para ver as mudanças.' : `A tela foi atualizada.${loteCancelado ? ' A simulação em lote foi cancelada.' : ''}` });
@@ -196,7 +204,7 @@ document.addEventListener('click', async event => {
   const loteCancelado = router.current?.name === 'arena' && !cleanup?.ocupada?.() && cleanup?.loteRodando?.();
   store.restoreAll();
   toast({ type: 'info', title: 'Dados originais restaurados', message: `Todas as tabelas voltaram ao estado original.${loteCancelado ? ' A simulação em lote foi cancelada.' : ''}` });
-  if (router.current?.name === 'arena' && cleanup?.ocupada?.()) cleanup.adiar(); // recarrega quando a luta ou o diálogo terminar
+  if (cleanup?.ocupada?.()) cleanup.adiar(); // recarrega quando a luta, o diálogo ou o card terminar
   else if (!['create', 'edit'].includes(router.current?.name)) router.reload();
 });
 

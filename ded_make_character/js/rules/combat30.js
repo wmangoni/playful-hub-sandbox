@@ -26,7 +26,7 @@ const TIPOS_SEM_CRITICO = ['Morto-Vivo', 'Constructo', 'Limo', 'Planta', 'Elemen
 const TIPOS_DESTRUIDOS_EM_ZERO = ['Morto-Vivo', 'Constructo'];
 /** Imunidades que o tipo dá na 3.0 (monster_overview do SRD), somadas às do catálogo. */
 const MORTO_OU_CONSTRUCTO = ['efeitos de ação mental', 'veneno', 'sono', 'paralisia', 'atordoamento', 'doença', 'efeitos de morte', 'acertos críticos', 'dano de atributo', 'dreno de energia', 'dano por contusão'];
-const IMUNIDADES_DE_TIPO = {
+export const IMUNIDADES_DE_TIPO = {
   'Morto-Vivo': MORTO_OU_CONSTRUCTO,
   Constructo: MORTO_OU_CONSTRUCTO,
   Limo: ['efeitos de ação mental', 'veneno', 'sono', 'paralisia', 'atordoamento', 'metamorfose', 'acertos críticos'],

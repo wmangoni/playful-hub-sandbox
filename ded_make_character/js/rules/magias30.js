@@ -394,7 +394,45 @@ const BONUS = {
   for: v => `${sinal(v)} de Força`,
   contra_medo: v => `${sinal(v)} contra medo`,
   anula: v => `anula ${v}`,
+  // os que só as magias do catálogo usam (card, TASK_010)
+  ca_deflexao: v => `${sinal(v)} CA de deflexão`,
+  resistencias: v => `${sinal(v)} em todos os testes de resistência`,
+  fort: v => `${sinal(v)} em Fortitude`,
+  ref: v => `${sinal(v)} em Reflexos`,
+  von: v => `${sinal(v)} em Vontade`,
+  des: v => `${sinal(v)} de Destreza`,
+  con: v => `${sinal(v)} de Constituição`,
+  int: v => `${sinal(v)} de Inteligência`,
+  sab: v => `${sinal(v)} de Sabedoria`,
+  car: v => `${sinal(v)} de Carisma`,
+  pv_temporarios: v => `${v} PV temporários`,
+  camuflagem_pct: v => `${v}% de chance de o ataque errar (camuflagem)`,
+  niveis_negativos: v => `${v} ${v === 1 ? 'nível negativo' : 'níveis negativos'}`,
+  penalidade_for: v => `${v} de penalidade de Força`,
+  imagens: v => `${danoLegivel(v)} imagens`,
+  acoes_extras: v => `${v} ação extra por rodada`,
+  rm: v => `RM ${v}`,
+  bba_efetivo: v => `BBA efetivo ${v}`,
+  for_minima: v => `Força mínima ${v}`,
+  tamanho: v => `tamanho ${v}`,
+  dano_arma: v => `dano da arma ${v}`,
+  pericias: v => Object.entries(v).map(([k, x]) => `${sinal(x)} em ${k}`).join(', '),
 };
+
+/** As chaves de `bonus` que `bonusLegivel` sabe escrever (outros efeitos usam `bonus` com outro formato). */
+export const chavesDeBonus = Object.keys(BONUS);
+
+/** "+7 CA, +3 em Reflexos contra área": os bônus de uma magia (`bonus` da mecânica) em texto. */
+export const bonusLegivel = bonus => Object.entries(bonus).map(([k, v]) => (BONUS[k] ? BONUS[k](v) : `${k.replace(/_/g, ' ')} ${v}`)).join(', ');
+
+/** Dano ou cura fixos vêm como "0d0+60" no catálogo: "60"; "0d0" é "sem dano". O resto fica como está. */
+export function danoLegivel(dano) {
+  const texto = String(dano);
+  const m = /^0d0([+-]\d+)?$/.exec(texto);
+  if (!m) return texto;
+  const fixo = Number(m[1]);
+  return fixo ? String(fixo).replace('-', '−') : 'sem dano';
+}
 
 /**
  * Os números de uma magia, em uma linha: "5d6 de fogo · raio 6 m · Reflexos CD 16 para metade".
@@ -404,12 +442,12 @@ export function detalheDaMagia(m, cd) {
   if (!m) return '';
   const partes = [];
   const tipos = [].concat(m.tipo_energia || []);
-  if (m.dano) partes.push(`${m.dano}${tipos.length ? ` de ${tipos.join(' e ')}` : ''}${(m.dano_extra || []).map(d => ` + ${d.dano} de ${d.tipo}`).join('')}`);
+  if (m.dano) partes.push(`${danoLegivel(m.dano)}${tipos.length ? ` de ${tipos.join(' e ')}` : ''}${(m.dano_extra || []).map(d => ` + ${d.dano} de ${d.tipo}`).join('')}`);
   if (m.continuo) partes.push(`mais ${m.continuo.dano} por rodada em ${m.continuo.rodadas === 1 ? '1 rodada' : `${m.continuo.rodadas} rodadas`}`);
-  if (m.cura) partes.push(`cura ${m.cura}`);
+  if (m.cura) partes.push(`cura ${danoLegivel(m.cura)}`);
   if (m.limite_dv) partes.push(`${m.limite_dv} DV`);
   if (m.condicao) partes.push(`${m.condicao}${m.duracao ? ` por ${m.duracao}` : ''}`);
-  if (m.bonus) partes.push(Object.entries(m.bonus).map(([k, v]) => (BONUS[k] ? BONUS[k](v) : `${k} ${v}`)).join(', ') + (m.somente_arma ? ` (${m.somente_arma.nome})` : ''));
+  if (m.bonus) partes.push(bonusLegivel(m.bonus) + (m.somente_arma ? ` (${m.somente_arma.nome})` : ''));
   if (m.alvo === 'aliados') partes.push('em todos os aliados');
   if (m.ataque) partes.push(m.ataque === 'toque a distancia' ? 'toque à distância' : m.ataque);
   if (m.acerto_automatico) partes.push('acerta sempre');
