@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -9,151 +9,507 @@
     })(window,document,'script','dataLayer','GTM-KM6SHZXP');</script>
     <!-- End Google Tag Manager -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Game Museum - PlayfulHub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+    <title>Retro Game Museum - PlayfulHub | Modo Museu Interativo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        @font-face {
-            font-family: 'PixelFont';
-            src: url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        :root {
+            --pixel-font: 'Press Start 2P', monospace;
+            --sans-font: 'Outfit', sans-serif;
+            --accent-green: #00ff88;
+            --accent-cyan: #00e5ff;
+            --accent-purple: #b388ff;
+            --accent-gold: #ffd700;
+            --accent-red: #ff5252;
+            --bg-dark: #0a0c10;
+            --card-glass: rgba(16, 20, 30, 0.88);
+            --border-glass: rgba(0, 255, 136, 0.35);
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'PixelFont', monospace;
-            image-rendering: pixelated;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        
+
         body {
-            background-color: #111;
-            color: #8F8F8F;
+            background-color: var(--bg-dark);
+            color: #e0e0e0;
             overflow: hidden;
             height: 100vh;
+            width: 100vw;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
+            font-family: var(--sans-font);
         }
-        
-        canvas {
-            background-color: #000;
-            border: 4px solid #333;
+
+        #game-wrapper {
+            position: relative;
+            width: 1000px;
+            height: 600px;
+            max-width: 100vw;
+            max-height: 100vh;
+            background: #000;
+            border: 4px solid #1a2230;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.15), 0 20px 50px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+        }
+
+        canvas#gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            background-color: #05070a;
         }
-        
-        #game-container {
-            position: relative;
-        }
-        
-        #ui-layer {
+
+        /* Scanline CRT Overlay */
+        #crt-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 6px 100%;
+            z-index: 20;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
         }
-        
-        #top-bar {
-            display: flex;
-            justify-content: space-between;
-            color: #00FF66;
-            font-size: 12px;
-            text-shadow: 2px 2px 0 #000;
+        #crt-overlay.disabled {
+            opacity: 0;
         }
-        
-        #bottom-bar {
-            color: #00FF66;
-            font-size: 12px;
-            text-shadow: 2px 2px 0 #000;
-            text-align: center;
-        }
-        
-        #info-panel {
+
+        /* Top HUD Bar */
+        #top-hud {
             position: absolute;
-            bottom: 40px;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .hud-panel {
+            background: var(--card-glass);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 8px 14px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #museum-badge {
+            font-family: var(--pixel-font);
+            font-size: 11px;
+            color: var(--accent-green);
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #current-zone {
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            padding-left: 8px;
+            border-left: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #progress-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--pixel-font);
+            font-size: 10px;
+            color: var(--accent-gold);
+        }
+
+        .hud-actions {
+            display: flex;
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        .hud-btn {
+            background: rgba(20, 26, 38, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-family: var(--sans-font);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+        .hud-btn:hover {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            transform: translateY(-1px);
+        }
+
+        /* Minimap Overlay */
+        #minimap-card {
+            position: absolute;
+            top: 60px;
+            right: 12px;
+            background: var(--card-glass);
+            backdrop-filter: blur(8px);
+            border: 2px solid rgba(0, 255, 136, 0.4);
+            border-radius: 8px;
+            padding: 6px;
+            z-index: 30;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        #minimap-card.hidden {
+            transform: scale(0.8);
+            opacity: 0;
+            pointer-events: none;
+        }
+        #minimap-title {
+            font-family: var(--pixel-font);
+            font-size: 8px;
+            color: var(--accent-green);
+            text-align: center;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+        #minimapCanvas {
+            display: block;
+            border-radius: 4px;
+            background: #080d14;
+        }
+
+        /* Bottom Controls Helper */
+        #bottom-hud {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        #controls-legend {
+            background: var(--card-glass);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #ccc;
+            display: flex;
+            gap: 16px;
+            pointer-events: auto;
+        }
+        .key-badge {
+            background: #1c2430;
+            border: 1px solid #334155;
+            color: var(--accent-green);
+            font-family: var(--pixel-font);
+            font-size: 9px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            box-shadow: 0 2px 0 #0f172a;
+        }
+
+        /* Exhibit Interaction Prompt */
+        #interaction-prompt {
+            position: absolute;
+            bottom: 60px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 2px solid #00FF66;
-            padding: 15px;
-            width: 80%;
-            max-width: 500px;
-            border-radius: 5px;
-            color: #00FF66;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid var(--accent-green);
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-family: var(--pixel-font);
+            font-size: 11px;
+            color: #fff;
             display: none;
-            text-align: center;
+            align-items: center;
+            gap: 8px;
+            z-index: 35;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+            animation: pulsePrompt 1.2s infinite alternate;
         }
-        
-        #info-panel h3 {
-            margin-bottom: 10px;
-            font-size: 18px;
+        @keyframes pulsePrompt {
+            0% { transform: translateX(-50%) scale(0.96); box-shadow: 0 0 10px rgba(0, 255, 136, 0.4); }
+            100% { transform: translateX(-50%) scale(1.04); box-shadow: 0 0 25px rgba(0, 255, 136, 0.8); }
         }
-        
-        #info-panel p {
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        
-        #info-panel button {
-            background-color: #00FF66;
-            color: #000;
-            border: none;
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            font-family: 'PixelFont', monospace;
-        }
-        
-        #info-panel button:hover {
-            background-color: #00CC33;
-        }
-        
-        #loading {
+
+        /* Glassmorphic Game Details Modal */
+        #game-modal {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: #000;
-            display: flex;
-            flex-direction: column;
+            background: rgba(4, 6, 10, 0.8);
+            backdrop-filter: blur(10px);
+            display: none;
             justify-content: center;
             align-items: center;
-            color: #00FF66;
-            font-size: 24px;
+            z-index: 50;
+            padding: 20px;
         }
-        
-        #loading-bar {
-            width: 200px;
-            height: 20px;
-            border: 2px solid #00FF66;
-            margin-top: 20px;
+        #game-modal.active {
+            display: flex;
         }
-        
-        #loading-progress {
+
+        .modal-card {
+            background: linear-gradient(135deg, rgba(16, 24, 38, 0.95) 0%, rgba(10, 14, 24, 0.98) 100%);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 35px rgba(0, 255, 136, 0.25), 0 20px 50px rgba(0, 0, 0, 0.9);
+            border-radius: 14px;
+            width: 90%;
+            max-width: 640px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: modalPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes modalPop {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header-media {
+            position: relative;
+            width: 100%;
+            height: 210px;
+            background: #05070a;
+            overflow: hidden;
+        }
+        .modal-header-media img {
+            width: 100%;
             height: 100%;
-            background-color: #00FF66;
-            width: 0%;
-            transition: width 0.5s;
+            object-fit: cover;
+            transition: transform 0.4s ease;
         }
-        
-        #instructions {
+        .modal-card:hover .modal-header-media img {
+            transform: scale(1.03);
+        }
+        .modal-media-overlay {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            color: #00FF66;
-            font-size: 12px;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #00FF66;
+            inset: 0;
+            background: linear-gradient(to top, rgba(10, 14, 24, 1) 0%, rgba(10, 14, 24, 0.2) 60%, rgba(0, 0, 0, 0.5) 100%);
+        }
+
+        .modal-badges {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            gap: 8px;
+            z-index: 2;
+        }
+        .category-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: rgba(0, 229, 255, 0.2);
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+            backdrop-filter: blur(4px);
+        }
+        .tech-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255, 215, 0, 0.2);
+            color: var(--accent-gold);
+            border: 1px solid var(--accent-gold);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 5;
+            transition: all 0.2s;
+        }
+        .modal-close-btn:hover {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+            transform: scale(1.1);
+        }
+
+        .modal-body {
+            padding: 18px 24px;
+        }
+        .modal-title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .modal-icon {
+            font-size: 28px;
+        }
+        .modal-title {
+            font-family: var(--pixel-font);
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+        }
+        .modal-desc {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #b0b9c6;
+            margin-bottom: 18px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 0 24px 20px;
+        }
+        .btn-modal {
+            font-family: var(--sans-font);
+            font-size: 13px;
+            font-weight: 700;
+            padding: 10px 22px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
+        .btn-modal-cancel {
+            background: rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .btn-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+        .btn-modal-play {
+            background: var(--accent-green);
+            color: #05070a;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
+        }
+        .btn-modal-play:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 255, 136, 0.6);
+        }
+
+        /* Mobile D-Pad Touch Controls */
+        #touch-controls {
+            position: absolute;
+            bottom: 18px;
+            left: 18px;
+            display: none;
+            grid-template-columns: repeat(3, 44px);
+            grid-template-rows: repeat(3, 44px);
+            gap: 6px;
+            z-index: 40;
+            pointer-events: auto;
+        }
+        .dpad-btn {
+            background: rgba(20, 26, 38, 0.75);
+            border: 1.5px solid rgba(0, 255, 136, 0.35);
+            color: #fff;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            user-select: none;
+        }
+        .dpad-btn:active {
+            background: var(--accent-green);
+            color: #000;
+        }
+        #touch-action {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.25);
+            border: 2px solid var(--accent-green);
+            color: #fff;
+            font-family: var(--pixel-font);
+            font-size: 10px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 40;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+        #touch-action:active {
+            background: var(--accent-green);
+            color: #000;
+            transform: scale(0.92);
+        }
+
+        @media (max-width: 768px), (pointer: coarse) {
+            #touch-controls, #touch-action {
+                display: grid;
+            }
+            #touch-action {
+                display: flex;
+            }
+            #controls-legend {
+                display: none;
+            }
+            #minimap-card {
+                top: 50px;
+                right: 8px;
+                transform: scale(0.85);
+                transform-origin: top right;
+            }
         }
     </style>
 </head>
@@ -162,608 +518,1432 @@
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
-    
-    <div id="game-container">
-        <canvas id="gameCanvas" width="800" height="500"></canvas>
-        
-        <div id="ui-layer">
-            <div id="top-bar">
-                <div id="location">RETRO MUSEUM</div>
-                <div id="game-count">GAMES: 0/0</div>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="1000" height="600"></canvas>
+        <div id="crt-overlay"></div>
+
+        <!-- Top HUD -->
+        <div id="top-hud">
+            <div class="hud-panel">
+                <div id="museum-badge">🏛️ PLAYFUL MUSEUM</div>
+                <div id="current-zone">Lobby Central</div>
             </div>
-            <div id="bottom-bar">ARROW KEYS TO MOVE | SPACE TO INTERACT</div>
-        </div>
-        
-        <div id="info-panel">
-            <h3>Game Title</h3>
-            <p>Game description goes here.</p>
-            <button id="play-button">PLAY GAME</button>
-        </div>
-        
-        <div id="instructions">
-            <p>↑↓←→: Move around</p>
-            <p>SPACE: Interact with exhibits</p>
-            <p>ESC: Hide info panel</p>
-        </div>
-        
-        <div id="loading">
-            <div>LOADING MUSEUM...</div>
-            <div id="loading-bar">
-                <div id="loading-progress"></div>
+
+            <div class="hud-panel">
+                <div id="progress-container">
+                    <span>EXPLORADOS:</span>
+                    <span id="visited-counter">0 / 27</span>
+                </div>
+            </div>
+
+            <div class="hud-actions">
+                <button class="hud-btn" id="audio-toggle-btn" title="Alternar Som">🔊 Som</button>
+                <button class="hud-btn" id="crt-toggle-btn" title="Alternar Filtro CRT">📺 CRT</button>
+                <button class="hud-btn" id="map-toggle-btn" title="Alternar Minimapa">🗺️ Mapa</button>
+                <a href="./index.html" class="hud-btn" title="Voltar para a Página Inicial">🏠 Sair</a>
             </div>
         </div>
-        
-        <a href="./rubiks_cube/index.html" class="play-button">
-            <div class="game-card">
-                <div class="game-icon puzzle-icon"><span class="icon-centered">🧩</span></div>
-                <h3 class="game-title">Rubik's Cube</h3>
-                <p class="game-description">Solve the classic Rubik's Cube in 3D!</p>
-                <span>Play Now</span>
+
+        <!-- Minimap Card -->
+        <div id="minimap-card">
+            <div id="minimap-title">RADAR DO MUSEU</div>
+            <canvas id="minimapCanvas" width="150" height="125"></canvas>
+        </div>
+
+        <!-- Bottom Controls Legend -->
+        <div id="bottom-hud">
+            <div id="controls-legend">
+                <div><span class="key-badge">WASD</span> / <span class="key-badge">SETAS</span> Caminhar</div>
+                <div><span class="key-badge">ESPAÇO</span> / <span class="key-badge">E</span> Inspecionar Jogo</div>
+                <div><span class="key-badge">ESC</span> Fechar Janela</div>
+                <div><span class="key-badge">M</span> Minimapa</div>
             </div>
-        </a>
+        </div>
+
+        <!-- Mobile Touch Controls -->
+        <div id="touch-controls">
+            <div></div>
+            <div class="dpad-btn" id="dpad-up">▲</div>
+            <div></div>
+            <div class="dpad-btn" id="dpad-left">◀</div>
+            <div></div>
+            <div class="dpad-btn" id="dpad-right">▶</div>
+            <div></div>
+            <div class="dpad-btn" id="dpad-down">▼</div>
+            <div></div>
+        </div>
+        <button id="touch-action">AÇÃO</button>
+
+        <!-- Exhibit Interaction Prompt -->
+        <div id="interaction-prompt">
+            <span class="key-badge">ESPAÇO</span>
+            <span id="prompt-game-title">Inspecionar Jogo</span>
+        </div>
+
+        <!-- Game Details Modal -->
+        <div id="game-modal">
+            <div class="modal-card">
+                <div class="modal-header-media">
+                    <div class="modal-badges">
+                        <span class="category-badge" id="modal-category">3D & WebGL</span>
+                        <span class="tech-badge" id="modal-tech">Three.js</span>
+                    </div>
+                    <button class="modal-close-btn" id="modal-close-x">✕</button>
+                    <img id="modal-preview-img" src="./assets/images/bg_neon_game.jpeg" alt="Preview">
+                    <div class="modal-media-overlay"></div>
+                </div>
+
+                <div class="modal-body">
+                    <div class="modal-title-row">
+                        <span class="modal-icon" id="modal-icon">🎮</span>
+                        <h2 class="modal-title" id="modal-title">Título do Jogo</h2>
+                    </div>
+                    <p class="modal-desc" id="modal-desc">Descrição completa do jogo.</p>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-modal btn-modal-cancel" id="modal-cancel-btn">Explorar Museu</button>
+                    <a href="#" class="btn-modal btn-modal-play" id="modal-play-btn">▶ JOGAR AGORA</a>
+                </div>
+            </div>
+        </div>
     </div>
-    
-    <!-- Game of Life Card -->
-    <div class="card">
-        <img src="images/gameoflife.png" alt="Game of Life" onerror="this.src='images/placeholder.png'">
-        <div class="card-content">
-            <h3>Conway's Game of Life</h3>
-            <p>A cellular automaton simulation where cells live or die based on simple rules.</p>
-            <a href="gameoflife/index.html" class="btn">Play Game</a>
-        </div>
-    </div>
-    
+
     <script>
-        // Museum and game setup
+        // ==============================================================
+        // PLAYFULHUB RETRO MUSEUM - MOTOR 2D DE EXPOSIÇÃO
+        // ==============================================================
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const infoPanel = document.getElementById('info-panel');
-        const playButton = document.getElementById('play-button');
-        const gameCountDisplay = document.getElementById('game-count');
-        const loadingScreen = document.getElementById('loading');
-        
-        // Pixel size for rendering (makes everything more pixelated)
-        const PIXEL_SIZE = 4;
-        
-        // Player settings
-        const player = {
-            x: 400,
-            y: 400,
-            width: 20,
-            height: 30,
-            speed: 3,
-            direction: 'down',
-            frameCount: 0,
-            animationFrame: 0
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const miniCtx = minimapCanvas.getContext('2d');
+
+        const currentZoneEl = document.getElementById('current-zone');
+        const visitedCounterEl = document.getElementById('visited-counter');
+        const interactionPrompt = document.getElementById('interaction-prompt');
+        const promptGameTitle = document.getElementById('prompt-game-title');
+        const gameModal = document.getElementById('game-modal');
+        const crtOverlay = document.getElementById('crt-overlay');
+        const minimapCard = document.getElementById('minimap-card');
+
+        // Modal Elements
+        const modalCategory = document.getElementById('modal-category');
+        const modalTech = document.getElementById('modal-tech');
+        const modalPreviewImg = document.getElementById('modal-preview-img');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalPlayBtn = document.getElementById('modal-play-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const modalCloseX = document.getElementById('modal-close-x');
+
+        // Global Museum Dimensions
+        const museum = {
+            width: 2400,
+            height: 2000,
+            tileSize: 32
         };
-        
-        // Camera settings
+
+        // Camera
         const camera = {
             x: 0,
             y: 0,
             width: canvas.width,
             height: canvas.height
         };
-        
-        // Museum settings
-        const museum = {
-            width: 1600,
-            height: 1200,
-            tileSize: 32
+
+        // Player
+        const player = {
+            x: 1200,
+            y: 1050,
+            width: 22,
+            height: 32,
+            speed: 4,
+            direction: 'down',
+            animFrame: 0,
+            animTimer: 0,
+            isMoving: false
         };
-        
-        // Controls
-        const keys = {
-            ArrowUp: false,
-            ArrowDown: false,
-            ArrowLeft: false,
-            ArrowRight: false,
-            ' ': false, // Space
-            Escape: false
-        };
-        
-        // List of games from the original index.html
-        const games = [
+
+        // Audio System (Web Audio API)
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioClass) audioCtx = new AudioClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playStepSound() {
+            if (isMuted || !audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(110 + Math.random() * 20, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.04);
+            } catch (e) {}
+        }
+
+        function playChimeSound() {
+            if (isMuted || !audioCtx) return;
+            try {
+                const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5
+                freqs.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.05);
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime + idx * 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.05 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(audioCtx.currentTime + idx * 0.05);
+                    osc.stop(audioCtx.currentTime + idx * 0.05 + 0.2);
+                });
+            } catch (e) {}
+        }
+
+        function playWarpSound() {
+            if (isMuted || !audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } catch (e) {}
+        }
+
+        // ==============================================================
+        // CATÁLOGO COMPLETO DE JOGOS DO MUSEU (27 JOGOS)
+        // ==============================================================
+
+        const MUSEUM_GAMES = [
+            // --- ALA NORTE: 3D & WebGL Expo (6 jogos) ---
             {
-                title: "Block Stacker",
-                description: "The classic block-stacking puzzle game. Arrange falling blocks to create complete rows and earn points.",
-                path: "./block_stacker/index.html",
-                icon: "🧱",
-                x: 200,
-                y: 150,
-                color: "#FF5733"
+                id: 'tumbalacatumba',
+                title: 'Tumbalacatumba',
+                category: '3d',
+                categoryLabel: '3D & Gráficos',
+                techTag: 'Three.js / 3D',
+                icon: '💀',
+                path: './jogos/tumbalacatumba',
+                previewImg: './assets/images/tumbalacatumba_preview.png',
+                description: 'RPG de mundo aberto com visual cartunesco à la Tim Burton. Explore o vale assombrado, cumpra missões e descubra segredos procedurais.',
+                x: 850, y: 280,
+                color: '#9c27b0'
             },
             {
-                title: "String Catcher",
-                description: "Capture musical notes on vibrating strings in this rhythmic arcade game.",
-                path: "./visual_effects/index.html",
-                icon: "🎵",
-                x: 400,
-                y: 150,
-                color: "#33FF57"
+                id: 'blender_game',
+                title: 'FPS Orla do Gasômetro 3D',
+                category: '3d',
+                categoryLabel: '3D & Gráficos',
+                techTag: 'Three.js / WebGL',
+                icon: '✈️',
+                path: './jogos/blender_game',
+                previewImg: './assets/images/gasometro_preview.png',
+                description: 'FPS 3D fotorealista na Orla do Gasômetro: combata patrulhas aéreas e o Titã Dreadnought com Jetpack e tráfego dinâmico.',
+                x: 1100, y: 220,
+                color: '#00e5ff'
             },
             {
-                title: "Snake",
-                description: "Control a snake as it grows by eating food, but don't hit the walls or your own tail!",
-                path: "./snake/index.html",
-                icon: "🐍",
-                x: 600,
-                y: 150,
-                color: "#3357FF"
+                id: '3d_shooter',
+                title: '3D Shooter',
+                category: '3d',
+                categoryLabel: '3D & Gráficos',
+                techTag: 'Three.js',
+                icon: '🔫',
+                path: './jogos/3d_shooter',
+                previewImg: './assets/images/3d_shooter_preview.png',
+                description: 'FPS retro no estilo clássico de Doom. Navegue pelo labirinto 3D, elimine inimigos e sobreviva.',
+                x: 1350, y: 220,
+                color: '#ff9800'
             },
             {
-                title: "Space Shooter",
-                description: "Defend Earth from alien invaders in this fast-paced space arcade game.",
-                path: "./space_shooter/index.html",
-                icon: "🚀",
-                x: 200,
-                y: 300,
-                color: "#FF33A8"
+                id: 'voxel_city',
+                title: 'Voxel City Delivery',
+                category: '3d',
+                categoryLabel: '3D & Gráficos',
+                techTag: 'Three.js / Voxels',
+                icon: '🏙️',
+                path: './jogos/voxel_city',
+                previewImg: './assets/images/voxel_city_preview.png',
+                description: 'Explore uma metrópole vibrante em voxel 3D, colete pacotes e faça entregas neste mundo aberto.',
+                x: 1550, y: 280,
+                color: '#4caf50'
             },
             {
-                title: "Driving Simulator",
-                description: "Drive for a road in a beatiful place.",
-                path: "./driving_simulator/index.html",
-                icon: "🚗",
-                x: 400,
-                y: 300,
-                color: "#FF9933"
+                id: 'threejs_earth',
+                title: 'Three.js Earth',
+                category: '3d',
+                categoryLabel: '3D & Gráficos',
+                techTag: 'WebGL Shaders',
+                icon: '🌍',
+                path: './jogos/threejs_earth',
+                previewImg: './assets/images/threejs_earth_preview.png',
+                description: 'Globo terrestre 3D interativo com rastreamento orbital de satélites e efeitos de tempestades solares.',
+                x: 950, y: 520,
+                color: '#2196f3'
             },
             {
-                title: "Galton board",
-                description: "A simple simulator of Galton board.",
-                path: "./tabuleiro_galton/index.html",
-                icon: "🧔",
-                x: 800,
-                y: 300,
-                color: "#FF9933"
+                id: 'voxel_arena',
+                title: 'Voxel Arena',
+                category: '3d',
+                categoryLabel: '3D & Gráficos',
+                techTag: 'Three.js / Ação',
+                icon: '⚔️',
+                path: './jogos/voxel_arena',
+                previewImg: './assets/images/voxel_arena_preview.png',
+                description: 'Hack and slash dinâmico em arena de sobrevivência. Enfrente ondas de inimigos, suba de nível e derrote o boss.',
+                x: 1450, y: 520,
+                color: '#e91e63'
+            },
+
+            // --- ALA OESTE: Ação & Arcade (7 jogos) ---
+            {
+                id: 'blood_and_silver',
+                title: 'Sangue & Prata',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Canvas 2D Roguelite',
+                icon: '🧛',
+                path: './jogos/blood_and_silver',
+                previewImg: './assets/images/blood_and_silver_preview.png',
+                description: 'Sobreviva a hordas infinitas de mortos-vivos neste roguelite gótico com auto-ataque e upgrades.',
+                x: 240, y: 750,
+                color: '#b71c1c'
             },
             {
-                title: "Archer",
-                description: "Try to hit the red balloon with your bow and arrow!",
-                path: "./archer/index.html",
-                icon: "🏹",
-                x: 600,
-                y: 300,
-                color: "#33FFCF"
+                id: 'space_shooter',
+                title: 'Space Shooter',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Canvas Arcade',
+                icon: '🚀',
+                path: './jogos/space_shooter',
+                previewImg: './assets/images/space_shooter_preview.png',
+                description: 'Reviva a era de ouro dos shoot em ups espaciais clássicos com combate ágil e power-ups.',
+                x: 500, y: 750,
+                color: '#00bcd4'
             },
             {
-                title: "Poker",
-                description: "Play Texas Hold'em Poker against AI opponents.",
-                path: "./poker/index.html",
-                icon: "♠️",
-                x: 200,
-                y: 450,
-                color: "#DD33FF"
+                id: 'pinball',
+                title: 'Neon Pinball',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Física 2D / Neon',
+                icon: '🪩',
+                path: './jogos/pinball',
+                previewImg: './assets/images/pinball_preview.png',
+                description: 'Arcade pinball neon retrô com física realista de flippers, multiball e trilha sonora sintetizada.',
+                x: 240, y: 980,
+                color: '#ff007f'
             },
             {
-                title: "3D Shooter",
-                description: "First-person shooter in the style of classic Doom.",
-                path: "./3d_shooter/index.html",
-                icon: "🔫",
-                x: 400,
-                y: 450,
-                color: "#FFDD33"
+                id: 'ded',
+                title: 'RPG Adventure Quest',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Pixel RPG',
+                icon: '🐉',
+                path: './jogos/ded',
+                previewImg: './assets/images/ded_preview.png',
+                description: 'Embarque em uma jornada épica de masmorras inspirada nas regras e rolagens clássicas de D&D.',
+                x: 500, y: 980,
+                color: '#ff5722'
             },
             {
-                title: "Mind Labyrinth",
-                description: "Solve puzzles and navigate through a mysterious labyrinth.",
-                path: "./puzzle/index.html",
-                icon: "🧩",
-                x: 600,
-                y: 450,
-                color: "#33A8FF"
+                id: 'snake',
+                title: 'Modern Snake',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Canvas Neon',
+                icon: '🐍',
+                path: './jogos/snake',
+                previewImg: './assets/images/snake_preview.png',
+                description: 'O clássico e nostálgico jogo da cobrinha reestilizado com estética neon e movimentação suave.',
+                x: 240, y: 1220,
+                color: '#00e676'
             },
             {
-                title: "Realm Builder",
-                description: "Build and manage your own kingdom in this strategy game.",
-                path: "./strategy_game/index.html",
-                icon: "👑",
-                x: 300,
-                y: 600,
-                color: "#FF3366"
+                id: 'visual_effects',
+                title: 'String Catcher',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Áudio & Rítmico',
+                icon: '🎵',
+                path: './jogos/visual_effects',
+                previewImg: './assets/images/visual_effects_preview.png',
+                description: 'Capture notas musicais em cordas vibrantes neste jogo rítmico com síntese de áudio dinâmico.',
+                x: 500, y: 1220,
+                color: '#ffeb3b'
             },
             {
-                title: "IT Simulator",
-                description: "Build your tech company from scratch in this business simulation.",
-                path: "./it_simulator/index.html",
-                icon: "💻",
-                x: 500,
-                y: 600,
-                color: "#8833FF"
+                id: 'archer',
+                title: 'The Archer',
+                category: 'arcade',
+                categoryLabel: 'Ação & Arcade',
+                techTag: 'Física Balística',
+                icon: '🏹',
+                path: './jogos/archer',
+                previewImg: './assets/images/archer_preview.png',
+                description: 'Acerte o balão vermelho calculando a trajetória balística e a força do disparo de arco e flecha.',
+                x: 370, y: 1420,
+                color: '#00b0ff'
+            },
+
+            // --- ALA LESTE: Puzzles & Estratégia (8 jogos) ---
+            {
+                id: 'puzzle',
+                title: 'Puzzle Master',
+                category: 'puzzle',
+                categoryLabel: 'Puzzles',
+                techTag: 'Lógica / Bilíngue',
+                icon: '🧩',
+                path: './jogos/puzzle',
+                previewImg: './assets/images/puzzle_preview.png?v=2',
+                description: 'Decifre os enigmas arcanos do Santuário Astral com desafios matemáticos, 3D, memória e lógica em PT ou EN.',
+                x: 1800, y: 750,
+                color: '#7c4dff'
             },
             {
-                title: "Conway's Game of Life",
-                description: "A cellular automaton simulation where cells live or die based on simple rules.",
-                path: "./gameoflife/index.html",
-                icon: "🌱",
-                x: 700,
-                y: 600,
-                color: "#FFDD33"
+                id: 'rubiks_cube',
+                title: 'Cubo Mágico 3D',
+                category: 'puzzle',
+                categoryLabel: 'Puzzles',
+                techTag: 'Three.js 3D',
+                icon: '🎲',
+                path: './jogos/rubiks_cube',
+                previewImg: './assets/images/rubiks_cube_preview.png',
+                description: 'Resolva o lendário Cubo de Rubik em um simulador tridimensional interativo e responsivo.',
+                x: 2100, y: 750,
+                color: '#ff5252'
             },
             {
-                title: "Sangue & Prata",
-                description: "Roguelite gótico de sobrevivência com armas automáticas e evoluções.",
-                path: "./blood_and_silver/index.html",
-                icon: "🧛",
-                x: 800,
-                y: 150,
-                color: "#E8435B"
+                id: 'block_stacker',
+                title: 'Block Stacker',
+                category: 'puzzle',
+                categoryLabel: 'Puzzles',
+                techTag: 'Arcade Clássico',
+                icon: '🧱',
+                path: './jogos/block_stacker',
+                previewImg: './assets/images/block_stacker_preview.png',
+                description: 'Encaixe os blocos geométricos e complete linhas horizontais neste arcade clássico viciante.',
+                x: 1800, y: 960,
+                color: '#ff9800'
             },
             {
-                title: "Planning Poker",
-                description: "Estime tarefas com seu time em tempo real via WebSocket.",
-                path: "./planning_poker/index.html",
-                icon: "🃏",
-                x: 1000,
-                y: 700,
-                color: "#00F0FF"
+                id: 'chess',
+                title: 'Xadrez Inteligente',
+                category: 'strategy',
+                categoryLabel: 'Estratégia & Raciocínio',
+                techTag: 'IA / Minimax',
+                icon: '♟️',
+                path: './jogos/chess',
+                previewImg: './assets/images/chess_preview.png',
+                description: 'Desafie seu raciocínio tático em uma partida de xadrez contra inteligência artificial em múltiplos níveis.',
+                x: 2100, y: 960,
+                color: '#607d8b'
+            },
+            {
+                id: 'strategy_game',
+                title: 'Strategy Empire',
+                category: 'strategy',
+                categoryLabel: 'Estratégia & Raciocínio',
+                techTag: 'Estratégia Militar',
+                icon: '👑',
+                path: './jogos/strategy_game',
+                previewImg: './assets/images/strategy_game_preview.png',
+                description: 'Construa seu império, administre recursos estratégicos e supere seus adversários militares.',
+                x: 1800, y: 1180,
+                color: '#ffd700'
+            },
+            {
+                id: 'poker',
+                title: 'Poker Texas Hold\'em',
+                category: 'strategy',
+                categoryLabel: 'Estratégia & Raciocínio',
+                techTag: 'Multiplayer / IA',
+                icon: '♠️',
+                path: './jogos/poker',
+                previewImg: './assets/images/poker_preview.png',
+                description: 'Jogue partidas táticas de Poker Texas Hold\'em contra a IA ou dispute blefes online com amigos.',
+                x: 2100, y: 1180,
+                color: '#2e7d32'
+            },
+            {
+                id: 'ded_make_character',
+                title: 'D&D Make Character',
+                category: 'strategy',
+                categoryLabel: 'Estratégia & Raciocínio',
+                techTag: 'RPG / Fichas & IA',
+                icon: '📜',
+                path: './jogos/ded_make_character',
+                previewImg: './assets/images/ded_make_character_preview.png',
+                description: 'Forja de heróis de D&D 3ª edição: crie personagens, escolha perícias/talentos e teste-os em combate com rede neural na Arena.',
+                x: 1800, y: 1400,
+                color: '#8d6e63'
+            },
+            {
+                id: 'planning_poker',
+                title: 'Planning Poker',
+                category: 'strategy',
+                categoryLabel: 'Estratégia & Raciocínio',
+                techTag: 'WebSocket Realtime',
+                icon: '🃏',
+                path: './jogos/planning_poker',
+                previewImg: './assets/images/bg_neon_game.jpeg',
+                description: 'Estime tarefas com seu time em tempo real: sala compartilhada por link, votação secreta na escala Fibonacci e revelação de votos.',
+                x: 2100, y: 1400,
+                color: '#00f0ff'
+            },
+
+            // --- ALA SUL: Simulações & Ciência (6 jogos) ---
+            {
+                id: 'gameoflife',
+                title: 'Conway\'s Game of Life',
+                category: 'simulation',
+                categoryLabel: 'Simulações & IA',
+                techTag: 'Autômato Celular',
+                icon: '🌱',
+                path: './jogos/gameoflife',
+                previewImg: './assets/images/gameoflife_preview.png',
+                description: 'Simulação matemática de autômato celular onde células vivem ou morrem segundo regras simples.',
+                x: 850, y: 1540,
+                color: '#4caf50'
+            },
+            {
+                id: 'tabuleiro_galton',
+                title: 'Tabuleiro de Galton',
+                category: 'simulation',
+                categoryLabel: 'Simulações & IA',
+                techTag: 'Física Estatística',
+                icon: '🧔',
+                path: './jogos/tabuleiro_galton',
+                previewImg: './assets/images/tabuleiro_galton_preview.png',
+                description: 'Simulador físico da Máquina de Galton demonstrando visualmente o Teorema do Limite Central e a Curva de Gauss.',
+                x: 1100, y: 1580,
+                color: '#ff9800'
+            },
+            {
+                id: 'rede_neural_evolutiva',
+                title: 'Rede Neural Evolutiva',
+                category: 'simulation',
+                categoryLabel: 'Simulações & IA',
+                techTag: 'Algoritmo Genético',
+                icon: '🧬',
+                path: './jogos/rede_neural_evolutiva',
+                previewImg: './assets/images/rede_neural_evolutiva_preview.png',
+                description: 'Demonstração de computação evolutiva: veja uma rede neural aprender a jogar autonomamente a cada geração.',
+                x: 1350, y: 1580,
+                color: '#e040fb'
+            },
+            {
+                id: 'lazy_gardner',
+                title: 'Lazy Gardener',
+                category: 'simulation',
+                categoryLabel: 'Simulações & IA',
+                techTag: 'Simulação Zen',
+                icon: '🪴',
+                path: './jogos/lazy_gardner',
+                previewImg: './assets/images/lazy_gardner_preview.png',
+                description: 'Cultive um jardim zen pacífico e contemplativo que cresce e evolui no seu próprio ritmo.',
+                x: 1550, y: 1540,
+                color: '#66bb6a'
+            },
+            {
+                id: 'driving_simulator',
+                title: 'Driving Simulator',
+                category: 'simulation',
+                categoryLabel: 'Simulações & IA',
+                techTag: 'Simulação 3D',
+                icon: '🚗',
+                path: './jogos/driving_simulator',
+                previewImg: './assets/images/driving_simulator_preview.png',
+                description: 'Conduza livremente por uma estrada cênica em um ambiente relaxante com física de condução.',
+                x: 950, y: 1780,
+                color: '#29b6f6'
+            },
+            {
+                id: 'it_simulator',
+                title: 'Company Simulator',
+                category: 'simulation',
+                categoryLabel: 'Simulações & IA',
+                techTag: 'Simulação Corporativa',
+                icon: '💻',
+                path: './jogos/it_simulator',
+                previewImg: './assets/images/it_simulator_preview.png',
+                description: 'Um simulador satírico e bem-humorado da rotina de trabalho em TI e dos desafios cotidianos corporativos.',
+                x: 1450, y: 1780,
+                color: '#7e57c2'
             }
         ];
-        
-        // Exhibit displays for games
-        const exhibits = [];
-        
-        // Museum walls and decorations
+
+        // Track visited exhibits
+        const visitedGames = new Set();
+        try {
+            const saved = localStorage.getItem('playful_museum_visited');
+            if (saved) {
+                JSON.parse(saved).forEach(id => visitedGames.add(id));
+            }
+        } catch (e) {}
+
+        function updateVisitedCounter() {
+            visitedCounterEl.textContent = `${visitedGames.size} / ${MUSEUM_GAMES.length}`;
+            try {
+                localStorage.setItem('playful_museum_visited', JSON.stringify(Array.from(visitedGames)));
+            } catch (e) {}
+        }
+        updateVisitedCounter();
+
+        // Exhibits objects
+        const exhibits = MUSEUM_GAMES.map(game => ({
+            game,
+            x: game.x,
+            y: game.y,
+            width: 70,
+            height: 60,
+            haloRadius: 100
+        }));
+
+        // Special Landmark: Central Monument
+        const centralMonument = {
+            title: 'Marco PlayfulHub',
+            icon: '🏛️',
+            description: 'Bem-vindo ao Modo Museu do PlayfulHub! Um pavilhão retrô interativo celebrando 27 jogos e experimentos independentes desenvolvidos em HTML5, Three.js e WebGL.',
+            x: 1165,
+            y: 920,
+            width: 70,
+            height: 70,
+            isMonument: true
+        };
+
+        // Special Landmark: Portal Home
+        const portalHome = {
+            title: 'Portal de Saída',
+            icon: '🚪',
+            description: 'Retorne ao menu principal do PlayfulHub na web.',
+            path: './index.html',
+            x: 1165,
+            y: 1220,
+            width: 70,
+            height: 60,
+            isPortal: true
+        };
+
+        // Museum Walls & Boundaries (Map size: 2400 x 2000)
         const walls = [
-            // Outer walls
-            {x: 0, y: 0, width: museum.width, height: 30}, // Top
-            {x: 0, y: 0, width: 30, height: museum.height}, // Left
-            {x: 0, y: museum.height - 30, width: museum.width, height: 30}, // Bottom
-            {x: museum.width - 30, y: 0, width: 30, height: museum.height}, // Right
-            
-            // Inner walls/dividers
-            {x: 100, y: 100, width: 30, height: 400}, // Left gallery wall
-            {x: museum.width - 130, y: 100, width: 30, height: 400}, // Right gallery wall
-            {x: 130, y: 100, width: 640, height: 30}, // Top gallery wall
-            {x: 130, y: 500, width: 640, height: 30}, // Bottom gallery wall
-            
-            // Display stands
-            {x: 150, y: 200, width: 100, height: 30},
-            {x: 350, y: 200, width: 100, height: 30},
-            {x: 550, y: 200, width: 100, height: 30},
-            {x: 750, y: 200, width: 100, height: 30},
-            {x: 150, y: 350, width: 100, height: 30},
-            {x: 350, y: 350, width: 100, height: 30},
-            {x: 550, y: 350, width: 100, height: 30},
-            {x: 750, y: 350, width: 100, height: 30},
-            {x: 150, y: 500, width: 100, height: 30},
-            {x: 350, y: 500, width: 100, height: 30},
-            {x: 550, y: 500, width: 100, height: 30},
-            {x: 750, y: 500, width: 100, height: 30},
-            {x: 250, y: 650, width: 100, height: 30},
-            {x: 450, y: 650, width: 100, height: 30},
-            {x: 650, y: 650, width: 100, height: 30}
+            // Outer Perimeter
+            { x: 0, y: 0, width: museum.width, height: 40 }, // Top
+            { x: 0, y: 0, width: 40, height: museum.height }, // Left
+            { x: 0, y: museum.height - 40, width: museum.width, height: 40 }, // Bottom
+            { x: museum.width - 40, y: 0, width: 40, height: museum.height }, // Right
+
+            // Lobby Surrounding Dividers (with cardinal exits of ~220px)
+            // Lobby Top Wall (divided by North door 1090-1310)
+            { x: 750, y: 780, width: 340, height: 30 },
+            { x: 1310, y: 780, width: 340, height: 30 },
+
+            // Lobby Bottom Wall (divided by South door 1090-1310)
+            { x: 750, y: 1300, width: 340, height: 30 },
+            { x: 1310, y: 1300, width: 340, height: 30 },
+
+            // Lobby Left Wall (divided by West door 960-1140)
+            { x: 750, y: 780, width: 30, height: 180 },
+            { x: 750, y: 1140, width: 30, height: 190 },
+
+            // Lobby Right Wall (divided by East door 960-1140)
+            { x: 1620, y: 780, width: 30, height: 180 },
+            { x: 1620, y: 1140, width: 30, height: 190 },
+
+            // North Wing Interior Pillars
+            { x: 920, y: 380, width: 40, height: 40 },
+            { x: 1440, y: 380, width: 40, height: 40 },
+
+            // West Wing Dividers
+            { x: 360, y: 880, width: 30, height: 60 },
+            { x: 360, y: 1120, width: 30, height: 60 },
+
+            // East Wing Dividers
+            { x: 1960, y: 860, width: 30, height: 60 },
+            { x: 1960, y: 1080, width: 30, height: 60 },
+            { x: 1960, y: 1300, width: 30, height: 60 },
+
+            // South Wing Interior Pillars
+            { x: 1050, y: 1680, width: 40, height: 40 },
+            { x: 1310, y: 1680, width: 40, height: 40 }
         ];
-        
-        // Create exhibit displays for each game
-        games.forEach(game => {
-            exhibits.push({
-                x: game.x,
-                y: game.y,
-                width: 60,
-                height: 60,
-                game: game,
-                isInteracting: false
+
+        // Atmospheric Dust Particles
+        const dustParticles = [];
+        for (let i = 0; i < 45; i++) {
+            dustParticles.push({
+                x: Math.random() * museum.width,
+                y: Math.random() * museum.height,
+                radius: Math.random() * 2 + 1,
+                vx: (Math.random() - 0.5) * 0.4,
+                vy: (Math.random() - 0.5) * 0.4,
+                alpha: Math.random() * 0.5 + 0.2
             });
+        }
+
+        // ==============================================================
+        // CONTROLES DE TECLADO E EVENTOS
+        // ==============================================================
+
+        const keys = {
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+            w: false, s: false, a: false, d: false,
+            W: false, S: false, A: false, D: false,
+            ' ': false, e: false, E: false, Escape: false, m: false, M: false
+        };
+
+        window.addEventListener('keydown', e => {
+            initAudio();
+            const k = e.key;
+            if (keys.hasOwnProperty(k)) {
+                keys[k] = true;
+            }
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.ArrowUp = true;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.ArrowDown = true;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.ArrowLeft = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.ArrowRight = true;
+            if (e.code === 'Space') keys[' '] = true;
+            if (e.code === 'KeyE') keys.e = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(k)) {
+                e.preventDefault();
+            }
+            if (k === 'Escape' || e.code === 'Escape') {
+                closeModal();
+            }
+            if (k === 'm' || k === 'M' || e.code === 'KeyM') {
+                toggleMinimap();
+            }
         });
-        
-        // Update the game counter
-        gameCountDisplay.textContent = `GAMES: ${games.length}`;
-        
-        // Current game being viewed
-        let currentGame = null;
-        
-        // Main game loop
+
+        window.addEventListener('keyup', e => {
+            const k = e.key;
+            if (keys.hasOwnProperty(k)) {
+                keys[k] = false;
+            }
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.ArrowUp = false;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.ArrowDown = false;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.ArrowLeft = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.ArrowRight = false;
+            if (e.code === 'Space') keys[' '] = false;
+            if (e.code === 'KeyE') keys.e = false;
+        });
+
+        // Touch Virtual D-Pad
+        const dpadMap = {
+            'dpad-up': 'ArrowUp',
+            'dpad-down': 'ArrowDown',
+            'dpad-left': 'ArrowLeft',
+            'dpad-right': 'ArrowRight'
+        };
+
+        Object.keys(dpadMap).forEach(id => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const keyName = dpadMap[id];
+            const startPress = (e) => { e.preventDefault(); initAudio(); keys[keyName] = true; };
+            const endPress = (e) => { e.preventDefault(); keys[keyName] = false; };
+            btn.addEventListener('touchstart', startPress, { passive: false });
+            btn.addEventListener('touchend', endPress, { passive: false });
+            btn.addEventListener('mousedown', startPress);
+            btn.addEventListener('mouseup', endPress);
+            btn.addEventListener('mouseleave', endPress);
+        });
+
+        const touchAction = document.getElementById('touch-action');
+        if (touchAction) {
+            touchAction.addEventListener('click', () => {
+                initAudio();
+                if (currentInteractable) {
+                    openInteractableModal(currentInteractable);
+                }
+            });
+        }
+
+        // HUD Buttons
+        document.getElementById('audio-toggle-btn').addEventListener('click', (e) => {
+            initAudio();
+            isMuted = !isMuted;
+            e.currentTarget.textContent = isMuted ? '🔇 Mudo' : '🔊 Som';
+            e.currentTarget.style.color = isMuted ? 'var(--accent-red)' : 'var(--accent-green)';
+        });
+
+        document.getElementById('crt-toggle-btn').addEventListener('click', (e) => {
+            crtOverlay.classList.toggle('disabled');
+            const isDisabled = crtOverlay.classList.contains('disabled');
+            e.currentTarget.style.color = isDisabled ? '#888' : 'var(--accent-green)';
+        });
+
+        function toggleMinimap() {
+            minimapCard.classList.toggle('hidden');
+        }
+        document.getElementById('map-toggle-btn').addEventListener('click', toggleMinimap);
+
+        // Modal Controls
+        function closeModal() {
+            gameModal.classList.remove('active');
+        }
+        modalCancelBtn.addEventListener('click', closeModal);
+        modalCloseX.addEventListener('click', closeModal);
+
+        // ==============================================================
+        // LÓGICA DE ZONAS E ATUALIZAÇÃO DO MUNDO
+        // ==============================================================
+
+        let currentInteractable = null;
+
+        function getZoneName(x, y) {
+            if (y < 780) return 'Ala Norte: 3D & WebGL Expo';
+            if (y > 1300) return 'Ala Sul: Simulações & Ciência';
+            if (x < 780) return 'Ala Oeste: Ação & Arcade';
+            if (x > 1620) return 'Ala Leste: Puzzles & Estratégia';
+            return 'Grande Salão Central (Lobby)';
+        }
+
+        function checkRectCollision(r1, r2) {
+            return r1.x < r2.x + r2.width &&
+                   r1.x + r1.width > r2.x &&
+                   r1.y < r2.y + r2.height &&
+                   r1.y + r1.height > r2.y;
+        }
+
+        function update() {
+            if (gameModal.classList.contains('active')) return;
+
+            const isUp = keys.ArrowUp || keys.w || keys.W;
+            const isDown = keys.ArrowDown || keys.s || keys.S;
+            const isLeft = keys.ArrowLeft || keys.a || keys.A;
+            const isRight = keys.ArrowRight || keys.d || keys.D;
+
+            player.isMoving = isUp || isDown || isLeft || isRight;
+
+            let dx = 0;
+            let dy = 0;
+
+            if (isUp) { dy -= player.speed; player.direction = 'up'; }
+            if (isDown) { dy += player.speed; player.direction = 'down'; }
+            if (isLeft) { dx -= player.speed; player.direction = 'left'; }
+            if (isRight) { dx += player.speed; player.direction = 'right'; }
+
+            // Normalize diagonal speed
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.7071;
+                dy *= 0.7071;
+            }
+
+            // Move X and test collisions
+            player.x += dx;
+            for (const wall of walls) {
+                if (checkRectCollision(player, wall)) {
+                    player.x -= dx;
+                    break;
+                }
+            }
+
+            // Move Y and test collisions
+            player.y += dy;
+            for (const wall of walls) {
+                if (checkRectCollision(player, wall)) {
+                    player.y -= dy;
+                    break;
+                }
+            }
+
+            // Clamp inside museum
+            player.x = Math.max(40, Math.min(museum.width - 40 - player.width, player.x));
+            player.y = Math.max(40, Math.min(museum.height - 40 - player.height, player.y));
+
+            // Animate Player & Audio Footsteps
+            if (player.isMoving) {
+                player.animTimer++;
+                if (player.animTimer > 8) {
+                    player.animFrame = (player.animFrame + 1) % 4;
+                    player.animTimer = 0;
+                    if (player.animFrame % 2 === 0) playStepSound();
+                }
+            } else {
+                player.animFrame = 0;
+            }
+
+            // Smooth Camera Follow
+            const targetCamX = player.x + player.width / 2 - camera.width / 2;
+            const targetCamY = player.y + player.height / 2 - camera.height / 2;
+            camera.x += (targetCamX - camera.x) * 0.1;
+            camera.y += (targetCamY - camera.y) * 0.1;
+
+            camera.x = Math.max(0, Math.min(museum.width - camera.width, camera.x));
+            camera.y = Math.max(0, Math.min(museum.height - camera.height, camera.y));
+
+            // Update Current Zone in HUD
+            const zoneName = getZoneName(player.x + player.width / 2, player.y + player.height / 2);
+            if (currentZoneEl.textContent !== zoneName) {
+                currentZoneEl.textContent = zoneName;
+            }
+
+            // Check Exhibit / Landmark Proximity
+            let nearest = null;
+            let nearestDist = Infinity;
+
+            const allInteractables = [...exhibits, centralMonument, portalHome];
+
+            for (const item of allInteractables) {
+                const centerX = item.x + item.width / 2;
+                const centerY = item.y + item.height / 2;
+                const playerCenterX = player.x + player.width / 2;
+                const playerCenterY = player.y + player.height / 2;
+
+                const dist = Math.hypot(playerCenterX - centerX, playerCenterY - centerY);
+                if (dist < 95 && dist < nearestDist) {
+                    nearest = item;
+                    nearestDist = dist;
+                }
+            }
+
+            if (nearest !== currentInteractable) {
+                currentInteractable = nearest;
+                if (currentInteractable) {
+                    playChimeSound();
+                    interactionPrompt.style.display = 'flex';
+                    promptGameTitle.textContent = currentInteractable.game ? currentInteractable.game.title : currentInteractable.title;
+                } else {
+                    interactionPrompt.style.display = 'none';
+                }
+            }
+
+            // Trigger Modal with Space or E
+            if ((keys[' '] || keys.e || keys.E) && currentInteractable) {
+                keys[' '] = false;
+                keys.e = false;
+                keys.E = false;
+                openInteractableModal(currentInteractable);
+            }
+
+            // Update dust particles
+            dustParticles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = museum.width;
+                if (p.x > museum.width) p.x = 0;
+                if (p.y < 0) p.y = museum.height;
+                if (p.y > museum.height) p.y = 0;
+            });
+        }
+
+        function openInteractableModal(item) {
+            initAudio();
+            playChimeSound();
+
+            if (item.isMonument) {
+                modalCategory.textContent = 'MONUMENTO';
+                modalTech.textContent = 'PlayfulHub';
+                modalPreviewImg.src = './assets/images/bg_neon_game.jpeg';
+                modalIcon.textContent = '🏛️';
+                modalTitle.textContent = item.title;
+                modalDesc.textContent = item.description;
+                modalPlayBtn.style.display = 'none';
+                gameModal.classList.add('active');
+                return;
+            }
+
+            if (item.isPortal) {
+                modalCategory.textContent = 'PORTAL';
+                modalTech.textContent = 'Página Inicial';
+                modalPreviewImg.src = './assets/images/bg_neon_game.jpeg';
+                modalIcon.textContent = '🚪';
+                modalTitle.textContent = item.title;
+                modalDesc.textContent = item.description;
+                modalPlayBtn.style.display = 'flex';
+                modalPlayBtn.textContent = 'Voltar para a Home';
+                modalPlayBtn.href = './index.html';
+                gameModal.classList.add('active');
+                return;
+            }
+
+            const g = item.game;
+            visitedGames.add(g.id);
+            updateVisitedCounter();
+
+            modalCategory.textContent = g.categoryLabel || g.category.toUpperCase();
+            modalTech.textContent = g.techTag || 'PlayfulHub';
+            modalPreviewImg.src = g.previewImg || './assets/images/bg_neon_game.jpeg';
+            modalIcon.textContent = g.icon || '🎮';
+            modalTitle.textContent = g.title;
+            modalDesc.textContent = g.description;
+
+            modalPlayBtn.style.display = 'flex';
+            modalPlayBtn.textContent = '▶ JOGAR AGORA';
+            modalPlayBtn.href = g.path;
+
+            modalPlayBtn.onclick = () => {
+                playWarpSound();
+            };
+
+            gameModal.classList.add('active');
+        }
+
+        // ==============================================================
+        // RENDERIZAÇÃO GRÁFICA EM CANVAS
+        // ==============================================================
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Thematic Floor
+            drawThemedFloor();
+
+            // 2. Draw Room Labels & Directional Floor Signage
+            drawFloorSignage();
+
+            // 3. Draw Walls
+            drawWalls();
+
+            // 4. Draw Exhibits and Landmarks
+            drawExhibitsAndLandmarks();
+
+            // 5. Draw Player Character
+            drawPlayer();
+
+            // 6. Draw Ambient Atmosphere & Dust
+            drawLightingAndDust();
+
+            // 7. Render Minimap
+            drawMinimap();
+        }
+
+        function drawThemedFloor() {
+            const startCol = Math.floor(camera.x / museum.tileSize);
+            const startRow = Math.floor(camera.y / museum.tileSize);
+            const endCol = Math.ceil((camera.x + camera.width) / museum.tileSize);
+            const endRow = Math.ceil((camera.y + camera.height) / museum.tileSize);
+
+            for (let r = startRow; r < endRow; r++) {
+                for (let c = startCol; c < endCol; c++) {
+                    const worldX = c * museum.tileSize;
+                    const worldY = r * museum.tileSize;
+                    const screenX = worldX - camera.x;
+                    const screenY = worldY - camera.y;
+
+                    // Determine Zone Theme
+                    const zone = getZoneName(worldX + 16, worldY + 16);
+
+                    if (zone.includes('Lobby')) {
+                        // Polished Marble with Red Carpet Runner in cross
+                        const isCarpetX = worldX >= 1140 && worldX <= 1260;
+                        const isCarpetY = worldY >= 900 && worldY <= 1200;
+
+                        if (isCarpetX || isCarpetY) {
+                            ctx.fillStyle = (c + r) % 2 === 0 ? '#7a0016' : '#96001d';
+                        } else {
+                            ctx.fillStyle = (c + r) % 2 === 0 ? '#263238' : '#37474f';
+                        }
+                    } else if (zone.includes('3D')) {
+                        // Cybernetic Grid with Cyan Conduits
+                        ctx.fillStyle = (c + r) % 2 === 0 ? '#0b1622' : '#081018';
+                        ctx.fillRect(screenX, screenY, museum.tileSize, museum.tileSize);
+                        if (c % 4 === 0 || r % 4 === 0) {
+                            ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
+                            ctx.fillRect(screenX, screenY, museum.tileSize, 2);
+                        }
+                        continue;
+                    } else if (zone.includes('Arcade')) {
+                        // Starry Retro Arcade Carpet
+                        ctx.fillStyle = (c + r) % 2 === 0 ? '#120d24' : '#191233';
+                        ctx.fillRect(screenX, screenY, museum.tileSize, museum.tileSize);
+                        if ((c * 3 + r * 5) % 11 === 0) {
+                            ctx.fillStyle = 'rgba(255, 0, 128, 0.2)';
+                            ctx.fillRect(screenX + 12, screenY + 12, 6, 6);
+                        }
+                        continue;
+                    } else if (zone.includes('Puzzles')) {
+                        // Warm Oak Parquet Wood
+                        ctx.fillStyle = (c + r) % 2 === 0 ? '#3e2723' : '#4e342e';
+                        ctx.fillRect(screenX, screenY, museum.tileSize, museum.tileSize);
+                        ctx.fillStyle = 'rgba(255, 215, 0, 0.04)';
+                        ctx.fillRect(screenX + 2, screenY + 2, museum.tileSize - 4, museum.tileSize - 4);
+                        continue;
+                    } else {
+                        // Simulation Cleanroom Tile
+                        ctx.fillStyle = (c + r) % 2 === 0 ? '#1e293b' : '#0f172a';
+                        ctx.fillRect(screenX, screenY, museum.tileSize, museum.tileSize);
+                        if (c % 3 === 0 && r % 3 === 0) {
+                            ctx.fillStyle = 'rgba(0, 255, 136, 0.08)';
+                            ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
+                        }
+                        continue;
+                    }
+
+                    ctx.fillRect(screenX, screenY, museum.tileSize, museum.tileSize);
+                }
+            }
+        }
+
+        function drawFloorSignage() {
+            // Directional Signs in Central Lobby
+            ctx.save();
+            ctx.font = '10px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // North Sign
+            let sx = 1200 - camera.x;
+            let sy = 830 - camera.y;
+            if (sx > -100 && sx < canvas.width + 100 && sy > -50 && sy < canvas.height + 50) {
+                ctx.fillStyle = 'rgba(0, 229, 255, 0.85)';
+                ctx.fillText('▲ ALA NORTE: 3D & WEBGL', sx, sy);
+            }
+
+            // South Sign
+            sy = 1270 - camera.y;
+            if (sx > -100 && sx < canvas.width + 100 && sy > -50 && sy < canvas.height + 50) {
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.85)';
+                ctx.fillText('▼ ALA SUL: SIMULAÇÕES & IA', sx, sy);
+            }
+
+            // West Sign
+            sx = 800 - camera.x;
+            sy = 1050 - camera.y;
+            if (sx > -100 && sx < canvas.width + 100 && sy > -50 && sy < canvas.height + 50) {
+                ctx.fillStyle = 'rgba(255, 0, 128, 0.85)';
+                ctx.fillText('◀ ALA AÇÃO & ARCADE', sx, sy);
+            }
+
+            // East Sign
+            sx = 1600 - camera.x;
+            sy = 1050 - camera.y;
+            if (sx > -100 && sx < canvas.width + 100 && sy > -50 && sy < canvas.height + 50) {
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.85)';
+                ctx.fillText('ALA PUZZLES & ESTRATÉGIA ▶', sx, sy);
+            }
+
+            ctx.restore();
+        }
+
+        function drawWalls() {
+            walls.forEach(w => {
+                const sx = w.x - camera.x;
+                const sy = w.y - camera.y;
+
+                if (sx + w.width < 0 || sx > canvas.width || sy + w.height < 0 || sy > canvas.height) return;
+
+                // Wall Base
+                ctx.fillStyle = '#1e2430';
+                ctx.fillRect(sx, sy, w.width, w.height);
+
+                // Wall Bevel Top
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(sx, sy, w.width, 3);
+                ctx.fillRect(sx, sy, 3, w.height);
+
+                // Wall Shadow Bottom
+                ctx.fillStyle = '#0a0d14';
+                ctx.fillRect(sx, sy + w.height - 3, w.width, 3);
+                ctx.fillRect(sx + w.width - 3, sy, 3, w.height);
+
+                // Brick Trim Details
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                for (let bx = sx + 8; bx < sx + w.width - 8; bx += 24) {
+                    ctx.fillRect(bx, sy + 6, 16, 6);
+                }
+            });
+        }
+
+        function drawExhibitsAndLandmarks() {
+            const time = performance.now() * 0.003;
+
+            // Draw Central Monument
+            drawSpecialPedestal(centralMonument, '#ffd700', '🏛️', 'MARCO PLAYFULHUB', time);
+
+            // Draw Exit Portal
+            drawSpecialPedestal(portalHome, '#00e5ff', '🚪', 'SAIR DO MUSEU', time);
+
+            // Draw 27 Game Exhibits
+            exhibits.forEach((ex, idx) => {
+                const sx = ex.x - camera.x;
+                const sy = ex.y - camera.y;
+
+                if (sx + ex.width < -100 || sx > canvas.width + 100 || sy + ex.height < -100 || sy > canvas.height + 100) return;
+
+                const isNear = currentInteractable === ex;
+                const isVisited = visitedGames.has(ex.game.id);
+
+                // 1. Floor Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.beginPath();
+                ctx.ellipse(sx + ex.width / 2, sy + ex.height + 4, ex.width * 0.55, 12, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 2. Proximity Light Halo
+                if (isNear) {
+                    const glowGrad = ctx.createRadialGradient(
+                        sx + ex.width / 2, sy + ex.height / 2, 10,
+                        sx + ex.width / 2, sy + ex.height / 2, 90
+                    );
+                    glowGrad.addColorStop(0, 'rgba(0, 255, 136, 0.35)');
+                    glowGrad.addColorStop(0.7, 'rgba(0, 255, 136, 0.1)');
+                    glowGrad.addColorStop(1, 'rgba(0, 255, 136, 0)');
+                    ctx.fillStyle = glowGrad;
+                    ctx.beginPath();
+                    ctx.arc(sx + ex.width / 2, sy + ex.height / 2, 90, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 3. Arcade Cabinet / Museum Pedestal 2.5D
+                // Base
+                ctx.fillStyle = ex.game.color || '#333';
+                ctx.fillRect(sx, sy + 18, ex.width, ex.height - 18);
+
+                // Front Panel shading
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(sx + 4, sy + 24, ex.width - 8, ex.height - 30);
+
+                // Pedestal Top Surface
+                ctx.fillStyle = '#2a3342';
+                ctx.fillRect(sx, sy, ex.width, 20);
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(sx + 2, sy + 2, ex.width - 4, 16);
+
+                // Gold or Neon Rim
+                ctx.strokeStyle = isNear ? '#00ff88' : (isVisited ? '#ffd700' : 'rgba(255, 255, 255, 0.25)');
+                ctx.lineWidth = isNear ? 2 : 1.5;
+                ctx.strokeRect(sx, sy, ex.width, ex.height);
+
+                // 4. Floating Holographic Game Icon
+                const bobbing = Math.sin(time + idx * 0.7) * 5;
+                ctx.font = '24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ex.game.icon, sx + ex.width / 2, sy - 8 + bobbing);
+
+                // 5. Game Name Plaque
+                ctx.font = '8px "Press Start 2P", monospace';
+                ctx.fillStyle = isNear ? '#00ff88' : '#e2e8f0';
+                ctx.fillText(ex.game.title.substring(0, 14), sx + ex.width / 2, sy + ex.height + 18);
+            });
+        }
+
+        function drawSpecialPedestal(item, accentColor, icon, label, time) {
+            const sx = item.x - camera.x;
+            const sy = item.y - camera.y;
+
+            if (sx + item.width < -100 || sx > canvas.width + 100 || sy + item.height < -100 || sy > canvas.height + 100) return;
+
+            const isNear = currentInteractable === item;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.beginPath();
+            ctx.ellipse(sx + item.width / 2, sy + item.height + 6, item.width * 0.6, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Halo
+            const glowGrad = ctx.createRadialGradient(
+                sx + item.width / 2, sy + item.height / 2, 10,
+                sx + item.width / 2, sy + item.height / 2, 80
+            );
+            glowGrad.addColorStop(0, accentColor + '55');
+            glowGrad.addColorStop(1, accentColor + '00');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(sx + item.width / 2, sy + item.height / 2, 80, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pedestal Body
+            ctx.fillStyle = '#1e2430';
+            ctx.fillRect(sx, sy + 15, item.width, item.height - 15);
+            ctx.fillStyle = accentColor;
+            ctx.fillRect(sx + 4, sy + 22, item.width - 8, item.height - 28);
+
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(sx, sy, item.width, 18);
+
+            ctx.strokeStyle = isNear ? '#ffffff' : accentColor;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx, sy, item.width, item.height);
+
+            // Icon
+            const bobbing = Math.sin(time * 1.5) * 6;
+            ctx.font = '28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(icon, sx + item.width / 2, sy - 12 + bobbing);
+
+            // Label
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.fillStyle = accentColor;
+            ctx.fillText(label, sx + item.width / 2, sy + item.height + 20);
+        }
+
+        function drawPlayer() {
+            const sx = player.x - camera.x;
+            const sy = player.y - camera.y;
+
+            // Player Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(sx + player.width / 2, sy + player.height + 2, 10, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Coat / Body (Pixel Art Explorer)
+            ctx.fillStyle = '#00ff88';
+            ctx.fillRect(sx + 3, sy + 10, player.width - 6, 14);
+
+            // Belt & Accent
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(sx + 3, sy + 18, player.width - 6, 2);
+
+            // Head / Skin
+            ctx.fillStyle = '#ffcc80';
+            ctx.fillRect(sx + 5, sy + 2, player.width - 10, 9);
+
+            // Explorer Hat
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(sx + 2, sy - 2, player.width - 4, 4);
+            ctx.fillRect(sx + 4, sy - 6, player.width - 8, 5);
+
+            // Directional Face Features
+            ctx.fillStyle = '#0f172a';
+            if (player.direction === 'down') {
+                ctx.fillRect(sx + 7, sy + 5, 2, 2);
+                ctx.fillRect(sx + 13, sy + 5, 2, 2);
+            } else if (player.direction === 'up') {
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(sx + 5, sy + 1, player.width - 10, 4);
+            } else if (player.direction === 'left') {
+                ctx.fillRect(sx + 5, sy + 5, 2, 2);
+            } else if (player.direction === 'right') {
+                ctx.fillRect(sx + 15, sy + 5, 2, 2);
+            }
+
+            // Animated Boots
+            ctx.fillStyle = '#451a03';
+            if (player.isMoving) {
+                if (player.animFrame % 2 === 0) {
+                    ctx.fillRect(sx + 4, sy + 24, 4, 8);
+                    ctx.fillRect(sx + 14, sy + 22, 4, 6);
+                } else {
+                    ctx.fillRect(sx + 4, sy + 22, 4, 6);
+                    ctx.fillRect(sx + 14, sy + 24, 4, 8);
+                }
+            } else {
+                ctx.fillRect(sx + 4, sy + 24, 4, 8);
+                ctx.fillRect(sx + 14, sy + 24, 4, 8);
+            }
+        }
+
+        function drawLightingAndDust() {
+            // Ambient Radial Light around player
+            const px = player.x + player.width / 2 - camera.x;
+            const py = player.y + player.height / 2 - camera.y;
+
+            const lightGrad = ctx.createRadialGradient(px, py, 40, px, py, 380);
+            lightGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            lightGrad.addColorStop(0.7, 'rgba(5, 8, 14, 0.45)');
+            lightGrad.addColorStop(1, 'rgba(5, 8, 14, 0.85)');
+
+            ctx.fillStyle = lightGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Floating Dust Motes
+            ctx.save();
+            dustParticles.forEach(p => {
+                const sx = p.x - camera.x;
+                const sy = p.y - camera.y;
+                if (sx > 0 && sx < canvas.width && sy > 0 && sy < canvas.height) {
+                    ctx.fillStyle = `rgba(255, 215, 0, ${p.alpha * 0.7})`;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            ctx.restore();
+        }
+
+        function drawMinimap() {
+            miniCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+            const scaleX = minimapCanvas.width / museum.width;
+            const scaleY = minimapCanvas.height / museum.height;
+
+            // Background
+            miniCtx.fillStyle = '#080d14';
+            miniCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+            // Walls
+            miniCtx.fillStyle = '#334155';
+            walls.forEach(w => {
+                miniCtx.fillRect(w.x * scaleX, w.y * scaleY, Math.max(1, w.width * scaleX), Math.max(1, w.height * scaleY));
+            });
+
+            // Exhibits
+            exhibits.forEach(ex => {
+                const isVisited = visitedGames.has(ex.game.id);
+                miniCtx.fillStyle = isVisited ? '#00ff88' : '#64748b';
+                miniCtx.beginPath();
+                miniCtx.arc((ex.x + ex.width / 2) * scaleX, (ex.y + ex.height / 2) * scaleY, isVisited ? 2.5 : 2, 0, Math.PI * 2);
+                miniCtx.fill();
+            });
+
+            // Player Blip (Pulsing Yellow)
+            const blink = Math.sin(performance.now() * 0.01) > 0;
+            miniCtx.fillStyle = blink ? '#ffd700' : '#ffffff';
+            const plX = (player.x + player.width / 2) * scaleX;
+            const plY = (player.y + player.height / 2) * scaleY;
+            miniCtx.beginPath();
+            miniCtx.arc(plX, plY, 3.5, 0, Math.PI * 2);
+            miniCtx.fill();
+        }
+
+        // ==============================================================
+        // MAIN GAME LOOP
+        // ==============================================================
+
         function gameLoop() {
             update();
             render();
             requestAnimationFrame(gameLoop);
         }
-        
-        // Update game state
-        function update() {
-            // Move player
-            if (keys.ArrowUp) {
-                player.y -= player.speed;
-                player.direction = 'up';
-                player.frameCount++;
+
+        // Start
+        requestAnimationFrame(gameLoop);
+
+        // Hook de depuração e testes QA
+        window.__museum = {
+            getPlayer: () => player,
+            getGames: () => MUSEUM_GAMES,
+            getVisitedCount: () => visitedGames.size,
+            getCurrentZone: () => currentZoneEl.textContent,
+            getCurrentInteractable: () => currentInteractable,
+            openModal: openInteractableModal,
+            closeModal: closeModal,
+            teleportPlayer: (x, y) => { player.x = x; player.y = y; },
+            simulateInteract: () => {
+                if (currentInteractable) openInteractableModal(currentInteractable);
             }
-            if (keys.ArrowDown) {
-                player.y += player.speed;
-                player.direction = 'down';
-                player.frameCount++;
-            }
-            if (keys.ArrowLeft) {
-                player.x -= player.speed;
-                player.direction = 'left';
-                player.frameCount++;
-            }
-            if (keys.ArrowRight) {
-                player.x += player.speed;
-                player.direction = 'right';
-                player.frameCount++;
-            }
-            
-            // Animate player
-            if (player.frameCount > 5) {
-                player.animationFrame = (player.animationFrame + 1) % 4;
-                player.frameCount = 0;
-            }
-            
-            // Collision with walls
-            walls.forEach(wall => {
-                if (checkCollision(player, wall)) {
-                    // Revert movement
-                    if (keys.ArrowUp) player.y += player.speed;
-                    if (keys.ArrowDown) player.y -= player.speed;
-                    if (keys.ArrowLeft) player.x += player.speed;
-                    if (keys.ArrowRight) player.x -= player.speed;
-                }
-            });
-            
-            // Keep player within museum bounds
-            player.x = Math.max(30, Math.min(museum.width - 30 - player.width, player.x));
-            player.y = Math.max(30, Math.min(museum.height - 30 - player.height, player.y));
-            
-            // Update camera to follow player
-            camera.x = player.x - camera.width / 2 + player.width / 2;
-            camera.y = player.y - camera.height / 2 + player.height / 2;
-            
-            // Clamp camera to museum bounds
-            camera.x = Math.max(0, Math.min(museum.width - camera.width, camera.x));
-            camera.y = Math.max(0, Math.min(museum.height - camera.height, camera.y));
-            
-            // Check for interaction with exhibits
-            let nearExhibit = null;
-            
-            exhibits.forEach(exhibit => {
-                // Check if player is near the exhibit
-                const distance = Math.sqrt(
-                    Math.pow(player.x + player.width/2 - (exhibit.x + exhibit.width/2), 2) +
-                    Math.pow(player.y + player.height/2 - (exhibit.y + exhibit.height/2), 2)
-                );
-                
-                if (distance < 80) {
-                    nearExhibit = exhibit;
-                }
-            });
-            
-            // Update current game and info panel
-            if (nearExhibit && nearExhibit !== currentGame) {
-                currentGame = nearExhibit;
-                updateInfoPanel(nearExhibit.game);
-            } else if (!nearExhibit && currentGame) {
-                currentGame = null;
-                infoPanel.style.display = 'none';
-            }
-            
-            // Handle interaction with space key
-            if (keys[' '] && currentGame) {
-                keys[' '] = false; // Reset the key
-                if (infoPanel.style.display === 'none') {
-                    infoPanel.style.display = 'block';
-                } else {
-                    // Open the game
-                    window.location.href = currentGame.game.path;
-                }
-            }
-            
-            // Close info panel with ESC
-            if (keys.Escape) {
-                keys.Escape = false;
-                infoPanel.style.display = 'none';
-            }
-        }
-        
-        // Check collision between two rectangles
-        function checkCollision(rect1, rect2) {
-            return rect1.x < rect2.x + rect2.width &&
-                   rect1.x + rect1.width > rect2.x &&
-                   rect1.y < rect2.y + rect2.height &&
-                   rect1.y + rect1.height > rect2.y;
-        }
-        
-        // Render the game
-        function render() {
-            // Clear the canvas
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw the museum floor (tile pattern)
-            drawMuseumFloor();
-            
-            // Draw walls
-            drawWalls();
-            
-            // Draw exhibits
-            drawExhibits();
-            
-            // Draw player
-            drawPlayer();
-        }
-        
-        // Draw the museum floor with a tile pattern
-        function drawMuseumFloor() {
-            // Calculate visible tile range
-            const startX = Math.floor(camera.x / museum.tileSize);
-            const startY = Math.floor(camera.y / museum.tileSize);
-            const endX = Math.ceil((camera.x + camera.width) / museum.tileSize);
-            const endY = Math.ceil((camera.y + camera.height) / museum.tileSize);
-            
-            // Draw each visible tile
-            for (let y = startY; y < endY; y++) {
-                for (let x = startX; x < endX; x++) {
-                    const tileX = x * museum.tileSize - camera.x;
-                    const tileY = y * museum.tileSize - camera.y;
-                    
-                    // Alternating pattern
-                    if ((x + y) % 2 === 0) {
-                        ctx.fillStyle = '#1a1a1a';
-                    } else {
-                        ctx.fillStyle = '#222222';
-                    }
-                    
-                    ctx.fillRect(tileX, tileY, museum.tileSize, museum.tileSize);
-                }
-            }
-        }
-        
-        // Draw the walls of the museum
-        function drawWalls() {
-            walls.forEach(wall => {
-                const drawX = wall.x - camera.x;
-                const drawY = wall.y - camera.y;
-                
-                // Only draw if visible on screen
-                if (drawX + wall.width >= 0 && drawX <= camera.width &&
-                    drawY + wall.height >= 0 && drawY <= camera.height) {
-                    
-                    // Create pixel art effect for walls
-                    ctx.fillStyle = '#555';
-                    ctx.fillRect(drawX, drawY, wall.width, wall.height);
-                    
-                    // Add highlight to top/left edges
-                    ctx.fillStyle = '#777';
-                    ctx.fillRect(drawX, drawY, wall.width, 2);
-                    ctx.fillRect(drawX, drawY, 2, wall.height);
-                    
-                    // Add shadow to bottom/right edges
-                    ctx.fillStyle = '#333';
-                    ctx.fillRect(drawX, drawY + wall.height - 2, wall.width, 2);
-                    ctx.fillRect(drawX + wall.width - 2, drawY, 2, wall.height);
-                }
-            });
-        }
-        
-        // Draw the museum exhibits
-        function drawExhibits() {
-            exhibits.forEach(exhibit => {
-                const drawX = exhibit.x - camera.x;
-                const drawY = exhibit.y - camera.y;
-                
-                // Only draw if visible on screen
-                if (drawX + exhibit.width >= 0 && drawX <= camera.width &&
-                    drawY + exhibit.height >= 0 && drawY <= camera.height) {
-                    
-                    // Draw exhibit stand
-                    ctx.fillStyle = exhibit.game.color;
-                    ctx.fillRect(drawX, drawY, exhibit.width, exhibit.height);
-                    
-                    // Draw exhibit frame
-                    ctx.strokeStyle = '#FFD700';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(drawX, drawY, exhibit.width, exhibit.height);
-                    
-                    // Draw game icon
-                    ctx.font = '24px Arial';
-                    ctx.fillStyle = '#FFF';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(exhibit.game.icon, drawX + exhibit.width / 2, drawY + exhibit.height / 2);
-                    
-                    // Add glow effect if this is the current exhibit
-                    if (exhibit === currentGame) {
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                        const glowSize = 10;
-                        ctx.fillRect(
-                            drawX - glowSize, 
-                            drawY - glowSize, 
-                            exhibit.width + glowSize * 2, 
-                            exhibit.height + glowSize * 2
-                        );
-                        
-                        // Draw interaction hint
-                        ctx.font = '12px Arial';
-                        ctx.fillStyle = '#00FF66';
-                        ctx.fillText('SPACE to view', drawX + exhibit.width / 2, drawY + exhibit.height + 20);
-                    }
-                }
-            });
-        }
-        
-        // Draw the player character
-        function drawPlayer() {
-            const drawX = player.x - camera.x;
-            const drawY = player.y - camera.y;
-            
-            // Draw player body
-            ctx.fillStyle = '#00FF66';
-            ctx.fillRect(drawX, drawY, player.width, player.height);
-            
-            // Draw player features to create a simple pixel character
-            ctx.fillStyle = '#000';
-            
-            // Draw direction-based features (eyes, etc.)
-            if (player.direction === 'down') {
-                // Eyes
-                ctx.fillRect(drawX + 5, drawY + 8, 3, 3);
-                ctx.fillRect(drawX + 12, drawY + 8, 3, 3);
-                // Mouth
-                ctx.fillRect(drawX + 7, drawY + 15, 6, 2);
-            } else if (player.direction === 'up') {
-                // Eyes
-                ctx.fillRect(drawX + 5, drawY + 8, 3, 3);
-                ctx.fillRect(drawX + 12, drawY + 8, 3, 3);
-                // Hair
-                ctx.fillRect(drawX + 3, drawY + 2, 14, 3);
-            } else if (player.direction === 'left') {
-                // Eye
-                ctx.fillRect(drawX + 5, drawY + 8, 3, 3);
-                // Ear
-                ctx.fillRect(drawX + 2, drawY + 10, 2, 5);
-            } else if (player.direction === 'right') {
-                // Eye
-                ctx.fillRect(drawX + 12, drawY + 8, 3, 3);
-                // Ear
-                ctx.fillRect(drawX + 16, drawY + 10, 2, 5);
-            }
-            
-            // Animate legs/movement
-            if (player.animationFrame % 2 === 0) {
-                ctx.fillRect(drawX + 4, drawY + player.height - 8, 4, 8);
-                ctx.fillRect(drawX + player.width - 8, drawY + player.height - 5, 4, 5);
-            } else {
-                ctx.fillRect(drawX + 4, drawY + player.height - 5, 4, 5);
-                ctx.fillRect(drawX + player.width - 8, drawY + player.height - 8, 4, 8);
-            }
-        }
-        
-        // Update the info panel with game details
-        function updateInfoPanel(game) {
-            const title = infoPanel.querySelector('h3');
-            const description = infoPanel.querySelector('p');
-            
-            title.textContent = game.title;
-            description.textContent = game.description;
-            
-            // Set up the play button
-            playButton.onclick = () => {
-                window.location.href = game.path;
-            };
-            
-            // Show the panel
-            infoPanel.style.display = 'block';
-        }
-        
-        // Set up the event listeners for keyboard
-        document.addEventListener('keydown', e => {
-            if (keys.hasOwnProperty(e.key)) {
-                keys[e.key] = true;
-                e.preventDefault();
-            }
-        });
-        
-        document.addEventListener('keyup', e => {
-            if (keys.hasOwnProperty(e.key)) {
-                keys[e.key] = false;
-                e.preventDefault();
-            }
-        });
-        
-        // Museum starts immediately — no artificial loading screen
-        loadingScreen.style.display = 'none';
-        gameLoop();
+        };
     </script>
 </body>
-</html> 
+</html>
