@@ -63,6 +63,17 @@ export async function renderHome({ root, store }) {
             <span class="tile__go" aria-hidden="true">${icon('chevron-right')}</span>
           </a>
         </li>
+        <li>
+          <a class="tile" href="#/bestiario">
+            <span class="tile__icon">${icon('skull')}</span>
+            <span class="tile__body">
+              <span class="tile__title">Bestiário</span>
+              <span class="tile__text">Os monstros do Livro dos Monstros 3.0 e os heróis de Holy Avenger em cards, com todas as estatísticas e habilidades.</span>
+            </span>
+            <span class="tile__meta"><span class="badge badge--arcane">Fichas de combate</span></span>
+            <span class="tile__go" aria-hidden="true">${icon('chevron-right')}</span>
+          </a>
+        </li>
       </ul>
     </section>
 

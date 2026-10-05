@@ -18,6 +18,7 @@ export const NAV_GROUPS = [
 /** Páginas do menu lateral que não são entidades (entram no grupo, depois das entidades). */
 export const NAV_PAGES = [
   { slug: 'arena', group: 'aventura', icon: 'arena', label: 'Arena' },
+  { slug: 'bestiario', group: 'compendio', icon: 'skull', label: 'Bestiário' },
 ];
 
 export const TABLES = ENTITIES.map(e => e.table);

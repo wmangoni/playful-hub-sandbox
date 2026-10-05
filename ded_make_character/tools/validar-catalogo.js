@@ -472,7 +472,7 @@ function validarCatalogo(catalogo) {
   return { erros, avisos };
 }
 
-module.exports = { validarSecao, validarCatalogo, EFEITOS, ENERGIAS, CONDICOES, IMUNIDADES };
+module.exports = { validarSecao, validarCatalogo, EFEITOS, ENERGIAS, CONDICOES, IMUNIDADES, TALENTOS_EXTRAS };
 
 if (require.main === module) {
   const [arquivo = path.join(__dirname, '..', 'data', 'catalogo-combate.json'), secaoArg] = process.argv.slice(2);
