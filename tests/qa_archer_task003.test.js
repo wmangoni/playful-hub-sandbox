@@ -36,6 +36,7 @@ async function runTests() {
   });
 
   page = await browser.newPage();
+  await page.setViewport({ width: 1000, height: 700 });
 
   const consoleErrors = [];
   page.on('console', msg => {

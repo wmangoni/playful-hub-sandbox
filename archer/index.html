@@ -34,7 +34,7 @@
             color: #fff;
         }
 
-        #score-container, #arrows-left, #instructions, #wind-container, #combo-container {
+        #score-container, #arrows-left, #instructions, #wind-container, #combo-container, #wave-container, #gold-container {
             position: absolute;
             background: linear-gradient(to bottom, rgba(245, 222, 179, 0.92) 0%, rgba(238, 210, 165, 0.92) 100%);
             padding: 8px 14px;
@@ -47,7 +47,7 @@
             z-index: 10;
         }
 
-        #score-container, #arrows-left, #combo-container, #wind-container {
+        #score-container, #arrows-left, #combo-container, #wind-container, #wave-container, #gold-container {
             font-family: 'Cinzel Decorative', cursive;
         }
 
@@ -55,6 +55,45 @@
         #arrows-left { top: 55px; left: 12px; }
         #combo-container { top: 98px; left: 12px; color: #8b0000; }
         #wind-container { top: 141px; left: 12px; display: flex; align-items: center; gap: 6px; font-family: 'Lato', sans-serif; font-size: 13px; }
+        #gold-container { top: 184px; left: 12px; color: #b8860b; }
+        #metagame-bar {
+            position: absolute;
+            top: 146px;
+            right: 12px;
+            display: flex;
+            gap: 6px;
+            z-index: 15;
+        }
+        .hud-action-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            background: linear-gradient(to bottom, #8B4513, #5a2e0a);
+            border: 1.5px solid #d4af37;
+            border-radius: 6px;
+            color: #fff8dc;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            font-family: 'Cinzel Decorative', cursive;
+            transition: all 0.15s ease;
+        }
+        .hud-action-btn:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(to bottom, #a0522d, #6b370d);
+            border-color: #ffd700;
+        }
+        #wave-container {
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+        #wave-container .divider {
+            color: #8b4513;
+            opacity: 0.6;
+        }
         
         #instructions {
             top: 12px; right: 12px;
@@ -161,6 +200,26 @@
             box-shadow: 0 0 35px rgba(255, 69, 0, 0.7);
         }
 
+        #game-container.frozen-active {
+            box-shadow: 0 0 40px rgba(0, 229, 255, 0.8), inset 0 0 30px rgba(0, 229, 255, 0.3);
+            filter: hue-rotate(170deg) saturate(1.2);
+        }
+
+        #frost-overlay {
+            position: absolute;
+            inset: 0;
+            border: 6px solid rgba(0, 229, 255, 0.6);
+            background: radial-gradient(circle, transparent 65%, rgba(0, 229, 255, 0.2) 100%);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 25;
+            transition: opacity 0.3s ease;
+        }
+
+        #game-container.frozen-active #frost-overlay {
+            opacity: 1;
+        }
+
         /* Dynamic Bullet Time Overlay Banner */
         #bullet-time-banner {
             position: absolute;
@@ -184,6 +243,42 @@
         @keyframes pulseText {
             from { transform: translateX(-50%) scale(1); }
             to { transform: translateX(-50%) scale(1.1); }
+        }
+
+        /* Wave Complete Banner */
+        #wave-banner {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.85);
+            background: linear-gradient(135deg, rgba(35, 25, 15, 0.95), rgba(70, 48, 25, 0.95));
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.5), inset 0 0 15px rgba(255, 215, 0, 0.2);
+            border-radius: 12px;
+            padding: 14px 28px;
+            text-align: center;
+            z-index: 45;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-family: 'Cinzel Decorative', cursive;
+        }
+        #wave-banner.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #wave-banner h3 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 20px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+        }
+        #wave-banner p {
+            margin: 6px 0 0;
+            color: #fff8dc;
+            font-size: 13px;
+            font-family: 'Lato', sans-serif;
+            font-weight: bold;
         }
 
         /* Clouds */
@@ -406,6 +501,212 @@
             100% { filter: drop-shadow(0 0 14px #ffffff); }
         }
 
+        /* Balloon Icon & Badge */
+        .balloon-icon {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* TNT Explosive Balloon */
+        .balloon-entity.tnt {
+            background: radial-gradient(circle at 30% 30%, #ff7043, #e64a19 60%, #bf360c 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.35), 0 0 18px rgba(255, 87, 34, 0.8);
+            border: 2px dashed #ffeb3b;
+            animation: tntPulse 0.75s infinite alternate;
+        }
+        .balloon-entity.tnt::after { background: #bf360c; }
+        @keyframes tntPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 4px #ff5722); }
+            100% { transform: scale(1.06); filter: drop-shadow(0 0 16px #ffeb3b); }
+        }
+
+        /* Ice Freezing Balloon */
+        .balloon-entity.ice {
+            background: radial-gradient(circle at 30% 30%, #e0f7fa, #00e5ff 60%, #0097a7 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2), 0 0 18px rgba(0, 229, 255, 0.85);
+            animation: iceGlow 1.4s infinite alternate;
+        }
+        .balloon-entity.ice::after { background: #00838f; }
+        @keyframes iceGlow {
+            0% { filter: drop-shadow(0 0 4px #00e5ff); }
+            100% { filter: drop-shadow(0 0 16px #ffffff); }
+        }
+
+        /* Armored Balloon (2 HP) */
+        .balloon-entity.armored {
+            background: radial-gradient(circle at 30% 30%, #cfd8dc, #78909c 60%, #37474f 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
+            border: 3px solid #b0bec5;
+        }
+        .balloon-entity.armored::after { background: #263238; }
+        .balloon-entity.armored.damaged {
+            border-color: #ef5350;
+            background: radial-gradient(circle at 30% 30%, #b0bec5, #546e7a 60%, #263238 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.5), 0 0 12px rgba(239, 83, 80, 0.7);
+        }
+        .balloon-entity .hp-badge {
+            position: absolute;
+            top: -10px;
+            right: -6px;
+            background: #263238;
+            border: 1.5px solid #ffd700;
+            color: #ffd700;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: 'Cinzel Decorative', cursive;
+            border-radius: 50%;
+            width: 17px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        /* Skull Penalty Balloon */
+        .balloon-entity.skull {
+            background: radial-gradient(circle at 30% 30%, #424242, #212121 60%, #0a0a0a 95%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.5), 0 0 14px rgba(186, 104, 200, 0.6);
+            border: 2px solid #ab47bc;
+            animation: skullPulse 1s infinite alternate;
+        }
+        .balloon-entity.skull::after { background: #000; }
+        @keyframes skullPulse {
+            0% { filter: drop-shadow(0 0 3px #8e24aa); }
+            100% { filter: drop-shadow(0 0 12px #e91e63); }
+        }
+
+        /* Boss Titan Balloon */
+        .balloon-entity.boss {
+            width: 62px;
+            height: 80px;
+            background: radial-gradient(circle at 35% 30%, #ffd700 0%, #8e24aa 45%, #280659 90%);
+            box-shadow: inset -5px -5px 12px rgba(0,0,0,0.6), 0 0 24px rgba(255, 215, 0, 0.8), 0 0 45px rgba(156, 39, 176, 0.6);
+            border: 3.5px solid #ffd700;
+            animation: bossHover 1.5s infinite alternate ease-in-out;
+            z-index: 12;
+        }
+        .balloon-entity.boss::after {
+            background: #ffd700;
+            width: 12px;
+            height: 12px;
+            bottom: -9px;
+            box-shadow: 0 0 8px #ffd700;
+        }
+        @keyframes bossHover {
+            0% { transform: scale(1); filter: drop-shadow(0 0 8px #ffd700); }
+            100% { transform: scale(1.04); filter: drop-shadow(0 0 24px #e040fb); }
+        }
+
+        /* Boss Health HUD */
+        #boss-bar-container {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 10, 35, 0.92);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 6px 18px;
+            z-index: 45;
+            display: none;
+            text-align: center;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8);
+            min-width: 250px;
+        }
+        #boss-bar-title {
+            font-size: 11px;
+            color: #ffd700;
+            font-family: 'Cinzel Decorative', cursive;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+        #boss-hp-track {
+            width: 100%;
+            height: 12px;
+            background: #331144;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #ffd700;
+        }
+        #boss-hp-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, #e91e63, #ffd700);
+            transition: width 0.25s ease;
+        }
+
+        /* Screen Shake Animation */
+        @keyframes screenShakeAnim {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-4px, 3px); }
+            40% { transform: translate(4px, -3px); }
+            60% { transform: translate(-3px, -2px); }
+            80% { transform: translate(3px, 2px); }
+            100% { transform: translate(0, 0); }
+        }
+        .screen-shake {
+            animation: screenShakeAnim 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Timer HUD (Rush 60s Mode) */
+        #timer-container {
+            position: absolute;
+            top: 48px;
+            right: 18px;
+            background: rgba(30, 20, 10, 0.85);
+            border: 2px solid #ff9800;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 13.5px;
+            font-weight: bold;
+            color: #ff9800;
+            font-family: 'Cinzel Decorative', cursive;
+            z-index: 20;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        /* Modes Selection Modal Styles */
+        .mode-card {
+            background: rgba(255, 255, 255, 0.88);
+            border: 2px solid #8b4513;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+        .mode-card:hover {
+            border-color: #ffd700;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+        .mode-card.active {
+            border-color: #2e7d32;
+            background: rgba(232, 245, 233, 0.95);
+        }
+        .mode-info h4 {
+            margin: 0 0 4px 0;
+            font-family: 'Cinzel Decorative', cursive;
+            font-size: 14px;
+            color: #2b180d;
+        }
+        .mode-info p {
+            margin: 0;
+            font-size: 11.5px;
+            color: #555;
+            max-width: 320px;
+            line-height: 1.3;
+        }
+
         #ground {
             position: absolute;
             bottom: 0;
@@ -472,29 +773,43 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: linear-gradient(to bottom, rgba(245, 222, 179, 0.96) 0%, rgba(238, 210, 165, 0.96) 100%);
-            padding: 30px 45px;
+            background: linear-gradient(to bottom, rgba(245, 222, 179, 0.98) 0%, rgba(238, 210, 165, 0.98) 100%);
+            padding: 24px 36px;
             border-radius: 12px;
             border: 3px solid #8B4513;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            box-shadow: 0 10px 35px rgba(0,0,0,0.6);
             text-align: center;
             display: none;
             color: #4a280d;
             z-index: 50;
+            min-width: 340px;
         }
         #game-over h2 {
-            font-size: 2.2em;
+            font-size: 2em;
             color: #8B0000;
-            margin: 0 0 10px 0;
+            margin: 0 0 6px 0;
+            font-family: 'Cinzel Decorative', cursive;
         }
-        #game-over p {
+        #game-over-subtitle {
+            margin: 0 0 14px 0;
+            font-size: 0.95em;
+            color: #5c3a1e;
+        }
+        #game-over-stats {
+            margin: 0 0 18px 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 14px;
+            text-align: left;
+            font-size: 0.95em;
+            background: rgba(0, 0, 0, 0.04);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px dashed #b8860b;
+        }
+        #game-over-stats strong {
+            font-family: 'Cinzel Decorative', cursive;
             font-size: 1.1em;
-            margin-bottom: 20px;
-        }
-        #final-score {
-            font-weight: bold;
-            font-size: 1.3em;
-            color: #006400;
         }
         button {
             padding: 12px 28px;
@@ -514,6 +829,156 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.5);
         }
+
+        /* Modal Overlay & Metagame Modals */
+        #modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 15, 20, 0.75);
+            backdrop-filter: blur(3px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-modal {
+            background: linear-gradient(135deg, #fdf6e2 0%, #faecd0 100%);
+            border: 4px solid #8b4513;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.8), inset 0 0 20px rgba(184, 134, 11, 0.2);
+            border-radius: 14px;
+            padding: 22px;
+            color: #3e2723;
+            text-align: center;
+            max-width: 580px;
+            width: 90%;
+            position: relative;
+            z-index: 105;
+            animation: modalPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes modalPop {
+            from { transform: scale(0.85); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .game-modal h2 {
+            font-family: 'Cinzel Decorative', cursive;
+            margin: 0 0 8px 0;
+            color: #4a280d;
+            font-size: 22px;
+            text-shadow: 1px 1px 0 rgba(255,255,255,0.7);
+        }
+
+        .game-modal p.modal-desc {
+            margin: 0 0 14px 0;
+            font-size: 13px;
+            color: #5c3a1e;
+        }
+
+        .bow-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .bow-card {
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid #b8860b;
+            border-radius: 10px;
+            padding: 12px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+
+        .bow-card.active {
+            border-color: #2e7d32;
+            box-shadow: 0 0 12px rgba(46, 125, 50, 0.6);
+            background: rgba(232, 245, 233, 0.95);
+        }
+
+        .bow-card .bow-icon {
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
+
+        .bow-card h4 {
+            margin: 4px 0 2px 0;
+            font-size: 12px;
+            font-family: 'Cinzel Decorative', cursive;
+            color: #2b180d;
+        }
+
+        .bow-card .bow-perk {
+            font-size: 10.5px;
+            color: #555;
+            margin: 6px 0 10px 0;
+            min-height: 32px;
+            line-height: 1.25;
+        }
+
+        .bow-card button {
+            padding: 6px 10px;
+            font-size: 11px;
+            width: 100%;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 12.5px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 7px 8px;
+            border-bottom: 1px solid #d7ccc8;
+        }
+
+        .leaderboard-table th {
+            background: rgba(139, 69, 19, 0.15);
+            font-family: 'Cinzel Decorative', cursive;
+            color: #4a280d;
+            font-size: 11.5px;
+        }
+
+        /* Achievement Toast Notification */
+        #achievement-toast {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            background: linear-gradient(135deg, #1b2631, #2c3e50);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 10px 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 6px 25px rgba(0,0,0,0.7);
+            z-index: 120;
+            color: #fff;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+        #achievement-toast.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+        #achievement-toast .toast-icon { font-size: 26px; }
+        #achievement-toast .toast-info { text-align: left; }
+        #achievement-toast .toast-title { font-size: 10px; color: #ffd700; text-transform: uppercase; letter-spacing: 1px; }
+        #achievement-toast .toast-name { font-size: 13.5px; font-weight: bold; font-family: 'Cinzel Decorative', cursive; }
+
+        /* Bow SVG Visuals */
+        #bow.composite svg path { stroke: #1e88e5; filter: drop-shadow(0 0 3px #00e5ff); }
+        #bow.elven svg path { stroke: #ffd700; filter: drop-shadow(0 0 5px #ffb300); }
     </style>
 </head>
 <body>
@@ -524,6 +989,18 @@
 
     <div id="game-container">
         <div id="bullet-time-banner">⚡ BULLET-TIME ⚡</div>
+        <div id="frost-overlay"></div>
+        <div id="boss-bar-container">
+            <div id="boss-bar-title">👑 O TITÃ DOS CÉUS (HP: <span id="boss-hp-val">5</span>/5)</div>
+            <div id="boss-hp-track">
+                <div id="boss-hp-fill" style="width: 100%;"></div>
+            </div>
+        </div>
+        <div id="timer-container">⏱️ Tempo: <span id="timer-val">60</span>s</div>
+        <div id="wave-banner">
+            <h3 id="wave-banner-title">✨ ONDA 1 CONCLUÍDA! ✨</h3>
+            <p id="wave-banner-desc">+2 Flechas Bônus!</p>
+        </div>
         <div id="score-container">🎯 Pontos: <span id="score">0</span></div>
         <div id="arrows-left">➵ Flechas: <span id="arrows-counter">5</span></div>
         <div id="combo-container">🔥 Combo: x<span id="combo-counter">0</span></div>
@@ -531,12 +1008,24 @@
             <span>💨 Vento:</span>
             <span id="wind-val">0.0</span>
         </div>
+        <div id="gold-container">🪙 Ouro: <span id="gold-counter">0</span></div>
+        <div id="wave-container">
+            <span>🌊 Onda: <strong id="wave-counter">1</strong>/10</span>
+            <span class="divider">|</span>
+            <span>🎯 Restam: <strong id="targets-counter">3</strong></span>
+        </div>
 
         <div id="instructions">
             <p><strong>Controles:</strong></p>
-            <p>Arraste para mirar e carregar força.</p>
-            <p>Solte para disparar.</p>
+            <p>Arraste para mirar e carregar força. Solte para disparar.</p>
             <p><span class="key">1</span> Normal | <span class="key">2</span> Tripla | <span class="key">3</span> Fogo | <span class="key">4</span> Gravitacional</p>
+            <p style="margin-top: 4px; font-size: 11px; color: #5a2e0a;">💣 TNT | ❄️ Gelo | 🛡️ Blindado | ☠️ Perigo | 👑 Titã</p>
+        </div>
+
+        <div id="metagame-bar">
+            <button class="hud-action-btn" id="btn-modes" onclick="openModesModal()">🎮 Modos</button>
+            <button class="hud-action-btn" id="btn-workshop" onclick="openWorkshop()">🏹 Oficina</button>
+            <button class="hud-action-btn" id="btn-leaderboard" onclick="openLeaderboard()">🏆 Recordes</button>
         </div>
 
         <!-- Clouds -->
@@ -573,7 +1062,7 @@
         </div>
         
         <!-- Bow -->
-        <div id="bow">
+        <div id="bow" class="oak">
             <svg viewBox="-5 -5 30 100" xmlns="http://www.w3.org/2000/svg">
                 <path d="M 10 0 Q 30 45 10 90" stroke="#8B4513" stroke-width="5" stroke-linecap="round" fill="none" />
             </svg>
@@ -620,23 +1109,249 @@
 
         <!-- Game Over Modal -->
         <div id="game-over">
-            <h2>Fim de Jogo!</h2>
-            <p>Sua pontuação final: <span id="final-score">0</span></p>
-            <button id="restart-button" onclick="restartGame()">Jogar Novamente</button>
+            <h2 id="game-over-title">Fim de Jogo!</h2>
+            <p id="game-over-subtitle">Suas flechas se esgotaram.</p>
+            <div id="game-over-stats">
+                <div>Pontuação: <strong id="final-score" style="color: #006400;">0</strong></div>
+                <div>Onda: <strong id="final-wave" style="color: #8b4513;">1 / 10</strong></div>
+                <div>Maior Combo: <strong id="final-combo" style="color: #8b0000;">x0</strong></div>
+                <div>Precisão: <strong id="final-accuracy" style="color: #1a5276;">0%</strong></div>
+                <div>Ouro Ganho: <strong id="final-gold" style="color: #b8860b;">+0 🪙</strong></div>
+                <div>Total Ouro: <strong id="total-gold" style="color: #b8860b;">0 🪙</strong></div>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap;">
+                <button id="restart-button" onclick="restartGame()">Jogar Novamente</button>
+                <button class="hud-action-btn" style="padding: 10px 16px; font-size: 13px;" onclick="openModesModal()">🎮 Modos</button>
+                <button class="hud-action-btn" style="padding: 10px 16px; font-size: 13px;" onclick="openWorkshop()">🏹 Oficina</button>
+                <button class="hud-action-btn" style="padding: 10px 16px; font-size: 13px;" onclick="openLeaderboard()">🏆 Recordes</button>
+            </div>
+        </div>
+
+        <!-- Metagame Modal Overlay -->
+        <div id="modal-overlay" onclick="handleOverlayClick(event)">
+            <!-- Modes Modal -->
+            <div id="modes-modal" class="game-modal" style="display: none; max-width: 520px;">
+                <h2>🎮 Modos de Jogo</h2>
+                <p class="modal-desc">Escolha sua forma de jogar e prove sua maestria com o arco!</p>
+                
+                <div class="mode-card" id="mode-card-campaign">
+                    <div class="mode-info">
+                        <h4>🌟 Campanha: 10 Ondas</h4>
+                        <p>Progressão clássica de 10 ondas com obstáculos, vento crescente e a Batalha Final contra o Titã dos Céus.</p>
+                    </div>
+                    <button onclick="selectGameMode('campaign')" style="padding: 8px 16px; font-size: 12px;">Jogar</button>
+                </div>
+
+                <div class="mode-card" id="mode-card-rush">
+                    <div class="mode-info">
+                        <h4>⏱️ Rush 60 Segundos</h4>
+                        <p>60 segundos frenéticos com flechas infinitas e alvos velozes incessantes. Pontue o máximo que puder!</p>
+                    </div>
+                    <button onclick="selectGameMode('rush')" style="padding: 8px 16px; font-size: 12px; background: #e65100;">Jogar</button>
+                </div>
+
+                <div class="mode-card" id="mode-card-trickshot">
+                    <div class="mode-info">
+                        <h4>🎯 Desafio Trickshot</h4>
+                        <p>3 desafios de quebra-cabeça balístico onde o único caminho até o balão é o ricochete calculado no escudo!</p>
+                    </div>
+                    <button onclick="selectGameMode('trickshot')" style="padding: 8px 16px; font-size: 12px; background: #4a148c;">Jogar</button>
+                </div>
+
+                <button onclick="closeModals()" style="padding: 8px 24px; font-size: 13px; margin-top: 6px;">Fechar</button>
+            </div>
+
+            <!-- Workshop Modal -->
+            <div id="workshop-modal" class="game-modal" style="display: none;">
+                <h2>🏹 Oficina do Arqueiro</h2>
+                <p class="modal-desc">Invista suas moedas para forjar arcos lendários com atributos exclusivos!</p>
+                <div style="font-size: 15px; font-weight: bold; color: #b8860b; margin-bottom: 8px;">
+                    Seu Tesouro: <span id="workshop-gold-val">0</span> 🪙
+                </div>
+                <div class="bow-grid" id="bow-grid">
+                    <!-- Dynamic Bow Cards -->
+                </div>
+                <button onclick="closeModals()" style="padding: 8px 24px; font-size: 13px;">Fechar</button>
+            </div>
+
+            <!-- Leaderboard Modal -->
+            <div id="leaderboard-modal" class="game-modal" style="display: none;">
+                <h2>🏆 Hall dos Mestres Arqueiros</h2>
+                <p class="modal-desc">Os 5 maiores feitos registrados nas crônicas de tiro ao alvo.</p>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Pontos</th>
+                            <th>Onda</th>
+                            <th>Combo</th>
+                            <th>Precisão</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-tbody">
+                        <!-- Dynamic Records -->
+                    </tbody>
+                </table>
+                <button onclick="closeModals()" style="padding: 8px 24px; font-size: 13px;">Fechar</button>
+            </div>
+        </div>
+
+        <!-- Achievement Toast -->
+        <div id="achievement-toast">
+            <span class="toast-icon" id="toast-icon">🎖️</span>
+            <div class="toast-info">
+                <div class="toast-title">Conquista Desbloqueada!</div>
+                <div class="toast-name" id="toast-name">Primeiro Disparo</div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Wave Progression Configuration (Waves 1-10)
+        const WAVE_CONFIG = [
+            { wave: 1, targets: 3, windMin: -0.5, windMax: 0.5, oscillation: 0, shieldSpeed: 0.03, cloudSpeed: 1.0, bonusArrows: 2, bonusSpecial: null, title: 'Iniciação: Tiro ao Alvo' },
+            { wave: 2, targets: 3, windMin: -1.5, windMax: 1.5, oscillation: 0, shieldSpeed: 0.035, cloudSpeed: 1.2, bonusArrows: 2, bonusSpecial: null, title: 'Brisa Suave' },
+            { wave: 3, targets: 4, windMin: -2.2, windMax: 2.2, oscillation: 0, shieldSpeed: 0.04, cloudSpeed: 1.4, bonusArrows: 2, bonusSpecial: 'split', title: 'Rajadas Cruzadas (+Tripla)' },
+            { wave: 4, targets: 4, windMin: -2.5, windMax: 2.5, oscillation: 18, shieldSpeed: 0.045, cloudSpeed: 1.5, bonusArrows: 3, bonusSpecial: null, title: 'Balões Oscilantes' },
+            { wave: 5, targets: 5, windMin: -3.0, windMax: 3.0, oscillation: 25, shieldSpeed: 0.05, cloudSpeed: 1.7, bonusArrows: 3, bonusSpecial: 'fire', title: 'Ventos Fortes (+Fogo)' },
+            { wave: 6, targets: 5, windMin: -3.5, windMax: 3.5, oscillation: 32, shieldSpeed: 0.055, cloudSpeed: 1.9, bonusArrows: 3, bonusSpecial: null, title: 'Escudo Veloz' },
+            { wave: 7, targets: 5, windMin: -4.0, windMax: 4.0, oscillation: 40, shieldSpeed: 0.06, cloudSpeed: 2.1, bonusArrows: 3, bonusSpecial: 'gravity', title: 'Tempestade Aberta (+Gravidade)' },
+            { wave: 8, targets: 6, windMin: -4.2, windMax: 4.2, oscillation: 48, shieldSpeed: 0.065, cloudSpeed: 2.3, bonusArrows: 4, bonusSpecial: 'split', title: 'Dança das Flechas' },
+            { wave: 9, targets: 6, windMin: -4.5, windMax: 4.5, oscillation: 55, shieldSpeed: 0.07, cloudSpeed: 2.5, bonusArrows: 4, bonusSpecial: 'fire', title: 'Vórtice do Mestre' },
+            { wave: 10, targets: 1, windMin: -5.0, windMax: 5.0, oscillation: 50, shieldSpeed: 0.08, cloudSpeed: 2.8, bonusArrows: 5, bonusSpecial: 'gravity', title: 'Batalha Final: O Titã dos Céus', isBoss: true }
+        ];
+
+        // Trickshot Challenges Configuration (Etapa 4)
+        const TRICKSHOT_LEVELS = [
+            { level: 1, balloonX: 620, balloonY: 130, shieldX: 420, shieldY: 160, cloudX: 300, cloudY: 220, arrows: 2, desc: 'Ricocheteie no escudo para contornar a nuvem de tempestade!' },
+            { level: 2, balloonX: 660, balloonY: 200, shieldX: 450, shieldY: 200, cloudX: 340, cloudY: 200, arrows: 2, desc: 'Ângulo parabólico alto com ricochete descendente!' },
+            { level: 3, balloonX: 600, balloonY: 90, shieldX: 380, shieldY: 130, cloudX: 420, cloudY: 240, arrows: 1, desc: 'Disparo único de precisão milimétrica!' }
+        ];
+
+        // Bow Workshop Configuration (Etapa 3)
+        const BOWS_CONFIG = {
+            oak: {
+                id: 'oak',
+                name: 'Arco de Carvalho',
+                icon: '🏹',
+                desc: 'O arco clássico dos caçadores.',
+                cost: 0,
+                speedMultiplier: 1.0,
+                windMultiplier: 1.0,
+                bonusInitialArrows: 0,
+                bullseyeRadius: 14,
+                perk: 'Equilíbrio padrão (1.0x)'
+            },
+            composite: {
+                id: 'composite',
+                name: 'Composto Ágil',
+                icon: '⚡',
+                desc: 'Lâminas curvas de alta tensão.',
+                cost: 50,
+                speedMultiplier: 1.2,
+                windMultiplier: 0.7,
+                bonusInitialArrows: 0,
+                bullseyeRadius: 14,
+                perk: '+20% Vel. / -30% Vento'
+            },
+            elven: {
+                id: 'elven',
+                name: 'Élfico Dourado',
+                icon: '✨',
+                desc: 'Madeira solar élfica abençoada.',
+                cost: 120,
+                speedMultiplier: 1.05,
+                windMultiplier: 0.85,
+                bonusInitialArrows: 1,
+                bullseyeRadius: 18,
+                perk: '+1 Flecha (6) / Bullseye Amplo'
+            }
+        };
+
+        // Achievements Configuration (Etapa 3 & 4)
+        const ACHIEVEMENTS = {
+            first_blood: { id: 'first_blood', name: 'Primeiro Disparo', desc: 'Estoure seu primeiro balão.', icon: '🎯' },
+            combo_5: { id: 'combo_5', name: 'Atirador Focado', desc: 'Alcance um Combo de x5.', icon: '🔥' },
+            fire_melter: { id: 'fire_melter', name: 'Mestre do Fogo', desc: 'Derreta um balão blindado com flecha de fogo.', icon: '🛡️' },
+            wave_10: { id: 'wave_10', name: 'Lenda dos Céus', desc: 'Alcance ou conclua a Onda 10.', icon: '👑' },
+            boss_slayer: { id: 'boss_slayer', name: 'Carrasco de Titãs', desc: 'Derrote o Titã dos Céus na Onda 10.', icon: '⚡' },
+            rush_master: { id: 'rush_master', name: 'Velocista Lendário', desc: 'Pontue 1.500+ no Modo Rush 60s.', icon: '⏱️' },
+            trickshot_ace: { id: 'trickshot_ace', name: 'Mestre do Ricochete', desc: 'Vença um desafio no Modo Trickshot.', icon: '🎯' }
+        };
+
+        // Safe LocalStorage Wrappers
+        function getStorage(key, defaultVal) {
+            try {
+                const v = localStorage.getItem(key);
+                return v !== null ? v : defaultVal;
+            } catch (e) {
+                return defaultVal;
+            }
+        }
+        function getStorageJSON(key, defaultVal) {
+            try {
+                const v = localStorage.getItem(key);
+                return v !== null ? JSON.parse(v) : defaultVal;
+            } catch (e) {
+                return defaultVal;
+            }
+        }
+        function setStorage(key, val) {
+            try {
+                localStorage.setItem(key, val);
+            } catch (e) {}
+        }
+
+        // Metagame State (Etapa 3 & 4)
+        let gold = parseInt(getStorage('archer_gold', '0'), 10);
+        let goldEarnedInMatch = 0;
+        let unlockedBows = getStorageJSON('archer_unlocked_bows', ['oak']);
+        let selectedBow = getStorage('archer_selected_bow', 'oak');
+        if (!BOWS_CONFIG[selectedBow]) selectedBow = 'oak';
+        let highScores = getStorageJSON('archer_highscores', []);
+        let unlockedAchievements = getStorageJSON('archer_achievements', []);
+
+        // Game Modes State (Etapa 4)
+        let gameMode = 'campaign'; // 'campaign' | 'rush' | 'trickshot'
+        let rushTimer = 60;
+        let rushInterval = null;
+        let trickshotLevelIndex = 0;
+
         // Game State Variables
         let score = 0;
         let arrowsLeft = 5;
         let comboStreak = 0;
+        let maxCombo = 0;
+        let totalShotsFired = 0;
+        let totalHits = 0;
+        let currentWave = 1;
+        const maxWaves = 10;
+        let waveTargetsPopped = 0;
+        let waveTargetCount = WAVE_CONFIG[0].targets;
+        let isWaveTransitioning = false;
+        let isGameOverPending = false;
+        let gameOverTimer = null;
+        let balloonSpawnTimer = null;
+        let waveTransitionTimer = null;
+        let isGameLoopRunning = false;
+        let balloonOscTimer = 0;
         let gameOver = false;
+
+        function scheduleBalloonSpawn(delay) {
+            if (balloonSpawnTimer) clearTimeout(balloonSpawnTimer);
+            balloonSpawnTimer = setTimeout(() => {
+                balloonSpawnTimer = null;
+                positionBalloon();
+            }, delay);
+        }
         let isDragging = false;
         let startX, startY;
         let arrowAngle = 0;
         let arrowSpeed = 0;
         let timeScale = 1.0;
+        let isFrozen = false;
+        let freezeTimer = null;
         let bulletTimeTimer = null;
         let isBulletTime = false;
         let windSpeed = 0;
@@ -650,10 +1365,21 @@
         };
 
         // Active Entities
-        let activeArrows = []; // Array holding active arrow objects: { id, x, y, vx, vy, type, angle, isRicocheted, element, extraEl }
-        let balloonData = { x: 600, y: 250, isGolden: false };
+        let activeArrows = []; // Array holding active arrow objects: { id, x, y, vx, vy, type, angle, isRicocheted, hasHit, element, extraEl }
+        let balloonData = { x: 600, y: 250, baseY: 250, type: 'normal', hp: 1, maxHp: 1, isGolden: false };
         let stormCloud = { x: 300, y: 60, vx: 1.2, width: 120, height: 45 };
         let woodenShield = { x: 480, y: 230, radius: 22, angle: 0, rotSpeed: 0.04 };
+
+        // Screen Shake Helper (Etapa 4)
+        let screenShakeTimeout = null;
+        function triggerScreenShake(duration = 320) {
+            if (!gameContainer) return;
+            gameContainer.classList.add('screen-shake');
+            if (screenShakeTimeout) clearTimeout(screenShakeTimeout);
+            screenShakeTimeout = setTimeout(() => {
+                gameContainer.classList.remove('screen-shake');
+            }, duration);
+        }
 
         // DOM References
         const gameContainer = document.getElementById('game-container');
@@ -665,13 +1391,51 @@
         const scoreElement = document.getElementById('score');
         const arrowsCounter = document.getElementById('arrows-counter');
         const comboCounter = document.getElementById('combo-counter');
+        const waveContainer = document.getElementById('wave-container');
+        const waveCounter = document.getElementById('wave-counter');
+        const targetsCounter = document.getElementById('targets-counter');
         const windVal = document.getElementById('wind-val');
+        const goldCounter = document.getElementById('gold-counter');
+        const finalGoldElement = document.getElementById('final-gold');
+        const totalGoldElement = document.getElementById('total-gold');
         const powerIndicator = document.getElementById('power-indicator');
         const powerBar = document.getElementById('power-bar');
+        const waveBanner = document.getElementById('wave-banner');
+        const waveBannerTitle = document.getElementById('wave-banner-title');
+        const waveBannerDesc = document.getElementById('wave-banner-desc');
         const gameOverElement = document.getElementById('game-over');
+        const gameOverTitle = document.getElementById('game-over-title');
+        const gameOverSubtitle = document.getElementById('game-over-subtitle');
         const finalScoreElement = document.getElementById('final-score');
+        const finalWaveElement = document.getElementById('final-wave');
+        const finalComboElement = document.getElementById('final-combo');
+        const finalAccuracyElement = document.getElementById('final-accuracy');
         const stormCloudEl = document.getElementById('storm-cloud');
         const woodenShieldEl = document.getElementById('wooden-shield');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modesModal = document.getElementById('modes-modal');
+        const workshopModal = document.getElementById('workshop-modal');
+        const leaderboardModal = document.getElementById('leaderboard-modal');
+        const workshopGoldVal = document.getElementById('workshop-gold-val');
+        const bowGrid = document.getElementById('bow-grid');
+        const leaderboardTbody = document.getElementById('leaderboard-tbody');
+        const achievementToast = document.getElementById('achievement-toast');
+        const toastIcon = document.getElementById('toast-icon');
+        const toastName = document.getElementById('toast-name');
+        const bossBarContainer = document.getElementById('boss-bar-container');
+        const bossHpVal = document.getElementById('boss-hp-val');
+        const bossHpFill = document.getElementById('boss-hp-fill');
+        const timerContainer = document.getElementById('timer-container');
+        const timerVal = document.getElementById('timer-val');
+
+        function updateBossHpUI() {
+            if (!bossBarContainer || !bossHpVal || !bossHpFill) return;
+            const currentHp = Math.max(0, balloonData.hp);
+            const maxHp = balloonData.maxHp || 5;
+            bossHpVal.textContent = currentHp;
+            const pct = Math.max(0, Math.min(100, (currentHp / maxHp) * 100));
+            bossHpFill.style.width = `${pct}%`;
+        }
 
         // Trajectory Preview Elements
         const TRAJECTORY_DOTS_COUNT = 10;
@@ -837,6 +1601,443 @@
             } catch (e) {}
         }
 
+        function playArrowRefundSound(isBullseye) {
+            if (!audioCtx) return;
+            try {
+                const baseFreq = isBullseye ? 659.25 : 523.25; // E5 or C5
+                const freqs = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
+                freqs.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    const startTime = audioCtx.currentTime + idx * 0.04;
+                    osc.frequency.setValueAtTime(freq, startTime);
+                    gain.gain.setValueAtTime(0.18, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.16);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.16);
+                });
+            } catch (e) {}
+        }
+
+        function playWaveCompleteSound() {
+            if (!audioCtx) return;
+            try {
+                const fanfare = [392.00, 523.25, 659.25, 783.99, 1046.50]; // G4, C5, E5, G5, C6
+                fanfare.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    const startTime = audioCtx.currentTime + idx * 0.07;
+                    const dur = (idx === fanfare.length - 1) ? 0.45 : 0.14;
+                    osc.frequency.setValueAtTime(freq, startTime);
+                    gain.gain.setValueAtTime(0.2, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + dur);
+                });
+            } catch (e) {}
+        }
+
+        function playExplosionSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+
+                const bufferSize = audioCtx.sampleRate * 0.25;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                noise.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                noise.start();
+            } catch (e) {}
+        }
+
+        function playFreezeSound() {
+            if (!audioCtx) return;
+            try {
+                const freqs = [1046.50, 1318.51, 1567.98, 2093.00]; // C6, E6, G6, C7
+                freqs.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    const startTime = audioCtx.currentTime + idx * 0.03;
+                    osc.frequency.setValueAtTime(freq, startTime);
+                    gain.gain.setValueAtTime(0.15, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.22);
+                });
+            } catch (e) {}
+        }
+
+        function playMetalHitSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(820, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(240, audioCtx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+            } catch (e) {}
+        }
+
+        function playPenaltySound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(45, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch (e) {}
+        }
+
+        function playGoldSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(987.77, audioCtx.currentTime); // B5
+                osc.frequency.exponentialRampToValueAtTime(1318.51, audioCtx.currentTime + 0.08); // E6
+                gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.14);
+            } catch (e) {}
+        }
+
+        function playAchievementSound() {
+            if (!audioCtx) return;
+            try {
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    const st = audioCtx.currentTime + idx * 0.06;
+                    osc.frequency.setValueAtTime(freq, st);
+                    gain.gain.setValueAtTime(0.2, st);
+                    gain.gain.exponentialRampToValueAtTime(0.001, st + 0.22);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(st);
+                    osc.stop(st + 0.22);
+                });
+            } catch (e) {}
+        }
+
+        // Metagame Economy & Persistence (Etapa 3)
+        function addGold(amount) {
+            gold += amount;
+            goldEarnedInMatch += amount;
+            setStorage('archer_gold', gold.toString());
+            if (goldCounter) goldCounter.textContent = gold;
+            if (workshopGoldVal) workshopGoldVal.textContent = gold;
+        }
+
+        let achievementTimer = null;
+        function unlockAchievement(id) {
+            if (!ACHIEVEMENTS[id] || unlockedAchievements.includes(id)) return;
+            unlockedAchievements.push(id);
+            setStorage('archer_achievements', JSON.stringify(unlockedAchievements));
+            showAchievementToast(ACHIEVEMENTS[id]);
+            playAchievementSound();
+        }
+
+        function showAchievementToast(ach) {
+            if (!achievementToast) return;
+            toastIcon.textContent = ach.icon || '🎖️';
+            toastName.textContent = ach.name;
+            achievementToast.classList.add('visible');
+            if (achievementTimer) clearTimeout(achievementTimer);
+            achievementTimer = setTimeout(() => {
+                achievementToast.classList.remove('visible');
+            }, 3200);
+        }
+
+        // Workshop & Bows System
+        function renderWorkshopCards() {
+            if (!bowGrid) return;
+            bowGrid.innerHTML = '';
+            Object.values(BOWS_CONFIG).forEach(b => {
+                const card = document.createElement('div');
+                card.className = `bow-card ${selectedBow === b.id ? 'active' : ''}`;
+                
+                const isUnlocked = unlockedBows.includes(b.id);
+                let actionBtnHtml = '';
+                if (selectedBow === b.id) {
+                    actionBtnHtml = '<button disabled style="background: #2e7d32; border-color: #1b5e20;">Equipado ✓</button>';
+                } else if (isUnlocked) {
+                    actionBtnHtml = `<button onclick="selectBow('${b.id}')" style="background: #37474f;">Equipar</button>`;
+                } else {
+                    const canAfford = gold >= b.cost;
+                    actionBtnHtml = `<button onclick="buyBow('${b.id}')" ${canAfford ? '' : 'disabled'} style="background: ${canAfford ? '#b8860b' : '#616161'};">Comprar (${b.cost} 🪙)</button>`;
+                }
+
+                card.innerHTML = `
+                    <div class="bow-icon">${b.icon}</div>
+                    <h4>${b.name}</h4>
+                    <div class="bow-perk">${b.perk}</div>
+                    ${actionBtnHtml}
+                `;
+                bowGrid.appendChild(card);
+            });
+        }
+
+        function openWorkshop() {
+            initAudio();
+            if (workshopGoldVal) workshopGoldVal.textContent = gold;
+            renderWorkshopCards();
+            if (workshopModal) workshopModal.style.display = 'block';
+            if (leaderboardModal) leaderboardModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'none';
+            if (modalOverlay) modalOverlay.style.display = 'flex';
+        }
+
+        function buyBow(bowId) {
+            const b = BOWS_CONFIG[bowId];
+            if (!b || unlockedBows.includes(bowId) || gold < b.cost) return;
+            gold -= b.cost;
+            setStorage('archer_gold', gold.toString());
+            unlockedBows.push(bowId);
+            setStorage('archer_unlocked_bows', JSON.stringify(unlockedBows));
+            selectBow(bowId);
+            playAchievementSound();
+            if (goldCounter) goldCounter.textContent = gold;
+            if (workshopGoldVal) workshopGoldVal.textContent = gold;
+            renderWorkshopCards();
+        }
+
+        function selectBow(bowId) {
+            if (!BOWS_CONFIG[bowId] || !unlockedBows.includes(bowId)) return;
+            selectedBow = bowId;
+            setStorage('archer_selected_bow', selectedBow);
+            if (bow) bow.className = selectedBow;
+            renderWorkshopCards();
+        }
+
+        // Leaderboard System
+        function saveHighScore() {
+            if (score <= 0) return;
+            const accuracyVal = totalShotsFired > 0 ? Math.round((totalHits / totalShotsFired) * 100) : 0;
+            const newRecord = {
+                score,
+                wave: currentWave,
+                combo: maxCombo,
+                accuracy: `${accuracyVal}%`,
+                date: new Date().toLocaleDateString('pt-BR')
+            };
+
+            const isNewBest = highScores.length === 0 || score > (highScores[0].score || 0);
+
+            highScores.push(newRecord);
+            highScores.sort((a, b) => b.score - a.score);
+            highScores = highScores.slice(0, 5);
+            setStorage('archer_highscores', JSON.stringify(highScores));
+
+            if (isNewBest && score > 0) {
+                createFloaterText(350, 300, '👑 NOVO RECORDE!', '#ffd700');
+            }
+        }
+
+        function openLeaderboard() {
+            initAudio();
+            if (!leaderboardTbody) return;
+            leaderboardTbody.innerHTML = '';
+            if (highScores.length === 0) {
+                leaderboardTbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #888;">Nenhum recorde registrado ainda. Vença as ondas para cravar seu nome!</td></tr>';
+            } else {
+                highScores.forEach((r, idx) => {
+                    const tr = document.createElement('tr');
+                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`;
+                    tr.innerHTML = `
+                        <td style="font-weight: bold; color: #8b4513;">${medal}</td>
+                        <td style="font-weight: bold; color: #2e7d32;">${r.score}</td>
+                        <td>${r.wave}/10</td>
+                        <td>x${r.combo}</td>
+                        <td>${r.accuracy}</td>
+                        <td style="font-size: 11px; color: #666;">${r.date}</td>
+                    `;
+                    leaderboardTbody.appendChild(tr);
+                });
+            }
+
+            if (workshopModal) workshopModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'none';
+            if (leaderboardModal) leaderboardModal.style.display = 'block';
+            if (modalOverlay) modalOverlay.style.display = 'flex';
+        }
+
+        function openModesModal() {
+            initAudio();
+            if (workshopModal) workshopModal.style.display = 'none';
+            if (leaderboardModal) leaderboardModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'block';
+            if (modalOverlay) modalOverlay.style.display = 'flex';
+
+            ['campaign', 'rush', 'trickshot'].forEach(m => {
+                const el = document.getElementById(`mode-card-${m}`);
+                if (el) {
+                    if (gameMode === m) el.classList.add('active');
+                    else el.classList.remove('active');
+                }
+            });
+        }
+
+        function selectGameMode(mode) {
+            closeModals();
+            if (mode === 'rush') {
+                startRushMode();
+            } else if (mode === 'trickshot') {
+                startTrickshotMode(0);
+            } else {
+                startCampaignMode();
+            }
+        }
+
+        function startCampaignMode() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            gameMode = 'campaign';
+            if (timerContainer) timerContainer.style.display = 'none';
+            if (waveContainer) waveContainer.style.display = 'flex';
+            if (bossBarContainer) bossBarContainer.style.display = 'none';
+            initGame();
+        }
+
+        function startRushMode() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            gameMode = 'rush';
+            rushTimer = 60;
+            if (timerContainer) {
+                timerContainer.style.display = 'block';
+                timerVal.textContent = '60';
+            }
+            if (waveContainer) waveContainer.style.display = 'none';
+            if (bossBarContainer) bossBarContainer.style.display = 'none';
+            initGame();
+            arrowsLeft = 999;
+            arrowsCounter.textContent = '∞';
+
+            rushInterval = setInterval(() => {
+                if (gameOver) {
+                    clearInterval(rushInterval);
+                    rushInterval = null;
+                    return;
+                }
+                rushTimer--;
+                if (timerVal) timerVal.textContent = Math.max(0, rushTimer);
+                if (rushTimer <= 0) {
+                    clearInterval(rushInterval);
+                    rushInterval = null;
+                    if (score >= 1500) {
+                        unlockAchievement('rush_master');
+                    }
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function startTrickshotMode(level = 0) {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            gameMode = 'trickshot';
+            trickshotLevelIndex = level;
+            if (timerContainer) timerContainer.style.display = 'none';
+            if (waveContainer) waveContainer.style.display = 'none';
+            if (bossBarContainer) bossBarContainer.style.display = 'none';
+            initGame();
+
+            const lvl = TRICKSHOT_LEVELS[trickshotLevelIndex] || TRICKSHOT_LEVELS[0];
+            arrowsLeft = lvl.arrows;
+            arrowsCounter.textContent = arrowsLeft;
+            woodenShield.x = lvl.shieldX;
+            woodenShield.y = lvl.shieldY;
+            woodenShieldEl.style.left = `${woodenShield.x}px`;
+            woodenShieldEl.style.top = `${woodenShield.y}px`;
+            stormCloud.x = lvl.cloudX;
+            stormCloud.y = lvl.cloudY;
+            stormCloud.vx = 0;
+            woodenShield.rotSpeed = 0.02;
+            isGameOverPending = false;
+            stormCloudEl.style.left = `${stormCloud.x}px`;
+            stormCloudEl.style.top = `${stormCloud.y}px`;
+
+            balloonData.x = lvl.balloonX;
+            balloonData.y = lvl.balloonY;
+            balloonData.baseY = lvl.balloonY;
+            balloonData.type = 'normal';
+            balloonData.hp = 1;
+            balloon.style.left = `${balloonData.x}px`;
+            balloon.style.bottom = `${balloonData.y}px`;
+            balloonString.style.left = `${balloonData.x + 20}px`;
+            balloonString.style.bottom = `${balloonData.y - 30}px`;
+            balloon.className = 'balloon-entity';
+            balloon.innerHTML = '';
+            balloon.style.display = 'block';
+            balloonString.style.display = 'block';
+
+            createFloaterText(400, 320, `🎯 TRICKSHOT DESAFIO ${lvl.level}!`, '#ffeb3b');
+        }
+
+        function closeModals() {
+            if (modalOverlay) modalOverlay.style.display = 'none';
+            if (workshopModal) workshopModal.style.display = 'none';
+            if (leaderboardModal) leaderboardModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'none';
+        }
+
+        function handleOverlayClick(e) {
+            if (e.target === modalOverlay) {
+                closeModals();
+            }
+        }
+
         // Arrow HUD Selection
         function selectArrowType(type) {
             initAudio();
@@ -868,8 +2069,10 @@
         function spawnArrow(angleOffset = 0, speedMultiplier = 1, type = 'normal') {
             if (arrowsLeft <= 0) return;
 
+            const currentBow = BOWS_CONFIG[selectedBow] || BOWS_CONFIG.oak;
+            const bowSpeedMult = currentBow.speedMultiplier || 1.0;
             const baseAngle = arrowAngle + angleOffset;
-            const speed = arrowSpeed * speedMultiplier;
+            const speed = arrowSpeed * speedMultiplier * bowSpeedMult;
             const vx = Math.cos(baseAngle) * speed;
             const vy = Math.sin(baseAngle) * speed; // FIX: vy positivo sobe em coordenadas CSS bottom
 
@@ -901,6 +2104,7 @@
                 angle: baseAngle,
                 type: type,
                 isRicocheted: false,
+                hasHit: false,
                 element: arrowEl,
                 extraEl: extraEl
             };
@@ -928,8 +2132,14 @@
                 ammo.gravity--;
             }
 
-            arrowsLeft--;
-            arrowsCounter.textContent = arrowsLeft;
+            if (gameMode === 'rush') {
+                arrowsLeft = 999;
+                arrowsCounter.textContent = '∞';
+            } else {
+                arrowsLeft--;
+                arrowsCounter.textContent = arrowsLeft;
+            }
+            totalShotsFired++;
             updateAmmoHUD();
         }
 
@@ -983,7 +2193,10 @@
 
             // Trajetória preditiva pontilhada em tempo real
             if (arrowSpeed > 1) {
-                const simSpeed = arrowSpeed;
+                const currentBow = BOWS_CONFIG[selectedBow] || BOWS_CONFIG.oak;
+                const bowSpeedMult = currentBow.speedMultiplier || 1.0;
+                const bowWindMult = currentBow.windMultiplier !== undefined ? currentBow.windMultiplier : 1.0;
+                const simSpeed = arrowSpeed * bowSpeedMult;
                 const simVx = Math.cos(arrowAngle) * simSpeed;
                 const simVy = Math.sin(arrowAngle) * simSpeed;
                 const startPointX = 135;
@@ -991,7 +2204,7 @@
 
                 for (let i = 0; i < TRAJECTORY_DOTS_COUNT; i++) {
                     const t = (i + 1) * 2.2;
-                    const windAcc = (selectedArrowType !== 'gravity') ? windSpeed * 0.03 : 0;
+                    const windAcc = (selectedArrowType !== 'gravity') ? windSpeed * 0.03 * bowWindMult : 0;
                     const px = startPointX + simVx * t + 0.5 * windAcc * (t * t);
                     const py = startPointY + simVy * t - 0.5 * 0.22 * (t * t);
 
@@ -1069,7 +2282,8 @@
         });
 
         // Balloon Management
-        function positionBalloon() {
+        function positionBalloon(forcedType) {
+            if (gameOver) return;
             const minX = 400;
             const maxX = 720;
             const minY = 140;
@@ -1077,17 +2291,98 @@
 
             balloonData.x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
             balloonData.y = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
-            balloonData.isGolden = Math.random() < 0.22; // 22% Golden Balloon Chance
+            balloonData.baseY = balloonData.y;
+
+            // Pick balloon type based on current wave, gameMode or forcedType
+            let chosenType = forcedType;
+            if (!chosenType) {
+                if (gameMode === 'campaign' && currentWave === 10) {
+                    chosenType = 'boss';
+                } else {
+                    const rand = Math.random();
+                    const goldenBonus = (selectedBow === 'elven') ? 0.10 : 0.0;
+                    if (currentWave <= 2) {
+                        // Wave 1-2: Normal, Golden
+                        chosenType = rand < (0.22 + goldenBonus) ? 'golden' : 'normal';
+                    } else if (currentWave <= 4) {
+                        // Wave 3-4: Normal, Golden, TNT, Ice
+                        if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
+                        else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
+                        else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
+                        else chosenType = 'normal';
+                    } else if (currentWave <= 6) {
+                        // Wave 5-6: Normal, Golden, TNT, Ice, Armored
+                        if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
+                        else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
+                        else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
+                        else if (rand < (0.65 + goldenBonus)) chosenType = 'armored';
+                        else chosenType = 'normal';
+                    } else {
+                        // Wave 7-9: Normal, Golden, TNT, Ice, Armored, Skull
+                        if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
+                        else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
+                        else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
+                        else if (rand < (0.65 + goldenBonus)) chosenType = 'armored';
+                        else if (rand < (0.75 + goldenBonus)) chosenType = 'skull';
+                        else chosenType = 'normal';
+                    }
+                }
+            }
+
+            if (chosenType === 'boss') {
+                balloonData.type = 'boss';
+                balloonData.maxHp = 5;
+                balloonData.hp = 5;
+                balloonData.x = 560;
+                balloonData.y = 230;
+                balloonData.baseY = 230;
+                balloonData.isGolden = false;
+
+                balloon.style.left = `${balloonData.x}px`;
+                balloon.style.bottom = `${balloonData.y}px`;
+                balloonString.style.left = `${balloonData.x + 31}px`;
+                balloonString.style.bottom = `${balloonData.y - 30}px`;
+
+                balloon.className = 'balloon-entity boss';
+                balloon.innerHTML = '<span class="balloon-icon" style="font-size: 26px;">👑</span>';
+                balloon.style.display = 'block';
+                balloonString.style.display = 'block';
+
+                if (bossBarContainer) bossBarContainer.style.display = 'block';
+                updateBossHpUI();
+                return;
+            } else {
+                if (bossBarContainer) bossBarContainer.style.display = 'none';
+            }
+
+            balloonData.type = chosenType;
+            balloonData.isGolden = (chosenType === 'golden');
+            balloonData.maxHp = (chosenType === 'armored') ? 2 : 1;
+            balloonData.hp = balloonData.maxHp;
 
             balloon.style.left = `${balloonData.x}px`;
             balloon.style.bottom = `${balloonData.y}px`;
             balloonString.style.left = `${balloonData.x + 20}px`;
             balloonString.style.bottom = `${balloonData.y - 30}px`;
 
-            if (balloonData.isGolden) {
+            // Reset CSS classes & inner elements
+            balloon.className = 'balloon-entity';
+            balloon.innerHTML = '';
+
+            if (chosenType === 'golden') {
                 balloon.classList.add('golden');
-            } else {
-                balloon.classList.remove('golden');
+            } else if (chosenType === 'tnt') {
+                balloon.classList.add('tnt');
+                balloon.innerHTML = '<span class="balloon-icon">💣</span>';
+            } else if (chosenType === 'ice') {
+                balloon.classList.add('ice');
+                balloon.innerHTML = '<span class="balloon-icon">❄️</span>';
+            } else if (chosenType === 'armored') {
+                balloon.classList.add('armored');
+                balloon.innerHTML = '<span class="balloon-icon">🛡️</span><span class="hp-badge" id="balloon-hp-badge">2</span>';
+            } else if (chosenType === 'skull') {
+                balloon.classList.add('skull');
+                balloon.innerHTML = '<span class="balloon-icon">☠️</span>';
             }
 
             balloon.style.display = 'block';
@@ -1147,24 +2442,77 @@
             }
         }
 
+        // Freeze-Time System (Ice Balloon)
+        let savedWindSpeed = 0;
+
+        function activateFreezeTime(duration = 4500) {
+            isFrozen = true;
+            gameContainer.classList.add('frozen-active');
+            savedWindSpeed = windSpeed;
+            windSpeed = 0;
+            windVal.textContent = '❄️ 0.0';
+
+            if (freezeTimer) clearTimeout(freezeTimer);
+            freezeTimer = setTimeout(deactivateFreezeTime, duration);
+        }
+
+        function deactivateFreezeTime() {
+            if (!isFrozen && !freezeTimer) return;
+            isFrozen = false;
+            gameContainer.classList.remove('frozen-active');
+            generateNewWind();
+            if (freezeTimer) {
+                clearTimeout(freezeTimer);
+                freezeTimer = null;
+            }
+        }
+
         // Main Game Physics Loop
         function gameLoop() {
-            if (gameOver) return;
+            if (gameOver) {
+                isGameLoopRunning = false;
+                return;
+            }
+            isGameLoopRunning = true;
 
             const dt = 1.0 * timeScale;
+            const currentWaveConfig = WAVE_CONFIG[currentWave - 1] || WAVE_CONFIG[WAVE_CONFIG.length - 1];
 
             // 1. Update Storm Cloud (horizontal bounce)
-            stormCloud.x += stormCloud.vx * dt;
-            if (stormCloud.x <= 200 || stormCloud.x >= 650) {
-                stormCloud.vx *= -1;
+            if (!isFrozen && gameMode !== 'trickshot') {
+                stormCloud.x += stormCloud.vx * dt;
+                if (stormCloud.x <= 200 || stormCloud.x >= 650) {
+                    stormCloud.vx *= -1;
+                }
             }
             stormCloudEl.style.left = `${stormCloud.x}px`;
 
             // 2. Update Wooden Shield Rotation
-            woodenShield.angle += woodenShield.rotSpeed * dt;
+            if (!isFrozen) {
+                woodenShield.angle += woodenShield.rotSpeed * dt;
+            }
             woodenShieldEl.style.transform = `rotate(${woodenShield.angle}rad)`;
 
-            // 3. Process Active Arrows
+            // 3. Update Balloon Oscillation (Waves 4+ & Boss)
+            if (balloonData.type === 'boss' && balloon.style.display !== 'none' && !isFrozen) {
+                balloonOscTimer += 0.035 * dt;
+                const offsetY = Math.sin(balloonOscTimer) * 45;
+                const offsetX = Math.cos(balloonOscTimer * 0.8) * 35;
+                balloonData.y = Math.max(90, Math.min(380, balloonData.baseY + offsetY));
+                balloonData.x = Math.max(450, Math.min(680, 560 + offsetX));
+                balloon.style.bottom = `${balloonData.y}px`;
+                balloon.style.left = `${balloonData.x}px`;
+                balloonString.style.left = `${balloonData.x + 31}px`;
+                balloonString.style.bottom = `${balloonData.y - 30}px`;
+            } else if (currentWaveConfig && currentWaveConfig.oscillation > 0 && balloon.style.display !== 'none' && !isFrozen) {
+                balloonOscTimer += 0.04 * dt;
+                const offsetY = Math.sin(balloonOscTimer) * currentWaveConfig.oscillation;
+                balloonData.y = Math.max(70, Math.min(430, balloonData.baseY + offsetY));
+                balloon.style.bottom = `${balloonData.y}px`;
+                balloonString.style.bottom = `${balloonData.y - 30}px`;
+            }
+
+            // 4. Process Active Arrows
             for (let i = activeArrows.length - 1; i >= 0; i--) {
                 const arrow = activeArrows[i];
 
@@ -1188,19 +2536,17 @@
                 }
 
                 // Physics updates
+                const currentBow = BOWS_CONFIG[selectedBow] || BOWS_CONFIG.oak;
+                const bowWindMult = currentBow.windMultiplier !== undefined ? currentBow.windMultiplier : 1.0;
                 if (arrow.type !== 'gravity') {
-                    arrow.vx += windSpeed * 0.03 * dt; // Wind effect
+                    arrow.vx += windSpeed * 0.03 * bowWindMult * dt; // Wind effect with bow resistance
                 }
                 arrow.vy -= 0.22 * dt; // Gravity
 
                 arrow.x += arrow.vx * dt;
                 arrow.y += arrow.vy * dt;
 
-                if (!arrow.isRicocheted) {
-                    arrow.angle = Math.atan2(arrow.vy, arrow.vx);
-                } else {
-                    arrow.angle += 0.2 * dt; // Tumble on ricochet
-                }
+                arrow.angle = Math.atan2(arrow.vy, arrow.vx);
 
                 arrow.element.style.left = `${arrow.x}px`;
                 arrow.element.style.bottom = `${arrow.y}px`;
@@ -1224,6 +2570,12 @@
                 ) {
                     createSparkEffect(arrowTipX, arrowTipY, '#00ffff', 14);
                     playCloudHitSound();
+                    if (comboStreak > 0) {
+                        playComboBreakSound();
+                        createFloaterText(arrowTipX, arrowTipY, 'COMBO PERDIDO!', '#ff4444');
+                    }
+                    comboStreak = 0;
+                    comboCounter.textContent = comboStreak;
                     arrow.element.remove();
                     activeArrows.splice(i, 1);
                     continue;
@@ -1232,49 +2584,243 @@
                 // Collision B: Rotating Wooden Shield (Ricochet physics)
                 const shieldCenterX = woodenShield.x + 22;
                 const shieldCenterY = woodenShield.y + 22;
-                const distToShield = Math.hypot(arrowTipX - shieldCenterX, arrowTipY - (500 - shieldCenterY));
+                const shieldBottomY = 500 - shieldCenterY;
+                const distToShield = Math.hypot(arrowTipX - shieldCenterX, arrowTipY - shieldBottomY);
 
                 if (distToShield < woodenShield.radius + 6 && !arrow.isRicocheted) {
-                    arrow.vx = -arrow.vx * 0.55;
-                    arrow.vy = (arrow.vy > 0 ? -1 : 1) * Math.abs(arrow.vy) * 0.35 + (Math.random() * 2 - 1);
+                    const dyFromCenter = arrowTipY - shieldBottomY;
+                    const bounceRatio = Math.max(-1, Math.min(1, dyFromCenter / (woodenShield.radius + 6)));
+
+                    // Deflexão dinâmica para frente em direção aos alvos (mantendo Vx > 0)
+                    arrow.vx = Math.abs(arrow.vx) * 0.85;
+                    arrow.vy = bounceRatio * 5.0 - Math.abs(arrow.vy) * 0.25;
                     arrow.isRicocheted = true;
-                    createSparkEffect(arrowTipX, arrowTipY, '#cd853f', 10);
+                    arrow.angle = Math.atan2(arrow.vy, arrow.vx);
+                    createSparkEffect(arrowTipX, arrowTipY, '#cd853f', 12);
                     createFloaterText(arrowTipX, arrowTipY, 'RICOCHETE!', '#ffd700');
                     playBounceSound();
                 }
 
                 // Collision C: Balloon Hit
                 if (balloon.style.display !== 'none') {
+                    const isBoss = (balloonData.type === 'boss');
+                    const bWidth = isBoss ? 62 : 42;
+                    const bHeight = isBoss ? 80 : 52;
                     const balloonBoxLeft = balloonData.x;
-                    const balloonBoxRight = balloonData.x + 42;
+                    const balloonBoxRight = balloonData.x + bWidth;
                     const balloonBoxBottom = balloonData.y;
-                    const balloonBoxTop = balloonData.y + 52;
+                    const balloonBoxTop = balloonData.y + bHeight;
 
                     if (
                         arrowTipX >= balloonBoxLeft && arrowTipX <= balloonBoxRight &&
                         arrowTipY >= balloonBoxBottom && arrowTipY <= balloonBoxTop
                     ) {
-                        // Pop Balloon!
-                        comboStreak++;
-                        comboCounter.textContent = comboStreak;
+                        arrow.hasHit = true;
 
-                        const pts = balloonData.isGolden ? 300 : (100 + (comboStreak - 1) * 20);
+                        // Case 0: Boss Balloon (5 HP)
+                        if (balloonData.type === 'boss') {
+                            const isFire = (arrow.type === 'fire');
+                            const dmg = isFire ? 2 : 1;
+                            balloonData.hp -= dmg;
+                            updateBossHpUI();
+                            triggerScreenShake(isFire ? 450 : 280);
+
+                            if (balloonData.hp > 0) {
+                                if (isFire) {
+                                    playExplosionSound();
+                                    createSparkEffect(arrowTipX, arrowTipY, '#ff5722', 20);
+                                    createFloaterText(balloonData.x + 10, balloonData.y + 60, '🔥 CHAMA ARDENTE! -2 HP', '#ff5722');
+                                } else {
+                                    playMetalHitSound();
+                                    createSparkEffect(arrowTipX, arrowTipY, '#ffd700', 16);
+                                    createFloaterText(balloonData.x + 10, balloonData.y + 60, `⚔️ GOLPE NO TITÃ! (HP ${balloonData.hp}/5)`, '#ffeb3b');
+                                }
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                                continue;
+                            } else {
+                                // Boss Defeated!
+                                playExplosionSound();
+                                triggerScreenShake(700);
+                                createSparkEffect(balloonData.x + 31, balloonData.y + 40, '#ffd700', 60);
+                                createFloaterText(balloonData.x, balloonData.y + 60, '👑 TITÃ DERROTADO! +1000 PTS +25 🪙', '#ffd700');
+                                score += 1000;
+                                scoreElement.textContent = score;
+                                addGold(25);
+                                unlockAchievement('boss_slayer');
+                                unlockAchievement('wave_10');
+
+                                balloon.style.display = 'none';
+                                balloonString.style.display = 'none';
+                                if (bossBarContainer) bossBarContainer.style.display = 'none';
+
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                                setTimeout(triggerVictory, 900);
+                                continue;
+                            }
+                        }
+
+                        // Case 1: Armored Balloon (2 HP)
+                        if (balloonData.type === 'armored') {
+                            if (arrow.type === 'fire') {
+                                balloonData.hp = 0;
+                                createFloaterText(balloonData.x, balloonData.y + 40, '🔥 ARMADURA DERRETIDA!', '#ff5722');
+                                unlockAchievement('fire_melter');
+                            } else {
+                                balloonData.hp--;
+                                if (balloonData.hp > 0) {
+                                    playMetalHitSound();
+                                    balloon.classList.add('damaged');
+                                    const hpBadge = document.getElementById('balloon-hp-badge');
+                                    if (hpBadge) hpBadge.textContent = '1';
+                                    createSparkEffect(arrowTipX, arrowTipY, '#b0bec5', 14);
+                                    createFloaterText(balloonData.x, balloonData.y + 36, '🛡️ RACHOU! (HP 1/2)', '#ffeb3b');
+                                    if (arrow.type !== 'fire') {
+                                        arrow.element.remove();
+                                        activeArrows.splice(i, 1);
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Case 2: Skull Balloon (Trap Penalty)
+                        if (balloonData.type === 'skull') {
+                            arrowsLeft = Math.max(0, arrowsLeft - 2);
+                            arrowsCounter.textContent = arrowsLeft;
+                            if (comboStreak > 0) playComboBreakSound();
+                            comboStreak = 0;
+                            comboCounter.textContent = comboStreak;
+                            playPenaltySound();
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#9c27b0', 25);
+                            createFloaterText(balloonData.x, balloonData.y + 36, '☠️ ARMADILHA! -2 FLECHAS', '#e91e63');
+
+                            balloon.style.display = 'none';
+                            balloonString.style.display = 'none';
+                            scheduleBalloonSpawn(1000);
+
+                            if (arrow.type !== 'fire') {
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                            }
+                            continue;
+                        }
+
+                        // Trickshot Mode Target Hit
+                        if (gameMode === 'trickshot') {
+                            if (!arrow.isRicocheted) {
+                                playMetalHitSound();
+                                createSparkEffect(arrowTipX, arrowTipY, '#ffd700', 10);
+                                createFloaterText(balloonData.x - 20, balloonData.y + 35, 'USE O RICOCHETE!', '#ffd700');
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                                continue;
+                            }
+
+                            playPopSound(false);
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#76ff03', 30);
+                            createFloaterText(balloonData.x, balloonData.y + 20, '🎯 DESAFIO CONCLUÍDO!', '#76ff03');
+                            balloon.style.display = 'none';
+                            balloonString.style.display = 'none';
+
+                            trickshotLevelIndex++;
+                            if (trickshotLevelIndex >= TRICKSHOT_LEVELS.length) {
+                                unlockAchievement('trickshot_ace');
+                                setTimeout(triggerVictory, 800);
+                            } else {
+                                setTimeout(() => startTrickshotMode(trickshotLevelIndex), 1200);
+                            }
+
+                            arrow.element.remove();
+                            activeArrows.splice(i, 1);
+                            continue;
+                        }
+
+                        // Standard Pop & Scoring Sequence:
+                        comboStreak++;
+                        if (comboStreak > maxCombo) maxCombo = comboStreak;
+                        comboCounter.textContent = comboStreak;
+                        totalHits++;
+
+                        // Achievements Check
+                        unlockAchievement('first_blood');
+                        if (comboStreak >= 5) {
+                            unlockAchievement('combo_5');
+                        }
+
+                        // Precision / Bullseye Check
+                        const balloonCenterX = balloonData.x + 21;
+                        const balloonCenterY = balloonData.y + 26;
+                        const distFromCenter = Math.hypot(arrowTipX - balloonCenterX, arrowTipY - balloonCenterY);
+                        const distFromBow = Math.hypot(arrowTipX - 135, arrowTipY - 90);
+                        const currentBow = BOWS_CONFIG[selectedBow] || BOWS_CONFIG.oak;
+                        const bullseyeThreshold = currentBow.bullseyeRadius || 14;
+                        const isBullseye = distFromCenter < bullseyeThreshold || distFromBow > 550 || balloonData.isGolden;
+
+                        // Refund Mechanic: Refund spent arrow + bonus arrow for Bullseye!
+                        const refundCount = isBullseye ? 2 : 1;
+                        if (gameMode !== 'rush') {
+                            arrowsLeft = Math.min(25, arrowsLeft + refundCount);
+                            arrowsCounter.textContent = arrowsLeft;
+                        }
+
+                        playArrowRefundSound(isBullseye);
+                        const refundText = isBullseye ? '🎯 BULLSEYE! +2 FLECHAS' : '🏹 +1 FLECHA';
+                        createFloaterText(balloonData.x, balloonData.y + 38, refundText, isBullseye ? '#ffff00' : '#76ff03');
+
+                        // Base points by balloon type
+                        let pts = 100 + (comboStreak - 1) * 20;
+                        if (balloonData.type === 'golden') pts = 300;
+                        else if (balloonData.type === 'tnt') pts = 250;
+                        else if (balloonData.type === 'ice') pts = 180;
+                        else if (balloonData.type === 'armored') pts = 220;
+
                         score += pts;
                         scoreElement.textContent = score;
 
-                        // Golden balloon or Combo multiples of 5 gives +1 Ammo Refill!
-                        let refillMsg = '';
-                        if (balloonData.isGolden || comboStreak % 5 === 0) {
-                            const ammoTypes = ['split', 'fire', 'gravity'];
-                            const randomAmmo = ammoTypes[Math.floor(Math.random() * ammoTypes.length)];
-                            ammo[randomAmmo]++;
-                            updateAmmoHUD();
-                            refillMsg = ` +1 ${randomAmmo.toUpperCase()}!`;
-                        }
+                        // Gold Economy Reward (Etapa 3)
+                        let goldEarned = 1;
+                        if (balloonData.type === 'golden') goldEarned = 5;
+                        else if (balloonData.type === 'tnt' || balloonData.type === 'ice') goldEarned = 2;
+                        else if (balloonData.type === 'armored') goldEarned = 3;
+                        if (isBullseye) goldEarned += 1;
+                        addGold(goldEarned);
+                        playGoldSound();
+                        createFloaterText(balloonData.x + 35, balloonData.y + 35, `+${goldEarned} 🪙`, '#ffd700');
 
-                        createFloaterText(balloonData.x, balloonData.y + 20, `+${pts}${refillMsg}`, balloonData.isGolden ? '#ffff00' : '#00ffcc');
-                        createSparkEffect(balloonData.x + 20, balloonData.y + 25, balloonData.isGolden ? '#ffd700' : '#ff3333', 18);
-                        playPopSound(balloonData.isGolden);
+                        // Type-Specific Special Effects
+                        if (balloonData.type === 'tnt') {
+                            playExplosionSound();
+                            triggerScreenShake(420);
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#ff5722', 40);
+                            createFloaterText(balloonData.x, balloonData.y + 18, `💥 BOOM TNT +${pts}!`, '#ff9800');
+                            waveTargetsPopped++; // Bonus pop from blast
+                            stormCloud.vx *= -1.5;
+                            woodenShield.rotSpeed *= -1.3;
+                        } else if (balloonData.type === 'ice') {
+                            playFreezeSound();
+                            activateFreezeTime(4500);
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#00e5ff', 30);
+                            createFloaterText(balloonData.x, balloonData.y + 18, `❄️ CONGELOU O TEMPO! +${pts}`, '#00e5ff');
+                        } else if (balloonData.type === 'armored') {
+                            playMetalHitSound();
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#cfd8dc', 25);
+                            createFloaterText(balloonData.x, balloonData.y + 18, `🛡️ DESTRUÍDO! +${pts}`, '#ffffff');
+                        } else {
+                            // Golden balloon or Combo multiples of 4 gives +1 Ammo Refill!
+                            let refillMsg = '';
+                            if (balloonData.isGolden || comboStreak % 4 === 0) {
+                                const ammoTypes = ['split', 'fire', 'gravity'];
+                                const randomAmmo = ammoTypes[Math.floor(Math.random() * ammoTypes.length)];
+                                ammo[randomAmmo]++;
+                                updateAmmoHUD();
+                                refillMsg = ` +1 ${randomAmmo.toUpperCase()}!`;
+                            }
+                            createFloaterText(balloonData.x, balloonData.y + 16, `+${pts}${refillMsg}`, balloonData.isGolden ? '#ffff00' : '#00ffcc');
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, balloonData.isGolden ? '#ffd700' : '#ff3333', 18);
+                            playPopSound(balloonData.isGolden);
+                        }
 
                         balloon.style.display = 'none';
                         balloonString.style.display = 'none';
@@ -1283,7 +2829,20 @@
                             activateBulletTime();
                         }
 
-                        setTimeout(positionBalloon, 1200);
+                        // Target Progress
+                        if (gameMode === 'rush') {
+                            scheduleBalloonSpawn(220);
+                        } else {
+                            waveTargetsPopped++;
+                            const targetsRemaining = Math.max(0, waveTargetCount - waveTargetsPopped);
+                            targetsCounter.textContent = targetsRemaining;
+
+                            if (waveTargetsPopped >= waveTargetCount) {
+                                completeWave();
+                            } else {
+                                scheduleBalloonSpawn(900);
+                            }
+                        }
 
                         // If not fire arrow, destroy arrow on balloon hit
                         if (arrow.type !== 'fire') {
@@ -1296,63 +2855,317 @@
 
                 // Check Bounds / Ground
                 if (arrow.x < 0 || arrow.x > 820 || arrow.y < 45 || arrow.y > 550) {
+                    if (!arrow.hasHit && arrow.type === 'normal') {
+                        if (comboStreak > 0) {
+                            playComboBreakSound();
+                            createFloaterText(Math.min(720, Math.max(80, arrow.x)), 60, 'ERROU!', '#ff4444');
+                        }
+                        comboStreak = 0;
+                        comboCounter.textContent = comboStreak;
+                    }
                     arrow.element.remove();
                     activeArrows.splice(i, 1);
+
+                    if (gameMode === 'trickshot' && arrowsLeft === 0 && activeArrows.length === 0 && !isGameOverPending) {
+                        isGameOverPending = true;
+                        setTimeout(() => {
+                            if (balloon.style.display !== 'none' && !gameOver) {
+                                createFloaterText(350, 250, 'FALHOU! REINICIANDO...', '#ff4444');
+                                setTimeout(() => {
+                                    isGameOverPending = false;
+                                    startTrickshotMode(trickshotLevelIndex);
+                                }, 900);
+                            }
+                        }, 400);
+                    }
                 }
             }
 
             // Check Game Over Condition
-            if (arrowsLeft === 0 && activeArrows.length === 0 && !gameOver) {
-                setTimeout(endGame, 800);
+            if (arrowsLeft === 0 && activeArrows.length === 0 && !gameOver && !isWaveTransitioning && !isGameOverPending && gameMode !== 'trickshot') {
+                isGameOverPending = true;
+                if (gameOverTimer) clearTimeout(gameOverTimer);
+                gameOverTimer = setTimeout(endGame, 800);
             }
 
             requestAnimationFrame(gameLoop);
         }
 
+        function completeWave() {
+            deactivateFreezeTime();
+            if (currentWave >= maxWaves) {
+                setTimeout(triggerVictory, 600);
+                return;
+            }
+
+            isWaveTransitioning = true;
+            const completedWaveNum = currentWave;
+            const waveCfg = WAVE_CONFIG[completedWaveNum - 1];
+
+            // Wave Clear Bonuses
+            const bonusArrows = waveCfg.bonusArrows || 2;
+            arrowsLeft = Math.min(25, arrowsLeft + bonusArrows);
+            arrowsCounter.textContent = arrowsLeft;
+
+            // Wave Gold Reward (Etapa 3)
+            const waveGold = completedWaveNum * 5;
+            addGold(waveGold);
+
+            if (currentWave >= 10) {
+                unlockAchievement('wave_10');
+            }
+
+            let specialMsg = '';
+            if (waveCfg.bonusSpecial) {
+                ammo[waveCfg.bonusSpecial] = (ammo[waveCfg.bonusSpecial] || 0) + 1;
+                updateAmmoHUD();
+                specialMsg = ` & +1 ${waveCfg.bonusSpecial.toUpperCase()}!`;
+            }
+
+            playWaveCompleteSound();
+            createSparkEffect(400, 250, '#ffd700', 30);
+
+            if (waveBanner) {
+                waveBannerTitle.textContent = `✨ ONDA ${completedWaveNum} CONCLUÍDA! ✨`;
+                waveBannerDesc.textContent = `+${bonusArrows} Flechas | +${waveGold} 🪙${specialMsg} | Próxima: ${WAVE_CONFIG[completedWaveNum].title}`;
+                waveBanner.classList.add('active');
+            }
+
+            currentWave++;
+            waveTargetsPopped = 0;
+            const nextCfg = WAVE_CONFIG[currentWave - 1];
+            waveTargetCount = nextCfg.targets;
+
+            waveCounter.textContent = currentWave;
+            targetsCounter.textContent = waveTargetCount;
+
+            // Apply new wave parameters
+            stormCloud.vx = (stormCloud.vx >= 0 ? 1 : -1) * nextCfg.cloudSpeed;
+            woodenShield.rotSpeed = nextCfg.shieldSpeed;
+            generateNewWind();
+
+            if (waveTransitionTimer) clearTimeout(waveTransitionTimer);
+            waveTransitionTimer = setTimeout(() => {
+                waveTransitionTimer = null;
+                if (waveBanner) waveBanner.classList.remove('active');
+                isWaveTransitioning = false;
+                positionBalloon();
+            }, 1800);
+        }
+
+        function triggerVictory() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            if (gameOverTimer) {
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
+            if (waveTransitionTimer) {
+                clearTimeout(waveTransitionTimer);
+                waveTransitionTimer = null;
+            }
+            if (balloonSpawnTimer) {
+                clearTimeout(balloonSpawnTimer);
+                balloonSpawnTimer = null;
+            }
+            if (gameOver) return;
+            gameOver = true;
+            isGameLoopRunning = false;
+            deactivateBulletTime();
+            deactivateFreezeTime();
+            trajectoryDots.forEach(d => d.style.display = 'none');
+
+            playWaveCompleteSound();
+            for (let i = 0; i < 4; i++) {
+                setTimeout(() => createSparkEffect(180 + i * 140, 200 + (i % 2) * 80, '#ffd700', 25), i * 250);
+            }
+
+            if (gameMode === 'trickshot') {
+                gameOverTitle.textContent = '🏆 TRICKSHOT CONCLUÍDO!';
+                gameOverTitle.style.color = '#38ef7d';
+                gameOverSubtitle.textContent = 'Incrível! Você dominou todos os quebra-cabeças de ricochete!';
+                unlockAchievement('trickshot_ace');
+            } else if (gameMode === 'rush') {
+                gameOverTitle.textContent = '⚡ RUSH CONCLUÍDO!';
+                gameOverTitle.style.color = '#ff9900';
+                gameOverSubtitle.textContent = `Tempo esgotado! Pontuação final incrível no modo frenético!`;
+                if (score >= 1500) unlockAchievement('rush_master');
+            } else {
+                gameOverTitle.textContent = '🏆 VITÓRIA ÉPICA!';
+                gameOverTitle.style.color = '#d4af37';
+                gameOverSubtitle.textContent = 'Parabéns! Você derrotou o Titã dos Céus e completou todas as 10 Ondas!';
+                unlockAchievement('boss_slayer');
+                unlockAchievement('wave_10');
+            }
+
+            saveHighScore();
+            updateStatsModal();
+            gameOverElement.style.display = 'block';
+        }
+
         function generateNewWind() {
-            windSpeed = (Math.random() * 4.4 - 2.2); // -2.2 to +2.2
+            const cfg = WAVE_CONFIG[currentWave - 1] || WAVE_CONFIG[0];
+            const min = cfg.windMin;
+            const max = cfg.windMax;
+            windSpeed = (Math.random() * (max - min) + min);
             const dir = windSpeed >= 0 ? '➡️' : '⬅️';
             windVal.textContent = `${dir} ${Math.abs(windSpeed).toFixed(1)}`;
         }
 
         function initGame() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            if (gameOverTimer) {
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
+            if (waveTransitionTimer) {
+                clearTimeout(waveTransitionTimer);
+                waveTransitionTimer = null;
+            }
+            if (balloonSpawnTimer) {
+                clearTimeout(balloonSpawnTimer);
+                balloonSpawnTimer = null;
+            }
+            const currentBow = BOWS_CONFIG[selectedBow] || BOWS_CONFIG.oak;
             score = 0;
-            arrowsLeft = 5;
             comboStreak = 0;
+            maxCombo = 0;
+            totalShotsFired = 0;
+            totalHits = 0;
+            currentWave = 1;
+            waveTargetsPopped = 0;
+            waveTargetCount = WAVE_CONFIG[0].targets;
+            isWaveTransitioning = false;
+            isGameOverPending = false;
+            balloonOscTimer = 0;
             gameOver = false;
+            goldEarnedInMatch = 0;
+
+            if (gameMode === 'rush') {
+                arrowsLeft = 999;
+                if (timerContainer) timerContainer.style.display = 'block';
+                if (waveContainer) waveContainer.style.display = 'none';
+                if (bossBarContainer) bossBarContainer.style.display = 'none';
+            } else if (gameMode === 'trickshot') {
+                const lvl = TRICKSHOT_LEVELS[trickshotLevelIndex] || TRICKSHOT_LEVELS[0];
+                arrowsLeft = lvl.arrows;
+                if (timerContainer) timerContainer.style.display = 'none';
+                if (waveContainer) waveContainer.style.display = 'none';
+                if (bossBarContainer) bossBarContainer.style.display = 'none';
+            } else {
+                arrowsLeft = 5 + (currentBow.bonusInitialArrows || 0);
+                if (timerContainer) timerContainer.style.display = 'none';
+                if (waveContainer) waveContainer.style.display = 'flex';
+                if (bossBarContainer) bossBarContainer.style.display = (currentWave === 10 ? 'block' : 'none');
+            }
+
+            if (bow) bow.className = selectedBow;
+            if (goldCounter) goldCounter.textContent = gold;
+            if (workshopGoldVal) workshopGoldVal.textContent = gold;
 
             ammo = { split: 3, fire: 2, gravity: 2 };
             selectArrowType('normal');
             updateAmmoHUD();
 
             scoreElement.textContent = score;
-            arrowsCounter.textContent = arrowsLeft;
+            arrowsCounter.textContent = (gameMode === 'rush') ? '∞' : arrowsLeft;
             comboCounter.textContent = comboStreak;
+            waveCounter.textContent = currentWave;
+            targetsCounter.textContent = waveTargetCount;
+
             gameOverElement.style.display = 'none';
+            if (waveBanner) waveBanner.classList.remove('active');
 
             activeArrows.forEach(a => a.element.remove());
             activeArrows = [];
 
+            stormCloud.vx = 1.0 * WAVE_CONFIG[0].cloudSpeed;
+            woodenShield.rotSpeed = WAVE_CONFIG[0].shieldSpeed;
+
             generateNewWind();
-            positionBalloon();
+            deactivateFreezeTime();
+            if (gameMode !== 'trickshot') {
+                positionBalloon();
+            }
             deactivateBulletTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
 
-            requestAnimationFrame(gameLoop);
+            if (!isGameLoopRunning) {
+                isGameLoopRunning = true;
+                requestAnimationFrame(gameLoop);
+            }
         }
 
         function restartGame() {
-            initGame();
+            if (gameMode === 'rush') {
+                startRushMode();
+            } else if (gameMode === 'trickshot') {
+                startTrickshotMode(trickshotLevelIndex);
+            } else {
+                initGame();
+            }
         }
 
         function endGame() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            if (gameOverTimer) {
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
+            if (waveTransitionTimer) {
+                clearTimeout(waveTransitionTimer);
+                waveTransitionTimer = null;
+            }
+            if (balloonSpawnTimer) {
+                clearTimeout(balloonSpawnTimer);
+                balloonSpawnTimer = null;
+            }
             if (gameOver) return;
             gameOver = true;
+            isGameLoopRunning = false;
             if (comboStreak === 0) playComboBreakSound();
             deactivateBulletTime();
+            deactivateFreezeTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
-            finalScoreElement.textContent = score;
+
+            if (gameMode === 'rush') {
+                gameOverTitle.textContent = '⚡ TEMPO ESGOTADO!';
+                gameOverTitle.style.color = '#ff9900';
+                gameOverSubtitle.textContent = `Você fez ${score} pontos em 60 segundos!`;
+                if (score >= 1500) {
+                    unlockAchievement('rush_master');
+                }
+            } else if (gameMode === 'trickshot') {
+                gameOverTitle.textContent = 'Fim das Flechas!';
+                gameOverTitle.style.color = '#8B0000';
+                gameOverSubtitle.textContent = 'Não desista! Use o escudo de madeira para ricochetear ao redor da nuvem.';
+            } else {
+                gameOverTitle.textContent = 'Fim de Jogo!';
+                gameOverTitle.style.color = '#8B0000';
+                gameOverSubtitle.textContent = 'Suas flechas se esgotaram. Tente novamente para alcançar a Onda 10!';
+            }
+
+            saveHighScore();
+            updateStatsModal();
             gameOverElement.style.display = 'block';
+        }
+
+        function updateStatsModal() {
+            finalScoreElement.textContent = score;
+            finalWaveElement.textContent = `${currentWave} / ${maxWaves}`;
+            finalComboElement.textContent = `x${maxCombo}`;
+            const accuracy = totalShotsFired > 0 ? Math.round((totalHits / totalShotsFired) * 100) : 0;
+            finalAccuracyElement.textContent = `${accuracy}% (${totalHits}/${totalShotsFired})`;
+            if (finalGoldElement) finalGoldElement.textContent = `+${goldEarnedInMatch} 🪙`;
+            if (totalGoldElement) totalGoldElement.textContent = `${gold} 🪙`;
         }
 
         // Start initial game
@@ -1364,31 +3177,149 @@
                 score,
                 arrowsLeft,
                 comboStreak,
+                maxCombo,
+                currentWave,
+                maxWaves,
+                waveTargetCount,
+                waveTargetsPopped,
+                totalShotsFired,
+                totalHits,
                 selectedArrowType,
                 isBulletTime,
+                isFrozen,
+                gameOver,
+                isGameLoopRunning,
+                balloonType: balloonData.type,
+                balloonHp: balloonData.hp,
                 timeScale,
                 activeArrowsCount: activeArrows.length,
                 ammo: { ...ammo },
                 arrowAngle,
-                arrowSpeed
+                arrowSpeed,
+                windSpeed,
+                gold,
+                goldEarnedInMatch,
+                selectedBow,
+                unlockedBows: [...unlockedBows],
+                highScores: [...highScores],
+                unlockedAchievements: [...unlockedAchievements],
+                gameMode,
+                rushTimer,
+                trickshotLevelIndex
             }),
+            gameLoop,
+            step: (frames = 1) => {
+                for (let f = 0; f < frames; f++) {
+                    gameLoop();
+                }
+            },
             selectArrowType,
             spawnArrow,
+            spawnArrowAt: (x, y, vx, vy, type = 'normal') => {
+                const arrowEl = document.createElement('div');
+                arrowEl.className = `arrow-entity type-${type}`;
+                arrowEl.innerHTML = '<div class="arrowhead"></div>';
+                let extraEl = null;
+                if (type === 'gravity') {
+                    extraEl = document.createElement('div');
+                    extraEl.className = 'gravity-field';
+                    arrowEl.appendChild(extraEl);
+                }
+                arrowEl.style.left = `${x}px`;
+                arrowEl.style.bottom = `${y}px`;
+                const angle = Math.atan2(vy, vx);
+                arrowEl.style.transform = `rotate(${-angle}rad)`;
+                gameContainer.appendChild(arrowEl);
+                const arrowObj = {
+                    id: Math.random(),
+                    x: x,
+                    y: y,
+                    vx: vx,
+                    vy: vy,
+                    angle: angle,
+                    type: type,
+                    isRicocheted: false,
+                    hasHit: false,
+                    element: arrowEl,
+                    extraEl: extraEl
+                };
+                activeArrows.push(arrowObj);
+                return arrowObj;
+            },
+            fireArrows,
             activateBulletTime,
             deactivateBulletTime,
+            activateFreezeTime,
+            deactivateFreezeTime,
             initAudio,
             playPopSound,
             playBounceSound,
             playCloudHitSound,
             playTensionSound,
             playLaunchSound,
+            playArrowRefundSound,
+            playWaveCompleteSound,
+            playExplosionSound,
+            playFreezeSound,
+            playMetalHitSound,
+            playPenaltySound,
+            playGoldSound,
+            playAchievementSound,
             stormCloud,
             woodenShield,
             balloonData,
             initGame,
+            positionBalloon,
+            setBalloonType: (type) => positionBalloon(type),
             setAmmo: (type, val) => { ammo[type] = val; updateAmmoHUD(); },
             getActiveArrows: () => activeArrows,
-            getTrajectoryDots: () => trajectoryDots
+            getTrajectoryDots: () => trajectoryDots,
+            WAVE_CONFIG,
+            completeWave,
+            advanceWave: completeWave,
+            triggerVictory,
+            setWave: (w) => {
+                currentWave = Math.max(1, Math.min(maxWaves, w));
+                waveTargetsPopped = 0;
+                waveTargetCount = WAVE_CONFIG[currentWave - 1].targets;
+                waveCounter.textContent = currentWave;
+                targetsCounter.textContent = waveTargetCount;
+                generateNewWind();
+            },
+            // Metagame Economy & Workshop API (Etapa 3)
+            getGold: () => gold,
+            getGoldEarnedInMatch: () => goldEarnedInMatch,
+            addGold,
+            getSelectedBow: () => selectedBow,
+            getUnlockedBows: () => unlockedBows,
+            getHighScores: () => highScores,
+            getUnlockedAchievements: () => unlockedAchievements,
+            selectBow,
+            buyBow,
+            saveHighScore,
+            unlockAchievement,
+            openWorkshop,
+            openLeaderboard,
+            closeModals,
+            renderWorkshopCards,
+            setScore: (s) => { score = s; scoreElement.textContent = score; },
+            BOWS_CONFIG,
+            ACHIEVEMENTS,
+            // Game Modes, Boss & Polish API (Etapa 4)
+            getGameMode: () => gameMode,
+            setGameMode: (m) => selectGameMode(m),
+            openModesModal,
+            selectGameMode,
+            startCampaignMode,
+            startRushMode,
+            startTrickshotMode,
+            getRushTimer: () => rushTimer,
+            setRushTimer: (t) => { rushTimer = t; if (timerVal) timerVal.textContent = Math.max(0, t); },
+            getTrickshotLevelIndex: () => trickshotLevelIndex,
+            setTrickshotLevel: (lvl) => startTrickshotMode(lvl),
+            TRICKSHOT_LEVELS,
+            triggerScreenShake,
+            updateBossHpUI
         };
     </script>
 </body>
