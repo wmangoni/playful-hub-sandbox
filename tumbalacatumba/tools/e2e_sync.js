@@ -591,6 +591,9 @@ window.__T = (() => {
         wait(60);
         cv.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [stk], bubbles: true, cancelable: true }));
         svgTap = ui.root.querySelector('#quest .scroll').innerHTML !== before && window.__errors.length === err0;
+        // o polegar saiu parado: vira um toque no mundo (no prefeito), que só é processado no quadro seguinte e
+        // reabriria a conversa depois do close; deixa ele passar antes de fechar
+        wait(30);
       }
       ui.dialog.close(); wait(60);
       ok.push(`briga continua com toque no joystick e no vazio ${fightKept}; ícone SVG da conversa com polegar no joystick ${svgTap}`);
@@ -635,6 +638,7 @@ window.__T = (() => {
       g.applySetting('controls', prevMode); g.input.lastPointer = 'mouse'; wait(60);
       ok.push(`aviso de retrato ${!!rot}; de volta ao desktop ${back}`);
       if (!rot || !back) fail('volta ao modo desktop falhou');
+      ui.dialog.close(); wait(30); // defesa: o passo seguinte (ou o teste com dedos de verdade) começa sem conversa aberta
       L.push('toqueHud: ' + ok.join('; '));
     },
     toqueJogo() {
