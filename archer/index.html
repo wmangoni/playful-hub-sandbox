@@ -580,6 +580,133 @@
             100% { filter: drop-shadow(0 0 12px #e91e63); }
         }
 
+        /* Boss Titan Balloon */
+        .balloon-entity.boss {
+            width: 62px;
+            height: 80px;
+            background: radial-gradient(circle at 35% 30%, #ffd700 0%, #8e24aa 45%, #280659 90%);
+            box-shadow: inset -5px -5px 12px rgba(0,0,0,0.6), 0 0 24px rgba(255, 215, 0, 0.8), 0 0 45px rgba(156, 39, 176, 0.6);
+            border: 3.5px solid #ffd700;
+            animation: bossHover 1.5s infinite alternate ease-in-out;
+            z-index: 12;
+        }
+        .balloon-entity.boss::after {
+            background: #ffd700;
+            width: 12px;
+            height: 12px;
+            bottom: -9px;
+            box-shadow: 0 0 8px #ffd700;
+        }
+        @keyframes bossHover {
+            0% { transform: scale(1); filter: drop-shadow(0 0 8px #ffd700); }
+            100% { transform: scale(1.04); filter: drop-shadow(0 0 24px #e040fb); }
+        }
+
+        /* Boss Health HUD */
+        #boss-bar-container {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 10, 35, 0.92);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 6px 18px;
+            z-index: 45;
+            display: none;
+            text-align: center;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8);
+            min-width: 250px;
+        }
+        #boss-bar-title {
+            font-size: 11px;
+            color: #ffd700;
+            font-family: 'Cinzel Decorative', cursive;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+        #boss-hp-track {
+            width: 100%;
+            height: 12px;
+            background: #331144;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #ffd700;
+        }
+        #boss-hp-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, #e91e63, #ffd700);
+            transition: width 0.25s ease;
+        }
+
+        /* Screen Shake Animation */
+        @keyframes screenShakeAnim {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-4px, 3px); }
+            40% { transform: translate(4px, -3px); }
+            60% { transform: translate(-3px, -2px); }
+            80% { transform: translate(3px, 2px); }
+            100% { transform: translate(0, 0); }
+        }
+        .screen-shake {
+            animation: screenShakeAnim 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Timer HUD (Rush 60s Mode) */
+        #timer-container {
+            position: absolute;
+            top: 48px;
+            right: 18px;
+            background: rgba(30, 20, 10, 0.85);
+            border: 2px solid #ff9800;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 13.5px;
+            font-weight: bold;
+            color: #ff9800;
+            font-family: 'Cinzel Decorative', cursive;
+            z-index: 20;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        /* Modes Selection Modal Styles */
+        .mode-card {
+            background: rgba(255, 255, 255, 0.88);
+            border: 2px solid #8b4513;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+        .mode-card:hover {
+            border-color: #ffd700;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+        .mode-card.active {
+            border-color: #2e7d32;
+            background: rgba(232, 245, 233, 0.95);
+        }
+        .mode-info h4 {
+            margin: 0 0 4px 0;
+            font-family: 'Cinzel Decorative', cursive;
+            font-size: 14px;
+            color: #2b180d;
+        }
+        .mode-info p {
+            margin: 0;
+            font-size: 11.5px;
+            color: #555;
+            max-width: 320px;
+            line-height: 1.3;
+        }
+
         #ground {
             position: absolute;
             bottom: 0;
@@ -863,6 +990,13 @@
     <div id="game-container">
         <div id="bullet-time-banner">⚡ BULLET-TIME ⚡</div>
         <div id="frost-overlay"></div>
+        <div id="boss-bar-container">
+            <div id="boss-bar-title">👑 O TITÃ DOS CÉUS (HP: <span id="boss-hp-val">5</span>/5)</div>
+            <div id="boss-hp-track">
+                <div id="boss-hp-fill" style="width: 100%;"></div>
+            </div>
+        </div>
+        <div id="timer-container">⏱️ Tempo: <span id="timer-val">60</span>s</div>
         <div id="wave-banner">
             <h3 id="wave-banner-title">✨ ONDA 1 CONCLUÍDA! ✨</h3>
             <p id="wave-banner-desc">+2 Flechas Bônus!</p>
@@ -885,10 +1019,11 @@
             <p><strong>Controles:</strong></p>
             <p>Arraste para mirar e carregar força. Solte para disparar.</p>
             <p><span class="key">1</span> Normal | <span class="key">2</span> Tripla | <span class="key">3</span> Fogo | <span class="key">4</span> Gravitacional</p>
-            <p style="margin-top: 4px; font-size: 11px; color: #5a2e0a;">💣 TNT | ❄️ Gelo | 🛡️ Blindado | ☠️ Perigo</p>
+            <p style="margin-top: 4px; font-size: 11px; color: #5a2e0a;">💣 TNT | ❄️ Gelo | 🛡️ Blindado | ☠️ Perigo | 👑 Titã</p>
         </div>
 
         <div id="metagame-bar">
+            <button class="hud-action-btn" id="btn-modes" onclick="openModesModal()">🎮 Modos</button>
             <button class="hud-action-btn" id="btn-workshop" onclick="openWorkshop()">🏹 Oficina</button>
             <button class="hud-action-btn" id="btn-leaderboard" onclick="openLeaderboard()">🏆 Recordes</button>
         </div>
@@ -984,8 +1119,9 @@
                 <div>Ouro Ganho: <strong id="final-gold" style="color: #b8860b;">+0 🪙</strong></div>
                 <div>Total Ouro: <strong id="total-gold" style="color: #b8860b;">0 🪙</strong></div>
             </div>
-            <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px;">
+            <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap;">
                 <button id="restart-button" onclick="restartGame()">Jogar Novamente</button>
+                <button class="hud-action-btn" style="padding: 10px 16px; font-size: 13px;" onclick="openModesModal()">🎮 Modos</button>
                 <button class="hud-action-btn" style="padding: 10px 16px; font-size: 13px;" onclick="openWorkshop()">🏹 Oficina</button>
                 <button class="hud-action-btn" style="padding: 10px 16px; font-size: 13px;" onclick="openLeaderboard()">🏆 Recordes</button>
             </div>
@@ -993,6 +1129,38 @@
 
         <!-- Metagame Modal Overlay -->
         <div id="modal-overlay" onclick="handleOverlayClick(event)">
+            <!-- Modes Modal -->
+            <div id="modes-modal" class="game-modal" style="display: none; max-width: 520px;">
+                <h2>🎮 Modos de Jogo</h2>
+                <p class="modal-desc">Escolha sua forma de jogar e prove sua maestria com o arco!</p>
+                
+                <div class="mode-card" id="mode-card-campaign">
+                    <div class="mode-info">
+                        <h4>🌟 Campanha: 10 Ondas</h4>
+                        <p>Progressão clássica de 10 ondas com obstáculos, vento crescente e a Batalha Final contra o Titã dos Céus.</p>
+                    </div>
+                    <button onclick="selectGameMode('campaign')" style="padding: 8px 16px; font-size: 12px;">Jogar</button>
+                </div>
+
+                <div class="mode-card" id="mode-card-rush">
+                    <div class="mode-info">
+                        <h4>⏱️ Rush 60 Segundos</h4>
+                        <p>60 segundos frenéticos com flechas infinitas e alvos velozes incessantes. Pontue o máximo que puder!</p>
+                    </div>
+                    <button onclick="selectGameMode('rush')" style="padding: 8px 16px; font-size: 12px; background: #e65100;">Jogar</button>
+                </div>
+
+                <div class="mode-card" id="mode-card-trickshot">
+                    <div class="mode-info">
+                        <h4>🎯 Desafio Trickshot</h4>
+                        <p>3 desafios de quebra-cabeça balístico onde o único caminho até o balão é o ricochete calculado no escudo!</p>
+                    </div>
+                    <button onclick="selectGameMode('trickshot')" style="padding: 8px 16px; font-size: 12px; background: #4a148c;">Jogar</button>
+                </div>
+
+                <button onclick="closeModals()" style="padding: 8px 24px; font-size: 13px; margin-top: 6px;">Fechar</button>
+            </div>
+
             <!-- Workshop Modal -->
             <div id="workshop-modal" class="game-modal" style="display: none;">
                 <h2>🏹 Oficina do Arqueiro</h2>
@@ -1051,7 +1219,14 @@
             { wave: 7, targets: 5, windMin: -4.0, windMax: 4.0, oscillation: 40, shieldSpeed: 0.06, cloudSpeed: 2.1, bonusArrows: 3, bonusSpecial: 'gravity', title: 'Tempestade Aberta (+Gravidade)' },
             { wave: 8, targets: 6, windMin: -4.2, windMax: 4.2, oscillation: 48, shieldSpeed: 0.065, cloudSpeed: 2.3, bonusArrows: 4, bonusSpecial: 'split', title: 'Dança das Flechas' },
             { wave: 9, targets: 6, windMin: -4.5, windMax: 4.5, oscillation: 55, shieldSpeed: 0.07, cloudSpeed: 2.5, bonusArrows: 4, bonusSpecial: 'fire', title: 'Vórtice do Mestre' },
-            { wave: 10, targets: 7, windMin: -5.0, windMax: 5.0, oscillation: 65, shieldSpeed: 0.08, cloudSpeed: 2.8, bonusArrows: 5, bonusSpecial: 'gravity', title: 'Onda Final: Lenda dos Céus' }
+            { wave: 10, targets: 1, windMin: -5.0, windMax: 5.0, oscillation: 50, shieldSpeed: 0.08, cloudSpeed: 2.8, bonusArrows: 5, bonusSpecial: 'gravity', title: 'Batalha Final: O Titã dos Céus', isBoss: true }
+        ];
+
+        // Trickshot Challenges Configuration (Etapa 4)
+        const TRICKSHOT_LEVELS = [
+            { level: 1, balloonX: 620, balloonY: 130, shieldX: 420, shieldY: 160, cloudX: 300, cloudY: 220, arrows: 2, desc: 'Ricocheteie no escudo para contornar a nuvem de tempestade!' },
+            { level: 2, balloonX: 660, balloonY: 200, shieldX: 450, shieldY: 200, cloudX: 340, cloudY: 200, arrows: 2, desc: 'Ângulo parabólico alto com ricochete descendente!' },
+            { level: 3, balloonX: 600, balloonY: 90, shieldX: 380, shieldY: 130, cloudX: 420, cloudY: 240, arrows: 1, desc: 'Disparo único de precisão milimétrica!' }
         ];
 
         // Bow Workshop Configuration (Etapa 3)
@@ -1094,12 +1269,15 @@
             }
         };
 
-        // Achievements Configuration (Etapa 3)
+        // Achievements Configuration (Etapa 3 & 4)
         const ACHIEVEMENTS = {
             first_blood: { id: 'first_blood', name: 'Primeiro Disparo', desc: 'Estoure seu primeiro balão.', icon: '🎯' },
             combo_5: { id: 'combo_5', name: 'Atirador Focado', desc: 'Alcance um Combo de x5.', icon: '🔥' },
             fire_melter: { id: 'fire_melter', name: 'Mestre do Fogo', desc: 'Derreta um balão blindado com flecha de fogo.', icon: '🛡️' },
-            wave_10: { id: 'wave_10', name: 'Lenda dos Céus', desc: 'Alcance ou conclua a Onda 10.', icon: '👑' }
+            wave_10: { id: 'wave_10', name: 'Lenda dos Céus', desc: 'Alcance ou conclua a Onda 10.', icon: '👑' },
+            boss_slayer: { id: 'boss_slayer', name: 'Carrasco de Titãs', desc: 'Derrote o Titã dos Céus na Onda 10.', icon: '⚡' },
+            rush_master: { id: 'rush_master', name: 'Velocista Lendário', desc: 'Pontue 1.500+ no Modo Rush 60s.', icon: '⏱️' },
+            trickshot_ace: { id: 'trickshot_ace', name: 'Mestre do Ricochete', desc: 'Vença um desafio no Modo Trickshot.', icon: '🎯' }
         };
 
         // Safe LocalStorage Wrappers
@@ -1125,7 +1303,7 @@
             } catch (e) {}
         }
 
-        // Metagame State (Etapa 3)
+        // Metagame State (Etapa 3 & 4)
         let gold = parseInt(getStorage('archer_gold', '0'), 10);
         let goldEarnedInMatch = 0;
         let unlockedBows = getStorageJSON('archer_unlocked_bows', ['oak']);
@@ -1133,6 +1311,12 @@
         if (!BOWS_CONFIG[selectedBow]) selectedBow = 'oak';
         let highScores = getStorageJSON('archer_highscores', []);
         let unlockedAchievements = getStorageJSON('archer_achievements', []);
+
+        // Game Modes State (Etapa 4)
+        let gameMode = 'campaign'; // 'campaign' | 'rush' | 'trickshot'
+        let rushTimer = 60;
+        let rushInterval = null;
+        let trickshotLevelIndex = 0;
 
         // Game State Variables
         let score = 0;
@@ -1148,9 +1332,19 @@
         let isWaveTransitioning = false;
         let isGameOverPending = false;
         let gameOverTimer = null;
+        let balloonSpawnTimer = null;
+        let waveTransitionTimer = null;
         let isGameLoopRunning = false;
         let balloonOscTimer = 0;
         let gameOver = false;
+
+        function scheduleBalloonSpawn(delay) {
+            if (balloonSpawnTimer) clearTimeout(balloonSpawnTimer);
+            balloonSpawnTimer = setTimeout(() => {
+                balloonSpawnTimer = null;
+                positionBalloon();
+            }, delay);
+        }
         let isDragging = false;
         let startX, startY;
         let arrowAngle = 0;
@@ -1176,6 +1370,17 @@
         let stormCloud = { x: 300, y: 60, vx: 1.2, width: 120, height: 45 };
         let woodenShield = { x: 480, y: 230, radius: 22, angle: 0, rotSpeed: 0.04 };
 
+        // Screen Shake Helper (Etapa 4)
+        let screenShakeTimeout = null;
+        function triggerScreenShake(duration = 320) {
+            if (!gameContainer) return;
+            gameContainer.classList.add('screen-shake');
+            if (screenShakeTimeout) clearTimeout(screenShakeTimeout);
+            screenShakeTimeout = setTimeout(() => {
+                gameContainer.classList.remove('screen-shake');
+            }, duration);
+        }
+
         // DOM References
         const gameContainer = document.getElementById('game-container');
         const bow = document.getElementById('bow');
@@ -1186,6 +1391,7 @@
         const scoreElement = document.getElementById('score');
         const arrowsCounter = document.getElementById('arrows-counter');
         const comboCounter = document.getElementById('combo-counter');
+        const waveContainer = document.getElementById('wave-container');
         const waveCounter = document.getElementById('wave-counter');
         const targetsCounter = document.getElementById('targets-counter');
         const windVal = document.getElementById('wind-val');
@@ -1207,6 +1413,7 @@
         const stormCloudEl = document.getElementById('storm-cloud');
         const woodenShieldEl = document.getElementById('wooden-shield');
         const modalOverlay = document.getElementById('modal-overlay');
+        const modesModal = document.getElementById('modes-modal');
         const workshopModal = document.getElementById('workshop-modal');
         const leaderboardModal = document.getElementById('leaderboard-modal');
         const workshopGoldVal = document.getElementById('workshop-gold-val');
@@ -1215,6 +1422,20 @@
         const achievementToast = document.getElementById('achievement-toast');
         const toastIcon = document.getElementById('toast-icon');
         const toastName = document.getElementById('toast-name');
+        const bossBarContainer = document.getElementById('boss-bar-container');
+        const bossHpVal = document.getElementById('boss-hp-val');
+        const bossHpFill = document.getElementById('boss-hp-fill');
+        const timerContainer = document.getElementById('timer-container');
+        const timerVal = document.getElementById('timer-val');
+
+        function updateBossHpUI() {
+            if (!bossBarContainer || !bossHpVal || !bossHpFill) return;
+            const currentHp = Math.max(0, balloonData.hp);
+            const maxHp = balloonData.maxHp || 5;
+            bossHpVal.textContent = currentHp;
+            const pct = Math.max(0, Math.min(100, (currentHp / maxHp) * 100));
+            bossHpFill.style.width = `${pct}%`;
+        }
 
         // Trajectory Preview Elements
         const TRAJECTORY_DOTS_COUNT = 10;
@@ -1607,6 +1828,7 @@
             renderWorkshopCards();
             if (workshopModal) workshopModal.style.display = 'block';
             if (leaderboardModal) leaderboardModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'none';
             if (modalOverlay) modalOverlay.style.display = 'flex';
         }
 
@@ -1679,14 +1901,135 @@
             }
 
             if (workshopModal) workshopModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'none';
             if (leaderboardModal) leaderboardModal.style.display = 'block';
             if (modalOverlay) modalOverlay.style.display = 'flex';
+        }
+
+        function openModesModal() {
+            initAudio();
+            if (workshopModal) workshopModal.style.display = 'none';
+            if (leaderboardModal) leaderboardModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'block';
+            if (modalOverlay) modalOverlay.style.display = 'flex';
+
+            ['campaign', 'rush', 'trickshot'].forEach(m => {
+                const el = document.getElementById(`mode-card-${m}`);
+                if (el) {
+                    if (gameMode === m) el.classList.add('active');
+                    else el.classList.remove('active');
+                }
+            });
+        }
+
+        function selectGameMode(mode) {
+            closeModals();
+            if (mode === 'rush') {
+                startRushMode();
+            } else if (mode === 'trickshot') {
+                startTrickshotMode(0);
+            } else {
+                startCampaignMode();
+            }
+        }
+
+        function startCampaignMode() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            gameMode = 'campaign';
+            if (timerContainer) timerContainer.style.display = 'none';
+            if (waveContainer) waveContainer.style.display = 'flex';
+            if (bossBarContainer) bossBarContainer.style.display = 'none';
+            initGame();
+        }
+
+        function startRushMode() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            gameMode = 'rush';
+            rushTimer = 60;
+            if (timerContainer) {
+                timerContainer.style.display = 'block';
+                timerVal.textContent = '60';
+            }
+            if (waveContainer) waveContainer.style.display = 'none';
+            if (bossBarContainer) bossBarContainer.style.display = 'none';
+            initGame();
+            arrowsLeft = 999;
+            arrowsCounter.textContent = '∞';
+
+            rushInterval = setInterval(() => {
+                if (gameOver) {
+                    clearInterval(rushInterval);
+                    rushInterval = null;
+                    return;
+                }
+                rushTimer--;
+                if (timerVal) timerVal.textContent = Math.max(0, rushTimer);
+                if (rushTimer <= 0) {
+                    clearInterval(rushInterval);
+                    rushInterval = null;
+                    if (score >= 1500) {
+                        unlockAchievement('rush_master');
+                    }
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function startTrickshotMode(level = 0) {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
+            gameMode = 'trickshot';
+            trickshotLevelIndex = level;
+            if (timerContainer) timerContainer.style.display = 'none';
+            if (waveContainer) waveContainer.style.display = 'none';
+            if (bossBarContainer) bossBarContainer.style.display = 'none';
+            initGame();
+
+            const lvl = TRICKSHOT_LEVELS[trickshotLevelIndex] || TRICKSHOT_LEVELS[0];
+            arrowsLeft = lvl.arrows;
+            arrowsCounter.textContent = arrowsLeft;
+            woodenShield.x = lvl.shieldX;
+            woodenShield.y = lvl.shieldY;
+            woodenShieldEl.style.left = `${woodenShield.x}px`;
+            woodenShieldEl.style.top = `${woodenShield.y}px`;
+            stormCloud.x = lvl.cloudX;
+            stormCloud.y = lvl.cloudY;
+            stormCloud.vx = 0;
+            woodenShield.rotSpeed = 0.02;
+            isGameOverPending = false;
+            stormCloudEl.style.left = `${stormCloud.x}px`;
+            stormCloudEl.style.top = `${stormCloud.y}px`;
+
+            balloonData.x = lvl.balloonX;
+            balloonData.y = lvl.balloonY;
+            balloonData.baseY = lvl.balloonY;
+            balloonData.type = 'normal';
+            balloonData.hp = 1;
+            balloon.style.left = `${balloonData.x}px`;
+            balloon.style.bottom = `${balloonData.y}px`;
+            balloonString.style.left = `${balloonData.x + 20}px`;
+            balloonString.style.bottom = `${balloonData.y - 30}px`;
+            balloon.className = 'balloon-entity';
+            balloon.innerHTML = '';
+            balloon.style.display = 'block';
+            balloonString.style.display = 'block';
+
+            createFloaterText(400, 320, `🎯 TRICKSHOT DESAFIO ${lvl.level}!`, '#ffeb3b');
         }
 
         function closeModals() {
             if (modalOverlay) modalOverlay.style.display = 'none';
             if (workshopModal) workshopModal.style.display = 'none';
             if (leaderboardModal) leaderboardModal.style.display = 'none';
+            if (modesModal) modesModal.style.display = 'none';
         }
 
         function handleOverlayClick(e) {
@@ -1789,9 +2132,14 @@
                 ammo.gravity--;
             }
 
-            arrowsLeft--;
+            if (gameMode === 'rush') {
+                arrowsLeft = 999;
+                arrowsCounter.textContent = '∞';
+            } else {
+                arrowsLeft--;
+                arrowsCounter.textContent = arrowsLeft;
+            }
             totalShotsFired++;
-            arrowsCounter.textContent = arrowsLeft;
             updateAmmoHUD();
         }
 
@@ -1945,36 +2293,66 @@
             balloonData.y = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
             balloonData.baseY = balloonData.y;
 
-            // Pick balloon type based on current wave or forcedType
+            // Pick balloon type based on current wave, gameMode or forcedType
             let chosenType = forcedType;
             if (!chosenType) {
-                const rand = Math.random();
-                const goldenBonus = (selectedBow === 'elven') ? 0.10 : 0.0;
-                if (currentWave <= 2) {
-                    // Wave 1-2: Normal, Golden
-                    chosenType = rand < (0.22 + goldenBonus) ? 'golden' : 'normal';
-                } else if (currentWave <= 4) {
-                    // Wave 3-4: Normal, Golden, TNT, Ice
-                    if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
-                    else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
-                    else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
-                    else chosenType = 'normal';
-                } else if (currentWave <= 6) {
-                    // Wave 5-6: Normal, Golden, TNT, Ice, Armored
-                    if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
-                    else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
-                    else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
-                    else if (rand < (0.65 + goldenBonus)) chosenType = 'armored';
-                    else chosenType = 'normal';
+                if (gameMode === 'campaign' && currentWave === 10) {
+                    chosenType = 'boss';
                 } else {
-                    // Wave 7-10: Normal, Golden, TNT, Ice, Armored, Skull
-                    if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
-                    else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
-                    else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
-                    else if (rand < (0.65 + goldenBonus)) chosenType = 'armored';
-                    else if (rand < (0.75 + goldenBonus)) chosenType = 'skull';
-                    else chosenType = 'normal';
+                    const rand = Math.random();
+                    const goldenBonus = (selectedBow === 'elven') ? 0.10 : 0.0;
+                    if (currentWave <= 2) {
+                        // Wave 1-2: Normal, Golden
+                        chosenType = rand < (0.22 + goldenBonus) ? 'golden' : 'normal';
+                    } else if (currentWave <= 4) {
+                        // Wave 3-4: Normal, Golden, TNT, Ice
+                        if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
+                        else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
+                        else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
+                        else chosenType = 'normal';
+                    } else if (currentWave <= 6) {
+                        // Wave 5-6: Normal, Golden, TNT, Ice, Armored
+                        if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
+                        else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
+                        else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
+                        else if (rand < (0.65 + goldenBonus)) chosenType = 'armored';
+                        else chosenType = 'normal';
+                    } else {
+                        // Wave 7-9: Normal, Golden, TNT, Ice, Armored, Skull
+                        if (rand < (0.20 + goldenBonus)) chosenType = 'golden';
+                        else if (rand < (0.35 + goldenBonus)) chosenType = 'tnt';
+                        else if (rand < (0.50 + goldenBonus)) chosenType = 'ice';
+                        else if (rand < (0.65 + goldenBonus)) chosenType = 'armored';
+                        else if (rand < (0.75 + goldenBonus)) chosenType = 'skull';
+                        else chosenType = 'normal';
+                    }
                 }
+            }
+
+            if (chosenType === 'boss') {
+                balloonData.type = 'boss';
+                balloonData.maxHp = 5;
+                balloonData.hp = 5;
+                balloonData.x = 560;
+                balloonData.y = 230;
+                balloonData.baseY = 230;
+                balloonData.isGolden = false;
+
+                balloon.style.left = `${balloonData.x}px`;
+                balloon.style.bottom = `${balloonData.y}px`;
+                balloonString.style.left = `${balloonData.x + 31}px`;
+                balloonString.style.bottom = `${balloonData.y - 30}px`;
+
+                balloon.className = 'balloon-entity boss';
+                balloon.innerHTML = '<span class="balloon-icon" style="font-size: 26px;">👑</span>';
+                balloon.style.display = 'block';
+                balloonString.style.display = 'block';
+
+                if (bossBarContainer) bossBarContainer.style.display = 'block';
+                updateBossHpUI();
+                return;
+            } else {
+                if (bossBarContainer) bossBarContainer.style.display = 'none';
             }
 
             balloonData.type = chosenType;
@@ -2101,7 +2479,7 @@
             const currentWaveConfig = WAVE_CONFIG[currentWave - 1] || WAVE_CONFIG[WAVE_CONFIG.length - 1];
 
             // 1. Update Storm Cloud (horizontal bounce)
-            if (!isFrozen) {
+            if (!isFrozen && gameMode !== 'trickshot') {
                 stormCloud.x += stormCloud.vx * dt;
                 if (stormCloud.x <= 200 || stormCloud.x >= 650) {
                     stormCloud.vx *= -1;
@@ -2115,8 +2493,18 @@
             }
             woodenShieldEl.style.transform = `rotate(${woodenShield.angle}rad)`;
 
-            // 3. Update Balloon Oscillation (Waves 4+)
-            if (currentWaveConfig.oscillation > 0 && balloon.style.display !== 'none' && !isFrozen) {
+            // 3. Update Balloon Oscillation (Waves 4+ & Boss)
+            if (balloonData.type === 'boss' && balloon.style.display !== 'none' && !isFrozen) {
+                balloonOscTimer += 0.035 * dt;
+                const offsetY = Math.sin(balloonOscTimer) * 45;
+                const offsetX = Math.cos(balloonOscTimer * 0.8) * 35;
+                balloonData.y = Math.max(90, Math.min(380, balloonData.baseY + offsetY));
+                balloonData.x = Math.max(450, Math.min(680, 560 + offsetX));
+                balloon.style.bottom = `${balloonData.y}px`;
+                balloon.style.left = `${balloonData.x}px`;
+                balloonString.style.left = `${balloonData.x + 31}px`;
+                balloonString.style.bottom = `${balloonData.y - 30}px`;
+            } else if (currentWaveConfig && currentWaveConfig.oscillation > 0 && balloon.style.display !== 'none' && !isFrozen) {
                 balloonOscTimer += 0.04 * dt;
                 const offsetY = Math.sin(balloonOscTimer) * currentWaveConfig.oscillation;
                 balloonData.y = Math.max(70, Math.min(430, balloonData.baseY + offsetY));
@@ -2158,11 +2546,7 @@
                 arrow.x += arrow.vx * dt;
                 arrow.y += arrow.vy * dt;
 
-                if (!arrow.isRicocheted) {
-                    arrow.angle = Math.atan2(arrow.vy, arrow.vx);
-                } else {
-                    arrow.angle += 0.2 * dt; // Tumble on ricochet
-                }
+                arrow.angle = Math.atan2(arrow.vy, arrow.vx);
 
                 arrow.element.style.left = `${arrow.x}px`;
                 arrow.element.style.bottom = `${arrow.y}px`;
@@ -2200,29 +2584,82 @@
                 // Collision B: Rotating Wooden Shield (Ricochet physics)
                 const shieldCenterX = woodenShield.x + 22;
                 const shieldCenterY = woodenShield.y + 22;
-                const distToShield = Math.hypot(arrowTipX - shieldCenterX, arrowTipY - (500 - shieldCenterY));
+                const shieldBottomY = 500 - shieldCenterY;
+                const distToShield = Math.hypot(arrowTipX - shieldCenterX, arrowTipY - shieldBottomY);
 
                 if (distToShield < woodenShield.radius + 6 && !arrow.isRicocheted) {
-                    arrow.vx = -arrow.vx * 0.55;
-                    arrow.vy = (arrow.vy > 0 ? -1 : 1) * Math.abs(arrow.vy) * 0.35 + (Math.random() * 2 - 1);
+                    const dyFromCenter = arrowTipY - shieldBottomY;
+                    const bounceRatio = Math.max(-1, Math.min(1, dyFromCenter / (woodenShield.radius + 6)));
+
+                    // Deflexão dinâmica para frente em direção aos alvos (mantendo Vx > 0)
+                    arrow.vx = Math.abs(arrow.vx) * 0.85;
+                    arrow.vy = bounceRatio * 5.0 - Math.abs(arrow.vy) * 0.25;
                     arrow.isRicocheted = true;
-                    createSparkEffect(arrowTipX, arrowTipY, '#cd853f', 10);
+                    arrow.angle = Math.atan2(arrow.vy, arrow.vx);
+                    createSparkEffect(arrowTipX, arrowTipY, '#cd853f', 12);
                     createFloaterText(arrowTipX, arrowTipY, 'RICOCHETE!', '#ffd700');
                     playBounceSound();
                 }
 
                 // Collision C: Balloon Hit
                 if (balloon.style.display !== 'none') {
+                    const isBoss = (balloonData.type === 'boss');
+                    const bWidth = isBoss ? 62 : 42;
+                    const bHeight = isBoss ? 80 : 52;
                     const balloonBoxLeft = balloonData.x;
-                    const balloonBoxRight = balloonData.x + 42;
+                    const balloonBoxRight = balloonData.x + bWidth;
                     const balloonBoxBottom = balloonData.y;
-                    const balloonBoxTop = balloonData.y + 52;
+                    const balloonBoxTop = balloonData.y + bHeight;
 
                     if (
                         arrowTipX >= balloonBoxLeft && arrowTipX <= balloonBoxRight &&
                         arrowTipY >= balloonBoxBottom && arrowTipY <= balloonBoxTop
                     ) {
                         arrow.hasHit = true;
+
+                        // Case 0: Boss Balloon (5 HP)
+                        if (balloonData.type === 'boss') {
+                            const isFire = (arrow.type === 'fire');
+                            const dmg = isFire ? 2 : 1;
+                            balloonData.hp -= dmg;
+                            updateBossHpUI();
+                            triggerScreenShake(isFire ? 450 : 280);
+
+                            if (balloonData.hp > 0) {
+                                if (isFire) {
+                                    playExplosionSound();
+                                    createSparkEffect(arrowTipX, arrowTipY, '#ff5722', 20);
+                                    createFloaterText(balloonData.x + 10, balloonData.y + 60, '🔥 CHAMA ARDENTE! -2 HP', '#ff5722');
+                                } else {
+                                    playMetalHitSound();
+                                    createSparkEffect(arrowTipX, arrowTipY, '#ffd700', 16);
+                                    createFloaterText(balloonData.x + 10, balloonData.y + 60, `⚔️ GOLPE NO TITÃ! (HP ${balloonData.hp}/5)`, '#ffeb3b');
+                                }
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                                continue;
+                            } else {
+                                // Boss Defeated!
+                                playExplosionSound();
+                                triggerScreenShake(700);
+                                createSparkEffect(balloonData.x + 31, balloonData.y + 40, '#ffd700', 60);
+                                createFloaterText(balloonData.x, balloonData.y + 60, '👑 TITÃ DERROTADO! +1000 PTS +25 🪙', '#ffd700');
+                                score += 1000;
+                                scoreElement.textContent = score;
+                                addGold(25);
+                                unlockAchievement('boss_slayer');
+                                unlockAchievement('wave_10');
+
+                                balloon.style.display = 'none';
+                                balloonString.style.display = 'none';
+                                if (bossBarContainer) bossBarContainer.style.display = 'none';
+
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                                setTimeout(triggerVictory, 900);
+                                continue;
+                            }
+                        }
 
                         // Case 1: Armored Balloon (2 HP)
                         if (balloonData.type === 'armored') {
@@ -2261,12 +2698,42 @@
 
                             balloon.style.display = 'none';
                             balloonString.style.display = 'none';
-                            setTimeout(positionBalloon, 1000);
+                            scheduleBalloonSpawn(1000);
 
                             if (arrow.type !== 'fire') {
                                 arrow.element.remove();
                                 activeArrows.splice(i, 1);
                             }
+                            continue;
+                        }
+
+                        // Trickshot Mode Target Hit
+                        if (gameMode === 'trickshot') {
+                            if (!arrow.isRicocheted) {
+                                playMetalHitSound();
+                                createSparkEffect(arrowTipX, arrowTipY, '#ffd700', 10);
+                                createFloaterText(balloonData.x - 20, balloonData.y + 35, 'USE O RICOCHETE!', '#ffd700');
+                                arrow.element.remove();
+                                activeArrows.splice(i, 1);
+                                continue;
+                            }
+
+                            playPopSound(false);
+                            createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#76ff03', 30);
+                            createFloaterText(balloonData.x, balloonData.y + 20, '🎯 DESAFIO CONCLUÍDO!', '#76ff03');
+                            balloon.style.display = 'none';
+                            balloonString.style.display = 'none';
+
+                            trickshotLevelIndex++;
+                            if (trickshotLevelIndex >= TRICKSHOT_LEVELS.length) {
+                                unlockAchievement('trickshot_ace');
+                                setTimeout(triggerVictory, 800);
+                            } else {
+                                setTimeout(() => startTrickshotMode(trickshotLevelIndex), 1200);
+                            }
+
+                            arrow.element.remove();
+                            activeArrows.splice(i, 1);
                             continue;
                         }
 
@@ -2293,8 +2760,10 @@
 
                         // Refund Mechanic: Refund spent arrow + bonus arrow for Bullseye!
                         const refundCount = isBullseye ? 2 : 1;
-                        arrowsLeft = Math.min(25, arrowsLeft + refundCount);
-                        arrowsCounter.textContent = arrowsLeft;
+                        if (gameMode !== 'rush') {
+                            arrowsLeft = Math.min(25, arrowsLeft + refundCount);
+                            arrowsCounter.textContent = arrowsLeft;
+                        }
 
                         playArrowRefundSound(isBullseye);
                         const refundText = isBullseye ? '🎯 BULLSEYE! +2 FLECHAS' : '🏹 +1 FLECHA';
@@ -2323,6 +2792,7 @@
                         // Type-Specific Special Effects
                         if (balloonData.type === 'tnt') {
                             playExplosionSound();
+                            triggerScreenShake(420);
                             createSparkEffect(balloonData.x + 20, balloonData.y + 25, '#ff5722', 40);
                             createFloaterText(balloonData.x, balloonData.y + 18, `💥 BOOM TNT +${pts}!`, '#ff9800');
                             waveTargetsPopped++; // Bonus pop from blast
@@ -2359,15 +2829,19 @@
                             activateBulletTime();
                         }
 
-                        // Wave Target Progress
-                        waveTargetsPopped++;
-                        const targetsRemaining = Math.max(0, waveTargetCount - waveTargetsPopped);
-                        targetsCounter.textContent = targetsRemaining;
-
-                        if (waveTargetsPopped >= waveTargetCount) {
-                            completeWave();
+                        // Target Progress
+                        if (gameMode === 'rush') {
+                            scheduleBalloonSpawn(220);
                         } else {
-                            setTimeout(positionBalloon, 900);
+                            waveTargetsPopped++;
+                            const targetsRemaining = Math.max(0, waveTargetCount - waveTargetsPopped);
+                            targetsCounter.textContent = targetsRemaining;
+
+                            if (waveTargetsPopped >= waveTargetCount) {
+                                completeWave();
+                            } else {
+                                scheduleBalloonSpawn(900);
+                            }
                         }
 
                         // If not fire arrow, destroy arrow on balloon hit
@@ -2391,11 +2865,24 @@
                     }
                     arrow.element.remove();
                     activeArrows.splice(i, 1);
+
+                    if (gameMode === 'trickshot' && arrowsLeft === 0 && activeArrows.length === 0 && !isGameOverPending) {
+                        isGameOverPending = true;
+                        setTimeout(() => {
+                            if (balloon.style.display !== 'none' && !gameOver) {
+                                createFloaterText(350, 250, 'FALHOU! REINICIANDO...', '#ff4444');
+                                setTimeout(() => {
+                                    isGameOverPending = false;
+                                    startTrickshotMode(trickshotLevelIndex);
+                                }, 900);
+                            }
+                        }, 400);
+                    }
                 }
             }
 
             // Check Game Over Condition
-            if (arrowsLeft === 0 && activeArrows.length === 0 && !gameOver && !isWaveTransitioning && !isGameOverPending) {
+            if (arrowsLeft === 0 && activeArrows.length === 0 && !gameOver && !isWaveTransitioning && !isGameOverPending && gameMode !== 'trickshot') {
                 isGameOverPending = true;
                 if (gameOverTimer) clearTimeout(gameOverTimer);
                 gameOverTimer = setTimeout(endGame, 800);
@@ -2457,7 +2944,9 @@
             woodenShield.rotSpeed = nextCfg.shieldSpeed;
             generateNewWind();
 
-            setTimeout(() => {
+            if (waveTransitionTimer) clearTimeout(waveTransitionTimer);
+            waveTransitionTimer = setTimeout(() => {
+                waveTransitionTimer = null;
                 if (waveBanner) waveBanner.classList.remove('active');
                 isWaveTransitioning = false;
                 positionBalloon();
@@ -2465,9 +2954,21 @@
         }
 
         function triggerVictory() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
             if (gameOverTimer) {
                 clearTimeout(gameOverTimer);
                 gameOverTimer = null;
+            }
+            if (waveTransitionTimer) {
+                clearTimeout(waveTransitionTimer);
+                waveTransitionTimer = null;
+            }
+            if (balloonSpawnTimer) {
+                clearTimeout(balloonSpawnTimer);
+                balloonSpawnTimer = null;
             }
             if (gameOver) return;
             gameOver = true;
@@ -2481,11 +2982,24 @@
                 setTimeout(() => createSparkEffect(180 + i * 140, 200 + (i % 2) * 80, '#ffd700', 25), i * 250);
             }
 
-            gameOverTitle.textContent = '🏆 VITÓRIA ÉPICA!';
-            gameOverTitle.style.color = '#d4af37';
-            gameOverSubtitle.textContent = 'Parabéns! Você completou todas as 10 Ondas e se tornou o Mestre Arqueiro!';
+            if (gameMode === 'trickshot') {
+                gameOverTitle.textContent = '🏆 TRICKSHOT CONCLUÍDO!';
+                gameOverTitle.style.color = '#38ef7d';
+                gameOverSubtitle.textContent = 'Incrível! Você dominou todos os quebra-cabeças de ricochete!';
+                unlockAchievement('trickshot_ace');
+            } else if (gameMode === 'rush') {
+                gameOverTitle.textContent = '⚡ RUSH CONCLUÍDO!';
+                gameOverTitle.style.color = '#ff9900';
+                gameOverSubtitle.textContent = `Tempo esgotado! Pontuação final incrível no modo frenético!`;
+                if (score >= 1500) unlockAchievement('rush_master');
+            } else {
+                gameOverTitle.textContent = '🏆 VITÓRIA ÉPICA!';
+                gameOverTitle.style.color = '#d4af37';
+                gameOverSubtitle.textContent = 'Parabéns! Você derrotou o Titã dos Céus e completou todas as 10 Ondas!';
+                unlockAchievement('boss_slayer');
+                unlockAchievement('wave_10');
+            }
 
-            unlockAchievement('wave_10');
             saveHighScore();
             updateStatsModal();
             gameOverElement.style.display = 'block';
@@ -2501,13 +3015,24 @@
         }
 
         function initGame() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
             if (gameOverTimer) {
                 clearTimeout(gameOverTimer);
                 gameOverTimer = null;
             }
+            if (waveTransitionTimer) {
+                clearTimeout(waveTransitionTimer);
+                waveTransitionTimer = null;
+            }
+            if (balloonSpawnTimer) {
+                clearTimeout(balloonSpawnTimer);
+                balloonSpawnTimer = null;
+            }
             const currentBow = BOWS_CONFIG[selectedBow] || BOWS_CONFIG.oak;
             score = 0;
-            arrowsLeft = 5 + (currentBow.bonusInitialArrows || 0);
             comboStreak = 0;
             maxCombo = 0;
             totalShotsFired = 0;
@@ -2521,6 +3046,24 @@
             gameOver = false;
             goldEarnedInMatch = 0;
 
+            if (gameMode === 'rush') {
+                arrowsLeft = 999;
+                if (timerContainer) timerContainer.style.display = 'block';
+                if (waveContainer) waveContainer.style.display = 'none';
+                if (bossBarContainer) bossBarContainer.style.display = 'none';
+            } else if (gameMode === 'trickshot') {
+                const lvl = TRICKSHOT_LEVELS[trickshotLevelIndex] || TRICKSHOT_LEVELS[0];
+                arrowsLeft = lvl.arrows;
+                if (timerContainer) timerContainer.style.display = 'none';
+                if (waveContainer) waveContainer.style.display = 'none';
+                if (bossBarContainer) bossBarContainer.style.display = 'none';
+            } else {
+                arrowsLeft = 5 + (currentBow.bonusInitialArrows || 0);
+                if (timerContainer) timerContainer.style.display = 'none';
+                if (waveContainer) waveContainer.style.display = 'flex';
+                if (bossBarContainer) bossBarContainer.style.display = (currentWave === 10 ? 'block' : 'none');
+            }
+
             if (bow) bow.className = selectedBow;
             if (goldCounter) goldCounter.textContent = gold;
             if (workshopGoldVal) workshopGoldVal.textContent = gold;
@@ -2530,7 +3073,7 @@
             updateAmmoHUD();
 
             scoreElement.textContent = score;
-            arrowsCounter.textContent = arrowsLeft;
+            arrowsCounter.textContent = (gameMode === 'rush') ? '∞' : arrowsLeft;
             comboCounter.textContent = comboStreak;
             waveCounter.textContent = currentWave;
             targetsCounter.textContent = waveTargetCount;
@@ -2546,7 +3089,9 @@
 
             generateNewWind();
             deactivateFreezeTime();
-            positionBalloon();
+            if (gameMode !== 'trickshot') {
+                positionBalloon();
+            }
             deactivateBulletTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
 
@@ -2557,13 +3102,31 @@
         }
 
         function restartGame() {
-            initGame();
+            if (gameMode === 'rush') {
+                startRushMode();
+            } else if (gameMode === 'trickshot') {
+                startTrickshotMode(trickshotLevelIndex);
+            } else {
+                initGame();
+            }
         }
 
         function endGame() {
+            if (rushInterval) {
+                clearInterval(rushInterval);
+                rushInterval = null;
+            }
             if (gameOverTimer) {
                 clearTimeout(gameOverTimer);
                 gameOverTimer = null;
+            }
+            if (waveTransitionTimer) {
+                clearTimeout(waveTransitionTimer);
+                waveTransitionTimer = null;
+            }
+            if (balloonSpawnTimer) {
+                clearTimeout(balloonSpawnTimer);
+                balloonSpawnTimer = null;
             }
             if (gameOver) return;
             gameOver = true;
@@ -2573,9 +3136,22 @@
             deactivateFreezeTime();
             trajectoryDots.forEach(d => d.style.display = 'none');
 
-            gameOverTitle.textContent = 'Fim de Jogo!';
-            gameOverTitle.style.color = '#8B0000';
-            gameOverSubtitle.textContent = 'Suas flechas se esgotaram. Tente novamente para alcançar a Onda 10!';
+            if (gameMode === 'rush') {
+                gameOverTitle.textContent = '⚡ TEMPO ESGOTADO!';
+                gameOverTitle.style.color = '#ff9900';
+                gameOverSubtitle.textContent = `Você fez ${score} pontos em 60 segundos!`;
+                if (score >= 1500) {
+                    unlockAchievement('rush_master');
+                }
+            } else if (gameMode === 'trickshot') {
+                gameOverTitle.textContent = 'Fim das Flechas!';
+                gameOverTitle.style.color = '#8B0000';
+                gameOverSubtitle.textContent = 'Não desista! Use o escudo de madeira para ricochetear ao redor da nuvem.';
+            } else {
+                gameOverTitle.textContent = 'Fim de Jogo!';
+                gameOverTitle.style.color = '#8B0000';
+                gameOverSubtitle.textContent = 'Suas flechas se esgotaram. Tente novamente para alcançar a Onda 10!';
+            }
 
             saveHighScore();
             updateStatsModal();
@@ -2626,7 +3202,10 @@
                 selectedBow,
                 unlockedBows: [...unlockedBows],
                 highScores: [...highScores],
-                unlockedAchievements: [...unlockedAchievements]
+                unlockedAchievements: [...unlockedAchievements],
+                gameMode,
+                rushTimer,
+                trickshotLevelIndex
             }),
             gameLoop,
             step: (frames = 1) => {
@@ -2725,7 +3304,22 @@
             renderWorkshopCards,
             setScore: (s) => { score = s; scoreElement.textContent = score; },
             BOWS_CONFIG,
-            ACHIEVEMENTS
+            ACHIEVEMENTS,
+            // Game Modes, Boss & Polish API (Etapa 4)
+            getGameMode: () => gameMode,
+            setGameMode: (m) => selectGameMode(m),
+            openModesModal,
+            selectGameMode,
+            startCampaignMode,
+            startRushMode,
+            startTrickshotMode,
+            getRushTimer: () => rushTimer,
+            setRushTimer: (t) => { rushTimer = t; if (timerVal) timerVal.textContent = Math.max(0, t); },
+            getTrickshotLevelIndex: () => trickshotLevelIndex,
+            setTrickshotLevel: (lvl) => startTrickshotMode(lvl),
+            TRICKSHOT_LEVELS,
+            triggerScreenShake,
+            updateBossHpUI
         };
     </script>
 </body>
