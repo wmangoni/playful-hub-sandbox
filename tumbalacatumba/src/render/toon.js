@@ -42,6 +42,15 @@ THREE.ShaderChunk.fog_fragment = /* glsl */ `
 #endif
 `;
 
+/**
+ * Celular: a neblina conta a distância até a câmera, não a profundidade. Com o celular deitado (~98° de campo
+ * horizontal), na borda da tela a profundidade é bem menor que a distância, e o corte do cenário longe aparecia.
+ * Chamar antes de compilar qualquer material.
+ */
+export function useRadialFog() {
+  THREE.ShaderChunk.fog_vertex = THREE.ShaderChunk.fog_vertex.replace('vFogDepth = - mvPosition.z;', 'vFogDepth = length( mvPosition.xyz );');
+}
+
 /** Uniforms globais compartilhados por vários shaders. */
 export const SHARED = {
   uTime: { value: 0 },

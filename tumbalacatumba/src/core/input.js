@@ -3,6 +3,7 @@
 //  - botão direito arrastado: gira câmera + personagem (A/D viram strafe)
 //  - os dois botões: anda para frente
 //  - clique simples (sem arrastar): seleciona (esq.) / interage (dir.)
+// No celular, src/core/touch.js preenche os mesmos campos (move, touchLook, dx/dy, wheel, clicks, hold e teclas virtuais).
 const GAME_KEYS = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash']);
 
 export class Input {
@@ -21,6 +22,11 @@ export class Input {
     this.enabled = true;
     this.pointerLock = false;
     this.overCanvas = true;
+    // toque: joystick (x lateral, y para a frente, m = intensidade 0..1), dedo girando a câmera e toque longo
+    this.move = { x: 0, y: 0, m: 0 };
+    this.touchLook = false;
+    this.hold = null; // { x, y } enquanto um dedo fica parado (mostra a dica, como o mouse por cima)
+    this.lastPointer = 'mouse'; // 'touch' desliga o "mouse por cima" (destaque e dica do que está sob o cursor)
     this._down = { x: 0, y: 0, t: 0, button: -1, moved: 0 };
     this.onKey = null; // callback(code, event) para atalhos de UI
     this._bind();
@@ -29,6 +35,8 @@ export class Input {
   get left() { return this.buttons[0]; }
   get right() { return this.buttons[2]; }
   get anyButton() { return this.buttons[0] || this.buttons[2]; }
+  /** o jogador está girando a câmera (mouse arrastando ou dedo na tela) */
+  get looking() { return this.anyButton || this.touchLook; }
   down(code) { return this.keys.has(code); }
   hit(code) { return this.pressed.has(code); }
 
@@ -77,6 +85,11 @@ export class Input {
         this.clicks.push({ button: e.button, x: e.clientX, y: e.clientY });
       }
       if (!this.anyButton) this._endDrag();
+    });
+    // mouse de verdade voltou (o toque num botão da interface também gera mousemove de compatibilidade,
+    // por isso olha o pointerType e não o mousemove)
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) this.lastPointer = 'mouse';
     });
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('wheel', (e) => {

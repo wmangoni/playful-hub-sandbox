@@ -81,7 +81,10 @@ export class NPC {
     // PNJ de dentro da mansão só aparece quando estamos no mesmo andar (senão a placa atravessa o piso)
     const io = g.indoors;
     const sameLv = io?.active && (io.level === this.indoorLevel || (this.indoorLevel === 'G' && io.level === 'U' && io.room?.id === 'saguao'));
-    this.rig.root.visible = camD < 110 && (!this.indoorLevel || sameLv);
+    // celular (lod < 1): aparecem mais perto, contando o mais perto entre câmera e jogador (a câmera afastada não
+    // esconde quem está perto dele)
+    const k = g.quality.lod ?? 1;
+    this.rig.root.visible = (k < 1 ? Math.min(camD, d) : camD) < 110 * k && (!this.indoorLevel || sameLv);
     if (!this.rig.root.visible) return;
     // lá dentro, a placa de nome some quando há parede entre a câmera e o PNJ (a placa é HTML e não tem profundidade)
     if (this.indoorLevel) {

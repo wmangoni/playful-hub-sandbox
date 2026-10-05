@@ -72,7 +72,7 @@ export class QuestWorld {
     c.inter = g.interaction.add(
       new Interactable({
         kind: 'npc', name: 'Sr. Bigodes', subtitle: 'Gato de Três Olhos', level: '??', reaction: 'neutral', pos: c.pos, radius: 0.5, height: 0.8,
-        range: 3.4, cursor: 'use', rig, enabled: () => rig.root.visible, hint: 'Clique com o botão direito para pegar o gato',
+        range: 3.4, cursor: 'use', rig, enabled: () => rig.root.visible, hint: 'Clique com o botão direito para pegar o gato', verb: 'Pegar',
         onInteract: () => this.catInteract(),
       })
     );
@@ -139,7 +139,7 @@ export class QuestWorld {
   setupPumpkins() {
     const g = this.game;
     this.pumpkins = [];
-    const f = PUMPKIN_FIELD;
+    const f = (this.pumpkinField = PUMPKIN_FIELD); // (o e2e do toque precisa saber o que é dentro da cerca)
     for (let i = 0; i < 7; i++) {
       const rig = CM.createRebelPumpkin(i);
       const hx = f.x + rng.range(-f.hw + 2, f.hw - 2), hz = f.z + rng.range(-f.hd + 2, f.hd - 2);
@@ -151,7 +151,7 @@ export class QuestWorld {
       w.inter = g.interaction.add(
         new Interactable({
           kind: 'npc', name: 'Abóbora Fujona', subtitle: 'Fugitiva da Prefeitura', level: 1, reaction: 'neutral', pos: w.pos, radius: 0.5, height: 0.8,
-          range: 3.0, cursor: 'use', rig, enabled: () => rig.root.visible, hint: 'Clique com o botão direito para capturar',
+          range: 3.0, cursor: 'use', rig, enabled: () => rig.root.visible, hint: 'Clique com o botão direito para capturar', verb: 'Pegar',
           onInteract: () => this.catchPumpkin(w),
         })
       );
@@ -257,6 +257,7 @@ export class QuestWorld {
       new Interactable({
         kind: 'npc', name: 'Sapo Sorridente', subtitle: 'Usando Dentes Emprestados', level: 2, reaction: 'neutral', pos: rig.root.position, radius: 0.6,
         height: 0.8, range: 3.5, cursor: 'use', rig, enabled: () => !!rig.dentures?.visible, hint: 'Clique com o botão direito',
+        verb: () => (this.P.wants('dentadura') ? 'Pegar' : 'Falar'), // fora da missão ele só coaxa
         onInteract: () => {
           if (!this.P.wants('dentadura')) {
             g.ui.bubble({ pos: rig.root.position, rig }, rng.pick(['Croac? (sorriso dourado)', 'CROAC. (ele sorri orgulhoso)', 'Croooac!']), 2.5);
@@ -285,7 +286,7 @@ export class QuestWorld {
     g.interaction.add(
       new Interactable({
         kind: 'npc', name: 'Ovo do Capeta', subtitle: 'Quentinho', level: '??', reaction: 'neutral', pos: rig.root.position, radius: 0.7, height: 1.6,
-        range: 3.5, cursor: 'use', rig, enabled: () => rig.root.visible, hint: 'Clique com o botão direito para sentar no ovo',
+        range: 3.5, cursor: 'use', rig, enabled: () => rig.root.visible, hint: 'Clique com o botão direito para sentar no ovo', verb: 'Sentar',
         onInteract: () => this.sitOnEgg(),
       })
     );
@@ -371,7 +372,7 @@ export class QuestWorld {
     g.interaction.add(
       new Interactable({
         kind: 'object', name: 'Lampião do Farol', subtitle: 'Apagado há cem anos', reaction: 'neutral', pos, radius: 0.8, height: 2.4, range: 4,
-        cursor: 'use', selectable: false, enabled: () => this.P.wants('farol'), hint: 'Clique com o botão direito para subir e acender o lampião',
+        cursor: 'use', selectable: false, enabled: () => this.P.wants('farol'), hint: 'Clique com o botão direito para subir e acender o lampião', verb: 'Acender',
         onInteract: () => this.lightLighthouse(),
       })
     );

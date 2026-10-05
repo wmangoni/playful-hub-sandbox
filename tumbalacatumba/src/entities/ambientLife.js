@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { NPC } from './npc.js';
 import * as NM from './npcModels.js';
 import * as CM from './creatureModels.js';
@@ -72,6 +73,7 @@ export class AmbientLife {
       post.position.set(x + Math.cos(r.root.rotation.y) * 0.6, gy + (y + 0.3) / 2 - 0.3, z - Math.sin(r.root.rotation.y) * 0.6);
       scene.add(post);
       game.world.colliders.addCircle(post.position.x, post.position.z, 0.25, { y0: gy - 1, y1: gy + y + 0.6 });
+      r.perch = [branch, post];
       this.owls.push(r);
     }
     // aranhas penduradas
@@ -82,16 +84,14 @@ export class AmbientLife {
       const gy = W.groundHeight(x, z);
       const top = gy + rng.range(4.5, 6);
       const g = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshToonMaterial({ color: '#16121c' }));
-      body.scale.set(1, 0.8, 1.2);
-      g.add(body);
+      // corpo e as 8 pernas numa malha só (mesmo material): 2 draw calls por aranha em vez de 10
+      const parts = [new THREE.SphereGeometry(0.12, 8, 6).scale(1, 0.8, 1.2)];
       for (let k = 0; k < 8; k++) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.26, 3), body.material);
         const s = k < 4 ? 1 : -1, i = k % 4;
-        leg.position.set(s * 0.12, -0.02, -0.09 + i * 0.06);
-        leg.rotation.z = s * (1.1 - i * 0.1);
-        g.add(leg);
+        parts.push(new THREE.CylinderGeometry(0.01, 0.01, 0.26, 3).rotateZ(s * (1.1 - i * 0.1)).translate(s * 0.12, -0.02, -0.09 + i * 0.06));
       }
+      const body = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshToonMaterial({ color: '#16121c' }));
+      g.add(body);
       const eyes = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 4), new THREE.MeshBasicMaterial({ color: '#ff3a3a' }));
       eyes.position.set(0, 0.04, 0.12);
       g.add(eyes);
@@ -104,7 +104,9 @@ export class AmbientLife {
   }
 
   update(dt, t) {
-    const g = this.game;
+    const g = this.game, k = g.quality.lod ?? 1;
+    // celular (lod < 1): coruja e aranhas longe nem são desenhadas
+    const far = k < 1 ? 70 * k : Infinity;
     // zumbi: trote lento em volta da fonte
     const zb = this.zombie;
     if (!zb.talking) {
@@ -131,13 +133,20 @@ export class AmbientLife {
       const dx = x - r.root.position.x, dz = z - r.root.position.z;
       if (dx || dz) r.root.rotation.y = dampAngle(r.root.rotation.y, Math.atan2(dx, dz), 3, dt);
       r.root.position.set(x, y, z);
-      r.root.visible = g.camera.position.distanceTo(r.root.position) < 80;
+      r.root.visible = g.camera.position.distanceTo(r.root.position) < 80 * k;
       if (r.root.visible) r.animate(dt, {});
     }
     // (os sapos pulam, coaxam e brigam em combat/: são criaturas neutras)
-    for (const o of this.owls) if (g.camera.position.distanceTo(o.root.position) < 70) o.animate(dt, {});
+    for (const o of this.owls) {
+      const d = g.camera.position.distanceTo(o.root.position);
+      o.root.visible = o.perch[0].visible = o.perch[1].visible = d < far;
+      if (d < 70 * k) o.animate(dt, {});
+    }
     // aranhas sobem e descem
+    const cp = g.camera.position;
     for (const s of this.spiders) {
+      s.g.visible = s.line.visible = Math.hypot(cp.x - s.x, cp.y - s.top, cp.z - s.z) < far;
+      if (!s.g.visible) continue;
       const y = s.top - s.len * (0.5 + 0.5 * Math.sin(t * 0.5 + s.ph));
       s.g.position.set(s.x, y, s.z);
       s.g.rotation.y = Math.sin(t * 0.7 + s.ph) * 0.8;

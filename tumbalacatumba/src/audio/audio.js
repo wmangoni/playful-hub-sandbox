@@ -41,8 +41,17 @@ export class Audio {
     if (!AC) return;
     const ctx = (this.ctx = new AC());
     // se o navegador segurou o áudio, retoma no próximo gesto real
-    const resume = () => ctx.state === 'suspended' && ctx.resume();
+    // iOS: depois de uma ligação ou do bloqueio de tela o estado vira 'interrupted'
+    const resume = () => ctx.state !== 'running' && ctx.state !== 'closed' && ctx.resume();
+    // iOS: 'ambient' respeita a chave de silencioso e não pausa a música que o jogador já está ouvindo
+    // ('playback' tocaria mesmo no silencioso e pararia o Spotify dele)
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'ambient';
+    } catch {
+      /* sem suporte */
+    }
     window.addEventListener('pointerdown', resume);
+    window.addEventListener('touchend', resume); // iOS: o gesto que libera o áudio é o touchend
     window.addEventListener('keydown', resume);
     this.master = ctx.createGain();
     this.master.connect(ctx.destination);

@@ -101,7 +101,7 @@ export class DayNight {
 
     const fog = this.scene.fog;
     fog.color.copy(c.fog);
-    fog.near = c.fd;
+    fog.near = Math.max(c.fd, this.fogMin ?? 0); // no celular, um piso (esconde o corte do cenário longe)
     fog.far = c.fh;
 
     const u = this.sky.uniforms;

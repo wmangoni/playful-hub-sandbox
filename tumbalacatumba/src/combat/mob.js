@@ -262,10 +262,13 @@ export class Mob {
     if (this.state === 'gone') return;
     this.updateY(dt);
     const camD = g.camera.position.distanceTo(this.pos);
-    r.root.visible = camD < 80 || this.engaged;
+    // celular (lod < 1): tudo mais perto, e a visibilidade conta o mais perto entre câmera e jogador (com a câmera
+    // afastada, a criatura à frente dele não some nem deixa de ser mirável, já que targetable exige o rig visível)
+    const k = g.quality.lod ?? 1;
+    r.root.visible = (k < 1 ? Math.min(camD, d) : camD) < 80 * k || this.engaged;
     if (!r.root.visible) return;
     // LOD: sombra só perto da câmera; de longe, sem o passe de contorno (1 draw call por peça)
-    const lod = camD < 22 ? 0 : camD < 36 ? 1 : 2;
+    const lod = camD < 22 * k ? 0 : camD < 36 * k ? 1 : 2;
     if (lod !== this.lod) {
       this.lod = lod;
       for (const m of r.meshes) {

@@ -7,7 +7,10 @@ import '@fontsource/patrick-hand/latin-400.css';
 import '@fontsource/griffy/latin-400.css';
 import './ui/styles.css';
 import './ui/hud.css';
+import './ui/touch.css';
 import { Game } from './game.js';
+import { prefersTouch } from './core/touch.js';
+import { BOOT_TIPS } from './quests/data.js';
 
 // guarda erros para diagnóstico (window.__errors)
 window.__errors = [];
@@ -26,21 +29,14 @@ fade.id = 'fade';
 document.body.appendChild(fade);
 const loader = document.createElement('div');
 loader.id = 'boot';
-const tips = [
-  'Dica: segure o botão direito do mouse para girar a câmera e o personagem ao mesmo tempo.',
-  'Dica: um ! cor de abóbora sobre alguém indica uma missão. Um ? cor de abóbora, missão pronta para entregar.',
-  'Dica: vaga-lumes só aparecem à noite. O coveiro deixa você cochilar até escurecer.',
-  'Dica: a Lápide de Regresso (tecla 6) leva você de volta à praça.',
-  'Dica: aperte R para correr sozinho e M para abrir o mapa.',
-  'Dica: aperte 7 (ou clique com o botão direito numa criatura) para dar uma Lanternada.',
-  'Dica: o nível das criaturas de cada região aparece no mapa (M). Comece pela Colina Espiral e pelo Sítio.',
-  'Curiosidade: o Prefeito Abóbora tem duas caras. Literalmente.',
-];
+const game = new Game(app);
+// no celular as dicas falam de dedos e botões (o modo toque ainda não existe aqui: vale a tela de toque do aparelho,
+// menos com "Nunca" salvo nas opções)
+const tips = BOOT_TIPS[prefersTouch() && game.settings.controls !== 'off' ? 'touch' : 'desk'];
 loader.innerHTML = `<div class="boot-title">Tumbalacatumba</div><div class="boot-sub">Contos do Vale Assombrado</div><div class="boot-bar"><i></i></div><div class="boot-msg">Carregando…</div><div class="boot-tip">${tips[Math.floor(Math.random() * tips.length)]}</div>`;
 document.body.appendChild(loader);
 const bar = loader.querySelector('i'), msg = loader.querySelector('.boot-msg');
 
-const game = new Game(app);
 game
   .init((p, m) => {
     bar.style.width = `${Math.round(p * 100)}%`;

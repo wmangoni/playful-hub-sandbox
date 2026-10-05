@@ -33,6 +33,25 @@ Abra **`Tumbalacatumba.html`** no navegador (Chrome, Edge ou Firefox). Só isso.
 | Esconder a interface | `Z` |
 | Menu, opções e controles | `Esc` |
 
+### No celular ou tablet (tela de toque)
+
+Jogue com o aparelho deitado. O modo toque liga sozinho em telas de toque, e dá para mudar em Opções → Controles de toque.
+Nesses aparelhos o jogo também começa na qualidade gráfica **Celular**, mais leve (Opções → Qualidade gráfica): o cenário
+bem longe some na neblina, a grama é mais rala e o jogo fica em até 60 quadros por segundo para poupar bateria.
+
+| Ação | Toque |
+|---|---|
+| Andar | arrastar o **lado esquerdo** da tela (joystick): o personagem anda para onde você aponta |
+| Correr sozinho | arrastar o joystick para cima até o **cadeado** e soltar: ele segue para onde a câmera aponta (toque no joystick para parar) |
+| Girar a câmera | arrastar o **lado direito** da tela |
+| Zoom | pinça com dois dedos |
+| Conversar / pegar / usar | **tocar** em alguém ou em algo perto (longe: só seleciona), ou o botão **Falar / Pegar / Sentar / Abrir…** que aparece quando há algo ao alcance |
+| Atacar | botão grande da **Lanternada** (sem alvo, mira na criatura mais próxima), ou tocar na criatura duas vezes |
+| Habilidades | três botões em volta da Lanternada (mudam conforme o que você já tem) e **⋯** com todas, inclusive Sentar |
+| O que é isso? | **toque longo** na tela ou num botão mostra a dica |
+| Pular / voar | botão **Pular** (voando: **Subir** e **Descer**; segure Descer rente ao chão para pousar) |
+| Diário, mapa, controles, opções, mochila | botões no topo da tela |
+
 ## O que tem no vale
 
 - **17 missões** com PNJs: o Prefeito Abóbora (cuja cabeça gira entre a cara feliz e a preocupada),
@@ -92,7 +111,7 @@ npm run build    # gera dist/index.html e Tumbalacatumba.html (arquivo único)
 ```
 
 Parâmetros úteis de URL no modo dev: `?play` (pula o título), `?t=21.5` (hora do dia),
-`?pos=x,z` (posição inicial), `?q=baixa|media|alta` (qualidade gráfica), `?notut` (sem tutorial),
+`?pos=x,z` (posição inicial), `?q=movel|baixa|media|alta` (qualidade gráfica; `movel` é a do celular), `?notut` (sem tutorial),
 `?peaceful` (criaturas não atacam).
 
 ### Estrutura

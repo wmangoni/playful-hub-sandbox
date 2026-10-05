@@ -199,14 +199,14 @@ export class Indoors {
     this.outSpot = { x: MANOR.x + lz2 * s, z: MANOR.z + lz2 * c, yaw: Math.atan2(s, c) };
     const outer = new Interactable({
       kind: 'object', name: 'Porta da Mansão', subtitle: 'Mansão Dentúcio', reaction: 'neutral', pos: this.outDoor, radius: 1.4, height: 3.2, range: 4.2,
-      cursor: 'use', selectable: false, hint: 'Clique com o botão direito para entrar', onInteract: () => this.enter(),
+      cursor: 'use', selectable: false, hint: 'Clique com o botão direito para entrar', verb: 'Entrar', onInteract: () => this.enter(),
     });
     g.interaction.add(outer);
     // porta da frente (lado de dentro)
     const inPos = this.toWorld(FRONT_DOOR.x, FRONT_DOOR.y, FRONT_DOOR.z);
     const inner = new Interactable({
       kind: 'object', name: 'Porta da Frente', subtitle: 'Sair da mansão', reaction: 'neutral', pos: inPos, radius: 1.3, height: 3.4, range: 3.6,
-      cursor: 'use', selectable: false, hint: 'Clique com o botão direito para sair', onInteract: () => this.exit(),
+      cursor: 'use', selectable: false, hint: 'Clique com o botão direito para sair', verb: 'Sair', onInteract: () => this.exit(),
     });
     g.interaction.add(inner);
     this.doorIn = inPos;

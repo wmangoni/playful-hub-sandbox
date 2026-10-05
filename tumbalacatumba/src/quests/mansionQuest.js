@@ -96,7 +96,7 @@ export class MansionQuest {
     c.inter = g.interaction.add(
       new Interactable({
         kind: 'item', name, subtitle, reaction: 'neutral', pos, radius: 0.5, height: 0.6, range: 3.2, vRange: 2.5, cursor: 'loot', selectable: false,
-        enabled: () => this.clueOpen(i), hint: 'Clique com o botão direito para examinar a pista',
+        enabled: () => this.clueOpen(i), hint: 'Clique com o botão direito para examinar a pista', verb: 'Examinar',
         onInteract: () => this.readClue(c),
       })
     );
@@ -167,7 +167,7 @@ export class MansionQuest {
     this.trunk.inter = g.interaction.add(
       new Interactable({
         kind: 'object', name: 'Baú do Anselmo', subtitle: '"NÃO ABRIR"', reaction: 'neutral', pos, radius: 0.8, height: 1.0, range: 3.4, vRange: 2.5, cursor: 'use', selectable: false,
-        enabled: () => this.trunkOpenable() || this.trunk.open > 0.5, hint: 'Clique com o botão direito para abrir o baú',
+        enabled: () => this.trunkOpenable() || this.trunk.open > 0.5, hint: 'Clique com o botão direito para abrir o baú', verb: 'Abrir',
         onInteract: () => this.openTrunk(),
       })
     );
@@ -244,9 +244,16 @@ export class MansionQuest {
     setTimeout(() => (c.action = null), 5000);
     setTimeout(() => c.say('Veludo carmim! Olhem só como eu fico DRAMÁTICO!', 4), 1200);
     setTimeout(() => {
-      g.ui.chat('Você aprendeu a VOAR! Aperte 8 (ou use a Capinha na mochila). Espaço sobe, X desce; segure X rente ao chão para pousar.', 'system');
-      g.ui.info('Novo poder: Voar (tecla 8)');
+      const [chat, info] = this.flyLearnedText(g.touchMode);
+      g.ui.chat(chat, 'system');
+      g.ui.info(info);
     }, 2200);
+  }
+  /** aviso de que aprendeu a voar (no toque, sem tecla: o Voar fica no arco de botões) */
+  flyLearnedText(touch) {
+    return touch
+      ? ['Você aprendeu a VOAR! Toque em Voar, nos botões à direita (ou use a Capinha na mochila). Os botões Subir e Descer controlam a altura; segure Descer rente ao chão para pousar.', 'Novo poder: Voar (nos botões à direita)']
+      : ['Você aprendeu a VOAR! Aperte 8 (ou use a Capinha na mochila). Espaço sobe, X desce; segure X rente ao chão para pousar.', 'Novo poder: Voar (tecla 8)'];
   }
   applyState() {
     const P = this.P, t = this.trunk;

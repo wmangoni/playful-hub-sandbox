@@ -97,7 +97,7 @@ export class Decor {
   flavorObj(p, name, subtitle, lines, { sfx = null, h = 1.6, r = 0.7, range = 3.2, onUse } = {}) {
     let i = 0;
     return this.inter(p, {
-      name, subtitle, height: h, radius: r, range, hint: 'Clique com o botão direito para examinar',
+      name, subtitle, height: h, radius: r, range, hint: 'Clique com o botão direito para examinar', verb: 'Examinar',
       onInteract: () => {
         const g = this.io.game;
         const line = typeof lines === 'function' ? lines() : lines[i++ % lines.length];

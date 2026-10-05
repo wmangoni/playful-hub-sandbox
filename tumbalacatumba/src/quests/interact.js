@@ -5,6 +5,7 @@ const _o = new THREE.Vector3();
 const _d = new THREE.Vector3();
 const _ndc = new THREE.Vector2();
 const _ray = new THREE.Raycaster();
+const TOUCH_PAD = 0.05; // ~3° de folga para o dedo (uns 20 px num celular deitado)
 
 /** Algo com que o jogador pode interagir (PNJ, item, objeto). */
 export class Interactable {
@@ -88,7 +89,14 @@ export class Interaction {
     if (this.target === it) this.setTarget(null);
   }
 
-  pick(mx, my) {
+  /**
+   * o que está sob (mx, my). pad = folga angular (rad) para o dedo, que é bem menos preciso que o mouse:
+   * primeiro tenta o acerto exato (senão a folga de algo mais perto ganharia do que o dedo acertou em cheio)
+   */
+  pick(mx, my, pad = 0) {
+    return this._pick(mx, my, 0) ?? (pad ? this._pick(mx, my, pad) : null);
+  }
+  _pick(mx, my, pad) {
     const cam = this.game.camera;
     _ndc.set((mx / window.innerWidth) * 2 - 1, -(my / window.innerHeight) * 2 + 1);
     _ray.setFromCamera(_ndc, cam);
@@ -97,7 +105,8 @@ export class Interaction {
     let best = null, bt = 80;
     for (const it of this.list) {
       if (!it.enabled()) continue;
-      const t = rayCapsule(_o, _d, it.pos, it.height, it.radius);
+      const extra = pad ? pad * _o.distanceTo(it.pos) : 0;
+      const t = rayCapsule(_o, _d, it.pos, it.height + extra, it.radius + extra);
       if (t < bt) {
         bt = t;
         best = it;
@@ -173,10 +182,37 @@ export class Interaction {
     it.onInteract?.(g, it);
   }
 
+  /**
+   * toque rápido: perto o bastante, conversa/pega/abre (o clique direito); longe, só seleciona.
+   * Criatura: o primeiro toque seleciona, o segundo ataca.
+   */
+  tap(x, y, fromStick = false) {
+    const it = this.pick(x, y, TOUCH_PAD);
+    if (!it) {
+      // toque no chão/céu vazio solta o alvo (no toque não há Esc à mão), menos quando é o polegar
+      // reencostando no joystick ou quando a briga está rolando (sem alvo, o ataque automático desliga)
+      const C = this.game.combat;
+      if (fromStick || (this.target?.kind === 'mob' && (C?.autoAttack || C?.inCombat))) return;
+      this.setTarget(null);
+      return;
+    }
+    if (it.kind === 'mob') {
+      if (this.target === it) this.tryInteract(it);
+      else this.setTarget(it);
+      return;
+    }
+    const near = this.distTo(it) <= it.range && Math.abs(this.game.player.pos.y - it.pos.y) <= (it.vRange ?? 4.5);
+    if (near || !it.selectable) this.tryInteract(it);
+    else this.setTarget(it);
+  }
+
   update() {
     const g = this.game, input = g.input;
     let h = null;
-    if (!input.dragging && input.overCanvas && !g.ui.blocking()) h = this.pick(input.mx, input.my);
+    // no toque não existe "mouse por cima": só o toque longo mostra o destaque e a dica
+    if (input.lastPointer === 'touch') {
+      if (input.hold && !g.ui.blocking()) h = this.pick(input.hold.x, input.hold.y, TOUCH_PAD);
+    } else if (!input.dragging && input.overCanvas && !g.ui.blocking()) h = this.pick(input.mx, input.my);
     if (h !== this.hover) {
       this.hover?.rig?.setHighlight(0);
       this.hover?.onHover?.(false);
@@ -192,6 +228,10 @@ export class Interaction {
     }
     if (g.ui.blocking()) return;
     for (const c of input.clicks) {
+      if (c.button === 'tap') {
+        this.tap(c.x, c.y, c.stick);
+        continue;
+      }
       const it = this.pick(c.x, c.y);
       if (c.button === 0) {
         if (it?.selectable) this.setTarget(it);

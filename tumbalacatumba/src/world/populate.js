@@ -113,6 +113,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
   const out = {
     map: { houses: [], trees: [], graves: [], lamps: [], lines: [], circles: [], pumpkins: [], rocks: [], bushes: [], decks: [] },
     lights: [],
+    loose: [], // peças fora do StaticBatch presas a um prédio (o corte por distância do celular as leva junto)
     smoke: [],
     anchors: {},
     animated: [],
@@ -170,6 +171,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
           mh.position.z = 0.07;
           pivot.add(hh, mh);
           scene.add(pivot);
+          out.loose.push(pivot);
           group.push({ hh, mh });
         }
         out.anchors.clockHands = group;
@@ -225,6 +227,7 @@ export async function populateWorld(world, plan, progress = () => {}) {
         piv.rotation.y = rot;
         piv.add(blades);
         scene.add(piv);
+        out.loose.push(piv);
         out.animated.push({ update: (dt) => (blades.rotation.z += dt * 0.55) });
         M.circles.push({ x, z, r: 2.8, fill: '#3a3052', tall: true });
         break;

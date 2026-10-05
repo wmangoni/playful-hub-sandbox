@@ -4,7 +4,7 @@ import { Minimap, WorldMap, paintWorldMap } from './minimap.js';
 import { Portraits } from './portrait.js';
 import { Dialog, QuestLog, Bags, Menu, esc } from './windows.js';
 import { CombatHud } from './combatHud.js';
-import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR, XP_TABLE } from '../quests/data.js';
+import { ITEMS, QUALITY_COLORS, ZONE_FLAVOR, XP_TABLE, txt } from '../quests/data.js';
 import { createPlayerModel } from '../entities/models.js';
 import * as NM from '../entities/npcModels.js';
 import * as CM from '../entities/creatureModels.js';
@@ -175,14 +175,41 @@ export class UI {
     return this.chatOpen || this.game.state !== 'play';
   }
   applyScale() {
-    const s = clamp(window.innerHeight / 960, 0.72, 1.15) * (this.game.settings.uiScale ?? 1);
+    // no toque (celular deitado, 360–430 px de altura) a interface é desenhada para ~560 px e as letras
+    // pequenas crescem no touch.css; as janelas não usam escala: o touch.css as encaixa na tela
+    const touch = !!this.game.touchMode;
+    const base = touch ? clamp(window.innerHeight / 560, 0.5, 0.8) : clamp(window.innerHeight / 960, 0.72, 1.15);
+    const s = base * (this.game.settings.uiScale ?? 1);
     this.scale = s;
     this.root.style.setProperty('--s', s.toFixed(3));
     for (const id of ['quest', 'qlog', 'bags', 'menu', 'options', 'tutorial']) {
       const w = this.q('#' + id);
-      if (w) w.style.transform = `scale(${s})`;
+      if (w) w.style.transform = touch ? '' : `scale(${s})`;
     }
     this.worldMap.resize();
+  }
+  /** troca entre a interface de desktop e a de toque (chamado quando o modo toque liga ou desliga) */
+  setTouchLayout(on) {
+    const tracker = this.q('#tracker');
+    // no celular o rastreador fica embaixo do retrato (à direita, o minimapa e o polegar já ocupam tudo)
+    (on ? this.q('.anchor.tl') : this.q('.anchor.tr')).appendChild(tracker);
+    if (on && !this._touchLayoutOnce) {
+      this._touchLayoutOnce = true;
+      this._trackerDesk = !!this.trackerCollapsed;
+      this.setTrackerCollapsed(true); // compacto: só a primeira missão
+    } else if (!on && this._touchLayoutOnce) {
+      // aparelho híbrido voltando ao mouse: o rastreador fica como estava no desktop
+      this._touchLayoutOnce = false;
+      this.setTrackerCollapsed(this._trackerDesk);
+    }
+    this.applyScale();
+    this.renderTracker();
+  }
+  setTrackerCollapsed(v) {
+    if (this.trackerCollapsed === v) return;
+    this.trackerCollapsed = v;
+    this.q('#tracker .tog').textContent = v ? '[+]' : '[−]';
+    this.renderTracker();
   }
   levelColor(lv) {
     const d = lv - this.game.progress.level;
@@ -218,7 +245,9 @@ export class UI {
     ];
     this.slots.push({
       key: '8', code: 'Digit8', id: 'fly', name: 'Voar', icon: 'batcape', cd: 0.8, locked: () => !P.hasItem('capinha'),
-      desc: 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). Espaço sobe, X desce; segure X rente ao chão para pousar. Use de novo no ar para descer planando. Não funciona debaixo de teto.',
+      desc: () => g.touchMode
+        ? 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). O botão Subir sobe e o Descer desce; segure Descer rente ao chão para pousar. Toque de novo no ar para descer planando. Não funciona debaixo de teto.'
+        : 'Abre a Capinha de Morcego Filhote e voa (60% mais rápido que correr). Espaço sobe, X desce; segure X rente ao chão para pousar. Use de novo no ar para descer planando. Não funciona debaixo de teto.',
     });
     for (let i = 9; i <= 12; i++) this.slots.push({ key: i <= 9 ? String(i) : i === 10 ? '0' : i === 11 ? '-' : '=', empty: true });
     const bar = this.q('#bottom .bar-frame');
@@ -231,11 +260,7 @@ export class UI {
       s.cdLeft = 0;
       if (s.empty) continue;
       e.onclick = () => this.useSlot(s);
-      e.onmousemove = (ev) => {
-        const lk = s.locked?.();
-        const desc = typeof s.desc === 'function' ? s.desc() : s.desc;
-        this.showTooltip('slot', `<div class="tt-name" style="color:#fff">${esc(s.name)}</div>${lk ? '<div class="tt-far">Ainda não aprendido</div>' : ''}<div class="tt-flavor">${esc(desc)}</div>${s.cd >= 2 ? `<div class="tt-sub">Recarga: ${s.cd} s</div>` : ''}`, ev.clientX, ev.clientY);
-      };
+      e.onmousemove = (ev) => this.showTooltip('slot', this.slotTooltip(s), ev.clientX, ev.clientY);
       e.onmouseleave = () => this.hideTooltip('slot');
     }
   }
@@ -255,9 +280,19 @@ export class UI {
       s.el.classList.add('press');
       setTimeout(() => s.el.classList.remove('press'), 120);
     }
+    return ok;
+  }
+  /** a habilidade está "ligada" agora? (lanterna acesa, montado, voando...) */
+  slotActive(s) {
+    const g = this.game;
+    return (s.id === 'lantern' && g.player.lanternOn) || (s.id === 'dance' && g.player.action === 'dance') || (s.id === 'pet' && g.questWorld.pet.active) || (s.id === 'mount' && g.player.mounted) || (s.id === 'attack' && g.combat.autoAttack) || (s.id === 'fly' && (g.player.flying || g.player.gliding));
+  }
+  slotTooltip(s) {
+    const lk = s.locked?.();
+    const desc = typeof s.desc === 'function' ? s.desc() : s.desc;
+    return `<div class="tt-name" style="color:#fff">${esc(s.name)}</div>${lk ? '<div class="tt-far">Ainda não aprendido</div>' : ''}<div class="tt-flavor">${esc(desc)}</div>${s.cd >= 2 ? `<div class="tt-sub">Recarga: ${s.cd} s</div>` : ''}`;
   }
   updateActionBar(dt) {
-    const g = this.game;
     for (const s of this.slots) {
       if (s.empty) continue;
       if (s.cdLeft > 0) s.cdLeft = Math.max(0, s.cdLeft - dt);
@@ -265,9 +300,9 @@ export class UI {
       s.el.classList.toggle('cooling', cool);
       if (cool) s.el.querySelector('.cd').style.background = `conic-gradient(rgba(0,0,0,0.7) ${(s.cdLeft / s.cd) * 360}deg, transparent 0)`;
       s.el.classList.toggle('locked', !!s.locked?.());
-      const active = (s.id === 'lantern' && g.player.lanternOn) || (s.id === 'dance' && g.player.action === 'dance') || (s.id === 'pet' && g.questWorld.pet.active) || (s.id === 'mount' && g.player.mounted) || (s.id === 'attack' && g.combat.autoAttack) || (s.id === 'fly' && (g.player.flying || g.player.gliding));
-      s.el.classList.toggle('active', active);
+      s.el.classList.toggle('active', this.slotActive(s));
     }
+    if (this.game.touchMode) this.game.touchBar?.update(dt);
   }
 
   // ------------------------------------------------------------ micromenu
@@ -286,7 +321,8 @@ export class UI {
         this.game.audio?.sfx('click');
         fn();
       };
-      b.onmousemove = (e) => this.showTooltip('micro', `<div class="tt-name" style="color:#fff">${tip}</div>`, e.clientX, e.clientY);
+      // (no toque não: o mousemove de compatibilidade mostraria o atalho de teclado)
+      b.onmousemove = (e) => !this.game.touchMode && this.showTooltip('micro', `<div class="tt-name" style="color:#fff">${tip}</div>`, e.clientX, e.clientY);
       b.onmouseleave = () => this.hideTooltip('micro');
       m.appendChild(b);
     }
@@ -294,7 +330,7 @@ export class UI {
     bag.className = 'bag';
     bag.style.backgroundImage = `url(${icon('bag')})`;
     bag.onclick = () => this.bags.toggle();
-    bag.onmousemove = (e) => this.showTooltip('micro', `<div class="tt-name" style="color:#fff">Mochila de Caixão (B)</div>`, e.clientX, e.clientY);
+    bag.onmousemove = (e) => !this.game.touchMode && this.showTooltip('micro', `<div class="tt-name" style="color:#fff">Mochila de Caixão (B)</div>`, e.clientX, e.clientY);
     bag.onmouseleave = () => this.hideTooltip('micro');
     m.appendChild(bag);
   }
@@ -314,7 +350,9 @@ export class UI {
     });
     this.chatInput.addEventListener('blur', () => setTimeout(() => this.closeChat(), 50));
     this.chat('Bem-vindo ao Vale Tumbalacatumba!', 'system');
-    this.chat('Dica: segure o botão direito do mouse e use W A S D para andar. Enter abre o chat.', 'system');
+    this.chat(this.game.touchMode
+      ? 'Dica: arraste o lado esquerdo da tela para andar e o lado direito para olhar em volta. Toque em alguém para conversar.'
+      : 'Dica: segure o botão direito do mouse e use W A S D para andar. Enter abre o chat.', 'system');
   }
   openChat() {
     this.chatOpen = true;
@@ -410,13 +448,20 @@ export class UI {
     } else {
       t.classList.remove('follow');
       t.style.left = t.style.top = '';
-      t.style.transform = `scale(${this.scale})`;
+      // no toque o touch.css centraliza a dica embaixo do menu, com letra grande (a escala a jogava para a direita)
+      t.style.transform = this.game.touchMode ? '' : `scale(${this.scale})`;
     }
   }
   hideTooltip(owner) {
     if (owner && this.ttOwner !== owner) return;
     this.tooltip.classList.add('hidden');
     this.ttOwner = null;
+  }
+  /** no toque, "Clique com o botão direito para X" vira "Toque para X" (criatura: "Toque de novo para atacar") */
+  hintText(hint) {
+    if (!this.game.touchMode) return hint;
+    if (hint === 'Clique com o botão direito para atacar') return 'Toque para selecionar, de novo para atacar';
+    return hint.replace(/^Clique com o botão direito/, 'Toque');
   }
   tooltipFor(it) {
     if (!it) return this.hideTooltip('world');
@@ -426,7 +471,7 @@ export class UI {
       h += `<div class="tt-lvl"><span style="color:${this.levelColor(m.level)}">Nível ${m.level}</span> ${esc(it.family)}</div>`;
       h += `<div class="tt-sub">${it.reaction === 'hostile' ? 'Hostil: ataca quem chega perto' : 'Neutro: só briga se provocado'}</div>`;
       if (m.hp < m.maxHp) h += `<div class="tt-sub">Vida: ${Math.ceil(m.hp)} / ${m.maxHp}</div>`;
-      if (it.hint) h += `<div class="tt-hint">${esc(it.hint)}</div>`;
+      if (it.hint) h += `<div class="tt-hint">${esc(this.hintText(it.hint))}</div>`;
       if (this.game.interaction.distTo(it) > it.range) h += `<div class="tt-far">Longe demais</div>`;
       return this.showTooltip('world', h);
     }
@@ -446,18 +491,21 @@ export class UI {
         if (o) h += `<div class="tt-flavor">${esc(q.title)}</div>`;
       }
     }
-    if (it.hint) h += `<div class="tt-hint">${esc(it.hint)}</div>`;
+    if (it.hint) h += `<div class="tt-hint">${esc(this.hintText(it.hint))}</div>`;
     if (this.game.interaction.distTo(it) > it.range) h += `<div class="tt-far">Longe demais</div>`;
     this.showTooltip('world', h);
   }
   itemTooltip(id, x, y, inBag = false) {
+    this.showTooltip('item', this.itemTooltipHTML(id, inBag), x, y);
+  }
+  itemTooltipHTML(id, inBag = false) {
     const it = ITEMS[id];
     let h = `<div class="tt-name" style="color:${QUALITY_COLORS[it.quality]}">${esc(it.name)}</div>`;
     if (it.quality === 'quest') h += '<div class="tt-sub">Item de missão</div>';
-    if (it.desc) h += `<div class="tt-desc">${esc(it.desc)}</div>`;
+    if (it.desc) h += `<div class="tt-desc">${esc(txt(it, 'desc', this.game.touchMode))}</div>`;
     if (it.flavor) h += `<div class="tt-flavor">"${esc(it.flavor)}"</div>`;
-    if (inBag && it.use) h += `<div class="tt-hint">Clique para usar</div>`;
-    this.showTooltip('item', h, x, y);
+    if (inBag && it.use) h += `<div class="tt-hint">${this.game.touchMode ? 'Toque para usar' : 'Clique para usar'}</div>`;
+    return h;
   }
 
   // ------------------------------------------------------------ alvo e jogador
@@ -514,12 +562,14 @@ export class UI {
     let qs = P.activeQuests().filter((q) => P.tracked.has(q.id));
     if (!qs.length) qs = P.activeQuests();
     this.q('#tracker').style.display = qs.length ? '' : 'none';
-    if (this.trackerCollapsed) {
+    const compact = this.trackerCollapsed && this.game.touchMode;
+    this.q('#tracker').classList.toggle('open', !!this.game.touchMode && !this.trackerCollapsed);
+    if (this.trackerCollapsed && !compact) {
       list.innerHTML = '';
       return;
     }
     let h = '';
-    for (const q of qs.slice(0, 7)) {
+    for (const q of qs.slice(0, compact ? 1 : 7)) {
       const st = P.status(q.id);
       h += `<div class="q ${q.id === flashId ? 'flash' : ''}" data-id="${q.id}"><div class="t"><span class="lv">[${q.level}]</span> ${esc(q.title)}</div>`;
       if (st === 'complete') {
@@ -636,8 +686,13 @@ export class UI {
       this.worldMap.resize();
       this.showWin(this.mapWin);
       const s = this.worldMap.px;
-      this.mapWin.style.marginLeft = `${-(s + 34) / 2}px`;
-      this.mapWin.style.marginTop = `${-(s + 70) / 2}px`;
+      if (this.game.touchMode) {
+        this.mapWin.style.marginLeft = `${-this.mapWin.offsetWidth / 2}px`;
+        this.mapWin.style.marginTop = `${-this.mapWin.offsetHeight / 2}px`;
+      } else {
+        this.mapWin.style.marginLeft = `${-(s + 34) / 2}px`;
+        this.mapWin.style.marginTop = `${-(s + 70) / 2}px`;
+      }
       this.game.audio?.sfx('map');
     } else this.hideWin(this.mapWin);
   }
@@ -904,7 +959,11 @@ export class UI {
   // ------------------------------------------------------------ tutorial
   startTutorial() {
     this.tipIndex = 0;
-    this.tipSteps = [
+    this.tipSteps = this.game.touchMode ? [
+      { text: 'Bem-vindo a <b>Tumbalacatumba</b>! Arraste o <b>lado esquerdo</b> da tela para andar e o <b>lado direito</b> para olhar ao redor.' },
+      { text: 'Personagens com um <b>!</b> cor de abóbora têm missões. O <b>Prefeito Abóbora</b> está logo ali na praça: <b>toque nele</b> (ou no botão <b>Falar</b>, quando estiver perto) para conversar.' },
+      { text: 'Suas missões aparecem embaixo do seu retrato e as áreas de objetivo ficam em <b>laranja no minimapa</b>. O <b>mapa</b> e o <b>diário</b> ficam nos botões do topo.', on: 'accept' },
+    ] : [
       { text: 'Bem-vindo a <b>Tumbalacatumba</b>! Use <b>W A S D</b> para andar. Segure o <b>botão direito do mouse</b> e arraste para olhar ao redor.' },
       { text: 'Personagens com um <b>!</b> cor de abóbora têm missões. O <b>Prefeito Abóbora</b> está logo ali na praça: clique nele com o <b>botão direito</b> para conversar.' },
       { text: 'Suas missões aparecem à direita e as áreas de objetivo ficam em <b>laranja no minimapa</b>. Aperte <b>M</b> para o mapa e <b>L</b> para o diário.', on: 'accept' },
