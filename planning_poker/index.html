@@ -3,71 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Planning Poker para times de desenvolvimento estimarem tarefas juntos, em tempo real via WebSocket.">
+    <meta name="description" content="Planning Poker moderno para times ágeis estimarem tarefas com baralho realista, colaboração em tempo real e histórico de votações.">
     <title>Planning Poker - PlayfulHub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-1: #0d0e15;
-            --bg-2: #16182a;
-            --panel: rgba(22, 24, 42, 0.75);
-            --panel-border: rgba(255, 255, 255, 0.08);
-            --accent: #e94560;
-            --accent-2: #6c8cff;
-            --neon-cyan: #00f0ff;
-            --neon-green: #39ff14;
-            --gold: #ffd700;
-            --text: #e8e8f0;
-            --muted: #9a9ab0;
-            --radius: 14px;
+            /* Light Theme (Padrão: Moderno, Claro & Vibrante) */
+            --bg-page: #f8fafc;
+            --bg-mesh-1: rgba(99, 102, 241, 0.08);
+            --bg-mesh-2: rgba(236, 72, 153, 0.06);
+            --bg-mesh-3: rgba(16, 185, 129, 0.06);
+            --panel: #ffffff;
+            --panel-translucent: rgba(255, 255, 255, 0.88);
+            --panel-border: rgba(226, 232, 240, 0.9);
+            --panel-border-subtle: rgba(241, 245, 249, 0.8);
+            --header-bg: rgba(255, 255, 255, 0.85);
+
+            --text: #0f172a;
+            --text-secondary: #475569;
+            --muted: #64748b;
+            --muted-light: #94a3b8;
+
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eef2ff;
+            --primary-glow: rgba(79, 70, 229, 0.25);
+
+            --accent: #e11d48;
+            --emerald: #10b981;
+            --emerald-light: #ecfdf5;
+            --emerald-glow: rgba(16, 185, 129, 0.25);
+
+            --amber: #f59e0b;
+            --amber-light: #fffbeb;
+            --rose: #e11d48;
+            --rose-light: #fff1f2;
+            --cyan: #0284c7;
+            --cyan-light: #f0f9ff;
+            --purple: #8b5cf6;
+
+            /* Sombras suaves e realistas */
+            --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+            --shadow-md: 0 4px 14px -1px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+            --shadow-lg: 0 12px 28px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
+            --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
+            --shadow-card-hover: 0 16px 30px -6px rgba(79, 70, 229, 0.22), 0 6px 12px -2px rgba(15, 23, 42, 0.06);
+
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-card: 12px;
+
+            /* Cartas de Baralho */
+            --card-front-bg: #ffffff;
+            --card-front-border: #cbd5e1;
+            --card-back-bg: #1e3a8a;
+            --card-back-pattern: #1e40af;
+        }
+
+        /* Dark Theme Opcional */
+        body.theme-dark {
+            --bg-page: #0b0f19;
+            --bg-mesh-1: rgba(99, 102, 241, 0.14);
+            --bg-mesh-2: rgba(236, 72, 153, 0.1);
+            --bg-mesh-3: rgba(16, 185, 129, 0.1);
+            --panel: #131b2e;
+            --panel-translucent: rgba(19, 27, 46, 0.88);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --panel-border-subtle: rgba(255, 255, 255, 0.05);
+            --header-bg: rgba(15, 23, 42, 0.85);
+
+            --text: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --muted: #94a3b8;
+            --muted-light: #64748b;
+
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-light: rgba(99, 102, 241, 0.18);
+            --primary-glow: rgba(99, 102, 241, 0.4);
+
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.5);
+            --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.35);
+            --shadow-card-hover: 0 16px 32px rgba(99, 102, 241, 0.35);
+
+            --card-front-bg: #1e293b;
+            --card-front-border: #334155;
+            --card-back-bg: #172554;
+            --card-back-pattern: #1e3a8a;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-page);
+            background-image: 
+                radial-gradient(at 0% 0%, var(--bg-mesh-1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, var(--bg-mesh-2) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, var(--bg-mesh-3) 0px, transparent 50%);
+            background-attachment: fixed;
             color: var(--text);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         .wrap {
-            max-width: 1080px;
+            max-width: 1140px;
             margin: 0 auto;
             width: 100%;
-            padding: 24px 20px 40px;
+            padding: 24px 20px 48px;
             flex: 1;
             display: flex;
             flex-direction: column;
+            gap: 20px;
         }
 
         .screen { display: none; flex: 1; flex-direction: column; }
         .screen.active { display: flex; }
 
         /* ============ Join Screen ============ */
-        .join-card {
+        .join-wrapper {
             margin: auto;
             width: 100%;
-            max-width: 440px;
-            background: var(--panel);
+            max-width: 480px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .join-card {
+            background: var(--panel-translucent);
             border: 1px solid var(--panel-border);
             border-radius: var(--radius);
-            padding: 36px 32px;
+            padding: 40px 36px;
             text-align: center;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .join-card .badge-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--primary);
+            background: var(--primary-light);
+            padding: 5px 12px;
+            border-radius: 999px;
+            margin-bottom: 16px;
         }
 
         .join-card h1 {
-            font-size: 1.9rem;
-            letter-spacing: 1px;
+            font-size: 2.1rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+            margin-bottom: 8px;
         }
 
         .join-card .subtitle {
             color: var(--muted);
-            margin: 10px 0 28px;
-            font-size: 0.95rem;
+            margin-bottom: 28px;
+            font-size: 0.98rem;
             line-height: 1.5;
         }
 
@@ -76,70 +182,154 @@
             flex-direction: column;
             gap: 8px;
             text-align: left;
-            margin-bottom: 20px;
+            margin-bottom: 22px;
         }
 
         .field label {
-            font-size: 0.8rem;
+            font-size: 0.82rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.8px;
             color: var(--muted);
         }
 
         .field input {
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            padding: 12px 14px;
+            background: var(--panel);
+            border: 1.5px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            padding: 13px 16px;
             color: var(--text);
-            font-size: 1rem;
+            font-size: 1.05rem;
+            font-family: inherit;
             outline: none;
-            transition: border-color 0.2s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .field input:focus { border-color: var(--accent-2); }
+        .field input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-light);
+        }
 
+        .join-cards-preview {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 20px 0 24px;
+        }
+
+        /* ============ Botões ============ */
         .btn {
             border: 0;
-            border-radius: 10px;
-            padding: 12px 20px;
-            font-size: 1rem;
+            border-radius: var(--radius-sm);
+            padding: 13px 24px;
+            font-size: 0.98rem;
             font-weight: 700;
+            font-family: inherit;
             cursor: pointer;
-            color: #fff;
-            background: linear-gradient(45deg, var(--accent), #ff6b6b);
-            transition: transform 0.15s ease, box-shadow 0.2s ease;
+            color: #ffffff;
+            background: linear-gradient(135deg, var(--primary), #6366f1);
+            box-shadow: 0 4px 14px var(--primary-glow);
+            transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
         }
 
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(233, 69, 96, 0.4); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--primary-glow);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
 
         .btn.secondary {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid var(--panel-border);
+            background: var(--panel);
+            color: var(--text);
+            border: 1.5px solid var(--panel-border);
+            box-shadow: var(--shadow-sm);
         }
 
-        .btn.neon {
-            background: linear-gradient(45deg, #0e7bd1, var(--neon-cyan));
+        .btn.secondary:hover:not(:disabled) {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: var(--shadow-md);
         }
 
-        .join-hint { margin-top: 18px; font-size: 0.8rem; color: var(--muted); }
+        .btn.danger {
+            background: linear-gradient(135deg, var(--rose), #f43f5e);
+            box-shadow: 0 4px 14px rgba(225, 29, 72, 0.25);
+        }
 
-        /* ============ Room Header ============ */
+        .btn-full { width: 100%; }
+
+        .join-hint {
+            margin-top: 18px;
+            font-size: 0.84rem;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        /* ============ Room Header & Bar ============ */
         .room-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 16px;
             flex-wrap: wrap;
-            padding: 12px 16px;
-            background: var(--panel);
+            padding: 16px 24px;
+            background: var(--header-bg);
             border: 1px solid var(--panel-border);
-            border-top-left-radius: var(--radius);
-            border-top-right-radius: var(--radius);
+            border-radius: var(--radius);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-sm);
         }
 
-        .room-header .title { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.5px; }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), #ec4899);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 10px var(--primary-glow);
+        }
+
+        .header-title-wrap h1 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+        }
+
+        .header-title-wrap .sub {
+            font-size: 0.8rem;
+            color: var(--muted);
+            font-weight: 500;
+        }
 
         .room-meta {
             display: flex;
@@ -149,153 +339,590 @@
         }
 
         .room-chip {
-            font-family: 'Consolas', 'Courier New', monospace;
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px dashed rgba(255, 255, 255, 0.25);
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            background: var(--primary-light);
+            border: 1px dashed var(--primary);
             border-radius: 8px;
-            padding: 6px 12px;
-            color: var(--neon-cyan);
-            letter-spacing: 2px;
+            padding: 6px 14px;
+            color: var(--primary);
+            letter-spacing: 1.5px;
             font-weight: 700;
+            font-size: 0.95rem;
         }
 
         .copy-btn {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid var(--panel-border);
+            background: var(--panel);
+            border: 1.5px solid var(--panel-border);
             color: var(--text);
             border-radius: 8px;
-            padding: 6px 12px;
+            padding: 7px 14px;
             cursor: pointer;
-            font-size: 0.85rem;
-            transition: background 0.2s ease;
+            font-size: 0.88rem;
+            font-weight: 600;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
         }
 
-        .copy-btn:hover { background: rgba(255, 255, 255, 0.15); }
-        .copy-btn.copied { color: var(--neon-green); border-color: var(--neon-green); }
+        .copy-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-light);
+        }
 
-        .status-line {
+        .copy-btn.copied {
+            background: var(--emerald-light);
+            color: var(--emerald);
+            border-color: var(--emerald);
+        }
+
+        .theme-toggle-btn {
+            background: var(--panel);
+            border: 1.5px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 7px 11px;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        /* Status Bar */
+        .status-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 12px;
             flex-wrap: wrap;
-            padding: 10px 16px;
-            background: rgba(0, 0, 0, 0.25);
+            padding: 10px 18px;
+            background: var(--panel-translucent);
             border: 1px solid var(--panel-border);
-            border-top: 0;
-            font-size: 0.85rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
             color: var(--muted);
+            backdrop-filter: blur(12px);
         }
 
-        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-        .dot.on { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
-        .dot.off { background: #ff6b6b; box-shadow: 0 0 8px #ff6b6b; }
-        .dot.mid { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+        .status-left, .status-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
 
-        /* ============ Players ============ */
+        .dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .dot.on { background: var(--emerald); box-shadow: 0 0 10px var(--emerald); }
+        .dot.off { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
+        .dot.mid { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+
+        .progress-pill {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Task Name Input Box */
+        .story-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            background: var(--panel-translucent);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(12px);
+        }
+
+        .story-bar label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .story-bar input {
+            flex: 1;
+            background: var(--panel);
+            border: 1.5px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .story-bar input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        /* ============ Mesa de Jogadores (Poker Table) ============ */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 10px 0 6px;
+        }
+
         .section-label {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            letter-spacing: 1.2px;
             color: var(--muted);
-            margin: 20px 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .table-stage {
+            background: var(--panel-translucent);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .table-stage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+            pointer-events: none;
         }
 
         .players-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 16px;
+            position: relative;
+            z-index: 1;
         }
 
+        /* Player Box */
         .player-card {
             background: var(--panel);
-            border: 1px solid var(--panel-border);
-            border-radius: 12px;
-            padding: 14px 10px;
+            border: 1.5px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            padding: 14px 10px 16px;
             text-align: center;
-            transition: border-color 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
-        .player-card.self { border-color: var(--accent-2); }
+        .player-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .player-card.self {
+            border-color: var(--primary);
+            background: linear-gradient(180deg, var(--primary-light) 0%, var(--panel) 35%);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: #ffffff;
+            box-shadow: var(--shadow-sm);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
         .player-card .pname {
             font-weight: 700;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
+            color: var(--text);
+            max-width: 130px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
-        .player-card .pstatus { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
-        .player-card .pstatus.voted { color: var(--neon-green); }
-        .player-card .mini-card {
-            margin: 10px auto 0;
-            width: 42px;
-            height: 56px;
-            border-radius: 8px;
-            font-weight: 800;
-            font-size: 1.1rem;
-            display: flex;
+        .player-card .self-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--primary);
+            background: var(--primary-light);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+
+        .player-card .pstatus {
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--muted);
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: var(--panel-border-subtle);
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
+            gap: 4px;
         }
 
-        .mini-card.back { background: repeating-linear-gradient(45deg, #2a2d4d, #2a2d4d 6px, #343864 6px, #343864 12px); border: 1px solid rgba(255, 255, 255, 0.15); }
-        .mini-card.value { background: linear-gradient(160deg, #1c1f38, #2a2e52); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 240, 255, 0.25); }
-        .mini-card.null { border: 1px dashed var(--panel-border); color: var(--muted); font-size: 0.8rem; }
-
-        /* ============ Deck ============ */
-        .deck {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-            gap: 10px;
-            max-width: 820px;
+        .player-card .pstatus.voted {
+            color: var(--emerald);
+            background: var(--emerald-light);
         }
 
-        .card {
-            aspect-ratio: 4 / 5;
-            border-radius: 12px;
-            border: 1px solid var(--panel-border);
-            background: linear-gradient(160deg, #1c1f38, #232648);
+        .player-card .pstatus.revealed {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        /* 3D Playing Card na mesa */
+        .card-perspective {
+            perspective: 800px;
+            width: 58px;
+            height: 84px;
+            margin: 4px auto 2px;
+        }
+
+        .card-flipper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .card-flipper.is-face-down {
+            transform: rotateY(180deg);
+        }
+
+        .card-flipper.is-face-up {
+            transform: rotateY(0deg);
+        }
+
+        /* Cartas de Baralho (Anatomia Real) */
+        .poker-card-face {
+            position: absolute;
+            inset: 0;
+            border-radius: 10px;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px 5px;
+            box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+            user-select: none;
+        }
+
+        /* Face Frontal (Branca / Marfim) */
+        .card-front {
+            background: linear-gradient(150deg, #ffffff 0%, #fbfcfe 60%, #f1f5f9 100%);
+            border: 1px solid var(--card-front-border);
             color: var(--text);
-            font-size: 1.5rem;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08), inset 0 0 0 1px rgba(255,255,255,0.8);
+        }
+
+        .card-front.suit-red { color: var(--rose); }
+        .card-front.suit-black { color: #1e293b; }
+        .card-front.suit-gold { color: #d97706; }
+        .card-front.suit-purple { color: #7c3aed; }
+
+        body.theme-dark .card-front.suit-black { color: #f8fafc; }
+
+        .card-corner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1;
+            font-size: 0.72rem;
             font-weight: 800;
-            font-family: 'Consolas', 'Courier New', monospace;
-            cursor: pointer;
+            width: 16px;
+        }
+
+        .card-corner.top-left { align-self: flex-start; }
+        .card-corner.bottom-right { align-self: flex-end; transform: rotate(180deg); }
+
+        .corner-val {
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .corner-suit {
+            font-size: 0.62rem;
+            margin-top: 1px;
+        }
+
+        .card-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .center-val {
+            font-size: 1.35rem;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            line-height: 1;
+        }
+
+        .center-suit {
+            font-size: 0.95rem;
+            line-height: 1;
+            margin-bottom: 2px;
+            opacity: 0.85;
+        }
+
+        /* Face Traseira (Verso Ornamental de Cassino) */
+        .card-back {
+            transform: rotateY(180deg);
+            background: var(--card-back-bg);
+            border: 3px solid #ffffff;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15), inset 0 0 0 1px rgba(0,0,0,0.1);
+        }
+
+        body.theme-dark .card-back {
+            border-color: #e2e8f0;
+        }
+
+        .card-back-pattern {
+            position: absolute;
+            inset: 3px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            background-color: var(--card-back-bg);
+            background-image: 
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px),
+                repeating-linear-gradient(-45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
-        .card:hover { transform: translateY(-4px); border-color: var(--neon-cyan); box-shadow: 0 8px 20px rgba(0, 240, 255, 0.18); }
-        .card.picked { border-color: var(--gold); box-shadow: 0 0 16px rgba(255, 215, 0, 0.45); transform: translateY(-4px); color: var(--gold); }
-        .card:disabled { cursor: not-allowed; opacity: 0.45; transform: none; }
-        .card:disabled:hover { border-color: var(--panel-border); box-shadow: none; }
-
-        .deck.is-locked .card:not(.picked) { cursor: not-allowed; opacity: 0.35; }
-
-        /* ============ Actions ============ */
-        .actions {
+        .card-back-emblem {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.7);
+            background: radial-gradient(circle, #3b82f6 0%, #1e3a8a 100%);
             display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-top: 24px;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 900;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
 
-        /* ============ Results / Stats ============ */
-        .results-panel {
-            margin-top: 24px;
-            background: var(--panel);
+        /* Placeholder de carta quando jogador ainda não votou */
+        .card-slot-placeholder {
+            width: 58px;
+            height: 84px;
+            margin: 4px auto 2px;
+            border: 2px dashed var(--panel-border);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted-light);
+            font-size: 0.75rem;
+            background: var(--panel-border-subtle);
+        }
+
+        .card-slot-placeholder .dot-wait {
+            font-size: 1.1rem;
+            animation: pulseSlow 1.8s infinite;
+        }
+
+        @keyframes pulseSlow {
+            0%, 100% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        /* ============ Deck de Cartas do Jogador ============ */
+        .deck-container {
+            background: var(--panel-translucent);
             border: 1px solid var(--panel-border);
             border-radius: var(--radius);
-            padding: 18px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .deck-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .deck {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            perspective: 1000px;
+        }
+
+        /* Carta Interativa do Deck */
+        .poker-btn-card {
+            width: 68px;
+            height: 98px;
+            border-radius: var(--radius-card);
+            border: 1.5px solid var(--card-front-border);
+            background: linear-gradient(150deg, #ffffff 0%, #fbfcfe 60%, #f1f5f9 100%);
+            box-shadow: var(--shadow-card);
+            cursor: pointer;
+            position: relative;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+            outline: none;
+            font-family: inherit;
+        }
+
+        body.theme-dark .poker-btn-card {
+            background: linear-gradient(150deg, #1e293b 0%, #0f172a 100%);
+            border-color: #334155;
+        }
+
+        .poker-btn-card:hover:not(:disabled) {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: var(--shadow-card-hover);
+            border-color: var(--primary);
+            z-index: 5;
+        }
+
+        .poker-btn-card.picked {
+            transform: translateY(-12px) scale(1.08);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary), 0 16px 30px var(--primary-glow);
+            z-index: 10;
+        }
+
+        .poker-btn-card:disabled {
+            cursor: not-allowed;
+            opacity: 0.45;
+            transform: none !important;
+            box-shadow: var(--shadow-sm) !important;
+        }
+
+        .deck.is-locked .poker-btn-card:not(.picked) {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .poker-btn-card .card-corner {
+            width: 18px;
+            font-size: 0.8rem;
+        }
+
+        .poker-btn-card .corner-val { font-size: 0.85rem; }
+        .poker-btn-card .corner-suit { font-size: 0.7rem; }
+        .poker-btn-card .center-val { font-size: 1.6rem; }
+        .poker-btn-card .center-suit { font-size: 1.15rem; }
+
+        .poker-btn-card.suit-red { color: var(--rose); }
+        .poker-btn-card.suit-black { color: #1e293b; }
+        .poker-btn-card.suit-gold { color: #d97706; }
+        .poker-btn-card.suit-purple { color: #7c3aed; }
+        body.theme-dark .poker-btn-card.suit-black { color: #f8fafc; }
+
+        /* ============ Ações ============ */
+        .actions-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        /* Banner de Consenso Alcançado */
+        .consensus-banner {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 1.5px solid var(--emerald);
+            color: #065f46;
+            border-radius: var(--radius-sm);
+            padding: 14px 20px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 6px 18px var(--emerald-glow);
+            animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            margin-bottom: 16px;
+        }
+
+        body.theme-dark .consensus-banner {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%);
+            color: #a7f3d0;
+            border-color: var(--emerald);
+        }
+
+        /* ============ Painel de Resultados da Rodada ============ */
+        .results-panel {
+            background: var(--panel-translucent);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-md);
+            animation: fadeIn 0.3s ease-out;
         }
 
         .results-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: 10px;
-            margin-bottom: 16px;
+            margin: 16px 0 20px;
         }
 
         .result-item {
@@ -303,120 +930,568 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            background: rgba(0, 0, 0, 0.25);
+            background: var(--panel);
             border: 1px solid var(--panel-border);
             border-radius: 10px;
-            padding: 10px 12px;
+            padding: 10px 14px;
+            box-shadow: var(--shadow-sm);
         }
 
-        .result-item .rname { font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .result-item .rval { font-family: 'Consolas', 'Courier New', monospace; font-weight: 800; color: var(--neon-cyan); }
+        .result-item .rname {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .result-item .rval {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-weight: 800;
+            font-size: 1.15rem;
+            color: var(--primary);
+        }
 
         .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-box {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-box .s-label {
+            font-size: 0.74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--muted);
+        }
+
+        .stat-box .s-value {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 4px;
+        }
+
+        /* ============ HISTÓRICO DE VOTAÇÕES ============ */
+        .history-panel {
+            background: var(--panel-translucent);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-md);
             display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .history-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        .history-count-badge {
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .history-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 7px 12px;
+            font-size: 0.82rem;
+            border-radius: 8px;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 36px 16px;
+            color: var(--muted);
+            font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            background: var(--panel-border-subtle);
+            border-radius: var(--radius-sm);
+            border: 1.5px dashed var(--panel-border);
+        }
+
+        .history-empty .empty-icon { font-size: 2.2rem; }
+
+        .history-cards-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* Card de Cada Rodada no Histórico */
+        .history-round-card {
+            background: var(--panel);
+            border: 1.5px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .history-round-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary-glow);
+        }
+
+        .round-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .round-title-group {
+            display: flex;
+            align-items: center;
             gap: 10px;
             flex-wrap: wrap;
         }
 
-        .stat-box {
-            flex: 1;
-            min-width: 110px;
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid var(--panel-border);
-            border-radius: 10px;
-            padding: 10px 12px;
-            text-align: center;
+        .round-number-chip {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-weight: 800;
+            font-size: 0.84rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: var(--primary-light);
+            color: var(--primary);
         }
 
-        .stat-box .s-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-        .stat-box .s-value { font-family: 'Consolas', 'Courier New', monospace; font-size: 1.2rem; font-weight: 800; color: var(--gold); margin-top: 4px; }
+        .round-task-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text);
+        }
 
-        /* ============ Toast ============ */
+        .round-time {
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        .consensus-pill {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .consensus-pill.total {
+            background: var(--emerald-light);
+            color: var(--emerald);
+            border: 1px solid var(--emerald);
+        }
+
+        .consensus-pill.high {
+            background: var(--amber-light);
+            color: var(--amber);
+            border: 1px solid var(--amber);
+        }
+
+        .consensus-pill.divergent {
+            background: var(--cyan-light);
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+        }
+
+        .round-metrics-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 8px 12px;
+            background: var(--panel-border-subtle);
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        .metric-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--text-secondary);
+        }
+
+        .metric-pill strong {
+            color: var(--primary);
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+        }
+
+        /* Mini-cartas no histórico */
+        .round-votes-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .mini-vote-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 4px 8px 4px 4px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        }
+
+        .mini-poker-card {
+            width: 28px;
+            height: 38px;
+            border-radius: 5px;
+            border: 1px solid var(--card-front-border);
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: inherit;
+            font-weight: 800;
+            font-size: 0.78rem;
+            color: #1e293b;
+            line-height: 1;
+        }
+
+        body.theme-dark .mini-poker-card {
+            background: #1e293b;
+            color: #ffffff;
+            border-color: #334155;
+        }
+
+        .mini-poker-card.suit-red { color: var(--rose); }
+
+        .mini-voter-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .round-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: var(--muted);
+            border-top: 1px solid var(--panel-border-subtle);
+            padding-top: 10px;
+        }
+
+        /* ============ Toast de Notificação ============ */
         .toast {
             position: fixed;
-            bottom: 20px;
+            bottom: 24px;
             left: 50%;
-            transform: translateX(-50%);
-            background: #2a0f17;
-            border: 1px solid var(--accent);
-            color: #ffd7de;
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-size: 0.9rem;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--panel);
+            border: 1.5px solid var(--primary);
+            color: var(--text);
+            padding: 12px 24px;
+            border-radius: var(--radius-sm);
+            font-size: 0.92rem;
+            font-weight: 600;
+            box-shadow: var(--shadow-lg);
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.25s ease;
-            z-index: 50;
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .toast.show { opacity: 1; }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
 
-        @media (max-width: 600px) {
-            .wrap { padding: 16px 12px; }
-            .deck { grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: 8px; }
-            .card { font-size: 1.1rem; }
+        /* Canvas de Confetti */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Animações */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            70% { transform: scale(1.03); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsividade */
+        @media (max-width: 680px) {
+            .wrap { padding: 14px 12px 32px; gap: 14px; }
+            .room-header { padding: 12px 14px; }
+            .header-brand h1 { font-size: 1.1rem; }
+            .table-stage, .deck-container, .results-panel, .history-panel { padding: 16px; }
+            .poker-btn-card { width: 56px; height: 82px; }
+            .poker-btn-card .center-val { font-size: 1.3rem; }
+            .poker-btn-card .center-suit { font-size: 0.95rem; }
+            .players-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
         }
     </style>
 </head>
 <body>
+    <canvas id="confetti-canvas"></canvas>
+
     <div class="wrap">
         <!-- ============ ENTRADA ============ -->
         <section id="join-screen" class="screen active">
-            <div class="join-card">
-                <h1>Planning Poker</h1>
-                <p class="subtitle" id="join-subtitle">Estime tarefas com seu time em tempo real.</p>
-                <div class="field">
-                    <label for="name-input">Seu nome</label>
-                    <input id="name-input" type="text" maxlength="24" placeholder="Ex.: Maria" autocomplete="off">
+            <div class="join-wrapper">
+                <div class="join-card">
+                    <div class="badge-tag">✨ Agile & Realtime</div>
+                    <h1>Planning Poker</h1>
+                    <p class="subtitle" id="join-subtitle">Estime tarefas com seu time em tempo real com baralho interativo.</p>
+
+                    <div class="join-cards-preview">
+                        <!-- Mini amostra de cartas físicas para dar boas-vindas -->
+                        <div class="mini-poker-card suit-black" style="width: 44px; height: 64px; font-size: 1.1rem;">
+                            <span style="font-size: 0.65rem;">♠</span>3
+                        </div>
+                        <div class="mini-poker-card suit-red" style="width: 48px; height: 70px; font-size: 1.25rem; transform: translateY(-4px); box-shadow: 0 4px 12px rgba(225,29,72,0.2);">
+                            <span style="font-size: 0.75rem;">♥</span>5
+                        </div>
+                        <div class="mini-poker-card suit-black" style="width: 44px; height: 64px; font-size: 1.1rem;">
+                            <span style="font-size: 0.65rem;">♦</span>8
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="name-input">Seu nome ou apelido</label>
+                        <input id="name-input" type="text" maxlength="24" placeholder="Ex.: Maria, João, dev_alex" autocomplete="name">
+                    </div>
+
+                    <button id="join-btn" class="btn btn-full">
+                        <span>Entrar / Criar sala</span>
+                        <span>➔</span>
+                    </button>
+
+                    <p class="join-hint">
+                        <span>🔗</span> Compartilhe o link da sala para seu time votar simultaneamente.
+                    </p>
                 </div>
-                <button id="join-btn" class="btn">Entrar / Criar sala</button>
-                <p class="join-hint">Seus colegas acessam a mesma sala pelo link.</p>
             </div>
         </section>
 
         <!-- ============ SALA ============ -->
         <section id="room-screen" class="screen">
+            <!-- Cabeçalho da Sala -->
             <header class="room-header">
-                <div class="title">Planning Poker</div>
+                <div class="header-brand">
+                    <div class="brand-icon">🃏</div>
+                    <div class="header-title-wrap">
+                        <h1>Planning Poker</h1>
+                        <div class="sub">Playful Hub • Sala em Tempo Real</div>
+                    </div>
+                </div>
+
                 <div class="room-meta">
-                    <span id="room-chip" class="room-chip">---</span>
-                    <button id="copy-link-btn" class="copy-btn" type="button">Copiar link</button>
+                    <span id="room-chip" class="room-chip" title="Código da sala">---</span>
+                    <button id="copy-link-btn" class="copy-btn" type="button" title="Copiar link para convidar colegas">
+                        <span>📋</span>
+                        <span id="copy-btn-text">Copiar link</span>
+                    </button>
+                    <button id="theme-toggle" class="theme-toggle-btn" type="button" title="Alternar Modo Claro / Escuro">
+                        <span id="theme-icon">🌙</span>
+                    </button>
                 </div>
             </header>
 
-            <div class="status-line">
-                <span><span id="conn-dot" class="dot mid"></span><span id="conn-text">Conectando...</span></span>
-                <span id="round-status">0/0 votaram</span>
+            <!-- Barra de Status da Conexão & Rodada -->
+            <div class="status-bar">
+                <div class="status-left">
+                    <span>
+                        <span id="conn-dot" class="dot mid"></span>
+                        <span id="conn-text">Conectando...</span>
+                    </span>
+                </div>
+                <div class="status-right">
+                    <span id="round-status" class="progress-pill">0/0 votaram</span>
+                </div>
             </div>
 
-            <h2 class="section-label">Participantes</h2>
-            <div id="players-grid" class="players-grid"></div>
-
-            <h2 class="section-label">Sua estimativa</h2>
-            <div id="deck" class="deck"></div>
-
-            <div class="actions">
-                <button id="reveal-btn" class="btn" type="button">Revelar votos</button>
-                <button id="reset-btn" class="btn secondary" type="button">Nova rodada</button>
+            <!-- Barra de Nome da Tarefa / História -->
+            <div class="story-bar">
+                <label for="task-name-input">
+                    <span>🏷️</span> Tarefa atual:
+                </label>
+                <input id="task-name-input" type="text" placeholder="Ex.: US-102: Tela de checkout ou BUG-401 (opcional)" maxlength="80">
             </div>
 
+            <!-- Banner Comemorativo de Consenso (Visível ao revelar com unanimidade) -->
+            <div id="consensus-banner" class="consensus-banner" style="display: none;">
+                <span>🎉</span>
+                <span id="consensus-text">Consenso Pleno Alcançado! Todos estimaram em X pontos.</span>
+            </div>
+
+            <!-- Mesa Virtual dos Participantes -->
+            <div class="table-stage">
+                <div class="section-header">
+                    <h2 class="section-label">
+                        <span>👥</span> Mesa de Participantes
+                    </h2>
+                </div>
+                <div id="players-grid" class="players-grid"></div>
+            </div>
+
+            <!-- Deck de Cartas do Jogador -->
+            <div class="deck-container">
+                <div class="deck-header">
+                    <h2 class="section-label">
+                        <span>🎴</span> Sua Estimativa
+                    </h2>
+                    <span id="deck-hint" style="font-size: 0.8rem; color: var(--muted);">Escolha uma carta para votar secretamente</span>
+                </div>
+                <div id="deck" class="deck"></div>
+
+                <div class="actions-bar">
+                    <button id="reveal-btn" class="btn" type="button">
+                        <span>👁️</span>
+                        <span>Revelar votos</span>
+                    </button>
+                    <button id="reset-btn" class="btn secondary" type="button">
+                        <span>🔄</span>
+                        <span>Nova rodada</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Painel de Resultados da Rodada Revelada -->
             <div id="results" class="results-panel" hidden>
-                <h2 class="section-label" style="margin-top:0;">Votos</h2>
+                <div class="section-header">
+                    <h2 class="section-label" style="margin-top:0;">
+                        <span>📊</span> Estatísticas da Rodada
+                    </h2>
+                </div>
                 <div id="results-list" class="results-list"></div>
                 <div id="stats-row" class="stats-row"></div>
+            </div>
+
+            <!-- HISTÓRICO DAS VOTAÇÕES -->
+            <div id="history-panel" class="history-panel">
+                <div class="history-header">
+                    <div class="history-header-left">
+                        <span style="font-size: 1.3rem;">📜</span>
+                        <h2 class="history-title">Histórico de Estimativas</h2>
+                        <span id="history-count" class="history-count-badge">0 rodadas</span>
+                    </div>
+                    <div class="history-actions">
+                        <button id="copy-history-btn" class="btn secondary btn-small" type="button" title="Copiar resumo completo em Markdown para Jira/Trello">
+                            <span>📋</span> Copiar Resumo
+                        </button>
+                        <button id="clear-history-btn" class="btn secondary btn-small" type="button" title="Limpar histórico da sessão">
+                            <span>🗑️</span> Limpar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="history-cards-container" class="history-cards-list">
+                    <div class="history-empty" id="history-empty">
+                        <span class="empty-icon">🗂️</span>
+                        <span>Nenhuma rodada registrada ainda.</span>
+                        <span style="font-size: 0.82rem; color: var(--muted-light);">Assim que os votos forem revelados, a rodada será documentada aqui automaticamente!</span>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 
-    <div id="toast" class="toast"></div>
+    <!-- Toast flutuante -->
+    <div id="toast" class="toast">
+        <span id="toast-icon">ℹ️</span>
+        <span id="toast-msg">Mensagem</span>
+    </div>
 
     <script>
         (function () {
             'use strict';
 
+            // Baralho Fibonacci ampliado
             const DECK = [0, 1, 2, 3, 5, 8, 13, 21, 34, '?', '\u221E'];
             const NAME_KEY = 'pp:name';
+            const THEME_KEY = 'pp:theme';
+            const HISTORY_PREFIX = 'pp:history:';
 
+            // Metadados visuais para cada carta de baralho
+            const CARD_META = {
+                0: { suit: '♠', suitClass: 'suit-black', icon: '0', cornerSuit: '♠' },
+                1: { suit: '♠', suitClass: 'suit-black', icon: '♠', cornerSuit: '♠' },
+                2: { suit: '♥', suitClass: 'suit-red', icon: '♥', cornerSuit: '♥' },
+                3: { suit: '♣', suitClass: 'suit-black', icon: '♣', cornerSuit: '♣' },
+                5: { suit: '♦', suitClass: 'suit-red', icon: '♦', cornerSuit: '♦' },
+                8: { suit: '♠', suitClass: 'suit-black', icon: '♠', cornerSuit: '♠' },
+                13: { suit: '♥', suitClass: 'suit-red', icon: '♥', cornerSuit: '♥' },
+                21: { suit: '♦', suitClass: 'suit-red', icon: '♦', cornerSuit: '♦' },
+                34: { suit: '♣', suitClass: 'suit-black', icon: '♣', cornerSuit: '♣' },
+                '?': { suit: '☕', suitClass: 'suit-gold', icon: '☕', cornerSuit: '?' },
+                '\u221E': { suit: '🚀', suitClass: 'suit-purple', icon: '🚀', cornerSuit: '\u221E' }
+            };
+
+            // Elementos DOM
             const joinScreen = document.getElementById('join-screen');
             const roomScreen = document.getElementById('room-screen');
             const joinBtn = document.getElementById('join-btn');
@@ -424,6 +1499,7 @@
             const joinSubtitle = document.getElementById('join-subtitle');
             const playersGrid = document.getElementById('players-grid');
             const deckEl = document.getElementById('deck');
+            const deckHint = document.getElementById('deck-hint');
             const revealBtn = document.getElementById('reveal-btn');
             const resetBtn = document.getElementById('reset-btn');
             const resultsPanel = document.getElementById('results');
@@ -431,15 +1507,41 @@
             const statsRow = document.getElementById('stats-row');
             const roomChip = document.getElementById('room-chip');
             const copyLinkBtn = document.getElementById('copy-link-btn');
+            const copyBtnText = document.getElementById('copy-btn-text');
             const connDot = document.getElementById('conn-dot');
             const connText = document.getElementById('conn-text');
             const roundStatus = document.getElementById('round-status');
             const toastEl = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+            const taskNameInput = document.getElementById('task-name-input');
+            const consensusBanner = document.getElementById('consensus-banner');
+            const consensusText = document.getElementById('consensus-text');
 
-            let state = { roomId: null, selfId: null, phase: 'voting', votesRevealed: false, players: [], votes: null, stats: null };
+            // Histórico DOM
+            const historyCardsContainer = document.getElementById('history-cards-container');
+            const historyEmptyEl = document.getElementById('history-empty');
+            const historyCountEl = document.getElementById('history-count');
+            const copyHistoryBtn = document.getElementById('copy-history-btn');
+            const clearHistoryBtn = document.getElementById('clear-history-btn');
+
+            let state = {
+                roomId: null,
+                selfId: null,
+                phase: 'voting',
+                votesRevealed: false,
+                players: [],
+                votes: null,
+                stats: null,
+                history: []
+            };
+
             let ws = null;
             let reconnectTimer = null;
             let toastTimer = null;
+            let lastRecordedRoundKey = null;
 
             function getRoomId() {
                 const parts = location.pathname.split('/').filter(Boolean);
@@ -452,61 +1554,197 @@
                 return proto + location.host + '/ws/planning-poker';
             }
 
+            // ============ TEMA CLARO / ESCURO ============
+            function initTheme() {
+                const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+                setTheme(savedTheme);
+            }
+
+            function setTheme(theme) {
+                if (theme === 'dark') {
+                    document.body.classList.add('theme-dark');
+                    themeIcon.textContent = '☀️';
+                } else {
+                    document.body.classList.remove('theme-dark');
+                    themeIcon.textContent = '🌙';
+                }
+                localStorage.setItem(THEME_KEY, theme);
+            }
+
+            themeToggleBtn.addEventListener('click', function () {
+                const isDark = document.body.classList.contains('theme-dark');
+                setTheme(isDark ? 'light' : 'dark');
+            });
+
+            // ============ CORES DE AVATARES ============
+            function getAvatarColor(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const h1 = Math.abs(hash) % 360;
+                const h2 = (h1 + 35) % 360;
+                return 'linear-gradient(135deg, hsl(' + h1 + ', 70%, 50%), hsl(' + h2 + ', 85%, 45%))';
+            }
+
+            function getInitials(name) {
+                if (!name) return '?';
+                const parts = name.trim().split(/\s+/);
+                if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            }
+
+            // ============ COMPONENTE DE CARTA DE BARALHO ============
+            function createCardFrontHtml(val) {
+                const meta = CARD_META[val] || { suit: '♠', suitClass: 'suit-black', icon: String(val), cornerSuit: '♠' };
+                const displayVal = String(val);
+                return `
+                    <div class="poker-card-face card-front ${meta.suitClass}">
+                        <div class="card-corner top-left">
+                            <span class="corner-val">${displayVal}</span>
+                            <span class="corner-suit">${meta.cornerSuit}</span>
+                        </div>
+                        <div class="card-center">
+                            <span class="center-suit">${meta.icon}</span>
+                            <span class="center-val">${displayVal}</span>
+                        </div>
+                        <div class="card-corner bottom-right">
+                            <span class="corner-val">${displayVal}</span>
+                            <span class="corner-suit">${meta.cornerSuit}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function createCardBackHtml() {
+                return `
+                    <div class="poker-card-face card-back">
+                        <div class="card-back-pattern">
+                            <div class="card-back-emblem">♠</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // ============ RENDERIZAR DECK DO JOGADOR ============
             function renderDeck() {
                 const locked = state.phase === 'revealed';
                 deckEl.classList.toggle('is-locked', locked);
                 deckEl.innerHTML = '';
+
+                if (locked) {
+                    deckHint.textContent = 'Votação revelada. Aguarde a nova rodada!';
+                } else if (state.selfVote != null) {
+                    deckHint.textContent = 'Você escolheu ' + state.selfVote + '. Pode alterar seu voto a qualquer momento.';
+                } else {
+                    deckHint.textContent = 'Escolha uma carta para votar secretamente';
+                }
+
                 DECK.forEach(function (value) {
+                    const meta = CARD_META[value] || { suit: '♠', suitClass: 'suit-black', icon: String(value), cornerSuit: '♠' };
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'card';
+                    btn.className = 'poker-btn-card ' + meta.suitClass;
                     btn.dataset.value = String(value);
-                    btn.textContent = String(value);
-                    if (state.selfVote === value || (state.selfVote != null && String(state.selfVote) === String(value))) {
+
+                    const isPicked = state.selfVote === value || (state.selfVote != null && String(state.selfVote) === String(value));
+                    if (isPicked) {
                         btn.classList.add('picked');
                     }
                     if (locked) {
                         btn.disabled = true;
-                    } else {
+                    }
+
+                    const displayVal = String(value);
+                    btn.innerHTML = `
+                        <div class="card-corner top-left">
+                            <span class="corner-val">${displayVal}</span>
+                            <span class="corner-suit">${meta.cornerSuit}</span>
+                        </div>
+                        <div class="card-center">
+                            <span class="center-suit">${meta.icon}</span>
+                            <span class="center-val">${displayVal}</span>
+                        </div>
+                        <div class="card-corner bottom-right">
+                            <span class="corner-val">${displayVal}</span>
+                            <span class="corner-suit">${meta.cornerSuit}</span>
+                        </div>
+                    `;
+
+                    if (!locked) {
                         btn.addEventListener('click', function () {
                             sendVote(value);
                         });
                     }
+
                     deckEl.appendChild(btn);
                 });
             }
 
+            // ============ RENDERIZAR PARTICIPANTES NA MESA ============
             function renderPlayers() {
                 playersGrid.innerHTML = '';
                 state.players.forEach(function (p) {
+                    const isSelf = p.id === state.selfId;
                     const card = document.createElement('div');
-                    card.className = 'player-card' + (p.id === state.selfId ? ' self' : '');
+                    card.className = 'player-card' + (isSelf ? ' self' : '');
 
-                    const name = document.createElement('div');
-                    name.className = 'pname';
-                    name.textContent = p.name + (p.id === state.selfId ? ' (você)' : '');
+                    // Avatar
+                    const avatar = document.createElement('div');
+                    avatar.className = 'player-avatar';
+                    avatar.style.background = getAvatarColor(p.name);
+                    avatar.textContent = getInitials(p.name);
 
-                    const status = document.createElement('div');
-                    const mini = document.createElement('div');
-                    if (state.votesRevealed) {
-                        status.className = 'pstatus';
-                        status.textContent = 'Revelado';
-                        mini.className = 'mini-card value';
-                        mini.textContent = formatVote(p.vote);
-                    } else if (p.hasVoted) {
-                        status.className = 'pstatus voted';
-                        status.textContent = 'Votou';
-                        mini.className = 'mini-card back';
-                        mini.innerHTML = '&nbsp;';
-                    } else {
-                        status.className = 'pstatus';
-                        status.textContent = 'Aguardando...';
-                        mini.className = 'mini-card null';
-                        mini.textContent = '?';
+                    // Nome
+                    const nameWrap = document.createElement('div');
+                    nameWrap.className = 'pname';
+                    nameWrap.textContent = p.name;
+                    if (isSelf) {
+                        const badge = document.createElement('span');
+                        badge.className = 'self-badge';
+                        badge.textContent = 'Você';
+                        nameWrap.appendChild(badge);
                     }
 
-                    card.appendChild(name);
-                    card.appendChild(mini);
+                    // Carta 3D ou Placeholder
+                    const cardArea = document.createElement('div');
+
+                    if (state.votesRevealed) {
+                        // Carta revelada (Front)
+                        cardArea.className = 'card-perspective';
+                        const flipper = document.createElement('div');
+                        flipper.className = 'card-flipper is-face-up';
+                        flipper.innerHTML = createCardFrontHtml(p.vote != null ? p.vote : '?') + createCardBackHtml();
+                        cardArea.appendChild(flipper);
+                    } else if (p.hasVoted) {
+                        // Carta virada para baixo (Back)
+                        cardArea.className = 'card-perspective';
+                        const flipper = document.createElement('div');
+                        flipper.className = 'card-flipper is-face-down';
+                        flipper.innerHTML = createCardFrontHtml('?') + createCardBackHtml();
+                        cardArea.appendChild(flipper);
+                    } else {
+                        // Placeholder aguardando voto
+                        cardArea.className = 'card-slot-placeholder';
+                        cardArea.innerHTML = '<span class="dot-wait">💭</span><span style="font-size: 0.72rem;">Pensando</span>';
+                    }
+
+                    // Status pill
+                    const status = document.createElement('div');
+                    if (state.votesRevealed) {
+                        status.className = 'pstatus revealed';
+                        status.innerHTML = '<span>🎯</span> Revelado';
+                    } else if (p.hasVoted) {
+                        status.className = 'pstatus voted';
+                        status.innerHTML = '<span>✨</span> Votou';
+                    } else {
+                        status.className = 'pstatus';
+                        status.innerHTML = '<span>⏳</span> Aguardando...';
+                    }
+
+                    card.appendChild(avatar);
+                    card.appendChild(nameWrap);
+                    card.appendChild(cardArea);
                     card.appendChild(status);
                     playersGrid.appendChild(card);
                 });
@@ -518,59 +1756,360 @@
             }
 
             function renderRoundStatus() {
-                const voted = state.players.filter(function (p) { return p.hasVoted || (state.votesRevealed && p.vote !== null); }).length;
+                const voted = state.players.filter(function (p) {
+                    return p.hasVoted || (state.votesRevealed && p.vote !== null);
+                }).length;
+
                 roundStatus.textContent = state.phase === 'revealed'
                     ? voted + '/' + state.players.length + ' revelados'
                     : voted + '/' + state.players.length + ' votaram';
+
                 revealBtn.disabled = state.phase === 'revealed' || voted === 0;
                 resetBtn.disabled = state.phase !== 'revealed';
+            }
+
+            // ============ CONSENSO & RESULTADOS ============
+            function checkConsensus(players) {
+                const votes = players
+                    .map(function (p) { return p.vote; })
+                    .filter(function (v) { return v !== null && v !== undefined && v !== '?'; });
+
+                if (votes.length < 2) return null;
+                const first = votes[0];
+                const allSame = votes.every(function (v) { return String(v) === String(first); });
+                return allSame ? first : null;
             }
 
             function renderResults() {
                 if (!state.votesRevealed || !state.players || state.players.length === 0) {
                     resultsPanel.hidden = true;
+                    consensusBanner.style.display = 'none';
                     return;
                 }
+
                 resultsPanel.hidden = false;
                 resultsList.innerHTML = '';
+
+                // Lista de Votos Individuais
                 state.players.forEach(function (p) {
                     const item = document.createElement('div');
                     item.className = 'result-item';
+
                     const rname = document.createElement('span');
                     rname.className = 'rname';
                     rname.textContent = p.name;
+
                     const rval = document.createElement('span');
                     rval.className = 'rval';
                     rval.textContent = formatVote(p.vote);
+
                     item.appendChild(rname);
                     item.appendChild(rval);
                     resultsList.appendChild(item);
                 });
 
+                // Estatísticas consolidadas
                 statsRow.innerHTML = '';
                 const stats = state.stats || {};
                 const defs = [
                     ['Média', stats.meanRounded != null ? stats.meanRounded : '-'],
                     ['Moda', stats.mode != null ? String(stats.mode) : '-'],
-                    ['Mín', stats.min != null ? stats.min : '-'],
-                    ['Máx', stats.max != null ? stats.max : '-'],
-                    ['Total', stats.total != null ? stats.total : '-']
+                    ['Mínimo', stats.min != null ? stats.min : '-'],
+                    ['Máximo', stats.max != null ? stats.max : '-'],
+                    ['Total Votos', stats.total != null ? stats.total : '-']
                 ];
+
                 defs.forEach(function (d) {
                     const box = document.createElement('div');
                     box.className = 'stat-box';
+
                     const lbl = document.createElement('div');
                     lbl.className = 's-label';
                     lbl.textContent = d[0];
+
                     const val = document.createElement('div');
                     val.className = 's-value';
                     val.textContent = d[1];
+
                     box.appendChild(lbl);
                     box.appendChild(val);
                     statsRow.appendChild(box);
                 });
+
+                // Verificação de Consenso
+                const consensusVal = checkConsensus(state.players);
+                if (consensusVal !== null) {
+                    consensusText.textContent = 'Consenso Pleno Alcançado! Todos estimaram em ' + consensusVal + ' pontos.';
+                    consensusBanner.style.display = 'flex';
+                    triggerConfetti();
+                } else {
+                    consensusBanner.style.display = 'none';
+                }
             }
 
+            // ============ GERENCIAMENTO DO HISTÓRICO DE VOTAÇÕES ============
+            function getHistoryStorageKey() {
+                return HISTORY_PREFIX + (state.roomId || roomId || 'default');
+            }
+
+            function loadHistory() {
+                try {
+                    const raw = localStorage.getItem(getHistoryStorageKey());
+                    state.history = raw ? JSON.parse(raw) : [];
+                } catch (e) {
+                    state.history = [];
+                }
+                renderHistory();
+            }
+
+            function saveHistory() {
+                try {
+                    localStorage.setItem(getHistoryStorageKey(), JSON.stringify(state.history));
+                } catch (e) {}
+                renderHistory();
+            }
+
+            function recordCurrentRoundToHistory() {
+                if (!state.votesRevealed || !state.players || state.players.length === 0) return;
+
+                // Evitar duplicações caso cheguem múltiplos broadcasts da mesma revelação
+                const roundIdentifier = (state.roomId || '') + ':' + (state.stats ? state.stats.total : 0) + ':' + Date.now();
+                if (lastRecordedRoundKey === roundIdentifier) return;
+                lastRecordedRoundKey = roundIdentifier;
+
+                const consensusVal = checkConsensus(state.players);
+                const taskTitle = taskNameInput.value.trim() || 'Estimativa #' + (state.history.length + 1);
+
+                const roundEntry = {
+                    id: Date.now(),
+                    roundNumber: state.history.length + 1,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    taskTitle: taskTitle,
+                    stats: state.stats || {},
+                    consensus: consensusVal,
+                    players: state.players.map(function (p) {
+                        return { name: p.name, vote: p.vote };
+                    })
+                };
+
+                state.history.unshift(roundEntry); // Adiciona ao topo
+                saveHistory();
+            }
+
+            function renderHistory() {
+                const total = state.history.length;
+                historyCountEl.textContent = total + (total === 1 ? ' rodada' : ' rodadas');
+
+                if (total === 0) {
+                    historyCardsContainer.innerHTML = '';
+                    historyCardsContainer.appendChild(historyEmptyEl);
+                    historyEmptyEl.style.display = 'flex';
+                    return;
+                }
+
+                historyEmptyEl.style.display = 'none';
+                historyCardsContainer.innerHTML = '';
+
+                state.history.forEach(function (round) {
+                    const card = document.createElement('div');
+                    card.className = 'history-round-card';
+
+                    // Header do Card
+                    const header = document.createElement('div');
+                    header.className = 'round-card-header';
+
+                    const titleGroup = document.createElement('div');
+                    titleGroup.className = 'round-title-group';
+
+                    const chip = document.createElement('span');
+                    chip.className = 'round-number-chip';
+                    chip.textContent = 'Rodada #' + round.roundNumber;
+
+                    const title = document.createElement('span');
+                    title.className = 'round-task-title';
+                    title.textContent = round.taskTitle;
+
+                    const time = document.createElement('span');
+                    time.className = 'round-time';
+                    time.textContent = '• ' + round.timestamp;
+
+                    titleGroup.appendChild(chip);
+                    titleGroup.appendChild(title);
+                    titleGroup.appendChild(time);
+
+                    // Badge de Consenso
+                    const consensusBadge = document.createElement('div');
+                    if (round.consensus !== null) {
+                        consensusBadge.className = 'consensus-pill total';
+                        consensusBadge.innerHTML = '<span>🎯</span> Consenso (' + round.consensus + ' pts)';
+                    } else {
+                        const st = round.stats || {};
+                        const diff = (st.max != null && st.min != null) ? (st.max - st.min) : 0;
+                        if (diff <= 2) {
+                            consensusBadge.className = 'consensus-pill high';
+                            consensusBadge.innerHTML = '<span>⚖️</span> Alinhado';
+                        } else {
+                            consensusBadge.className = 'consensus-pill divergent';
+                            consensusBadge.innerHTML = '<span>💬</span> Divergência';
+                        }
+                    }
+
+                    header.appendChild(titleGroup);
+                    header.appendChild(consensusBadge);
+
+                    // Barra de Métricas
+                    const metricsBar = document.createElement('div');
+                    metricsBar.className = 'round-metrics-bar';
+                    const st = round.stats || {};
+                    metricsBar.innerHTML = `
+                        <span class="metric-pill">Média: <strong>${st.meanRounded != null ? st.meanRounded : '-'}</strong></span>
+                        <span class="metric-pill">• Moda: <strong>${st.mode != null ? st.mode : '-'}</strong></span>
+                        <span class="metric-pill">• Mín: <strong>${st.min != null ? st.min : '-'}</strong></span>
+                        <span class="metric-pill">• Máx: <strong>${st.max != null ? st.max : '-'}</strong></span>
+                    `;
+
+                    // Mini-Cartas dos Votos
+                    const votesGrid = document.createElement('div');
+                    votesGrid.className = 'round-votes-grid';
+
+                    (round.players || []).forEach(function (p) {
+                        const isRed = p.vote === 2 || p.vote === 5 || p.vote === 13 || p.vote === 21;
+                        const chipVote = document.createElement('div');
+                        chipVote.className = 'mini-vote-chip';
+                        chipVote.innerHTML = `
+                            <div class="mini-poker-card ${isRed ? 'suit-red' : ''}">${formatVote(p.vote)}</div>
+                            <span class="mini-voter-name" title="${p.name}">${p.name}</span>
+                        `;
+                        votesGrid.appendChild(chipVote);
+                    });
+
+                    // Footer com ação de cópia individual
+                    const footer = document.createElement('div');
+                    footer.className = 'round-footer';
+                    const roundCountText = document.createElement('span');
+                    roundCountText.textContent = (round.players ? round.players.length : 0) + ' participantes estimaram';
+
+                    const copyRoundBtn = document.createElement('button');
+                    copyRoundBtn.type = 'button';
+                    copyRoundBtn.className = 'copy-btn';
+                    copyRoundBtn.style.padding = '4px 10px';
+                    copyRoundBtn.style.fontSize = '0.78rem';
+                    copyRoundBtn.innerHTML = '<span>📋</span> Copiar Rodada';
+                    copyRoundBtn.addEventListener('click', function () {
+                        copySingleRoundMarkdown(round);
+                    });
+
+                    footer.appendChild(roundCountText);
+                    footer.appendChild(copyRoundBtn);
+
+                    card.appendChild(header);
+                    card.appendChild(metricsBar);
+                    card.appendChild(votesGrid);
+                    card.appendChild(footer);
+                    historyCardsContainer.appendChild(card);
+                });
+            }
+
+            function copySingleRoundMarkdown(round) {
+                const st = round.stats || {};
+                let text = `### 🃏 Planning Poker — ${round.taskTitle} (Rodada #${round.roundNumber})\n`;
+                text += `- **Resultado:** ${round.consensus !== null ? round.consensus + ' pts (Consenso)' : 'Média ' + (st.meanRounded || '-')}\n`;
+                text += `- **Estatísticas:** Média: ${st.meanRounded || '-'} | Moda: ${st.mode || '-'} | Mín: ${st.min || '-'} | Máx: ${st.max || '-'}\n`;
+                text += `- **Votos dos Participantes:**\n`;
+                (round.players || []).forEach(function (p) {
+                    text += `  - ${p.name}: ${formatVote(p.vote)}\n`;
+                });
+                copyToClipboard(text, 'Rodada copiada em Markdown!');
+            }
+
+            function copyFullHistoryMarkdown() {
+                if (!state.history.length) {
+                    showToast('Nenhuma rodada no histórico para copiar.');
+                    return;
+                }
+                let text = `# 🃏 Relatório de Estimativas — Planning Poker\n\n`;
+                text += `**Sala:** ${state.roomId || roomId || 'Geral'} • **Total de Tarefas Estimadas:** ${state.history.length}\n\n`;
+                state.history.forEach(function (r) {
+                    const st = r.stats || {};
+                    text += `## Rodada #${r.roundNumber}: ${r.taskTitle} (${r.timestamp})\n`;
+                    text += `- **Estimativa:** ${r.consensus !== null ? r.consensus + ' pts (Consenso)' : 'Média ' + (st.meanRounded || '-')}\n`;
+                    text += `- **Métricas:** Média: ${st.meanRounded || '-'} | Moda: ${st.mode || '-'} | Mín: ${st.min || '-'} | Máx: ${st.max || '-'}\n`;
+                    text += `- **Votos:**\n`;
+                    (r.players || []).forEach(function (p) {
+                        text += `  - ${p.name}: ${formatVote(p.vote)}\n`;
+                    });
+                    text += `\n---\n\n`;
+                });
+                copyToClipboard(text, 'Histórico completo copiado em Markdown!');
+            }
+
+            clearHistoryBtn.addEventListener('click', function () {
+                if (!state.history.length) return;
+                if (confirm('Deseja limpar todo o histórico de estimativas desta sala?')) {
+                    state.history = [];
+                    saveHistory();
+                    showToast('Histórico limpo com sucesso.');
+                }
+            });
+
+            copyHistoryBtn.addEventListener('click', copyFullHistoryMarkdown);
+
+            // ============ CONFETTI DE CONSENSO ============
+            function triggerConfetti() {
+                const canvas = document.getElementById('confetti-canvas');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                const particles = [];
+                const colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#ffd700'];
+
+                for (let i = 0; i < 90; i++) {
+                    particles.push({
+                        x: canvas.width / 2,
+                        y: canvas.height * 0.45,
+                        r: Math.random() * 6 + 3,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        vx: (Math.random() - 0.5) * 16,
+                        vy: (Math.random() - 0.5) * 16 - 3,
+                        gravity: 0.28,
+                        alpha: 1,
+                        tilt: Math.random() * 10
+                    });
+                }
+
+                let animFrame;
+                function update() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    let alive = false;
+                    particles.forEach(function (p) {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += p.gravity;
+                        p.alpha -= 0.012;
+                        if (p.alpha > 0) {
+                            alive = true;
+                            ctx.save();
+                            ctx.globalAlpha = Math.max(0, p.alpha);
+                            ctx.fillStyle = p.color;
+                            ctx.beginPath();
+                            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
+                        }
+                    });
+                    if (alive) {
+                        animFrame = requestAnimationFrame(update);
+                    } else {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        cancelAnimationFrame(animFrame);
+                    }
+                }
+                update();
+            }
+
+            // ============ FLUXO GERAL ============
             function renderAll() {
                 renderPlayers();
                 renderDeck();
@@ -586,15 +2125,23 @@
                 state.players = payload.players || [];
                 state.votes = payload.votes || null;
                 state.stats = payload.stats || null;
+
                 if (payload.selfId) state.selfId = payload.selfId;
                 if (payload.selfVote !== undefined) state.selfVote = payload.selfVote;
                 if (state.votesRevealed && state.selfVote === undefined && state.selfId) {
                     const me = state.players.find(function (p) { return p.id === state.selfId; });
                     if (me) state.selfVote = me.vote;
                 }
+
                 joinScreen.classList.remove('active');
                 roomScreen.classList.add('active');
+
                 renderAll();
+
+                // Gravar no histórico se acabou de ser revelado
+                if (state.votesRevealed) {
+                    recordCurrentRoundToHistory();
+                }
             }
 
             function send(type, payload) {
@@ -614,19 +2161,23 @@
                 setConnection('mid', 'Conectando...');
                 let opened = false;
                 ws = new WebSocket(getWsUrl());
+
                 ws.onopen = function () {
                     opened = true;
                     setConnection('on', 'Conectado');
                     send('join', { roomId: roomId, name: nameInput.value || getStoredName() });
                 };
+
                 ws.onmessage = function (event) {
                     let msg;
                     try { msg = JSON.parse(event.data); } catch (e) { return; }
                     handleMessage(msg);
                 };
+
                 ws.onerror = function () {
                     setConnection('off', 'Erro de conexão');
                 };
+
                 ws.onclose = function () {
                     if (!opened) setConnection('off', 'Servidor indisponível');
                     else setConnection('off', 'Reconectando...');
@@ -653,14 +2204,19 @@
                         state.votesRevealed = true;
                         state.phase = 'revealed';
                         state.stats = (msg.payload && msg.payload.stats) || null;
+                        renderAll();
+                        recordCurrentRoundToHistory();
                         break;
                     case 'reset_round':
                         state.votesRevealed = false;
                         state.phase = 'voting';
                         state.selfVote = null;
+                        taskNameInput.value = ''; // Limpar para próxima tarefa
+                        consensusBanner.style.display = 'none';
+                        renderAll();
                         break;
                     case 'error':
-                        showToast((msg.payload && msg.payload.message) || 'Erro');
+                        showToast((msg.payload && msg.payload.message) || 'Erro', '⚠️');
                         break;
                     default:
                         break;
@@ -672,8 +2228,9 @@
                 connText.textContent = text;
             }
 
-            function showToast(message) {
-                toastEl.textContent = message;
+            function showToast(message, icon) {
+                toastMsg.textContent = message;
+                toastIcon.textContent = icon || '✨';
                 toastEl.classList.add('show');
                 if (toastTimer) clearTimeout(toastTimer);
                 toastTimer = setTimeout(function () {
@@ -691,20 +2248,28 @@
 
             function copyRoomLink() {
                 const url = location.origin + '/planning_poker/' + (state.roomId || roomId || '');
-                const done = function () {
+                copyToClipboard(url, 'Link da sala copiado!', function () {
                     copyLinkBtn.classList.add('copied');
-                    copyLinkBtn.textContent = 'Link copiado!';
+                    copyBtnText.textContent = 'Link copiado!';
                     setTimeout(function () {
                         copyLinkBtn.classList.remove('copied');
-                        copyLinkBtn.textContent = 'Copiar link';
+                        copyBtnText.textContent = 'Copiar link';
                     }, 2000);
+                });
+            }
+
+            function copyToClipboard(text, successToastMsg, onDone) {
+                const done = function () {
+                    if (successToastMsg) showToast(successToastMsg, '📋');
+                    if (onDone) onDone();
                 };
+
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(url).then(done, function () {
-                        legacyCopy(url, done);
+                    navigator.clipboard.writeText(text).then(done, function () {
+                        legacyCopy(text, done);
                     });
                 } else {
-                    legacyCopy(url, done);
+                    legacyCopy(text, done);
                 }
             }
 
@@ -720,26 +2285,28 @@
                 done();
             }
 
-            // ============ Boot ============
+            // ============ INICIALIZAÇÃO ============
+            initTheme();
+            loadHistory();
+
             const storedName = getStoredName();
             if (storedName) nameInput.value = storedName;
 
             if (roomId) {
                 joinSubtitle.textContent = 'Entrando na sala /planning_poker/' + roomId;
-                joinBtn.textContent = 'Entrar na sala';
+                joinBtn.innerHTML = '<span>Entrar na sala</span><span>➔</span>';
                 if (storedName) {
-                    joinBtn.textContent = 'Entrar na sala';
                     connect();
                 }
             } else {
                 joinSubtitle.textContent = 'Crie uma sala e estime tarefas com seu time em tempo real.';
-                joinBtn.textContent = 'Criar sala';
+                joinBtn.innerHTML = '<span>Criar sala</span><span>➔</span>';
             }
 
             joinBtn.addEventListener('click', function () {
                 const name = nameInput.value.trim();
                 if (!name) {
-                    showToast('Digite seu nome para continuar.');
+                    showToast('Digite seu nome para continuar.', '⚠️');
                     nameInput.focus();
                     return;
                 }
