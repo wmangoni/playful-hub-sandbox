@@ -648,15 +648,21 @@ function generateAllGamePages() {
     
     console.log(`\n🎉 Todas as ${Object.keys(gamesData).length} páginas de jogos foram geradas com sucesso!`);
     console.log(`📁 Páginas salvas em: ${outputDir}`);
+
+    // O template não traz canonical/JSON-LD: reaplica o bloco de SEO por cima das páginas recém-geradas.
+    const seo = require('./generate-seo').run();
+    console.log(`🔎 SEO reaplicado (${seo.changed.length} arquivos atualizados).`);
 }
+
+// Exports antes da execução: generate-seo.js lê gamesData e é chamado ao fim de generateAllGamePages.
+module.exports = {
+    gamesData,
+    generateGamePage,
+    generateAllGamePages
+};
 
 // Executar se chamado diretamente
 if (require.main === module) {
     generateAllGamePages();
 }
 
-module.exports = {
-    gamesData,
-    generateGamePage,
-    generateAllGamePages
-};
