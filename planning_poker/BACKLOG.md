@@ -2,4 +2,5 @@
 
 > ⚠️ Arquivo legado/read-only. Rastreamento de status apenas no `BACKLOG.md` da raiz.
 
-- [ ] 001 - Infraestrutura de Salas via WebSocket (v1)
+- [x] 001 - Infraestrutura de Salas via WebSocket (v1)
+- [ ] 002 - Redesign Visual Moderno, Baralho Físico Realista e Painel de Histórico de Votações
