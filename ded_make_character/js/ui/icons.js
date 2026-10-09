@@ -47,6 +47,7 @@ const ICONS = {
   skull: `<path d="M12 3a8 8 0 0 0-8 8c0 2.6 1.2 4.2 3 5.4V20h10v-3.6c1.8-1.2 3-2.8 3-5.4a8 8 0 0 0-8-8Z"/><circle cx="9" cy="11.5" r="1.6"/><circle cx="15" cy="11.5" r="1.6"/><path d="M10.5 20v-2.5M13.5 20v-2.5"/>`,
   card: `<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 9.5h16"/><path d="M7.5 6.5h4"/><path d="M8 13.5h8M8 17h5"/>`,
   trophy: `<path d="M8 21h8M12 16.5V21"/><path d="M7 3.5h10V9a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4a3 3 0 0 0 3 4.3M17 5.5h3a3 3 0 0 1-3 4.3"/>`,
+  grid: `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>`,
 };
 
 export const ICON_NAMES = Object.keys(ICONS);

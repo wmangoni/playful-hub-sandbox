@@ -32,6 +32,7 @@ import {
   LIMITES, adicionar, distanciaValida, ehPersonagem, escreverMontagem, lerMontagem, maximoDe, mudarQuantidade, novaSemente, rodadasValidas, sementeValida, totalDoLado,
 } from './arena-setup.js';
 import { ranksToKeys } from './choices.js';
+import { criarComponenteTabuleiro } from './tabuleiro.js';
 
 const LADOS = ['A', 'B'];
 
@@ -143,6 +144,14 @@ export async function renderArena({ root, router, query, store }) {
   let seletor = null;
   let editando = null; // o diálogo de equipamento ou o de magias de um personagem
   let cardAberto = null; // o popup do card de um combatente (TASK_010)
+  let tabuleiroComponente = null; // o tabuleiro tático de combate (TASK_011)
+  let catalogoTokens = null;
+  try {
+    const resTokens = await fetch('data/tokens.json');
+    if (resTokens.ok) catalogoTokens = await resTokens.json();
+  } catch {
+    catalogoTokens = null;
+  }
 
   // o cabeçalho e a região de avisos ficam; só a fase (montagem ou luta) é redesenhada
   render(root, html`${cabecalho()}<div data-slot="fase"></div><p class="visually-hidden" aria-live="polite" data-slot="avisos"></p>`);
@@ -847,6 +856,7 @@ export async function renderArena({ root, router, query, store }) {
         </div>
       </section>
       <div data-slot="resultado"></div>
+      <div data-slot="tabuleiro"></div>
       <div class="arena-fight">
         <section class="card arena-order" aria-labelledby="arena-ordem">
           <h2 class="arena-h2" id="arena-ordem">Ordem de iniciativa</h2>
@@ -857,12 +867,21 @@ export async function renderArena({ root, router, query, store }) {
           <ol class="arena-log" data-slot="registro" tabindex="0" aria-labelledby="arena-registro"></ol>
         </section>
       </div>`);
+    const slotTabuleiro = root.querySelector('[data-slot="tabuleiro"]');
+    if (slotTabuleiro) {
+      tabuleiroComponente = criarComponenteTabuleiro({
+        container: slotTabuleiro,
+        onAbrirCard: abrirCardDe,
+        catalogoTokens,
+      });
+    }
     atualizar([]);
   }
 
   /** Atualiza a tela depois de um passo; `novos` são os eventos do passo (para o anúncio). */
   function atualizar(novos) {
     const b = state.b;
+    tabuleiroComponente?.desenhar(b, novos);
     const slot = nome => root.querySelector(`[data-slot="${nome}"]`);
     const seguinte = proximo(b);
     slot('situacao').textContent = b.fim
@@ -1090,6 +1109,8 @@ export async function renderArena({ root, router, query, store }) {
     else if (acao === 'nova-luta') recomecar({ novaSementeAntes: true });
     else if (acao === 'copiar-semente') copiarSemente();
     else if (acao === 'montagem') {
+      tabuleiroComponente?.destruir();
+      tabuleiroComponente = null;
       state.fase = 'montagem';
       state.b = null;
       if (recarregarSePendente()) return;
@@ -1137,6 +1158,8 @@ export async function renderArena({ root, router, query, store }) {
     seletor?.fechar();
     editando?.fechar();
     cardAberto?.fechar();
+    tabuleiroComponente?.destruir();
+    tabuleiroComponente = null;
   }
   // o app não recarrega a Arena (evento de outra aba, "Restaurar tudo") com luta ou diálogo aberto:
   // marca a recarga (`adiar`), que acontece ao voltar à montagem ou ao fechar o diálogo

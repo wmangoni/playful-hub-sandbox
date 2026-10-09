@@ -1,0 +1,278 @@
+/**
+ * Estilos do Tabuleiro Tático de Combate (D&D 3.5) — TASK_011.
+ * 
+ * Grid quadriculado de 5 pés (1,5 m), miniaturas posicionadas (1x1 a 6x6),
+ * auras de turno e efeitos de área (cones de sopro e magia).
+ */
+
+.arena-tabuleiro-card {
+  margin-bottom: var(--space-4, 1rem);
+  padding: var(--space-3, 0.75rem);
+  background: radial-gradient(circle at 50% 20%, #17130e 0%, #0e0b08 100%);
+  border: 1px solid var(--color-gold-border, #4a3b2c);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.arena-tabuleiro__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  padding-bottom: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-2, 0.5rem);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.arena-tabuleiro__title {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: var(--text-base, 1rem);
+  font-weight: 700;
+  color: var(--color-gold, #d4af37);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  margin: 0;
+}
+
+.arena-tabuleiro__legend {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted, #a0978d);
+  display: flex;
+  gap: var(--space-3, 0.75rem);
+  align-items: center;
+}
+
+.arena-tabuleiro__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.arena-tabuleiro__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.arena-tabuleiro__dot--a {
+  background: #d4af37;
+  box-shadow: 0 0 6px #d4af37;
+}
+
+.arena-tabuleiro__dot--b {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+/* Área de Rolagem do Tabuleiro */
+.arena-tabuleiro__scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px;
+  border-radius: var(--radius-sm, 4px);
+  background: #080604;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: #4a3b2c #080604;
+}
+
+/* O Grid em si */
+.arena-tabuleiro__grid {
+  position: relative;
+  background-color: #120e0a;
+  background-image: 
+    linear-gradient(to right, rgba(212, 175, 55, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(212, 175, 55, 0.08) 1px, transparent 1px);
+  background-size: var(--cell-size, 48px) var(--cell-size, 48px);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+  user-select: none;
+}
+
+/* Camada de Células Iluminadas (AoE) */
+.arena-tabuleiro__cell-highlight {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(239, 68, 68, 0.25);
+  box-shadow: inset 0 0 8px rgba(239, 68, 68, 0.5);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  transition: opacity 0.3s ease;
+  animation: pulse-cell 1.5s infinite alternate;
+}
+
+.arena-tabuleiro__cell-highlight--frio {
+  background: rgba(56, 189, 248, 0.25);
+  box-shadow: inset 0 0 8px rgba(56, 189, 248, 0.5);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.arena-tabuleiro__cell-highlight--acido {
+  background: rgba(132, 204, 22, 0.25);
+  box-shadow: inset 0 0 8px rgba(132, 204, 22, 0.5);
+  border-color: rgba(132, 204, 22, 0.4);
+}
+
+.arena-tabuleiro__cell-highlight--gas {
+  background: rgba(168, 85, 247, 0.25);
+  box-shadow: inset 0 0 8px rgba(168, 85, 247, 0.5);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+@keyframes pulse-cell {
+  from { opacity: 0.6; }
+  to { opacity: 0.95; }
+}
+
+/* Miniatura (Token) no Tabuleiro */
+.arena-token {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s ease;
+  cursor: pointer;
+  outline: none;
+}
+
+.arena-token:hover,
+.arena-token:focus-visible {
+  transform: scale(1.06);
+  z-index: 25;
+}
+
+.arena-token__body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arena-token__img {
+  width: 90%;
+  height: 90%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+  transition: filter 0.3s ease;
+}
+
+/* Bordas por Lado */
+.arena-token--a .arena-token__img {
+  border: 2px solid #d4af37;
+  filter: drop-shadow(0 0 4px rgba(212, 175, 55, 0.4));
+}
+
+.arena-token--b .arena-token__img {
+  border: 2px solid #ef4444;
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+
+/* Turno Ativo (Pulsação Luminosa) */
+.arena-token.is-active {
+  z-index: 20;
+}
+
+.arena-token.is-active::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  animation: token-glow 1.4s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes token-glow {
+  0% { transform: scale(0.92); opacity: 0.9; box-shadow: 0 0 4px #ffffff; }
+  50% { transform: scale(1.12); opacity: 0.3; box-shadow: 0 0 16px #d4af37; }
+  100% { transform: scale(0.92); opacity: 0.9; box-shadow: 0 0 4px #ffffff; }
+}
+
+/* Estados da Criatura */
+.arena-token.is-morto {
+  opacity: 0.35;
+  filter: grayscale(100%);
+}
+
+.arena-token.is-inconsciente {
+  opacity: 0.6;
+  filter: sepia(50%);
+}
+
+/* Barra de Vida (PV) */
+.arena-token__pv-bar {
+  position: absolute;
+  bottom: -4px;
+  width: 80%;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.arena-token__pv-fill {
+  height: 100%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.arena-token__pv-fill--high { background: #22c55e; }
+.arena-token__pv-fill--mid { background: #eab308; }
+.arena-token__pv-fill--low { background: #ef4444; }
+
+/* Rótulo de Nome Curto */
+.arena-token__label {
+  position: absolute;
+  top: -16px;
+  background: rgba(10, 8, 6, 0.85);
+  color: #f3ede2;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  font-family: 'Alegreya Sans', sans-serif;
+}
+
+/* Camada SVG dos Cones (VFX) */
+.arena-tabuleiro__vfx-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.arena-cone-polygon {
+  animation: cone-burst 0.7s ease-out forwards;
+  transform-origin: center;
+}
+
+@keyframes cone-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  30% {
+    opacity: 0.95;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+}

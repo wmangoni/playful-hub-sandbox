@@ -107,6 +107,8 @@ Cada tarefa possui uma especificação completa e detalhada de requisitos, crit�
 | `TASK_008.md` | D&D Make Character | Catálogo de Holy Avenger revisado pelas fichas oficiais do livro Tormenta D20 – Holy Avenger: 19 fichas revisadas e 35 novas (54 no total) | 🚀 Dev Complete | Claude | Média | [TASK_008.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded_make_character/TASKS/TASK_008.md) |
 | `TASK_009.md` | D&D Make Character | IA de combate com rede neural: duas redes (marcial e recursos) que escolhem entre as ações legais do motor, treinadas com 2.058.966 lutas simuladas em 3 gerações; na Arena, "Treinada (experimental)" usa só a de recursos (+12,2 a +12,7 p.p. de vitória com magias ou poderes, em fichas que a rede não viu) | 🚀 Dev Complete | Claude | Média | [TASK_009.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded_make_character/TASKS/TASK_009.md) |
 | `TASK_010.md` | D&D Make Character | Bestiário (`#/bestiario`) e card completo de monstros e personagens: estatísticas, ataques e a descrição de todas as habilidades, magias e talentos, em popup ao lado do nome na Arena; glossário de 89 magias, 20 talentos e 77 habilidades de classe e raça, conferido contra o SRD 3.0 | 🚀 Dev Complete | Claude | Média | [TASK_010.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded_make_character/TASKS/TASK_010.md) |
+| `TASK_011.md` | D&D Make Character | Tabuleiro Tático 3.5 com Miniaturas Nano Banana e Cones de Área (Sopros e Magias) na Arena | 🚀 Dev Complete | Antigravity | Alta | [TASK_011.md](file:///d:/Users/Home/Documents/repos/playful-hub-sandbox/ded_make_character/TASKS/TASK_011.md) |
+
 
 
 
