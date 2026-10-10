@@ -2,6 +2,7 @@
  * QA E2E do D&D Make Character (Puppeteer).
  * Executar: node tests/qa_ded_make_character.test.js
  */
+process.env.NODE_ENV = 'test';
 const http = require('http');
 const assert = require('assert');
 const fs = require('fs');
