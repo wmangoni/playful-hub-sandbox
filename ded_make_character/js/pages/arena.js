@@ -33,6 +33,7 @@ import {
 } from './arena-setup.js';
 import { ranksToKeys } from './choices.js';
 import { criarComponenteTabuleiro } from './tabuleiro.js';
+import { obterUrlToken } from '../rules/tokens.js';
 
 const LADOS = ['A', 'B'];
 
@@ -219,8 +220,12 @@ export async function renderArena({ root, router, query, store }) {
     const e = porId.get(x.ref);
     const cheio = totalDoLado(state[lado]) >= LIMITES.porLado;
     const chave = `${lado}-${x.ref}`;
+    const tokenUrl = obterUrlToken(e, catalogoTokens);
     if (e.categoria === 'personagem') {
       return html`<li class="arena-roster__item arena-roster__item--pc">
+        <div class="arena-roster__avatar">
+          <img class="arena-roster__img" src="${tokenUrl}" alt="" loading="lazy" width="44" height="44">
+        </div>
         <div class="arena-roster__info">
           <div class="arena-nome-linha"><p class="arena-roster__name">${e.nome}</p>${botaoDoCard(x.ref, e.nome, `card-${chave}`)}</div>
           <p class="arena-roster__meta">${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
@@ -235,6 +240,9 @@ export async function renderArena({ root, router, query, store }) {
       </li>`;
     }
     return html`<li class="arena-roster__item">
+      <div class="arena-roster__avatar">
+        <img class="arena-roster__img" src="${tokenUrl}" alt="" loading="lazy" width="44" height="44">
+      </div>
       <div class="arena-roster__info">
         <div class="arena-nome-linha"><p class="arena-roster__name">${e.nome}</p>${botaoDoCard(x.ref, e.nome, `card-${chave}`)}</div>
         <p class="arena-roster__meta">ND ${ndRotulo(e.nd)} · ${descricao(e)} · PV ${e.pv} · CA ${e.ca.total}</p>
@@ -607,19 +615,25 @@ export async function renderArena({ root, router, query, store }) {
       }
       const itens = filtrados();
       if (!itens.length) return html`<div class="arena-picker__empty">${icon('search')}<p>Nenhum combatente com esses filtros.</p></div>`;
-      return html`<ul class="arena-picker__list">${itens.map(e => html`<li class="arena-pick">
-        <div class="arena-pick__info">
-          <div class="arena-nome-linha"><p class="arena-pick__name">${e.nome}</p>${botaoDoCard(e.id, e.nome)}</div>
-          <p class="arena-pick__meta"><span class="badge badge--neutral">${e.categoria === 'personagem' ? `Nível ${e.nd}` : `ND ${ndRotulo(e.nd)}`}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
-          ${e.categoria === 'personagem'
-            ? html`<p class="arena-pick__lore">${textoDoEquipamento(e.equipamento)}</p>${e.erros.length ? html`<p class="arena-pick__erro">${icon('alert')}Não pode lutar: ${e.erros.join('; ')}.</p>` : ''}`
-            : html`<p class="arena-pick__lore">${e.resumo}</p>`}
-        </div>
-        <div class="arena-pick__side">
-          <span class="arena-pick__count" data-contagem="${e.id}">${contagem(e.id)}</span>
-          <button type="button" class="btn btn--outline btn--sm" data-add="${e.id}" aria-label="Adicionar ${e.nome} ao lado ${lado}" ${podeAdicionar(e) ? '' : 'disabled'}>${icon('plus')}Adicionar</button>
-        </div>
-      </li>`)}</ul>`;
+      return html`<ul class="arena-picker__list">${itens.map(e => {
+        const tokenUrl = obterUrlToken(e, catalogoTokens);
+        return html`<li class="arena-pick">
+          <div class="arena-pick__avatar">
+            <img class="arena-pick__img" src="${tokenUrl}" alt="" loading="lazy" width="48" height="48">
+          </div>
+          <div class="arena-pick__info">
+            <div class="arena-nome-linha"><p class="arena-pick__name">${e.nome}</p>${botaoDoCard(e.id, e.nome)}</div>
+            <p class="arena-pick__meta"><span class="badge badge--neutral">${e.categoria === 'personagem' ? `Nível ${e.nd}` : `ND ${ndRotulo(e.nd)}`}</span><span>${descricao(e)}</span><span>PV ${e.pv} · CA ${e.ca.total}</span></p>
+            ${e.categoria === 'personagem'
+              ? html`<p class="arena-pick__lore">${textoDoEquipamento(e.equipamento)}</p>${e.erros.length ? html`<p class="arena-pick__erro">${icon('alert')}Não pode lutar: ${e.erros.join('; ')}.</p>` : ''}`
+              : html`<p class="arena-pick__lore">${e.resumo}</p>`}
+          </div>
+          <div class="arena-pick__side">
+            <span class="arena-pick__count" data-contagem="${e.id}">${contagem(e.id)}</span>
+            <button type="button" class="btn btn--outline btn--sm" data-add="${e.id}" aria-label="Adicionar ${e.nome} ao lado ${lado}" ${podeAdicionar(e) ? '' : 'disabled'}>${icon('plus')}Adicionar</button>
+          </div>
+        </li>`;
+      })}</ul>`;
     }
 
     function desenhar() {
@@ -788,8 +802,12 @@ export async function renderArena({ root, router, query, store }) {
     const distancia = maisPerto && (gap(c, maisPerto) === 0 ? 'colado no inimigo' : `${metros(gap(c, maisPerto))} do inimigo mais perto`);
     const pv = `PV ${c.pv < 0 ? `−${-c.pv}` : c.pv}/${c.pvMax}${c.contusao ? ` (${c.contusao} de contusão)` : ''}`;
     const meta = (morto ? [pv] : [pv, ca, distancia]).filter(Boolean).join(' · ');
+    const tokenUrl = obterUrlToken(c, catalogoTokens);
     return html`<li class="arena-fighter arena-fighter--${c.lado.toLowerCase()} ${vez ? 'is-turn' : ''} ${fora ? 'is-down' : ''}" ${vez ? html`aria-current="true"` : ''}>
       <span class="arena-tag arena-tag--${c.lado.toLowerCase()}" aria-hidden="true">${c.lado}</span>
+      <div class="arena-fighter__avatar">
+        <img class="arena-fighter__img" src="${tokenUrl}" alt="" loading="lazy" width="40" height="40">
+      </div>
       <div class="arena-fighter__main">
         <div class="arena-nome-linha"><p class="arena-fighter__name"><span class="visually-hidden">Lado ${c.lado}: </span>${c.nome}${ESTADOS[estado] ? html` <span class="arena-fighter__state is-${estado}">${ESTADOS[estado]}</span>` : ''}${seguinte ? html` <span class="arena-fighter__next">a seguir</span>` : ''}</p>${botaoDoCard(c.ref, c.nome)}</div>
         <div class="arena-hp arena-hp--${tom}" aria-hidden="true"><span class="arena-hp__fill" style="width: ${pct.toFixed(1)}%"></span>${contusao ? html`<span class="arena-hp__sub" style="width: ${contusao.toFixed(1)}%"></span>` : ''}</div>

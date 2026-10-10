@@ -80,6 +80,40 @@ export function gerarTokenProceduralSvg(c) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+export const MAPA_TOKENS_PADRAO = {
+  'carnical': 'carnical.png',
+  'ogro': 'ogro.png',
+  'cubo-gelatinoso': 'cubo-gelatinoso.png',
+  'urso-coruja': 'urso-coruja.png',
+  'troll': 'troll.png',
+  'arbusto-errante': 'arbusto-errante.png',
+  'medusa': 'medusa.png',
+  'behir': 'behir.png',
+  'gigante-do-gelo': 'gigante-do-gelo.png',
+  'naga-guardia': 'naga-guardia.png',
+  'elemental-do-fogo-anciao': 'elemental-do-fogo-anciao.png',
+  'verme-purpura': 'verme-purpura.png',
+  'golem-de-ferro': 'golem-de-ferro.png',
+  'dragao-vermelho-adulto': 'dragao-vermelho-adulto.png',
+  'glabrezu': 'glabrezu.png',
+  'lorde-das-profundezas': 'lorde-das-profundezas.png',
+  'dragao-azul-antigo': 'dragao-azul-antigo.svg',
+  'balor': 'balor.svg',
+  'dragao-de-prata-antigo': 'dragao-de-prata-antigo.png',
+  'tarrasque': 'tarrasque.svg',
+  'paladino-de-arton': 'paladino-de-arton.png',
+  'guerreiro': 'guerreiro.png',
+  'mago': 'mago.png',
+};
+
+export const MAPA_CLASSES_PADRAO = {
+  'guerreiro': 'guerreiro.png',
+  'paladino': 'paladino-de-arton.png',
+  'mago': 'mago.png',
+  'feiticeiro': 'mago.png',
+  'clerigo': 'paladino-de-arton.png',
+};
+
 /**
  * Retorna o caminho da imagem do token ou o SVG procedural correspondente.
  */
@@ -93,9 +127,17 @@ export function obterUrlToken(c, catalogoTokens = null) {
     return `${CAMINHO_TOKENS}${tokenCadastrado.arquivo}`;
   }
 
+  // Se nenhum catálogo dinâmico foi passado, utiliza o mapa padrão do sistema
+  if (!catalogoTokens && MAPA_TOKENS_PADRAO[id]) {
+    return `${CAMINHO_TOKENS}${MAPA_TOKENS_PADRAO[id]}`;
+  }
+
   // Verifica classe do personagem
   if (c.sheet?.classKey && catalogoTokens?.classes?.[c.sheet.classKey]) {
     return `${CAMINHO_TOKENS}${catalogoTokens.classes[c.sheet.classKey]}`;
+  }
+  if (!catalogoTokens && c.sheet?.classKey && MAPA_CLASSES_PADRAO[c.sheet.classKey]) {
+    return `${CAMINHO_TOKENS}${MAPA_CLASSES_PADRAO[c.sheet.classKey]}`;
   }
 
   return gerarTokenProceduralSvg(c);
