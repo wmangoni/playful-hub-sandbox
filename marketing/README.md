@@ -74,7 +74,9 @@ Cada jogo tem um arquivo em `cineasta/shots/<jogo>.js` com `file`, `query`, `cta
 node marketing/cineasta/record.js tumbalacatumba --all --stills --fast --out /tmp/ensaio
 ```
 
-O Cineasta usa a API de depuração do jogo (`__game.tick`, `dayNight.setTime`, `cam.override`, `world.groundHeight`) e não altera o jogo. Os vídeos saem em 720×1280, 30 fps, sem áudio (a maior parte do público assiste no mudo), e só são aprovados depois de um controle de qualidade (resolução, quantidade de quadros, duração, poster não escuro, nenhum erro no jogo).
+O Cineasta usa a API de depuração do jogo (`__game.tick`, `dayNight.setTime`, `cam.override`, `world.groundHeight`) e não altera o jogo. **Perfis.** Com GPU (`gpu`, o padrão local): renderiza em 720×1280, qualidade alta, 30 fps (os 8 clipes levam ~3,5 min). Sem GPU (`software`, usado na CI com `CINEASTA_GL=swiftshader`): renderiza em 540×960, qualidade baixa, 24 fps e amplia no ffmpeg, porque a qualidade alta em software custava ~8 s por quadro (mais de 1 h por clipe). Medido numa máquina local: um clipe de 15 s em modo CI leva ~11 min, e o workflow só grava o clipe do post que está na hora. Troque com `CINEASTA_PROFILE=gpu|software`.
+
+Os vídeos saem em 720×1280, 30 fps, sem áudio (a maior parte do público assiste no mudo), e só são aprovados depois de um controle de qualidade (resolução, quantidade de quadros, duração, poster não escuro, nenhum erro no jogo).
 
 ## O que não está aqui (de propósito)
 
