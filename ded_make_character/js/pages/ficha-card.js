@@ -8,6 +8,7 @@
  */
 import { html, nextId, render } from '../core/dom.js';
 import { LEGENDA_DAS_NATUREZAS } from '../rules/card30.js';
+import { MAPA_TOKENS_PADRAO, obterUrlToken } from '../rules/tokens.js';
 import { icon } from '../ui/icons.js';
 
 /**
@@ -116,9 +117,10 @@ function rodape(m) {
 /** O card inteiro. `idTitulo`: o id do <h2>, para o `aria-labelledby` do popup. */
 export function cardHtml(m, { idTitulo = nextId('fc-titulo') } = {}) {
   const magiasN = m.magias ? m.magias.grupos.reduce((s, g) => s + g.itens.length, 0) : 0;
+  const tokenUrl = MAPA_TOKENS_PADRAO[m.id] ? `assets/tokens/${MAPA_TOKENS_PADRAO[m.id]}` : null;
   return html`<article class="fc fc--${m.tema} fc--${m.origem}" aria-labelledby="${idTitulo}">
     <header class="fc-head">
-      <span class="fc-head__glifo" aria-hidden="true">${icon(m.icone)}</span>
+      <span class="fc-head__glifo" aria-hidden="true">${tokenUrl ? html`<img class="fc-head__img" src="${tokenUrl}" alt="" loading="lazy" width="52" height="52">` : icon(m.icone)}</span>
       <div class="fc-head__texto">
         <p class="fc-head__sub">${m.subtitulo}</p>
         <h2 class="fc-head__nome" id="${idTitulo}">${m.nome}</h2>
@@ -151,9 +153,10 @@ export function cardHtml(m, { idTitulo = nextId('fc-titulo') } = {}) {
 export function cartaoCompacto(m) {
   const [pv, ca, ini] = m.numeros;
   const a = m.ataques.unico[0];
+  const tokenUrl = MAPA_TOKENS_PADRAO[m.id] ? `assets/tokens/${MAPA_TOKENS_PADRAO[m.id]}` : null;
   return html`<article class="bc bc--${m.tema}" data-card="${m.id}">
     <header class="bc__head">
-      <span class="bc__glifo" aria-hidden="true">${icon(m.icone)}</span>
+      <span class="bc__glifo" aria-hidden="true">${tokenUrl ? html`<img class="bc__img" src="${tokenUrl}" alt="" loading="lazy" width="38" height="38">` : icon(m.icone)}</span>
       <div class="bc__titulo">
         <h2 class="bc__nome"><button type="button" class="bc__abrir" data-abrir="${m.id}" aria-haspopup="dialog">${m.nome}</button></h2>
         <p class="bc__sub">${m.subtitulo}</p>
