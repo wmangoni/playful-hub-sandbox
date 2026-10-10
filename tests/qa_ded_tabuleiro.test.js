@@ -51,6 +51,21 @@ async function run() {
       await page.waitForSelector('[data-action="comecar"]', { timeout: 5000 });
       const pronto = await page.$eval('[data-action="comecar"]', b => !b.disabled);
       assert.strictEqual(pronto, true, 'O botão Começar deve estar habilitado');
+
+      // Verifica imagem ao lado do monstro na listagem de montagem (roster)
+      const rosterImgs = await page.$$eval('.arena-roster__avatar img', imgs => imgs.map(i => i.src));
+      assert.ok(rosterImgs.length >= 2, 'Devem existir imagens ao lado dos monstros na lista de montagem');
+      assert.ok(rosterImgs.some(s => s.includes('troll.png')), 'Deve exibir imagem do Troll no Lado A');
+      assert.ok(rosterImgs.some(s => s.includes('dragao-vermelho-adulto.png')), 'Deve exibir imagem do Dragão no Lado B');
+
+      // Abre o seletor para verificar imagens na listagem de escolha
+      await page.click('[data-action="adicionar"][data-lado="A"]');
+      await page.waitForSelector('.arena-pick__avatar img', { timeout: 3000 });
+      const pickerImgs = await page.$$eval('.arena-pick__avatar img', imgs => imgs.map(i => i.src));
+      assert.ok(pickerImgs.length > 0, 'Monstros na listagem do seletor devem ter imagens ao lado');
+      assert.ok(pickerImgs.some(s => s.includes('carnical.png') || s.includes('ogro.png') || s.includes('behir.png')), 'Imagens dos novos monstros gerados devem estar presentes na listagem');
+      await page.keyboard.press('Escape');
+      await sleep(300);
     });
 
     await step('Inicia o combate e renderiza o Tabuleiro Tático na tela', async () => {
@@ -157,6 +172,15 @@ async function run() {
       const tabuleiro = await page.$('.arena-tabuleiro-card');
       assert.strictEqual(tabuleiro, null, 'O tabuleiro deve ser desmontado ao voltar à montagem');
       assert.deepStrictEqual(consoleErrors, [], `Sem erros no console: ${consoleErrors.join(', ')}`);
+    });
+
+    await step('Bestiário exibe as miniaturas ao lado de cada monstro na galeria', async () => {
+      await go('#/bestiario');
+      await page.waitForSelector('.bc__glifo img', { timeout: 5000 });
+      const glifoImgs = await page.$$eval('.bc__glifo img', imgs => imgs.map(i => i.src));
+      assert.ok(glifoImgs.length >= 15, 'Monstros no bestiário devem exibir sua miniatura no glifo');
+      assert.ok(glifoImgs.some(s => s.includes('carnical.png')));
+      assert.ok(glifoImgs.some(s => s.includes('medusa.png')));
     });
 
     console.log(`\n🎉 Todos os ${passed} testes E2E do Tabuleiro Tático passaram com sucesso!`);
