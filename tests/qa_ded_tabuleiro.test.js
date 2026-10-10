@@ -60,6 +60,33 @@ async function run() {
       assert.ok(titulo.includes('Tabuleiro Tático'), 'O título do tabuleiro deve estar visível');
     });
 
+    await step('Tabuleiro fica posicionado à esquerda e o Registro à direita no layout de combate', async () => {
+      const layout = await page.evaluate(() => {
+        const leftCol = document.querySelector('.arena-fight__left');
+        const rightCol = document.querySelector('.arena-fight__right');
+        const tabuleiroCard = document.querySelector('.arena-tabuleiro-card');
+        const logCard = document.querySelector('.arena-log-card');
+        const orderCard = document.querySelector('.arena-order');
+
+        const tabRect = tabuleiroCard.getBoundingClientRect();
+        const logRect = logCard.getBoundingClientRect();
+
+        return {
+          leftHasTabuleiro: Boolean(leftCol && leftCol.contains(tabuleiroCard)),
+          leftHasOrder: Boolean(leftCol && leftCol.contains(orderCard)),
+          rightHasLog: Boolean(rightCol && rightCol.contains(logCard)),
+          tabuleiroX: tabRect.left,
+          logX: logRect.left,
+          sideBySide: tabRect.right <= logRect.left + 5,
+        };
+      });
+
+      assert.ok(layout.leftHasTabuleiro, 'Coluna esquerda deve conter o tabuleiro');
+      assert.ok(layout.leftHasOrder, 'Coluna esquerda deve conter a ordem de iniciativa');
+      assert.ok(layout.rightHasLog, 'Coluna direita deve conter o registro de combate');
+      assert.ok(layout.sideBySide, 'Tabuleiro deve estar posicionado à esquerda do Registro');
+    });
+
     await step('Miniaturas respeitam a simplificação de tamanho da 3.5 (Troll 2x2 e Dragão 3x3)', async () => {
       const tokens = await page.$$eval('.arena-token', els => els.map(el => ({
         uid: el.dataset.token,
@@ -135,13 +162,13 @@ async function run() {
     console.log(`\n🎉 Todos os ${passed} testes E2E do Tabuleiro Tático passaram com sucesso!`);
   } finally {
     if (browser) await browser.close();
-    if (server) server.close();
+    if (server) await new Promise(r => server.close(r));
   }
 }
 
-run().catch(err => {
+run().catch(async err => {
   console.error('\n❌ Falha no teste QA E2E do tabuleiro:', err);
-  if (browser) browser.close();
-  if (server) server.close();
+  if (browser) await browser.close();
+  if (server) await new Promise(r => server.close(r));
   process.exit(1);
 });

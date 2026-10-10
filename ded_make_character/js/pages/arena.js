@@ -856,16 +856,20 @@ export async function renderArena({ root, router, query, store }) {
         </div>
       </section>
       <div data-slot="resultado"></div>
-      <div data-slot="tabuleiro"></div>
       <div class="arena-fight">
-        <section class="card arena-order" aria-labelledby="arena-ordem">
-          <h2 class="arena-h2" id="arena-ordem">Ordem de iniciativa</h2>
-          <ol class="arena-order__list" data-slot="ordem"></ol>
-        </section>
-        <section class="card arena-log-card" aria-labelledby="arena-registro">
-          <h2 class="arena-h2" id="arena-registro">Registro</h2>
-          <ol class="arena-log" data-slot="registro" tabindex="0" aria-labelledby="arena-registro"></ol>
-        </section>
+        <div class="arena-fight__left">
+          <div data-slot="tabuleiro"></div>
+          <section class="card arena-order" aria-labelledby="arena-ordem">
+            <h2 class="arena-h2" id="arena-ordem">Ordem de iniciativa</h2>
+            <ol class="arena-order__list" data-slot="ordem"></ol>
+          </section>
+        </div>
+        <div class="arena-fight__right">
+          <section class="card arena-log-card" aria-labelledby="arena-registro">
+            <h2 class="arena-h2" id="arena-registro">Registro</h2>
+            <ol class="arena-log" data-slot="registro" tabindex="0" aria-labelledby="arena-registro"></ol>
+          </section>
+        </div>
       </div>`);
     const slotTabuleiro = root.querySelector('[data-slot="tabuleiro"]');
     if (slotTabuleiro) {
