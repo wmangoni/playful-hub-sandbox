@@ -250,7 +250,8 @@ const ours = (m) => /desafio/i.test(m);
         }
         // ================= 7) overlay em celular: nada pode ficar fora da tela
         console.log('[7] Overlay em celular ...');
-        for (const width of [360, 390]) {
+        // 320 px é mais estreito do que qualquer fonte do sistema exigiria: prova que a pílula encolhe em vez de depender da fonte (no Linux da CI a fonte é mais larga)
+        for (const width of [320, 360, 390]) {
             const p = await clean.newPage();
             await p.evaluateOnNewDocument(() => { window.PHDesafioConfig = { collapseMs: 0 }; });
             await p.setViewport({ width, height: 800, isMobile: true, hasTouch: true });

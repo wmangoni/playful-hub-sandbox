@@ -45,7 +45,9 @@
         'background:rgba(18,12,36,.92);color:#fff4dc;border:1px solid rgba(255,154,60,.7);border-radius:999px;padding:6px 8px 6px 14px;' +
         'font-size:13px;line-height:1;box-shadow:0 4px 18px rgba(0,0,0,.45);max-width:calc(100vw - 16px);white-space:nowrap}' +
         '.wrap[hidden],.mini[hidden]{display:none}' +
-        '.tag{font-weight:600}.best b{color:#ff9a3c;font-variant-numeric:tabular-nums}' +
+        // a etiqueta encolhe (com reticências) antes de a pílula passar da tela; botões e placar nunca encolhem
+        '.tag{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}.best,button,a.link{flex:none}' +
+        '.best b{color:#ff9a3c;font-variant-numeric:tabular-nums}' +
         'button,a.link{all:unset;cursor:pointer;border-radius:999px;padding:7px 11px;background:#ff9a3c;color:#1b0e2e;font-weight:700;font-size:12px}' +
         'a.link{background:transparent;color:#fff4dc;text-decoration:underline;font-weight:500}' +
         'button.x{background:transparent;color:#fff4dc;padding:4px 8px;font-size:16px}' +
