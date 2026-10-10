@@ -33,3 +33,13 @@ O SEO e a descoberta do portal são **gerados**, não escritos à mão. A fonte 
 - **Não adicione `hreflang`** enquanto não existirem versões traduzidas reais das páginas (previsto para uma fase futura); `hreflang` apontando para páginas inexistentes prejudica a indexação.
 - **Teste:** `tests/seo.test.js` valida cobertura do sitemap, URLs absolutas, imagens existentes, JSON-LD parseável e um único bloco por página. Ao mudar o gerador, rode `npm run seo`, `npm run seo:check` e `node tests/seo.test.js`.
 
+## Regras do Desafio do Dia (`/desafio/`)
+
+Todo dia (data de Brasília) um jogo de um rodízio fixo vira o "Desafio do Dia": o jogador faz o maior placar e compartilha. Fonte única das regras: `assets/js/desafio-core.js` (usado pela página `desafio/index.html`, pelo banner da home, pelo overlay `assets/js/desafio.js` e, depois, pelo publicador de divulgação).
+
+- **A lista `GAMES` do `desafio-core.js` define o jogo de cada dia: qualquer mudança nela (ordem, inclusão, remoção) muda o jogo de todos os dias futuros.** O teste `tests/desafio.test.js` trava a lista de propósito. Só mude com decisão do dono do projeto e atualize o teste junto.
+- **Um jogo só participa se tiver um elemento com o placar numérico visível** (hoje `#score`) e carregar `desafio-core.js` e `desafio.js` no fim do `<body>` do `index.html`. Se renomear ou remover esse elemento, atualize `scoreSelector` no core; o teste confere os 5 jogos.
+- **O overlay só lê.** Nunca altere a lógica, o estado ou o `Math.random` de um jogo por causa do desafio. Ele fica inativo sem `?desafio=AAAA-MM-DD` válido, recente e do jogo certo para aquela data, e se esconde num Shadow DOM.
+- **Sem servidor, ranking ou cadastro.** Os placares ficam só no `localStorage` de quem jogou (`ph-desafio-v1`). Mudar isso (ranking, contas, envio de dados) é decisão do dono do projeto (privacidade/LGPD), não faça por conta própria. Não prometa "mesma sequência para todos": os jogos não são determinísticos.
+- A página `desafio/index.html` tem o head escrito à mão (canonical, OG, JSON-LD) e entra no sitemap e no `llms.txt` por `EXTRA_PAGES` em `scripts/generate-seo.js`; rode `npm run seo`. Nunca crie um `<iframe>` do jogo nela (regra do projeto).
+- Testes: `node tests/desafio.test.js` (regras e integridade) e `node tests/qa_desafio.test.js` (navegador; `SHOTS_DIR=<pasta>` salva capturas).

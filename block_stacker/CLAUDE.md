@@ -39,3 +39,5 @@ O projeto adota uma arquitetura de arquivo único (`index.html`) modularizada qu
 - `dropPiece()`: Incrementa a posição Y da peça e, em caso de colisão, chama as rotinas de fusão, eliminação de linhas e sorteio de novas peças.
 - `clearLines()`: Varre a matriz de baixo para cima buscando linhas completas, removendo-as via `.splice()` e inserindo novas linhas zeradas no topo via `.unshift()`.
 - `updateScore(linesCleared)`: Multiplica os pontos clássicos de eliminação simultânea de linhas (40, 100, 300, 1200) pelo nível ativo. A cada 10 linhas, o nível sobe e o tempo de queda (`dropInterval`) é encurtado para elevar o desafio.
+
+- **Desafio do Dia:** este jogo participa do rodízio (`assets/js/desafio-core.js`). O overlay `assets/js/desafio.js` só lê o texto do elemento `#score` (e só com `?desafio=AAAA-MM-DD` na URL). Não renomeie nem remova o `#score` sem atualizar `scoreSelector` no core (o teste `tests/desafio.test.js` confere). Ele não toca no estado nem no `Math.random` do jogo.

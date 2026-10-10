@@ -17,7 +17,8 @@ const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
 assert.strictEqual(new Set(locs).size, locs.length, 'sitemap com URLs duplicadas');
 assert.ok(locs.includes(SITE + '/'), 'sitemap sem a home');
 pages.forEach(p => assert.ok(locs.includes(`${SITE}/jogos/${p}`), `sitemap sem /jogos/${p}`));
-assert.strictEqual(locs.length, pages.length + 1, 'sitemap com URLs além da home e dos jogos');
+assert.ok(locs.includes(SITE + '/desafio/'), 'sitemap sem a página do Desafio do Dia');
+assert.strictEqual(locs.length, pages.length + 2, 'sitemap com URLs além da home, do desafio e dos jogos');
 locs.forEach(u => assert.ok(u.startsWith(SITE), `URL fora do domínio: ${u}`));
 
 // robots.txt aponta para o sitemap
@@ -25,6 +26,7 @@ assert.ok(read('robots.txt').includes(`Sitemap: ${SITE}/sitemap.xml`), 'robots.t
 
 // llms.txt e games.json listam todos os títulos
 const llms = read('llms.txt');
+assert.ok(llms.includes(`${SITE}/desafio/`), 'llms.txt sem o Desafio do Dia');
 const catalog = JSON.parse(read('games.json'));
 assert.strictEqual(catalog.count, pages.length);
 pages.forEach(p => {

@@ -39,3 +39,5 @@ O jogo é executado inteiramente sob um fluxo monolítico no cliente:
 - `addHighScore(name, score)`: Grava e organiza o placar de recordistas no `localStorage`.
 - `drawRoundedRect(ctx, x, y, width, height, radius)`: Utilitário para desenho de retângulos com cantos circulares suaves.
 - `drawEyes(ctx, headX, headY, segmentSize)`: Desenha e posiciona proceduralmente os olhos da serpente na direção correspondente do movimento atual.
+
+- **Desafio do Dia:** este jogo participa do rodízio (`assets/js/desafio-core.js`). O overlay `assets/js/desafio.js` só lê o texto do elemento `#score` (e só com `?desafio=AAAA-MM-DD` na URL). Não renomeie nem remova o `#score` sem atualizar `scoreSelector` no core (o teste `tests/desafio.test.js` confere). Ele não toca no estado nem no `Math.random` do jogo.
