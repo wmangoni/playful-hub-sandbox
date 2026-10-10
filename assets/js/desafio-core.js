@@ -96,34 +96,53 @@
     /** { days: { 'YYYY-MM-DD': { slug, best } } } */
     function emptyState() { return { version: 1, days: {} }; }
 
+    /**
+     * Só aceita o que o próprio módulo grava: chaves de data reais, jogo do rodízio e placar numérico finito.
+     * O localStorage é editável (e pode estar corrompido); lixo nele nunca pode derrubar a página nem apagar
+     * dados válidos na poda.
+     */
+    function sanitize(s) {
+        var out = emptyState();
+        if (!s || s.version !== 1 || !s.days || typeof s.days !== 'object' || Array.isArray(s.days)) return out;
+        Object.keys(s.days).forEach(function (k) {
+            var v = s.days[k];
+            if (isDate(k) && v && typeof v.slug === 'string' && gameBySlug(v.slug) && typeof v.best === 'number' && isFinite(v.best) && v.best >= 0 && v.best <= 1e12) {
+                out.days[k] = { slug: v.slug, best: Math.floor(v.best), live: v.live === true };
+            }
+        });
+        return out;
+    }
+
     function loadState(storage) {
         try {
             var raw = storage && storage.getItem(STORAGE_KEY);
-            var s = raw ? JSON.parse(raw) : null;
-            if (s && s.version === 1 && s.days && typeof s.days === 'object') return s;
-        } catch (e) { /* localStorage indisponível ou corrompido: começa do zero */ }
-        return emptyState();
+            return sanitize(raw ? JSON.parse(raw) : null);
+        } catch (e) { return emptyState(); /* localStorage indisponível ou corrompido: começa do zero */ }
     }
 
     function saveState(storage, state) {
         try { storage.setItem(STORAGE_KEY, JSON.stringify(state)); return true; } catch (e) { return false; }
     }
 
-    /** registra um placar; só guarda se for o melhor do dia. Devolve { state, improved }. */
-    function record(state, date, slug, score) {
+    /**
+     * registra um placar; só guarda se for o melhor do dia. `live` = foi jogado no próprio dia do desafio
+     * (e não numa repetição de um dia passado): só dias "live" contam para a sequência.
+     */
+    function record(state, date, slug, score, now) {
+        var live = date === brtDate(now);
         var cur = state.days[date];
         var improved = !cur || cur.slug !== slug || score > cur.best;
-        if (improved) state.days[date] = { slug: slug, best: score };
+        if (improved) state.days[date] = { slug: slug, best: score, live: live || Boolean(cur && cur.slug === slug && cur.live) };
         var dates = Object.keys(state.days).sort();
         while (dates.length > KEEP_DAYS) delete state.days[dates.shift()];
         return { state: state, improved: improved };
     }
 
-    /** dias seguidos jogando, terminando hoje (ou ontem, se hoje ainda não jogou: a sequência não quebra até o dia acabar) */
+    /** dias seguidos jogando no próprio dia, terminando hoje (ou ontem, se hoje ainda não jogou: a sequência não quebra até o dia acabar) */
     function streak(state, today) {
-        var d = state.days[today] ? today : addDays(today, -1);
+        var d = state.days[today] && state.days[today].live ? today : addDays(today, -1);
         var n = 0;
-        while (state.days[d]) { n++; d = addDays(d, -1); }
+        while (state.days[d] && state.days[d].live) { n++; d = addDays(d, -1); }
         return n;
     }
 
@@ -136,7 +155,7 @@
     /** texto compartilhável (sem spoiler: só o placar) */
     function shareText(c, best, streakDays) {
         var lines = [
-            'PlayfulHub · Desafio do Dia #' + c.edition + ' (' + formatDM(c.date) + ') 🎯',
+            'PlayfulHub · Desafio do Dia' + (c.edition >= 1 ? ' #' + c.edition : '') + ' (' + formatDM(c.date) + ') 🎯',
             c.game.emoji + ' ' + c.game.name + ': ' + best + ' pontos'
         ];
         if (streakDays > 1) lines.push('🔥 ' + streakDays + ' dias seguidos');

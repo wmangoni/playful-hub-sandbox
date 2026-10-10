@@ -53,9 +53,9 @@
         '.mini{position:fixed;left:10px;bottom:10px;z-index:2147483000;min-width:36px;height:30px;padding:0 10px;text-align:center;line-height:30px;' +
         'background:rgba(18,12,36,.85);color:#fff4dc;border:1px solid rgba(255,154,60,.7);font-size:13px;font-weight:600;white-space:nowrap}' +
         '.mini b{color:#ff9a3c;font-variant-numeric:tabular-nums}' +
-        '@media (max-width:520px){.link{display:none}.tag{font-size:12px}}' +
+        '@media (max-width:520px){a.link{display:none}.tag{font-size:12px}}' +
         '</style>' +
-        '<div class="wrap" role="status" aria-live="polite">' +
+        '<div class="wrap" role="group" aria-label="Desafio do Dia">' +
         '<span class="tag"></span><span class="best">Melhor: <b>0</b></span>' +
         '<button class="share" type="button">Compartilhar</button>' +
         '<a class="link" href="/desafio/">Desafio</a>' +
@@ -116,16 +116,25 @@
         return ok;
     }
 
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () { flash('Copiado!'); }, function () { flash(copyFallback(text) ? 'Copiado!' : 'Não consegui copiar'); });
+        } else {
+            flash(copyFallback(text) ? 'Copiado!' : 'Não consegui copiar');
+        }
+    }
+
     shareBtn.addEventListener('click', function () {
         if (best <= 0) { flash('Jogue primeiro'); return; }
         var text = core.shareText(challenge, best, core.streak(state, date));
         track('desafio_share');
         if (navigator.share) {
-            navigator.share({ text: text }).catch(function () { /* usuário cancelou */ });
-        } else if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function () { flash('Copiado!'); }, function () { flash(copyFallback(text) ? 'Copiado!' : 'Não consegui copiar'); });
+            navigator.share({ text: text }).catch(function (e) {
+                if (e && e.name === 'AbortError') return; // a pessoa cancelou
+                copyText(text);
+            });
         } else {
-            flash(copyFallback(text) ? 'Copiado!' : 'Não consegui copiar');
+            copyText(text);
         }
     });
 
@@ -135,6 +144,7 @@
         var n = el ? core.parseScore(el.textContent) : null;
         if (n != null && n > best) {
             best = n;
+            if (store) state = core.loadState(store); // outra aba pode ter gravado desde a última vez
             core.record(state, date, slug, best);
             core.saveState(store, state);
             render();

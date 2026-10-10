@@ -75,37 +75,68 @@ assert.strictEqual(core.parseScore(null), null);
 
 // ---- estado, melhor do dia e sequência
 {
+    const at = (d) => new Date(d + 'T15:00:00Z'); // meio do dia em Brasília
     const s = core.emptyState();
-    assert.deepStrictEqual(core.record(s, '2026-10-20', 'snake', 10), { state: s, improved: true });
-    assert.strictEqual(core.record(s, '2026-10-20', 'snake', 7).improved, false, 'placar menor não substitui');
-    assert.strictEqual(core.record(s, '2026-10-20', 'snake', 25).improved, true);
-    assert.strictEqual(s.days['2026-10-20'].best, 25);
+    assert.strictEqual(core.record(s, '2026-10-20', 'snake', 10, at('2026-10-20')).improved, true);
+    assert.strictEqual(core.record(s, '2026-10-20', 'snake', 7, at('2026-10-20')).improved, false, 'placar menor não substitui');
+    assert.strictEqual(core.record(s, '2026-10-20', 'snake', 25, at('2026-10-20')).improved, true);
+    assert.deepStrictEqual(s.days['2026-10-20'], { slug: 'snake', best: 25, live: true }, 'jogado no próprio dia: live');
 
+    // a sequência só conta dias jogados no próprio dia (repetir um desafio antigo é treino)
     const st = core.emptyState();
-    ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20'].forEach((d) => core.record(st, d, 'x', 1));
+    ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20'].forEach((d) => core.record(st, d, 'snake', 1, at(d)));
     assert.strictEqual(core.streak(st, '2026-10-20'), 4);
     assert.strictEqual(core.streak(st, '2026-10-21'), 4, 'ainda não jogou hoje: a sequência não quebra até o fim do dia');
     assert.strictEqual(core.streak(st, '2026-10-22'), 0, 'passou um dia inteiro sem jogar: recomeça');
-    core.record(st, '2026-10-15', 'x', 1);
+    core.record(st, '2026-10-15', 'snake', 1, at('2026-10-15'));
     assert.strictEqual(core.streak(st, '2026-10-20'), 4, 'buraco em 10-16 separa as sequências');
+    core.record(st, '2026-10-16', 'snake', 9, at('2026-10-20')); // treino: dia passado jogado hoje
+    assert.strictEqual(st.days['2026-10-16'].live, false);
+    assert.strictEqual(core.streak(st, '2026-10-20'), 4, 'treino de um dia passado NÃO fecha o buraco nem estende a sequência');
     assert.strictEqual(core.streak(core.emptyState(), '2026-10-20'), 0);
 
     const big = core.emptyState();
-    for (let i = 0; i < 90; i++) core.record(big, core.addDays('2026-01-01', i), 'x', 1);
+    for (let i = 0; i < 90; i++) core.record(big, core.addDays('2026-01-01', i), 'snake', 1, at('2026-04-01'));
     assert.strictEqual(Object.keys(big.days).length, 60, 'guarda só os últimos 60 dias');
     assert.ok(big.days[core.addDays('2026-01-01', 89)], 'os mais recentes ficam');
 
-    // armazenamento corrompido ou indisponível nunca quebra
+    // armazenamento corrompido, adulterado ou indisponível nunca quebra
     const mem = { v: null, getItem() { return this.v; }, setItem(k, v) { this.v = v; } };
     assert.deepStrictEqual(core.loadState(mem), core.emptyState());
     mem.v = '{lixo';
     assert.deepStrictEqual(core.loadState(mem), core.emptyState(), 'JSON corrompido');
     mem.v = JSON.stringify({ version: 2, days: {} });
     assert.deepStrictEqual(core.loadState(mem), core.emptyState(), 'versão desconhecida');
+    mem.v = JSON.stringify({ version: 1, days: [1, 2] });
+    assert.deepStrictEqual(core.loadState(mem), core.emptyState(), 'days como lista');
     assert.strictEqual(core.saveState(mem, st), true);
-    assert.deepStrictEqual(core.loadState(mem).days, st.days);
+    assert.deepStrictEqual(core.loadState(mem).days, st.days, 'ida e volta preserva tudo');
     assert.strictEqual(core.saveState({ setItem() { throw new Error('quota'); } }, st), false, 'sem armazenamento: não lança');
     assert.deepStrictEqual(core.loadState(null), core.emptyState());
+    assert.deepStrictEqual(core.loadState({ getItem() { throw new Error('bloqueado'); } }), core.emptyState());
+
+    // sanitização: só entra o que o módulo grava
+    const lixo = { version: 1, days: {
+        '2026-10-20': { slug: 'snake', best: 'abc' },
+        '2026-10-19': { slug: 'snake', best: 1e300 },
+        '2026-10-18': { slug: 'snake', best: -5 },
+        '2026-10-17': { slug: 'jogo-que-nao-existe', best: 3 },
+        '2026-10-16': { slug: 'snake', best: 12.9, live: 'sim' },
+        '2026-10-15': null,
+        '__proto__': { slug: 'snake', best: 1 },
+        'zz-lixo': { slug: 'snake', best: 1 },
+        '2026-02-30': { slug: 'snake', best: 1 }
+    } };
+    mem.v = JSON.stringify(lixo);
+    assert.deepStrictEqual(core.loadState(mem).days, { '2026-10-16': { slug: 'snake', best: 12, live: false } }, 'só o registro válido sobrevive, normalizado');
+    // chaves lixo não podem apagar datas reais na poda
+    const poluido = { version: 1, days: {} };
+    for (let i = 0; i < 70; i++) poluido.days['zz' + i] = { slug: 'snake', best: 1 };
+    poluido.days['2026-10-20'] = { slug: 'snake', best: 5, live: true };
+    mem.v = JSON.stringify(poluido);
+    const limpo = core.loadState(mem);
+    core.record(limpo, '2026-10-21', 'snake', 9, at('2026-10-21'));
+    assert.deepStrictEqual(Object.keys(limpo.days).sort(), ['2026-10-20', '2026-10-21'], 'lixo descartado, datas reais mantidas');
 }
 
 // ---- texto compartilhável
@@ -116,6 +147,13 @@ assert.strictEqual(core.parseScore(null), null);
     assert.ok(one.includes('Desafio do Dia #9 (20/10)') && one.includes(c.game.name) && one.includes('42 pontos'));
     assert.ok(!one.includes('seguidos'), 'sem sequência para mostrar com 1 dia');
     assert.ok(many.includes('5 dias seguidos'));
+    // antes do lançamento (edição <= 0) não pode sair "#-1" nem "#0"
+    for (const d of ['2026-10-10', '2026-10-11']) {
+        const header = core.shareText(core.challengeFor(d), 5, 1).split('\n')[0];
+        assert.ok(!/#/.test(header), 'sem número de edição antes do lançamento: ' + header);
+        assert.ok(header.includes(`(${core.formatDM(d)})`));
+    }
+    assert.ok(core.shareText(core.challengeFor('2026-10-12'), 5, 1).split('\n')[0].includes('#1 '), 'lançamento é a edição #1');
     const link = many.split('\n').pop();
     const u = new URL(link);
     assert.strictEqual(u.origin + u.pathname, 'https://playfulhub.com.br/desafio/');

@@ -76,7 +76,7 @@ const ours = (m) => /desafio/i.test(m);
         // sequência e compartilhamento, com o estado de 3 dias seguidos gravado como o overlay faria
         await page.evaluate((k, days, slug) => {
             const st = { version: 1, days: {} };
-            days.forEach((d, i) => { st.days[d] = { slug, best: 10 + i }; });
+            days.forEach((d, i) => { st.days[d] = { slug, best: 10 + i, live: true }; });
             localStorage.setItem(k, JSON.stringify(st));
         }, core.STORAGE_KEY, [core.addDays(today, -2), core.addDays(today, -1), today], todays.game.slug);
         await page.reload({ waitUntil: 'networkidle0' });
@@ -137,7 +137,7 @@ const ours = (m) => /desafio/i.test(m);
             await setScore('Pontos: 1.250');
             await p.waitForFunction(() => document.querySelector('[data-desafio]').shadowRoot.querySelector('.best b').textContent === '1250', { timeout: 4000 });
             const st = await stored(p);
-            assert.deepStrictEqual(st.days[date], { slug: g.slug, best: 1250 }, `${g.slug}: gravou o melhor do dia`);
+            assert.deepStrictEqual(st.days[date], { slug: g.slug, best: 1250, live: date === today }, `${g.slug}: gravou o melhor do dia`);
             await shot(p, `overlay-${g.slug}`);
 
             // minimizar / reabrir
@@ -174,11 +174,14 @@ const ours = (m) => /desafio/i.test(m);
         while (core.challengeFor(snakeDay).game.slug !== 'snake') snakeDay = core.addDays(snakeDay, -1);
         let otherDay = today;
         while (core.challengeFor(otherDay).game.slug === 'snake') otherDay = core.addDays(otherDay, -1);
+        // "data futura" só prova a regra de futuro se for um dia em que o snake É o desafio (senão passaria por "jogo errado")
+        let futureSnakeDay = core.addDays(today, 1);
+        while (core.challengeFor(futureSnakeDay).game.slug !== 'snake') futureSnakeDay = core.addDays(futureSnakeDay, 1);
         const cases = {
             'sem o parâmetro': `${snake.play}`,
             'parâmetro vazio': `${snake.play}?desafio=`,
             'data inválida': `${snake.play}?desafio=2026-02-30`,
-            'data futura': `${snake.play}?desafio=${core.addDays(today, 5)}`,
+            'data futura (de um dia em que o snake é o desafio)': `${snake.play}?desafio=${futureSnakeDay}`,
             'data antiga demais': `${snake.play}?desafio=${core.addDays(snakeDay, -35)}`,
             'dia em que o desafio era outro jogo': `${snake.play}?desafio=${otherDay}`,
             'lixo no parâmetro': `${snake.play}?desafio=<script>alert(1)</script>`
@@ -230,8 +233,8 @@ const ours = (m) => /desafio/i.test(m);
             await p.close();
         }
 
-        // ================= 6) o jogo continua jogável com o overlay (o canvas segue recebendo as teclas)
-        console.log('[6/6] O overlay não atrapalha o jogo ...');
+        // ================= 6) o overlay não adiciona nada ao documento além do host (o texto fica no Shadow DOM)
+        console.log('[6/6] O overlay não vaza para o documento do jogo ...');
         {
             const p = await clean.newPage();
             await p.setViewport({ width: 1100, height: 800 });
@@ -245,6 +248,58 @@ const ours = (m) => /desafio/i.test(m);
             assert.ok(!(await p.evaluate(() => document.body.innerText)).includes('Compartilhar'), 'texto do overlay não vaza para fora do shadow DOM');
             await p.close();
         }
+        // ================= 7) overlay em celular: nada pode ficar fora da tela
+        console.log('[7] Overlay em celular ...');
+        for (const width of [360, 390]) {
+            const p = await clean.newPage();
+            await p.evaluateOnNewDocument(() => { window.PHDesafioConfig = { collapseMs: 0 }; });
+            await p.setViewport({ width, height: 800, isMobile: true, hasTouch: true });
+            await p.goto(`${BASE}${snake.play}?desafio=${snakeDay}`, { waitUntil: 'domcontentloaded' });
+            await p.waitForSelector('[data-desafio]');
+            const box = await p.evaluate(() => {
+                const r = document.querySelector('[data-desafio]').shadowRoot;
+                const rect = (sel) => { const b = r.querySelector(sel).getBoundingClientRect(); return { l: b.left, r: b.right, w: b.width }; };
+                return { wrap: rect('.wrap'), x: rect('.x'), share: rect('.share'), link: getComputedStyle(r.querySelector('a.link')).display, vw: window.innerWidth };
+            });
+            assert.strictEqual(box.link, 'none', `${width}px: o link "Desafio" some em tela estreita`);
+            assert.ok(box.wrap.l >= 0 && box.wrap.r <= box.vw, `${width}px: a pílula cabe na tela (${JSON.stringify(box.wrap)} em ${box.vw})`);
+            assert.ok(box.x.r <= box.vw && box.share.r <= box.vw, `${width}px: botões dentro da tela`);
+            await p.close();
+        }
+
+        // ================= 8) sem JavaScript a página não mostra o jogo errado
+        console.log('[8] Página sem JavaScript ...');
+        {
+            const p = await clean.newPage();
+            await p.setJavaScriptEnabled(false);
+            await p.goto(`${BASE}/desafio/`, { waitUntil: 'domcontentloaded' });
+            const vis = await p.evaluate(() => ({
+                today: getComputedStyle(document.getElementById('today')).display,
+                stats: getComputedStyle(document.getElementById('stats')).display,
+                history: getComputedStyle(document.getElementById('history-section')).display
+            }));
+            assert.deepStrictEqual(vis, { today: 'none', stats: 'none', history: 'none' }, 'cards dependentes de JS ficam ocultos');
+            assert.ok((await p.evaluate(() => document.body.innerText)).includes('Ative o JavaScript'), 'mostra o aviso');
+            assert.strictEqual(await p.$$eval('.rotation a', (a) => a.length), 5, 'o rodízio (links para os jogos) aparece sem JS');
+            await p.close();
+        }
+
+        // ================= 9) treino de um dia passado não conta para a sequência (na página)
+        console.log('[9] Treino não estende a sequência ...');
+        {
+            const p = await clean.newPage();
+            await p.setViewport({ width: 1100, height: 800 });
+            await p.goto(`${BASE}/desafio/`, { waitUntil: 'domcontentloaded' });
+            const yesterday = core.addDays(today, -1);
+            await p.evaluate((k, t, y, slug, ySlug) => {
+                localStorage.setItem(k, JSON.stringify({ version: 1, days: { [t]: { slug, best: 5, live: true }, [y]: { slug: ySlug, best: 9, live: false } } }));
+            }, core.STORAGE_KEY, today, yesterday, todays.game.slug, core.challengeFor(yesterday).game.slug);
+            await p.reload({ waitUntil: 'domcontentloaded' });
+            assert.strictEqual(await p.$eval('#st-streak', (e) => e.textContent), '1 dia', 'ontem foi treino: a sequência é só hoje');
+            await p.close();
+        }
+
+        await clean.close();
         console.log('\nQA do Desafio do Dia: todos os testes passaram');
     } finally {
         await browser.close();

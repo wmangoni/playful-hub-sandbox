@@ -43,6 +43,7 @@
             --accent-ink: #1b0e2e;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; } /* o display: grid de .today/.stats vencia o atributo hidden */
         body { background: radial-gradient(1200px 600px at 50% -10%, #241a4a 0%, var(--bg) 60%); color: var(--text);
                font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.55; min-height: 100vh; }
         a { color: inherit; }
@@ -120,9 +121,9 @@
 
         <noscript><p>O desafio de hoje é escolhido pelo navegador. Ative o JavaScript para ver o jogo do dia, sua sequência e seu placar. Enquanto isso, <a href="/">escolha qualquer jogo na página inicial</a>.</p></noscript>
 
-        <section class="today" id="today" aria-live="polite" hidden>
-            <a class="today-media" id="today-media" href="/snake/" aria-label="Jogar o desafio de hoje">
-                <img id="today-img" src="/assets/images/snake_preview.png" alt="Prévia do jogo do dia" width="950" height="598">
+        <section class="today" id="today" hidden>
+            <a class="today-media" id="today-media" href="/" aria-label="Jogar o desafio de hoje">
+                <img id="today-img" src="/assets/images/bg_neon_game.jpeg" alt="Prévia do jogo do dia" width="950" height="598">
                 <div class="today-overlay"><span>PLAY</span></div>
             </a>
             <div class="today-body">
@@ -130,7 +131,7 @@
                 <h2 id="today-name"></h2>
                 <p class="lead" style="margin:0">Faça o maior placar hoje. Só vale a data de hoje (horário de Brasília) para a sequência.</p>
                 <div class="row">
-                    <a class="btn" id="today-play" href="/snake/">Jogar o desafio</a>
+                    <a class="btn" id="today-play" href="/">Jogar o desafio</a>
                     <button class="btn ghost" id="share" type="button" disabled>Compartilhar resultado</button>
                 </div>
                 <small id="share-msg" style="color:var(--muted)" role="status"></small>
@@ -153,7 +154,8 @@
             <p>A cada dia, no horário de Brasília, o PlayfulHub escolhe um jogo de um rodízio fixo. O objetivo é simples: faça o maior placar que conseguir naquele jogo. Seu melhor placar do dia fica guardado só no seu navegador, e você pode compartilhar o resultado com um toque.</p>
             <ul>
                 <li>Jogar de novo no mesmo dia não zera nada: vale o seu melhor placar.</li>
-                <li>Jogou hoje? A sequência cresce um dia. Perdeu um dia, ela recomeça.</li>
+                <li>Jogou hoje? A sequência cresce um dia. Perdeu um dia, ela recomeça. Desafios de dias anteriores (na lista "Últimos desafios") servem para treinar: aparecem no histórico, mas não contam para a sequência.</li>
+                <li>Vale o placar que o jogo mostrar, em qualquer modo de jogo. O modo duelo do Block Stacker não conta.</li>
                 <li>Não há cadastro, ranking nem envio de dados: é um desafio de honra entre você e seus amigos.</li>
             </ul>
             <p>Os jogos do rodízio:</p>
@@ -241,9 +243,12 @@
             if (view.best <= 0) return;
             var text = core.shareText(view.challenge, view.best, view.streak);
             try { (window.dataLayer = window.dataLayer || []).push({ event: 'desafio_share', game_slug: view.challenge.game.slug, desafio_data: view.today }); } catch (e) { /* analytics */ }
-            if (navigator.share) navigator.share({ text: text }).catch(function () {});
-            else if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { msg('Resultado copiado!'); }, function () { msg('Não consegui copiar. Selecione e copie o texto manualmente.'); });
-            else msg('Seu navegador não permite copiar aqui.');
+            var copy = function () {
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { msg('Resultado copiado!'); }, function () { msg('Não consegui copiar. Selecione e copie o texto manualmente.'); });
+                else msg('Seu navegador não permite copiar aqui.');
+            };
+            if (navigator.share) navigator.share({ text: text }).catch(function (e) { if (!e || e.name !== 'AbortError') copy(); });
+            else copy();
         });
     })();
     </script>
