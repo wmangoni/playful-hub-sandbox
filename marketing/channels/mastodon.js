@@ -7,7 +7,8 @@ const { request, json, sleep } = require('../lib/http');
 const name = 'mastodon';
 const MIME = { '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
 
-const isConfigured = (env) => Boolean(env.MASTODON_INSTANCE && env.MASTODON_ACCESS_TOKEN);
+// https obrigatório: o token de acesso não pode trafegar em texto puro
+const isConfigured = (env) => Boolean(/^https:\/\//.test(env.MASTODON_INSTANCE || '') && env.MASTODON_ACCESS_TOKEN);
 
 const blobOf = (file) => new Blob([fs.readFileSync(file)], { type: MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
 

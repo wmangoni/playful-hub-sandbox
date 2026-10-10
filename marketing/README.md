@@ -39,8 +39,8 @@ ledger (branch marketing-ledger) ◄── publicador ◄───────�
 ## Como funciona a publicação
 
 - O workflow roda de hora em hora. Um post está "devido" quando `at` já passou e ainda falta algum canal.
-- Post que ficou mais de **36 h** para trás (workflow parado, por exemplo) **não** é publicado: é melhor perder um post do que despejar vários de uma vez.
-- Cada publicação é gravada no ledger na hora, e o workflow salva o ledger mesmo se um canal falhar. Um canal que falhou é tentado de novo na execução seguinte; os que deram certo não se repetem. O Mastodon ainda recebe `Idempotency-Key`.
+- Post que ficou mais de **36 h** para trás (workflow parado, por exemplo) **não** é publicado, e se houver mais de um post devido no mesmo canal só o **mais recente** sai por execução: é melhor perder um post do que despejar vários de uma vez. Ambos os casos geram um aviso (`::warning::`) na execução.
+- Cada publicação é gravada no ledger **e enviada à branch `marketing-ledger` na hora** (se o envio falhar, o job para: seguir publicando sem registro arriscaria duplicar tudo). Se o runner morrer no meio, o que já foi publicado continua registrado. Um canal que falhou é tentado de novo na execução seguinte; os que deram certo não se repetem. O Mastodon recebe `Idempotency-Key`. Bluesky e Telegram não têm idempotência, então o `createRecord`/`send*` **nunca** é repetido automaticamente (se a resposta se perder, o post pode ter saído: confira o canal antes de reexecutar).
 - Todo link leva UTMs (`utm_source=<canal>&utm_medium=social&utm_campaign=<campanha>&utm_content=<id do post>`) para a página de informações do jogo (`/jogos/<jogo>`, a canônica do SEO). O GA4 lê as UTMs sem nenhum código extra.
 
 ## Escrevendo posts (humanos ou agentes)
@@ -76,7 +76,7 @@ node marketing/cineasta/record.js tumbalacatumba --all --stills --fast --out /tm
 
 O Cineasta usa a API de depuração do jogo (`__game.tick`, `dayNight.setTime`, `cam.override`, `world.groundHeight`) e não altera o jogo. **Perfis.** Com GPU (`gpu`, o padrão local): renderiza em 720×1280, qualidade alta, 30 fps (os 8 clipes levam ~3,5 min). Sem GPU (`software`, usado na CI com `CINEASTA_GL=swiftshader`): renderiza em 540×960, qualidade baixa, 24 fps e amplia no ffmpeg, porque a qualidade alta em software custava ~8 s por quadro (mais de 1 h por clipe). Medido numa máquina local: um clipe de 15 s em modo CI leva ~11 min, e o workflow só grava o clipe do post que está na hora. Troque com `CINEASTA_PROFILE=gpu|software`.
 
-Os vídeos saem em 720×1280, 30 fps, sem áudio (a maior parte do público assiste no mudo), e só são aprovados depois de um controle de qualidade (resolução, quantidade de quadros, duração, poster não escuro, nenhum erro no jogo).
+Os vídeos saem sempre em 720×1280, sem áudio (a maior parte do público assiste no mudo), mas **na CI o Cineasta renderiza em software: 540×960, qualidade baixa, 24 fps, ampliado no ffmpeg**. Para um vídeo em 30 fps nítido, grave com GPU (`npm run marketing:render -- --all`) e aponte o post para o arquivo versionado em `assets/videos/` (`media.video`). Cada clipe só é aprovado depois de um controle de qualidade: resolução, quantidade de quadros, duração, brilho em 5 instantes (poster e ao longo do vídeo), vídeo não congelado e nenhum `[error]` no jogo. Um clipe reprovado é apagado e nunca chega a ser publicado.
 
 ## O que não está aqui (de propósito)
 

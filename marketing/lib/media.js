@@ -19,7 +19,17 @@ function resolveMedia(post) {
 }
 
 /** arquivos que precisam existir para publicar */
-const requiredFiles = (media) => (media ? [media.video, media.image, media.poster].filter(Boolean) : []);
+// o relatório (.json) do Cineasta também é exigido: ele diz se o clipe passou no controle de qualidade
+const requiredFiles = (media) => (media ? [media.video, media.image, media.poster, media.generated ? media.report : null].filter(Boolean) : []);
 const missingFiles = (media) => requiredFiles(media).filter((f) => !fs.existsSync(f));
 
-module.exports = { resolveMedia, requiredFiles, missingFiles };
+// Mídia que vem do repositório só pode estar em assets/ e ter extensão de mídia: o calendário é escrito por
+// agentes, e "falha fechada" não pode deixar subir package.json (ou qualquer arquivo) para uma rede social.
+const ASSETS = path.join(ROOT, 'assets');
+const ALLOWED_EXT = new Set(['.mp4', '.jpg', '.jpeg', '.png']);
+function insideAssets(file) {
+    const rel = path.relative(ASSETS, file);
+    return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel) && ALLOWED_EXT.has(path.extname(file).toLowerCase());
+}
+
+module.exports = { resolveMedia, requiredFiles, missingFiles, insideAssets };

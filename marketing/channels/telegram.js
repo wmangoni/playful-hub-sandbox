@@ -42,7 +42,8 @@ async function publish({ post, composed, media }, env, fetchImpl = fetch) {
         method = 'sendMessage';
         form.append('text', caption);
     }
-    const res = await json(await request(fetchImpl, api(method), { method: 'POST', body: form }));
+    // sem retentativa: o Telegram não tem chave de idempotência, e repetir um send* cuja resposta se perdeu duplicaria o post
+    const res = await json(await request(fetchImpl, api(method), { method: 'POST', body: form }, { retries: 0 }));
     if (!res.ok) throw new Error(`Telegram: ${res.description || 'resposta sem ok'}`);
     const id = res.result.message_id;
     const chat = String(env.TELEGRAM_CHAT_ID);

@@ -28,7 +28,7 @@ module.exports = {
     MIN_TEXT_LENGTH: 40,
 
     // Onde ficam os clipes gravados pelo Cineasta e o ledger (o que já foi publicado)
-    CLIPS_DIR: path.resolve(__dirname, 'out/clips'),
+    CLIPS_DIR: process.env.MARKETING_CLIPS_DIR ? path.resolve(process.env.MARKETING_CLIPS_DIR) : path.resolve(__dirname, 'out/clips'),
     LEDGER_FILE: process.env.MARKETING_LEDGER || path.resolve(__dirname, '.ledger/ledger.json'),
     CALENDAR_DIR: path.resolve(__dirname, 'calendar')
 };

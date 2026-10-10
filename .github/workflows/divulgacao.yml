@@ -48,14 +48,25 @@ jobs:
         with:
           node-version: 20
 
+      - name: Conferir entradas
+        run: |
+          if [ "$DRY" != "true" ] && [ -n "$NOW" ]; then
+            echo "::error::O campo 'now' só vale com dry_run marcado: com publicação de verdade ele gravaria um horário falso no ledger."
+            exit 1
+          fi
+
       - name: Ledger (branch marketing-ledger)
         run: bash marketing/scripts/ledger.sh checkout
 
       - name: Plano
         id: plan
+        env:
+          MARKETING_PAUSED: ${{ vars.MARKETING_PAUSED }}
         run: |
           plan=$(node marketing/publish.js --plan ${NOW:+--now "$NOW"})
           echo "$plan"
+          # post que passou da janela sem ser publicado não pode sumir em silêncio
+          node -e "const p = JSON.parse(process.argv[1]); (p.expired || []).forEach((id) => console.log('::warning::Post vencido, não será publicado: ' + id)); (p.superseded || []).forEach((x) => console.log('::warning::Post adiado por haver um mais recente no canal: ' + x.id + ' (' + x.channel + ')'))" "$plan"
           echo "due=$(node -p "JSON.parse(process.argv[1]).due?.length ?? 0" "$plan")" >> "$GITHUB_OUTPUT"
           echo "clips=$(node -p "JSON.parse(process.argv[1]).clipsNeeded?.length ?? 0" "$plan")" >> "$GITHUB_OUTPUT"
 
@@ -80,8 +91,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: marketing/out/clips
-          # regrava se o jogo ou as tomadas mudarem
-          key: clips-${{ hashFiles('tumbalacatumba/Tumbalacatumba.html', 'marketing/cineasta/**') }}
+          # regrava se o jogo ou as tomadas mudarem. O run_id faz cada execução salvar o que gravou (uma chave fixa
+          # nunca seria atualizada depois do primeiro salvamento); o restore-keys traz o cache mais recente.
+          key: clips-${{ hashFiles('tumbalacatumba/Tumbalacatumba.html', 'marketing/cineasta/**') }}-${{ github.run_id }}
+          restore-keys: |
+            clips-${{ hashFiles('tumbalacatumba/Tumbalacatumba.html', 'marketing/cineasta/**') }}-
 
       - name: Gravar clipes (Cineasta)
         if: steps.plan.outputs.clips != '0'
@@ -98,10 +112,13 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MARKETING_PAUSED: ${{ vars.MARKETING_PAUSED }}
+          # envia o ledger ao remoto logo depois de cada publicação (não só no fim): runner que morre ou job que
+          # estoura o tempo não pode deixar posts publicados fora do ledger
+          MARKETING_LEDGER_PUSH: ${{ env.DRY != 'true' && 'true' || 'false' }}
         run: node marketing/publish.js ${NOW:+--now "$NOW"} $([ "$DRY" = "true" ] && echo --dry-run)
 
-      # roda mesmo se a publicação falhou em um canal: o que já foi ao ar precisa ficar registrado,
-      # senão a próxima execução publicaria de novo
+      # rede de segurança: o publicador já envia o ledger a cada post; isto cobre o que sobrou (ex.: falha parcial).
+      # Roda mesmo se a publicação falhou em um canal: o que já foi ao ar precisa ficar registrado
       - name: Salvar ledger
         if: ${{ always() && steps.plan.outputs.due != '0' && env.DRY != 'true' }}
         run: bash marketing/scripts/ledger.sh commit

@@ -5,15 +5,22 @@ const os = require('os');
 const path = require('path');
 const assert = require('assert');
 
+// clipes de teste vivem numa pasta temporária: os testes não dependem do que há (ou não) em marketing/out
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mkt-'));
+process.env.MARKETING_CLIPS_DIR = path.join(tmp, 'clips');
+fs.mkdirSync(process.env.MARKETING_CLIPS_DIR);
+
 const M = path.resolve(__dirname, '../marketing');
+const { spawnSync } = require('child_process');
 const { sample, sampleVec, clamp01 } = require(`${M}/cineasta/lib/spline`);
 const { frameState, captionAt } = require(`${M}/cineasta/record`);
 const { postLink } = require(`${M}/lib/links`);
 const { compose, countedLength, graphemes } = require(`${M}/lib/compose`);
 const { lintText, validatePost, validateCalendar } = require(`${M}/lib/guard`);
-const { classify } = require(`${M}/lib/schedule`);
+const { classify, onePerChannel } = require(`${M}/lib/schedule`);
 const ledgerLib = require(`${M}/lib/ledger`);
-const { request, HttpError } = require(`${M}/lib/http`);
+const { request, HttpError, safePath } = require(`${M}/lib/http`);
+const { insideAssets } = require(`${M}/lib/media`);
 const { loadCalendars, loadGames } = require(`${M}/lib/calendar`);
 const bluesky = require(`${M}/channels/bluesky`);
 const mastodon = require(`${M}/channels/mastodon`);
@@ -22,7 +29,6 @@ const { run, clipsNeeded } = require(`${M}/publish`);
 
 const games = loadGames();
 const jsonRes = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mkt-'));
 const quiet = () => {};
 
 const goodPost = (over = {}) => ({
@@ -120,10 +126,16 @@ const goodPost = (over = {}) => ({
         assert.ok(ok(goodPost({ media: { image: 'assets/images/nao_existe.png', alt: 'descrição suficientemente longa' } })).length, 'imagem inexistente reprova');
         assert.ok(ok(goodPost({ media: { clip: 'tomada-fantasma', alt: 'descrição suficientemente longa' } })).length, 'tomada inexistente reprova');
         assert.deepStrictEqual(ok(goodPost({ media: { clip: 'campo-de-abobora', game: 'tumbalacatumba', alt: 'descrição suficientemente longa' } })), [], 'clipe ainda não gravado passa no modo plan');
-        // no modo publish o arquivo do clipe gravado precisa existir (confere nos dois sentidos, com ou sem gravação local)
+        // no modo publish o clipe gravado precisa existir E ter passado no controle de qualidade
         const clipPost = goodPost({ media: { clip: 'lago-lamentoso', game: 'tumbalacatumba', alt: 'descrição suficientemente longa' } });
-        const rendered = fs.existsSync(path.join(M, 'out/clips/tumbalacatumba--lago-lamentoso.mp4')) && fs.existsSync(path.join(M, 'out/clips/tumbalacatumba--lago-lamentoso.jpg'));
-        assert.strictEqual(validatePost(clipPost, { games, mode: 'publish' }).length === 0, rendered, 'modo publish exige o clipe gravado');
+        const clipBase = path.join(process.env.MARKETING_CLIPS_DIR, 'tumbalacatumba--lago-lamentoso');
+        assert.ok(validatePost(clipPost, { games, mode: 'publish' }).some((m) => m.includes('não encontrado')), 'sem o clipe gravado: reprova');
+        fs.writeFileSync(clipBase + '.mp4', Buffer.alloc(8)); fs.writeFileSync(clipBase + '.jpg', Buffer.alloc(8));
+        assert.ok(validatePost(clipPost, { games, mode: 'publish' }).some((m) => m.includes('não encontrado')), 'sem o relatório de QC: reprova');
+        fs.writeFileSync(clipBase + '.json', JSON.stringify({ ok: false, problems: ['x'] }));
+        assert.ok(validatePost(clipPost, { games, mode: 'publish' }).some((m) => m.includes('reprovado')), 'relatório com ok:false: reprova');
+        fs.writeFileSync(clipBase + '.json', JSON.stringify({ ok: true }));
+        assert.deepStrictEqual(validatePost(clipPost, { games, mode: 'publish' }), [], 'clipe gravado e aprovado passa');
         const long = goodPost({ text: 'Jogo muito divertido de cobrinha. '.repeat(10).trim() });
         assert.ok(ok(long).some((m) => m.includes('bluesky')), 'texto acima do limite do Bluesky reprova');
 
@@ -330,16 +342,195 @@ const goodPost = (over = {}) => ({
         assert.strictEqual(r.paused, true, 'kill switch');
         assert.strictEqual(sent.length, 3);
 
-        write([...posts, goodPost({ id: 'e2e-03', at: '2026-10-16T20:00:00-03:00', text: 'Clique aqui para jogar a cobrinha clássica que roda direto no navegador.' })]);
+        const baited = goodPost({ id: 'e2e-03', at: '2026-10-22T20:00:00-03:00', text: 'Clique aqui para jogar a cobrinha clássica que roda direto no navegador.' });
+        assert.ok(validateCalendar([...posts, baited], { games }).some((m) => m.includes('isca')), 'o motivo da reprovação é a isca de engajamento');
+        write([...posts, baited]);
         await assert.rejects(run({ ...base, now: new Date('2026-10-16T20:30:00-03:00') }), /Guardião reprovou/, 'calendário inválido: falha fechada');
         assert.strictEqual(sent.length, 3, 'nada publicado com calendário reprovado');
 
         // clipes necessários para os posts devidos
         const clipPost = goodPost({ id: 'clip-01', media: { clip: 'moinho-ao-por-do-sol', game: 'tumbalacatumba', alt: 'descrição suficientemente longa' } });
         const need = clipsNeeded([{ post: clipPost, channels: ['bluesky'] }]);
-        const clipFile = path.join(M, 'out/clips/tumbalacatumba--moinho-ao-por-do-sol.mp4');
-        assert.deepStrictEqual(need, fs.existsSync(clipFile) ? [] : [{ game: 'tumbalacatumba', shot: 'moinho-ao-por-do-sol' }]);
+        assert.deepStrictEqual(need, [{ game: 'tumbalacatumba', shot: 'moinho-ao-por-do-sol' }], 'clipe não gravado é pedido ao Cineasta');
         console.log('✓ publicador de ponta a ponta');
+    }
+
+
+    // ---- review: relógio inválido, --now só em simulação
+    {
+        assert.throws(() => classify([], { version: 1, posts: {} }, new Date('14/10/2026 19:30')), /relógio inválido/);
+        await assert.rejects(run({ calendarDir: path.join(M, 'calendar'), ledgerFile: path.join(tmp, 'x.json'), now: new Date('lixo'), games, log: quiet, env: {} }), /--now inválido/);
+        const cli = spawnSync(process.execPath, [`${M}/publish.js`, '--now', '2026-10-14T19:30:00-03:00'], { encoding: 'utf8' });
+        assert.strictEqual(cli.status, 2, '--now sem --dry-run/--plan/--check é recusado');
+        assert.ok(/só pode ser usado/.test(cli.stderr));
+        console.log('✓ --now: validação');
+    }
+
+    // ---- review: um post por canal por execução (sem despejar atraso acumulado)
+    {
+        const mkPost = (id, at, channels) => goodPost({ id, at, channels });
+        const dueList = [
+            { post: mkPost('a', '2026-10-14T19:00:00-03:00', ['bluesky', 'telegram']), channels: ['bluesky', 'telegram'] },
+            { post: mkPost('b', '2026-10-15T19:00:00-03:00', ['bluesky']), channels: ['bluesky'] },
+            { post: mkPost('c', '2026-10-16T19:00:00-03:00', ['bluesky', 'mastodon']), channels: ['bluesky', 'mastodon'] }
+        ];
+        const r = onePerChannel(dueList);
+        assert.deepStrictEqual(r.due.map((d) => [d.post.id, d.channels]), [['a', ['telegram']], ['c', ['bluesky', 'mastodon']]]);
+        assert.deepStrictEqual(r.superseded.map((x) => `${x.id}:${x.channel}`).sort(), ['a:bluesky', 'b:bluesky']);
+
+        const dir = path.join(tmp, 'cal-backlog');
+        fs.mkdirSync(dir);
+        fs.writeFileSync(path.join(dir, 'c.json'), JSON.stringify({ campaign: 'teste', posts: [
+            goodPost({ id: 'bk-1', at: '2026-10-14T19:00:00-03:00', channels: ['bluesky'] }),
+            goodPost({ id: 'bk-2', at: '2026-10-15T09:00:00-03:00', channels: ['bluesky'], text: 'Outro texto bem diferente sobre a cobrinha clássica, no navegador, grátis.' })
+        ] }));
+        const sent = [];
+        const channels = { bluesky: { name: 'bluesky', isConfigured: () => true, publish: async ({ post }) => { sent.push(post.id); return { id: post.id }; } }, mastodon: {}, telegram: {} };
+        const res = await run({ calendarDir: dir, ledgerFile: path.join(tmp, 'bk-ledger.json'), channels, games, log: quiet, env: {}, now: new Date('2026-10-15T12:00:00-03:00') });
+        assert.deepStrictEqual(sent, ['bk-2'], 'só o mais recente sai');
+        assert.deepStrictEqual(res.superseded, [{ id: 'bk-1', channel: 'bluesky' }]);
+        console.log('✓ um post por canal por execução');
+    }
+
+    // ---- review: ledger enviado ao remoto a cada publicação; falha ao registrar é fatal
+    {
+        const dir = path.join(tmp, 'cal-hook');
+        fs.mkdirSync(dir);
+        fs.writeFileSync(path.join(dir, 'c.json'), JSON.stringify({ campaign: 'teste', posts: [goodPost({ id: 'hk-1', at: '2026-10-14T19:00:00-03:00', channels: ['bluesky', 'mastodon', 'telegram'] })] }));
+        const mk = (n) => ({ name: n, isConfigured: () => true, publish: async () => ({ id: n }) });
+        const channels = { bluesky: mk('bluesky'), mastodon: mk('mastodon'), telegram: mk('telegram') };
+        let pushes = 0;
+        await run({ calendarDir: dir, ledgerFile: path.join(tmp, 'hk1.json'), channels, games, log: quiet, env: {}, now: new Date('2026-10-14T20:00:00-03:00'), afterPublish: async () => { pushes++; } });
+        assert.strictEqual(pushes, 3, 'um envio do ledger por publicação');
+
+        let calls = 0;
+        const ledgerFile = path.join(tmp, 'hk2.json');
+        await assert.rejects(run({ calendarDir: dir, ledgerFile, channels, games, log: quiet, env: {}, now: new Date('2026-10-14T20:00:00-03:00'), afterPublish: async () => { if (++calls === 2) throw new Error('push rejeitado'); } }), /push rejeitado/, 'envio do ledger falhou: o job para');
+        assert.strictEqual(calls, 2, 'não segue publicando depois da falha');
+        assert.ok(Object.keys(ledgerLib.load(ledgerFile).posts['hk-1']).length >= 2, 'o que já foi ao ar está no ledger local');
+        console.log('✓ ledger a cada publicação');
+    }
+
+    // ---- review: token do Telegram não vaza; POST não idempotente não é repetido
+    {
+        const token = '123456789:AAHSECRETSECRETSECRET';
+        assert.ok(!safePath(`https://api.telegram.org/bot${token}/sendMessage`).includes('SECRET'));
+        assert.strictEqual(safePath(`https://api.telegram.org/bot${token}/sendMessage`), '/bot***/sendMessage');
+        const post = goodPost();
+        let n = 0;
+        const bad = async () => { n++; return new Response('boom', { status: 400 }); };
+        let err;
+        try { await telegram.publish({ post, composed: compose(post, 'telegram', 'teste'), media: null }, { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: '@c' }, bad); } catch (e) { err = e; }
+        assert.ok(err && !err.message.includes('SECRET'), 'mensagem de erro sem o token');
+
+        n = 0;
+        const flaky = async () => { n++; return new Response('bad gateway', { status: 502 }); };
+        await assert.rejects(telegram.publish({ post, composed: compose(post, 'telegram', 'teste'), media: null }, { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: '@c' }, flaky));
+        assert.strictEqual(n, 1, 'Telegram: 502 não repete o envio');
+
+        const urls = [];
+        const bskyFetch = async (url) => {
+            urls.push(url.split('/').pop());
+            if (url.endsWith('createSession')) return jsonRes({ accessJwt: 'j', did: 'did:plc:x', handle: 'h.bsky.social' });
+            return new Response('bad gateway', { status: 502 });
+        };
+        await assert.rejects(bluesky.publish({ post, composed: compose(post, 'bluesky', 'teste'), game: games.get('snake'), media: null }, { BLUESKY_HANDLE: 'h', BLUESKY_APP_PASSWORD: 'p' }, bskyFetch));
+        assert.strictEqual(urls.filter((u) => u === 'com.atproto.repo.createRecord').length, 1, 'Bluesky: 502 não repete o createRecord');
+
+        let signal;
+        await request(async (u, init) => { signal = init.signal; return new Response('{}', { status: 200 }); }, 'https://x.test/t', {}, {});
+        assert.ok(signal, 'toda requisição leva timeout (AbortSignal)');
+        assert.strictEqual(mastodon.isConfigured({ MASTODON_INSTANCE: 'http://m.example', MASTODON_ACCESS_TOKEN: 't' }), false, 'Mastodon exige https');
+        console.log('✓ token, retentativa e timeout');
+    }
+
+    // ---- review: Guardião mais estrito
+    {
+        const ok = (p) => validatePost(p, { games });
+        for (const at of ['2026-02-30T10:00:00-03:00', '2026-10-14T24:00:00Z', '2026-13-01T10:00:00Z', '2026-10-14 19:00:00-03:00', '2026-10-14T19:00:00']) assert.ok(ok(goodPost({ at })).length, `data inválida deveria reprovar: ${at}`);
+        assert.deepStrictEqual(ok(goodPost({ at: '2026-10-14T19:00:00Z' })), []);
+        assert.deepStrictEqual(ok(goodPost({ at: '2026-10-14T19:00-03:00' })), [], 'sem segundos é válido');
+        assert.ok(ok(goodPost({ campaign: undefined })).length, 'campanha ausente reprova (evita utm_campaign=undefined)');
+
+        const alt = 'descrição suficientemente longa';
+        assert.ok(ok(goodPost({ media: { image: 'package.json', alt } })).length, 'package.json fora de assets/ reprova');
+        assert.ok(ok(goodPost({ media: { video: 'tests/smoke.test.js', alt } })).length, 'qualquer arquivo fora de assets/ reprova');
+        assert.ok(ok(goodPost({ media: { image: 'assets/../package.json', alt } })).length, 'caminho com .. reprova');
+        assert.ok(ok(goodPost({ media: { image: 'assets/images/snake_preview.png', alt } })).length === 0, 'imagem de assets/ passa');
+        assert.ok(ok(goodPost({ media: { clip: 'constructor', game: 'tumbalacatumba', alt } })).length, 'tomada "constructor" não existe');
+        assert.ok(ok(goodPost({ media: { clip: 'mansao-ao-anoitecer', game: '../../x', alt } })).length, 'game com caminho reprova');
+        assert.strictEqual(insideAssets(path.resolve(__dirname, '../assets/images/snake_preview.png')), true);
+        assert.strictEqual(insideAssets(path.resolve(__dirname, '../assets/notas.txt')), false, 'extensão não permitida');
+
+        assert.deepStrictEqual(lintText('Para o número 12 da lista, o jogo roda direto no navegador, sem instalar nada.'), [], 'número 12 não é "número 1"');
+        assert.ok(lintText('O número 1 dos jogos de cobrinha, direto no navegador e sem instalar nada.').length, 'número 1 reprova');
+        assert.deepStrictEqual(lintText('Um jogo feito com C# e três.js, roda no navegador sem instalar nada aqui.'), [], 'C# no meio do texto não é hashtag');
+        assert.ok(lintText('Jogue em foo.com agora mesmo, roda direto no navegador sem instalar nada.').length, 'domínio sem http reprova');
+        assert.ok(lintText('Jogo brasileiro 🇧🇷🇧🇷🇧🇷🇧🇷 que roda direto no navegador sem instalar nada.').length, 'bandeiras contam como emoji');
+        console.log('✓ Guardião estrito');
+    }
+
+    // ---- review: Bluesky, hashtag que é prefixo de outra; calendário malformado
+    {
+        const text = 'texto\n\nplayfulhub.com.br/jogos/snake\n\n#JogosBR #Jogos';
+        const composed = { text, shown: 'playfulhub.com.br/jogos/snake', link: 'https://x/', tags: '#Jogos #JogosBR' };
+        const f = bluesky.buildFacets(text, composed);
+        const buf = Buffer.from(text);
+        const tagsFound = f.filter((x) => x.features[0].tag).map((x) => buf.subarray(x.index.byteStart, x.index.byteEnd).toString());
+        assert.deepStrictEqual(tagsFound.sort(), ['#Jogos', '#JogosBR'], '#Jogos não casa dentro de #JogosBR');
+        const bad = path.join(tmp, 'cal-bad');
+        fs.mkdirSync(bad);
+        fs.writeFileSync(path.join(bad, 'x.json'), JSON.stringify({ campaign: 'c1', psots: [] }));
+        assert.throws(() => loadCalendars(bad), /"posts" precisa ser uma lista/);
+        console.log('✓ facets e calendário malformado');
+    }
+
+    // ---- review: ledger.sh contra um remoto git local (precisa de bash e git 2.42+)
+    {
+        const have = (cmd) => spawnSync(cmd, ['--version'], { encoding: 'utf8' }).status === 0;
+        const gitVer = (spawnSync('git', ['--version'], { encoding: 'utf8' }).stdout.match(/(\d+)\.(\d+)/) || []).slice(1).map(Number);
+        if (!have('bash') || !have('git') || gitVer[0] < 2 || (gitVer[0] === 2 && gitVer[1] < 42)) {
+            console.log('⏭ ledger.sh: pulado (sem bash ou git 2.42+)');
+        } else {
+            const script = path.join(M, 'scripts/ledger.sh');
+            const git = (cwd, ...args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' });
+            const sh = (cwd, mode) => spawnSync('bash', [script, mode], { cwd, encoding: 'utf8' });
+            const origin = path.join(tmp, 'origin.git');
+            git(tmp, 'init', '-q', '--bare', origin);
+            const w1 = path.join(tmp, 'w1');
+            git(tmp, 'clone', '-q', origin, w1);
+            git(w1, 'commit', '-q', '--allow-empty', '-m', 'init');
+            git(w1, 'push', '-q', 'origin', 'HEAD:main');
+
+            // 1) remoto sem a branch: cria a órfã com ledger vazio
+            assert.strictEqual(sh(w1, 'checkout').status, 0);
+            assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(w1, '.ledger/ledger.json'), 'utf8')), { version: 1, posts: {} });
+            fs.writeFileSync(path.join(w1, '.ledger/ledger.json'), JSON.stringify({ version: 1, posts: { p1: { bluesky: { id: '1' } } } }));
+            assert.strictEqual(sh(w1, 'commit').status, 0);
+            assert.ok(git(origin, 'branch', '--list', 'marketing-ledger').stdout.includes('marketing-ledger'));
+            assert.strictEqual(sh(w1, 'commit').status, 0, 'sem mudança: ok e sem commit novo');
+
+            // 2) branch existente: o checkout traz o ledger de volta
+            const w2 = path.join(tmp, 'w2');
+            git(tmp, 'clone', '-q', origin, w2);
+            assert.strictEqual(sh(w2, 'checkout').status, 0);
+            assert.ok(fs.readFileSync(path.join(w2, '.ledger/ledger.json'), 'utf8').includes('"p1"'), 'ledger existente restaurado');
+
+            // 3) o caso do review: remoto inacessível NÃO pode virar um ledger vazio
+            const w3 = path.join(tmp, 'w3');
+            git(tmp, 'clone', '-q', origin, w3);
+            git(w3, 'remote', 'set-url', 'origin', path.join(tmp, 'nao-existe.git'));
+            const r3 = sh(w3, 'checkout');
+            assert.notStrictEqual(r3.status, 0, 'remoto inacessível: aborta');
+            assert.ok(!fs.existsSync(path.join(w3, '.ledger')), 'e não cria ledger vazio');
+
+            // 4) push rejeitado falha alto (outro ledger gravou antes) em vez de divergir
+            fs.writeFileSync(path.join(w2, '.ledger/ledger.json'), JSON.stringify({ version: 1, posts: { p2: {} } }));
+            assert.strictEqual(sh(w2, 'commit').status, 0);
+            fs.writeFileSync(path.join(w1, '.ledger/ledger.json'), JSON.stringify({ version: 1, posts: { p3: {} } }));
+            assert.notStrictEqual(sh(w1, 'commit').status, 0, 'push rejeitado: o script falha');
+            console.log('✓ ledger.sh');
+        }
     }
 
     fs.rmSync(tmp, { recursive: true, force: true });

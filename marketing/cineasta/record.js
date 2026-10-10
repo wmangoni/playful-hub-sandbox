@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync, execFileSync } = require('child_process');
+const { pathToFileURL } = require('url');
 const { sampleVec, clamp01 } = require('./lib/spline');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -34,8 +35,9 @@ const profileName = () => process.env.CINEASTA_PROFILE || (process.env.CINEASTA_
 const FPS = PROFILES.gpu.fps;
 const MIN_BRIGHTNESS = 18; // média de luma (0-255) abaixo disso = quadro preto/estragado
 
-// avisos do compilador de shader do Direct3D (ANGLE) no FXAA do three não são erro do jogo (ver tumbalacatumba/CLAUDE.md)
-const realErrors = (list) => list.filter((e) => !/warning X(3595|4000)/.test(e));
+// window.__errors junta console.error e console.warn do jogo. Só [error] e [uncaught] reprovam o clipe: avisos
+// ([warn]) do Chrome/SwiftShader/ANGLE são ruído de plataforma (ver tumbalacatumba/CLAUDE.md).
+const realErrors = (list) => list.filter((e) => !/^\[warn\]/.test(e) && !/warning X(3595|4000)/.test(e));
 
 function loadShots(game) {
     const file = path.join(__dirname, 'shots', `${game}.js`);
@@ -71,9 +73,20 @@ async function openPage(browser, shots, firstHour, profile) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.setViewport({ width: profile.width, height: profile.height, deviceScaleFactor: 1 });
-    const url = 'file:///' + path.resolve(ROOT, shots.file).split(path.sep).join('/');
+    const url = pathToFileURL(path.resolve(ROOT, shots.file)).href;
     await page.goto(`${url}?${shots.query}&q=${profile.quality}&t=${firstHour}`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__game && window.__game.state === 'play', { timeout: 90000 });
+    // O jogo tem o próprio loop de requestAnimationFrame, que avançaria o relógio entre os nossos ticks e quebraria
+    // o tempo determinístico (animações ambientes até 3x mais rápidas que a câmera, e variando com a máquina).
+    // Para o loop e confere que o tempo do jogo realmente parou.
+    const frozen = await page.evaluate(async () => {
+        const g = window.__game;
+        cancelAnimationFrame(g._raf);
+        const t0 = g.time;
+        await new Promise((r) => setTimeout(r, 200));
+        return g.time === t0;
+    });
+    if (!frozen) throw new Error('Cineasta: não consegui parar o loop do jogo (window.__game._raf mudou?). Veja tumbalacatumba/CLAUDE.md.');
     await page.addStyleTag({ content: OVERLAY_CSS });
     await page.evaluate((cta, url, k) => {
         document.documentElement.style.setProperty('--k', String(k));
@@ -145,7 +158,8 @@ function startFfmpeg(videoFile, fps, upscale) {
         proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg saiu com código ${code}`))));
     });
     proc.stdin.on('error', () => {}); // erro real aparece no 'close'
-    return { stdin: proc.stdin, done };
+    done.catch(() => {}); // a rejeição é tratada por quem faz await; isto evita 'unhandled' se o ffmpeg morrer antes
+    return { stdin: proc.stdin, done, proc };
 }
 
 const writeFrame = (stdin, buf) => new Promise((resolve) => (stdin.write(buf) ? resolve() : stdin.once('drain', resolve)));
@@ -166,6 +180,13 @@ function brightnessOf(imageFile) {
     return m ? Number(m[1]) : NaN;
 }
 
+/** brilho de um quadro do vídeo no instante `sec` */
+function lumaAt(videoFile, sec) {
+    const r = spawnSync('ffmpeg', ['-v', 'info', '-ss', String(sec), '-i', videoFile, '-frames:v', '1', '-vf', 'signalstats,metadata=print:key=lavfi.signalstats.YAVG', '-f', 'null', '-'], { encoding: 'utf8' });
+    const m = /YAVG=([\d.]+)/.exec((r.stdout || '') + (r.stderr || ''));
+    return m ? Number(m[1]) : NaN;
+}
+
 async function recordShot(browser, shots, shotId, outDir, { fast = false, stills = false } = {}) {
     const shot = shots.shots[shotId];
     if (!shot) throw new Error(`Cineasta: tomada "${shotId}" não existe em ${shots.game} (há: ${Object.keys(shots.shots).join(', ')})`);
@@ -181,43 +202,67 @@ async function recordShot(browser, shots, shotId, outDir, { fast = false, stills
     // aquecimento: deixa luz, neblina e LOD assentarem na posição inicial antes do primeiro quadro gravado
     for (let i = 0; i < 12; i++) await page.evaluate(frameInPage, { ...frameState(shot, 0), dt });
 
-    const enc = stills ? null : startFfmpeg(paths.video, fps, profile.width !== OUTPUT.width);
-    const posterIndex = Math.round(total * (shot.poster ?? 0.4));
+    // Grava com nome temporário e só promove ao nome final depois do controle de qualidade: um clipe reprovado
+    // (ou uma gravação interrompida) nunca fica no disco com o nome que o publicador procura.
+    const tmp = { video: paths.video.replace(/\.mp4$/, '.partial.mp4'), poster: paths.poster.replace(/\.jpg$/, '.partial.jpg') };
+    const cleanup = () => { for (const f of [tmp.video, tmp.poster]) fs.rmSync(f, { force: true }); };
+    // um relatório/clipe antigo não pode sobreviver a uma nova tentativa que falhe
+    if (!stills) for (const f of [paths.video, paths.poster, paths.report]) fs.rmSync(f, { force: true });
+
+    const enc = stills ? null : startFfmpeg(tmp.video, fps, profile.width !== OUTPUT.width);
+    const posterIndex = Math.min(total - 1, Math.round(total * (shot.poster ?? 0.4)));
     let posterBuf = null;
     const started = Date.now();
-    for (let i = 0; i < total; i++) {
-        const t = i * dt;
-        await page.evaluate(frameInPage, { ...frameState(shot, t), dt });
-        const buf = await page.screenshot({ type: 'jpeg', quality: fast ? 70 : 93, encoding: 'binary' });
-        if (i === posterIndex) posterBuf = Buffer.from(buf);
-        if (stills) {
-            if (i % (5 * fps) === 0) fs.writeFileSync(path.join(outDir, `${shots.game}--${shotId}--t${Math.round(t)}.jpg`), buf);
-        } else {
-            await writeFrame(enc.stdin, buf);
+    let gameErrors;
+    try {
+        for (let i = 0; i < total; i++) {
+            const t = i * dt;
+            await page.evaluate(frameInPage, { ...frameState(shot, t), dt });
+            const buf = await page.screenshot({ type: 'jpeg', quality: fast ? 70 : 93, encoding: 'binary' });
+            if (i === posterIndex) posterBuf = Buffer.from(buf);
+            if (stills) {
+                if (i % (5 * fps) === 0) fs.writeFileSync(path.join(outDir, `${shots.game}--${shotId}--t${Math.round(t)}.jpg`), buf);
+            } else {
+                await writeFrame(enc.stdin, buf);
+            }
+            if (i % (fps * 3) === 0) console.log(`  ${shotId}: ${i}/${total} quadros (${Math.round((Date.now() - started) / 1000)} s)`);
         }
-        if (i % (fps * 3) === 0) console.log(`  ${shotId}: ${i}/${total} quadros (${Math.round((Date.now() - started) / 1000)} s)`);
+        gameErrors = realErrors(await page.evaluate(() => (window.__errors || []).map(String)).catch(() => []))
+            .concat(realErrors(errors));
+    } catch (e) {
+        if (enc) { enc.stdin.destroy(); enc.proc.kill(); }
+        cleanup();
+        throw e;
+    } finally {
+        await page.close().catch(() => {});
     }
-    const gameErrors = realErrors(await page.evaluate(() => (window.__errors || []).map(String)).catch(() => []))
-        .concat(realErrors(errors));
-    await page.close();
     if (stills) return { shotId, stills: true };
 
     enc.stdin.end();
-    await enc.done;
-    fs.writeFileSync(paths.poster, posterBuf);
+    try { await enc.done; } catch (e) { cleanup(); throw e; }
+    fs.writeFileSync(tmp.poster, posterBuf);
 
     // controle de qualidade: se falhar, o clipe não pode ser publicado
-    const info = probe(paths.video);
-    const luma = brightnessOf(paths.poster);
+    const info = probe(tmp.video);
+    const luma = brightnessOf(tmp.poster);
+    // vários quadros, não só o poster: contexto WebGL perdido ou vídeo congelado passariam num único quadro bom
+    const lumas = [0.1, 0.3, 0.5, 0.7, 0.9].map((k) => lumaAt(tmp.video, +(shot.duration * k).toFixed(2)));
     const problems = [];
     if (info.width !== OUTPUT.width || info.height !== OUTPUT.height) problems.push(`resolução ${info.width}x${info.height}`);
     if (info.frames !== total) problems.push(`${info.frames} quadros em vez de ${total}`);
     if (Math.abs(info.duration - shot.duration) > 0.25) problems.push(`duração ${info.duration.toFixed(2)} s`);
     if (!(luma >= MIN_BRIGHTNESS)) problems.push(`poster escuro demais (luma ${luma})`);
+    if (lumas.some((l) => !(l >= MIN_BRIGHTNESS))) problems.push(`quadro escuro ao longo do vídeo (luma ${lumas.map((l) => l.toFixed(0)).join('/')})`);
+    if (new Set(lumas.map((l) => l.toFixed(2))).size < 3) problems.push('vídeo parece congelado (brilho idêntico em vários instantes)');
     if (gameErrors.length) problems.push(`erros no jogo: ${gameErrors.slice(0, 3).join(' | ')}`);
-    const report = { game: shots.game, shot: shotId, profile: profileName(), fps, ...info, posterLuma: luma, problems, ok: problems.length === 0 };
+    const report = { game: shots.game, shot: shotId, profile: profileName(), fps, ...info, posterLuma: luma, lumas, problems, ok: problems.length === 0 };
+    if (!report.ok) {
+        cleanup();
+        throw new Error(`Cineasta: ${shotId} reprovada no controle de qualidade: ${problems.join('; ')}`);
+    }
+    fs.renameSync(tmp.video, paths.video);
+    fs.renameSync(tmp.poster, paths.poster);
     fs.writeFileSync(paths.report, JSON.stringify(report, null, 2));
-    if (!report.ok) throw new Error(`Cineasta: ${shotId} reprovada no controle de qualidade: ${problems.join('; ')}`);
     return report;
 }
 

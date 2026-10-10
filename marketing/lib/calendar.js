@@ -6,6 +6,9 @@ const { CALENDAR_DIR } = require('../config');
 function loadCalendars(dir = CALENDAR_DIR) {
     const calendars = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort().map((file) => {
         const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+        // erro de digitação em "posts" faria o calendário inteiro ser ignorado em silêncio
+        if (!Array.isArray(data.posts)) throw new Error(`${file}: "posts" precisa ser uma lista`);
+        if (typeof data.campaign !== 'string' || !data.campaign) throw new Error(`${file}: "campaign" é obrigatório`);
         return { file, campaign: data.campaign, posts: data.posts };
     });
     const posts = calendars.flatMap((c) => (Array.isArray(c.posts) ? c.posts.map((p) => ({ ...p, campaign: c.campaign })) : []));

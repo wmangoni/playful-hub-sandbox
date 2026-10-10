@@ -10,9 +10,18 @@ const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' 
 
 const isConfigured = (env) => Boolean(env.BLUESKY_HANDLE && env.BLUESKY_APP_PASSWORD);
 
-/** posição de `needle` em `text` em bytes UTF-8 (o Bluesky indexa facets em bytes, não em caracteres) */
+/**
+ * posição de `needle` em `text` em bytes UTF-8 (o Bluesky indexa facets em bytes, não em caracteres).
+ * Só conta como achado se for uma "palavra" inteira: #Jogos não pode casar dentro de #JogosBR.
+ */
 function byteRange(text, needle) {
-    const i = text.indexOf(needle);
+    let i = text.indexOf(needle);
+    while (i >= 0) {
+        const before = i === 0 || /\s/.test(text[i - 1]);
+        const after = i + needle.length >= text.length || /\s/.test(text[i + needle.length]);
+        if (before && after) break;
+        i = text.indexOf(needle, i + 1);
+    }
     if (i < 0) return null;
     const start = Buffer.byteLength(text.slice(0, i));
     return { byteStart: start, byteEnd: start + Buffer.byteLength(needle) };
@@ -63,11 +72,12 @@ async function publish({ post, composed, game, media }, env, fetchImpl = fetch) 
         facets: buildFacets(composed.text, composed),
         embed: { $type: 'app.bsky.embed.external', external }
     };
+    // sem retentativa: o Bluesky não tem chave de idempotência, e repetir um createRecord cuja resposta se perdeu duplicaria o post
     const created = await json(await request(fetchImpl, `${service}/xrpc/com.atproto.repo.createRecord`, {
         method: 'POST',
         headers: { ...auth, 'content-type': 'application/json' },
         body: JSON.stringify({ repo: session.did, collection: 'app.bsky.feed.post', record })
-    }));
+    }, { retries: 0 }));
     const rkey = String(created.uri).split('/').pop();
     return { id: created.uri, url: `https://bsky.app/profile/${session.handle || env.BLUESKY_HANDLE}/post/${rkey}` };
 }
