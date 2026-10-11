@@ -9,6 +9,8 @@ const { resolveMedia, missingFiles, insideAssets } = require('./media');
 const ID_RE = /^[a-z0-9][a-z0-9-]{2,60}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
 const AT_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(Z|[+-]\d{2}:\d{2})$/;
+// destinos permitidos além da página do jogo (cada um é uma página do portal que existe de verdade)
+const ALLOWED_LINK_PATHS = ['/desafio/'];
 const CAMPAIGN_RE = /^[a-z0-9][a-z0-9-]{2,40}$/;
 
 /** ISO 8601 com fuso, estrito: rejeita 30/02, hora 24 e qualquer data que o JavaScript "corrigiria" em silêncio */
@@ -69,6 +71,17 @@ function validatePost(post, { games, mode = 'plan' }) {
     if (!Array.isArray(post.channels) || !post.channels.length || post.channels.some((c) => !cfg.CHANNELS.includes(c))) add(`"channels" deve ser subconjunto de ${cfg.CHANNELS.join(', ')}`);
     if (typeof post.text !== 'string') { add('texto ausente'); return p; }
     lintText(post.text).forEach(add);
+
+    if (post.link !== undefined) {
+        const l = post.link;
+        const plain = (t, min, max) => typeof t === 'string' && t.trim().length >= min && t.length <= max && !/https?:\/\/|www\.|(^|\s)@\w/i.test(t);
+        if (!l || typeof l !== 'object' || !ALLOWED_LINK_PATHS.includes(l.path)) add(`link.path deve ser um de: ${ALLOWED_LINK_PATHS.join(', ')}`);
+        else {
+            if (!plain(l.title, 5, 120)) add('link.title inválido (5 a 120 caracteres, sem URL nem @)');
+            if (!plain(l.description, 10, 280)) add('link.description inválida (10 a 280 caracteres, sem URL nem @)');
+            if (l.cta !== undefined && !plain(l.cta, 3, 40)) add('link.cta inválido (3 a 40 caracteres, sem URL nem @)');
+        }
+    }
 
     const tags = post.hashtags || [];
     if (!Array.isArray(tags) || tags.length > cfg.MAX_HASHTAGS) add(`no máximo ${cfg.MAX_HASHTAGS} hashtags`);

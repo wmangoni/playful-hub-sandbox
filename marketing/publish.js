@@ -21,6 +21,8 @@ const { classify, onePerChannel } = require('./lib/schedule');
 const ledgerLib = require('./lib/ledger');
 const { resolveMedia, missingFiles } = require('./lib/media');
 const { compose } = require('./lib/compose');
+const { dailyPosts, dailyWindow } = require('./lib/daily');
+const desafio = require(path.join(cfg.ROOT, 'assets/js/desafio-core.js'));
 
 function clipsNeeded(due) {
     const seen = new Map();
@@ -45,14 +47,27 @@ async function run({
         return { paused: true, published: [], skipped: [], failed: [], expired: [] };
     }
 
-    const { posts } = loadCalendars(calendarDir);
+    const { posts: calendarPosts } = loadCalendars(calendarDir);
+    // Post diário do Desafio do Dia: derivado das regras da página /desafio/ (não há arquivo de calendário).
+    // MARKETING_DAILY=false desliga. Na checagem (CI) cobre os próximos 180 dias, para um conflito com o
+    // calendário editorial aparecer no PR e não só no dia.
+    let daily = [];
+    if (env.MARKETING_DAILY !== 'false') {
+        if (checkOnly) {
+            const today = desafio.brtDate(now);
+            daily = dailyPosts({ from: today, to: desafio.addDays(today, 180), existing: calendarPosts });
+        } else {
+            daily = dailyPosts({ ...dailyWindow(now), existing: calendarPosts });
+        }
+    }
+    const posts = [...calendarPosts, ...daily];
     const problems = validateCalendar(posts, { games, mode: 'plan' });
     if (problems.length) {
         const err = new Error(`Guardião reprovou o calendário:\n  - ${problems.join('\n  - ')}`);
         err.problems = problems;
         throw err;
     }
-    if (checkOnly) return { ok: true, posts: posts.length };
+    if (checkOnly) return { ok: true, posts: calendarPosts.length, daily: daily.length };
 
     const ledger = ledgerLib.load(ledgerFile);
     const classified = classify(posts, ledger, now);
@@ -141,7 +156,7 @@ if (require.main === module) {
         afterPublish
     }).then((r) => {
         if (flag('--plan')) return console.log(JSON.stringify(r));
-        if (flag('--check')) return console.log(`Calendários válidos (${r.posts} posts).`);
+        if (flag('--check')) return console.log(`Calendários válidos (${r.posts} posts) e ${r.daily} posts diários do Desafio do Dia nos próximos 180 dias.`);
         if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryMarkdown(r));
         if (r.failed.length) process.exit(1);
     }).catch((e) => { console.error(e.message); process.exit(1); });
