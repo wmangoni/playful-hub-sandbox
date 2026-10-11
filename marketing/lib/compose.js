@@ -9,16 +9,18 @@ function graphemes(text) {
     return [...new Intl.Segmenter('pt', { granularity: 'grapheme' }).segment(text)].length;
 }
 
-/** @returns {{text: string, link: string, shown: string, tags: string}} */
+/** @returns {{text: string, link: string, shown: string, tags: string, cta: string}} */
 function compose(post, channel, campaign) {
-    const link = postLink({ game: post.game, campaign, postId: post.id }, channel);
-    const shown = displayLink(post.game);
+    const dest = post.link && post.link.path; // destino alternativo (ex.: /desafio/); padrão = página do jogo
+    const link = postLink({ game: post.game, path: dest, campaign, postId: post.id }, channel);
+    const shown = displayLink(post.game, dest);
+    const cta = (post.link && post.link.cta) || 'Jogar grátis no navegador';
     const tags = tagsLine(post);
     let text;
     if (channel === 'bluesky') text = [post.text, shown, tags].filter(Boolean).join('\n\n');
     else if (channel === 'mastodon') text = [post.text, link, tags].filter(Boolean).join('\n\n');
-    else text = [post.text, '▶ Jogar grátis no navegador', tags].filter(Boolean).join('\n\n');
-    return { text, link, shown, tags };
+    else text = [post.text, `▶ ${cta}`, tags].filter(Boolean).join('\n\n');
+    return { text, link, shown, tags, cta };
 }
 
 /** tamanho como cada plataforma conta */
