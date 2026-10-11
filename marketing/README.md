@@ -43,6 +43,20 @@ ledger (branch marketing-ledger) ◄── publicador ◄───────�
 - Cada publicação é gravada no ledger **e enviada à branch `marketing-ledger` na hora** (se o envio falhar, o job para: seguir publicando sem registro arriscaria duplicar tudo). Se o runner morrer no meio, o que já foi publicado continua registrado. Um canal que falhou é tentado de novo na execução seguinte; os que deram certo não se repetem. O Mastodon recebe `Idempotency-Key`. Bluesky e Telegram não têm idempotência, então o `createRecord`/`send*` **nunca** é repetido automaticamente (se a resposta se perder, o post pode ter saído: confira o canal antes de reexecutar).
 - Todo link leva UTMs (`utm_source=<canal>&utm_medium=social&utm_campaign=<campanha>&utm_content=<id do post>`) para a página de informações do jogo (`/jogos/<jogo>`, a canônica do SEO). O GA4 lê as UTMs sem nenhum código extra.
 
+## Post diário do Desafio do Dia (automático, sem calendário)
+
+Todo dia às **09:00 (Brasília)** o publicador anuncia o Desafio do Dia nos três canais. Não existe arquivo de calendário para isso: o post de cada data é **derivado** de `assets/js/desafio-core.js` (as mesmas regras da página `/desafio/`), então o jogo anunciado é sempre o jogo do dia. Código: `lib/daily.js`.
+
+- **Texto:** 24 variações em rodízio, sempre com o número da edição (`#N`) e o nome do jogo. Todas passam pelo Guardião como qualquer post.
+- **Link:** vai para `/desafio/` (que abre o jogo do dia), com `utm_campaign=desafio-do-dia&utm_content=desafio-AAAA-MM-DD`. O cartão do Bluesky e a legenda do Telegram usam o título/CTA do desafio, não os do jogo. Isso é o campo opcional `link` de um post (`path` só pode ser `/desafio/`, validado pelo Guardião).
+- **Imagem:** a prévia do jogo em `assets/images/`. A do Pinball (1,2 MB) estoura o limite do card do Bluesky, então o diário usa `pinball_preview_card.jpg` (`IMAGE_OVERRIDES` em `daily.js`); o teste confere que todas cabem.
+- **Calendário editorial tem prioridade:** se um post diário violasse a frequência por canal (2 por dia, 4 h de intervalo) com os posts do calendário, ele é **pulado** naquele dia (hoje: 31/10, por causa do post de Halloween do meio-dia). Nunca derruba a divulgação: um defeito do gerador (imagem ausente, conflito inesperado) descarta o diário com aviso e o calendário editorial segue; já na checagem da CI o mesmo defeito falha, para ser corrigido. O prefixo de id `desafio-AAAA-MM-DD` é reservado ao gerador.
+- **Antes de 12/10/2026** (edição #1) não há post.
+- **O post diário vale só no próprio dia** (`staleAfterHours: 14`, ou seja, até 23:00): o link abre `/desafio/`, que sempre mostra o jogo de *hoje*, então um post atrasado anunciaria um jogo e levaria a outro. Passou das 23:00 sem sair (workflow parado, canal fora do ar), ele **vence** com um `::warning::` e não é publicado no dia seguinte. É um campo opcional de qualquer post (`staleAfterHours`, de 1 a 36).
+- **Desligar só o diário:** variável de repositório `MARKETING_DAILY=false` (também vale `0`, `no`, `off`; o workflow repassa a variável ao plano e ao publicador). `MARKETING_PAUSED=true` desliga tudo (diário incluído). `npm run marketing:check` valida os próximos 180 dias, para um conflito com o calendário aparecer no PR.
+
+**Limitações conhecidas do diário:** (1) um post editorial adicionado *depois* de o diário do dia já ter saído, a menos de 4 h dele, não é barrado (o ledger já registrou o diário); mexa no calendário só para datas futuras. (2) Com só um canal configurado, os outros ficam pendentes e geram avisos de "vencido" na execução (inofensivo).
+
 ## Escrevendo posts (humanos ou agentes)
 
 Arquivo `calendar/<campanha>.json`:
