@@ -53,7 +53,8 @@ async function runTests() {
 
   console.log('\n--- 0. Navegando para Voxel City ---');
   await page.goto(`http://127.0.0.1:${PORT}/voxel_city/index.html`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  await new Promise(r => setTimeout(r, 2000));
+  await page.waitForFunction(() => window.game && window.game.world && window.game.world.buildings && window.game.world.buildings.length > 50, { timeout: 20000 });
+  await new Promise(r => setTimeout(r, 500));
 
   // Test 1: Spatial hash estrutura populada
   console.log('\n--- Test 1: Spatial hash populada ---');
@@ -93,18 +94,19 @@ async function runTests() {
     const w = window.game.world;
     const b = w.buildings[0]; // first building box (raw)
     const cx = (b.min.x + b.max.x) / 2;
+    const cy = (b.min.y + b.max.y) / 2;
     const cz = (b.min.z + b.max.z) / 2;
     const halfW = (b.max.x - b.min.x) / 2;
     const halfD = (b.max.z - b.min.z) / 2;
 
     // 1) dead center inside a building -> must collide
-    const insideUnsafe = w.checkCollision({ x: cx, y: 1, z: cz });
+    const insideUnsafe = w.checkCollision({ x: cx, y: cy, z: cz });
 
     // 2) far away in open ground -> must NOT collide
-    const openUnsafe = w.checkCollision({ x: cx + halfW + 500, y: 1, z: cz + halfD + 500 });
+    const openUnsafe = w.checkCollision({ x: cx + halfW + 500, y: cy, z: cz + halfD + 500 });
 
     // 3) just grazing: 0.3 inside the wall (within 0.5 radius) -> still collides (radius preserved)
-    const edgeUnsafe = w.checkCollision({ x: cx + halfW - 0.3, y: 1, z: cz });
+    const edgeUnsafe = w.checkCollision({ x: cx + halfW - 0.3, y: cy, z: cz });
 
     // 4) 1.0 clear of the wall -> NOT collide
     const clearSafe = w.checkCollision({ x: cx + halfW + 1.0, y: 1, z: cz });

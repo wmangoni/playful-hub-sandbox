@@ -104,7 +104,7 @@ async function runTests() {
 
   // Observa o voo da flecha pelos próximos frames
   const flightHistory = [];
-  for (let f = 0; f < 15; f++) {
+  for (let f = 0; f < 35; f++) {
     await new Promise(r => setTimeout(r, 25));
     const arrowState = await page.evaluate(() => {
       const arrows = window.__archer.getActiveArrows();
