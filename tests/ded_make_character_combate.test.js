@@ -840,6 +840,65 @@ async function run() {
     C.runBattle(b);
   });
 
+  test('Avatar de Sszzaas: imune a medo (Dragão, Tarrasque, Balor), Evasão contra sopros e Esquiva Sobrenatural', () => {
+    // 1. Tarrasque: Presença Aterradora (48 DV afeta criaturas com até 47 DV; Avatar tem 44 DV)
+    let b = luta(ficha('tarrasque'), ficha('ha-avatar-de-sszzaas'), [1]);
+    const tarrasque = b.get('A1');
+    const avatar = b.get('B1');
+    SP.onAttackAction(K, b, tarrasque);
+    assert.deepStrictEqual(Object.keys(avatar.cond), [], 'não fica abalado/apavorado');
+    assert.ok(b.eventos.some(e => e.tipo === 'imune' && /imune a Presença Aterradora/i.test(e.texto)), 'registra log de imunidade contra Presença Aterradora');
+
+    // 2. Balor: Medo na pancada e magia Medo (ambos bloqueados por imunidade a ação mental/medo)
+    b = luta(ficha('balor'), ficha('ha-avatar-de-sszzaas'), [1, 1]);
+    const balor = b.get('A1');
+    const av = b.get('B1');
+    const pancada = balor.ataques.find(a => /pancada/i.test(a.nome));
+    SP.onHit(K, b, balor, av, pancada, { critico: false, natural: 15 });
+    assert.deepStrictEqual(Object.keys(av.cond), [], 'imune ao medo da pancada');
+    assert.ok(b.eventos.some(e => e.tipo === 'imune' && /Medo não afeta/i.test(e.texto)), 'registra imunidade à pancada');
+
+    const magiaMedo = balor.especiais.find(e => e.id === 'medo-sm');
+    K.efeitoComTeste(b, balor, av, magiaMedo.mecanica, { rotulo: magiaMedo.nome, natureza: magiaMedo.natureza });
+    assert.deepStrictEqual(Object.keys(av.cond), [], 'imune à magia Medo');
+    assert.ok(b.eventos.some(e => e.tipo === 'imune' && /não afeta Avatar de Sszzaas/i.test(e.texto)), 'registra imunidade à magia Medo');
+
+    // 3. Evasão contra o sopro do Dragão Vermelho (Reflexos CD 25 para metade)
+    b = luta(ficha('dragao-vermelho-adulto'), ficha('ha-avatar-de-sszzaas'), [10]); // Avatar rola 10 + 43 = 53 vs CD 25
+    const av2 = b.get('B1');
+    const pvAntes = av2.pv;
+    const sopro = b.get('A1').especiais.find(e => e.mecanica?.efeito === 'sopro');
+    K.efeitoComTeste(b, b.get('A1'), av2, sopro.mecanica, { rotulo: sopro.nome, natureza: sopro.natureza });
+    assert.strictEqual(av2.pv, pvAntes, 'evasão anula todo o dano do sopro');
+    assert.ok(b.eventos.some(e => e.tipo === 'evasao' && /usa Evasão e não sofre dano/i.test(e.texto)), 'emite log de evasão');
+
+    // 4. Esquiva Sobrenatural (não perde Des na rodada 1 antes de agir e não pode ser flanqueado)
+    b = luta(ficha('balor'), ficha('ha-avatar-de-sszzaas'));
+    b.rodada = 1;
+    assert.strictEqual(K.semDestreza(b, b.get('B1'), b.get('A1')), false, 'mantém a Des na CA na 1ª rodada');
+    assert.strictEqual(b.get('B1').imuneAFlanco, true, 'não pode ser flanqueado');
+  });
+
+  test('Mestre-Arsenal (Coragem Total), Paladino Extremo e Tarso (ácido): imunidades respeitadas', () => {
+    // 1. Mestre-Arsenal: Coragem Total de Keenn (imune a medo da Presença Aterradora do Tarrasque)
+    let b = luta(ficha('tarrasque'), ficha('ha-mestre-arsenal'), [1]);
+    SP.onAttackAction(K, b, b.get('A1'));
+    assert.deepStrictEqual(Object.keys(b.get('B1').cond), [], 'Arsenal não fica com medo do Tarrasque');
+    assert.ok(b.eventos.some(e => e.tipo === 'imune' && /imune a Presença Aterradora/i.test(e.texto)), 'Arsenal registra log de imunidade a medo');
+
+    // 2. Paladino Extremo: Paladino 20 (imune a medo do Tarrasque)
+    b = luta(ficha('tarrasque'), ficha('ha-paladino-extremo'), [1]);
+    SP.onAttackAction(K, b, b.get('A1'));
+    assert.deepStrictEqual(Object.keys(b.get('B1').cond), [], 'Paladino Extremo imune a medo do Tarrasque');
+
+    // 3. Tarso: Imune a ácido (fisiologia de Dragão Negro Ancião / Dracolich)
+    b = luta(ficha('tarrasque'), ficha('ha-tarso'), [1]);
+    const pvTarso = b.get('B1').pv;
+    const efeitoAcido = { dano: '10d6', tipo_energia: 'ácido', resistencia: 'ref', cd: 20, metade_se_passar: true };
+    K.efeitoComTeste(b, b.get('A1'), b.get('B1'), efeitoAcido, { rotulo: 'Baforada Ácida' });
+    assert.strictEqual(b.get('B1').pv, pvTarso, 'Tarso não sofre dano de ácido');
+  });
+
   console.log(`\n${passed} testes passaram.`);
 }
 
