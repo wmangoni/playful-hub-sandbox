@@ -1,0 +1,124 @@
+name: Divulgação
+
+# Publica os posts do calendário (marketing/calendar) quando chega a hora e grava os clipes que faltam.
+# Detalhes, segredos necessários e como pausar: marketing/README.md
+#
+# Liga/desliga: o agendamento só roda com a variável de repositório MARKETING_ENABLED=true
+# (Settings > Secrets and variables > Actions > Variables). A execução manual sempre roda.
+
+on:
+  schedule:
+    - cron: '7 * * * *' # de hora em hora; sem nada devido, termina em segundos
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Só simular: grava os clipes, mostra o que seria publicado e não toca no ledger'
+        type: boolean
+        default: true
+      now:
+        description: 'Simular o relógio (ISO com fuso, ex.: 2026-10-14T19:30:00-03:00). Vazio = agora'
+        required: false
+
+# uma execução por vez: duas ao mesmo tempo poderiam publicar o mesmo post duas vezes
+concurrency:
+  group: divulgacao
+  cancel-in-progress: false
+
+permissions:
+  contents: write # só para a branch marketing-ledger
+
+env:
+  MARKETING_LEDGER: ${{ github.workspace }}/.ledger/ledger.json
+  CINEASTA_GL: swiftshader # runner sem GPU: o Cineasta renderiza por software, quadro a quadro
+
+jobs:
+  divulgacao:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.MARKETING_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NOW: ${{ inputs.now }}
+      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Conferir entradas
+        run: |
+          if [ "$DRY" != "true" ] && [ -n "$NOW" ]; then
+            echo "::error::O campo 'now' só vale com dry_run marcado: com publicação de verdade ele gravaria um horário falso no ledger."
+            exit 1
+          fi
+
+      - name: Ledger (branch marketing-ledger)
+        run: bash marketing/scripts/ledger.sh checkout
+
+      - name: Plano
+        id: plan
+        env:
+          MARKETING_PAUSED: ${{ vars.MARKETING_PAUSED }}
+        run: |
+          plan=$(node marketing/publish.js --plan ${NOW:+--now "$NOW"})
+          echo "$plan"
+          # post que passou da janela sem ser publicado não pode sumir em silêncio
+          node -e "const p = JSON.parse(process.argv[1]); (p.expired || []).forEach((id) => console.log('::warning::Post vencido, não será publicado: ' + id)); (p.superseded || []).forEach((x) => console.log('::warning::Post adiado por haver um mais recente no canal: ' + x.id + ' (' + x.channel + ')'))" "$plan"
+          echo "due=$(node -p "JSON.parse(process.argv[1]).due?.length ?? 0" "$plan")" >> "$GITHUB_OUTPUT"
+          echo "clips=$(node -p "JSON.parse(process.argv[1]).clipsNeeded?.length ?? 0" "$plan")" >> "$GITHUB_OUTPUT"
+
+      # --- só quando há clipe para gravar (o publicador em si não tem dependências)
+      - name: ffmpeg
+        if: steps.plan.outputs.clips != '0'
+        run: command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
+      - name: Cache do Chrome do Puppeteer
+        if: steps.plan.outputs.clips != '0'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Dependências
+        if: steps.plan.outputs.clips != '0'
+        run: npm ci
+
+      - name: Cache dos clipes
+        if: steps.plan.outputs.clips != '0'
+        uses: actions/cache@v4
+        with:
+          path: marketing/out/clips
+          # regrava se o jogo ou as tomadas mudarem. O run_id faz cada execução salvar o que gravou (uma chave fixa
+          # nunca seria atualizada depois do primeiro salvamento); o restore-keys traz o cache mais recente.
+          key: clips-${{ hashFiles('tumbalacatumba/Tumbalacatumba.html', 'marketing/cineasta/**') }}-${{ github.run_id }}
+          restore-keys: |
+            clips-${{ hashFiles('tumbalacatumba/Tumbalacatumba.html', 'marketing/cineasta/**') }}-
+
+      - name: Gravar clipes (Cineasta)
+        if: steps.plan.outputs.clips != '0'
+        run: node marketing/render.js
+
+      # --- publicação
+      - name: Publicar
+        if: steps.plan.outputs.due != '0'
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          MASTODON_INSTANCE: ${{ secrets.MASTODON_INSTANCE }}
+          MASTODON_ACCESS_TOKEN: ${{ secrets.MASTODON_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MARKETING_PAUSED: ${{ vars.MARKETING_PAUSED }}
+          # envia o ledger ao remoto logo depois de cada publicação (não só no fim): runner que morre ou job que
+          # estoura o tempo não pode deixar posts publicados fora do ledger
+          MARKETING_LEDGER_PUSH: ${{ env.DRY != 'true' && 'true' || 'false' }}
+        run: node marketing/publish.js ${NOW:+--now "$NOW"} $([ "$DRY" = "true" ] && echo --dry-run)
+
+      # rede de segurança: o publicador já envia o ledger a cada post; isto cobre o que sobrou (ex.: falha parcial).
+      # Roda mesmo se a publicação falhou em um canal: o que já foi ao ar precisa ficar registrado
+      - name: Salvar ledger
+        if: ${{ always() && steps.plan.outputs.due != '0' && env.DRY != 'true' }}
+        run: bash marketing/scripts/ledger.sh commit

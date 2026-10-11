@@ -33,3 +33,26 @@ O SEO e a descoberta do portal são **gerados**, não escritos à mão. A fonte 
 - **Não adicione `hreflang`** enquanto não existirem versões traduzidas reais das páginas (previsto para uma fase futura); `hreflang` apontando para páginas inexistentes prejudica a indexação.
 - **Teste:** `tests/seo.test.js` valida cobertura do sitemap, URLs absolutas, imagens existentes, JSON-LD parseável e um único bloco por página. Ao mudar o gerador, rode `npm run seo`, `npm run seo:check` e `node tests/seo.test.js`.
 
+## Regras de divulgação (`marketing/`)
+
+A divulgação do portal é automatizada: o calendário em `marketing/calendar/*.json` define os posts, o Cineasta grava vídeos dos jogos, o Guardião valida e o publicador envia pelas APIs oficiais (Bluesky, Mastodon, Telegram), tudo pelo workflow `.github/workflows/divulgacao.yml`. Guia completo em `marketing/README.md`.
+
+- **Posts são dados, não código.** Para divulgar algo, adicione posts ao calendário (ou crie um novo `calendar/<campanha>.json`) e abra PR. `npm run marketing:check` (também no `test:ci`) precisa passar. Não publique "na mão" nem chame as APIs fora do publicador.
+- **Nunca afrouxe o Guardião** (`marketing/lib/guard.js`, limites em `marketing/config.js`) para fazer um post passar: corrija o post. Os limites (no máximo 2 posts por dia e 4 h de intervalo por canal, 3 hashtags, 36 h de janela) existem para não virar spam.
+- **Texto honesto e sem isca.** Só afirme o que o jogo realmente tem (confira em `games.json`/`jogos/<jogo>.html` e no código). Nada de URL, @menção ou hashtag dentro do texto (o link com UTM e as hashtags são montados pelo publicador), nada de "o melhor do mundo", "clique aqui", "marque um amigo", sorteios ou pedido de curtida/compartilhamento. Toda mídia precisa de `alt`.
+- **Segredos nunca entram no repositório.** Tokens vivem só nos Secrets do GitHub. O `server.js` serve a raiz do projeto como estática, então nada sensível pode ficar em `marketing/`. `marketing/out/` (clipes) e `.ledger/` são ignorados pelo git.
+- **O ledger vive na branch `marketing-ledger`**, mantida pelo workflow. Não edite à mão nem apague: é o que impede posts duplicados.
+- **Canais novos** só com API oficial que permita postar de forma automatizada, conta marcada como automatizada e adaptador em `marketing/channels/` com testes em `tests/marketing.test.js`. Reddit, Facebook, Instagram e TikTok ficam de fora de propósito (sem API gratuita utilizável e risco de ban). Nada de contas falsas, engajamento comprado ou respostas automáticas em posts de terceiros.
+- **Vídeos vêm do Cineasta** (`marketing/cineasta/`): novas tomadas em `cineasta/shots/<jogo>.js`, ensaiadas com `--stills`. O Cineasta não pode alterar o jogo; ele só usa a API de depuração do jogo. Se mudar essa API, atualize o Cineasta junto.
+- **Pausar tudo:** variável de repositório `MARKETING_PAUSED=true` (ou desligar `MARKETING_ENABLED`).
+
+## Regras do Desafio do Dia (`/desafio/`)
+
+Todo dia (data de Brasília) um jogo de um rodízio fixo vira o "Desafio do Dia": o jogador faz o maior placar e compartilha. Fonte única das regras: `assets/js/desafio-core.js` (usado pela página `desafio/index.html`, pelo banner da home, pelo overlay `assets/js/desafio.js` e, depois, pelo publicador de divulgação).
+
+- **A lista `GAMES` do `desafio-core.js` define o jogo de cada dia: qualquer mudança nela (ordem, inclusão, remoção) muda o jogo de todos os dias futuros.** O teste `tests/desafio.test.js` trava a lista de propósito. Só mude com decisão do dono do projeto e atualize o teste junto.
+- **Um jogo só participa se tiver um elemento com o placar numérico visível** (hoje `#score`) e carregar `desafio-core.js` e `desafio.js` no fim do `<body>` do `index.html`. Se renomear ou remover esse elemento, atualize `scoreSelector` no core; o teste confere os 5 jogos.
+- **O overlay só lê.** Nunca altere a lógica, o estado ou o `Math.random` de um jogo por causa do desafio. Ele fica inativo sem `?desafio=AAAA-MM-DD` válido, recente e do jogo certo para aquela data, e se esconde num Shadow DOM.
+- **Sem servidor, ranking ou cadastro.** Os placares ficam só no `localStorage` de quem jogou (`ph-desafio-v1`). Mudar isso (ranking, contas, envio de dados) é decisão do dono do projeto (privacidade/LGPD), não faça por conta própria. Não prometa "mesma sequência para todos": os jogos não são determinísticos.
+- A página `desafio/index.html` tem o head escrito à mão (canonical, OG, JSON-LD) e entra no sitemap e no `llms.txt` por `EXTRA_PAGES` em `scripts/generate-seo.js`; rode `npm run seo`. Nunca crie um `<iframe>` do jogo nela (regra do projeto).
+- Testes: `node tests/desafio.test.js` (regras e integridade) e `node tests/qa_desafio.test.js` (navegador; `SHOTS_DIR=<pasta>` salva capturas).

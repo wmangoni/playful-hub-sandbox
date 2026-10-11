@@ -40,3 +40,5 @@ O jogo é implementado em um único arquivo de interface e motor físico:
 - `reflectVelocity(vx, vy, normalX, normalY)`: Executa a reflexão elástica de um vetor de velocidade bidimensional diante de uma normal de impacto.
 - `checkFlipperCollisions()`: Avalia o contato entre a bola e os retângulos dos flippers rotacionados nos pivôs.
 - `createParticles(x, y, count, color)`: Spawna novas partículas no vetor de colisão com cores customizadas para efeitos de faísca.
+
+- **Desafio do Dia:** este jogo participa do rodízio (`assets/js/desafio-core.js`). O overlay `assets/js/desafio.js` só lê o texto do elemento `#score` (e só com `?desafio=AAAA-MM-DD` na URL). Não renomeie nem remova o `#score` sem atualizar `scoreSelector` no core (o teste `tests/desafio.test.js` confere). Ele não toca no estado nem no `Math.random` do jogo.

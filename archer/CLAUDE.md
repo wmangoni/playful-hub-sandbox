@@ -43,3 +43,5 @@ O jogo é estruturado de forma compacta em um único arquivo HTML que centraliza
 - `checkCollision()`: Testa a colisão geométrica da flecha com o balão. Se colidirem, invoca `createBalloonPopEffect()` para despedaçar o balão em fragmentos dinâmicos (`.balloon-fragment`) usando propriedades CSS variáveis (`--tx`, `--ty`, `--rot`).
 - `positionBalloon()`: Coloca o balão de forma aleatória em zonas seguras no lado direito da tela e reativa sua exibição.
 - `endGame()`: Finaliza a partida e exibe a tela de estatísticas finais.
+
+- **Desafio do Dia:** este jogo participa do rodízio (`assets/js/desafio-core.js`). O overlay `assets/js/desafio.js` só lê o texto do elemento `#score` (e só com `?desafio=AAAA-MM-DD` na URL). Não renomeie nem remova o `#score` sem atualizar `scoreSelector` no core (o teste `tests/desafio.test.js` confere). Ele não toca no estado nem no `Math.random` do jogo.
