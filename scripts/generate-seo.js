@@ -127,6 +127,7 @@ function gameJsonLd(g) {
         offers: { '@type': 'Offer', price: '0', priceCurrency: g.currency || 'BRL', availability: 'https://schema.org/InStock' },
         publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE + '/' }
     };
+    if (g.noOffers) delete entity.offers; // páginas traduzidas: sem preço/moeda inventados (isAccessibleForFree já diz que é grátis)
     if (g.kind === 'game') entity.gamePlatform = 'Web browser';
     if (g.genre) entity.genre = g.genre;
     if (g.playUrl) entity.potentialAction = { '@type': 'PlayAction', target: g.playUrl };
@@ -257,7 +258,7 @@ function buildLlmsTxt(catalog) {
         '',
         '## English and Spanish / Inglés y español',
         '',
-        ...i18n.langs.map(l => `- [PlayfulHub in ${i18n.LANGS[l].label}](${i18n.hubUrl(l)}): ${i18n.slugs.length} games with an info page in ${i18n.LANGS[l].label} (the games themselves may show some labels in Portuguese)`),
+        ...i18n.langs.map(l => `- [PlayfulHub in ${i18n.LANGS[l].label}](${i18n.hubUrl(l)}): ${i18n.slugs.length} games with an info page in ${i18n.LANGS[l].englishName} (some games show a few labels in Portuguese; each page says so)`),
         '',
         '## Dados',
         '',

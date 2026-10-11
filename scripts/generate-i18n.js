@@ -40,10 +40,10 @@ function validateTranslation(lang, tr, pages) {
     const p = [];
     const need = (cond, msg) => { if (!cond) p.push(`${lang}: ${msg}`); return Boolean(cond); };
     const filled = (v) => typeof v === 'string' && v.trim().length > 0 && !/\{\{|\}\}|\bundefined\b|\bTODO\b|\bFIXME\b/.test(v);
-    for (const k of ['htmlLang', 'titleSuffix', 'ogTitleSuffix', 'home', 'games', 'howToPlay', 'goal', 'tips', 'about', 'genre', 'developer', 'features', 'related', 'footer', 'notePartial', 'noteToggle']) {
+    for (const k of ['htmlLang', 'titleSuffix', 'ogTitleSuffix', 'home', 'games', 'howToPlay', 'goal', 'tips', 'about', 'genre', 'developer', 'features', 'related', 'footer', 'noteToggle']) {
         need(filled(tr.ui && tr.ui[k]), `ui.${k} vazio`);
     }
-    for (const k of ['title', 'description', 'keywords', 'h1', 'lead', 'gamesHeading', 'cta', 'more', 'moreLink', 'footer']) {
+    for (const k of ['title', 'description', 'keywords', 'h1', 'lead', 'gamesHeading', 'cta', 'more', 'moreLink', 'footer', 'langLabel']) {
         need(filled(tr.hub && tr.hub[k]), `hub.${k} vazio`);
     }
     for (const slug of cfg.slugs) {
@@ -55,6 +55,9 @@ function validateTranslation(lang, tr, pages) {
         (t.controls || []).forEach((c, i) => need(Array.isArray(c) && c.length === 2 && filled(c[0]) && filled(c[1]), `${slug}.controls[${i}] inválido`));
         need(Array.isArray(t.tips) && t.tips.length === src.tips.length, `${slug}: ${src.tips.length} dicas no original, ${(t.tips || []).length} na tradução`);
         (t.tips || []).forEach((x, i) => need(filled(x), `${slug}.tips[${i}] vazio`));
+        // nota de idioma ESPECÍFICA do jogo (o que está em português), só nos jogos "partial"
+        if (cfg.game(slug).ui === 'partial') need(filled(t.uiNote) && t.uiNote.length >= 40, `${slug}: falta uiNote específica (o que está em português dentro do jogo)`);
+        else need(t.uiNote === undefined, `${slug}: uiNote só vale para jogos "partial"`);
         need(Array.isArray(t.tags) && t.tags.length === src.tags.length, `${slug}: ${src.tags.length} tags no original, ${(t.tags || []).length} na tradução`);
         (t.tags || []).forEach((x, i) => need(filled(x), `${slug}.tags[${i}] vazio`));
     }
@@ -66,6 +69,19 @@ function replaceOnce(html, from, to) {
     const n = html.split(from).length - 1;
     if (n !== 1) throw new Error(`templates/game-page-template.html mudou: "${from.slice(0, 70)}" aparece ${n}x (esperava 1). Atualize scripts/generate-i18n.js.`);
     return html.replace(from, () => to);
+}
+
+/** remove contêineres de anúncio, o carregamento do AdSense e os preconnects; falha se o template mudar */
+function stripAds(html) {
+    const strip = (re, expected, what) => {
+        const n = (html.match(re) || []).length;
+        if (n !== expected) throw new Error(`templates/game-page-template.html mudou: ${what} aparece ${n}x (esperava ${expected}). Atualize stripAds em scripts/generate-i18n.js.`);
+        html = html.replace(re, '');
+    };
+    strip(/\n[ \t]*<!-- Ad Space \d -->\n[ \t]*<div class="ad-container">[\s\S]*?<\/ins>\s*<\/div>/g, 2, 'contêiner de anúncio');
+    strip(/\n[ \t]*\/\/ Google AdSense\n[\s\S]*?\(adsbygoogle = window\.adsbygoogle \|\| \[\]\)\.push\(\{\}\);\n[ \t]*\};/g, 1, 'carregamento do AdSense');
+    strip(/\n[ \t]*<link rel="(?:preconnect|dns-prefetch)" href="https:\/\/pagead2\.googlesyndication\.com">/g, 2, 'preconnect do AdSense');
+    return html;
 }
 
 const controlsHtml = (controls) => controls.map(([key, action]) => `
@@ -137,14 +153,17 @@ function renderGame(lang, slug, tr, page) {
         `<p>${ui.footer}</p>\n            <p style="margin-top:8px;font-size:.85rem;">${languageLinks(lang, slug)}</p>`);
 
     // ressalva honesta sobre o idioma de DENTRO do jogo
-    const note = g.ui === 'partial' ? ui.notePartial : g.ui === 'toggle' ? ui.noteToggle : null;
+    const note = g.ui === 'partial' ? t.uiNote : g.ui === 'toggle' ? ui.noteToggle : null;
     if (note) {
         R('<p class="game-description">{{GAME_DESCRIPTION}}</p>',
             `<p class="game-description">{{GAME_DESCRIPTION}}</p>\n                    <p class="ui-note" style="margin-top:12px;font-size:.9rem;color:var(--text-muted);"><i class="fas fa-language"></i> ${esc(note)}</p>`);
     }
 
     // o título vai também numa string JS (evento do GA4): precisa ser literal JS seguro (aspas, apóstrofos)
-    R("'game_name': '{{GAME_TITLE}}',", `'game_name': ${JSON.stringify(t.title).replace(/</g, '\u003c')},`);
+    R("'game_name': '{{GAME_TITLE}}',", `'game_name': ${JSON.stringify(page.title).replace(/</g, '\\u003c')},\n                        'language': '${lang}',`);
+
+    // --- anúncios: fora das páginas traduzidas enquanto o texto não passar por revisão humana (config.ADS_ON_TRANSLATED_PAGES)
+    if (!cfg.ADS_ON_TRANSLATED_PAGES) html = stripAds(html);
 
     // --- conteúdo
     const vars = {
@@ -173,11 +192,10 @@ function renderGame(lang, slug, tr, page) {
     const jsonLd = seo.gameJsonLd({
         kind: ['gameoflife'].includes(slug) ? 'app' : 'game',
         slug, name: t.title, description: t.description, url, image: imageUrl, genre: t.genre,
-        playUrl: cfg.SITE + page.play, inLanguage: L.code, currency: L.currency,
+        playUrl: cfg.SITE + page.play, inLanguage: L.code, noOffers: true,
         breadcrumb: [
             { '@type': 'ListItem', position: 1, name: seo.SITE_NAME, item: cfg.hubUrl(lang) },
-            { '@type': 'ListItem', position: 2, name: tr.ui.games, item: cfg.hubUrl(lang) },
-            { '@type': 'ListItem', position: 3, name: t.title, item: url }
+            { '@type': 'ListItem', position: 2, name: t.title, item: url }
         ]
     });
     return seo.injectSeo(html, { url, title: `${t.title} - ${ui.ogTitleSuffix}`, description: t.description, image: imageUrl, jsonLd, alternates: cfg.gameAlternates(slug), locale: L.locale });
@@ -225,9 +243,9 @@ function renderHub(lang, tr, pages) {
     const jsonLd = {
         '@context': 'https://schema.org',
         '@graph': [
-            { '@type': 'CollectionPage', '@id': `${url}#page`, url, name: h.h1, description: h.description, inLanguage: L.code, isPartOf: { '@id': `${cfg.SITE}/#website` } },
+            { '@type': 'CollectionPage', '@id': `${url}#page`, url, name: h.h1, description: h.description, inLanguage: L.code },
             { '@type': 'ItemList', name: h.gamesHeading, numberOfItems: cfg.GAMES.length, itemListElement: cfg.GAMES.map((g, i) => ({ '@type': 'ListItem', position: i + 1, name: tr.games[g.slug].title, url: cfg.gameUrl(lang, g.slug) })) },
-            { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: seo.SITE_NAME, item: url }] }
+            { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: seo.SITE_NAME, item: cfg.SITE + '/' }, { '@type': 'ListItem', position: 2, name: h.gamesHeading, item: url }] }
         ]
     };
     const html = `<!DOCTYPE html>
@@ -263,7 +281,7 @@ function renderHub(lang, tr, pages) {
     <div class="wrap">
         <div class="top">
             <a class="brand" href="${cfg.hubPath(lang)}">🎮 PlayfulHub</a>
-            <nav class="langs" aria-label="Language">${switcher}</nav>
+            <nav class="langs" aria-label="${esc(h.langLabel)}">${switcher}</nav>
         </div>
         <main>
             <h1>${esc(h.h1)}</h1>

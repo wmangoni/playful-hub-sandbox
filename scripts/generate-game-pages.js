@@ -34,9 +34,10 @@ const gamesData = {
         features: 'Múltiplas armas, power-ups, sistema de pontuação, efeitos visuais',
         objective: 'Sobreviva às ondas de inimigos e alcance a maior pontuação possível.',
         controls: [
-            { key: '⬅️➡️', action: 'Mover nave' },
-            { key: 'Espaço', action: 'Atirar' },
-            { key: 'P', action: 'Pausar jogo' }
+            { key: '⬅️➡️ / A D', action: 'Mover a nave' },
+            { key: '⬆️ / W', action: 'Atirar (segure)' },
+            { key: 'Espaço', action: 'Tiro especial' },
+            { key: 'H', action: 'Abrir o hangar de armas' }
         ],
         tips: [
             'Mantenha-se sempre em movimento para evitar tiros inimigos',
@@ -78,10 +79,12 @@ const gamesData = {
         features: 'Gráficos 3D, múltiplas armas, labirinto complexo, sistema de vida',
         objective: 'Navegue pelo labirinto, elimine inimigos e sobreviva o máximo possível.',
         controls: [
-            { key: 'WASD', action: 'Mover' },
-            { key: 'Mouse', action: 'Mirar' },
-            { key: 'Clique', action: 'Atirar' },
-            { key: 'Shift', action: 'Correr' }
+            { key: 'WASD / ⬆️⬇️', action: 'Mover (A/D andam de lado)' },
+            { key: 'Mouse / ⬅️➡️', action: 'Mirar e girar' },
+            { key: 'Clique / Espaço', action: 'Atirar' },
+            { key: '1-4', action: 'Trocar de arma' },
+            { key: 'E', action: 'Interagir (portas e paredes secretas)' },
+            { key: 'Esc', action: 'Pausar' }
         ],
         tips: [
             'Use o som para localizar inimigos antes de vê-los',
@@ -147,8 +150,8 @@ const gamesData = {
         objective: 'Colete comida para crescer e alcance a maior pontuação possível.',
         controls: [
             { key: '⬅️➡️⬆️⬇️', action: 'Mover cobra' },
-            { key: 'WASD', action: 'Mover cobra' },
-            { key: 'Espaço', action: 'Pausar' }
+            { key: 'Shift / E', action: 'Ativar a habilidade equipada' },
+            { key: 'Espaço (segurar)', action: 'Acelerar a cobra: gasta pontos enquanto segura' }
         ],
         tips: [
             'Comece devagar para se acostumar com os controles',
@@ -190,10 +193,11 @@ const gamesData = {
         features: 'Visualização 3D, rotação suave, sistema de embaralhamento',
         objective: 'Organize todas as faces do cubo para que cada uma tenha uma cor única.',
         controls: [
-            { key: 'Mouse', action: 'Girar cubo' },
-            { key: 'Clique + Arrastar', action: 'Rotacionar faces' },
-            { key: 'R', action: 'Embaralhar' },
-            { key: 'S', action: 'Resolver automaticamente' }
+            { key: 'Clique + arrastar', action: 'Girar uma camada: arraste uma peça de uma face' },
+            { key: 'Botão direito ou do meio + arrastar', action: 'Girar a câmera em volta do cubo' },
+            { key: 'U D L R F B', action: 'Girar a face correspondente (Shift inverte o sentido)' },
+            { key: 'Scramble / Auto-Resolver', action: 'Embaralhar o cubo ou resolvê-lo automaticamente' },
+            { key: 'Espaço (segurar)', action: 'Cronômetro: segure até ficar verde e solte' }
         ],
         tips: [
             'Comece resolvendo uma face completamente',
@@ -257,10 +261,11 @@ const gamesData = {
         features: 'Regras clássicas de Conway, padrões emergentes, controles de velocidade',
         objective: 'Observe como padrões complexos emergem de regras simples.',
         controls: [
-            { key: 'Mouse', action: 'Adicionar / remover células' },
-            { key: 'Espaço', action: 'Pausar / continuar' },
-            { key: 'R', action: 'Reiniciar' },
-            { key: '+/-', action: 'Ajustar velocidade' }
+            { key: 'Clique', action: 'Ligar / desligar células na grade' },
+            { key: 'Start / Pause', action: 'Iniciar e pausar a simulação' },
+            { key: 'Clear / Random', action: 'Limpar a grade ou sortear células' },
+            { key: 'Speed', action: 'Ajustar a velocidade (barra deslizante)' },
+            { key: 'Esc', action: 'Cancelar o padrão escolhido' }
         ],
         tips: [
             'Comece com padrões simples e observe o que acontece',
@@ -301,9 +306,9 @@ const gamesData = {
         features: 'Física de cordas realista, música sincronizada, efeitos visuais',
         objective: 'Capture as notas musicais que passam pelas cordas vibrantes.',
         controls: [
-            { key: 'Mouse', action: 'Mover cursor' },
-            { key: 'Clique', action: 'Capturar nota' },
-            { key: 'Espaço', action: 'Pausar música' }
+            { key: 'Clique', action: 'Capturar a nota na zona de captura' },
+            { key: 'Clique e segurar', action: 'Segurar a nota amarela até a cauda passar' },
+            { key: 'Menu lateral', action: 'Trocar tema, sintetizador e parâmetros das cordas' }
         ],
         tips: [
             'Sincronize seus movimentos com o ritmo da música',
@@ -389,9 +394,10 @@ const gamesData = {
         features: 'Física realista, múltiplos objetivos, sistema de pontuação',
         objective: 'Mantenha a bola em jogo e alcance a maior pontuação possível.',
         controls: [
-            { key: 'Z/X', action: 'Paletas esquerda / direita' },
+            { key: 'Z/X', action: 'Paletas esquerda / direita (também A/D e as setas)' },
             { key: 'Espaço', action: 'Lançar bola' },
-            { key: 'Shift', action: 'Sacudir mesa' }
+            { key: 'Q/W/E', action: 'Sacudir a mesa (nudge)' },
+            { key: 'T', action: 'Trocar o tema visual' }
         ],
         tips: [
             'Timing é tudo - aprenda quando ativar as paletas',

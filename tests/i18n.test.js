@@ -34,7 +34,7 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
             assert.ok(g.related.length === 3 && g.related.every((r) => cfg.has(r) && r !== g.slug), `${g.slug}: related precisa ser outros jogos traduzidos`);
             assert.ok(pages[g.slug].play && pages[g.slug].image && exists(`assets/images/${pages[g.slug].image}`), `${g.slug}: sem PLAY/imagem na página original`);
         }
-        assert.strictEqual(cfg.routes().length, cfg.langs.length * (cfg.slugs.length + 2));
+        assert.strictEqual(cfg.routes().length, cfg.langs.length * (cfg.slugs.length + 3), "hub + 2 redirecionamentos + jogos, por idioma");
         assert.strictEqual(cfg.gameUrl('en', 'snake'), `${SITE}/en/games/snake`);
         assert.strictEqual(cfg.gameUrl('es', 'snake'), `${SITE}/es/juegos/snake`);
         assert.deepStrictEqual(cfg.gameAlternates('snake').map((a) => a.hreflang), ['pt-BR', 'en', 'es', 'x-default']);
@@ -65,6 +65,9 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
         assert.ok(bad((c) => { delete c.games.pinball; }).some((m) => m.includes('pinball')), 'jogo sem tradução');
         assert.ok(bad((c) => { c.games.chess = c.games.snake; }).some((m) => m.includes('chess')), 'tradução de jogo fora da config');
         assert.ok(bad((c) => { delete c.ui.home; }).length, 'ui faltando');
+        assert.ok(bad((c) => { delete c.games.snake.uiNote; }).some((m) => m.includes('uiNote')), 'jogo partial sem nota específica');
+        assert.ok(bad((c) => { c.games.snake.uiNote = 'Alguns rótulos'; }).some((m) => m.includes('uiNote')), 'nota genérica curta demais');
+        assert.ok(bad((c) => { c.games['3d_shooter'].uiNote = 'Heads-up: a note that does not belong to a full game at all.'; }).some((m) => m.includes('uiNote')), 'uiNote em jogo full');
         assert.deepStrictEqual(bad((c) => { c.games.snake.tips[0] = 'Es todo lo que necesitas, TODOS los días'; }), [], '"todo/todos" em espanhol não é marcador (regressão)');
         console.log('✓ validação das traduções');
     }
@@ -128,14 +131,21 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
             assert.ok(html.includes(`<title>${t.title.replace(/&/g, '&amp;')} - ${T[lang].ui.titleSuffix}</title>`), `${where}: <title>`);
             assert.ok(html.includes(`<h1 class="game-title">${t.title.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}</h1>`), `${where}: h1`);
 
+            // sem anúncios enquanto a tradução não passar por revisão humana (config.ADS_ON_TRANSLATED_PAGES)
+            assert.strictEqual(cfg.ADS_ON_TRANSLATED_PAGES, false);
+            assert.ok(!/adsbygoogle|pagead2|<ins\b/.test(html), `${where}: não pode carregar anúncio`);
+
             // JSON-LD
             const ld = jsonLd(html);
             const entity = ld['@graph'].find((x) => ['VideoGame', 'WebApplication'].includes(x['@type']));
             assert.strictEqual(entity.inLanguage, lang, `${where}: JSON-LD inLanguage`);
             assert.strictEqual(entity.name, t.title);
             assert.strictEqual(entity.url, url);
-            assert.strictEqual(entity.offers.price, '0');
-            assert.strictEqual(ld['@graph'].find((x) => x['@type'] === 'BreadcrumbList').itemListElement.length, 3);
+            assert.strictEqual(entity.isAccessibleForFree, true);
+            assert.strictEqual(entity.offers, undefined, `${where}: sem preço/moeda inventados`);
+            const crumbs = ld['@graph'].find((x) => x['@type'] === 'BreadcrumbList').itemListElement;
+            assert.strictEqual(crumbs.length, 2, `${where}: BreadcrumbList com 2 itens`);
+            assert.notStrictEqual(crumbs[0].item, crumbs[1].item, `${where}: itens do breadcrumb com URLs diferentes`);
 
             // regra do projeto: preview com PLAY levando ao jogo, nunca iframe
             const frame = html.match(/<a id="gameFrame"[^>]*href="([^"]+)">\s*<img src="([^"]+)"/);
@@ -154,7 +164,7 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
             const uiKind = cfg.game(slug).ui;
             const hasNote = html.includes('class="ui-note"');
             assert.strictEqual(hasNote, uiKind !== 'full', `${where}: ressalva de idioma (${uiKind})`);
-            if (uiKind === 'partial') assert.ok(html.includes(T[lang].ui.notePartial));
+            if (uiKind === 'partial') assert.ok(html.includes(t.uiNote.replace(/&/g, '&amp;')), `${where}: nota de idioma específica do jogo`);
             if (uiKind === 'toggle') assert.ok(html.includes(T[lang].ui.noteToggle));
 
             // relacionados: só páginas traduzidas do mesmo idioma
@@ -163,7 +173,8 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
             assert.ok(!/href="\/jogos\//.test(html.replace(/hreflang="pt-BR"[^>]*href="[^"]*"|<a href="\/jogos\/[a-z0-9_]+" hreflang="pt-BR"[^>]*>[^<]*<\/a>/g, '')), `${where}: link para /jogos/ fora do seletor de idioma`);
             // GA4: o título numa string JS precisa ser literal válido (apóstrofo em "Conway's")
             const gaLiteral = (html.match(/'game_name': ("(?:[^"\\]|\\.)*"),/) || [])[1];
-            assert.strictEqual(JSON.parse(gaLiteral), t.title, `${where}: título no evento do GA4`);
+            assert.strictEqual(JSON.parse(gaLiteral), pages[slug].title, `${where}: o GA4 usa o nome do jogo em português (métricas não se dividem por idioma)`);
+            assert.ok(html.includes(`'language': '${lang}'`), `${where}: o GA4 envia o idioma`);
         }
 
         // hub
@@ -173,6 +184,10 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
         assert.ok(hub.includes(`<html lang="${lang}">`));
         assert.deepStrictEqual([...hub.matchAll(/<link rel="canonical" href="([^"]+)">/g)].map((m) => m[1]), [cfg.hubUrl(lang)]);
         assert.deepStrictEqual(links(hub), cfg.homeAlternates().map((a) => [a.hreflang, a.href]));
+        assert.ok(hub.includes(`aria-label="${T[lang].hub.langLabel}"`), `${lang}: aria-label do seletor de idioma no idioma da página`);
+        const hubGraph = jsonLd(hub)['@graph'];
+        assert.strictEqual(hubGraph.find((x) => x['@type'] === 'BreadcrumbList').itemListElement.length, 2, `${lang}: breadcrumb do hub com 2 itens`);
+        assert.ok(!JSON.stringify(hubGraph).includes('#website'), `${lang}: o hub não referencia nó inexistente`);
         for (const slug of cfg.slugs) assert.ok(hub.includes(`href="${cfg.gamePath(lang, slug)}"`), `${lang}: hub sem ${slug}`);
         const hubLd = jsonLd(hub);
         assert.strictEqual(hubLd['@graph'].find((x) => x['@type'] === 'ItemList').numberOfItems, cfg.slugs.length);
@@ -181,6 +196,57 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
         for (const m of hub.matchAll(/<img src="([^"]+)"/g)) assert.ok(exists(m[1].slice(1)), `${lang}: imagem do hub inexistente ${m[1]}`);
     }
     console.log(`✓ páginas geradas (${cfg.langs.length * (cfg.slugs.length + 1)})`);
+
+
+    // ---- a classificação `ui` confere com o CÓDIGO do jogo (strings do JavaScript, inclusive o que é desenhado no canvas,
+    //      e o texto visível do HTML). "full" exige zero português; "partial" exige que exista (senão reclassifique).
+    {
+        const PT = /\b(Jogar|Jogo|Pontuação|Pontos|Começar|Novamente|Pausado|Fase|Nível|Vidas|Carregar|Escolha|Recorde|Instruções|Aleta|Tentar|Salvar|Melhores|Voltar|Iniciar|Fechar|Ataque|Habilidade|Segure|Clique|Modo|Regras|Aplicar|Sair|Tiro|Armas|Hangar|Ensolarado|Cercando|Cura|Poder|Escudo|Chefe)\b/i;
+        const stringsOf = (src) => [...src.matchAll(/(['"`])((?:\.|(?!\1)[^\\n])*)\1/g)].map((m) => m[2]).filter((x) => x.length > 2);
+        const count = (slug) => {
+            const src = read(`${slug}/index.html`).replace(/<!--[\s\S]*?-->/g, '');
+            const scripts = [...src.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n');
+            const visible = src.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ');
+            return stringsOf(scripts).filter((x) => PT.test(x)).length + (visible.match(new RegExp(PT.source, 'gi')) || []).length;
+        };
+        for (const g of cfg.GAMES) {
+            const n = count(g.slug);
+            if (g.ui === 'full') assert.strictEqual(n, 0, `${g.slug}: marcado "full" (interface em inglês), mas o código tem ${n} textos em português. Reclassifique como "partial" e escreva a uiNote, ou tire o jogo.`);
+            if (g.ui === 'partial') assert.ok(n >= 1, `${g.slug}: marcado "partial", mas não há português no código: reclassifique como "full"`);
+        }
+        const puzzle = read('puzzle/index.html');
+        assert.ok(/navigator\.language[\s\S]{0,60}startsWith\('pt'\)/.test(puzzle) && /Mental Focus/.test(puzzle) && /Foco Mental/.test(puzzle), 'puzzle: "toggle" exige as duas línguas no jogo');
+        console.log('✓ classificação de idioma confere com o código dos jogos');
+    }
+
+    // ---- nenhum português solto no texto visível das páginas geradas (varredura geral, além das strings fixas)
+    {
+        const visible = (html) => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<!--[\s\S]*?-->/g, ' ')
+            .replace(/<a [^>]*hreflang="pt-BR"[^>]*>[\s\S]*?<\/a>/g, ' ')   // o seletor de idioma ("Português")
+            .replace(/<[^>]+>/g, ' ');
+        const PT_ONLY = /\b(você|vocês|não|jogo|jogos|jogar|pontuação|também|então|ação|início|gênero|dicas|desenvolvedor)\b/i;
+        for (const lang of cfg.langs) {
+            for (const rel of [cfg.hubFile(lang), ...cfg.slugs.map((s) => cfg.gameFile(lang, s))]) {
+                const text = visible(read(rel));
+                const m = text.match(PT_ONLY);
+                assert.ok(!m, `${rel}: palavra em português no texto visível: "${m && m[0]}"`);
+            }
+        }
+        console.log('✓ sem português solto no texto visível');
+    }
+
+    // ---- as páginas em português dos jogos traduzidos batem com o gamesData (uma regeneração não desfaz correções)
+    {
+        const { gamesData } = require('../scripts/generate-game-pages');
+        const drift = [];
+        for (const slug of cfg.slugs) {
+            const real = pages[slug], src = gamesData[slug];
+            const same = JSON.stringify(real.controls) === JSON.stringify(src.controls.map((c) => [c.key, c.action]));
+            if (!same) drift.push(slug);
+        }
+        assert.deepStrictEqual(drift, ['puzzle'], 'só o puzzle (já divergente do template, veja o CLAUDE.md) pode diferir do gamesData nos controles; os outros: corrija a página E o gamesData');
+        console.log('✓ páginas em português e gamesData em sintonia');
+    }
 
     // ---- reciprocidade: português ↔ inglês ↔ espanhol (o Google ignora alternates sem volta)
     {
@@ -249,6 +315,17 @@ const abs = (url) => url.startsWith(SITE) ? url.slice(SITE.length) : url;
                 assert.strictEqual(hub.status, 200);
                 assert.ok(hub.body.includes(`<html lang="${lang}">`));
                 assert.strictEqual((await get(`/${lang}`)).status, 301, 'sem barra final: redireciona para o hub');
+                // /en/games e /en/games/ (pasta sem índice) levam ao hub, seguindo os 301 (o static acrescenta a barra primeiro)
+                for (const dir of [`/${lang}/${cfg.LANGS[lang].gamesDir}`, `/${lang}/${cfg.LANGS[lang].gamesDir}/`]) {
+                    let at = dir, hops = 0, last;
+                    while (hops++ < 4) {
+                        last = await new Promise((resolve, reject) => http.get({ host: '127.0.0.1', port: 3094, path: at }, (res) => { res.resume(); resolve({ status: res.statusCode, location: res.headers.location }); }).on('error', reject));
+                        if (last.status !== 301) break;
+                        at = last.location;
+                    }
+                    assert.strictEqual(at, cfg.hubPath(lang), `${dir}: termina no hub (antes dava 404)`);
+                    assert.strictEqual(last.status, 200);
+                }
                 for (const slug of cfg.slugs) {
                     const r = await get(cfg.gamePath(lang, slug));
                     assert.strictEqual(r.status, 200, `${cfg.gamePath(lang, slug)}: ${r.status}`);
