@@ -28,6 +28,17 @@ const LOGO = '/favicon_io/android-chrome-512x512.png';
 const BLOCK_START = '<!-- seo:begin (gerado por scripts/generate-seo.js, não editar à mão) -->';
 const BLOCK_END = '<!-- seo:end -->';
 
+// Páginas do portal que não são jogos (têm head próprio, com canonical/OG/JSON-LD escritos à mão) mas precisam
+// estar no sitemap e no llms.txt. O arquivo precisa existir: URL no sitemap sem página é link quebrado.
+const EXTRA_PAGES = [
+    {
+        path: '/desafio/',
+        file: 'desafio/index.html',
+        name: 'Desafio do Dia',
+        description: 'Todo dia um jogo diferente do portal vira o desafio: faça o maior placar, compartilhe o resultado e mantenha a sequência de dias.'
+    }
+];
+
 // Ferramentas e simulações que não são "jogos" no sentido estrito: o JSON-LD
 // descreve cada uma pelo que ela é (WebApplication), não como VideoGame.
 const APP_CATEGORY = {
@@ -192,10 +203,17 @@ function injectSeo(rawHtml, page) {
 }
 
 function buildSitemap(catalog) {
-    const urls = [SITE + '/', ...catalog.map(g => g.url)];
+    EXTRA_PAGES.forEach(p => {
+        if (!fs.existsSync(path.join(ROOT, p.file))) throw new Error(`EXTRA_PAGES: ${p.file} não existe`);
+    });
+    const urls = [
+        { loc: SITE + '/', priority: '1.0' },
+        ...EXTRA_PAGES.map(p => ({ loc: SITE + p.path, priority: '0.9' })),
+        ...catalog.map(g => ({ loc: g.url, priority: '0.8' }))
+    ];
     return '<?xml version="1.0" encoding="UTF-8"?>\n' +
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-        urls.map((u, i) => `  <url>\n    <loc>${escXml(u)}</loc>\n    <priority>${i === 0 ? '1.0' : '0.8'}</priority>\n  </url>\n`).join('') +
+        urls.map(u => `  <url>\n    <loc>${escXml(u.loc)}</loc>\n    <priority>${u.priority}</priority>\n  </url>\n`).join('') +
         '</urlset>\n';
 }
 
@@ -217,6 +235,10 @@ function buildLlmsTxt(catalog) {
         '## Ferramentas e simulações',
         '',
         ...apps.map(item),
+        '',
+        '## Desafio do Dia',
+        '',
+        ...EXTRA_PAGES.map(p => `- [${p.name}](${SITE}${p.path}): ${p.description}`),
         '',
         '## Dados',
         '',
@@ -280,4 +302,4 @@ if (require.main === module) {
     console.log(check ? `SEO em dia (${total} arquivos).` : `SEO gerado: ${changed.length} de ${total} arquivos atualizados.`);
 }
 
-module.exports = { run, computeOutputs, buildCatalog, SITE };
+module.exports = { run, computeOutputs, buildCatalog, SITE, EXTRA_PAGES };

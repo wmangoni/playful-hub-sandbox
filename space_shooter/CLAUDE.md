@@ -45,3 +45,5 @@ A aplicação utiliza uma estrutura híbrida baseada no DOM do navegador para po
 - `checkCollisions()`: Core resolvedor de colisões retangulares do jogo (`getBoundingClientRect`).
 - `createExplosion(x, y)` / `createParticleBurst(x, y)`: Spawnam animações de fumaça e faíscas nos vetores correspondentes.
 - `playerTakeDamage(amount)`: Trata danos sofridos, efeitos de tremor de tela, HP HUD e morte do caça.
+
+- **Desafio do Dia:** este jogo participa do rodízio (`assets/js/desafio-core.js`). O overlay `assets/js/desafio.js` só lê o texto do elemento `#score` (e só com `?desafio=AAAA-MM-DD` na URL). Não renomeie nem remova o `#score` sem atualizar `scoreSelector` no core (o teste `tests/desafio.test.js` confere). Ele não toca no estado nem no `Math.random` do jogo.
