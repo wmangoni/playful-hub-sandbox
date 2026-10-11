@@ -879,6 +879,26 @@ async function run() {
     assert.strictEqual(b.get('B1').imuneAFlanco, true, 'não pode ser flanqueado');
   });
 
+  test('Mestre-Arsenal (Coragem Total), Paladino Extremo e Tarso (ácido): imunidades respeitadas', () => {
+    // 1. Mestre-Arsenal: Coragem Total de Keenn (imune a medo da Presença Aterradora do Tarrasque)
+    let b = luta(ficha('tarrasque'), ficha('ha-mestre-arsenal'), [1]);
+    SP.onAttackAction(K, b, b.get('A1'));
+    assert.deepStrictEqual(Object.keys(b.get('B1').cond), [], 'Arsenal não fica com medo do Tarrasque');
+    assert.ok(b.eventos.some(e => e.tipo === 'imune' && /imune a Presença Aterradora/i.test(e.texto)), 'Arsenal registra log de imunidade a medo');
+
+    // 2. Paladino Extremo: Paladino 20 (imune a medo do Tarrasque)
+    b = luta(ficha('tarrasque'), ficha('ha-paladino-extremo'), [1]);
+    SP.onAttackAction(K, b, b.get('A1'));
+    assert.deepStrictEqual(Object.keys(b.get('B1').cond), [], 'Paladino Extremo imune a medo do Tarrasque');
+
+    // 3. Tarso: Imune a ácido (fisiologia de Dragão Negro Ancião / Dracolich)
+    b = luta(ficha('tarrasque'), ficha('ha-tarso'), [1]);
+    const pvTarso = b.get('B1').pv;
+    const efeitoAcido = { dano: '10d6', tipo_energia: 'ácido', resistencia: 'ref', cd: 20, metade_se_passar: true };
+    K.efeitoComTeste(b, b.get('A1'), b.get('B1'), efeitoAcido, { rotulo: 'Baforada Ácida' });
+    assert.strictEqual(b.get('B1').pv, pvTarso, 'Tarso não sofre dano de ácido');
+  });
+
   console.log(`\n${passed} testes passaram.`);
 }
 
