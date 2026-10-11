@@ -24,8 +24,10 @@ alterados. Cada símbolo do sprite traz o autor e o nome original num comentári
 
 ## Fontes
 
-Fontes do Google Fonts, sob a SIL Open Font License:
+As fontes de `fontes/` estão sob a SIL Open Font License 1.1. Cada licença está ao lado do arquivo, com o aviso de copyright (`fontes/OFL-*.txt`).
 
-- Grenze Gotisch;
-- Alegreya;
-- Marcellus SC.
+São os arquivos do subconjunto latino que o Google Fonts servia em 11/10/2026:
+
+- **Alegreya** (Huerta Tipográfica): `alegreya.woff2`, variável de 400 a 900, e `alegreya-italico.woff2`, estática 400. Licença em `OFL-alegreya.txt`.
+- **Grenze Gotisch** (Omnibus-Type): `grenze-gotisch.woff2`, variável de 100 a 900. Licença em `OFL-grenze-gotisch.txt`.
+- **Marcellus SC** (Astigmatic): `marcellus-sc.woff2`. Licença em `OFL-marcellus-sc.txt`.
