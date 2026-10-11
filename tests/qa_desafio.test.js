@@ -43,7 +43,8 @@ const ours = (m) => /desafio/i.test(m);
         const page = await browser.newPage();
         const errs = track(page);
         await page.setViewport({ width: 1100, height: 800 });
-        await page.goto(`${BASE}/desafio`, { waitUntil: 'networkidle0' }); // sem barra final: o Express redireciona
+        await page.goto(`${BASE}/desafio`, { waitUntil: 'domcontentloaded' }); // sem barra final: o Express redireciona
+        await page.waitForFunction(() => { const i = document.getElementById('today-img'); return i && i.complete && i.naturalWidth > 0; }, { timeout: 8000 });
         assert.ok(page.url().endsWith('/desafio/'), 'redireciona para /desafio/');
         const v = await page.evaluate(() => ({
             name: document.getElementById('today-name').textContent,
@@ -79,7 +80,7 @@ const ours = (m) => /desafio/i.test(m);
             days.forEach((d, i) => { st.days[d] = { slug, best: 10 + i, live: true }; });
             localStorage.setItem(k, JSON.stringify(st));
         }, core.STORAGE_KEY, [core.addDays(today, -2), core.addDays(today, -1), today], todays.game.slug);
-        await page.reload({ waitUntil: 'networkidle0' });
+        await page.reload({ waitUntil: 'domcontentloaded' });
         // o histórico só mostra placar quando o jogo gravado é o jogo daquele dia; aqui basta hoje
         const v2 = await page.evaluate(() => ({ streak: document.getElementById('st-streak').textContent, best: document.getElementById('st-best').textContent, shareDisabled: document.getElementById('share').disabled }));
         assert.strictEqual(v2.streak, '3 dias');
@@ -91,7 +92,7 @@ const ours = (m) => /desafio/i.test(m);
         assert.ok(copied && copied.includes(todays.game.name) && copied.includes('12 pontos') && copied.includes('3 dias seguidos') && copied.includes('utm_campaign=desafio-do-dia'), 'texto compartilhado: ' + copied);
         assert.ok((await page.$eval('#share-msg', (e) => e.textContent)).length > 0, 'avisa que copiou');
         await page.setViewport({ width: 390, height: 844 });
-        await page.reload({ waitUntil: 'networkidle0' });
+        await page.reload({ waitUntil: 'domcontentloaded' });
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'sem rolagem horizontal no celular');
         await shot(page, 'desafio-pagina-celular');
         assert.deepStrictEqual(errs.filter(ours), [], 'sem erros nossos na página');
@@ -132,12 +133,12 @@ const ours = (m) => /desafio/i.test(m);
             await setScore('Score: 42');
             await p.waitForFunction(() => document.querySelector('[data-desafio]').shadowRoot.querySelector('.best b').textContent === '42', { timeout: 4000 });
             await setScore('Score: 10');
-            await new Promise((r) => setTimeout(r, 1000));
+            await new Promise((r) => setTimeout(r, 400)); // o MutationObserver lê na hora; isto só dá folga
             assert.strictEqual((await overlay(p)).best, '42', `${g.slug}: placar menor não substitui o melhor`);
             await setScore('Pontos: 1.250');
             await p.waitForFunction(() => document.querySelector('[data-desafio]').shadowRoot.querySelector('.best b').textContent === '1250', { timeout: 4000 });
             const st = await stored(p);
-            assert.deepStrictEqual(st.days[date], { slug: g.slug, best: 1250, live: date === today }, `${g.slug}: gravou o melhor do dia`);
+            assert.deepStrictEqual(st.days[date], { slug: g.slug, best: 1250, live: date === today && date >= core.LAUNCH }, `${g.slug}: gravou o melhor do dia`);
             await shot(p, `overlay-${g.slug}`);
 
             // minimizar / reabrir
@@ -186,22 +187,35 @@ const ours = (m) => /desafio/i.test(m);
             'dia em que o desafio era outro jogo': `${snake.play}?desafio=${otherDay}`,
             'lixo no parâmetro': `${snake.play}?desafio=<script>alert(1)</script>`
         };
-        for (const [label, url] of Object.entries(cases)) {
+        await Promise.all(Object.entries(cases).map(async ([label, url]) => {
             const p = await clean.newPage();
             const perrs = track(p);
             await p.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' });
-            await new Promise((r) => setTimeout(r, 900));
+            await new Promise((r) => setTimeout(r, 700));
             assert.strictEqual(await p.$('[data-desafio]'), null, `não deveria haver overlay: ${label}`);
             assert.strictEqual(await stored(p), null, `não deveria gravar nada: ${label}`);
             assert.deepStrictEqual(perrs.filter(ours), [], label);
             await p.close();
-        }
+        }));
         // jogo fora do rodízio nunca carrega o overlay
         const chess = await clean.newPage();
         await chess.goto(`${BASE}/chess/?desafio=${today}`, { waitUntil: 'domcontentloaded' });
         assert.strictEqual(await chess.$('[data-desafio]'), null, 'xadrez não participa');
         assert.strictEqual(await chess.evaluate(() => typeof window.PHDesafio), 'undefined', 'e nem carrega o módulo');
         await chess.close();
+
+        // o rótulo do botão volta ao normal mesmo com cliques seguidos (bug: guardava a mensagem como rótulo)
+        {
+            const p = await clean.newPage();
+            await p.evaluateOnNewDocument(() => { window.PHDesafioConfig = { collapseMs: 0 }; });
+            await p.setViewport({ width: 1100, height: 800 });
+            await p.goto(`${BASE}${snake.play}?desafio=${snakeDay}`, { waitUntil: 'domcontentloaded' });
+            await p.waitForSelector('[data-desafio]');
+            const click = async () => { const h = await p.evaluateHandle(() => document.querySelector('[data-desafio]').shadowRoot.querySelector('.share')); const b = await h.boundingBox(); await p.mouse.click(b.x + b.width / 2, b.y + b.height / 2); };
+            await click(); await click(); // sem placar: "Jogue primeiro", duas vezes seguidas
+            await p.waitForFunction(() => document.querySelector('[data-desafio]').shadowRoot.querySelector('.share').textContent === 'Compartilhar', { timeout: 4000 });
+            await p.close();
+        }
 
         // ================= 5) armazenamento indisponível não derruba o jogo
         console.log('[5/6] Sem localStorage ...');
@@ -238,7 +252,7 @@ const ours = (m) => /desafio/i.test(m);
         {
             const p = await clean.newPage();
             await p.setViewport({ width: 1100, height: 800 });
-            await p.goto(`${BASE}${snake.play}?desafio=${snakeDay}`, { waitUntil: 'networkidle0' });
+            await p.goto(`${BASE}${snake.play}?desafio=${snakeDay}`, { waitUntil: 'domcontentloaded' });
             await p.waitForSelector('[data-desafio]');
             assert.ok(await p.$('canvas'), 'canvas do jogo presente');
             const before = await p.evaluate(() => document.body.children.length);

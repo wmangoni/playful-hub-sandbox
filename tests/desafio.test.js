@@ -43,9 +43,11 @@ assert.strictEqual(core.addDays('2028-03-01', -1), '2028-02-29');
     assert.strictEqual(core.challengeFor('2026-10-20').edition, 9);
     assert.ok(core.challengeFor('1969-12-31').game, 'datas antes de 1970 também funcionam (módulo negativo)');
     assert.throws(() => core.challengeFor('2026-02-30'), /data inválida/);
+    // tabela dourada (valores escritos à mão, não derivados do código): trava a época e o módulo
+    const golden = { '2026-10-12': 'archer', '2026-10-13': 'pinball', '2026-10-14': 'snake', '2026-10-15': 'block_stacker', '2026-10-16': 'space_shooter', '2026-10-17': 'archer', '2027-01-01': 'pinball' }; // valores calculados à parte (datetime.date do Python), não pelo código testado
+    for (const [d, slug] of Object.entries(golden)) assert.strictEqual(core.challengeFor(d).game.slug, slug, `jogo do dia ${d}`);
     // trava de regressão: mudar a ordem ou o tamanho da lista muda o jogo de todos os dias futuros
     assert.deepStrictEqual(core.GAMES.map((g) => g.slug), ['snake', 'block_stacker', 'space_shooter', 'archer', 'pinball']);
-    assert.strictEqual(core.challengeFor('2026-10-20').game.slug, core.GAMES[core.dayNumber('2026-10-20') % 5].slug);
 }
 
 // ---- o overlay só vale para o jogo certo, em data recente que já começou
@@ -96,9 +98,31 @@ assert.strictEqual(core.parseScore(null), null);
     assert.strictEqual(core.streak(core.emptyState(), '2026-10-20'), 0);
 
     const big = core.emptyState();
-    for (let i = 0; i < 90; i++) core.record(big, core.addDays('2026-01-01', i), 'snake', 1, at('2026-04-01'));
-    assert.strictEqual(Object.keys(big.days).length, 60, 'guarda só os últimos 60 dias');
-    assert.ok(big.days[core.addDays('2026-01-01', 89)], 'os mais recentes ficam');
+    for (let i = 0; i < 450; i++) core.record(big, core.addDays('2026-01-01', i), 'snake', 1, at(core.addDays('2026-01-01', i)));
+    assert.strictEqual(Object.keys(big.days).length, 400, 'guarda só os últimos 400 dias');
+    assert.ok(big.days[core.addDays('2026-01-01', 449)], 'os mais recentes ficam');
+    // a poda nunca pode encurtar uma sequência real (antes: teto de 60 dias)
+    const longa = core.emptyState();
+    for (let i = 0; i < 75; i++) core.record(longa, core.addDays('2026-10-12', i), 'snake', 1, at(core.addDays('2026-10-12', i)));
+    assert.strictEqual(core.streak(longa, core.addDays('2026-10-12', 74)), 75, 'sequência de 75 dias não é truncada');
+    // placar inválido nunca é gravado
+    const inv = core.emptyState();
+    for (const bad of [NaN, -1, 1e13, Infinity]) assert.strictEqual(core.record(inv, '2026-10-20', 'snake', bad, at('2026-10-20')).improved, false, 'placar inválido: ' + bad);
+    assert.deepStrictEqual(inv.days, {});
+    assert.strictEqual(core.record(inv, '2026-10-20', 'snake', 12.9, at('2026-10-20')).state.days['2026-10-20'].best, 12, 'fracionário vira inteiro');
+    assert.strictEqual(core.parseScore('Score: 99999999999999999999999'), null, 'número absurdo é ignorado');
+    // antes do lançamento tudo é treino; a partida vale pelo dia em que começou
+    const pre = core.emptyState();
+    core.record(pre, '2026-10-10', 'snake', 5, at('2026-10-10'));
+    core.record(pre, '2026-10-11', 'snake', 5, at('2026-10-11'));
+    assert.strictEqual(pre.days['2026-10-11'].live, false, 'antes de 12/10 não é live');
+    assert.strictEqual(core.streak(pre, '2026-10-12'), 0, 'treino pré-lançamento não vira sequência');
+    const meia = core.emptyState();
+    core.record(meia, '2026-10-20', 'snake', 9, new Date('2026-10-20T02:58:00Z')); // aberta às 23:58 (dia 19)? não: 02:58Z = 23:58 de 19/10
+    assert.strictEqual(meia.days['2026-10-20'].live, false, 'aberta antes da virada com a data do dia seguinte: treino');
+    const meia2 = core.emptyState();
+    core.record(meia2, '2026-10-20', 'snake', 9, new Date('2026-10-20T03:01:00Z'));
+    assert.strictEqual(meia2.days['2026-10-20'].live, true, 'aberta depois da virada: live');
 
     // armazenamento corrompido, adulterado ou indisponível nunca quebra
     const mem = { v: null, getItem() { return this.v; }, setItem(k, v) { this.v = v; } };

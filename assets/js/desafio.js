@@ -18,6 +18,7 @@
     var slug = core.slugFromPath(location.pathname);
     if (!slug) return;
     var challenge = core.challengeFor(date);
+    var openedAt = new Date(); // o dia vale pela hora em que a partida começou, mesmo que vire a meia-noite jogando
     if (challenge.game.slug !== slug) return;
 
     var game = challenge.game;
@@ -46,10 +47,12 @@
         'font-size:13px;line-height:1;box-shadow:0 4px 18px rgba(0,0,0,.45);max-width:calc(100vw - 16px);white-space:nowrap}' +
         '.wrap[hidden],.mini[hidden]{display:none}' +
         // a etiqueta encolhe (com reticências) antes de a pílula passar da tela; botões e placar nunca encolhem
-        '.tag{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}.best,button,a.link{flex:none}' +
+        '.tag{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
         '.best b{color:#ff9a3c;font-variant-numeric:tabular-nums}' +
         'button,a.link{all:unset;cursor:pointer;border-radius:999px;padding:7px 11px;background:#ff9a3c;color:#1b0e2e;font-weight:700;font-size:12px}' +
         'a.link{background:transparent;color:#fff4dc;text-decoration:underline;font-weight:500}' +
+        // depois do all:unset (mesma especificidade: o que vem por último vence); placar e botões nunca encolhem
+        '.best,button,a.link{flex:none}' +
         'button.x{background:transparent;color:#fff4dc;padding:4px 8px;font-size:16px}' +
         'button:focus-visible,a.link:focus-visible{outline:2px solid #fff4dc;outline-offset:2px}' +
         '.mini{position:fixed;left:10px;bottom:10px;z-index:2147483000;min-width:36px;height:30px;padding:0 10px;text-align:center;line-height:30px;' +
@@ -99,10 +102,12 @@
     wrap.addEventListener('mouseenter', function () { clearTimeout(collapseTimer); });
     wrap.addEventListener('mouseleave', function () { if (collapseMs > 0) collapseTimer = setTimeout(collapse, collapseMs); });
 
+    var flashTimer = null;
     function flash(msg) {
-        var old = shareBtn.textContent;
+        // rótulo fixo (e não "o texto de agora"): dois cliques seguidos não podem guardar a mensagem como se fosse o rótulo
+        clearTimeout(flashTimer);
         shareBtn.textContent = msg;
-        setTimeout(function () { shareBtn.textContent = old; }, 1800);
+        flashTimer = setTimeout(function () { shareBtn.textContent = 'Compartilhar'; }, 1800);
     }
 
     function copyFallback(text) {
@@ -147,7 +152,7 @@
         if (n != null && n > best) {
             best = n;
             if (store) state = core.loadState(store); // outra aba pode ter gravado desde a última vez
-            core.record(state, date, slug, best);
+            core.record(state, date, slug, best, openedAt);
             core.saveState(store, state);
             render();
         }

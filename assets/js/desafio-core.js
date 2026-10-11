@@ -18,7 +18,10 @@
     var BRT_OFFSET_MS = -3 * 3600 * 1000; // Brasília (sem horário de verão desde 2019)
     var DAY_MS = 86400000;
     var LAUNCH = '2026-10-12'; // edição nº 1
-    var KEEP_DAYS = 60;
+    // A sequência é calculada a partir dos dias guardados: podar abaixo do comprimento da sequência a truncaria.
+    // ~13 meses de histórico, ocupando poucos KB no localStorage.
+    var KEEP_DAYS = 400;
+    var MAX_SCORE = 1e12; // acima disso o placar não é plausível (e viraria notação científica no texto)
 
     // Ordem fixa: cada jogo volta a cada GAMES.length dias. Mexer na ordem muda o jogo de todos os dias futuros.
     var GAMES = [
@@ -90,7 +93,7 @@
         var m = /\d+(?:[.,]\d{3})*/.exec(String(text || ''));
         if (!m) return null;
         var n = parseInt(m[0].replace(/[.,]/g, ''), 10);
-        return isFinite(n) ? n : null;
+        return isFinite(n) && n <= MAX_SCORE ? n : null;
     }
 
     /** { days: { 'YYYY-MM-DD': { slug, best } } } */
@@ -106,7 +109,7 @@
         if (!s || s.version !== 1 || !s.days || typeof s.days !== 'object' || Array.isArray(s.days)) return out;
         Object.keys(s.days).forEach(function (k) {
             var v = s.days[k];
-            if (isDate(k) && v && typeof v.slug === 'string' && gameBySlug(v.slug) && typeof v.best === 'number' && isFinite(v.best) && v.best >= 0 && v.best <= 1e12) {
+            if (isDate(k) && v && typeof v.slug === 'string' && gameBySlug(v.slug) && typeof v.best === 'number' && isFinite(v.best) && v.best >= 0 && v.best <= MAX_SCORE) {
                 out.days[k] = { slug: v.slug, best: Math.floor(v.best), live: v.live === true };
             }
         });
@@ -129,7 +132,11 @@
      * (e não numa repetição de um dia passado): só dias "live" contam para a sequência.
      */
     function record(state, date, slug, score, now) {
-        var live = date === brtDate(now);
+        // placar inválido (NaN, negativo, absurdo) nunca é gravado
+        score = Math.floor(score);
+        if (!(score >= 0 && score <= MAX_SCORE)) return { state: state, improved: false };
+        // antes do lançamento (edição < 1) tudo é treino: não conta para a sequência
+        var live = date === brtDate(now) && date >= LAUNCH;
         var cur = state.days[date];
         var improved = !cur || cur.slug !== slug || score > cur.best;
         if (improved) state.days[date] = { slug: slug, best: score, live: live || Boolean(cur && cur.slug === slug && cur.live) };

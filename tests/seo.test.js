@@ -18,7 +18,9 @@ assert.strictEqual(new Set(locs).size, locs.length, 'sitemap com URLs duplicadas
 assert.ok(locs.includes(SITE + '/'), 'sitemap sem a home');
 pages.forEach(p => assert.ok(locs.includes(`${SITE}/jogos/${p}`), `sitemap sem /jogos/${p}`));
 assert.ok(locs.includes(SITE + '/desafio/'), 'sitemap sem a página do Desafio do Dia');
-assert.strictEqual(locs.length, pages.length + 2, 'sitemap com URLs além da home, do desafio e dos jogos');
+const extras = require('../scripts/generate-seo').EXTRA_PAGES;
+extras.forEach((e) => assert.ok(locs.includes(SITE + e.path), `sitemap sem ${e.path}`));
+assert.strictEqual(locs.length, pages.length + 1 + extras.length, 'sitemap com URLs além da home, das páginas extras e dos jogos');
 locs.forEach(u => assert.ok(u.startsWith(SITE), `URL fora do domínio: ${u}`));
 
 // robots.txt aponta para o sitemap
