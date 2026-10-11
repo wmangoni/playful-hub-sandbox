@@ -28,6 +28,9 @@ Passo a passo detalhado em [`README.md`](README.md#configuração-inicial-única
 - [ ] **Imagem de compartilhamento própria** para a `/desafio/` e para o Planning Poker (hoje usam `bg_neon_game.jpeg`).
 - [ ] **Vídeos em 30 fps nítido:** na CI (sem GPU) os clipes saem em 540×960/24 fps ampliados. Para qualidade máxima, gravar com GPU (`npm run marketing:render -- --all`) e versionar em `assets/videos/`.
 
+- [ ] **Revisão das traduções em inglês e espanhol por um falante nativo** (foram escritas por IA a partir do conteúdo real das páginas; PR das versões em outros idiomas). Enquanto isso **as páginas traduzidas não têm anúncios**; depois da revisão, decida se liga (`ADS_ON_TRANSLATED_PAGES` em `i18n/config.js`).
+- [ ] Posts de divulgação em inglês e espanhol (hoje saem só em português) e tradução da home e do Desafio do Dia.
+
 ## 4. Segurança e manutenção
 
 - [ ] **`express.static('./')` expõe `server.js`, `package.json` e `games_control.json`** publicamente (achado durante a Fase 1; existe uma tarefa separada para restringir, ainda não executada). Nada de segredo está exposto, mas o código-fonte do servidor está.
