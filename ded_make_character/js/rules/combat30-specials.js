@@ -204,7 +204,11 @@ export function onAttackAction(K, b, c) {
       if (x.dv > dvMax) continue;
       if (m.afeta && !K.atende(x, { ...m.afeta, dv_max: undefined })) continue;
       x.imuneAPresenca.push(c.uid); // um teste por luta: quem passa fica imune; quem falha já está com medo
-      if (K.imuneACondicao(x, m.condicao, 'medo')) continue; // morto-vivo, imune a medo: nem testa
+      const imuMedo = K.imuneACondicao(x, m.condicao, 'medo');
+      if (imuMedo) {
+        K.log(b, x, 'imune', `${x.nome} é imune a ${e.nome} (${imuMedo}).`);
+        continue; // morto-vivo, imune a medo: nem testa
+      }
       const r = K.teste(b, x, m.resistencia, m.cd, { medo: true, rotulo: e.nome });
       if (r.passou) continue;
       const porDv = (m.efeitos_por_dv || []).find(p => p.dv_max == null || x.dv <= p.dv_max);
@@ -235,7 +239,11 @@ export function onHit(K, b, c, alvo, a, { critico, natural, anuladoPorRD = false
         if (!K.podeLutar(alvo)) break;
         const cond = m.efeito === 'paralisia' ? 'paralisado' : m.condicao;
         const categoria = m.efeito === 'paralisia' ? 'paralisia' : K.MEDO[m.condicao] ? 'medo' : null;
-        if (K.efeitoNaoAfeta(alvo, { resistencia: m.resistencia, condicao: cond, afeta: m.afeta }, categoria)) break;
+        const motivo = K.efeitoNaoAfeta(alvo, { resistencia: m.resistencia, condicao: cond, afeta: m.afeta }, categoria);
+        if (motivo) {
+          K.log(b, alvo, 'imune', `${e.nome} não afeta ${alvo.nome} (${motivo}).`);
+          break;
+        }
         const r = K.teste(b, alvo, m.resistencia, m.cd, { rotulo: e.nome, medo: categoria === 'medo' });
         if (r.passou) break;
         const rodadas = K.parseDuracao(m.duracao, b.rng);

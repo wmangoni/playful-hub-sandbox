@@ -180,6 +180,7 @@ export function fromCatalog(e) {
     // o catálogo não descreve a armadura: a evasão vale (3.0: só com armadura leve ou nenhuma)
     armaduraLeve: true,
     esquivaSobrenatural: especiais.some(x => /esquiva sobrenatural/.test(loose(`${x.id} ${x.nome}`).replace(/-/g, ' '))),
+    imuneAFlanco: especiais.some(x => /esquiva sobrenatural/.test(loose(`${x.id} ${x.nome}`).replace(/-/g, ' '))),
   };
 }
 
@@ -1135,10 +1136,15 @@ function efeitoComTeste(b, c, alvo, ef, { rotulo = '', ignoraRD = true, categori
     }
     if (passou === true) {
       // evasão (3.0): só em efeito de Reflexos que dá metade; passar anula o dano
-      if (ef.resistencia === 'ref' && ef.metade_se_passar && SP.temEvasao(K, alvo)) fator = 0;
-      else if (ef.metade_se_passar) fator *= 0.5;
+      if (ef.resistencia === 'ref' && ef.metade_se_passar && SP.temEvasao(K, alvo)) {
+        fator = 0;
+        log(b, alvo, 'evasao', `${alvo.nome} usa Evasão e não sofre dano de ${rotulo || 'efeito'}.`);
+      } else if (ef.metade_se_passar) fator *= 0.5;
       else fator = 0;
-    } else if (passou === false && ef.resistencia === 'ref' && ef.metade_se_passar && SP.temEvasaoAprimorada(K, alvo)) fator *= 0.5;
+    } else if (passou === false && ef.resistencia === 'ref' && ef.metade_se_passar && SP.temEvasaoAprimorada(K, alvo)) {
+      fator *= 0.5;
+      log(b, alvo, 'evasao', `${alvo.nome} usa Evasão Aprimorada e sofre apenas metade do dano de ${rotulo || 'efeito'}.`);
+    }
     if (fator > 0) {
       const partes = [];
       const tipos = Array.isArray(ef.tipo_energia) ? ef.tipo_energia : ef.tipo_energia ? [ef.tipo_energia] : ['fisico'];
