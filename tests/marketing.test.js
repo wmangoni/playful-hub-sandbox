@@ -649,7 +649,7 @@ const goodPost = (over = {}) => ({
         sent.length = 0;
         const back = await run({ ...base, ledgerFile: path.join(tmp, 'dd-ledger2.json'), now: new Date('2026-10-15T12:00:00-03:00') });
         assert.deepStrictEqual([...new Set(sent.map((x) => x.split(':')[0]))], ['desafio-2026-10-15'], 'só o desafio de hoje sai');
-        assert.ok(back.superseded.length >= 3, 'os anteriores ficam adiados');
+        assert.ok(back.expired.length >= 2, 'os diários dos dias anteriores VENCEM (não ficam "adiados" para sair depois como se fossem de hoje)');
 
         // o plano (usado pelo workflow) enxerga o post diário e não pede clipe nenhum
         const plan = await run({ ...base, ledgerFile: path.join(tmp, 'dd-ledger3.json'), now: new Date('2026-10-16T10:00:00-03:00'), planOnly: true });
@@ -667,6 +667,137 @@ const goodPost = (over = {}) => ({
         assert.ok(sent.includes('dd-conf:bluesky:false'), 'o post editorial sai');
         assert.ok(!sent.some((x) => x.startsWith('desafio-2026-10-20')), 'o diário do próprio dia cedeu ao editorial (1 h de diferença), sem erro');
         console.log('✓ post diário do Desafio do Dia');
+    }
+
+
+    // ================= Review do PR #81: o diário só vale no próprio dia, e outras correções =================
+    {
+        const real = loadCalendars().posts;
+        const mkChannels = (state) => Object.fromEntries(['bluesky', 'mastodon', 'telegram'].map((n) => [n, { name: n, isConfigured: () => true, publish: async ({ post }) => { if (state.down === n) throw new Error('canal fora do ar'); state.sent.push(`${post.id}:${n}`); return { id: post.id }; } }]));
+        const dirOf = (name, posts) => { const d = path.join(tmp, name); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, 'c.json'), JSON.stringify({ campaign: 'teste', posts })); return d; };
+        const farPost = goodPost({ id: 'rv-far', at: '2027-06-01T19:00:00-03:00', channels: ['bluesky'] });
+
+        // B1: o diário vence às 23:00 do próprio dia (o link abre o jogo de HOJE)
+        assert.strictEqual(daily.dailyPostFor('2026-10-14').staleAfterHours, 14);
+        {
+            const st = { sent: [], down: null };
+            const base = { calendarDir: dirOf('rv-cal1', [farPost]), ledgerFile: path.join(tmp, 'rv-l1.json'), channels: mkChannels(st), games, log: quiet, env: {} };
+            await run({ ...base, now: new Date('2026-10-15T15:00:00-03:00') }); // workflow voltou depois de 30 h parado
+            assert.deepStrictEqual([...new Set(st.sent.map((x) => x.split(':')[0]))], ['desafio-2026-10-15'], 'só o de hoje sai');
+            const n = st.sent.length;
+            await run({ ...base, now: new Date('2026-10-15T16:07:00-03:00') }); // a execução seguinte NÃO solta o de ontem
+            await run({ ...base, now: new Date('2026-10-15T23:30:00-03:00') });
+            assert.strictEqual(st.sent.length, n, 'o diário de 14/10 não sai como "hoje" no dia 15');
+            assert.ok(!st.sent.some((x) => x.startsWith('desafio-2026-10-14')));
+        }
+        {
+            // canal fora do ar atravessando a meia-noite: o post do dia 16 não sai no dia 17 anunciando o jogo errado
+            const st = { sent: [], down: 'telegram' };
+            const base = { calendarDir: dirOf('rv-cal2', [farPost]), ledgerFile: path.join(tmp, 'rv-l2.json'), channels: mkChannels(st), games, log: quiet, env: {} };
+            await run({ ...base, now: new Date('2026-10-16T09:07:00-03:00') });
+            assert.ok(st.sent.includes('desafio-2026-10-16:bluesky') && !st.sent.includes('desafio-2026-10-16:telegram'));
+            st.down = null;
+            await run({ ...base, now: new Date('2026-10-16T22:07:00-03:00') });
+            assert.ok(st.sent.includes('desafio-2026-10-16:telegram'), 'dentro do dia o canal recupera o post');
+            const st2 = { sent: [], down: 'telegram' };
+            const base2 = { ...base, ledgerFile: path.join(tmp, 'rv-l2b.json'), channels: mkChannels(st2) };
+            await run({ ...base2, now: new Date('2026-10-16T09:07:00-03:00') });
+            st2.down = null;
+            await run({ ...base2, now: new Date('2026-10-17T00:07:00-03:00') });
+            assert.ok(!st2.sent.includes('desafio-2026-10-16:telegram'), 'depois da meia-noite o post vence: nada de "Hoje: Space Shooter" com link para outro jogo');
+        }
+        // o dia civil do post (BRT) é o da data, e o jogo é o da página naquele dia (400 dias, sem depender de módulo igual nos dois lados)
+        for (let i = 0; i < 400; i++) {
+            const d = desafio.addDays('2026-10-12', i);
+            const post = daily.dailyPostFor(d);
+            assert.strictEqual(desafio.brtDate(new Date(post.at)), d, `${d}: 09:00 BRT cai no mesmo dia civil`);
+            assert.strictEqual(desafio.brtDate(new Date(Date.parse(post.at) + post.staleAfterHours * 36e5)), d, `${d}: o prazo de validade termina ainda no mesmo dia`);
+            assert.strictEqual(desafio.challengeFor(desafio.brtDate(new Date(post.at))).game.slug, post.game);
+        }
+        assert.ok(daily.TEMPLATES.every((tp) => !/\bno \{jogo\}/.test(tp)), '"no {jogo}" vira "no The Archer": gramática');
+        assert.strictEqual(validatePost({ ...daily.dailyPostFor('2026-10-14'), staleAfterHours: 0 }, { games }).some((m) => m.includes('staleAfterHours')), true);
+        assert.strictEqual(validatePost({ ...daily.dailyPostFor('2026-10-14'), staleAfterHours: 99 }, { games }).some((m) => m.includes('staleAfterHours')), true);
+
+        // I1: MARKETING_DAILY chega ao plano e ao publicador no workflow, e as variações de "desligado"
+        {
+            const wf = fs.readFileSync(path.resolve(__dirname, '../.github/workflows/divulgacao.yml'), 'utf8');
+            const steps = wf.split(/\n      - name: /).slice(1);
+            for (const name of ['Plano', 'Publicar']) {
+                const step = steps.find((x) => x.startsWith(name));
+                assert.ok(step && step.includes('MARKETING_DAILY: ${{ vars.MARKETING_DAILY }}'), `o passo "${name}" precisa repassar vars.MARKETING_DAILY`);
+            }
+            for (const off of ['false', 'False', 'FALSE', '0', 'off', 'no', ' false ']) assert.strictEqual(daily.dailyEnabled({ MARKETING_DAILY: off }), false, `desliga com "${off}"`);
+            for (const on of [undefined, '', 'true', '1']) assert.strictEqual(daily.dailyEnabled({ MARKETING_DAILY: on }), true, `liga com ${JSON.stringify(on)}`);
+        }
+
+        // I2: título, descrição e CTA do link passam pelo mesmo lint do texto
+        {
+            const base = { path: '/desafio/', title: 'Desafio do Dia #3: Snake', description: 'Todo dia um jogo diferente do PlayfulHub.', cta: 'Jogar agora' };
+            const bad = (over) => validatePost(goodPost({ link: { ...base, ...over } }), { games });
+            assert.deepStrictEqual(bad({}), []);
+            for (const [k, v] of Object.entries({
+                cta: 'Clique aqui e ganhe dinheiro', title: 'JOGUE AGORA MESMO NESTE DESAFIO DO DIA',
+                description: 'O melhor jogo do mundo! Participe do sorteio e marque um amigo',
+            })) assert.ok(bad({ [k]: v }).length, `${k}: isca/CAPS/afirmação reprova`);
+            assert.ok(bad({ description: 'Acesse bit.ly/abc123 agora mesmo e jogue' }).length, 'domínio sem esquema na descrição');
+            assert.ok(bad({ cta: 'evil.example.com' }).length, 'domínio no CTA');
+            assert.ok(bad({ title: 'Desafio\ndo Dia aqui' }).length, 'quebra de linha no título');
+            assert.ok(bad({ title: 'Desafio do Dia \u202Eatnoc' }).length, 'caractere de direção (RLO) no título');
+            assert.ok(bad({ url: 'https://evil.example' }).some((m) => m.includes('desconhecido')), 'campo extra no link');
+            assert.ok(bad({ cta: 'ab' }).length && bad({ title: 'x'.repeat(121) }).length, 'limites de tamanho');
+        }
+
+        // I3: calendário malformado vira lista do Guardião (nunca stack), e defeito do diário não derruba o editorial
+        {
+            for (const [label, posts] of Object.entries({ 'at inválido': [{ ...goodPost({ id: 'mf-1' }), at: 'lixo' }], 'sem channels': [{ ...goodPost({ id: 'mf-2' }), channels: undefined }], 'post nulo': [null] })) {
+                const st = { sent: [], down: null };
+                let err;
+                try { await run({ calendarDir: dirOf('rv-bad-' + label.replace(/\W/g, ''), posts), ledgerFile: path.join(tmp, 'rv-bad.json'), channels: mkChannels(st), games, log: quiet, env: {}, now: new Date('2026-10-20T10:00:00-03:00') }); } catch (e) { err = e; }
+                assert.ok(err && /Guardião reprovou/.test(err.message) && Array.isArray(err.problems), `${label}: erro do Guardião, não stack (${err && err.message})`);
+                assert.ok(!(err instanceof TypeError) && !(err instanceof RangeError), `${label}: não pode ser TypeError/RangeError`);
+                assert.strictEqual(st.sent.length, 0);
+            }
+            // diário defeituoso (imagem sumiu): descartado com aviso, o editorial sai; na checagem da CI, falha
+            const ed = goodPost({ id: 'rv-ed', at: '2026-10-20T19:00:00-03:00', channels: ['bluesky'] });
+            const dirEd = dirOf('rv-cal-ed', [ed]);
+            const slug = daily.dailyPostFor('2026-10-20').game;
+            const saved = daily.IMAGE_OVERRIDES[slug];
+            daily.IMAGE_OVERRIDES[slug] = 'assets/images/nao_existe.png';
+            try {
+                const st = { sent: [], down: null };
+                const logs = [];
+                await run({ calendarDir: dirEd, ledgerFile: path.join(tmp, 'rv-ed.json'), channels: mkChannels(st), games, log: (m) => logs.push(m), env: {}, now: new Date('2026-10-20T19:30:00-03:00') });
+                assert.ok(st.sent.includes('rv-ed:bluesky'), 'o post editorial sai mesmo com o diário defeituoso');
+                assert.ok(!st.sent.some((x) => x.startsWith('desafio-2026-10-20')), 'o diário defeituoso não sai');
+                assert.ok(logs.some((m) => m.includes('post diário descartado')), 'e há aviso');
+                await assert.rejects(run({ calendarDir: dirEd, ledgerFile: path.join(tmp, 'rv-ed2.json'), channels: mkChannels({ sent: [], down: null }), games, log: quiet, env: {}, checkOnly: true, now: new Date('2026-10-20T10:00:00-03:00') }), /Guardião reprovou/, 'na checagem da CI o defeito falha');
+            } finally {
+                if (saved === undefined) delete daily.IMAGE_OVERRIDES[slug]; else daily.IMAGE_OVERRIDES[slug] = saved;
+            }
+        }
+
+        // M1: o prefixo desafio-AAAA-MM-DD é do gerador; o calendário não pode usá-lo nem forjar "generated"
+        {
+            assert.ok(validatePost(goodPost({ id: 'desafio-2026-10-14' }), { games }).some((m) => m.includes('reservado')), 'id reservado');
+            assert.ok(validatePost(daily.dailyPostFor('2026-10-14'), { games }).length === 0, 'o gerador pode usar o próprio prefixo');
+            const dir = dirOf('rv-gen', [{ ...goodPost({ id: 'forja-1' }), generated: 'daily' }]);
+            assert.throws(() => loadCalendars(dir), /reservado ao gerador/);
+            const own = daily.dailyPosts({ from: '2026-10-20', to: '2026-10-20', existing: [goodPost({ id: 'desafio-2026-10-20', at: '2026-10-20T20:00:00-03:00' })] });
+            assert.deepStrictEqual(own, [], 'id já existente: o gerador pula');
+        }
+
+        // fronteiras do conflito: 4 h exatas passam; fuso Z conta em Brasília
+        {
+            const at = (iso) => ({ ...goodPost({ id: 'cf-' + iso, at: iso, channels: ['bluesky'] }) });
+            const post = daily.dailyPostFor('2026-10-20'); // 09:00 BRT
+            assert.strictEqual(daily.conflicts(post, [at('2026-10-20T05:00:00-03:00')]), false, '4 h exatas antes: ok');
+            assert.strictEqual(daily.conflicts(post, [at('2026-10-20T13:00:00-03:00')]), false, '4 h exatas depois: ok');
+            assert.strictEqual(daily.conflicts(post, [at('2026-10-20T06:59:00-03:00')]), true);
+            assert.strictEqual(daily.conflicts(post, [at('2026-10-20T12:59:00-03:00')]), true);
+            assert.strictEqual(daily.conflicts(post, [at('2026-10-20T12:00:00Z')]), true, '12:00Z = 09:00 BRT');
+            assert.strictEqual(daily.conflicts(post, [null, { id: 'x' }, { ...at('2026-10-20T10:00:00-03:00'), channels: 'bluesky' }]), false, 'posts malformados são ignorados (o Guardião os reprova)');
+        }
+        console.log('✓ review do PR #81 (validade do diário, workflow, link, malformados, id reservado)');
     }
 
     fs.rmSync(tmp, { recursive: true, force: true });

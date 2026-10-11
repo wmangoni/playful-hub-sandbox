@@ -21,7 +21,7 @@ const { classify, onePerChannel } = require('./lib/schedule');
 const ledgerLib = require('./lib/ledger');
 const { resolveMedia, missingFiles } = require('./lib/media');
 const { compose } = require('./lib/compose');
-const { dailyPosts, dailyWindow } = require('./lib/daily');
+const { dailyPosts, dailyWindow, dailyEnabled } = require('./lib/daily');
 const desafio = require(path.join(cfg.ROOT, 'assets/js/desafio-core.js'));
 
 function clipsNeeded(due) {
@@ -48,24 +48,46 @@ async function run({
     }
 
     const { posts: calendarPosts } = loadCalendars(calendarDir);
-    // Post diário do Desafio do Dia: derivado das regras da página /desafio/ (não há arquivo de calendário).
-    // MARKETING_DAILY=false desliga. Na checagem (CI) cobre os próximos 180 dias, para um conflito com o
-    // calendário editorial aparecer no PR e não só no dia.
+    const guardError = (list) => {
+        const err = new Error(`Guardião reprovou o calendário:\n  - ${list.join('\n  - ')}`);
+        err.problems = list;
+        return err;
+    };
+    // 1) O calendário editorial é validado sozinho e primeiro: seus erros saem como lista do Guardião (nunca como
+    //    stack) e o post diário nunca é derivado de dados malformados.
+    const calendarProblems = validateCalendar(calendarPosts, { games, mode: 'plan' });
+    if (calendarProblems.length) throw guardError(calendarProblems);
+
+    // 2) Post diário do Desafio do Dia: derivado das regras da página /desafio/ (não há arquivo de calendário).
+    //    MARKETING_DAILY=false desliga. Na checagem (CI) cobre os próximos 180 dias, para um defeito aparecer no
+    //    PR e não só no dia. Ao publicar, um defeito do diário NUNCA derruba o calendário editorial: o diário é
+    //    descartado com aviso. Na checagem (CI) o mesmo defeito falha, para ser corrigido.
     let daily = [];
-    if (env.MARKETING_DAILY !== 'false') {
+    if (dailyEnabled(env)) {
         if (checkOnly) {
             const today = desafio.brtDate(now);
             daily = dailyPosts({ from: today, to: desafio.addDays(today, 180), existing: calendarPosts });
         } else {
             daily = dailyPosts({ ...dailyWindow(now), existing: calendarPosts });
         }
+        const bad = [];
+        daily = daily.filter((p) => {
+            const pr = validatePost(p, { games, mode: 'plan' });
+            bad.push(...pr);
+            return pr.length === 0;
+        });
+        if (bad.length) {
+            if (checkOnly) throw guardError(bad);
+            log(`⚠️  post diário descartado (o calendário editorial segue): ${bad[0]}`);
+        }
     }
-    const posts = [...calendarPosts, ...daily];
+    let posts = [...calendarPosts, ...daily];
     const problems = validateCalendar(posts, { games, mode: 'plan' });
     if (problems.length) {
-        const err = new Error(`Guardião reprovou o calendário:\n  - ${problems.join('\n  - ')}`);
-        err.problems = problems;
-        throw err;
+        if (checkOnly || !daily.length) throw guardError(problems);
+        log(`⚠️  o post diário conflita com o calendário e foi descartado (o calendário editorial segue): ${problems[0]}`);
+        daily = [];
+        posts = calendarPosts;
     }
     if (checkOnly) return { ok: true, posts: calendarPosts.length, daily: daily.length };
 

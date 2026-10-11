@@ -30,7 +30,7 @@ const TEMPLATES = [
     'Amanhã o jogo muda, então aproveite: hoje é {jogo} no Desafio do Dia #{n}.',
     '{jogo} é o jogo de hoje. Desafio do Dia #{n}: faça o seu melhor placar e compare com quem você quiser.',
     'Nada de instalar nada: o Desafio #{n} abre direto no navegador. Hoje: {jogo}.',
-    'Até onde você vai no {jogo}? É o Desafio do Dia #{n}.',
+    'Até onde você vai em {jogo}? É o Desafio do Dia #{n}.',
     'Desafio do Dia #{n}: {jogo}. Jogue uma vez ou dez, vale o seu melhor placar.',
     '{emoji} Hoje no PlayfulHub: {jogo}. É o Desafio do Dia #{n}, um jogo diferente a cada dia.',
     'Começar o dia com um desafio rápido? O de hoje (#{n}) é {jogo}.',
@@ -72,6 +72,9 @@ function dailyPostFor(date) {
             image: IMAGE_OVERRIDES[g.slug] || g.image.slice(1),
             alt: `Prévia do jogo ${g.name}, o jogo de hoje no Desafio do Dia do PlayfulHub.`
         },
+        // O link leva a /desafio/, que sempre mostra o jogo de HOJE: o post só vale no próprio dia (09:00 + 14 h = 23:00).
+        // Depois disso ele vence (e gera aviso) em vez de sair "atrasado" anunciando outro jogo como se fosse o de hoje.
+        staleAfterHours: 14,
         generated: 'daily'
     };
 }
@@ -82,8 +85,10 @@ const brtDay = (iso) => new Date(Date.parse(iso) - 3 * 36e5).toISOString().slice
 function conflicts(post, existing) {
     const at = Date.parse(post.at);
     const day = brtDay(post.at);
+    // posts malformados (sem data/canais válidos) não participam: quem os reprova é o Guardião, com mensagem própria
+    const usable = existing.filter((p) => p && Array.isArray(p.channels) && Number.isFinite(Date.parse(p.at)));
     for (const ch of post.channels) {
-        const mine = existing.filter((p) => p.channels.includes(ch));
+        const mine = usable.filter((p) => p.channels.includes(ch));
         if (mine.filter((p) => brtDay(p.at) === day).length >= cfg.MAX_POSTS_PER_DAY_PER_CHANNEL) return true;
         if (mine.some((p) => Math.abs(Date.parse(p.at) - at) / 36e5 < cfg.MIN_HOURS_BETWEEN_POSTS_PER_CHANNEL)) return true;
     }
@@ -99,11 +104,16 @@ function dailyPosts({ from, to, existing = [] }) {
     for (let d = from; d <= to; d = desafio.addDays(d, 1)) {
         const post = dailyPostFor(d);
         if (!post) continue;
+        // id já usado (o Guardião também reserva o prefixo desafio-AAAA-MM-DD para o gerador)
+        if ([...existing, ...out].some((p) => p && p.id === post.id)) continue;
         if (conflicts(post, [...existing, ...out])) continue;
         out.push(post);
     }
     return out;
 }
+
+/** MARKETING_DAILY=false (ou 0/no/off, em qualquer caixa) desliga só o post diário */
+const dailyEnabled = (env) => !['false', '0', 'no', 'off'].includes(String(env.MARKETING_DAILY == null ? '' : env.MARKETING_DAILY).trim().toLowerCase());
 
 /** janela usada na hora de publicar: ontem, hoje e amanhã (em Brasília) bastam para o que está devido */
 function dailyWindow(now) {
@@ -111,4 +121,4 @@ function dailyWindow(now) {
     return { from: desafio.addDays(today, -2), to: desafio.addDays(today, 2) };
 }
 
-module.exports = { dailyPostFor, dailyPosts, dailyWindow, TEMPLATES, CAMPAIGN, HOUR_BRT, IMAGE_OVERRIDES, conflicts };
+module.exports = { dailyPostFor, dailyPosts, dailyWindow, dailyEnabled, TEMPLATES, CAMPAIGN, HOUR_BRT, IMAGE_OVERRIDES, conflicts };

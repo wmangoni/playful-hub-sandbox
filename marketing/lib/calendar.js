@@ -9,6 +9,8 @@ function loadCalendars(dir = CALENDAR_DIR) {
         // erro de digitação em "posts" faria o calendário inteiro ser ignorado em silêncio
         if (!Array.isArray(data.posts)) throw new Error(`${file}: "posts" precisa ser uma lista`);
         if (typeof data.campaign !== 'string' || !data.campaign) throw new Error(`${file}: "campaign" é obrigatório`);
+        // `generated` marca posts criados pelo gerador do diário; um calendário não pode se passar por ele
+        data.posts.forEach((p) => { if (p && typeof p === 'object' && 'generated' in p) throw new Error(`${file}: o campo "generated" é reservado ao gerador do post diário`); });
         return { file, campaign: data.campaign, posts: data.posts };
     });
     const posts = calendars.flatMap((c) => (Array.isArray(c.posts) ? c.posts.map((p) => ({ ...p, campaign: c.campaign })) : []));
