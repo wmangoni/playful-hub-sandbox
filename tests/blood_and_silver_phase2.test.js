@@ -41,7 +41,7 @@ const assert = require('assert');
         assert.ok(c[1].locked && c[1].disabled && c[1].padlock && !c[1].selected && c[1].tab === -1, 'Fase II bloqueada, com cadeado em pixel art');
         assert.ok(c[1].text.includes('10:00') && c[1].text.includes('Fase I'), `O cartão diz como liberar (${c[1].text})`);
         const desertFlora = await floraSig();
-        await page.click('.phase-card[data-phase="2"]');
+        await page.$eval('.phase-card[data-phase="2"]', el => el.click());
         await page.keyboard.press('2');
         await page.keyboard.press('ArrowRight');
         assert.strictEqual(await G(() => window.__game.phase), 1, 'Fase bloqueada não é selecionada');

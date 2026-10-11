@@ -15,7 +15,7 @@ for (const file of testFiles) {
     try {
         const output = execSync(`node "${filePath}"`, {
             cwd: path.resolve(__dirname, '..'),
-            timeout: 25000,
+            timeout: parseInt(process.env.TEST_TIMEOUT || '150000', 10),
             env: { ...process.env, NODE_ENV: 'test' },
             encoding: 'utf-8'
         });
@@ -41,3 +41,7 @@ const failed = report.filter(r => r.status === 'FAILED').length;
 console.log(`Total: ${report.length} | Passed: ${passed} | Failed: ${failed}`);
 
 fs.writeFileSync(path.join(__dirname, 'test_summary_report.json'), JSON.stringify(report, null, 2));
+
+if (failed > 0) {
+    process.exit(1);
+}

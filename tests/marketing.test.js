@@ -489,8 +489,8 @@ const goodPost = (over = {}) => ({
     {
         const have = (cmd) => spawnSync(cmd, ['--version'], { encoding: 'utf8' }).status === 0;
         const gitVer = (spawnSync('git', ['--version'], { encoding: 'utf8' }).stdout.match(/(\d+)\.(\d+)/) || []).slice(1).map(Number);
-        if (!have('bash') || !have('git') || gitVer[0] < 2 || (gitVer[0] === 2 && gitVer[1] < 42)) {
-            console.log('⏭ ledger.sh: pulado (sem bash ou git 2.42+)');
+        if (process.platform === 'win32' || !have('bash') || !have('git') || gitVer[0] < 2 || (gitVer[0] === 2 && gitVer[1] < 42)) {
+            console.log('⏭ ledger.sh: pulado (Windows ou sem bash/git 2.42+)');
         } else {
             const script = path.join(M, 'scripts/ledger.sh');
             const git = (cwd, ...args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' });

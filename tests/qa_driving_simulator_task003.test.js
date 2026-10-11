@@ -165,7 +165,8 @@ async function runTests() {
     const d = window.__drive;
     const state = d.gameStateRef();
     
-    // Aplicar 60 de dano para ficar com 40% (ativa fumaça)
+    // Resetar integridade e aplicar 60 de dano para ficar com 40% (ativa fumaça)
+    state.playerHealth = 100;
     d.applyDamage('player', 60);
     const healthAfterDamage = state.playerHealth;
 
