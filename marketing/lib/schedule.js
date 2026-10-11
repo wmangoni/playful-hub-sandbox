@@ -14,7 +14,8 @@ function classify(posts, ledger, now, { staleAfterHours = STALE_AFTER_HOURS } = 
         const pending = post.channels.filter((c) => !isPosted(ledger, post.id, c));
         if (!pending.length) continue;
         if (at > now) future.push(post);
-        else if ((now - at) / 36e5 > staleAfterHours) expired.push(post);
+        // `staleAfterHours` no post (ex.: o diário do Desafio do Dia vale só até 23:00) vence a janela geral
+        else if ((now - at) / 36e5 > (typeof post.staleAfterHours === 'number' ? post.staleAfterHours : staleAfterHours)) expired.push(post);
         else due.push({ post, channels: pending });
     }
     due.sort((a, b) => new Date(a.post.at) - new Date(b.post.at));

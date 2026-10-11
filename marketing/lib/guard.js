@@ -9,6 +9,9 @@ const { resolveMedia, missingFiles, insideAssets } = require('./media');
 const ID_RE = /^[a-z0-9][a-z0-9-]{2,60}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
 const AT_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(Z|[+-]\d{2}:\d{2})$/;
+// destinos permitidos além da página do jogo (cada um é uma página do portal que existe de verdade)
+const ALLOWED_LINK_PATHS = ['/desafio/'];
+const LINK_KEYS = ['path', 'title', 'description', 'cta'];
 const CAMPAIGN_RE = /^[a-z0-9][a-z0-9-]{2,40}$/;
 
 /** ISO 8601 com fuso, estrito: rejeita 30/02, hora 24 e qualquer data que o JavaScript "corrigiria" em silêncio */
@@ -28,10 +31,10 @@ const CLAIMS = [/melhor jogo do mundo/, /\bn(úmero|º) ?1\b/, /o maior do brasi
 
 const emojiCount = (s) => (s.match(/\p{Extended_Pictographic}/gu) || []).length + (s.match(/\p{Regional_Indicator}{2}/gu) || []).length;
 
-function lintText(text) {
+function lintText(text, { min = cfg.MIN_TEXT_LENGTH } = {}) {
     const p = [];
     const low = text.toLowerCase();
-    if (text.trim().length < cfg.MIN_TEXT_LENGTH) p.push(`texto curto demais (mínimo ${cfg.MIN_TEXT_LENGTH} caracteres)`);
+    if (text.trim().length < min) p.push(`texto curto demais (mínimo ${min} caracteres)`);
     if (/https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|br|io|gg|ly|co|app|dev)\b/i.test(text)) p.push('o texto não pode conter URL ou domínio (o link é montado com UTM automaticamente)');
     if (/(^|\s)@\w/.test(text)) p.push('o texto não pode conter @menção');
     if (/(^|\s)#\p{L}/u.test(text)) p.push('hashtags vão no campo "hashtags", não no texto');
@@ -69,6 +72,32 @@ function validatePost(post, { games, mode = 'plan' }) {
     if (!Array.isArray(post.channels) || !post.channels.length || post.channels.some((c) => !cfg.CHANNELS.includes(c))) add(`"channels" deve ser subconjunto de ${cfg.CHANNELS.join(', ')}`);
     if (typeof post.text !== 'string') { add('texto ausente'); return p; }
     lintText(post.text).forEach(add);
+
+    if (post.link !== undefined) {
+        const l = post.link;
+        // título, descrição e CTA vão para o card do Bluesky e para a legenda do Telegram: mesmo lint do texto do post
+        const field = (name, t, min, max) => {
+            if (typeof t !== 'string' || t.trim().length < min || t.length > max) return [`link.${name}: de ${min} a ${max} caracteres`];
+            const out = [];
+            if (/[\p{Cc}\p{Cf}]/u.test(t)) out.push(`link.${name}: caracteres de controle ou de direção de texto não são permitidos`);
+            lintText(t, { min: 0 }).forEach((m) => out.push(`link.${name}: ${m}`));
+            return out;
+        };
+        if (!l || typeof l !== 'object' || Array.isArray(l) || !ALLOWED_LINK_PATHS.includes(l.path)) add(`link.path deve ser um de: ${ALLOWED_LINK_PATHS.join(', ')}`);
+        else {
+            Object.keys(l).filter((k) => !LINK_KEYS.includes(k)).forEach((k) => add(`link: campo desconhecido "${k}"`));
+            field('title', l.title, 5, 120).forEach(add);
+            field('description', l.description, 10, 280).forEach(add);
+            if (l.cta !== undefined) field('cta', l.cta, 3, 40).forEach(add);
+        }
+    }
+
+    if (post.staleAfterHours !== undefined && !(Number.isFinite(post.staleAfterHours) && post.staleAfterHours >= 1 && post.staleAfterHours <= cfg.STALE_AFTER_HOURS)) {
+        add(`staleAfterHours deve ser um número entre 1 e ${cfg.STALE_AFTER_HOURS}`);
+    }
+
+    // o prefixo desafio-AAAA-MM-DD é do gerador do post diário (o loader do calendário proíbe o campo "generated")
+    if (/^desafio-\d{4}-\d{2}-\d{2}$/.test(post.id || '') && post.generated !== 'daily') add('id reservado ao gerador do post diário do Desafio do Dia');
 
     const tags = post.hashtags || [];
     if (!Array.isArray(tags) || tags.length > cfg.MAX_HASHTAGS) add(`no máximo ${cfg.MAX_HASHTAGS} hashtags`);

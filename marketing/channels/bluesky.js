@@ -50,7 +50,9 @@ async function publish({ post, composed, game, media }, env, fetchImpl = fetch) 
     }));
     const auth = { authorization: `Bearer ${session.accessJwt}` };
 
-    const external = { uri: composed.link, title: game.name, description: truncate(game.description || '', 280) };
+    // posts com destino alternativo (ex.: Desafio do Dia) trazem o próprio título/descrição do card
+    const card = post.link || { title: game.name, description: game.description || '' };
+    const external = { uri: composed.link, title: truncate(card.title, 120), description: truncate(card.description || '', 280) };
     const thumbFile = media && media.poster && fs.existsSync(media.poster) ? media.poster : null;
     if (thumbFile) {
         const mime = MIME[path.extname(thumbFile).toLowerCase()];
