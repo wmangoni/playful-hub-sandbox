@@ -1,0 +1,944 @@
+/* ==========================================================================
+   Ficha Iluminada: protótipo da tela de exploração (Fase 0).
+   Tudo em rem: 1rem = 16px em 1920x1080 e a tela inteira escala com a janela.
+   Rótulos pequenos têm piso em px para continuarem legíveis em 1366x768.
+   ========================================================================== */
+
+:root {
+    /* Pergaminho e tinta */
+    --pergaminho: #e9dcbf;
+    --pergaminho-2: #dcc79e;
+    --pergaminho-3: #c4a979;
+    --tinta: #2f1f12;
+    --tinta-2: #4a3220;
+    --sepia: #6b4a2e;
+    --sepia-claro: #8c6a48;
+    --apagado: #6f5a47;          /* texto inativo: ~4,8:1 sobre o pergaminho */
+
+    /* Rubrica, metais e vitral */
+    --rubro: #7e2320;
+    --rubro-escuro: #4f1512;
+    --bronze: #8f6c34;
+    --ouro: #c9a14f;
+    --ouro-claro: #e6c983;
+    --ambar: #e0a145;
+    --verdete: #3f5a3d;          /* sucesso: ~5,6:1 sobre o pergaminho */
+    --mesa: #140d08;
+
+    /* Tipografia */
+    --fonte-titulo: 'Grenze Gotisch', 'Alegreya', Georgia, serif;
+    --fonte-texto: 'Alegreya', Georgia, 'Times New Roman', serif;
+    --fonte-rotulo: 'Marcellus SC', 'Alegreya', Georgia, serif;
+    --fonte-numero: 'Alegreya', Georgia, serif; /* algarismos alinhados; os do Marcellus SC parecem letras */
+    --rotulo: max(0.8rem, 11.5px);
+    --rotulo-menor: max(0.74rem, 11px);
+
+    /* Medidas: moldura 1,4rem + cabeçalho 6,5rem + respiro da mesa 2,3rem */
+    --coluna-ficha: 23rem;
+    --vao: 1.6rem;
+    --cabecalho: 6.5rem;
+    --altura-mesa: calc(100dvh - 2.8rem - var(--cabecalho) - 2.3rem);
+
+    color-scheme: light;
+}
+
+html {
+    font-size: clamp(10px, min(0.8333vw, 1.4815vh), 18px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--mesa);
+    color: var(--tinta);
+    font-family: var(--fonte-texto);
+    -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; }
+
+.so-leitor {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.num, .medalhao-mod, .medalhao-valor, .emblema-valor, .nivel-valor, .escolha-num {
+    font-family: var(--fonte-numero);
+    font-weight: 500;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+
+:focus-visible {
+    outline: 0.15rem solid var(--rubro);
+    outline-offset: 0.12rem;
+}
+
+/* ---------- Folha ---------- */
+
+.folha {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--coluna-ficha) auto minmax(0, 1fr);
+    grid-template-rows: var(--cabecalho) minmax(0, 1fr);
+    column-gap: var(--vao);
+    height: 100dvh;
+    padding: 0 1.4rem;
+    border: 1.4rem solid transparent;
+    border-image: url(../ui/ornamentos/moldura-folha.svg) 56 / 4.6rem / 0 stretch;
+    /* Bordas queimadas em gradientes (sombras internas grandes custam caro para rasterizar) */
+    background:
+        linear-gradient(90deg, rgba(70, 40, 12, 0.38), transparent 1.6rem, transparent calc(100% - 1.6rem), rgba(70, 40, 12, 0.38)),
+        linear-gradient(rgba(70, 40, 12, 0.38), transparent 1.6rem, transparent calc(100% - 1.6rem), rgba(70, 40, 12, 0.38)),
+        radial-gradient(ellipse 75% 70% at 50% 46%, rgba(255, 248, 228, 0.35), transparent 70%, rgba(110, 66, 24, 0.32) 100%),
+        url(../ui/texturas/pergaminho.webp) 0 0 / 512px repeat,
+        var(--pergaminho);
+    background-clip: padding-box;
+}
+
+/* Dragões empoleirados nos cantos da moldura */
+.dragao {
+    position: absolute;
+    top: -0.55rem;
+    left: -0.65rem;
+    z-index: 4;
+    width: 7rem;
+    height: 7rem;
+    pointer-events: none;
+    filter: drop-shadow(0 0.25rem 0.3rem rgba(30, 15, 5, 0.45));
+}
+.dragao-direita { left: auto; right: -0.65rem; transform: scaleX(-1); }
+
+/* ---------- Cabeçalho (mesmas colunas da mesa) ---------- */
+
+.cabecalho {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+}
+
+.campos {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    padding-left: 7rem;
+}
+.campo dt {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.12em;
+    color: var(--sepia);
+}
+.campo dd {
+    margin: 0;
+    padding: 0 0.2rem 0.1rem;
+    border-bottom: 1px solid var(--sepia);
+    box-shadow: 0 2px 0 -1px rgba(107, 74, 46, 0.35);
+    font: italic 1.2rem/1.15 var(--fonte-texto);
+    color: var(--tinta);
+}
+.campo dd.campo-vazio { color: var(--apagado); font-size: 1rem; }
+
+.titulo {
+    margin: 0;
+    font: 700 3.3rem/1 var(--fonte-titulo);
+    color: var(--rubro);
+    letter-spacing: 0.01em;
+    text-align: center;
+    white-space: nowrap;
+    text-shadow: 0 0.07rem 0 rgba(255, 244, 220, 0.75), 0 0 1.2rem rgba(255, 236, 200, 0.5);
+}
+.titulo::after {
+    content: '';
+    display: block;
+    width: 70%;
+    height: 0.8rem;
+    margin: 0.3rem auto 0;
+    background: url(../ui/ornamentos/corrente.svg) center / auto 100% repeat-x;
+    -webkit-mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+            mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+}
+
+.selos {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.9rem;
+    padding-right: 7rem;
+}
+.selo {
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.08em;
+    color: var(--sepia);
+}
+.selo svg {
+    width: 3.3rem;
+    height: 3.3rem;
+    padding: 0.8rem;
+    border-radius: 50%;
+    color: var(--tinta-2);
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+.selo:hover svg { transform: translateY(-0.12rem); color: var(--rubro); }
+.selo[aria-pressed="true"] svg { color: var(--rubro); }
+.selo[aria-pressed="false"] svg { opacity: 0.6; }
+.selo:focus-visible { outline: none; }
+.selo:focus-visible svg { box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro); }
+
+/* ---------- Mesa (três colunas) ---------- */
+
+.mesa {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    min-height: 0;
+    padding: 1.2rem 0 1.1rem;
+}
+
+.coluna {
+    display: flex;
+    flex-direction: column;
+    gap: 2.15rem;
+    min-height: 0;
+}
+
+/* ---------- Painel com moldura e fita ---------- */
+
+.painel {
+    position: relative;
+    border: 0.7rem solid transparent;
+    border-image: url(../ui/ornamentos/moldura.svg) 40 / 2.5rem / 0 stretch;
+    padding: 1.55rem 1rem 0.9rem;
+    background: rgba(255, 250, 236, 0.3);
+    background-clip: padding-box;
+}
+
+.fita {
+    position: absolute;
+    top: -1.95rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    height: 3.5rem;
+    margin: 0;
+    padding: 0 0.5rem;
+    border-style: solid;
+    border-width: 0 2.75rem;
+    border-image: url(../ui/ornamentos/fita.svg) 0 44 fill / 0 2.75rem / 0 stretch;
+    font: 700 1.4rem/3.05rem var(--fonte-titulo);
+    letter-spacing: 0.02em;
+    color: var(--tinta);
+    white-space: nowrap;
+}
+.fita-rubra {
+    border-image-source: url(../ui/ornamentos/fita-rubra.svg);
+    color: #f6e6c4;
+    text-shadow: 0 0.06rem 0 rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Vida, armadura e ouro ---------- */
+
+.vitais {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: end;
+    justify-items: center;
+    row-gap: 0.7rem;
+    padding: 0 0.6rem;
+}
+.vital {
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+}
+.emblema {
+    display: grid;
+    place-items: center;
+    width: 5.4rem;
+    aspect-ratio: 1;
+    background: center / contain no-repeat;
+}
+.emblema-vida { background-image: url(../ui/ornamentos/medalhao-rubro.svg); }
+.emblema-ca { width: 4.7rem; aspect-ratio: 100 / 116; background-image: url(../ui/ornamentos/escudo.svg); }
+.emblema-ouro { width: 5rem; background-image: url(../ui/ornamentos/moeda.svg); }
+.emblema-valor {
+    font-size: 1.85rem;
+    line-height: 1;
+    color: var(--tinta);
+}
+.emblema-ca .emblema-valor { margin-top: -0.55rem; }
+.emblema-vida .emblema-valor { color: #f8e8c8; text-shadow: 0 0.08rem 0 rgba(0, 0, 0, 0.5); }
+.emblema-valor small { font-size: 0.55em; opacity: 0.85; }
+.vital-rotulo {
+    font: var(--rotulo) var(--fonte-rotulo);
+    letter-spacing: 0.1em;
+    color: var(--sepia);
+}
+
+.barra-vida {
+    grid-column: 1 / -1;
+    position: relative;
+    width: 100%;
+    height: 0.95rem;
+    border: 0.12rem solid var(--tinta);
+    border-radius: 1rem;
+    background: linear-gradient(var(--tinta), var(--tinta-2));
+    box-shadow: 0 0 0 0.1rem var(--ouro), 0 0 0 0.22rem var(--tinta), inset 0 0.1rem 0.25rem rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+.barra-vida span {
+    display: block;
+    width: calc(var(--v) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(#c45444, var(--rubro) 55%, #561713);
+    box-shadow: inset 0 0.1rem 0 rgba(255, 214, 190, 0.4);
+    transition: width 0.5s ease-out;
+}
+.barra-vida::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(30, 15, 5, 0.45) calc(10% - 1px) 10%);
+}
+
+/* ---------- Atributos (modificador em destaque, valor na pílula) ---------- */
+
+.atributos, .slots, .missoes, .cronica {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.atributos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem 0.2rem;
+}
+.atributo {
+    display: grid;
+    justify-items: center;
+    gap: 0.5rem;
+}
+.medalhao {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 4.7rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.medalhao-mod {
+    margin-top: -0.2rem;
+    font-size: 1.8rem;
+    line-height: 1;
+    color: var(--tinta);
+}
+.negativo .medalhao-mod { color: var(--rubro); }
+.medalhao-valor {
+    position: absolute;
+    bottom: -0.4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 2.2rem;
+    padding: 0.08rem 0.45rem 0.04rem;
+    border: 0.1rem solid var(--tinta);
+    border-radius: 1rem;
+    background: linear-gradient(#f4ead2, #d6c094);
+    box-shadow: inset 0 0 0 0.07rem rgba(201, 161, 79, 0.8);
+    font-size: var(--rotulo);
+    line-height: 1.15;
+    color: var(--tinta);
+    text-align: center;
+}
+.atributo-nome {
+    max-width: 100%;
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.02em;
+    color: var(--sepia);
+    white-space: nowrap;
+}
+
+/* ---------- Equipamento ---------- */
+
+.slots {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+.slot {
+    position: relative;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.2rem;
+    width: 100%;
+    aspect-ratio: 1.3;
+    padding: 0;
+    border: 0.1rem solid var(--tinta-2);
+    border-radius: 0.2rem;
+    outline: 0.07rem solid var(--ouro);
+    outline-offset: -0.3rem;
+    background: radial-gradient(circle at 50% 38%, rgba(255, 251, 238, 0.7), rgba(214, 192, 148, 0.35));
+    box-shadow: inset 0 0 0.6rem rgba(74, 50, 32, 0.3);
+}
+.slot svg { width: 1.9rem; height: 1.9rem; color: var(--tinta-2); }
+.slot-nome {
+    max-width: 100%;
+    padding: 0 0.3rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: 500 var(--rotulo-menor) / 1.1 var(--fonte-texto);
+    color: var(--tinta);
+}
+.slot-usavel { cursor: pointer; }
+.slot-usar {
+    position: absolute;
+    top: -0.6em;
+    right: 0.35rem;
+    padding: 0 0.4em;
+    border: 1px solid var(--tinta);
+    border-radius: 0.6rem;
+    background: var(--rubro);
+    font: max(0.62rem, 11px) / 1.25 var(--fonte-rotulo);
+    letter-spacing: 0.06em;
+    color: #f6e6c4;
+}
+.slot-usavel:hover { outline-color: var(--rubro); }
+.slot-usavel:hover svg { color: var(--rubro); }
+.slot-usavel:focus-visible { outline: 0.15rem solid var(--rubro); outline-offset: 0.1rem; }
+.slot-vazio {
+    border-style: dashed;
+    border-color: rgba(74, 50, 32, 0.5);
+    outline-color: transparent;
+    background: rgba(255, 250, 236, 0.18);
+    box-shadow: none;
+}
+.slot-vazio .slot-nome { font-style: italic; color: var(--apagado); }
+
+/* ---------- Missões ---------- */
+
+.coluna-ficha > .painel:last-child { flex: 1 1 auto; }
+
+.missoes { display: grid; }
+.missao {
+    display: grid;
+    grid-template-columns: 1rem 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.32rem 0.1rem;
+    border-bottom: 1px dotted rgba(107, 74, 46, 0.55);
+    font: max(1rem, 12.5px)/1.25 var(--fonte-texto);
+}
+.missao:last-child { border-bottom: 0; }
+.bolha {
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 0.1rem solid var(--tinta);
+    border-radius: 50%;
+}
+.missao-ativa .bolha { background: linear-gradient(90deg, var(--rubro) 50%, transparent 50%); }
+.missao-concluida .bolha { background: var(--rubro); }
+.missao-inativa { color: var(--apagado); font-style: italic; }
+.missao-inativa .bolha { border-color: var(--apagado); }
+.missao-estado {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    font-style: normal;
+    letter-spacing: 0.04em;
+    color: var(--sepia);
+}
+
+/* ---------- Vitral e nível ---------- */
+
+.coluna-vitral {
+    position: relative;
+    align-items: center;
+    gap: 0;
+}
+
+.vitral {
+    position: relative;
+    height: var(--altura-mesa);
+    aspect-ratio: 600 / 800;
+    margin: 0;
+}
+.vitral::before {
+    content: '';
+    position: absolute;
+    inset: 2% -4% -3%;
+    background: radial-gradient(closest-side, rgba(50, 28, 8, 0.5), rgba(50, 28, 8, 0.25) 75%, transparent);
+}
+.vitral-cena {
+    position: absolute;
+    inset: 0;
+    background: #1a120b;
+}
+.vitral-cena img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--foco, 50% 50%);
+}
+.vitral-sombra {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 75% 65% at 50% 55%, transparent 55%, rgba(26, 12, 4, 0.55) 100%),
+        linear-gradient(rgba(120, 70, 20, 0.12), rgba(120, 70, 20, 0.12));
+}
+.vitral-chama {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 92%, rgba(255, 170, 80, 0.3), transparent 70%);
+    animation: chama 3.2s ease-in-out infinite;
+}
+@keyframes chama {
+    0%, 100% { opacity: 0.7; }
+    18% { opacity: 1; }
+    34% { opacity: 0.78; }
+    52% { opacity: 0.95; }
+    70% { opacity: 0.66; }
+    86% { opacity: 0.9; }
+}
+.vitral-moldura {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.nivel {
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: max(9.6rem, 136px);
+    aspect-ratio: 1;
+    transform: translateX(-50%);
+    filter: drop-shadow(0 0.25rem 0.4rem rgba(40, 22, 6, 0.5));
+}
+.nivel-arte { position: absolute; inset: 0; width: 100%; height: 100%; }
+.nivel-rotulo, .nivel-valor, .nivel-xp { position: relative; grid-area: 1 / 1; }
+.nivel-rotulo {
+    align-self: start;
+    margin-top: 28%;
+    font: max(0.7rem, 11px) var(--fonte-rotulo);
+    letter-spacing: 0.16em;
+    color: var(--sepia);
+}
+.nivel-valor {
+    margin-top: 0.15rem;
+    font-size: max(2.6rem, 34px);
+    line-height: 1;
+    color: var(--tinta);
+}
+.nivel-xp {
+    align-self: end;
+    margin-bottom: 27%;
+    font: max(0.7rem, 11px) var(--fonte-rotulo);
+    letter-spacing: 0.02em;
+    color: var(--sepia);
+}
+
+/* ---------- Narrativa ---------- */
+
+.coluna-narrativa { padding-top: 0.2rem; }
+
+.painel-narrativa {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 2.2rem 2.2rem 1.2rem;
+    contain: layout style; /* trocar escolhas por dado não reflui o resto da folha */
+}
+
+.cena-texto {
+    flex: 0 1 auto;
+    min-height: 0;
+    margin: 0 0 0.6rem;
+    overflow-y: auto;
+    font: 1.32rem/1.6 var(--fonte-texto);
+    color: var(--tinta);
+    text-wrap: pretty;
+    contain: layout style; /* o efeito de máquina de escrever reflui só este bloco */
+    scrollbar-width: thin;
+    scrollbar-color: var(--sepia-claro) transparent;
+}
+.cena-texto::first-letter {
+    float: left;
+    margin: 0.4rem 0.8rem 0 0;
+    padding: 0.55rem 0.7rem 0.5rem;
+    background: url(../ui/ornamentos/capitular.svg) center / 100% 100%;
+    font: 700 5.05rem/0.9 var(--fonte-titulo);
+    color: var(--rubro);
+    text-shadow: 0 0.06rem 0 rgba(255, 244, 220, 0.6);
+}
+
+/* Escolhas e bandeja ocupam a mesma célula: a altura é sempre a do estado
+   mais alto, então trocar de estado não move nada, e a bandeja já chega
+   com estilo e layout calculados (só fica invisível). */
+.acoes { display: grid; }
+.acoes > .corrente { grid-area: 1 / 1; }
+.acoes > .escolhas, .acoes > .bandeja { grid-area: 2 / 1; align-self: start; }
+.estado-oculto { visibility: hidden; }
+
+.corrente {
+    position: relative;
+    height: 0.85rem;
+    margin: 0.4rem 0 0.9rem;
+    background: url(../ui/ornamentos/corrente.svg) center / auto 100% repeat-x;
+}
+.corrente::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1rem;
+    height: 1rem;
+    transform: translate(-50%, -50%) rotate(45deg);
+    border: 0.1rem solid var(--ouro);
+    background: linear-gradient(135deg, #c45444, var(--rubro-escuro));
+    box-shadow: 0 0 0 0.12rem var(--tinta), 0 0 0 0.45rem rgba(233, 220, 191, 0.95);
+}
+
+.escolhas { display: grid; }
+.escolhas-titulo {
+    margin: 0 0 0.35rem;
+    font: var(--rotulo) var(--fonte-rotulo);
+    letter-spacing: 0.16em;
+    color: var(--sepia);
+    text-align: center;
+}
+.escolha {
+    display: grid;
+    grid-template-columns: 1.9rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 0.62rem 0.6rem;
+    border: 0;
+    border-bottom: 1px dotted rgba(107, 74, 46, 0.6);
+    border-radius: 0.15rem;
+    background: transparent;
+    font: 500 1.2rem/1.3 var(--fonte-texto);
+    color: var(--tinta);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.escolha:last-child { border-bottom: 0; }
+.escolha-num {
+    display: grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 0.1rem solid var(--tinta);
+    border-radius: 50%;
+    background: rgba(255, 250, 236, 0.5);
+    font-size: max(0.95rem, 12px);
+    line-height: 1;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.escolha:hover, .escolha:focus-visible {
+    background: rgba(126, 35, 32, 0.08);
+    color: var(--rubro);
+}
+.escolha:hover .escolha-num, .escolha:focus-visible .escolha-num {
+    border-color: var(--rubro);
+    background: var(--rubro);
+    color: #f6e6c4;
+}
+.escolha:focus-visible { outline-offset: 0.05rem; }
+
+.teste {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.7rem 0.16rem 0.35rem;
+    border: 0.1rem solid var(--tinta);
+    border-radius: 1rem;
+    background: linear-gradient(#9a3028, #6a1b18);
+    box-shadow: inset 0 0 0 0.07rem rgba(230, 201, 131, 0.7);
+    font: var(--rotulo-menor) / 1.2 var(--fonte-rotulo);
+    letter-spacing: 0.05em;
+    color: #f6e6c4;
+}
+.teste svg { width: 1.05rem; height: 1.05rem; color: var(--ouro-claro); }
+
+/* ---------- Bandeja do dado ---------- */
+
+.bandeja {
+    display: grid;
+    justify-items: center;
+    gap: 0.55rem;
+    padding: 0.2rem 0 0.4rem;
+}
+.bandeja-titulo {
+    margin: 0;
+    font: var(--rotulo) var(--fonte-rotulo);
+    letter-spacing: 0.12em;
+    color: var(--sepia);
+}
+.bandeja-titulo b { font-weight: 400; color: var(--rubro); }
+
+/* Couro escuro com aro de ouro: o d20 vinho se destaca dele */
+.bandeja-mesa {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 17rem;
+    height: 9rem;
+    border: 0.18rem solid var(--tinta);
+    border-radius: 50% / 46%;
+    isolation: isolate; /* o brilho do 20 natural fica entre o couro e o dado */
+    /* profundidade em gradientes: sombra interna desfocada numa elipse custa caro na GPU */
+    background:
+        radial-gradient(ellipse 100% 100% at 50% 62%, transparent 52%, rgba(0, 0, 0, 0.55) 100%),
+        radial-gradient(ellipse at 50% 36%, rgba(255, 220, 170, 0.1), transparent 60%),
+        radial-gradient(ellipse at 50% 40%, #4a3524, #2a1c12 60%, #170f09);
+    box-shadow:
+        inset 0 0 0 0.14rem var(--ouro),
+        inset 0 0 0 0.3rem var(--tinta),
+        0 0.18rem 0 rgba(40, 20, 5, 0.3);
+}
+.bandeja-mesa::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 74%;
+    width: 5.6rem;
+    height: 1.1rem;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(0, 0, 0, 0.6), transparent 70%);
+}
+
+.dice {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 7rem;
+    height: 7rem;
+    padding-top: 0.25rem;
+    background: url(../ui/ornamentos/d20.svg) center / contain no-repeat;
+    font: 700 1.75rem/1 var(--fonte-titulo);
+    color: #fbeccb;
+    text-shadow: 0 0.08rem 0 rgba(0, 0, 0, 0.55);
+    user-select: none;
+    contain: size layout style; /* o número troca a cada 60 ms sem refluir a bandeja */
+}
+.dice.rolling-animation { animation: d20-rolar 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes d20-rolar {
+    0%   { transform: translate(0, 0) rotate(0) scale(1); }
+    14%  { transform: translate(-1.6rem, -1.4rem) rotate(-150deg) scale(1.12); }
+    32%  { transform: translate(1.5rem, -0.5rem) rotate(170deg) scale(1.06); }
+    52%  { transform: translate(-0.8rem, 0.4rem) rotate(410deg) scale(1.08); }
+    72%  { transform: translate(0.4rem, -0.2rem) rotate(620deg) scale(1.02); }
+    88%  { transform: translate(0, 0.1rem) rotate(706deg) scale(0.97); }
+    100% { transform: translate(0, 0) rotate(720deg) scale(1); }
+}
+.bandeja-mesa::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10rem;
+    height: 10rem;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 214, 120, 0.8), rgba(255, 170, 60, 0.3) 45%, transparent 70%);
+    visibility: visible; /* pintado desde a abertura, mesmo com a bandeja oculta */
+    opacity: 0.01;
+    will-change: opacity;
+}
+.bandeja-mesa.critico::after { animation: brilho-critico 1.4s ease-in-out infinite alternate; }
+@keyframes brilho-critico { from { opacity: 0.55; } to { opacity: 1; } }
+.dice::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: url(../ui/ornamentos/d20-apagado.svg) center / contain no-repeat;
+    visibility: visible; /* pintado desde a abertura, mesmo com a bandeja oculta */
+    opacity: 0.01;
+}
+.dice.falha-critica::before { opacity: 1; }
+.dice.falha-critica { color: #d9c7b0; }
+
+.bandeja-conta {
+    margin: 0;
+    font: 1.15rem/1.4 var(--fonte-texto);
+    font-variant-numeric: lining-nums tabular-nums;
+    color: var(--tinta);
+    text-align: center;
+}
+.bandeja-conta b { font-weight: 700; color: var(--rubro); }
+.bandeja-conta .critico { letter-spacing: 0.04em; }
+
+.botao-fita {
+    height: 3.5rem;
+    padding: 0 0.6rem;
+    border-style: solid;
+    border-width: 0 2.75rem;
+    border-image: url(../ui/ornamentos/fita-rubra.svg) 0 44 fill / 0 2.75rem / 0 stretch;
+    background: none;
+    font: 700 1.45rem/3.05rem var(--fonte-titulo);
+    color: #f6e6c4;
+    text-shadow: 0 0.06rem 0 rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.botao-fita:hover { transform: translateY(-0.1rem); }
+.botao-fita:disabled { cursor: default; opacity: 0.55; transform: none; }
+
+/* Selo de cera carimbado sobre o aro da bandeja */
+.selo-resultado {
+    position: absolute;
+    top: -1.3rem;
+    right: -3.2rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 6.2rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/selo-cera.svg) center / contain no-repeat;
+    font: max(0.85rem, 11.5px) var(--fonte-rotulo);
+    letter-spacing: 0.1em;
+    color: #f8dcc8;
+    text-shadow: 0 0.06rem 0 rgba(0, 0, 0, 0.5);
+    visibility: visible; /* pintado desde a abertura, mesmo com a bandeja oculta */
+    opacity: 0.01;
+    transform: scale(1.8) rotate(-22deg);
+    pointer-events: none;
+    will-change: transform, opacity;
+}
+.selo-resultado.visivel { animation: carimbar 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.selo-escuro { background-image: url(../ui/ornamentos/selo-cera-escuro.svg); color: #e8d2c4; }
+.selo-critico { background-image: url(../ui/ornamentos/selo-cera-critico.svg); color: #fbe7c4; }
+@keyframes carimbar {
+    from { opacity: 0.01; transform: scale(1.8) rotate(-22deg); }
+    to   { opacity: 1; transform: scale(1) rotate(-10deg); }
+}
+
+/* ---------- Crônica ---------- */
+
+.painel-cronica {
+    flex: 1 1 9rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 1.8rem 1.3rem 0.7rem;
+}
+.cronica {
+    display: grid;
+    align-content: start;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sepia-claro) transparent;
+}
+.cronica-item {
+    display: grid;
+    grid-template-columns: 1.15rem 1fr;
+    gap: 0.6rem;
+    align-items: start;
+    padding: 0.32rem 0.1rem;
+    border-bottom: 1px dotted rgba(107, 74, 46, 0.5);
+}
+.cronica-item:last-child { border-bottom: 0; }
+.cronica-item svg { width: 1.1rem; height: 1.1rem; margin-top: 0.15rem; color: var(--sepia); }
+.cronica-item p {
+    margin: 0;
+    font: max(0.98rem, 12.5px)/1.4 var(--fonte-texto);
+    font-variant-numeric: lining-nums;
+}
+.cronica-item b { font-weight: 700; color: var(--tinta-2); }
+.cronica-item .resultado { font-weight: 700; }
+.cronica-sucesso svg, .cronica-sucesso .resultado { color: var(--verdete); }
+.cronica-falha svg, .cronica-falha .resultado { color: var(--rubro); }
+
+/* ---------- Barra do protótipo (não faz parte do jogo) ---------- */
+
+.prototipo-barra {
+    position: fixed;
+    left: 50%;
+    bottom: 0.2rem;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    transform: translateX(-50%);
+    border-radius: 0.4rem;
+    background: rgba(20, 13, 8, 0.85);
+    font: 12px system-ui, sans-serif;
+    color: #e9dcbf;
+}
+.prototipo-barra button {
+    padding: 0.2rem 0.55rem;
+    border: 1px solid #6b4a2e;
+    border-radius: 0.3rem;
+    background: #2f1f12;
+    color: #e9dcbf;
+    cursor: pointer;
+}
+.prototipo-barra button[aria-pressed="true"] { background: #7e2320; border-color: #c9a14f; }
+
+/* ---------- Movimento reduzido ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .vitral-chama { animation: none; }
+    .dice.rolling-animation { animation: d20-surgir 0.4s ease both; }
+    .selo-resultado.visivel { animation-duration: 0.01s; }
+    @keyframes d20-surgir { from { opacity: 0.2; } to { opacity: 1; } }
+}
+
+/* ---------- Telas estreitas ou em retrato: coluna única (refinado na Fase 5) ---------- */
+
+@media (max-width: 1099px), (orientation: portrait) {
+    html { font-size: 15px; }
+    .folha {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        height: auto;
+        min-height: 100dvh;
+        padding: 0 0.4rem;
+    }
+    .dragao { width: 3.8rem; height: 3.8rem; top: -0.35rem; left: -0.45rem; }
+    .dragao-direita { left: auto; right: -0.45rem; }
+    .cabecalho { grid-template-columns: minmax(0, 1fr); row-gap: 0.7rem; padding: 0.8rem 0 0; }
+    .titulo { order: -1; padding: 0 3.2rem; font-size: clamp(1.6rem, 7vw, 2.6rem); white-space: normal; }
+    .campos { grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0; }
+    .selos { justify-content: center; padding: 0; }
+    .mesa { grid-template-columns: minmax(0, 1fr); row-gap: 2.6rem; padding: 1.4rem 0 1rem; }
+    .coluna-vitral { order: -2; padding-top: 4.2rem; }
+    .coluna-narrativa { order: -1; }
+    .vitral { height: auto; width: min(100%, 30rem); }
+    .painel-narrativa { padding: 2.2rem 1.1rem 1rem; }
+    .painel-cronica { flex-basis: auto; }
+    .escolha { grid-template-columns: 1.9rem minmax(0, 1fr); }
+    .escolha .teste { grid-column: 2; justify-self: start; }
+    .selo-resultado { right: -1.2rem; }
+    .bandeja-mesa { width: min(19rem, 80vw); }
+    .prototipo-barra { flex-wrap: wrap; justify-content: center; width: calc(100% - 1rem); }
+}

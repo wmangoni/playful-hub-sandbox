@@ -1,33 +1,86 @@
-# 🎨 Tarefa 001 - Melhoria Visual: Ded (A Masmorra de Drakmor)
+# 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: [ ] Pendente
-
----
-
-## 🔍 Análise do Product Owner (PO)
-
-A Masmorra de Drakmor possui uma excelente base mecânica e narrativa de RPG de fantasia medieval (estilo D&D / Adventure Quest), mas a interface visual é extremamente estática e baseada em elementos HTML cruus e cores sólidas que remetem a páginas de internet dos anos 2000. O uso da fonte `Palatino` serifada é adequado ao tema, mas o layout de grade básica, botões simples nas cores marrom/vermelho, caixas quadradas brancas e um dado representado por um simples caractere estático impedem que o jogador se sinta em uma jornada imersiva de alta fantasia.
-
-O design de interface de um RPG premium precisa transmitir mistério, atmosfera de masmorra, e o suspense de rolar um dado. A transição entre os cartões de seleção de personagem e a aventura carece de suavidade. A disposição das colunas (história, imagem, logs) precisa de um agrupamento visual mais harmônico, com bordas inspiradas em metal, pergaminho ou pedra, além de barras de vida dinâmicas para o HUD.
-
-## 💡 Sugestões de Melhorias Visuais
-
-1.  **Dark Fantasy Theme & Pergaminho Mágico**:
-    Mudar o esquema de cores para um estilo "Dark Fantasy". O plano de fundo geral (`body`) deve adotar um gradiente radial dramático (`radial-gradient(circle, #22140a 0%, #0b0603 100%)`) simulando a iluminação de uma tocha fraca em uma caverna. A caixa do jogo (`.game-container`) e o modal de compras devem usar fundos simulando pergaminho antigo escuro com **Glass-papyrus** (`background: rgba(43, 29, 17, 0.9); backdrop-filter: blur(10px); border: 2px solid #b89c72`), complementados por bordas chanfradas douradas ou bronzeadas que remetem a artefatos medievais.
-2.  **Dado D20 Tridimensional e Efeitos de Rolagem Dinâmicos**:
-    Substituir o elemento de dado estático (`.dice`) por um componente animado via CSS 3D. Ao clicar em "Rolar d20", o dado deve executar uma animação rápida de rotação aleatória de 3D (`transform: rotateX() rotateY()`) simulando a física de rolagem de um poliedro. Ao parar, o resultado deve piscar em ciano/dourado brilhante para sucessos (`text-shadow: 0 0 10px #ffc107`) ou um fade vermelho dramático para falhas críticas.
-3.  **HUD de Status Épico & Tipografia Cinematográfica**:
-    Substituir os valores de status de texto simples por um painel de RPG elegante com ícones SVG modernos e barras de progresso visuais: a barra de vida (`health`) deve ser um medidor animado vermelho (`linear-gradient(90deg, #7a0000, #ff2e2e)`) que diminui suavemente com transição física (`transition: width 0.5s ease-out`). Importar as fontes **Cinzel Decorative** (do Google Fonts) para os títulos épicos das cenas e a fonte **Lora** ou **MedievalSharp** para os textos descritivos da masmorra. Adicionar micro-animações de trepidação de tela (`shake`) ao sofrer dano para aumentar o impacto visual.
+**Status**: 🚧 Em andamento. Fase 0 pronta (protótipo aprovado pelo juiz como "excelente"); próxima é a Fase 1.
+**Responsável**: Claude (Dev)
+**Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
 ---
 
-## 🛠️ Requisitos Técnicos Sugeridos
+## 1. Pedido do usuário (11/10/2026)
 
-- [ ] Importar fontes premium do Google Fonts (`Cinzel Decorative`, `MedievalSharp` e `Lora`).
-- [ ] Aplicar fundo temático de masmorra (`radial-gradient`) com tons quentes e sombrios de carvão e fogo.
-- [ ] Criar estilização "Glass-papyrus" e bordas metálicas envelhecidas (`#b89c72`) para a interface principal.
-- [ ] Implementar barras de progresso CSS dinâmicas para Vida (HP) com animações suaves de transição.
-- [ ] Desenvolver a animação de rotação 3D (`@keyframes roll`) para o dado D20 e feedback visual luminoso no sucesso/falha.
-- [ ] Estilizar os cards de seleção de personagem (`.character-card`) com efeito de escala suave, brilho dourado e transição suave ao serem selecionados.
-- [ ] Reformular os botões de ação e itens da lojinha com visual de botões de couro/metal gravados, com estados `:hover` e `:active` reativos.
-- [ ] Adicionar efeito de vibração na tela (`shake`) quando o herói perder vida para aumentar o feedback sensorial.
+> Elabore um plano criterioso de melhorias para o jogo ded, hoje ele tá meio sem graça. Interface sem personalidade, visual simplista, mecânicas simples. Quero começar pelo visual, deixemos as mecânicas e o enredo para um segundo momento. Busco um visual para a UI semelhante (não precisa ser igual) a [uma ficha de personagem de D&D ornamentada].
+
+Este plano substitui a versão anterior desta tarefa (tema escuro com glassmorphism e `backdrop-filter`), que contrariava a referência e o limite de performance.
+
+## 2. Diagnóstico da UI atual
+
+- **Quatro linguagens visuais misturadas:**
+  - página creme com botões marrons genéricos;
+  - painéis escuros "premium";
+  - mapa em ciano e azul neon;
+  - mensagens verde e vermelho no estilo Bootstrap.
+- **Hierarquia invertida:** a narrativa fica numa caixa de 20vh, e o log ocupa uma coluna inteira. Em 1080p o inventário cai abaixo da dobra.
+- **Identidade fraca:** Outfit (sans moderna) no corpo e 220 emojis no lugar de ícones.
+- **Controles soltos e inconsistências:**
+  - `<audio controls>` nativo, botões em `absolute` e link azul para a "versão beta" antiga;
+  - modais inconsistentes;
+  - 5 `alert()`.
+- **Nada de responsividade ou acessibilidade básica:** nenhuma `@media`, nenhum estilo de foco, nada de `prefers-reduced-motion`.
+- **Artes das cenas:** as 40 artes em pixel art são o melhor ativo visual. Mas têm tamanhos misturados, ocupam 15 MB em PNG e trocam sem transição.
+
+## 3. Direção aprovada
+
+- **Pergaminho claro sobre moldura escura**, como na ficha de referência.
+- **Paleta:** pergaminho `#e9dcbf`, tinta `#2f1f12`, sépia `#6b4a2e`, rubro `#7e2320`, bronze `#8f6c34`, ouro `#c9a14f`, verdete `#3f5a3d`.
+- **Fontes:**
+  - Grenze Gotisch nos títulos, fitas e capitulares;
+  - Alegreya na narrativa e em **todos os números** (algarismos alinhados);
+  - Marcellus SC só em rótulos de letras, porque os algarismos dele parecem letras.
+- **Ornamentos SVG gerados em código** por `ded/tools/gerar-ornamentos.mjs`.
+- **Texturas pré-renderizadas** por `ded/tools/gerar-texturas.py`.
+- **Ícones do game-icons.net** (CC BY 3.0), com créditos em `ded/ui/CREDITOS.md`.
+- **A pixel art fica**, emoldurada num vitral gótico, com ponto focal por cena (`--foco`).
+- **O link da "versão beta" sai.** `index_new.html` e `d3.html` ficam fora do escopo.
+- **Fora de escopo agora:** mecânicas, enredo, textos das cenas e áudio.
+
+## 4. Layout
+
+Grade de 3 colunas no desktop: a ficha à esquerda, o vitral com a cena no centro e a narrativa com a crônica à direita. O cabeçalho usa as mesmas colunas (`subgrid`), e o título fica centrado sobre o vitral.
+
+A tela inteira é medida em `rem`, com `1rem = 16px` em 1920x1080, e escala com a janela. Os rótulos pequenos têm piso em px.
+
+No celular a tela vira uma coluna única. A versão definitiva do celular fica para a Fase 5.
+
+## 5. Fases
+
+| Fase | Entrega | Aceite |
+|---|---|---|
+| 0 ✅ | Protótipo estático da tela de exploração (`ded/prototipo/`) | Direção aprovada; juiz "excelente" |
+| 1 | Fundação: CSS do `index.html` extraído para `ded/css/` **sem mudança visual**, tokens, fontes e kit de componentes | Capturas idênticas às atuais; testes do ded verdes |
+| 2 | Exploração, seleção de personagem e dado d20 no jogo real | Layout novo no desktop; aceite de performance; testes |
+| 3 | Combate | Idem |
+| 4 | Loja, especialização, diário, mapa, telas de fim e toasts | Nenhum `alert()`; modais consistentes |
+| 5 | Celular, acessibilidade, transições, WebP, preview do hub e `npm run seo` | Sem rolagem horizontal em 375 px; contraste AA; `seo:check` |
+
+## 6. Regras de performance
+
+O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de até 20,8 ms.
+
+- **Como medir:** rAF sem limite, com CPU 1x e 4x, no pior momento: máquina de escrever, dado rolando e combate.
+- **Primeiro clique do teste de dado:** 30 execuções em CPU 1x, sem nenhum quadro acima de 20,8 ms.
+- **Ambiente da medição:** o Puppeteer abre o Chrome com o processo de GPU frio, o que gera picos de 300 a 800 ms nos primeiros ~500 ms que não vêm da página. Meça com um perfil persistente (`userDataDir`) e uma página de aquecimento antes.
+- **O que evitar:**
+  - animar qualquer coisa além de `transform` e `opacity`;
+  - `backdrop-filter`;
+  - `filter` e `box-shadow` grandes com desfoque (use gradientes);
+  - trocar `background-image` na hora de revelar um resultado (deixe as camadas pré-pintadas com `opacity: .01`).
+- **Movimento:** respeitar `prefers-reduced-motion`.
+
+## 7. Pendências que a Fase 0 deixou
+
+- **Máquina de escrever:** revelar o texto já montado, por trechos, em vez de acrescentar caractere a caractere. Isso evita o refluxo e deixa as escolhas paradas.
+- **Medição real:** refazer o aceite de performance no fluxo real do dado (Fase 2).
+- **Fontes:** hospedar as fontes no projeto, com `preload`.
+- **Créditos:** mostrar os créditos dos ícones dentro do jogo (por exemplo, no Diário).
+- **Contratos dos testes:** preservar os IDs e classes usados por `qa_ded`, `qa_ded_task003` e `journey_ded`. O teste do 1 natural lê `dice.style.borderColor`, que hoje é estilo inline.
+- **Erro de digitação em `assets/scenes.json`:** "Ira até a porta do fundo da cripta". Corrigir junto com os textos (fase de enredo).
