@@ -1336,15 +1336,31 @@
                 requestAnimationFrame(() => requestAnimationFrame(funcao));
             }
 
-            // Quando muita coisa chega à tela de uma vez (a arte nova e o texto inteiro,
-            // ou a crônica de volta depois da luta), a narrativa fica invisível no
-            // primeiro quadro, já no lugar e sem mexer no resto, e aparece no seguinte:
-            // o trabalho da GPU se divide em dois quadros. O foco espera ela aparecer
-            // (focarNoQuadro).
+            // Na volta da luta, a crônica (fora da tela durante o combate) e a narrativa
+            // nova chegariam juntas: a narrativa fica invisível no primeiro quadro, já no
+            // lugar e sem mexer no resto, e aparece no seguinte; o trabalho da GPU se
+            // divide em dois quadros. O foco espera ela aparecer (focarNoQuadro).
             function esconderNarrativaUmQuadro() {
                 const narrativa = document.getElementById('narrativa');
                 narrativa.style.visibility = 'hidden';
                 depoisDoProximoQuadro(() => { narrativa.style.visibility = ''; });
+            }
+
+            // No movimento reduzido, o texto da cena fica invisível (já no lugar) até um
+            // quadro depois de a arte nova entrar no vitral, ou por no máximo 250 ms: a
+            // arte e o texto inteiro no mesmo quadro passavam do limite. As escolhas
+            // ficam à vista e com o foco.
+            function mostrarTextoDepoisDe(antes) {
+                const texto = document.getElementById('scene-text');
+                texto.style.visibility = 'hidden';
+                let pedido = false;
+                const mostrar = () => {
+                    if (pedido) return;
+                    pedido = true;
+                    depoisDoProximoQuadro(() => { texto.style.visibility = ''; });
+                };
+                antes.then(mostrar, mostrar);
+                setTimeout(mostrar, 250);
             }
 
             // Aquecimento da GPU: a peça .aquecer-gpu (ver o CSS) entra na primeira
@@ -1377,25 +1393,31 @@
                 return lugar && vitrais[lugar] && vitrais[lugar].arquivo ? lugar : 'start';
             }
 
+            // Devolve uma promessa que se cumpre quando a arte nova entra no vitral
+            // (na hora, se a arte não muda)
             function changeImage(sceneName) {
                 const arte = arteDaCena(sceneName);
                 const vitral = vitrais[arte];
-                if (!vitral || !vitral.arquivo || arte === vitralAtual) return;
+                if (!vitral || !vitral.arquivo || arte === vitralAtual) return Promise.resolve();
                 vitralAtual = arte;
                 document.getElementById('local').textContent = vitral.local;
                 const src = 'images/' + vitral.arquivo;
                 const img = document.getElementById('image');
-                const trocar = () => {
-                    if (vitralAtual !== arte) return; // outra cena já pediu outra arte
-                    img.src = src;
-                    img.alt = vitral.alt;
-                    img.setAttribute('style', `--foco: ${vitral.foco}`);
-                };
-                // Decodifica antes de trocar: sem quadro vazio no vitral e sem
-                // decodificar a arte no quadro da troca
-                const nova = new Image();
-                nova.src = src;
-                if (nova.decode) nova.decode().then(trocar, trocar); else trocar();
+                return new Promise(trocou => {
+                    const trocar = () => {
+                        if (vitralAtual === arte) { // outra cena pode já ter pedido outra arte
+                            img.src = src;
+                            img.alt = vitral.alt;
+                            img.setAttribute('style', `--foco: ${vitral.foco}`);
+                        }
+                        trocou();
+                    };
+                    // Decodifica antes de trocar: sem quadro vazio no vitral e sem
+                    // decodificar a arte no quadro da troca
+                    const nova = new Image();
+                    nova.src = src;
+                    if (nova.decode) nova.decode().then(trocar, trocar); else trocar();
+                });
             }
 
             function loadScene(sceneName) {
@@ -1428,9 +1450,10 @@
                 const focoNasAcoes = !!(ativo && ativo.closest && ativo.closest('.acoes')) || focarEscolhasDepoisDoCombate;
                 focarEscolhasDepoisDoCombate = false;
 
-                // Sem a máquina de escrever, o texto inteiro chegaria no quadro da arte nova
-                if (movimentoReduzido()) esconderNarrativaUmQuadro();
-                changeImage(sceneName);
+                const arteTrocada = changeImage(sceneName);
+                // Sem a máquina de escrever, o texto inteiro chegaria junto com a arte nova
+                // (que entra depois de decodificada, num quadro qualquer): ele espera
+                if (movimentoReduzido()) mostrarTextoDepoisDe(arteTrocada);
 
                 gameState.currentScene = sceneName;
                 const scene = scenes[sceneName];
