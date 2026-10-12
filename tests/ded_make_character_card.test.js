@@ -260,7 +260,7 @@ async function run() {
       for (const i of x.imunidades) assert.ok(mostradas.includes(i), e.id + ": imunidade " + i + " fora do card");
       const defesa = rotulo => c.defesas.find(d => d.rotulo === rotulo)?.valor;
       assert.strictEqual(defesa('Resistência à magia'), x.rm == null ? undefined : String(x.rm), e.id + ": RM");
-      assert.strictEqual(defesa('Redução de dano'), x.rd ? x.rd.valor + "/" + x.rd.exceto : undefined, e.id + ": RD");
+      assert.strictEqual(defesa('Redução de dano'), x.rd ? C.rdTexto(x.rd) : undefined, e.id + ": RD");
       assert.strictEqual(defesa('Vulnerabilidades'), x.vulnerabilidades.length ? x.vulnerabilidades.join(', ') : undefined, e.id + ": vulnerabilidades");
       assert.strictEqual(defesa('Cura acelerada'), x.curaAcelerada == null ? undefined : String(x.curaAcelerada), e.id + ": cura acelerada");
       // magias: a mesma CD que o motor usa (mecanica.cd ou cd_base + nível)

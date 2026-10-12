@@ -135,13 +135,13 @@ async function run() {
     assert.match(orc.divergenciasRaca[0], /^ajustes de atributo \+2 FOR, −2 INT, −2 CAR \(o compêndio registra \+2 FOR, −2 CAR\)$/);
   });
 
-  test('classes básicas seguem a 3.0 e a ficha aponta divergências do compêndio (Ranger)', () => {
+  test('classes básicas seguem a 3.5 e a ficha aponta divergências do compêndio (Ranger)', () => {
     const base = { nome: 'R', nivel: 5, for: 14, des: 14, con: 12, int: 10, sab: 12, car: 10, iniciativa: 0, pvs: 40 };
     const ranger = R.computeSheet(base, { race: byName(races, 'Humano'), classe: byName(classes, 'Ranger'), bbaRows, pericias });
-    assert.strictEqual(ranger.pv.dadoVida, 'd10', '3.0: Ranger d10');
-    assert.deepStrictEqual(ranger.resistencias.map(s => s.base), [4, 1, 1], '3.0: só Fortitude boa');
-    assert.strictEqual(ranger.divergencias.length, 3);
-    assert.match(ranger.divergencias[2], /^perícias de classe pela lista da 3\.0 \(o compêndio difere em \d+: /);
+    assert.strictEqual(ranger.pv.dadoVida, 'd8', '3.5: Ranger d8');
+    assert.deepStrictEqual(ranger.resistencias.map(s => s.base), [4, 4, 1], '3.5: Fortitude e Reflexos bons');
+    assert.strictEqual(ranger.divergencias.length, 1);
+    assert.match(ranger.divergencias[0], /^perícias de classe pela lista da 3\.0 \(o compêndio difere em \d+: /);
     assert.ok(ranger.habilidadesClasse.some(h => /Inimigo predileto: 2 inimigos/.test(h)));
   });
 
@@ -176,13 +176,13 @@ async function run() {
     const feats = (cls, nivel) => R.computeSheet({ nome: 'X', nivel, for: 14, des: 12, con: 12, int: 12, sab: 14, car: 14, iniciativa: 0, pvs: 10 }, { race: byName(races, 'Humano'), classe: byName(classes, cls), bbaRows, pericias }).habilidadesClasse;
     const bar20 = feats('Bárbaro', 20);
     assert.ok(bar20.includes('Fúria 6/dia (+4 For, +4 Con, +2 em Vontade, −2 na CA)'));
-    assert.ok(bar20.includes('Redução de dano 4/—'), 'RD 4/— no 20º');
+    assert.ok(bar20.includes('Redução de dano 5/—'), 'RD 5/— no 20º');
     assert.ok(bar20.includes('Fúria maior: +6 For, +6 Con, +3 em Vontade'));
     assert.ok(feats('Bárbaro', 19).includes('Esquiva sobrenatural: mantém a Des na CA; não pode ser flanqueado; +4 contra armadilhas'));
     assert.ok(!feats('Bárbaro', 14).some(f => f.startsWith('Fúria maior')), 'fúria maior só no 15º');
     const wildShape = nivel => feats('Druida', nivel).find(f => f.startsWith('Forma selvagem '))?.match(/(\d)\/dia/)[1];
     assert.deepStrictEqual([5, 6, 7, 9, 10, 14, 18].map(wildShape), ['1', '2', '3', '3', '4', '5', '6']);
-    assert.ok(feats('Paladino', 15).includes('Destruir o mal 1/dia (+Car no ataque, +15 no dano)'), 'sempre 1/dia na 3.0');
+    assert.ok(feats('Paladino', 15).includes('Destruir o mal 4/dia (+Car no ataque, +15 no dano)'), 'escalonado na 3.5');
     assert.ok(feats('Paladino', 15).includes('Remover doença 5/semana'));
     assert.ok(feats('Paladino', 5).includes('Montaria especial'));
     const bardo14 = feats('Bardo', 14);
@@ -253,10 +253,10 @@ async function run() {
     assert.ok(monge(7).habilidadesClasse.includes('Integridade corporal: cura 14 PV/dia em si mesmo'));
     assert.ok(monge(13).habilidadesClasse.includes('Alma de diamante: resistência à magia 23'));
     assert.ok(monge(15).habilidadesClasse.includes('Palma vibrante 1/semana (Fortitude CD 20)'), '10 + 7 + Sab 3');
-    assert.ok(monge(20).habilidadesClasse.includes('Eu perfeito: extraplanar, redução de dano 20/+1'));
+    assert.ok(monge(20).habilidadesClasse.includes('Eu perfeito: extraplanar, redução de dano 10/magia'));
     assert.ok(!monge(6).habilidadesClasse.some(h => /Imobilização Aprimorada/.test(h)), 'talento concedido fica só em "Talentos concedidos"');
-    assert.deepStrictEqual([monge(12).resistenciaMagia, monge(13).resistenciaMagia, monge(20).resistenciaMagia, monge(20).reducaoDano], [null, 23, 30, '20/+1']);
-    assert.deepStrictEqual([10, 11, 14, 17, 20].map(n => sheet('Bárbaro', n).reducaoDano), [null, '1/—', '2/—', '3/—', '4/—']);
+    assert.deepStrictEqual([monge(12).resistenciaMagia, monge(13).resistenciaMagia, monge(20).resistenciaMagia, monge(20).reducaoDano], [null, 23, 30, '10/magia']);
+    assert.deepStrictEqual([6, 7, 10, 14, 17, 20].map(n => sheet('Bárbaro', n).reducaoDano), [null, '1/—', '2/—', '3/—', '4/—', '5/—']);
     assert.strictEqual(sheet('Guerreiro', 20).reducaoDano, null);
     assert.ok(sheet('Ranger', 10).habilidadesClasse.includes('Inimigo predileto: 3 inimigos (+3, +2 e +1 em Blefar, Ouvir, Sentir Motivação, Observar, Sobrevivência e no dano)'));
     assert.ok(sheet('Ranger', 1).habilidadesClasse.some(h => h.startsWith('Inimigo predileto: 1 inimigo (+1 em Blefar')));

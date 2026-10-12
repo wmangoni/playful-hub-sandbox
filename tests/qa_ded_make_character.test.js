@@ -500,7 +500,7 @@ async function run() {
     assert.deepStrictEqual(await page.evaluate(() => ['redução de dano', 'resist. à magia'].map(label => {
       const box = [...document.querySelectorAll('.sf-cell')].find(c => c.querySelector('small')?.textContent === label);
       return box.querySelector('.sf-cell__box').textContent.trim();
-    })), ['20/+1', '30'], 'RD e RM do monge 20 nas caixas da página 1');
+    })), ['10/magia', '30'], 'RD e RM do monge 20 nas caixas da página 1');
   });
 
   await step('ficha: impressão gera exatamente 2 páginas A4', async () => {

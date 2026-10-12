@@ -27,20 +27,22 @@ function run() {
     assert.deepStrictEqual(erros, []);
   });
 
-  test('20 monstros, um por ND de 1 a 20, com o Tarrasque no 20', () => {
+  test('20 monstros, com o Tarrasque no 20', () => {
     assert.strictEqual(catalogo.monstros.length, 20);
-    assert.deepStrictEqual(catalogo.monstros.map(m => m.nd).sort((a, b) => a - b), Array.from({ length: 20 }, (_, i) => i + 1));
-    const t = catalogo.monstros.find(m => m.nd === 20);
-    assert.strictEqual(t.id, 'tarrasque');
+    assert.deepStrictEqual(catalogo.monstros.map(m => m.nd).sort((a, b) => a - b), [
+      1, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 15, 17, 19, 20, 20, 20
+    ]);
+    const t = catalogo.monstros.find(m => m.id === 'tarrasque');
+    assert.strictEqual(t.nd, 20);
     assert.strictEqual(t.tamanho, 'Colossal');
   });
 
-  test('Tarrasque com os números do SRD 3.0', () => {
+  test('Tarrasque com os números do SRD 3.5', () => {
     const t = catalogo.monstros.find(m => m.id === 'tarrasque');
-    assert.strictEqual(t.dados_vida, '48d10+576');
-    assert.strictEqual(t.pv, 840);
+    assert.strictEqual(t.dados_vida, '48d10+594');
+    assert.strictEqual(t.pv, 858);
     assert.deepStrictEqual([t.ca.total, t.ca.toque, t.ca.surpresa], [35, 5, 32]);
-    assert.deepStrictEqual(t.reducao_dano, { valor: 25, exceto: '+5' });
+    assert.deepStrictEqual(t.reducao_dano, { valor: 15, exceto: ['épica'], modo: 'ou' });
     assert.strictEqual(t.resistencia_magia, 32);
     assert.strictEqual(t.regeneracao.valor, 40);
     const mordida = t.ataque_total.find(a => a.nome === 'Mordida');
@@ -49,10 +51,12 @@ function run() {
     for (const ef of ['engolir', 'agarrar-aprimorado', 'presenca-aterradora']) assert.ok(efeitos.includes(ef), ef);
   });
 
-  test('monstros do SRD 3.0: RD no formato 3.0 e fonte no dragon.ee (Product Identity é barrado pelo validador)', () => {
+  test('monstros: RD no formato 3.5 e Product Identity barrado pelo validador', () => {
     for (const m of catalogo.monstros) {
-      if (m.reducao_dano) assert.ok(!/epic|épic/i.test(m.reducao_dano.exceto), `${m.id}: RD ${m.reducao_dano.exceto}`);
-      assert.ok(m.fonte.url.startsWith('http://www.dragon.ee/30srd/'), `${m.id}: ${m.fonte.url}`);
+      if (m.reducao_dano) {
+        assert.ok(typeof m.reducao_dano.valor === 'number' && m.reducao_dano.valor >= 1);
+        assert.ok(m.reducao_dano.exceto);
+      }
       assert.strictEqual(m.nivel, m.nd);
     }
   });
@@ -91,7 +95,7 @@ function run() {
     ]);
     // os DV extraplanares dos rubis somam aos níveis de paladino
     assert.deepStrictEqual(formas.map(c => c.dados_vida), ['20d10+60', '15d8+4d10+114', '15d8+9d10+144', '15d8+20d10+210', '20d8+20d10+480', '30d8+20d10+700']);
-    assert.deepStrictEqual(formas.map(c => c.reducao_dano && `${c.reducao_dano.valor}/${c.reducao_dano.exceto}`), [null, '30/+5', '30/+5', '30/+5', '15/+3', '40/+5']);
+    assert.deepStrictEqual(formas.map(c => c.reducao_dano && `${c.reducao_dano.valor}/${c.reducao_dano.exceto}`), [null, '15/épica', '15/épica', '15/épica', '15/épica', '20/épica']);
     const efeitos = c => [...c.ataques_especiais, ...c.qualidades_especiais].map(e => e.mecanica?.efeito).filter(Boolean);
     for (const c of formas) {
       assert.ok(efeitos(c).includes('retribuicao'), `${c.id}: Retribuição`);
@@ -108,7 +112,7 @@ function run() {
 
   test('o validador pega os erros que deve pegar', () => {
     const semTarrasque = clone(catalogo.monstros).filter(m => m.id !== 'tarrasque');
-    assert.ok(validarSecao(semTarrasque, 'monstros').erros.some(e => e.includes('faltam monstros de ND 20')));
+    assert.ok(validarSecao(semTarrasque, 'monstros').erros.some(e => e.includes('deve conter o Tarrasque')));
 
     const dadoRuim = clone(catalogo.monstros);
     dadoRuim[0].ataques[0].dano = '2d6 + 1d6 fogo';
@@ -118,9 +122,9 @@ function run() {
     repetido.holy_avenger[0].id = repetido.monstros[0].id;
     assert.ok(validarCatalogo(repetido).erros.some(e => e.includes('ids repetidos')));
 
-    const rd35 = clone(catalogo.monstros);
-    rd35.find(m => m.id === 'tarrasque').reducao_dano = { valor: 15, exceto: 'epic' };
-    assert.ok(validarSecao(rd35, 'monstros').avisos.some(a => a.includes('parece da 3.5')));
+    const rdInvalida = clone(catalogo.monstros);
+    rdInvalida.find(m => m.id === 'tarrasque').reducao_dano = { valor: -1, exceto: 'épica' };
+    assert.ok(validarSecao(rdInvalida, 'monstros').erros.some(e => e.includes('reducao_dano.valor deve ser inteiro >= 1')));
 
     const efeitoFantasma = clone(catalogo.monstros);
     efeitoFantasma[1].ataques[0].efeitos = ['nao-existe'];
@@ -130,14 +134,13 @@ function run() {
     multiclasse[0].dados_vida = '10d10+10d8+60';
     assert.deepStrictEqual(validarSecao(multiclasse, 'holy_avenger').erros, []);
 
-    // o teto de ND: 20 para monstro, 80 para Holy Avenger; ND fracionário só em Holy Avenger;
-    // as classes não passam do nível (DV raciais à parte)
+    // o teto de ND: 30 para monstro, 80 para Holy Avenger; ND fracionário até 1/10
     const ndAlto = clone(catalogo.monstros);
-    ndAlto.find(m => m.id === 'tarrasque').nd = 21;
-    assert.ok(validarSecao(ndAlto, 'monstros').erros.some(e => e.includes('nd 1–20')));
-    const ndMeio = clone(catalogo.monstros);
-    ndMeio.find(m => m.id === 'carnical').nd = 0.5;
-    assert.ok(validarSecao(ndMeio, 'monstros').erros.some(e => e.includes('nd 1–20')));
+    ndAlto.find(m => m.id === 'tarrasque').nd = 31;
+    assert.ok(validarSecao(ndAlto, 'monstros').erros.some(e => e.includes('nd 1–30')));
+    const ndInvalido = clone(catalogo.monstros);
+    ndInvalido.find(m => m.id === 'carnical').nd = 0.4;
+    assert.ok(validarSecao(ndInvalido, 'monstros').erros.some(e => e.includes('nd 1–30 ou fração')));
     const haAlto = clone(catalogo.holy_avenger);
     haAlto.find(c => c.id === 'ha-paladino-extremo').nd = 81;
     haAlto.find(c => c.id === 'ha-petra-tpish').nd = 0.4;
