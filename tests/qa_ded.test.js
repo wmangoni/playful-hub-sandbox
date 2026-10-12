@@ -6,7 +6,7 @@ let browser;
 let page;
 let puppeteer;
 
-const PORT = 3003;
+const PORT = Number(process.env.PORT) || 3003; // outra porta quando a 3003 estiver ocupada
 
 async function startServer() {
   return new Promise((resolve) => {
