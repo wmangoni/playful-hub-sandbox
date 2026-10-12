@@ -4,10 +4,14 @@
 //   node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]
 //                                 [--json saida.json] [--raiz <repo>] [--perfil <pasta>]
 //                                 [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]
-//                                 [--aquecimento d20|combate|nenhum]
+//                                 [--aquecimento janelas|d20|combate|nenhum]
 //
-// A aba de aquecimento joga o teste de d20 com o 20 natural (d20, o padrão); com combate, também
-// abre uma luta e vence; com nenhum, só mede o intervalo de atualização, com a sessão fria.
+// A aba de aquecimento joga o teste de d20 com o 20 natural; com janelas (o padrão), também passa uma
+// vez por cada janela e efeito da Fase 4 (o mapa, uma compra na loja, o diário, a especialização, a
+// barreira, a janela do fim e um aviso); com combate, só o d20 e uma luta vencida; com nenhum, só mede
+// o intervalo de atualização, com a sessão fria. O primeiro desenho de cada coisa nova numa sessão do
+// Chrome compila pipelines da GPU (30 a 50 ms cada, TASK_001 §7): o aquecimento tira esse custo de
+// primeira vez da medição, que fica com o custo de toda vez.
 // O rastreio de cada execução com um quadro acima do limite fica guardado em --rastreios (o padrão
 // é ded-desempenho-rastreios na pasta temporária do sistema), e o relatório diz o arquivo.
 //
@@ -40,6 +44,23 @@
 //                     acerta o 20 natural (~4 s), vem a derrota (~5,5 s) e a cena da morte (~7,5 s); 9 s do clique.
 //   combate-fuga *    o mesmo começo, com "Fugir" e o 20 natural: a fuga dá certo (~1,3 s) e a cena anterior
 //                     volta (~3,1 s); 5,5 s do clique.
+//   mapa *            as janelas da Fase 4, cada uma num jogo novo de guerreiro na entrada. Do clique no selo
+//                     "Mapa" até 2 s depois: a janela entra (0,22 s), o anel de "você está aqui" sai (até ~1,1 s)
+//                     e, aos 1,2 s, o medalhão de fechar a tira (0,16 s).
+//   mapa-viajar *     com o mapa já aberto, o clique no Corredor Escuro: a janela fecha e a cena nova entra;
+//                     2,5 s do clique.
+//   loja *            a escolha "comprar suprimentos" da entrada: a cena nova e, um quadro depois, a janela da
+//                     loja; 2 s do clique.
+//   loja-comprar *    com a loja já aberta, o clique na tocha (2 de ouro): o ouro, a mochila e a linha de status
+//                     mudam; aos 0,6 s, o medalhão fecha a janela. 1,5 s do clique.
+//   diario *          o selo "Diário" e, aos 1,2 s, o medalhão; 2 s do clique.
+//   especializacao *  com 140 de XP, changeXP(20) leva ao nível 3: o número que sobe, o som e, dois quadros
+//                     depois, a janela obrigatória; aos 1,5 s, o clique na primeira opção a fecha. 2,6 s.
+//   fim *             loadScene('death') com o texto pulado: a cena da morte e, ~1,25 s depois, a janela do fim
+//                     com o carimbo do selo (0,45 s); 3 s.
+//   aviso *           avisar() sem janela aberta: o aviso desce, fica ~5,1 s e some (0,3 s); 6,5 s.
+//   barreira *        loadScene('final_chamber_entrance') com as alavancas abaixadas: a barreira recusa a
+//                     passagem, com o clarão da barreira (0,7 s) e o aviso; 2 s.
 //   primeiro-clique   o aceite: --execucoes (30) rodadas, cada uma numa aba nova, com o save apagado e
 //                     jogo novo, do primeiro clique no teste até 1,8 s depois de rolar (a primeira vez
 //                     que a bandeja e a arte do dado aparecem naquela página).
@@ -58,7 +79,10 @@
 // startInteractiveCombat, gameState.combat (active, turn, enemy.hp), gameState.player (health, xp) e
 // #btn-combat-attack e #btn-combat-flee; na entrada, scenes.goblin_encounter (a escolha com checkType
 // "combat") e o rótulo "Enfrentar" do #dice-button. As conferências do combate leem o gameState
-// depois da janela medida.
+// depois da janela medida. Nas janelas: #btn-toggle-map, #quest-journal-button, os ids das janelas
+// (mapa, loja, diario, especializacao, fim) com o atributo open, o .janela-fechar de cada uma,
+// .mapa-no[data-estado="pode-ir"], os <button> de #loja-mercadorias, [data-especializacao], abrirLoja,
+// changeXP, avisar e gameState.player (gold, xp, specialization).
 //
 // Armadilhas da medição (aprendidas neste projeto):
 // - GPU de verdade, sem --disable-gpu. O Puppeteer abre o Chrome com o processo de GPU frio, que gera
@@ -117,9 +141,24 @@ const PERFIL_PADRAO = path.join(os.tmpdir(), 'ded-desempenho-perfil');
 const LIMITE_MS = 1000 / 48;
 const FOLGA_MS = 1.5; // ruído do timestamp do rAF; ver o cabeçalho
 const CENARIOS = ['abertura', 'exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
-    'combate-vitoria', 'combate-derrota', 'combate-fuga', 'primeiro-clique'];
+    'combate-vitoria', 'combate-derrota', 'combate-fuga', 'mapa', 'mapa-viajar', 'loja', 'loja-comprar', 'diario',
+    'especializacao', 'fim', 'aviso', 'barreira', 'primeiro-clique'];
 const EM_4X = new Set(['exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
-    'combate-vitoria', 'combate-derrota', 'combate-fuga']);
+    'combate-vitoria', 'combate-derrota', 'combate-fuga', 'mapa', 'mapa-viajar', 'loja', 'loja-comprar', 'diario',
+    'especializacao', 'fim', 'aviso', 'barreira']);
+// Janelas e avisos (Fase 4): o preparo fora da janela medida, a ação e, com depois, o fechamento
+// (pelo medalhão, ou pela escolha na especialização) depois ms depois da ação
+const JANELAS = {
+    mapa: { preparo: 'jogo', janela: 2000, depois: 1200 },
+    'mapa-viajar': { preparo: 'mapa', janela: 2500 },
+    loja: { preparo: 'jogo', janela: 2000 },
+    'loja-comprar': { preparo: 'loja', janela: 1500, depois: 600 },
+    diario: { preparo: 'jogo', janela: 2000, depois: 1200 },
+    especializacao: { preparo: 'jogo', janela: 2600, depois: 1500 },
+    fim: { preparo: 'jogo', janela: 3000 },
+    aviso: { preparo: 'jogo', janela: 6500 },
+    barreira: { preparo: 'jogo', janela: 2000 }
+};
 const SO_INFORMA = new Set(['abertura']);
 const FORCAR = { 'teste-d20': null, 'critico-20': 0.96, 'critico-1': 0 }; // floor(0,96 * 20) + 1 = 20
 // Combate: o desfecho esperado, a ação clicada, o Math.random no turno do jogador e no do
@@ -141,7 +180,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const passou = d => d > LIMITE_MS + FOLGA_MS;
 const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
 let RASTREAR = true; // --sem-rastreio desliga
-let AQUECIMENTO = 'd20'; // --aquecimento
+let AQUECIMENTO = 'janelas'; // --aquecimento
 let PASTA_RASTREIOS = path.join(os.tmpdir(), 'ded-desempenho-rastreios'); // --rastreios
 
 function servidor(raiz) {
@@ -359,6 +398,54 @@ async function fluxoEntrada({ janela }) {
     return { ...r, combate: { ativo: !!(gameState.combat && gameState.combat.active) } };
 }
 
+// Dentro da página: as janelas da Fase 4 e os avisos (ver JANELAS e o cabeçalho). A ação é um clique
+// (como o de um jogador) ou a função que o jogo chama; as conferências só leem atributos e o gameState.
+async function fluxoJanela({ tipo, janela, depois }) {
+    const m = window.__desempenho;
+    const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+    const antes = { cena: gameState.currentScene, ouro: gameState.player.gold };
+    const ids = { mapa: 'mapa', loja: 'loja', 'loja-comprar': 'loja', diario: 'diario', especializacao: 'especializacao', fim: 'fim' };
+    let alvo = null;
+    if (tipo === 'mapa-viajar') {
+        alvo = document.querySelector('#mapa .mapa-no[data-no="corridor"][data-estado="pode-ir"]:not([aria-disabled="true"])');
+        if (!alvo) throw new Error('o mapa aberto na entrada não ofereceu o Corredor Escuro');
+    } else if (tipo === 'loja') {
+        const i = scenes[gameState.currentScene].choices.findIndex(c => c.nextScene === 'buy_supplies');
+        alvo = [...document.querySelectorAll('#choices button')][i];
+        if (!alvo) throw new Error(`a cena "${gameState.currentScene}" não tem a escolha que leva à loja`);
+    } else if (tipo === 'loja-comprar') {
+        alvo = [...document.querySelectorAll('#loja-mercadorias button')].pop();
+        if (!alvo) throw new Error('a loja não tem mercadorias');
+    }
+    if (tipo === 'especializacao') { gameState.player.xp = 140; gameState.player.level = 2; }
+    await m.iniciar();
+    m.marcar();
+    if (tipo === 'mapa') document.getElementById('btn-toggle-map').click();
+    else if (tipo === 'diario') document.getElementById('quest-journal-button').click();
+    else if (tipo === 'especializacao') changeXP(20);
+    else if (tipo === 'fim') { loadScene('death'); skipTyping = true; }
+    else if (tipo === 'aviso') avisar('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' });
+    else if (tipo === 'barreira') loadScene('final_chamber_entrance');
+    else alvo.click();
+    let aberta = null;
+    if (depois) {
+        await dorme(depois);
+        const id = ids[tipo];
+        aberta = !!document.getElementById(id)?.open;
+        if (tipo === 'especializacao') document.querySelector('#especializacao [data-especializacao]')?.click();
+        else document.querySelector(`#${id} .janela-fechar`)?.click();
+        await dorme(janela - depois);
+    } else {
+        await dorme(janela);
+    }
+    const r = await m.parar();
+    const abertas = [...document.querySelectorAll('dialog.janela[open]')].map(d => d.id);
+    return {
+        ...r, cenaAntes: antes.cena, cena: gameState.currentScene,
+        resultado: JSON.stringify({ aberta, abertas, ouro: [antes.ouro, gameState.player.gold], especializacao: gameState.player.specialization || null })
+    };
+}
+
 // Rastreio leve da janela medida: as tarefas de cada thread ('toplevel') e a marca da ação, de onde
 // saem as limpezas ociosas da GPU e o trabalho da thread principal da página (ver as armadilhas),
 // em ms contados da ação.
@@ -514,6 +601,43 @@ async function cenarioEntrada(browser, base, cpu, reg) {
     } finally { await page.close().catch(() => {}); }
 }
 
+// As janelas e os avisos: jogo novo de guerreiro na entrada; o mapa ou a loja já abertos, quando o
+// cenário começa com eles. As conferências viram aviso.
+async function cenarioJanela(browser, base, cpu, reg, cenario, { preparo, janela, depois }) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await novoJogo(page);
+        await espera(400);
+        if (preparo === 'mapa') {
+            await page.evaluate(() => document.getElementById('btn-toggle-map').click());
+            await page.waitForFunction(() => document.getElementById('mapa')?.open, { timeout: 5000 })
+                .catch(() => { throw new Error('o selo "Mapa" não abriu a janela #mapa em 5 s'); });
+            await espera(1200);
+        } else if (preparo === 'loja') {
+            await page.evaluate(() => loadScene('buy_supplies'));
+            await page.waitForFunction(() => document.getElementById('loja')?.open, { timeout: 5000 })
+                .catch(() => { throw new Error('a cena buy_supplies não abriu a janela #loja em 5 s'); });
+            await espera(1000);
+        }
+        const r = await comRastreio(page, () => page.evaluate(fluxoJanela, { tipo: cenario, janela, depois }));
+        const x = JSON.parse(r.resultado);
+        const confere = {
+            mapa: () => x.aberta && !x.abertas.length,
+            'mapa-viajar': () => r.cena !== r.cenaAntes && !x.abertas.length,
+            loja: () => r.cena === 'buy_supplies' && x.abertas.includes('loja'),
+            'loja-comprar': () => x.ouro[1] === x.ouro[0] - 2 && !x.abertas.length,
+            diario: () => x.aberta && !x.abertas.length,
+            especializacao: () => x.aberta && x.especializacao && !x.abertas.length,
+            fim: () => r.cena === 'death' && x.abertas.includes('fim'),
+            aviso: () => true,
+            barreira: () => r.cena === r.cenaAntes
+        }[cenario];
+        if (confere && !confere()) reg.avisos.push(`${cenario}: o estado depois não é o esperado (${r.cenaAntes} → ${r.cena}, ${r.resultado})`);
+        reg.execucoes.push(r);
+        return r;
+    } finally { await page.close().catch(() => {}); }
+}
+
 // combate, vitória, derrota e fuga: jogo novo de guerreiro, o Goblin, 800 ms com o combate
 // parado (depois das imagens) e uma ação. As conferências viram aviso; só um clique que não
 // mexe em nada é erro.
@@ -574,6 +698,24 @@ async function aquecer(browser, base, modo) {
                     document.getElementById('btn-combat-attack').click();
                 });
                 await espera(5500);
+            }
+            if (modo === 'janelas') {
+                // cada janela e efeito da Fase 4 uma vez, na ordem em que um jogador os veria
+                const passo = async (acao, ms) => { await page.evaluate(acao); await espera(ms); };
+                await passo(() => loadScene('start'), 600);
+                await passo(() => document.getElementById('btn-toggle-map').click(), 1400);
+                await passo(() => document.querySelector('#mapa .janela-fechar').click(), 500);
+                await passo(() => loadScene('buy_supplies'), 1200);
+                await passo(() => [...document.querySelectorAll('#loja-mercadorias button')].pop().click(), 700);
+                await passo(() => document.querySelector('#loja .janela-fechar').click(), 500);
+                await passo(() => document.getElementById('quest-journal-button').click(), 1000);
+                await passo(() => document.querySelector('#diario .janela-fechar').click(), 500);
+                await passo(() => { gameState.player.xp = 140; gameState.player.level = 2; changeXP(20); }, 1500);
+                await passo(() => document.querySelector('#especializacao [data-especializacao]').click(), 600);
+                await passo(() => loadScene('final_chamber_entrance'), 1200);
+                await passo(() => avisar('Aquecendo os avisos.'), 600);
+                await passo(() => { loadScene('death'); skipTyping = true; }, 2600);
+                await passo(() => document.querySelector('#fim .janela-fechar').click(), 600);
             }
         } catch (e) { reg.avisos.push(`aquecimento incompleto: ${e.message}`); }
         await espera(500);
@@ -750,7 +892,8 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
                     'combate-entrada': () => cenarioEntrada(browser, base, cpu, reg),
                     'primeiro-clique': () => cenarioDado(browser, base, cpu, reg, null, 1800)
                 }[cenario] || (cenario in FORCAR ? () => cenarioDado(browser, base, cpu, reg, FORCAR[cenario], 3400)
-                    : cenario in COMBATE ? () => cenarioCombate(browser, base, cpu, reg, COMBATE[cenario]) : null);
+                    : cenario in COMBATE ? () => cenarioCombate(browser, base, cpu, reg, COMBATE[cenario])
+                    : cenario in JANELAS ? () => cenarioJanela(browser, base, cpu, reg, cenario, JANELAS[cenario]) : null);
                 if (cenario === 'abertura') {
                     try { await cenarioAbertura(browser, base, cpu, reg); } catch (e) { reg.erros.push(e.message.split('\n')[0]); }
                 } else {
@@ -814,7 +957,7 @@ const repeticoes = Number(opcao('--repeticoes') ?? 10);
 if (args.includes('--sem-rastreio')) { args.splice(args.indexOf('--sem-rastreio'), 1); RASTREAR = false; }
 const pastaRastreios = opcao('--rastreios');
 if (pastaRastreios) PASTA_RASTREIOS = path.resolve(pastaRastreios);
-AQUECIMENTO = opcao('--aquecimento') ?? 'd20';
+AQUECIMENTO = opcao('--aquecimento') ?? 'janelas';
 const cpu = opcao('--cpu') ?? 'ambos';
 const json = opcao('--json');
 const raiz = opcao('--raiz') || RAIZ_PADRAO;
@@ -824,13 +967,13 @@ MOVIMENTO = movimento === 'reduzido' ? 'reduce' : 'no-preference';
 const desconhecidos = cenarios.filter(c => !CENARIOS.includes(c));
 if (invalido || args.length || desconhecidos.length || !Number.isInteger(execucoes) || execucoes < 1
     || !Number.isInteger(repeticoes) || repeticoes < 1 || !['1', '4', 'ambos'].includes(cpu)
-    || !['d20', 'combate', 'nenhum'].includes(AQUECIMENTO)
+    || !['janelas', 'd20', 'combate', 'nenhum'].includes(AQUECIMENTO)
     || !['padrao', 'reduzido'].includes(movimento)) {
     if (desconhecidos.length) console.log(`Cenário(s) desconhecido(s): ${desconhecidos.join(', ')}`);
     console.log('Uso:\n  node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]\n' +
         '                                [--json saida.json] [--raiz <repo>] [--perfil <pasta>]\n' +
         '                                [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]\n' +
-        '                                [--aquecimento d20|combate|nenhum]\n' +
+        '                                [--aquecimento janelas|d20|combate|nenhum]\n' +
         `Cenários (* repete em CPU 4x): ${CENARIOS.map(c => c + (EM_4X.has(c) ? ' *' : '')).join(', ')}`);
     process.exitCode = 2;
 } else {

@@ -32,6 +32,9 @@
         <link rel="stylesheet" href="ui/ornamentos/vitral-recorte.css">
     </head>
     <body class="ficha">
+        <!-- O texto dos avisos para o leitor de tela. Fica no começo: absoluto e no
+             fim do body, ele esticaria a página em 1 px -->
+        <p id="avisos-leitor" class="so-leitor" aria-live="polite"></p>
         <!-- Google Tag Manager (noscript) -->
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KM6SHZXP"
         height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -463,12 +466,11 @@
         </dialog>
 
         <!-- Avisos (toasts): duas peças fixas reusadas por avisar(); o texto também
-             vai para #avisos-leitor, que o leitor de tela anuncia -->
+             vai para #avisos-leitor (no começo do body), que o leitor de tela anuncia -->
         <div id="avisos" class="avisos" popover="manual" aria-hidden="true">
             <p class="aviso" hidden><svg aria-hidden="true"><use href="ui/icones.svg#i-alerta"/></svg><span class="aviso-texto"></span></p>
             <p class="aviso" hidden><svg aria-hidden="true"><use href="ui/icones.svg#i-alerta"/></svg><span class="aviso-texto"></span></p>
         </div>
-        <p id="avisos-leitor" class="so-leitor" aria-live="polite"></p>
 
         <!-- Flash Vermelho para Impacto de Dano -->
         <div id="red-flash" class="red-flash-overlay"></div>
@@ -1863,6 +1865,10 @@
                 return janela;
             }
 
+            // 5214 → "5.214". Sem toLocaleString: a primeira chamada dele na página carrega os
+            // dados do locale (11 a 13 ms) e caía no quadro em que a janela do fim abre.
+            const milhares = n => String(Math.trunc(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
             // Selo, título e mensagem do final; o resumo sai do gameState. Escreve só o
             // que mudou (a janela fica montada de uma abertura para a outra).
             function preencherFim(cena) {
@@ -1881,7 +1887,7 @@
                 escreverTexto(porId('fim-mensagem'), final.mensagem);
                 escreverTexto(porId('fim-nivel'), p.level || 1);
                 escreverTexto(porId('fim-xp'), p.xp || 0);
-                escreverTexto(porId('fim-ouro'), (p.gold || 0).toLocaleString('pt-BR'));
+                escreverTexto(porId('fim-ouro'), milhares(p.gold || 0));
                 escreverTexto(porId('fim-missoes'), concluidas);
                 escreverTexto(porId('fim-missoes-total'), missoes.length);
                 escreverTexto(porId('fim-lugares'), lugares);

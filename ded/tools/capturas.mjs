@@ -2,24 +2,19 @@
 // Prova que uma mudança de CSS não mexeu no visual: capture antes, mude,
 // capture depois e compare.
 //
-//   node ded/tools/capturas.mjs capturar <pasta> [--raiz <repo>] [--alvo jogo,prototipo,catalogo] [--kit]
+//   node ded/tools/capturas.mjs capturar <pasta> [--raiz <repo>] [--alvo jogo,prototipo,catalogo]
 //   node ded/tools/capturas.mjs comparar <pastaA> <pastaB> [--so prefixo] [--tolerancia N]
 //
-// --kit injeta o CSS do kit (fontes, tokens, base, componentes, exploracao e o
-// recorte do vitral) depois do legado no jogo. Serve para capturar a referência
-// num worktree de antes da Fase 2 (--raiz) com o kit carregado, como o jogo
-// carrega hoje: os recortes legado-*.png das telas antigas têm de sair
-// idênticos (comparar ... --so legado).
+// --raiz captura outro worktree (a referência de um commit anterior).
 // --so compara só os arquivos que começam com o prefixo; --tolerancia ignora
 // pixels cuja diferença em cada canal é de no máximo N (padrão 0).
 //
 // Detalhes que tornam as capturas repetíveis:
 // - rasterização por software (a da GPU varia alguns pixels entre execuções);
-// - animações congeladas: as infinitas no início e as finitas no fim;
-// - GTM e áudio bloqueados; no jogo, também o Google Fonts (a Outfit das telas
-//   legadas chegava em momentos diferentes e mudava o texto entre capturas
-//   iguais; sem ela, o legado usa a fonte de reserva nas duas pontas);
-// - o alert() da abertura do jogo dispensado;
+// - animações congeladas: as infinitas no início e as finitas no fim (a entrada
+//   das janelas, o carimbo do selo do fim, o anel do mapa e a subida dos avisos);
+// - GTM, Google Fonts e áudio bloqueados;
+// - diálogos nativos dispensados (o jogo não abre mais nenhum);
 // - o acaso forçado: Math.random preso nos testes de d20 e no combate;
 // - movimento padrão forçado (prefers-reduced-motion: no-preference), porque o
 //   Windows com as animações desligadas faz o Chrome pedir movimento reduzido.
@@ -67,16 +62,14 @@ function congelar(instante = null) {
 }
 
 // Cada captura num contexto próprio: o jogo grava o progresso no localStorage
-// e uma captura não pode herdar o save da anterior. semGoogleFonts vale para
-// as telas legadas (a Outfit); o protótipo da Fase 0 ainda dependia do Google.
-async function novaPagina(browser, erros, w, h, semGoogleFonts = false) {
+// e uma captura não pode herdar o save da anterior. Nenhuma página do ded usa
+// mais o Google Fonts; o bloqueio fica para nenhuma captura depender de rede.
+async function novaPagina(browser, erros, w, h) {
     const contexto = await browser.createBrowserContext();
     const page = await contexto.newPage();
     page.once('close', () => contexto.close().catch(() => {}));
     await page.setRequestInterception(true);
-    const bloqueio = semGoogleFonts
-        ? /googletagmanager|google-analytics|fonts\.googleapis|fonts\.gstatic|\.mp3(\?|$)/
-        : /googletagmanager|google-analytics|\.mp3(\?|$)/;
+    const bloqueio = /googletagmanager|google-analytics|fonts\.googleapis|fonts\.gstatic|\.mp3(\?|$)/;
     page.on('request', r => (bloqueio.test(r.url()) ? r.abort() : r.continue()));
     page.on('dialog', d => d.dismiss());
     page.on('pageerror', e => erros.push(e.message));
@@ -97,32 +90,12 @@ async function foto(page, pasta, nome, inteira, instante = null) {
 }
 
 // ---------------------------------------------------------------------------
-// Jogo (ded/index.html). Desde a Fase 2 a seleção, a exploração e o d20 vêm
-// do kit, e desde a Fase 3 o combate também. As telas que seguem legadas (loja,
-// especialização e diário) também saem recortadas em legado-*.png (1920x1080) e
-// legado-*-768.png (1366x768), só o overlay e sem os cantos arredondados: o
-// fundo atrás delas mudou, mas elas têm de sair idênticas a uma referência de
-// antes da migração capturada com --kit.
-// Mesma ordem de carga da Fase 2, depois do legado
-const KIT = ['css/fontes.css', 'css/tokens.css', 'css/base.css', 'css/componentes.css', 'css/exploracao.css', 'ui/ornamentos/vitral-recorte.css'];
-const LEGADOS = {
-    loja: ['#shop-modal .modal-content', 0],
-    especializacao: ['#specialization-modal .modal-content', 14],
-    diario: ['#quest-journal', 12]
-};
-
-async function recorte(page, pasta, nome, sufixo) {
-    const [seletor, canto] = LEGADOS[nome];
-    const caixa = await page.evaluate(s => {
-        const r = document.querySelector(s).getBoundingClientRect();
-        return { x: r.x, y: r.y, width: r.width, height: r.height };
-    }, seletor);
-    await page.screenshot({
-        path: path.join(pasta, `legado-${nome}${sufixo}.png`),
-        clip: { x: caixa.x + canto, y: caixa.y + canto, width: caixa.width - 2 * canto, height: caixa.height - 2 * canto }
-    });
-    console.log('  ', `legado-${nome}${sufixo}`);
-}
+// Jogo (ded/index.html). Desde a Fase 4 não há tela legada: a seleção, a
+// exploração, o d20, o combate e as janelas (mapa, loja, especialização, diário e
+// fim da aventura) vêm todos do kit. As janelas são <dialog> abertos pelas
+// funções do jogo; JANELA é a espera para a entrada delas terminar (0,22 s, e o
+// carimbo do selo do fim, 0,45 s), antes do congelar() da foto.
+const JANELA = 700;
 
 // Teste de Força na cripta (2ª escolha) com o resultado forçado
 async function rolar(page, aleatorio) {
@@ -138,22 +111,12 @@ async function rolar(page, aleatorio) {
     await espera(1300 + 700); // giro + carimbo do selo
 }
 
-// O jogo carregado na seleção (com o kit injetado, se --kit), num contexto novo
-async function abrirJogo(browser, base, erros, w, h, comKit) {
-    const page = await novaPagina(browser, erros, w, h, true);
+// O jogo carregado na seleção, num contexto novo
+async function abrirJogo(browser, base, erros, w, h) {
+    const page = await novaPagina(browser, erros, w, h);
     await page.goto(base + '/ded/', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof scenes === 'object' && Object.keys(scenes).length > 50
         && document.getElementById('image').complete, { timeout: 20000 });
-    if (comKit) {
-        await page.evaluate(async folhas => {
-            for (const f of folhas) {
-                const l = document.createElement('link');
-                l.rel = 'stylesheet';
-                l.href = f;
-                await new Promise((ok, erro) => { l.onload = ok; l.onerror = erro; document.head.append(l); });
-            }
-        }, KIT);
-    }
     await page.evaluate(() => document.fonts.ready);
     await espera(500);
     return page;
@@ -168,10 +131,9 @@ async function comecar(page, classe) {
 }
 
 // ---------------------------------------------------------------------------
-// Combate (Fase 3), em 1920x1080 e 1366x768. Roda em páginas próprias, fora do
-// fluxo das telas legadas: a vitória dá XP e ouro, escreve na crônica e troca a
-// cena, e a especialização (de fundo translúcido) tem de continuar saindo sobre
-// o fundo de sempre para bater com a referência.
+// Combate (Fase 3), em 1920x1080 e 1366x768, em páginas próprias: a vitória dá XP
+// e ouro, escreve na crônica e troca a cena, e o resto do fluxo do jogo não pode
+// depender disso.
 // O Math.random fica preso em 0,96 do começo ao fim: o d20 dá 20 natural dos dois
 // lados e o dano sai sempre o mesmo. Cada foto espera o estado do jogo mudar
 // (vida, XP, turno) e só depois conta o próprio atraso; as animações finitas
@@ -183,13 +145,13 @@ async function comecar(page, classe) {
 const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 };
 const CHEFE = { name: 'Fantasma de Drakmor', ac: 18, hp: 40, max_hp: 40, str: 16, dex: 14, con: 10, bba: 4 };
 
-async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo) {
+async function capturarCombate(browser, base, pasta, erros, w, h, sufixo) {
     const aguarda = (page, condicao, arg) => page.waitForFunction(condicao, { timeout: 15000 }, arg);
     const clica = (page, id) => page.evaluate(i => document.getElementById(i).click(), id);
 
     // Guerreiro. O 20 natural tira 16 de vida (1d8 → 8, +3 de Força, +5 do crítico)
     // e mata o Goblin de 12 num golpe; o ataque e o turno do inimigo são contra o chefe
-    let page = await abrirJogo(browser, base, erros, w, h, comKit);
+    let page = await abrirJogo(browser, base, erros, w, h);
     let tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, false);
     await comecar(page, 'warrior');
     await page.evaluate(g => { Math.random = () => 0.96; startInteractiveCombat(g); }, GOBLIN);
@@ -228,7 +190,7 @@ async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo
     await page.close();
 
     // Mago, num jogo próprio (a ficha e os atributos são os dele): o submenu de magias
-    page = await abrirJogo(browser, base, erros, w, h, comKit);
+    page = await abrirJogo(browser, base, erros, w, h);
     tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, false);
     await comecar(page, 'wizard');
     await page.evaluate(g => { Math.random = () => 0.96; startInteractiveCombat(g); }, GOBLIN);
@@ -239,10 +201,10 @@ async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo
     await page.close();
 }
 
-async function capturarJogo(browser, base, pasta, erros, comKit) {
+async function capturarJogo(browser, base, pasta, erros) {
     const tamanhos = [[1920, 1080, ''], [1366, 768, '-768'], [390, 844, '-390']];
     for (const [w, h, sufixo] of tamanhos) {
-        const page = await abrirJogo(browser, base, erros, w, h, comKit);
+        const page = await abrirJogo(browser, base, erros, w, h);
         const tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, w < 800);
         await tira('selecao');
         await page.evaluate(() => selectCharacter('wizard'));
@@ -252,10 +214,11 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         await tira('exploracao');
         if (sufixo === '-390') { await page.close(); continue; } // o celular é da Fase 5
 
+        // O mapa na entrada: você está aqui, três lugares aonde ir
         await page.evaluate(() => document.getElementById('btn-toggle-map').click());
-        await espera(250);
+        await espera(JANELA);
         await tira('mapa');
-        await page.evaluate(() => { document.getElementById('btn-toggle-map').click(); loadScene('crypt'); });
+        await page.evaluate(() => { fecharJanela('mapa'); loadScene('crypt'); });
         await espera(150);
         await page.evaluate(() => { skipTyping = true; });
         await espera(300);
@@ -270,36 +233,41 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         await rolar(page, 0);
         await tira('dado-1');
         await espera(1600);
+
+        // O fim: a cena da morte e, depois, a janela do fim (que o jogo abriria sozinho
+        // 1,2 s depois do texto); a da vitória, com o resumo da mesma partida
         await page.evaluate(() => { Math.random = window.__aleatorio; loadScene('death'); skipTyping = true; });
         await espera(300);
         await tira('fim');
+        await page.evaluate(() => { cancelarFim(); document.activeElement?.blur(); abrirFim('death'); });
+        await espera(JANELA);
+        await tira('fim-morte');
+        await page.evaluate(() => { fecharJanela('fim'); abrirFim('victory'); });
+        await espera(JANELA);
+        await tira('fim-vitoria');
+        await page.evaluate(() => fecharJanela('fim'));
+        await espera(400);
 
-        // O foco sai do "Começar uma nova aventura", como saía quando o combate abria e
-        // fechava aqui (até a Fase 3): a loja, a especialização e o diário seguem iguais às referências
-        await page.evaluate(() => {
-            document.activeElement?.blur();
-            document.getElementById('shop-modal').classList.remove('hidden');
-        });
-        await espera(250);
+        // A loja, com 5 de ouro (a poção não cabe no bolso)
+        await page.evaluate(() => abrirLoja());
+        await espera(JANELA);
         await tira('loja');
-        await recorte(page, pasta, 'loja', sufixo);
-        await page.evaluate(() => {
-            document.getElementById('shop-modal').classList.add('hidden');
-            gameState.player.level = 3;
-            openSpecializationModal();
-        });
-        await espera(250);
+        // A especialização (obrigatória: sai pela escolha)
+        await page.evaluate(() => { fecharJanela('loja'); gameState.player.level = 3; openSpecializationModal(); });
+        await espera(JANELA);
         await tira('especializacao');
-        await recorte(page, pasta, 'especializacao', sufixo);
-        await page.evaluate(() => {
-            document.getElementById('specialization-modal').classList.add('hidden');
-            document.getElementById('quest-journal-button').click();
-        });
-        await espera(250);
+        await page.evaluate(() => chooseSpecialization(Object.keys(SPECIALIZATIONS[gameState.player.class])[0]));
+        await espera(400);
+        // O diário, pelo selo
+        await page.evaluate(() => document.getElementById('quest-journal-button').click());
+        await espera(JANELA);
         await tira('diario');
-        await recorte(page, pasta, 'diario', sufixo);
+        // Um aviso sobre o diário aberto (os avisos ficam na frente das janelas)
+        await page.evaluate(() => avisar('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' }));
+        await espera(JANELA);
+        await tira('aviso');
         await page.close();
-        await capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo);
+        await capturarCombate(browser, base, pasta, erros, w, h, sufixo);
     }
 }
 
@@ -337,7 +305,7 @@ async function capturarCatalogo(browser, base, pasta, erros) {
     }
 }
 
-async function capturar(pasta, raiz, alvos, comKit) {
+async function capturar(pasta, raiz, alvos) {
     fs.mkdirSync(pasta, { recursive: true });
     const srv = await servidor(path.resolve(raiz));
     const base = `http://127.0.0.1:${srv.address().port}`;
@@ -347,7 +315,7 @@ async function capturar(pasta, raiz, alvos, comKit) {
     });
     const erros = [];
     try {
-        if (alvos.includes('jogo')) await capturarJogo(browser, base, pasta, erros, comKit);
+        if (alvos.includes('jogo')) await capturarJogo(browser, base, pasta, erros);
         if (alvos.includes('prototipo')) await capturarPrototipo(browser, base, pasta, erros);
         if (alvos.includes('catalogo')) await capturarCatalogo(browser, base, pasta, erros);
     } finally {
@@ -401,18 +369,16 @@ async function comparar(pastaA, pastaB, prefixo = '', tolerancia = 0) {
 // ---------------------------------------------------------------------------
 const [comando, ...resto] = process.argv.slice(2);
 const opcao = nome => { const i = resto.indexOf(nome); return i >= 0 ? resto.splice(i, 2)[1] : null; };
-const bandeira = nome => { const i = resto.indexOf(nome); return i >= 0 && resto.splice(i, 1).length > 0; };
 if (comando === 'capturar' && resto.length) {
     const raiz = opcao('--raiz') || RAIZ_PADRAO;
     const alvos = (opcao('--alvo') || 'jogo,prototipo,catalogo').split(',');
-    const comKit = bandeira('--kit');
-    await capturar(path.resolve(resto[0]), raiz, alvos, comKit);
+    await capturar(path.resolve(resto[0]), raiz, alvos);
 } else if (comando === 'comparar' && resto.length >= 2) {
     const prefixo = opcao('--so') || '';
     const tolerancia = Number(opcao('--tolerancia') || 0);
     await comparar(path.resolve(resto[0]), path.resolve(resto[1]), prefixo, tolerancia);
 } else {
-    console.log('Uso:\n  node ded/tools/capturas.mjs capturar <pasta> [--raiz <repo>] [--alvo jogo,prototipo,catalogo] [--kit]\n' +
+    console.log('Uso:\n  node ded/tools/capturas.mjs capturar <pasta> [--raiz <repo>] [--alvo jogo,prototipo,catalogo]\n' +
         '  node ded/tools/capturas.mjs comparar <pastaA> <pastaB> [--so prefixo] [--tolerancia N]');
     process.exitCode = 2;
 }
