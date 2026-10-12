@@ -234,22 +234,27 @@ async function capturarJogo(browser, base, pasta, erros) {
         await tira('dado-1');
         await espera(1600);
 
-        // O fim: a cena da morte e, depois, a janela do fim (que o jogo abriria sozinho
-        // 1,2 s depois do texto); a da vitória, com o resumo da mesma partida
+        // O fim: a cena da morte e, ~1,2 s depois do texto, a janela do fim que o jogo
+        // abre sozinho; depois a vitória, na cena dela, com o resumo da mesma partida
+        const esperaJanela = (id, aberta = true) => page.waitForFunction((i, a) => document.getElementById(i).open === a, { timeout: 8000 }, id, aberta);
         await page.evaluate(() => { Math.random = window.__aleatorio; loadScene('death'); skipTyping = true; });
         await espera(300);
         await tira('fim');
-        await page.evaluate(() => { cancelarFim(); document.activeElement?.blur(); abrirFim('death'); });
+        await esperaJanela('fim');
         await espera(JANELA);
         await tira('fim-morte');
-        await page.evaluate(() => { fecharJanela('fim'); abrirFim('victory'); });
+        await page.evaluate(() => fecharJanela('fim'));
+        await esperaJanela('fim', false); // a saída anima: sem esperar, a janela da morte ainda estaria aberta
+        await page.evaluate(() => { loadScene('victory'); skipTyping = true; });
+        await esperaJanela('fim');
         await espera(JANELA);
         await tira('fim-vitoria');
         await page.evaluate(() => fecharJanela('fim'));
-        await espera(400);
+        await esperaJanela('fim', false);
 
-        // A loja, com 5 de ouro (a poção não cabe no bolso)
-        await page.evaluate(() => abrirLoja());
+        // A loja, na cena dela, com 5 de ouro (a poção não cabe no bolso)
+        await page.evaluate(() => { gameState.player.gold = 5; loadScene('buy_supplies'); skipTyping = true; });
+        await esperaJanela('loja');
         await espera(JANELA);
         await tira('loja');
         // A especialização (obrigatória: sai pela escolha)

@@ -6,12 +6,14 @@
 //                                 [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]
 //                                 [--aquecimento janelas|d20|combate|nenhum]
 //
-// A aba de aquecimento joga o teste de d20 com o 20 natural; com janelas (o padrão), também passa uma
-// vez por cada janela e efeito da Fase 4 (o mapa, uma compra na loja, o diário, a especialização, a
-// barreira, a janela do fim e um aviso); com combate, só o d20 e uma luta vencida; com nenhum, só mede
-// o intervalo de atualização, com a sessão fria. O primeiro desenho de cada coisa nova numa sessão do
-// Chrome compila pipelines da GPU (30 a 50 ms cada, TASK_001 §7): o aquecimento tira esse custo de
-// primeira vez da medição, que fica com o custo de toda vez.
+// A aba de aquecimento joga o teste de d20 com o 20 natural (d20, o padrão). Com janelas, também passa
+// uma vez por cada janela e efeito da Fase 4 (o mapa, uma compra na loja, o diário, a especialização,
+// a barreira, a janela do fim e um aviso): serve para isolar o custo de toda vez. Com combate, o d20 e
+// uma luta vencida; com nenhum, só mede o intervalo de atualização, com a sessão fria.
+// O primeiro desenho de cada coisa nova numa sessão do Chrome compila pipelines da GPU (30 a 50 ms
+// cada, TASK_001 §6 e §7), e o jogador paga isso em toda sessão. Com o d20, a primeira execução de cada
+// cenário mede justamente essa primeira vez, e conta: um quadro com compilação no rastreio sai marcado
+// "compilação da GPU" e fica no veredito.
 // O rastreio de cada execução com um quadro acima do limite fica guardado em --rastreios (o padrão
 // é ded-desempenho-rastreios na pasta temporária do sistema), e o relatório diz o arquivo.
 //
@@ -180,7 +182,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const passou = d => d > LIMITE_MS + FOLGA_MS;
 const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
 let RASTREAR = true; // --sem-rastreio desliga
-let AQUECIMENTO = 'janelas'; // --aquecimento
+let AQUECIMENTO = 'd20'; // --aquecimento
 let PASTA_RASTREIOS = path.join(os.tmpdir(), 'ded-desempenho-rastreios'); // --rastreios
 
 function servidor(raiz) {
@@ -450,7 +452,7 @@ async function fluxoJanela({ tipo, janela, depois }) {
 // saem as limpezas ociosas da GPU e o trabalho da thread principal da página (ver as armadilhas),
 // em ms contados da ação.
 async function comRastreio(page, executar) {
-    if (!RASTREAR) return Object.assign(await executar(), { limpezas: null, trabalho: null });
+    if (!RASTREAR) return Object.assign(await executar(), { limpezas: null, trabalho: null, compilacoes: null, paradas: null });
     const arq = path.join(os.tmpdir(), `ded-desempenho-${process.pid}-${Date.now()}.json`);
     await page.tracing.start({ path: arq, categories: ['toplevel', 'blink.user_timing'] });
     let r;
@@ -472,16 +474,23 @@ async function comRastreio(page, executar) {
 
 function lerRastreio(arq) {
     let eventos;
-    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return { limpezas: null, trabalho: null }; }
+    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return { limpezas: null, trabalho: null, compilacoes: null, paradas: null }; }
     const marca = eventos.find(e => e.name === 'desempenho:acao');
-    if (!marca) return { limpezas: null, trabalho: null };
+    if (!marca) return { limpezas: null, trabalho: null, compilacoes: null, paradas: null };
     const threads = new Map();
     for (const e of eventos) if (e.name === 'thread_name') threads.set(`${e.pid}:${e.tid}`, e.args && e.args.name);
     const ms = ts => (ts - marca.ts) / 1000;
     const tarefas = eventos.filter(e => e.ph === 'X' && e.name === 'ThreadControllerImpl::RunTask');
+    const naGpu = e => threads.get(`${e.pid}:${e.tid}`) === 'CrGpuMain';
     return {
-        limpezas: tarefas.filter(e => e.dur >= 5000 && e.args?.src_func === 'ScheduleCleanUpAllResources'
-            && threads.get(`${e.pid}:${e.tid}`) === 'CrGpuMain').map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        limpezas: tarefas.filter(e => e.dur >= 5000 && e.args?.src_func === 'ScheduleCleanUpAllResources' && naGpu(e))
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        // A compilação de um pipeline da GPU (o Dawn compila num worker, e a thread da GPU espera)
+        compilacoes: eventos.filter(e => e.ph === 'X' && e.name === 'DawnPlatformImpl::RunWorkerTask' && e.dur >= 5000)
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        // A parada do ambiente, pelo nome: GpuServiceImpl::GetDawnInfo na thread principal da GPU
+        paradas: tarefas.filter(e => e.dur >= 50000 && e.args?.src_func === 'GetDawnInfo' && naGpu(e))
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
         // a thread principal da página é a da marca
         trabalho: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100).map(e => [ms(e.ts), ms(e.ts + e.dur)])
     };
@@ -506,6 +515,11 @@ function daLimpeza(e, i) {
     return trecho > 0 && e.quadros[i] - trecho <= LIMITE_MS + FOLGA_MS && trabalhoDaPagina(e, i) < TRABALHO_MAX_MS;
 }
 const daPagina = (e, i) => passou(e.quadros[i]) && !daLimpeza(e, i);
+// Um quadro em que o Dawn compilava um pipeline (é custo de primeira vez, e conta contra a página)
+function comCompilacao(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return (e.compilacoes || []).some(c => sobreposicao(inicio - 30, fim, c.inicio, c.inicio + c.duracao) > 0);
+}
 
 async function cenarioAbertura(browser, base, cpu, reg) {
     const page = await abrirJogo(browser, base, cpu, reg, true);
@@ -779,7 +793,8 @@ function imprimir(resultados, meta) {
                 `estilo e layout ${num(pior.estiloLayout, 0)})${pior.fonte ? `; maior script: ${pior.fonte}` : ''}`);
         }
         const quadrosDe = f => r.execucoes.flatMap((e, k) => e.quadros.map((d, i) => ({ d, inicio: e.fins[i] - d, k, e, i })).filter(x => f(x.e, x.i)));
-        const fmt = x => `${num(x.d)}@${x.inicio >= 0 ? '+' : ''}${Math.round(x.inicio)}${r.execucoes.length > 1 ? ` (exec ${x.k + 1})` : ''}`;
+        const fmt = x => `${num(x.d)}@${x.inicio >= 0 ? '+' : ''}${Math.round(x.inicio)}` +
+            `${r.execucoes.length > 1 || comCompilacao(x.e, x.i) ? ` (${[r.execucoes.length > 1 ? `exec ${x.k + 1}` : '', comCompilacao(x.e, x.i) ? 'compilação da GPU' : ''].filter(Boolean).join(', ')})` : ''}`;
         const acima = quadrosDe(daPagina);
         if (acima.length) console.log(`${rotulo}: acima do limite (ms@início): ${acima.slice(0, 40).map(fmt).join(', ')}${acima.length > 40 ? ', …' : ''}`);
         const guardados = [...new Set(acima.map(x => x.e.rastreioGuardado).filter(Boolean))];
@@ -823,14 +838,23 @@ function veredito(resultados) {
     return { texto: `REPROVADO (${partes.join('; ')})`, aprovado: false };
 }
 
-// Parada do ambiente: um quadro de mais de 100 ms em que a thread principal não
-// trabalhou (todo LoAF longo sem script nem render). Ela aparece até numa página
-// vazia, uns 120 s depois de o Chrome abrir. A execução é refeita uma vez, e o
-// relatório avisa. Um quadro longo com script ou render é da página e fica.
+// Parada do ambiente: a tarefa GpuServiceImpl::GetDawnInfo, de ~500 ms na thread principal
+// da GPU, que aparece até numa página vazia, uns 120 s depois de o Chrome abrir. Um quadro de
+// mais de 100 ms em que ela roda é refeito uma vez, e o relatório avisa; um quadro com
+// compilação do Dawn nunca é refeito (é custo da página, de primeira vez). Sem rastreio
+// (--sem-rastreio), vale o sinal antigo: todo LoAF longo sem script nem render.
 function paradaDoAmbiente(e) {
+    const quadros = e.quadros.map((d, i) => i).filter(i => e.quadros[i] > 100);
+    if (!quadros.length) return false;
+    if (e.paradas) {
+        return quadros.every(i => {
+            const [inicio, fim] = intervalo(e, i);
+            return e.paradas.some(p => sobreposicao(inicio, fim, p.inicio, p.inicio + p.duracao) > 0) && !comCompilacao(e, i);
+        });
+    }
     const longos = (e.loaf || []).filter(l => l.duracao > 100);
     // render até 5 ms: é o do próprio quadro (uma parada de 503 ms teve 3,2)
-    return Math.max(...e.quadros) > 100 && longos.length > 0 && longos.every(l => l.scripts <= 2 && l.render <= 5);
+    return longos.length > 0 && longos.every(l => l.scripts <= 2 && l.render <= 5);
 }
 
 async function comRefacao(reg, executar) {
@@ -840,7 +864,7 @@ async function comRefacao(reg, executar) {
     if (reg.execucoes.length > antes && paradaDoAmbiente(e)) {
         reg.execucoes.pop();
         reg.avisos.push(`execução refeita: parada do ambiente de ${Math.round(Math.max(...e.quadros))} ms ` +
-            '(LoAF sem script nem render)');
+            (e.paradas ? '(GetDawnInfo na GPU)' : '(LoAF sem script nem render)'));
         return executar();
     }
     return r;
@@ -929,6 +953,8 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
                 execucoes: r.execucoes.map(e => ({
                     aposLancamentoMs: Math.round(e.epoca - lancamento), quadros: e.quadros.map(r2), fins: e.fins.map(r2), loaf: e.loaf,
                     limpezasGpu: e.limpezas && e.limpezas.map(l => ({ inicio: r2(l.inicio), duracao: r2(l.duracao) })),
+                    compilacoesGpu: e.compilacoes && e.compilacoes.map(c => ({ inicio: r2(c.inicio), duracao: r2(c.duracao) })),
+                    quadrosComCompilacao: e.quadros.map((_, i) => i).filter(i => passou(e.quadros[i]) && comCompilacao(e, i)),
                     quadrosNaLimpeza: e.quadros.map((_, i) => i).filter(i => daLimpeza(e, i)),
                     rastreio: !!(e.limpezas && e.trabalho), rastreioGuardado: e.rastreioGuardado || null,
                     comecou: e.comecou, resultado: e.resultado, cenaAntes: e.cenaAntes, cena: e.cena, combate: e.combate
@@ -957,7 +983,7 @@ const repeticoes = Number(opcao('--repeticoes') ?? 10);
 if (args.includes('--sem-rastreio')) { args.splice(args.indexOf('--sem-rastreio'), 1); RASTREAR = false; }
 const pastaRastreios = opcao('--rastreios');
 if (pastaRastreios) PASTA_RASTREIOS = path.resolve(pastaRastreios);
-AQUECIMENTO = opcao('--aquecimento') ?? 'janelas';
+AQUECIMENTO = opcao('--aquecimento') ?? 'd20';
 const cpu = opcao('--cpu') ?? 'ambos';
 const json = opcao('--json');
 const raiz = opcao('--raiz') || RAIZ_PADRAO;

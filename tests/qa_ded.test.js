@@ -1081,14 +1081,14 @@ async function runTests() {
     const fim = await page.evaluate(() => ({
       titulo: document.getElementById('fim-titulo').textContent,
       desfecho: document.getElementById('fim').dataset.desfecho,
-      foco: document.activeElement && document.activeElement.id
+      foco: document.activeElement && document.activeElement.textContent.trim()
     }));
-    if (fim.titulo !== 'Você morreu' || fim.desfecho !== 'derrota' || fim.foco !== 'fim-recomecar') throw new Error(`The death must open the end window focused on "Começar uma nova aventura", got ${JSON.stringify(fim)}`);
-    await page.evaluate(() => { window.__semRecarga = true; });
-    await page.keyboard.press('Enter'); // logo depois de abrir: ignorado
+    // o foco vai para "Rever a cena", não para o botão que apaga o save
+    if (fim.titulo !== 'Você morreu' || fim.desfecho !== 'derrota' || fim.foco !== 'Rever a cena') throw new Error(`The death must open the end window focused on "Rever a cena", got ${JSON.stringify(fim)}`);
+    await page.evaluate(() => { window.__semRecarga = true; document.getElementById('fim-recomecar').click(); }); // logo depois de abrir: ignorado
     await pausa(100);
     const intacto = await page.evaluate(() => !!localStorage.getItem('ded_save_v1') && window.__semRecarga === true);
-    if (!intacto) throw new Error('An Enter right after the end window opens must not start a new adventure');
+    if (!intacto) throw new Error('A click on "Começar uma nova aventura" right after the end window opens must not start a new adventure');
     await page.keyboard.press('Escape');
     await esperarJanela('fim', false);
     const focoNoFim = await focado();
@@ -1125,7 +1125,7 @@ async function runTests() {
     const linha = await page.evaluate(() => { addToLog('💍 👑 💵 💰 🪙 💎'); const li = [...document.querySelectorAll('#game-log li')].pop(); return li.textContent.trim(); });
     if (linha !== 'Anel, coroa, notas, bolsa de ouro, moeda e diamante.') throw new Error(`The emoji-only chronicle line must read in words, got "${linha}"`);
     if (dialogos.length) throw new Error(`Native dialogs opened during cases 9 to 12: ${JSON.stringify(dialogos)}`);
-    console.log('✅ PASS: The end window opens after the death and can be dismissed, a new scene cancels it, toasts replace the alerts, the barrier says why, and the chronicle reads in words.');
+    console.log('✅ PASS: The end window opens after the death focused on "Rever a cena" and can be dismissed, a new scene cancels it, toasts replace the alerts, the barrier says why, and the chronicle reads in words.');
   } finally {
     page.off('dialog', contarDialogo);
   }

@@ -351,6 +351,7 @@
                         <li data-estado="atual"><span class="mapa-medalhao"><svg aria-hidden="true"><use href="ui/icones.svg#i-pegadas"/></svg></span>Você está aqui</li>
                         <li data-estado="visitado"><span class="mapa-medalhao"></span>Visitado</li>
                         <li data-estado="pode-ir"><span class="mapa-medalhao"></span>Pode ir</li>
+                        <li data-estado="desconhecido"><span class="mapa-medalhao"></span>Não visitado</li>
                         <li data-estado="selado"><span class="mapa-medalhao"><svg aria-hidden="true"><use href="ui/icones.svg#i-cadeado"/></svg></span>Selado</li>
                         <li><span class="mapa-alavanca" data-puxada="true"><svg aria-hidden="true"><use href="ui/icones.svg#i-alavanca"/></svg></span>Alavanca puxada</li>
                     </ul>
@@ -458,9 +459,9 @@
                     </dl>
                 </div>
                 <div class="janela-rodape">
-                    <button class="botao-secundario" type="button" data-fechar-janela>Rever a cena</button>
+                    <button class="botao-secundario" type="button" data-fechar-janela autofocus>Rever a cena</button>
                     <!-- o foco chega aqui quando a janela abre (autofocus) -->
-                    <button class="botao-fita" type="button" id="fim-recomecar" autofocus>Começar uma nova aventura</button>
+                    <button class="botao-fita" type="button" id="fim-recomecar">Começar uma nova aventura</button>
                 </div>
             </div>
         </dialog>
@@ -475,6 +476,7 @@
         <!-- Flash Vermelho para Impacto de Dano -->
         <div id="red-flash" class="red-flash-overlay"></div>
         <div class="aquecer-gpu" aria-hidden="true"></div>
+        <div class="aquecer-gpu aquecer-gpu-clarao" aria-hidden="true"></div>
         <script>
             // --- Sintetizador de Áudio Procedural Premium (Web Audio API) ---
             const AudioEngine = {
@@ -1493,10 +1495,15 @@
             }
 
             // Fechar pelo medalhão, por Escape (cancel não sobe, daí a captura) e por um
-            // clique no fundo escuro (o clique no ::backdrop chega no próprio <dialog>)
+            // clique no fundo escuro (o clique no ::backdrop chega no próprio <dialog>).
+            // O fundo só fecha se o toque também começou nele: um arrasto de seleção que
+            // começa dentro da janela e termina fora gera um clique com alvo no <dialog>.
+            let tocouEm = null;
+            document.addEventListener('pointerdown', e => { tocouEm = e.target; }, true);
             document.addEventListener('click', e => {
                 const fechar = e.target.closest && e.target.closest('.janela-fechar, [data-fechar-janela]');
-                const janela = fechar ? fechar.closest('dialog.janela') : (e.target.matches && e.target.matches('dialog.janela') ? e.target : null);
+                const noFundo = e.target.matches && e.target.matches('dialog.janela') && tocouEm === e.target;
+                const janela = fechar ? fechar.closest('dialog.janela') : (noFundo ? e.target : null);
                 if (janela && !janela.hasAttribute('data-obrigatoria')) fecharJanela(janela);
             });
             document.addEventListener('cancel', e => {
@@ -1527,20 +1534,25 @@
                 escreverAtributo(peca.querySelector('use'), 'href', hrefIcone(icone));
                 peca.dataset.tom = tom;
                 peca.hidden = false;
-                if (!host.matches(':popover-open')) host.showPopover();
                 const tempo = duracao || Math.min(6000, 2600 + texto.length * 45);
                 peca.noArAte = agora + tempo;
-                const sobe = movimentoReduzido() ? [{ opacity: 0 }, { opacity: 1 }]
-                    : [{ opacity: 0, transform: 'translateY(-0.8rem)' }, { opacity: 1, transform: 'none' }];
-                peca.animacao = peca.animate(sobe, { duration: 220, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
-                peca.saida = setTimeout(() => {
-                    const sumir = () => {
-                        peca.hidden = true;
-                        if (pecas.every(p => p.hidden)) host.hidePopover();
-                    };
-                    peca.animacao = peca.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-in', fill: 'forwards' });
-                    if (peca.animacao) peca.animacao.onfinish = sumir; else sumir();
-                }, tempo);
+                // Aparece depois do próximo quadro: o aviso pedido por uma cena (o mercador
+                // fala na cena de texto mais longo) não pesa no quadro da cena
+                depoisDoProximoQuadro(() => {
+                    if (peca.hidden) return; // outro aviso já ocupou e soltou a peça
+                    if (!host.matches(':popover-open')) host.showPopover();
+                    const sobe = movimentoReduzido() ? [{ opacity: 0 }, { opacity: 1 }]
+                        : [{ opacity: 0, transform: 'translateY(-0.8rem)' }, { opacity: 1, transform: 'none' }];
+                    peca.animacao = peca.animate(sobe, { duration: 220, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
+                    peca.saida = setTimeout(() => {
+                        const sumir = () => {
+                            peca.hidden = true;
+                            if (pecas.every(p => p.hidden)) host.hidePopover();
+                        };
+                        peca.animacao = peca.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-in', fill: 'forwards' });
+                        if (peca.animacao) peca.animacao.onfinish = sumir; else sumir();
+                    }, tempo);
+                });
             }
 
             // Uma janela aberta depois do aviso entra na frente dele: o aviso volta à frente
@@ -1572,8 +1584,8 @@
             // pintura da abertura e sai dois quadros depois, com o resto da pintura a
             // frio, longe do "Começar".
             function encerrarAquecimento() {
-                const peca = document.querySelector && document.querySelector('.aquecer-gpu');
-                if (peca && peca.remove) peca.remove();
+                if (!document.querySelectorAll) return;
+                document.querySelectorAll('.aquecer-gpu').forEach(peca => { if (peca.remove) peca.remove(); });
             }
             depoisDoProximoQuadro(encerrarAquecimento);
 

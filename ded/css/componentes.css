@@ -338,8 +338,9 @@
     border-radius: 0.2rem;
     outline: 0.07rem solid var(--ouro);
     outline-offset: -0.3rem;
-    background: radial-gradient(circle at 50% 38%, rgba(255, 251, 238, 0.7), rgba(214, 192, 148, 0.35));
-    box-shadow: inset 0 0 0.6rem rgba(74, 50, 32, 0.3);
+    /* a borda escurecida vem do gradiente, não de uma sombra desfocada: o desfoque
+       compilava três pipelines da GPU (~30 ms cada) no primeiro item de uma sessão */
+    background: radial-gradient(circle at 50% 38%, rgba(255, 251, 238, 0.7), rgba(214, 192, 148, 0.35) 62%, rgba(74, 50, 32, 0.28));
 }
 .slot svg { width: 1.9rem; height: 1.9rem; color: var(--tinta-2); }
 .slot-nome {
@@ -801,8 +802,10 @@
     border-radius: 0.25rem;
     outline: 0.07rem solid var(--ouro);
     outline-offset: -0.3rem;
-    background: linear-gradient(#f6eed9, #dcc79e);
-    box-shadow: 0 0.12rem 0 rgba(40, 20, 5, 0.25);
+    /* cor sólida com um realce em cima, sem gradiente: ao lado da fita (na janela do
+       fim), o gradiente caía num passe com MSAA e compilava ~145 ms na primeira vez */
+    background: #ebdfc2;
+    box-shadow: inset 0 0.12rem 0 rgba(255, 252, 240, 0.6), 0 0.12rem 0 rgba(40, 20, 5, 0.25);
     font: max(0.95rem, 13px) / 1.1 var(--fonte-rotulo);
     letter-spacing: 0.1em;
     color: var(--tinta-2);
@@ -1056,6 +1059,9 @@
     pointer-events: none;
     will-change: transform;
 }
+/* A segunda peça aquece o clarão da barreira (um gradiente radial numa camada
+   própria), que compilava ~32 ms na primeira barreira de uma sessão */
+.aquecer-gpu.aquecer-gpu-clarao { right: 8rem; border-radius: 0; box-shadow: none; }
 
 /* ---------- Combate: efeitos em jogo ---------- */
 
@@ -1243,13 +1249,21 @@ dialog.janela::backdrop { background: rgba(14, 9, 5, 0.74); }
     height: 3.3rem;
     padding: 0.95rem;
     border: 0;
-    border-radius: 50%;
-    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+    border-radius: 50%; /* o anel de foco segue o círculo */
+    background: none;
     color: var(--tinta-2);
     cursor: pointer;
     transition: transform 0.15s ease, color 0.15s ease;
 }
-.janela-fechar svg { width: 100%; height: 100%; }
+/* a arte do medalhão fica num ::before sem border-radius: uma imagem num recorte
+   redondo compilava um pipeline da GPU na primeira janela de cada sessão */
+.janela-fechar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.janela-fechar svg { position: relative; width: 100%; height: 100%; }
 .janela-fechar:hover { transform: translateY(-0.12rem); color: var(--rubro); }
 .janela-fechar:focus-visible { outline: none; box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro); }
 /* Título de seção dentro da janela (a mesma letra do título das escolhas) */
@@ -1272,14 +1286,19 @@ dialog.janela::backdrop { background: rgba(14, 9, 5, 0.74); }
 }
 .janela-status[data-tom="sucesso"] { color: var(--verdete); }
 .janela-status[data-tom="falha"] { color: var(--rubro); }
-/* Abrir e fechar: só opacidade e transform, na janela e no fundo */
-dialog.janela[open] { animation: janela-abrir 0.22s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
-dialog.janela[open]::backdrop { animation: janela-escurecer 0.22s ease-out both; }
+/* Abrir e fechar: só opacidade, na janela e no fundo. Aberta, a janela e o fundo
+   ficam cada um numa camada própria (nítida, com will-change: opacity) do começo ao
+   fim. Sem isso, o fim da animação devolvia o conteúdo (e, no fundo, a folha inteira
+   por baixo dele) à camada de baixo, e a GPU rasterizava tudo de novo; um transform
+   na entrada também fazia rasterizar de novo no fim, para alinhar ao pixel. Nas duas
+   vezes, com pipelines que compilavam na primeira abertura (TASK_001 §6). */
+dialog.janela[open] { will-change: opacity; animation: janela-abrir 0.22s ease-out both; }
+dialog.janela[open]::backdrop { will-change: opacity; animation: janela-escurecer 0.22s ease-out both; }
 dialog.janela.fechando { animation: janela-fechar 0.16s ease-in both; }
 dialog.janela.fechando::backdrop { animation: janela-clarear 0.16s ease-in both; }
-@keyframes janela-abrir { from { opacity: 0; transform: translateY(0.8rem); } }
+@keyframes janela-abrir { from { opacity: 0; } }
 @keyframes janela-escurecer { from { opacity: 0; } }
-@keyframes janela-fechar { to { opacity: 0; transform: translateY(0.5rem); } }
+@keyframes janela-fechar { to { opacity: 0; } }
 @keyframes janela-clarear { to { opacity: 0; } }
 
 /* ---------- Aviso: toast (fora da folha) ---------- */
@@ -1320,7 +1339,7 @@ dialog.janela.fechando::backdrop { animation: janela-clarear 0.16s ease-in both;
     border-image: url(../ui/ornamentos/moldura.svg) 40 / 2.5rem / 0 stretch;
     background: linear-gradient(#f4e9d0, #e2cfa6);
     background-clip: padding-box;
-    box-shadow: 0 0.3rem 0.7rem rgba(14, 9, 5, 0.45);
+    box-shadow: 0 0.2rem 0 rgba(14, 9, 5, 0.4); /* sem desfoque: compilava um pipeline no primeiro aviso */
     font: 1.12rem/1.35 var(--fonte-texto);
     font-variant-numeric: lining-nums;
     color: var(--tinta);
@@ -1355,11 +1374,15 @@ dialog.janela.fechando::backdrop { animation: janela-clarear 0.16s ease-in both;
    verdete, arcana, como o clarão vermelho do golpe. O JS anima só a opacidade.
    Fica em opacity 0 e sem camada própria (a barreira é rara: a camada nasce com
    a animação e some com ela). */
+/* o gradiente é o mesmo da peça de aquecimento (.aquecer-gpu-clarao): três paradas
+   e sem "transparent" (com ele, o Chrome o desenha como um gradiente de oito) */
+.clarao-barreira, .aquecer-gpu.aquecer-gpu-clarao {
+    background: radial-gradient(ellipse at center, rgba(63, 90, 61, 0) 40%, rgba(201, 161, 79, 0.42) 74%, rgba(63, 90, 61, 0.78));
+}
 .clarao-barreira {
     position: fixed;
     inset: 0;
     z-index: var(--z-efeito);
-    background: radial-gradient(ellipse at center, transparent 38%, rgba(63, 90, 61, 0.22) 60%, rgba(201, 161, 79, 0.42) 78%, rgba(63, 90, 61, 0.78));
     opacity: 0;
     pointer-events: none;
 }
@@ -1416,9 +1439,6 @@ dialog.janela.fechando::backdrop { animation: janela-clarear 0.16s ease-in both;
     .card-heroi:hover, .botao-fita:hover, .botao-secundario:hover, .selo:hover svg { transform: none; }
     .cena-texto > span { transition: none; }
     .janela-fechar:hover { transform: none; }
-    /* as janelas só esmaecem */
-    @keyframes janela-abrir { from { opacity: 0; } }
-    @keyframes janela-fechar { to { opacity: 0; } }
     @keyframes d20-surgir { from { opacity: 0.2; } to { opacity: 1; } }
 }
 
