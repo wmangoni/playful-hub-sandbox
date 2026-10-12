@@ -20,23 +20,22 @@ O jogo está estruturado com base nos seguintes arquivos:
 
 A interface está sendo trocada por fases. O plano, as fases e as regras de performance estão em `TASKS/TASK_001.md`.
 
-- **`css/legado.css`**: a interface antiga das telas que ainda não migraram (combate, loja, especialização, diário e mapa), em `px` para a escala do kit não afetá-las. A seleção, a exploração e o d20 migraram na Fase 2; as outras telas saem nas fases 3 e 4.
+- **`css/legado.css`**: a interface antiga das telas que ainda não migraram (loja, especialização, diário e mapa), em `px` para a escala do kit não afetá-las. A seleção, a exploração e o d20 migraram na Fase 2, e o combate na Fase 3; as outras telas saem na Fase 4.
   - O legado vem **antes** do kit no `<head>`.
   - Nos dois sentidos, nada pode vazar.
     - O reset do kit (`base.css`) vale só dentro da `.folha`, com especificidade zero (`:where`). O fundo escuro fica no `body.ficha`.
     - O `body` legado só define a fonte, o `font-size: 16px` e a cor que as telas antigas herdam. A `.folha` reancora em `1rem`, então a escala do `html` do kit não chega ao texto legado.
-    - As telas legadas ficam **fora** da `.folha`. O `.game-container` virou só o palco do combate: repete a geometria do contêiner antigo e fica vazio e transparente fora do combate.
+    - As telas legadas ficam **fora** da `.folha`.
     - Os seletores genéricos que sobraram são restritos com `:where()`, que não muda a especificidade:
       - `button` vale só fora da `.folha`;
-      - `.dice` vale só dentro do `#combat-screen`;
       - `.hidden` (`display: none`) vale em tudo, menos nos filhos de `.acoes`.
 - **`css/` do kit novo**, nesta ordem de carga:
   - `fontes.css`: `@font-face` das fontes do projeto;
   - `tokens.css`: cores, tipografia e camadas (`--z-*`);
   - `base.css`: escala da tela em `rem`, o reset (só dentro da `.folha`), o fundo do `body.ficha` e utilitários;
-  - `componentes.css`: as peças e o comportamento responsivo delas (folha, painel com fita, emblemas, medalhões, slots, escolhas, ações, bandeja do d20, selos de cera e crônica);
+  - `componentes.css`: as peças e o comportamento responsivo delas (folha, painel com fita, emblemas, medalhões, slots, escolhas, ações, bandeja do d20, selos de cera, crônica, card de inimigo, efeitos em jogo, ações de combate, clarão vermelho e números flutuantes);
   - `selecao.css`: só o arranjo da seleção de personagem, sob `.tela-selecao`;
-  - `exploracao.css`: só o arranjo da tela de exploração, com tudo sob `.tela-exploracao`;
+  - `exploracao.css`: só o arranjo da tela de exploração (e do combate, que é um estado dela), com tudo sob `.tela-exploracao`;
   - `ui/ornamentos/vitral-recorte.css`: o recorte em arco da cena, gerado.
 - **Telas:** cada tela é uma `.folha` com a classe dela: `#character-select.tela-selecao` e `#game-screen.tela-exploracao`. `mostrarTela()` alterna as duas.
   - A seleção some com `.hidden`.
@@ -50,11 +49,19 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - Só as cenas de `CENAS_FINAIS` (mortes e vitórias) oferecem "Começar uma nova aventura". Uma cena sem escolhas que volta sozinha pelo `onEnter`, como a da poção, mostra só "A aventura continua…".
   - Depois do resultado, o `#dice-button` vira "Continuar" ("Enfrentar", no teste de combate) e avança na hora. Sem clique, o jogo avança sozinho em 1,8 s.
   - Escolhas e "Continuar" recém-montados ignoram ativações por 300 ms (`PAUSA_ATIVACAO`): um segundo Enter não escolhe na cena nova sem ela ser lida. Testes e ferramentas esperam pelo menos 400 ms depois de um `loadScene` antes de clicar numa escolha.
+- **Combate:** é um estado da folha de exploração, não uma tela.
+  - `startInteractiveCombat(inimigo)` abre o combate e `mostrarCombate(true)` troca a narrativa (`#narrativa`) pelo painel `#combat-screen` e a crônica (`#painel-cronica`) pelo relato `#combat-log-box`, alternando `.hidden`. `closeCombatScreen()` desfaz a troca. A ficha, o vitral e o nível continuam à vista.
+  - O painel tem o card do inimigo (retrato em medalhão do sprite, nome, barra de vida, armadura e os selos de vitória e derrota já pintados), os efeitos em jogo (`#combat-condicoes`, `atualizarCondicoes()`), a bandeja do d20 do combate (a mesma peça da exploração, menor) e as ações.
+  - Nome, gênero e ícone de cada inimigo saem de `INIMIGOS`; `inimigo(prep, maiuscula)` escreve "o Goblin", "da Aranha" etc.
+  - As ações são `.escolha.acao-combate` montadas por `botaoCombate()`, com o ícone no medalhão e um detalhe à direita (recarga, custo, "ativa"). No turno do inimigo elas ficam com `aria-disabled` e mantêm o foco. Uma habilidade indisponível continua clicável e explica o motivo no relato.
+  - O relato (`addCombatLog`) segue a crônica: ícone e tom pelo emoji do começo (`RELATO_ICONES`), sem emojis no texto, e o resultado do d20 carimba o selo da bandeja.
+  - Efeitos: clarão vermelho (`#red-flash`), brilho de impacto (`.impacto`), tremor e números flutuantes, todos com Web Animations em `opacity` e `transform`. Os números flutuantes são quatro peças fixas em `#floater-layer` e uma na vida do herói, reusadas por `spawnFloater()`; não crie nem remova elementos para eles.
 - **Nomes:** em português, exceto os que são contrato com o JS e os testes do jogo:
   - o d20: `#dice`, `.dice`, `.rolling-animation`, `.critical-success-bg` (20 natural), `.falha-critica` (1 natural), `#dice-container`, `#dice-button` e `#result-message`;
   - as escolhas: `#choices`;
   - a seleção: `.character-card[data-class]` e `.selected`. O primeiro `<button>` de `#character-select` é o de começar;
   - os atributos: `#val-*` e `#mod-*`. O modificador sai como `+3` e `−1`;
+  - o combate: `#combat-screen` (alternado com `.hidden`), `#combat-enemy-name`, `#combat-enemy-ac`, `#combat-actions-panel` e os botões `#btn-combat-attack`, `#btn-combat-spell` (sempre presente; oculto para quem não tem magia), `#btn-combat-item` e `#btn-combat-flee`;
   - o equipamento: `.inventory-slots-grid .inventory-slot-box`, com `.occupied`, `.usable`, `.disabled` e `.item-name`. O ícone fica em `.item-icone use` (`href` com `#i-*` do sprite) e a descrição no `title` do slot;
   - os globais que as ferramentas usam: `scenes`, `gameState`, `skipTyping`, `ttsEnabled`, `selectCharacter`, `startGame`, `loadScene`, `startInteractiveCombat`, `closeCombatScreen` e `openSpecializationModal`.
 
@@ -72,14 +79,19 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - As telas legadas também saem recortadas em `legado-*.png`, só o overlay.
     - Compare-as com uma referência de antes da migração capturada com `--kit` (o kit injetado depois do legado): `comparar <ref> <nova> --so legado`.
     - `--tolerancia N` ignora diferenças de até N por canal. Serve, por exemplo, para o fundo translúcido da especialização.
-- **Desempenho:** `node ded/tools/desempenho.mjs` mede o tempo dos quadros no Chrome com GPU. Cobre a digitação, o teste de d20, os críticos e o aceite do primeiro clique, repetido 30 vezes. Rode depois de mexer em animação, bandeja ou vitral.
+- **Desempenho:** `node ded/tools/desempenho.mjs` mede o tempo dos quadros no Chrome com GPU. Cobre a digitação, o teste de d20, os críticos, uma rodada de combate, a vitória e o aceite do primeiro clique, repetido 30 vezes. Rode depois de mexer em animação, bandeja, combate ou vitral.
+  - Um quadro que cai na limpeza ociosa da GPU do Chrome (uns 30 a 70 ms, cerca de 1 s depois de a página parar de rasterizar) sai listado à parte e fora do veredito, com a prova no rastreio. Ver o cabeçalho do script e o §6 da TASK_001.
   - As duas ferramentas forçam o movimento padrão. Com as animações do Windows desligadas, o Chrome pede movimento reduzido e o jogo pula justamente a animação.
   - Dentro da janela medida, a ferramenta não pode ler layout.
 - **`server.js`:** serve `/ded/css` e `/ded/ui` com `no-cache` (revalida por ETag), para um deploy não juntar HTML novo com CSS ou artes antigas.
   - A exceção é `/ded/ui/fontes`, com cache de 30 dias. Uma fonte nova entra com **outro nome de arquivo**: nunca substitua um `.woff2` mantendo o nome.
 - **Regras do kit:**
   - Números em Alegreya com algarismos alinhados (`.num`); os algarismos do Marcellus SC parecem letras. Há uma exceção: o número do d20, as fitas e o título ficam na Grenze Gotisch, com `font-variant-numeric: lining-nums`.
-  - Animar só `transform` e `opacity`; a barra de vida desliza com `translateX`. Transições de cor só valem em hover e foco de elementos pequenos (escolhas, selos).
+  - Animar só `transform` e `opacity`. Transições de cor só valem em hover e foco de elementos pequenos (escolhas, selos). Nada de transição em `clip-path` ou outra propriedade de pintura: ela repinta a cada quadro.
+  - A barra de vida: o preenchimento (`span::before`) tem camada própria e desliza com `translateX` dentro de uma janela de recorte **retangular** (o `span`); a ponta esquerda é um disco parado (`.barra-vida::before`). Camada animada sob `overflow: hidden` com `border-radius` faz o compositor compilar um shader de recorte arredondado no primeiro uso (50 a 130 ms).
+  - O que anima de novo e de novo (números flutuantes, tremor do retrato e da vida) mora numa camada que nunca some: criar e destruir camadas faz a GPU pagar a limpeza das texturas depois.
+  - Nada de `filter` em peça que repinta (o medalhão do nível tem a sombra num gradiente) e nenhuma camada da tela toda sempre composta (o clarão vermelho fica em `opacity: 0`, nunca a 1%).
+  - O anel de XP é um traço SVG de cor sólida: com gradiente, o primeiro XP compilava um pipeline novo na GPU.
   - Não ler o layout logo depois de mudar o DOM (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`). Leve a leitura para o próximo quadro com `noProximoQuadro()` ou `focarNoQuadro()`.
   - Camada própria para algo que fica parado vem de `will-change: opacity`. Com `transform`, o Chrome não alinha a camada ao pixel e ela borra.
   - Nada de `backdrop-filter`, nem de `filter` ou sombra desfocada grandes (use gradientes).

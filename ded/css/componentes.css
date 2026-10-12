@@ -209,23 +209,53 @@
     border-radius: 1rem;
     background: linear-gradient(var(--tinta), var(--tinta-2));
     box-shadow: 0 0 0 0.1rem var(--ouro), 0 0 0 0.22rem var(--tinta), inset 0 0.1rem 0.25rem rgba(0, 0, 0, 0.6);
-    overflow: hidden;
+    --altura: 0.71rem; /* a altura de dentro (0,95rem menos as bordas) */
 }
-/* O preenchimento tem a largura toda e desliza para a esquerda: anima só
-   transform (no compositor) e mantém a ponta arredondada */
-.barra-vida span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
+/* O preenchimento (span::before) tem a largura toda, numa camada própria, e
+   desliza para a esquerda só com transform, dentro de uma janela de recorte
+   retangular (o span) que começa no meio da ponta esquerda; a ponta é um disco
+   parado (.barra-vida::before). Assim o golpe não rasteriza nada. Não volte ao
+   overflow: hidden no pai arredondado (o compositor compilava um shader de
+   recorte arredondado no primeiro golpe, 50 a 130 ms) nem a um clip-path animado
+   (repintava a barra a cada quadro, e a GPU pagava a limpeza dessas texturas
+   num quadro de 30 a 60 ms um segundo depois). */
+.barra-vida::before,
+.barra-vida span::before {
     background: linear-gradient(#c45444, var(--rubro) 55%, #561713);
     box-shadow: inset 0 0.1rem 0 rgba(255, 214, 190, 0.4);
+}
+.barra-vida::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--altura);
+    height: 100%;
+    border-radius: 50%;
+    opacity: calc(var(--v) * 1000); /* some só sem vida nenhuma */
+}
+.barra-vida span {
+    position: absolute;
+    inset: 0 0 0 calc(var(--altura) / 2);
+    overflow: hidden;
+}
+.barra-vida span::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: calc(100% + var(--altura) / 2);
+    height: 100%;
+    border-radius: 1rem;
     transform: translateX(calc((var(--v) - 1) * 100%));
     transition: transform 0.5s ease-out;
+    will-change: transform;
 }
 .barra-vida::after {
     content: '';
     position: absolute;
     inset: 0;
+    border-radius: inherit;
     background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(30, 15, 5, 0.45) calc(10% - 1px) 10%);
 }
 
@@ -440,7 +470,17 @@
     place-items: center;
     width: max(9.6rem, 136px);
     aspect-ratio: 1;
-    filter: drop-shadow(0 0.25rem 0.4rem rgba(40, 22, 6, 0.5));
+}
+/* A sombra é um disco com gradiente, e não filter: drop-shadow. Com o filtro, cada
+   mudança do anel de XP refazia o desfoque, e a limpeza do Graphite, um segundo
+   depois, liberava as texturas dele num quadro de 30 ms (a vitória com nível novo). */
+.nivel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(40, 22, 6, 0.5) 82%, rgba(40, 22, 6, 0.22) 92%, rgba(40, 22, 6, 0) 100%);
+    transform: translateY(0.25rem);
 }
 .nivel-arte { position: absolute; inset: 0; width: 100%; height: 100%; }
 .nivel-rotulo, .nivel-valor, .nivel-xp { position: relative; grid-area: 1 / 1; }
@@ -922,6 +962,139 @@
 .card-heroi:has(input:checked) .selo-cera,
 .card-heroi.selected .selo-cera { animation: carimbar 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 
+/* ---------- Combate: card de inimigo ---------- */
+
+/* Retrato num medalhão rubro, nome, vida e armadura. Os selos de vitória e
+   derrota já nascem pintados, como os da bandeja: revelar é só animar. */
+.card-inimigo {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.3rem;
+    contain: layout; /* os selos em repouso (escala 1,8) não criam rolagem */
+}
+.card-inimigo-retrato {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 6.6rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/medalhao-rubro.svg) center / contain no-repeat;
+}
+.card-inimigo-retrato svg { width: 3.5rem; height: 3.5rem; color: var(--creme); }
+.card-inimigo.derrotado .card-inimigo-retrato svg { opacity: 0.4; }
+.card-inimigo-nome {
+    margin: 0 0 0.5rem;
+    font: 700 2.1rem/1 var(--fonte-titulo);
+    color: var(--tinta);
+}
+.card-inimigo-vida {
+    margin: 0.45rem 0 0;
+    font: italic max(0.95rem, 12.5px)/1.2 var(--fonte-texto);
+    color: var(--sepia);
+}
+.card-inimigo-vida .num { font-style: normal; font-size: max(1.05rem, 13px); color: var(--tinta); }
+.card-inimigo-ca .emblema-ca { width: 4.2rem; }
+/* o desfecho é carimbado sobre o retrato (esmaecido na vitória), sem cobrir o nome */
+.card-inimigo .selo-cera { top: 0.2rem; right: auto; left: 0.2rem; }
+
+/* Barra de vida do inimigo: a peça da ficha em vinho escuro, com aro de ferro */
+.barra-vida-inimigo {
+    box-shadow: 0 0 0 0.1rem var(--sepia-claro), 0 0 0 0.22rem var(--tinta), inset 0 0.1rem 0.25rem rgba(0, 0, 0, 0.6);
+}
+.barra-vida-inimigo::before,
+.barra-vida-inimigo span::before {
+    background: linear-gradient(#8a3a2c, #5a1a14 55%, #2c0b08);
+    box-shadow: inset 0 0.1rem 0 rgba(255, 200, 180, 0.3);
+}
+
+/* Brilho de impacto sobre o retrato do inimigo ou a vida do herói: corte
+   (rubro), magia (ouro) e cura (verde). O JS anima só a opacidade. */
+.impacto {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 226, 200, 0.95), rgba(196, 84, 68, 0.6) 45%, transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    will-change: opacity;
+}
+.impacto-magic { background: radial-gradient(circle, rgba(255, 244, 210, 0.95), rgba(224, 161, 69, 0.6) 45%, transparent 70%); }
+.impacto-heal { background: radial-gradient(circle, rgba(232, 246, 220, 0.95), rgba(63, 90, 61, 0.55) 45%, transparent 70%); }
+.emblema-vida { position: relative; }
+/* O retrato do inimigo e a vida do herói tremem no golpe (Web Animations): cada um
+   tem camada própria desde a abertura, para o tremor não criar nem destruir uma */
+.emblema-vida, .card-inimigo-retrato { will-change: opacity; }
+
+/* ---------- Combate: efeitos em jogo ---------- */
+
+.condicoes {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 0.5rem;
+    min-height: 1.9rem; /* o painel não pula quando o primeiro efeito aparece */
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.condicoes:empty::before {
+    content: 'Nenhum efeito em jogo.';
+    font: italic max(0.95rem, 12.5px)/1.9rem var(--fonte-texto);
+    color: var(--apagado);
+}
+.condicao {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.75rem 0.12rem 0.45rem;
+    border: 0.1rem solid var(--tinta-2);
+    border-radius: 1rem;
+    background: linear-gradient(#f4ead2, #d6c094);
+    font: var(--rotulo-menor) / 1.3 var(--fonte-rotulo);
+    letter-spacing: 0.04em;
+    color: var(--tinta-2);
+}
+.condicao svg { width: 1.05rem; height: 1.05rem; color: var(--sepia); }
+.condicao .num { font-size: max(0.95rem, 12px); }
+/* efeito sobre o inimigo (o veneno), em rubro */
+.condicao-alvo { border-color: var(--rubro); color: var(--rubro); }
+.condicao-alvo svg { color: var(--rubro); }
+
+/* ---------- Combate: ações ---------- */
+
+/* As ações usam a peça das escolhas: o ícone vai no medalhão do número, e um
+   detalhe (recarga, custo, "ativa") fica à direita */
+.acao-combate .escolha-num svg { width: 1.15rem; height: 1.15rem; }
+.acao-detalhe {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.04em;
+    color: var(--sepia);
+    white-space: nowrap;
+}
+/* indisponível (recarga, sem poção, sem mana): ícone esmaecido e o motivo em
+   rubro; o clique ainda explica no relato */
+.acao-combate.indisponivel .escolha-texto { color: var(--apagado); }
+.acao-combate.indisponivel .escolha-num { opacity: 0.5; }
+.acao-combate.indisponivel .acao-detalhe { color: var(--rubro); }
+/* turno do inimigo: as ações esperam (aria-disabled mantém o foco) */
+.escolha[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+.escolha[aria-disabled="true"]:hover { background: transparent; color: var(--tinta); }
+.escolha[aria-disabled="true"]:hover .escolha-num {
+    border-color: var(--tinta);
+    background: rgba(255, 250, 236, 0.5);
+    color: var(--tinta);
+}
+
+/* O d20 do combate é o mesmo da bandeja, um pouco menor */
+.bandeja-combate .bandeja-mesa { width: 14rem; height: 7.6rem; }
+.bandeja-combate .bandeja-mesa > .dice { width: 6rem; height: 6rem; font-size: 1.5rem; }
+.bandeja-combate .bandeja-mesa::after { width: 8.6rem; height: 8.6rem; }
+.bandeja-combate .bandeja-conta { max-width: 16rem; font-size: 1.05rem; }
+/* os selos ficam dentro da coluna do dado, sem cobrir as ações ao lado */
+.bandeja-combate .selo-cera { top: -1.6rem; right: -1rem; width: max(5.2rem, 76px); }
+
 /* ---------- Crônica ---------- */
 
 .cronica {
@@ -957,6 +1130,48 @@
 .cronica-sucesso svg, .cronica-sucesso .resultado { color: var(--verdete); }
 .cronica-falha svg, .cronica-falha .resultado { color: var(--rubro); }
 
+/* ---------- Efeitos de tela (fora da folha) ---------- */
+
+/* Golpe no herói: a borda da tela pulsa em vermelho (o JS anima a opacidade) */
+.red-flash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-efeito);
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(126, 35, 32, 0.3) 80%, rgba(79, 21, 18, 0.55));
+    opacity: 0; /* não deixe a 1%: uma camada da tela toda sempre composta piora todos os quadros */
+    pointer-events: none;
+    will-change: opacity;
+}
+/* Números que sobem e somem, em Grenze. São peças fixas, cada uma numa camada
+   que nunca some e com largura fixa (o texto troca sem mudar o tamanho da
+   camada); o JS só troca o texto e anima transform e opacidade (spawnFloater).
+   Criar e remover um div por número fazia o compositor destruir as texturas
+   dele, e a GPU pagava a limpeza num quadro de 30 ms um segundo depois. */
+#floater-layer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    overflow: hidden;
+    pointer-events: none;
+}
+.floater {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    width: 40rem;
+    translate: -50% 0;
+    text-align: center;
+    white-space: nowrap;
+    font: 700 2.6rem/1 var(--fonte-titulo);
+    letter-spacing: 0.01em;
+    text-shadow: 0 0.1rem 0 rgba(20, 13, 8, 0.9), 0 0 0.5rem rgba(20, 13, 8, 0.65);
+    opacity: 0;
+    will-change: transform, opacity;
+    pointer-events: none;
+}
+/* o dano que o herói leva sai da vida na ficha */
+.floater-heroi { top: -0.4rem; z-index: 1; width: 8rem; font-size: 2rem; }
+
 /* ---------- Movimento reduzido ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -978,7 +1193,10 @@
     .dragao-direita { left: auto; right: -0.45rem; }
     .titulo { padding: 0 3.2rem; font-size: clamp(1.6rem, 7vw, 2.6rem); white-space: normal; }
     .escolha { grid-template-columns: 1.9rem minmax(0, 1fr); }
-    .escolha .teste { grid-column: 2; justify-self: start; }
+    .escolha .teste, .escolha .acao-detalhe { grid-column: 2; justify-self: start; }
+    .card-inimigo { gap: 0.8rem; }
+    .card-inimigo-retrato { width: 5.4rem; }
+    .card-inimigo-retrato svg { width: 2.9rem; height: 2.9rem; }
     .selo-cera { right: -1.2rem; }
     .bandeja-mesa { width: min(17rem, 80vw); }
 }

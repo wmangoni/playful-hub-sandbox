@@ -20,6 +20,7 @@
 //   legadas chegava em momentos diferentes e mudava o texto entre capturas
 //   iguais; sem ela, o legado usa a fonte de reserva nas duas pontas);
 // - o alert() da abertura do jogo dispensado;
+// - o acaso forçado: Math.random preso nos testes de d20 e no combate;
 // - movimento padrão forçado (prefers-reduced-motion: no-preference), porque o
 //   Windows com as animações desligadas faz o Chrome pedir movimento reduzido.
 import http from 'node:http';
@@ -94,15 +95,14 @@ async function foto(page, pasta, nome, inteira) {
 
 // ---------------------------------------------------------------------------
 // Jogo (ded/index.html). Desde a Fase 2 a seleção, a exploração e o d20 vêm
-// do kit. As telas que seguem legadas (combate, loja, especialização e diário)
-// também saem recortadas em legado-*.png (1920x1080) e legado-*-768.png
-// (1366x768), só o overlay e sem os cantos arredondados: o fundo atrás delas
-// mudou, mas elas têm de sair idênticas a uma referência de antes da migração
-// capturada com --kit.
+// do kit, e desde a Fase 3 o combate também. As telas que seguem legadas (loja,
+// especialização e diário) também saem recortadas em legado-*.png (1920x1080) e
+// legado-*-768.png (1366x768), só o overlay e sem os cantos arredondados: o
+// fundo atrás delas mudou, mas elas têm de sair idênticas a uma referência de
+// antes da migração capturada com --kit.
 // Mesma ordem de carga da Fase 2, depois do legado
 const KIT = ['css/fontes.css', 'css/tokens.css', 'css/base.css', 'css/componentes.css', 'css/exploracao.css', 'ui/ornamentos/vitral-recorte.css'];
 const LEGADOS = {
-    combate: ['#combat-screen', 8],
     loja: ['#shop-modal .modal-content', 0],
     especializacao: ['#specialization-modal .modal-content', 14],
     diario: ['#quest-journal', 12]
@@ -135,34 +135,111 @@ async function rolar(page, aleatorio) {
     await espera(1300 + 700); // giro + carimbo do selo
 }
 
+// O jogo carregado na seleção (com o kit injetado, se --kit), num contexto novo
+async function abrirJogo(browser, base, erros, w, h, comKit) {
+    const page = await novaPagina(browser, erros, w, h, true);
+    await page.goto(base + '/ded/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof scenes === 'object' && Object.keys(scenes).length > 50
+        && document.getElementById('image').complete, { timeout: 20000 });
+    if (comKit) {
+        await page.evaluate(async folhas => {
+            for (const f of folhas) {
+                const l = document.createElement('link');
+                l.rel = 'stylesheet';
+                l.href = f;
+                await new Promise((ok, erro) => { l.onload = ok; l.onerror = erro; document.head.append(l); });
+            }
+        }, KIT);
+    }
+    await page.evaluate(() => document.fonts.ready);
+    await espera(500);
+    return page;
+}
+
+// Jogo novo com a classe dada, já na cena inicial com o texto inteiro
+async function comecar(page, classe) {
+    await page.evaluate(c => { ttsEnabled = false; selectCharacter(c); startGame(); }, classe);
+    await espera(150);
+    await page.evaluate(() => { skipTyping = true; });
+    await espera(300);
+}
+
+// ---------------------------------------------------------------------------
+// Combate (Fase 3), em 1920x1080 e 1366x768. Roda em páginas próprias, fora do
+// fluxo das telas legadas: a vitória dá XP e ouro, escreve na crônica e troca a
+// cena, e a especialização (de fundo translúcido) tem de continuar saindo sobre
+// o fundo de sempre para bater com a referência.
+// O Math.random fica preso em 0,96 do começo ao fim: o d20 dá 20 natural dos dois
+// lados e o dano sai sempre o mesmo. Cada foto espera o estado do jogo mudar
+// (vida, XP, turno) e só depois conta o próprio atraso; as animações finitas
+// terminam no congelar(), então alguns ms a mais ou a menos não mudam a captura.
+// Inimigos do scenes.json: o Goblin da entrada e o chefe da cripta
+const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 };
+const CHEFE = { name: 'Fantasma de Drakmor', ac: 18, hp: 40, max_hp: 40, str: 16, dex: 14, con: 10, bba: 4 };
+
+async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo) {
+    const aguarda = (page, condicao, arg) => page.waitForFunction(condicao, { timeout: 15000 }, arg);
+    const clica = (page, id) => page.evaluate(i => document.getElementById(i).click(), id);
+
+    // Guerreiro. O 20 natural tira 16 de vida (1d8 → 8, +3 de Força, +5 do crítico)
+    // e mata o Goblin de 12 num golpe; o ataque e o turno do inimigo são contra o chefe
+    let page = await abrirJogo(browser, base, erros, w, h, comKit);
+    let tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, false);
+    await comecar(page, 'warrior');
+    await page.evaluate(g => { Math.random = () => 0.96; startInteractiveCombat(g); }, GOBLIN);
+    await espera(300);
+    await tira('combate');
+
+    // Vitória: o Goblin com 1 de vida. A foto sai 0,6 s depois de a vitória ser
+    // declarada (o XP sobe), com a faixa e os ganhos; a volta para a cena vem 2,2 s depois dela
+    const xp = await page.evaluate(() => { gameState.combat.enemy.hp = 1; return gameState.player.xp; });
+    await clica(page, 'btn-combat-attack');
+    await aguarda(page, x => gameState.player.xp > x, xp);
+    await espera(600);
+    await tira('combate-vitoria');
+    await aguarda(page, () => !gameState.combat.active);
+    await page.evaluate(() => { skipTyping = true; });
+    await espera(300);
+
+    await page.evaluate(c => startInteractiveCombat(c), CHEFE);
+    await espera(300);
+    await tira('combate-chefe');
+    // 20 natural contra o chefe (sobram 24 de 40): o resultado no dado, 0,3 s depois
+    // de a vida dele cair (~1,6 s do clique)
+    await clica(page, 'btn-combat-attack');
+    await aguarda(page, () => gameState.combat.enemy.hp < gameState.combat.enemy.max_hp);
+    await espera(300);
+    await tira('combate-ataque');
+    // O turno do chefe: o 20 natural dele (9 de dano), 0,3 s depois do golpe
+    const vida = await page.evaluate(() => gameState.player.health);
+    await aguarda(page, v => gameState.player.health < v, vida);
+    await espera(300);
+    await tira('combate-inimigo');
+    await aguarda(page, () => gameState.combat.turn === 'player');
+    await page.close();
+
+    // Mago, num jogo próprio (a ficha e os atributos são os dele): o submenu de magias
+    page = await abrirJogo(browser, base, erros, w, h, comKit);
+    tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, false);
+    await comecar(page, 'wizard');
+    await page.evaluate(g => { Math.random = () => 0.96; startInteractiveCombat(g); }, GOBLIN);
+    await espera(300);
+    await clica(page, 'btn-combat-spell');
+    await espera(250);
+    await tira('combate-magias');
+    await page.close();
+}
+
 async function capturarJogo(browser, base, pasta, erros, comKit) {
     const tamanhos = [[1920, 1080, ''], [1366, 768, '-768'], [390, 844, '-390']];
     for (const [w, h, sufixo] of tamanhos) {
-        const page = await novaPagina(browser, erros, w, h, true);
-        await page.goto(base + '/ded/', { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(() => typeof scenes === 'object' && Object.keys(scenes).length > 50
-            && document.getElementById('image').complete, { timeout: 20000 });
-        if (comKit) {
-            await page.evaluate(async folhas => {
-                for (const f of folhas) {
-                    const l = document.createElement('link');
-                    l.rel = 'stylesheet';
-                    l.href = f;
-                    await new Promise((ok, erro) => { l.onload = ok; l.onerror = erro; document.head.append(l); });
-                }
-            }, KIT);
-        }
-        await page.evaluate(() => document.fonts.ready);
-        await espera(500);
+        const page = await abrirJogo(browser, base, erros, w, h, comKit);
         const tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, w < 800);
         await tira('selecao');
         await page.evaluate(() => selectCharacter('wizard'));
         await espera(600);
         await tira('selecao-escolhido');
-        await page.evaluate(() => { ttsEnabled = false; selectCharacter('warrior'); startGame(); });
-        await espera(150);
-        await page.evaluate(() => { skipTyping = true; });
-        await espera(300);
+        await comecar(page, 'warrior');
         await tira('exploracao');
         if (sufixo === '-390') { await page.close(); continue; } // o celular é da Fase 5
 
@@ -188,11 +265,12 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         await espera(300);
         await tira('fim');
 
-        await page.evaluate(() => startInteractiveCombat({ name: 'Goblin', ac: 12, hp: 15, max_hp: 15, attack: 3, damage: 4 }));
-        await espera(300);
-        await tira('combate');
-        await recorte(page, pasta, 'combate', sufixo);
-        await page.evaluate(() => { closeCombatScreen(); document.getElementById('shop-modal').classList.remove('hidden'); });
+        // O foco sai do "Começar uma nova aventura", como saía quando o combate abria e
+        // fechava aqui (até a Fase 3): a loja, a especialização e o diário seguem iguais às referências
+        await page.evaluate(() => {
+            document.activeElement?.blur();
+            document.getElementById('shop-modal').classList.remove('hidden');
+        });
         await espera(250);
         await tira('loja');
         await recorte(page, pasta, 'loja', sufixo);
@@ -212,6 +290,7 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         await tira('diario');
         await recorte(page, pasta, 'diario', sufixo);
         await page.close();
+        await capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo);
     }
 }
 

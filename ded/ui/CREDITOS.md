@@ -7,15 +7,21 @@ Os ícones de `icones.svg` e a cabeça de dragão de `ornamentos/dragao.svg` vê
 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Só a cor e o contorno foram
 alterados. Cada símbolo do sprite traz o autor e o nome original num comentário.
 
-- **Lorc**: battle-axe, brain, broadsword, candle-light, checked-shield, clover,
-  crossed-swords, crystal-growth, cut-diamond, dragon-head, fairy-wand, feather, fist,
-  gem-pendant, hazard-sign, heart-organ, hood, jeweled-chalice, linked-rings, lyre, meat,
-  open-book, owl, padlock, plain-dagger, pointy-hat, quill-ink, scroll-unfurled,
-  skeleton-key, swap-bag, treasure-map, visored-helm, winged-sword.
-- **Delapouite**: dice-twenty-faces-twenty, health-potion, lighter, rope-coil, torch,
-  two-coins, upgrade, water-flask.
-- **sbed**: death-skull, shield.
-- **Skoll**: hearts.
+- **Lorc**: backstab, battle-axe, brain, bright-explosion, broadsword, candle-light,
+  checked-shield, clover, crossed-swords, crystal-growth, cut-diamond, decapitation,
+  dragon-head, dripping-knife, drop, energy-arrow, fairy-wand, feather, fire-silhouette,
+  fist, gem-pendant, gooey-daemon, grim-reaper, hammer-drop, hazard-sign, heart-organ,
+  hood, jeweled-chalice, linked-rings, lyre, magic-shield, meat, open-book, owl,
+  padlock, plain-dagger, pointy-hat, pretty-fangs, quill-ink, run, scroll-unfurled,
+  shadow-follower, shining-sword, skeleton-key, sunbeams, swap-bag, treasure-map,
+  visored-helm, winged-sword, wolf-head.
+- **Delapouite**: anticlockwise-rotation, dice-twenty-faces-twenty, goblin-head,
+  health-potion, lighter, rope-coil, templar-shield, torch, two-coins, upgrade,
+  water-flask.
+- **sbed**: death-skull, health-increase, shield.
+- **Skoll**: hearts, raise-skeleton, skeleton.
+- **Carl Olsen**: spider-alt.
+- **DarkZaitzev**: hooded-assassin.
 
 ## Ornamentos e texturas
 

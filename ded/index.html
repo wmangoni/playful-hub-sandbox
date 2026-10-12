@@ -163,7 +163,7 @@
                 <section class="coluna coluna-ficha" aria-label="Ficha do herói">
                     <div class="vitais">
                         <div class="vital">
-                            <div class="emblema emblema-vida"><span class="emblema-valor"><span id="health">20</span><small>/<span id="max-health">20</span></small></span></div>
+                            <div class="emblema emblema-vida"><span class="emblema-valor"><span id="health">20</span><small>/<span id="max-health">20</span></small></span><span class="impacto" id="combat-player-flash" aria-hidden="true"></span><span class="floater floater-heroi" aria-hidden="true"></span></div>
                             <span class="vital-rotulo">Vida</span>
                         </div>
                         <div class="vital">
@@ -212,9 +212,6 @@
                                 <radialGradient id="nivel-face" cx=".42" cy=".36" r=".72">
                                     <stop offset="0" stop-color="#f6edd6"/><stop offset="1" stop-color="#d4bd8f"/>
                                 </radialGradient>
-                                <linearGradient id="nivel-xp" x1="0" y1="0" x2="1" y2="1">
-                                    <stop offset="0" stop-color="#f3d995"/><stop offset="1" stop-color="#e0a145"/>
-                                </linearGradient>
                             </defs>
                             <polygon points="100.0,3.0 116.6,16.6 137.1,10.4 147.2,29.3 168.6,31.4 170.7,52.8 189.6,62.9 183.4,83.4 197.0,100.0 183.4,116.6 189.6,137.1 170.7,147.2 168.6,168.6 147.2,170.7 137.1,189.6 116.6,183.4 100.0,197.0 83.4,183.4 62.9,189.6 52.8,170.7 31.4,168.6 29.3,147.2 10.4,137.1 16.6,116.6 3.0,100.0 16.6,83.4 10.4,62.9 29.3,52.8 31.4,31.4 52.8,29.3 62.9,10.4 83.4,16.6"
                                      fill="#4a3220" stroke="#c9a14f" stroke-width="1.4" stroke-linejoin="round"/>
@@ -222,8 +219,9 @@
                             <circle cx="100" cy="100" r="79" fill="url(#nivel-bronze)"/>
                             <circle cx="100" cy="100" r="73.5" fill="#2f1f12"/>
                             <circle cx="100" cy="100" r="67" fill="none" stroke="#1e130b" stroke-width="9"/>
-                            <circle class="nivel-progresso" id="anel-xp" cx="100" cy="100" r="67" fill="none" stroke="url(#nivel-xp)" stroke-width="7"
-                                    stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 100 100)"/>
+                            <!-- anel em cor sólida: com gradiente, o primeiro XP compilava um pipeline novo na GPU (30 ms) -->
+                            <circle class="nivel-progresso" id="anel-xp" cx="100" cy="100" r="67" fill="none" stroke="#eabd6d" stroke-width="7"
+                                    stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" stroke-opacity="0" transform="rotate(-90 100 100)"/>
                             <circle cx="100" cy="100" r="61" fill="#2f1f12"/>
                             <circle cx="100" cy="100" r="58.5" fill="url(#nivel-face)"/>
                             <circle cx="100" cy="100" r="54" fill="none" stroke="#6b4a2e" stroke-width=".8" opacity=".6"/>
@@ -245,7 +243,7 @@
 
                 <!-- Coluna 3: narrativa e crônica -->
                 <section class="coluna coluna-narrativa">
-                    <article class="painel painel-narrativa" aria-labelledby="local">
+                    <article class="painel painel-narrativa" id="narrativa" aria-labelledby="local">
                         <h2 class="fita fita-rubra" id="local">Entrada da Masmorra</h2>
 
                         <p class="cena-texto" id="scene-text"></p>
@@ -271,9 +269,61 @@
                         </div>
                     </article>
 
-                    <section class="painel painel-cronica" aria-labelledby="titulo-cronica">
+                    <section class="painel painel-cronica" id="painel-cronica" aria-labelledby="titulo-cronica">
                         <h2 class="fita" id="titulo-cronica">Crônica</h2>
                         <ol class="cronica" id="game-log" aria-live="polite"></ol>
+                    </section>
+
+                    <!-- Combate: enquanto dura a luta, troca a narrativa e a crônica.
+                         Os ids em inglês são contrato com o JS e os testes. -->
+                    <section class="painel painel-combate hidden" id="combat-screen" aria-labelledby="titulo-combate">
+                        <h2 class="fita fita-rubra" id="titulo-combate">Combate</h2>
+
+                        <div class="card-inimigo" id="combat-enemy-card">
+                            <div class="card-inimigo-retrato" aria-hidden="true">
+                                <svg><use id="combat-enemy-icone" href="ui/icones.svg#i-monstro"/></svg>
+                                <span class="impacto" id="combat-enemy-flash"></span>
+                            </div>
+                            <div class="card-inimigo-dados">
+                                <h3 class="card-inimigo-nome" id="combat-enemy-name">Inimigo</h3>
+                                <div class="barra-vida barra-vida-inimigo" id="combat-enemy-health" role="meter" aria-label="Vida do inimigo" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10" style="--v: 1"><span></span></div>
+                                <p class="card-inimigo-vida"><span class="num" id="combat-enemy-hp-text">10 / 10</span> de vida</p>
+                            </div>
+                            <div class="vital card-inimigo-ca">
+                                <div class="emblema emblema-ca"><span class="emblema-valor" id="combat-enemy-ac">10</span></div>
+                                <span class="vital-rotulo">Armadura</span>
+                            </div>
+                            <!-- desfechos já pintados: revelar é só opacidade e transform -->
+                            <div class="selo-cera selo-cera-critico" data-desfecho="vitoria" aria-hidden="true">Vitória</div>
+                            <div class="selo-cera selo-cera-escuro" data-desfecho="derrota" aria-hidden="true">Derrota</div>
+                        </div>
+
+                        <ul class="condicoes" id="combat-condicoes" aria-label="Efeitos em jogo"></ul>
+
+                        <div class="corrente" aria-hidden="true"></div>
+
+                        <div class="combate-mesa">
+                            <div class="bandeja bandeja-combate" id="combat-dice-container">
+                                <div class="bandeja-mesa" id="combat-mesa">
+                                    <div class="dice" id="combat-dice">20</div>
+                                    <div class="selo-cera" data-selo="sucesso" aria-hidden="true">Sucesso</div>
+                                    <div class="selo-cera selo-cera-escuro" data-selo="falha" aria-hidden="true">Falha</div>
+                                    <div class="selo-cera selo-cera-escuro" data-selo="desastre" aria-hidden="true">Desastre</div>
+                                    <div class="selo-cera selo-cera-critico" data-selo="critico" aria-hidden="true">Crítico</div>
+                                </div>
+                                <p class="bandeja-conta" id="combat-dice-result" role="status"></p>
+                            </div>
+                            <div class="acoes-combate">
+                                <p class="escolhas-titulo" id="combat-turno">O que você faz?</p>
+                                <!-- montadas pelo JS (showCombatMainMenu e os submenus) -->
+                                <div class="escolhas" id="combat-actions-panel"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="painel painel-cronica painel-relato hidden" id="combat-log-box" aria-labelledby="titulo-relato">
+                        <h2 class="fita" id="titulo-relato">Relato do combate</h2>
+                        <ol class="cronica" id="combat-log-text" aria-live="polite"></ol>
                     </section>
                 </section>
             </main>
@@ -289,62 +339,6 @@
             </div>
         </div>
 
-        <!-- Palco do combate (Fase 3): repete a geometria do contêiner antigo -->
-        <div class="game-container">
-            <!-- Tela de Combate por Turnos Premium Overlay -->
-            <div id="combat-screen" class="hidden">
-                <h2>⚔️ Combate da Masmorra ⚔️</h2>
-
-                <div class="combat-grid">
-                    <!-- Card do Jogador -->
-                    <div class="combat-card player-card" id="combat-player-card">
-                        <div class="impact-flash" id="combat-player-flash"></div>
-                        <div class="combat-card-emoji">🛡️</div>
-                        <h3 id="combat-player-name">Você (Guerreiro)</h3>
-                        <div class="health-bar-container">
-                            <div id="combat-player-health" class="health-bar" style="width: 100%;"></div>
-                        </div>
-                        <div id="combat-player-hp-text" class="hp-text">20/20 HP</div>
-                        <div id="combat-player-slots" class="combat-details hidden">✨ Magias: 3/3</div>
-                        <div id="combat-player-mana" class="combat-details hidden">💠 Mana: 0/0</div>
-                    </div>
-
-                    <!-- Versus / Dado de Combate -->
-                    <div class="combat-versus-panel">
-                        <div class="vs-text">VS</div>
-                        <div id="combat-dice-container" class="hidden combat-dice-roll">
-                            <div class="dice" id="combat-dice">🎲</div>
-                            <div id="combat-dice-result" class="combat-dice-result"></div>
-                        </div>
-                    </div>
-
-                    <!-- Card do Monstro -->
-                    <div class="combat-card enemy-card" id="combat-enemy-card">
-                        <div class="impact-flash" id="combat-enemy-flash"></div>
-                        <div class="combat-card-emoji" id="combat-enemy-emoji">👹</div>
-                        <h3 id="combat-enemy-name">Nome do Monstro</h3>
-                        <div class="health-bar-container">
-                            <div id="combat-enemy-health" class="health-bar" style="width: 100%;"></div>
-                        </div>
-                        <div id="combat-enemy-hp-text" class="hp-text">15/15 HP</div>
-                        <div class="combat-details">AC: <span id="combat-enemy-ac">12</span></div>
-                    </div>
-                </div>
-
-                <!-- Log do Combate Integrado -->
-                <div class="combat-log-box" id="combat-log-box">
-                    <div id="combat-log-text"></div>
-                </div>
-
-                <!-- Painel de Ações -->
-                <div class="combat-actions-container" id="combat-actions-panel">
-                    <button id="btn-combat-attack">⚔️ Ataque Físico</button>
-                    <button id="btn-combat-spell">✨ Magia/Especial</button>
-                    <button id="btn-combat-item">🎒 Usar Item</button>
-                    <button id="btn-combat-flee">🏃 Fugir</button>
-                </div>
-            </div>
-        </div>
         <div id="shop-modal" class="modal hidden">
             <div class="modal-content">
                 <h2>🏦 Lojinha</h2>
@@ -384,7 +378,7 @@
         <div id="barrier-flash"></div>
 
         <!-- Camada de Floaters -->
-        <div id="floater-layer"></div>
+        <div id="floater-layer" aria-hidden="true"><div class="floater"></div><div class="floater"></div><div class="floater"></div><div class="floater"></div></div>
 
         <!-- Flash Vermelho para Impacto de Dano -->
         <div id="red-flash" class="red-flash-overlay"></div>
@@ -1372,7 +1366,9 @@
 
                 // Quem escolheu pelo teclado continua nas escolhas da cena nova
                 const ativo = document.activeElement;
-                const focoNasAcoes = !!(ativo && ativo.closest && ativo.closest('.acoes'));
+                const focoNasAcoes = !!(ativo && ativo.closest && ativo.closest('.acoes')) || focarEscolhasDepoisDoCombate;
+                focarEscolhasDepoisDoCombate = false;
+                mostrarCombate(false); // uma cena nova nunca começa no meio de um combate
 
                 changeImage(sceneName);
 
@@ -1670,11 +1666,49 @@
             }
 
             // --- MOTOR DE COMBATE POR TURNOS INTERATIVO ---
+            // O combate é um estado da folha: o painel de combate e o relato tomam
+            // o lugar da narrativa e da crônica; a ficha (vida, armadura) e o vitral
+            // continuam à vista.
+
+            // Nome, gênero e retrato de cada inimigo. As cenas usam alguns nomes em
+            // inglês ("Wolf", "Spider"); quem joga vê o nome em português.
+            const INIMIGOS = {
+                'Goblin': { nome: 'Goblin', icone: 'i-goblin' },
+                'Wolf': { nome: 'Lobo', icone: 'i-lobo' },
+                'Spider': { nome: 'Aranha', feminino: true, icone: 'i-aranha' },
+                'Fantasma de Drakmor': { nome: 'Fantasma de Drakmor', icone: 'i-espectro' }
+            };
+
+            function dadosDoInimigo(nome) {
+                if (INIMIGOS[nome]) return INIMIGOS[nome];
+                const achado = Object.values(INIMIGOS).find(i => i.nome === nome);
+                if (achado) return achado;
+                const baixo = String(nome).toLowerCase();
+                const icone = baixo.includes('goblin') ? 'i-goblin'
+                    : baixo.includes('lobo') || baixo.includes('wolf') ? 'i-lobo'
+                    : baixo.includes('aranha') || baixo.includes('spider') ? 'i-aranha'
+                    : baixo.includes('fantasma') || baixo.includes('espectro') ? 'i-espectro'
+                    : baixo.includes('esqueleto') ? 'i-esqueleto' : 'i-monstro';
+                return { nome, icone };
+            }
+
+            // O inimigo com artigo: inimigo() → "o Goblin"; inimigo('de') → "da
+            // Aranha"; inimigo('em', true) → "No Lobo"; forte põe o nome em negrito
+            function inimigo(prep = '', maiuscula = false, forte = false) {
+                const e = gameState.combat.enemy;
+                const artigo = { '': e.feminino ? 'a' : 'o', de: e.feminino ? 'da' : 'do', em: e.feminino ? 'na' : 'no', com: e.feminino ? 'com a' : 'com o' }[prep];
+                const texto = maiuscula ? artigo.charAt(0).toUpperCase() + artigo.slice(1) : artigo;
+                return `${texto} ${forte ? `<strong>${e.name}</strong>` : e.name}`;
+            }
+
             function startInteractiveCombat(enemy) {
+                const dados = dadosDoInimigo(enemy.name);
                 gameState.combat = {
                     active: true,
                     enemy: {
-                        name: enemy.name,
+                        name: dados.nome,
+                        feminino: !!dados.feminino,
+                        icone: dados.icone,
                         ac: enemy.ac,
                         hp: enemy.hp,
                         max_hp: enemy.max_hp || enemy.hp,
@@ -1694,43 +1728,37 @@
                     poisonBlade: false
                 };
 
-                // Mostrar tela de combate
-                const combatScreen = document.getElementById('combat-screen');
-                combatScreen.classList.remove('hidden');
-                
-                // Configurar Cards
-                document.getElementById('combat-player-name').textContent = `Você (${getPlayerDisplayName()})`;
-                document.getElementById('combat-enemy-name').textContent = enemy.name;
+                // Card do inimigo
+                document.getElementById('combat-enemy-name').textContent = dados.nome;
                 document.getElementById('combat-enemy-ac').textContent = enemy.ac;
-                document.getElementById('combat-enemy-emoji').textContent = getEnemyEmoji(enemy.name);
-                
-                // Resetar Log de Combate
-                const logText = document.getElementById('combat-log-text');
-                logText.innerHTML = `<div class="combat-log-entry info">⚔️ O combate com o <strong>${enemy.name}</strong> começou!</div>`;
-                
-                // Resetar dado
-                document.getElementById('combat-dice-container').classList.add('hidden');
-                document.getElementById('combat-dice-result').textContent = "";
-                
-                // Mostrar slots de magia se for Mago
-                const slotsEl = document.getElementById('combat-player-slots');
-                if (gameState.player.class === 'wizard') {
-                    slotsEl.classList.remove('hidden');
-                    slotsEl.textContent = `✨ Magias: ${gameState.combat.magicSlots}/3`;
-                } else {
-                    slotsEl.classList.add('hidden');
-                }
+                document.getElementById('combat-enemy-icone').setAttribute('href', `ui/icones.svg#${dados.icone}`);
+                const card = document.getElementById('combat-enemy-card');
+                card.classList.remove('derrotado');
+                card.querySelectorAll('[data-desfecho]').forEach(selo => selo.classList.remove('visivel'));
 
-                // Inicializar botões de controle
-                setupCombatActionListeners();
-                
-                // Atualizar barras de vida
+                // Relato novo e d20 em repouso
+                document.getElementById('combat-log-text').innerHTML = '';
+                addCombatLog(`⚔️ O combate ${inimigo('com', false, true)} começou!`, 'info');
+                limparBandejaCombate('Role o d20 ao atacar.');
+
+                const ativo = document.activeElement;
+                const comFoco = !!(ativo && ativo.closest && ativo.closest('.folha'));
+                mostrarCombate(true);
+                updateInventoryDisplay(); // a mochila da ficha fica bloqueada durante a luta
+
                 updateCombatUi();
-                
-                // Tocar som de início
                 AudioEngine.playSlash();
-                
                 showCombatMainMenu();
+                // quem chegou pelo teclado (o "Enfrentar" da bandeja) segue para as ações
+                if (comFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
+            }
+
+            // Troca a narrativa e a crônica pelo painel de combate e o relato (e volta)
+            function mostrarCombate(ativo) {
+                document.getElementById('combat-screen').classList.toggle('hidden', !ativo);
+                document.getElementById('combat-log-box').classList.toggle('hidden', !ativo);
+                document.getElementById('narrativa').classList.toggle('hidden', ativo);
+                document.getElementById('painel-cronica').classList.toggle('hidden', ativo);
             }
 
             function getPlayerClassNamePt() {
@@ -1740,255 +1768,247 @@
                 return 'Aventureiro';
             }
 
-            function getEnemyEmoji(name) {
-                const lower = name.toLowerCase();
-                if (lower.includes('goblin')) return '👹';
-                if (lower.includes('wolf') || lower.includes('lobo')) return '🐺';
-                if (lower.includes('spider') || lower.includes('aranha')) return '🕷️';
-                if (lower.includes('spectro') || lower.includes('ghost') || lower.includes('boss')) return '💀';
-                return '👾';
-            }
-
             function updateCombatUi() {
-                // Jogador
-                updateHpBar(
-                    document.getElementById('combat-player-health'),
-                    document.getElementById('combat-player-hp-text'),
-                    gameState.player.health,
-                    gameState.player.maxHealth
-                );
-                
-                // Inimigo
-                updateHpBar(
-                    document.getElementById('combat-enemy-health'),
-                    document.getElementById('combat-enemy-hp-text'),
-                    gameState.combat.enemy.hp,
-                    gameState.combat.enemy.max_hp
-                );
-                
-                // Slots de Magia do Mago
-                if (gameState.player.class === 'wizard') {
-                    document.getElementById('combat-player-slots').textContent = `✨ Magias: ${gameState.combat.magicSlots}/3`;
-                }
-                
-                // Mana para subclasses de Mago
-                const manaEl = document.getElementById('combat-player-mana');
-                if (manaEl) {
-                    const hasMana = ['Arcanista', 'Necromante'].includes(gameState.player.specialization);
-                    if (hasMana) {
-                        manaEl.classList.remove('hidden');
-                        manaEl.textContent = `💠 Mana: ${gameState.player.mana}/${gameState.player.maxMana}`;
-                    } else {
-                        manaEl.classList.add('hidden');
-                    }
-                }
+                const e = gameState.combat.enemy;
+                const vida = Math.max(0, e.hp);
+                const barra = document.getElementById('combat-enemy-health');
+                barra.setAttribute('style', `--v: ${(e.max_hp ? Math.min(1, vida / e.max_hp) : 0).toFixed(3)}`);
+                barra.setAttribute('aria-valuenow', vida);
+                barra.setAttribute('aria-valuemax', e.max_hp);
+                document.getElementById('combat-enemy-hp-text').textContent = `${vida} / ${e.max_hp}`;
+                // a vida, a armadura e a mana do herói ficam na ficha
+                updateStatsDisplay();
+                atualizarCondicoes();
             }
 
-            function updateHpBar(barEl, textEl, current, max) {
-                if (current < 0) current = 0;
-                const pct = Math.max(0, Math.min(100, (current / max) * 100));
-                barEl.style.width = `${pct}%`;
-                textEl.textContent = `${current}/${max} HP`;
-                
-                // Atualizar cores
-                if (pct > 50) {
-                    barEl.style.backgroundColor = '#28a745'; // Verde
-                } else if (pct > 20) {
-                    barEl.style.backgroundColor = '#ffc107'; // Amarelo
-                } else {
-                    barEl.style.backgroundColor = '#dc3545'; // Vermelho
-                }
+            // Efeitos em jogo, como pílulas sob o card do inimigo
+            function atualizarCondicoes() {
+                const c = gameState.combat;
+                const p = gameState.player;
+                const turnos = n => `<span class="num">${n}</span> ${n === 1 ? 'turno' : 'turnos'}`;
+                const itens = [];
+                if (p.class === 'wizard' && !p.specialization) itens.push(['i-magia', `Magias <span class="num">${c.magicSlots}/3</span>`]);
+                if (['Arcanista', 'Necromante'].includes(p.specialization)) itens.push(['i-mana', `Mana <span class="num">${p.mana}/${p.maxMana}</span>`]);
+                if (p.manaBarrierActive) itens.push(['i-barreira', 'Barreira de mana']);
+                if (c.tempHp > 0) itens.push(['i-escudo-sagrado', `Escudo sagrado <span class="num">+${c.tempHp}</span>`]);
+                if (c.effects.fury.turnsLeft > 0) itens.push(['i-furia', `Fúria · ${turnos(c.effects.fury.turnsLeft)}`]);
+                if (c.effects.sneakBoost.turnsLeft > 0) itens.push(['i-armadura', `Armadura <span class="num">+3</span> · ${turnos(c.effects.sneakBoost.turnsLeft)}`]);
+                if (c.shadowStepActive) itens.push(['i-passo-sombra', 'Passo de sombra']);
+                if (c.poisonBlade) itens.push(['i-veneno', 'Lâmina envenenada']);
+                if (c.skeleton.active) itens.push(['i-esqueleto', 'Esqueleto invocado']);
+                if (c.enemyPoison.turnsLeft > 0) itens.push(['i-veneno', `Veneno ${inimigo('em')} · ${turnos(c.enemyPoison.turnsLeft)}`, 'condicao-alvo']);
+                document.getElementById('combat-condicoes').innerHTML = itens.map(([icone, texto, classe]) =>
+                    `<li class="condicao${classe ? ' ' + classe : ''}"><svg aria-hidden="true"><use href="ui/icones.svg#${icone}"/></svg><span>${texto}</span></li>`).join('');
             }
+
+            // O relato usa as linhas da crônica: ícone pelo primeiro emoji da
+            // mensagem, tom pelo tipo; os <span class="success|failure"> viram
+            // o destaque do resultado
+            const RELATO_ICONES = {
+                '🎯': 'i-espada', '❌': 'i-alerta', '💥': 'i-explosao', '⚡': 'i-missil', '💖': 'i-cura', '🫙': 'i-pocao',
+                '🎒': 'i-item', '🗡️': 'i-adaga', '🏃': 'i-fugir', '👹': 'i-combate', '🥊': 'i-vida', '🛡️': 'i-armadura',
+                '☠️': 'i-caveira', '🔥': 'i-furia', '🔮': 'i-barreira', '🩸': 'i-drenar', '💀': 'i-esqueleto',
+                '🌑': 'i-passo-sombra', '🔪': 'i-misericordia', '🏆': 'i-experiencia', '⚠️': 'i-alerta', '⚔️': 'i-combate', '✨': 'i-magia'
+            };
+            let rolagemDoCombate = null; // a última rolagem do herói, até o selo ser carimbado
 
             function addCombatLog(msg, type = '') {
-                const logText = document.getElementById('combat-log-text');
-                const entry = document.createElement('div');
-                entry.className = `combat-log-entry ${type}`;
-                entry.innerHTML = msg;
-                logText.appendChild(entry);
-                
-                const logBox = document.getElementById('combat-log-box');
-                logBox.scrollTop = logBox.scrollHeight;
+                const texto = String(msg);
+                const emoji = (texto.match(/\p{Extended_Pictographic}️?/u) || [''])[0];
+                const icone = RELATO_ICONES[emoji] || RELATO_ICONES[emoji.replace('️', '')] || 'i-d20';
+                const tom = type === 'success' ? 'sucesso' : type === 'failure' ? 'falha' : '';
+                // sem os emojis; o espaço que sobra logo depois de uma tag de abertura também sai
+                const html = texto.replace(EMOJIS, '').replace(/class="(success|failure)"/g, 'class="resultado"')
+                    .replace(/(<[a-z][^>]*>)\s+/gi, '$1').replace(/\s+/g, ' ').trim();
+                const lista = document.getElementById('combat-log-text');
+                const linha = document.createElement('li');
+                linha.className = 'cronica-item' + (tom ? ` cronica-${tom}` : '');
+                linha.innerHTML = `<svg aria-hidden="true"><use href="ui/icones.svg#${icone}"/></svg><p>${html}</p>`;
+                lista.appendChild(linha);
+                noProximoQuadro('relato', () => { lista.scrollTop = lista.scrollHeight; });
+
+                // o desfecho da rolagem do herói carimba o selo da bandeja
+                if (rolagemDoCombate && !rolagemDoCombate.carimbada && tom) {
+                    rolagemDoCombate.carimbada = true;
+                    const r = rolagemDoCombate.valor;
+                    carimbarCombate(tom === 'sucesso' ? (r === 20 ? 'critico' : 'sucesso') : (r === 1 ? 'desastre' : 'falha'));
+                }
             }
 
-            function setupCombatActionListeners() {
-                const btnAttack = document.getElementById('btn-combat-attack');
-                const btnSpell = document.getElementById('btn-combat-spell');
-                const btnItem = document.getElementById('btn-combat-item');
-                const btnFlee = document.getElementById('btn-combat-flee');
-                
-                btnAttack.onclick = () => {
-                    if (gameState.combat.turn !== 'player') return;
-                    performPlayerAttack();
+            function carimbarCombate(selo) {
+                const alvo = document.querySelector(`#combat-mesa [data-selo="${selo}"]`);
+                if (alvo) alvo.classList.add('visivel');
+            }
+
+            // d20 do combate em repouso: sem marca, sem brilho e sem selo
+            function limparBandejaCombate(legenda) {
+                const dado = document.getElementById('combat-dice');
+                dado.className = 'dice';
+                dado.textContent = '20';
+                document.getElementById('combat-mesa').classList.remove('critico');
+                document.querySelectorAll('#combat-mesa .selo-cera').forEach(selo => selo.classList.remove('visivel'));
+                rolagemDoCombate = null;
+                if (legenda !== undefined) document.getElementById('combat-dice-result').innerHTML = legenda;
+            }
+
+            // Mantido para compatibilidade: as ações de combate usam onclick (sem
+            // listeners duplicados), atribuído ao montar cada botão
+            function setupCombatActionListeners() {}
+
+            // Ação do combate no formato das escolhas: ícone no medalhão, nome e um
+            // detalhe à direita. Durante o turno do inimigo ela fica com
+            // aria-disabled (o foco não se perde) e ignora cliques.
+            function botaoCombate({ id, icone, nome, detalhe = '', aoClicar, indisponivel = false }) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'escolha acao-combate' + (indisponivel ? ' indisponivel' : '');
+                if (id) b.id = id;
+                b.innerHTML = `<span class="escolha-num" aria-hidden="true"><svg><use href="ui/icones.svg#${icone}"/></svg></span>` +
+                    `<span class="escolha-texto">${nome}</span>` + (detalhe ? `<span class="acao-detalhe">${algarismosAlinhados(detalhe)}</span>` : '');
+                b.onclick = () => {
+                    if (b.getAttribute('aria-disabled') === 'true' || gameState.combat.turn !== 'player') return;
+                    aoClicar();
                 };
-                
-                btnSpell.onclick = () => {
-                    if (gameState.combat.turn !== 'player') return;
-                    if (gameState.player.specialization) {
-                        showSpecializationAbilityMenu();
-                        return;
-                    }
-                    if (gameState.player.class === 'wizard') {
-                        showCombatSpellMenu();
-                    } else if (gameState.player.class === 'warrior') {
-                        if (gameState.combat.cooldowns.heroStrike > 0) {
-                            addCombatLog(`❌ Golpe Heroico em cooldown! (${gameState.combat.cooldowns.heroStrike} turnos restantes)`, 'info');
-                            return;
-                        }
-                        performHeroicStrike();
-                    } else if (gameState.player.class === 'rogue') {
-                        performSneakAttack();
-                    }
-                };
-                
-                btnItem.onclick = () => {
-                    if (gameState.combat.turn !== 'player') return;
-                    showCombatItemMenu();
-                };
-                
-                btnFlee.onclick = () => {
-                    if (gameState.combat.turn !== 'player') return;
-                    performFleeAttempt();
-                };
+                return b;
+            }
+
+            // O detalhe usa a Marcellus SC, cujos algarismos parecem letras: os
+            // números do texto vão para a Alegreya (.num)
+            function algarismosAlinhados(html) {
+                return html.replace(/(^|>)([^<]+)/g, (m, tag, texto) => tag + texto.replace(/\d+/g, '<span class="num">$&</span>'));
+            }
+
+            function montarAcoes(botoes) {
+                const painel = document.getElementById('combat-actions-panel');
+                painel.innerHTML = '';
+                botoes.forEach(b => painel.appendChild(b));
             }
 
             function setCombatButtonsDisabled(disabled) {
-                const buttons = document.querySelectorAll('#combat-actions-panel button');
-                buttons.forEach(btn => {
-                    if (disabled) {
-                        btn.setAttribute('disabled', 'true');
-                        btn.style.opacity = '0.5';
-                        btn.style.pointerEvents = 'none';
-                    } else {
-                        btn.removeAttribute('disabled');
-                        btn.style.opacity = '1';
-                        btn.style.pointerEvents = 'auto';
-                    }
+                document.querySelectorAll('#combat-actions-panel button').forEach(btn => {
+                    if (disabled) btn.setAttribute('aria-disabled', 'true');
+                    else btn.removeAttribute('aria-disabled');
                 });
+            }
+
+            const HABILIDADE_DA_CLASSE = {
+                warrior: { icone: 'i-golpe-heroico', nome: 'Golpe heroico' },
+                wizard: { icone: 'i-magia', nome: 'Magias arcanas' },
+                rogue: { icone: 'i-furtivo', nome: 'Ataque furtivo' }
+            };
+            const ICONE_DA_ESPECIALIZACAO = {
+                'Paladino': 'i-escudo-sagrado', 'Berserker': 'i-furia', 'Arcanista': 'i-barreira',
+                'Necromante': 'i-invocar', 'Assassino': 'i-veneno', 'Dançarino das Sombras': 'i-passo-sombra'
+            };
+            const recarga = n => `recarga · <span class="num">${n}</span> ${n === 1 ? 'turno' : 'turnos'}`;
+
+            // As quatro ações do turno (ids contrato dos testes). Remontar não tira o
+            // foco de quem estava nas ações: ele vai para o ataque.
+            function restoreActionsPanelHTML() {
+                const ativo = document.activeElement;
+                const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-actions-panel'));
+                const c = gameState.combat;
+                const p = gameState.player;
+                const pocoes = p.inventory.filter(i => i.toLowerCase().includes('poção')).length;
+                let especial;
+                if (p.specialization) {
+                    especial = { icone: ICONE_DA_ESPECIALIZACAO[p.specialization] || 'i-magia', nome: `Habilidades de ${p.specialization}`, aoClicar: showSpecializationAbilityMenu };
+                } else if (p.class === 'warrior') {
+                    const cd = c.cooldowns.heroStrike;
+                    especial = { ...HABILIDADE_DA_CLASSE.warrior, detalhe: cd > 0 ? recarga(cd) : 'vantagem no d20', indisponivel: cd > 0, aoClicar: () => {
+                        if (c.cooldowns.heroStrike > 0) { addCombatLog(`❌ Golpe heroico em recarga (${c.cooldowns.heroStrike} turnos).`, 'info'); return; }
+                        performHeroicStrike();
+                    } };
+                } else if (p.class === 'wizard') {
+                    especial = { ...HABILIDADE_DA_CLASSE.wizard, detalhe: `<span class="num">${c.magicSlots}/3</span> magias`, aoClicar: showCombatSpellMenu };
+                } else if (p.class === 'rogue') {
+                    const intacto = c.enemy.hp === c.enemy.max_hp;
+                    especial = { ...HABILIDADE_DA_CLASSE.rogue, detalhe: intacto ? '+1d6 no alvo intacto' : '', aoClicar: performSneakAttack };
+                }
+                const botoes = [botaoCombate({ id: 'btn-combat-attack', icone: 'i-espada', nome: 'Ataque físico', aoClicar: performPlayerAttack })];
+                // sem classe (só nos testes) não há habilidade, mas o botão existe, oculto, como antes
+                const botaoEspecial = botaoCombate({ id: 'btn-combat-spell', icone: 'i-magia', nome: 'Habilidade', aoClicar: () => {}, ...especial });
+                if (!especial) botaoEspecial.hidden = true;
+                botoes.push(botaoEspecial);
+                botoes.push(
+                    botaoCombate({ id: 'btn-combat-item', icone: 'i-pocao', nome: 'Usar item', detalhe: pocoes ? `<span class="num">${pocoes}</span> ${pocoes === 1 ? 'poção' : 'poções'}` : 'nenhuma poção', indisponivel: !pocoes, aoClicar: showCombatItemMenu }),
+                    botaoCombate({ id: 'btn-combat-flee', icone: 'i-fugir', nome: 'Fugir', detalhe: 'Destreza contra 12', aoClicar: performFleeAttempt })
+                );
+                montarAcoes(botoes);
+                if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
             }
 
             function showCombatMainMenu() {
                 gameState.combat.turn = 'player';
+                const ativo = document.activeElement;
+                const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
+                restoreActionsPanelHTML();
                 setCombatButtonsDisabled(false);
-                
-                const btnAttack = document.getElementById('btn-combat-attack');
-                const btnSpell = document.getElementById('btn-combat-spell');
-                const btnItem = document.getElementById('btn-combat-item');
-                const btnFlee = document.getElementById('btn-combat-flee');
-                
-                btnAttack.innerHTML = `⚔️ Ataque Físico`;
-                btnItem.innerHTML = `🎒 Usar Item`;
-                btnFlee.innerHTML = `🏃 Fugir`;
-                btnSpell.style.display = 'block';
-                
-                if (gameState.player.specialization) {
-                    btnSpell.style.display = 'block';
-                    btnSpell.style.opacity = '1';
-                    btnSpell.innerHTML = `⚡ Habilidades de ${gameState.player.specialization}`;
-                } else if (gameState.player.class === 'warrior') {
-                    const cd = gameState.combat.cooldowns.heroStrike;
-                    btnSpell.innerHTML = `💥 Golpe Heroico ${cd > 0 ? `(${cd}t)` : ''}`;
-                    btnSpell.style.opacity = cd > 0 ? '0.5' : '1';
-                } else if (gameState.player.class === 'wizard') {
-                    btnSpell.innerHTML = `✨ Magias Arcana`;
-                    btnSpell.style.opacity = '1';
-                } else if (gameState.player.class === 'rogue') {
-                    btnSpell.innerHTML = `🗡️ Ataque Furtivo`;
-                    btnSpell.style.opacity = '1';
-                } else {
-                    btnSpell.style.display = 'none';
-                }
-                
-                setupCombatActionListeners();
+                document.getElementById('combat-turno').textContent = 'O que você faz?';
+                atualizarCondicoes();
+                // os botões foram remontados: quem estava neles (teclado) continua no primeiro
+                if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
+            }
+
+            function botaoVoltar() {
+                return botaoCombate({ icone: 'i-voltar', nome: 'Voltar', aoClicar: () => {
+                    showCombatMainMenu();
+                    focarNoQuadro(() => document.getElementById('btn-combat-spell') || document.getElementById('btn-combat-attack'));
+                } });
             }
 
             function showCombatSpellMenu() {
-                const actionsPanel = document.getElementById('combat-actions-panel');
-                actionsPanel.innerHTML = `
-                    <button id="btn-spell-missile">⚡ Míssil Mágico (Automático)</button>
-                    <button id="btn-spell-heal">💖 Curar Ferimentos (1 slot)</button>
-                    <button id="btn-spell-back" style="grid-column: span 2; background-color: #443322;">🔙 Voltar</button>
-                `;
-                
-                document.getElementById('btn-spell-missile').onclick = performMagicMissile;
-                document.getElementById('btn-spell-heal').onclick = performHealSpell;
-                document.getElementById('btn-spell-back').onclick = () => {
-                    restoreActionsPanelHTML();
-                    showCombatMainMenu();
-                };
+                const c = gameState.combat;
+                montarAcoes([
+                    botaoCombate({ id: 'btn-spell-missile', icone: 'i-missil', nome: 'Míssil mágico', detalhe: 'acerta sempre', aoClicar: performMagicMissile }),
+                    botaoCombate({ id: 'btn-spell-heal', icone: 'i-cura', nome: 'Curar ferimentos', detalhe: `1 magia · restam <span class="num">${c.magicSlots}</span>`, indisponivel: c.magicSlots <= 0, aoClicar: performHealSpell }),
+                    botaoVoltar()
+                ]);
+                focarNoQuadro(() => document.getElementById('btn-spell-missile'));
             }
 
             function showCombatItemMenu() {
-                const actionsPanel = document.getElementById('combat-actions-panel');
                 const items = gameState.player.inventory.filter(i => i.toLowerCase().includes('poção'));
-                
                 if (items.length === 0) {
-                    addCombatLog("❌ Você não tem consumíveis de cura no inventário!", "info");
+                    addCombatLog("❌ Você não tem poções na mochila!", "info");
                     return;
                 }
-                
-                actionsPanel.innerHTML = "";
-                items.forEach((item, idx) => {
-                    const btn = document.createElement('button');
-                    btn.textContent = `🧪 ${item}`;
-                    btn.onclick = () => {
-                        performUseItemInCombat(item);
-                    };
-                    actionsPanel.appendChild(btn);
-                });
-                
-                const btnBack = document.createElement('button');
-                btnBack.textContent = "🔙 Voltar";
-                btnBack.style.gridColumn = "span 2";
-                btnBack.style.backgroundColor = "#443322";
-                btnBack.onclick = () => {
-                    restoreActionsPanelHTML();
-                    showCombatMainMenu();
-                };
-                actionsPanel.appendChild(btnBack);
+                montarAcoes([
+                    ...items.map(item => botaoCombate({ icone: ICONES_ITEM[item] || 'i-pocao', nome: escaparHtml(item), detalhe: 'recupera <span class="num">10</span>', aoClicar: () => performUseItemInCombat(item) })),
+                    botaoVoltar()
+                ]);
+                focarNoQuadro(() => document.querySelector('#combat-actions-panel button'));
             }
 
-            function restoreActionsPanelHTML() {
-                const actionsPanel = document.getElementById('combat-actions-panel');
-                actionsPanel.innerHTML = `
-                    <button id="btn-combat-attack">⚔️ Ataque Físico</button>
-                    <button id="btn-combat-spell">✨ Magia/Especial</button>
-                    <button id="btn-combat-item">🎒 Usar Item</button>
-                    <button id="btn-combat-flee">🏃 Fugir</button>
-                `;
-                setupCombatActionListeners();
-            }
-
+            // Rolagem do herói: 1,3 s de giro na bandeja do combate. O desfecho
+            // (acerto ou erro) chega pelo relato e carimba o selo.
             function rollCombatDice(callback) {
-                const diceContainer = document.getElementById('combat-dice-container');
                 const diceElement = document.getElementById('combat-dice');
                 const diceResult = document.getElementById('combat-dice-result');
-                
-                diceContainer.classList.remove('hidden');
-                diceResult.textContent = "";
-                diceElement.textContent = "?";
-                diceElement.className = "dice";
-                
-                // Forçar reflow CSS
-                void diceElement.offsetWidth;
-                diceElement.classList.add('rolling-animation');
-                
+                limparBandejaCombate('');
+                diceElement.className = "dice rolling-animation";
+                const giro = setInterval(() => {
+                    diceElement.textContent = Math.floor(Math.random() * 20) + 1;
+                }, 60);
+
                 setTimeout(() => {
+                    clearInterval(giro);
                     diceElement.classList.remove('rolling-animation');
                     const roll = Math.floor(Math.random() * 20) + 1;
                     diceElement.textContent = roll;
-                    
+
                     if (roll === 20) {
                         diceElement.classList.add('critical-success-bg');
-                        diceResult.textContent = "CRÍTICO! (20)";
+                        document.getElementById('combat-mesa').classList.add('critico');
+                        diceResult.innerHTML = '<b>20</b> natural!';
                     } else if (roll === 1) {
-                        diceElement.style.borderColor = "#ff0000";
-                        diceElement.style.boxShadow = "0 0 15px #ff0000";
-                        diceResult.textContent = "FALHA CRÍTICA! (1)";
+                        diceElement.classList.add('falha-critica');
+                        diceResult.innerHTML = '<b>1</b> natural';
                     } else {
-                        diceResult.textContent = `Rolado: ${roll}`;
+                        diceResult.innerHTML = `Você tirou <b>${roll}</b>`;
                     }
-                    
+                    rolagemDoCombate = { valor: roll, carimbada: false };
+
                     callback(roll);
                 }, 1300);
             }
@@ -2019,7 +2039,7 @@
                     const totalAtk = roll + atkBonus + attrMod + (gameState.player.stats.bba || 1);
                     const isCrit = roll === 20;
                     
-                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> + modificadores (${atkBonus + attrMod + (gameState.player.stats.bba || 1)}) = <strong>${totalAtk}</strong> contra AC ${gameState.combat.enemy.ac}`);
+                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> + modificadores (${atkBonus + attrMod + (gameState.player.stats.bba || 1)}) = <strong>${totalAtk}</strong> contra armadura ${gameState.combat.enemy.ac}`);
                     
                     if (isCrit || totalAtk >= gameState.combat.enemy.ac) {
                         // Acertou!
@@ -2027,14 +2047,14 @@
                         if (damage < 1) damage = 1;
                         if (isCrit) {
                             damage += 5; // Bônus de crítico
-                            addCombatLog(`<span class="success">💥 ACERTO CRÍTICO!</span> Causa +5 de dano adicional!`);
+                            addCombatLog(`<span class="success">💥 Acerto crítico!</span> Mais 5 de dano!`);
                         }
                         
                         damage = physicalDamage(damage);
                         applyPoisonOnHit();
                         
                         gameState.combat.enemy.hp -= damage;
-                        addCombatLog(`<span class="success">🎯 Acertou!</span> Você causou <strong>${damage}</strong> de dano no ${gameState.combat.enemy.name}.`, 'success');
+                        addCombatLog(`<span class="success">🎯 Acertou!</span> Você causou <strong>${damage}</strong> de dano ${inimigo('em')}.`, 'success');
                         
                         AudioEngine.playSlash();
                         triggerImpactEffect('enemy', 'slash');
@@ -2075,16 +2095,16 @@
                                 if (damage < 1) damage = 1;
                                 if (chosenRoll === 20) {
                                     damage += 5;
-                                    addCombatLog(`<span class="success">💥 ACERTO CRÍTICO!</span>`);
+                                    addCombatLog(`<span class="success">💥 Acerto crítico!</span>`);
                                 }
                                 gameState.combat.enemy.hp -= damage;
-                                addCombatLog(`<span class="success">🎯 Golpe Heroico Acertou!</span> Você causou <strong>${damage}</strong> de dano no ${gameState.combat.enemy.name}.`, 'success');
+                                addCombatLog(`<span class="success">🎯 O golpe heroico acertou!</span> Você causou <strong>${damage}</strong> de dano ${inimigo('em')}.`, 'success');
                                 
                                 AudioEngine.playSlash();
                                 triggerImpactEffect('enemy', 'slash');
                                 updateCombatUi();
                             } else {
-                                addCombatLog(`<span class="failure">❌ Golpe Heroico Errou!</span>`, 'failure');
+                                addCombatLog(`<span class="failure">❌ O golpe heroico errou!</span>`, 'failure');
                             }
                             
                             gameState.combat.cooldowns.heroStrike = 4; // Entra em cooldown (3 turnos efetivos, pois decrementa no fim do round)
@@ -2109,7 +2129,7 @@
                 if (damage < 1) damage = 1;
                 
                 gameState.combat.enemy.hp -= damage;
-                addCombatLog(`<span class="success">✨ Impacto Mágico!</span> Causa <strong>${damage}</strong> de dano automático no ${gameState.combat.enemy.name}.`, 'success');
+                addCombatLog(`<span class="success">✨ Impacto Mágico!</span> Causa <strong>${damage}</strong> de dano automático ${inimigo('em')}.`, 'success');
                 
                 AudioEngine.playSpell();
                 triggerImpactEffect('enemy', 'magic');
@@ -2180,12 +2200,12 @@
                         }
                         if (roll === 20) {
                             damage += 5;
-                            addCombatLog(`<span class="success">💥 ACERTO CRÍTICO!</span>`);
+                            addCombatLog(`<span class="success">💥 Acerto crítico!</span>`);
                         }
                         if (damage < 1) damage = 1;
                         
                         gameState.combat.enemy.hp -= damage;
-                        addCombatLog(`<span class="success">🎯 Ataque Furtivo acertou!</span> Você causou <strong>${damage}</strong> de dano no ${gameState.combat.enemy.name}.`, 'success');
+                        addCombatLog(`<span class="success">🎯 Ataque Furtivo acertou!</span> Você causou <strong>${damage}</strong> de dano ${inimigo('em')}.`, 'success');
                         
                         AudioEngine.playSlash();
                         triggerImpactEffect('enemy', 'slash');
@@ -2221,7 +2241,7 @@
                     gameState.player.health = gameState.player.maxHealth;
                 }
                 
-                addCombatLog(`<span class="success">🫙 Cura!</span> Recuperou <strong>${healAmount}</strong> HP.`, 'success');
+                addCombatLog(`<span class="success">🫙 Cura!</span> Você recuperou <strong>${healAmount}</strong> de vida.`, 'success');
                 
                 AudioEngine.playHeal();
                 triggerImpactEffect('player', 'heal');
@@ -2243,10 +2263,10 @@
                     const dexMod = Math.floor((gameState.player.stats.dex - 10) / 2);
                     const totalRoll = roll + dexMod;
                     
-                    addCombatLog(`Rolagem de fuga: <strong>${roll}</strong> + DEX (${dexMod}) = <strong>${totalRoll}</strong> contra DC 12`);
+                    addCombatLog(`Rolagem de fuga: <strong>${roll}</strong> ${dexMod < 0 ? '−' : '+'} ${Math.abs(dexMod)} (Destreza) = <strong>${totalRoll}</strong> contra 12`);
                     
                     if (totalRoll >= 12) {
-                        addCombatLog("<span class=\"success\">🏃 Fuga Bem Sucedida!</span> Você correu de volta para a sala anterior em segurança.", "success");
+                        addCombatLog("<span class=\"success\">🏃 Fuga bem-sucedida!</span> Você escapou em segurança.", "success");
                         AudioEngine.playFlee();
                         
                         setTimeout(() => {
@@ -2255,7 +2275,7 @@
                             loadScene(gameState.lastScene || "start");
                         }, 1800);
                     } else {
-                        addCombatLog("<span class=\"failure\">❌ Fuga Falhou!</span> O monstro te bloqueou!", "failure");
+                        addCombatLog(`<span class="failure">❌ A fuga falhou!</span> ${inimigo('', true)} bloqueou a passagem!`, "failure");
                         
                         setTimeout(() => {
                             enemyTurn();
@@ -2267,40 +2287,50 @@
             function enemyTurn() {
                 gameState.combat.turn = 'enemy';
                 setCombatButtonsDisabled(true);
-                addCombatLog(`👹 Turno do inimigo! O <strong>${gameState.combat.enemy.name}</strong> se prepara para atacar...`, 'info');
-                
+                document.getElementById('combat-turno').textContent = `Vez ${inimigo('de')}`;
+                limparBandejaCombate(`${inimigo('', true)} se prepara para atacar…`);
+                addCombatLog(`👹 Turno do inimigo! ${inimigo('', true, true)} se prepara para atacar...`, 'info');
+
                 setTimeout(() => {
                     const roll = Math.floor(Math.random() * 20) + 1;
                     const enemyStr = gameState.combat.enemy.str || 10;
                     const strMod = Math.floor((enemyStr - 10) / 2);
-                    const totalAtk = roll + strMod + (gameState.combat.enemy.bba || 1);
-                    
+                    const bonus = strMod + (gameState.combat.enemy.bba || 1);
+                    const totalAtk = roll + bonus;
+
                     // Armadura do Jogador
                     const playerAC = getPlayerAC();
-                    
-                    addCombatLog(`O <strong>${gameState.combat.enemy.name}</strong> ataca e rola: <strong>${roll}</strong> + modifiers (${strMod + (gameState.combat.enemy.bba || 1)}) = <strong>${totalAtk}</strong> contra sua AC ${playerAC}`);
-                    
+
+                    // a rolagem do inimigo aparece na bandeja, sem giro
+                    const dado = document.getElementById('combat-dice');
+                    dado.textContent = roll;
+                    document.getElementById('combat-dice-result').innerHTML =
+                        `${inimigo('', true)} tirou <b>${roll}</b> ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = <b>${totalAtk}</b> contra sua armadura ${playerAC}`;
+
+                    addCombatLog(`${inimigo('', true, true)} ataca e rola: <strong>${roll}</strong> + modificadores (${bonus}) = <strong>${totalAtk}</strong> contra sua armadura ${playerAC}`);
+
                     if (roll === 20 || totalAtk >= playerAC) {
                         // Acertou!
                         let damage = Math.floor(Math.random() * 6) + 1; // D6 dano básico
                         if (roll === 20) {
                             damage += 3;
-                            addCombatLog(`<span class="failure">☠️ ACERTO CRÍTICO DO INIMIGO!</span>`);
+                            addCombatLog(`<span class="failure">☠️ Acerto crítico ${inimigo('de')}!</span>`);
                         }
-                        
+
                         const dealt = applyDamageToPlayer(damage);
-                        
-                        addCombatLog(`<span class="failure">🥊 Acertou!</span> Você levou <strong>${dealt}</strong> de dano do ${gameState.combat.enemy.name}.`, 'failure');
-                        
-                        // Tremor de tela e Red flash
+
+                        addCombatLog(`<span class="failure">🥊 Acertou!</span> Você levou <strong>${dealt}</strong> de dano ${inimigo('de')}.`, 'failure');
+
+                        // a vida da ficha sacode e a tela pulsa em vermelho
                         triggerScreenShakeAndFlash();
                         triggerImpactEffect('player', 'slash');
                         updateCombatUi();
                         updateStatsDisplay();
+                        if (dealt > 0) spawnFloater(`−${dealt}`, '#f2b8a8', 'heroi');
                     } else {
-                        addCombatLog(`🛡️ O ${gameState.combat.enemy.name} errou o ataque!`);
+                        addCombatLog(`🛡️ ${inimigo('', true)} errou o ataque!`);
                     }
-                    
+
                     setTimeout(() => {
                         tickRoundEndEffects();
                         if (!checkCombatResolution()) {
@@ -2313,18 +2343,19 @@
             function checkCombatResolution() {
                 if (gameState.combat.enemy.hp <= 0) {
                     setCombatButtonsDisabled(true);
-                    
+
                     const xpGain = 50;
                     const goldGain = Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 3; // 3D6
-                    
-                    addCombatLog(`<span class="success">🏆 VITÓRIA!</span> Você derrotou o ${gameState.combat.enemy.name}!`, 'success');
-                    addCombatLog(`Concedido: <strong>+${xpGain} XP</strong> e <strong>+${goldGain}g</strong> de ouro.`, 'success');
-                    
+
+                    addCombatLog(`<span class="success">🏆 Vitória!</span> Você derrotou ${inimigo()}!`, 'success');
+                    addCombatLog(`🏆 Recompensa: <strong>${xpGain} de experiência</strong> e <strong>${goldGain} de ouro</strong>.`, 'success');
+                    addToLog(`⚔️ Vitória sobre ${inimigo()}.`);
+
                     changeXP(xpGain);
                     changeGold(goldGain);
-                    spawnFloater(`+${xpGain} XP`, '#00d2ff');
-                    spawnFloater(`+${goldGain} 🪙`, '#ffd700');
-                    
+                    spawnFloater(`+${xpGain} de experiência`, '#f3d995');
+                    spawnFloater(`+${goldGain} de ouro`, '#e0a145');
+
                     if (gameState.combat.enemy.name.toLowerCase().includes('fantasma') || gameState.combat.enemy.name.toLowerCase().includes('espectro')) {
                         if (gameState.quests.purify_crypt.status === 'active') {
                             gameState.quests.purify_crypt.status = 'completed';
@@ -2336,13 +2367,12 @@
                             saveGame();
                         }
                     }
-                    
+
                     AudioEngine.playVictory();
-                    
-                    // Exibir banner de vitória na UI
-                    const actionsPanel = document.getElementById('combat-actions-panel');
-                    actionsPanel.innerHTML = `<div class="success-banner">🏆 Vitória Lendária!</div>`;
-                    
+
+                    // O selo da vitória carimba o card do inimigo
+                    mostrarDesfecho('vitoria', `${inimigo('', true)} caiu.`);
+
                     setTimeout(() => {
                         closeCombatScreen();
                         // Carrega cena de sucesso do combate
@@ -2351,61 +2381,90 @@
                     }, 2200);
                     return true;
                 }
-                
+
                 if (gameState.player.health <= 0) {
                     setCombatButtonsDisabled(true);
-                    addCombatLog(`<span class="failure">☠️ DERROTA!</span> Você caiu em combate...`, 'failure');
+                    addCombatLog(`<span class="failure">☠️ Derrota!</span> Você caiu em combate...`, 'failure');
+                    addToLog(`☠️ Você caiu em combate contra ${inimigo()}.`);
                     AudioEngine.playDefeat();
-                    
+                    mostrarDesfecho('derrota', 'Você caiu em combate.');
+
                     setTimeout(() => {
                         closeCombatScreen();
                         loadScene('death');
                     }, 2000);
                     return true;
                 }
-                
+
                 return false;
             }
 
+            // Fim da luta: o selo no card, o turno vira o desfecho e as ações somem
+            function mostrarDesfecho(desfecho, texto) {
+                const card = document.getElementById('combat-enemy-card');
+                if (desfecho === 'vitoria') card.classList.add('derrotado');
+                const selo = card.querySelector(`[data-desfecho="${desfecho}"]`);
+                if (selo) selo.classList.add('visivel');
+                document.getElementById('combat-turno').textContent = texto;
+                montarAcoes([]);
+            }
+
+            // Fecha o painel de combate e devolve a narrativa. Os efeitos que mexem
+            // na armadura (fúria, ataque sorrateiro) acabam com a luta, para a ficha
+            // não mostrar a armadura de combate depois dela.
+            let focarEscolhasDepoisDoCombate = false;
             function closeCombatScreen() {
-                gameState.combat.active = false;
-                document.getElementById('combat-screen').classList.add('hidden');
+                const c = gameState.combat;
+                c.active = false;
+                c.effects.fury.turnsLeft = 0;
+                c.effects.sneakBoost.turnsLeft = 0;
+                const ativo = document.activeElement;
+                focarEscolhasDepoisDoCombate = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
+                limparBandejaCombate('');
+                mostrarCombate(false);
                 restoreActionsPanelHTML();
+                updateStatsDisplay();
+                updateInventoryDisplay();
             }
 
+            // Golpe no herói: a vida da ficha treme e a borda da tela pulsa em
+            // vermelho. Só opacidade e transform (Web Animations, no compositor).
             function triggerScreenShakeAndFlash() {
-                const container = document.querySelector('.game-container');
-                if (container) {
-                    container.classList.add('shake-effect');
-                    setTimeout(() => {
-                        container.classList.remove('shake-effect');
-                    }, 250);
-                }
-                
                 const flash = document.getElementById('red-flash');
-                if (flash) {
-                    flash.classList.add('flash-active');
-                    setTimeout(() => {
-                        flash.classList.remove('flash-active');
-                    }, 150);
-                }
+                if (flash && flash.animate) flash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out' });
+                if (movimentoReduzido()) return;
+                const vida = document.querySelector('.emblema-vida');
+                if (vida && vida.animate) vida.animate(TREMOR, { duration: 300, easing: 'ease-out' });
             }
 
+            const TREMOR = [
+                { transform: 'translateX(0)' }, { transform: 'translateX(-0.35rem) rotate(-3deg)' },
+                { transform: 'translateX(0.3rem) rotate(2deg)' }, { transform: 'translateX(-0.2rem)' },
+                { transform: 'translateX(0)' }
+            ];
+
+            // A preferência fica guardada e muda por evento: criar o matchMedia a cada
+            // golpe custava uma avaliação no meio do handler, depois de mexer no DOM
+            const PREFERE_MENOS_MOVIMENTO = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+            let semMovimentoAgora = !!(PREFERE_MENOS_MOVIMENTO && PREFERE_MENOS_MOVIMENTO.matches);
+            if (PREFERE_MENOS_MOVIMENTO && PREFERE_MENOS_MOVIMENTO.addEventListener) {
+                PREFERE_MENOS_MOVIMENTO.addEventListener('change', e => { semMovimentoAgora = e.matches; });
+            }
+            function movimentoReduzido() {
+                return semMovimentoAgora;
+            }
+
+            // Brilho sobre o retrato do inimigo ou a vida do herói: corte (rubro),
+            // magia (ouro) ou cura (verde). O card do inimigo também recua no golpe.
             function triggerImpactEffect(target, type) {
-                const flashId = target === 'player' ? 'combat-player-flash' : 'combat-enemy-flash';
-                const el = document.getElementById(flashId);
-                if (!el) return;
-                
-                // Limpar classes antigas
-                el.className = "impact-flash";
-                
-                // Forçar reflow
-                void el.offsetWidth;
-                
-                el.classList.add(`impact-${type}`);
-                setTimeout(() => {
-                    el.className = "impact-flash";
-                }, 400);
+                const el = document.getElementById(target === 'player' ? 'combat-player-flash' : 'combat-enemy-flash');
+                if (!el || !el.animate) return;
+                el.className = `impacto impacto-${type}`;
+                el.animate([{ opacity: 0 }, { opacity: 0.9, offset: 0.25 }, { opacity: 0 }], { duration: 420, easing: 'ease-out' });
+                if (target === 'enemy' && type !== 'heal' && !movimentoReduzido()) {
+                    const retrato = document.querySelector('#combat-enemy-card .card-inimigo-retrato');
+                    if (retrato && retrato.animate) retrato.animate(TREMOR, { duration: 300, easing: 'ease-out' });
+                }
             }
 
             function changeHealth(amount) {
@@ -2590,6 +2649,7 @@
 
             function isInteractionDisabled() {
                 const diceContainer = document.getElementById('dice-container');
+                if (gameState.combat && gameState.combat.active) return true;
                 return diceContainer && !diceContainer.classList.contains('hidden');
             }
 
@@ -2668,6 +2728,7 @@
                 [/^🎲.*Sucesso\.$/u, 'i-d20', 'sucesso'],
                 [/^🎲/u, 'i-d20', 'falha'],
                 [/^(🌟|🎊)/u, 'i-experiencia', 'sucesso'],
+                [/^⚔️/u, 'i-combate', 'sucesso'],
                 [/^☠️/u, 'i-caveira', 'falha'],
                 [/^🏴/u, 'i-caveira'],
                 [/^(⚠️|🎒|🚧)/u, 'i-alerta', 'falha'],
@@ -2749,7 +2810,7 @@
             // --- CONTROLE E NAVEGAÇÃO DO MINIMAPA ---
             function teleportToNode(nodeId) {
                 if (gameState.combat && gameState.combat.active) {
-                    alert("Você não pode fugir de fininho pelo mapa durante um combate!");
+                    addCombatLog("⚠️ Não dá para fugir pelo mapa no meio do combate.", "info");
                     return;
                 }
                 if (gameState.isPaused) {
@@ -3175,7 +3236,7 @@
                 }
                 if (c.enemyPoison.turnsLeft > 0 && c.enemy.hp > 0) {
                     c.enemy.hp -= c.enemyPoison.dmg;
-                    addCombatLog(`☠️ O veneno corrói o ${c.enemy.name} causando <strong>${c.enemyPoison.dmg}</strong> de dano.`);
+                    addCombatLog(`☠️ O veneno corrói ${inimigo()} causando <strong>${c.enemyPoison.dmg}</strong> de dano.`);
                     AudioEngine.playPoison();
                     updateCombatUi();
                     c.enemyPoison.turnsLeft--;
@@ -3192,10 +3253,6 @@
                 }
             }
 
-            function getPlayerDisplayName() {
-                if (gameState.player.specialization) return gameState.player.specialization;
-                return getPlayerClassNamePt();
-            }
 
             function openSpecializationModal() {
                 if (gameState.player.specialization || gameState.player.level < 3) return;
@@ -3377,18 +3434,33 @@
                 } catch(e) { console.error('loadGame failed', e); return false; }
             }
 
-            function spawnFloater(text, color) {
-                const layer = document.getElementById('floater-layer');
-                if (!layer) return;
-                const el = document.createElement('div');
-                el.className = 'floater';
+            // Números e avisos que sobem e somem (Grenze, nas cores da folha). Na
+            // tela ficam empilhados, para dois ao mesmo tempo não se cobrirem; com
+            // alvo 'heroi', saem da vida na ficha (o dano que o herói levou).
+            const CORES_ANTIGAS = { '#ffd700': '#e6c983', '#00d2ff': '#f3d995' };
+            // Números que sobem e somem: as peças são fixas (ver .floater no CSS) e
+            // reusadas em rodízio; as que estão no ar empilham a próxima mais abaixo.
+            const SUBIDA = [
+                { opacity: 0, transform: 'translateY(0) scale(0.8)' },
+                { opacity: 1, transform: 'translateY(-0.5rem) scale(1.1)', offset: 0.15 },
+                { opacity: 0, transform: 'translateY(-5.6rem) scale(1)' }
+            ];
+            const ESMAECER = [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }];
+            // Quem está no ar fica anotado na peça (getAnimations() forçaria o estilo no
+            // meio do golpe, logo depois das mudanças no DOM)
+            function spawnFloater(text, color, alvo) {
+                const heroi = alvo === 'heroi';
+                const pecas = [...document.querySelectorAll(heroi ? '.emblema-vida .floater' : '#floater-layer .floater')];
+                const agora = performance.now();
+                const noAr = p => (p.noArAte || 0) > agora;
+                const el = pecas.find(p => !noAr(p)) || pecas[0];
+                if (!el || !el.animate) return;
+                if (el.subida) el.subida.cancel();
                 el.textContent = text;
-                el.style.color = color || '#ffd700';
-                el.style.left = '50%';
-                el.style.top = '40%';
-                el.style.transform = 'translateX(-50%)';
-                layer.appendChild(el);
-                setTimeout(() => el.remove(), 1700);
+                el.style.color = CORES_ANTIGAS[color] || color || '#e6c983';
+                if (!heroi) el.style.top = `calc(40% + ${pecas.filter(noAr).length * 3.2}rem)`;
+                el.subida = el.animate(movimentoReduzido() ? ESMAECER : SUBIDA, { duration: 1600, easing: 'ease-out' });
+                el.noArAte = agora + 1600;
             }
 
             document.getElementById('quest-journal-button').addEventListener('click', () => {
@@ -3399,43 +3471,38 @@
                 document.getElementById('quest-journal').classList.add('hidden');
             });
 
-            function abilityLabel(abil) {
+            // Ícone, nome e detalhe (recarga, custo, "ativa") de cada habilidade
+            function abilityInfo(abil) {
                 const c = gameState.combat;
+                const p = gameState.player;
+                const ativa = 'ativa';
                 switch (abil) {
-                    case 'Escudo Sagrado': return `🛡️ Escudo Sagrado${c.cooldowns.holyShield > 0 ? ` (${c.cooldowns.holyShield}t)` : ''}`;
-                    case 'Golpe Sagrado': return '⚔️ Golpe Sagrado';
-                    case 'Fúria Berserker': return c.effects.fury.turnsLeft > 0 ? `🔥 Fúria Berserker (ativa ${c.effects.fury.turnsLeft}t)` : '🔥 Fúria Berserker';
-                    case 'Golpe Devastador': return `💥 Golpe Devastador${c.cooldowns.devastatingBlow > 0 ? ` (${c.cooldowns.devastatingBlow}t)` : ''}`;
-                    case 'Barreira de Mana': return gameState.player.manaBarrierActive ? '🔮 Barreira de Mana (ativa)' : '🔮 Barreira de Mana';
-                    case 'Explosão Arcana': return '💥 Explosão Arcana';
-                    case 'Drenar Vida': return '🩸 Drenar Vida (1 mana)';
-                    case 'Invocar Esqueleto': return c.skeleton.active ? '💀 Esqueleto (ativo)' : '💀 Invocar Esqueleto';
-                    case 'Lâmina Envenenada': return c.poisonBlade ? '☠️ Lâmina Envenenada (ativa)' : '☠️ Lâmina Envenenada';
-                    case 'Golpe de Misericórdia': return `🔪 Golpe de Misericórdia${c.cooldowns.mercyStrike > 0 ? ` (${c.cooldowns.mercyStrike}t)` : ''}`;
-                    case 'Passo de Sombra': return `🌑 Passo de Sombra${c.cooldowns.shadowStep > 0 ? ` (${c.cooldowns.shadowStep}t)` : ''}`;
-                    case 'Ataque Sorrateiro': return '🗡️ Ataque Sorrateiro';
-                    default: return abil;
+                    case 'Escudo Sagrado': return { icone: 'i-escudo-sagrado', nome: 'Escudo sagrado', detalhe: c.cooldowns.holyShield > 0 ? recarga(c.cooldowns.holyShield) : 'vida temporária', indisponivel: c.cooldowns.holyShield > 0 };
+                    case 'Golpe Sagrado': return { icone: 'i-golpe-sagrado', nome: 'Golpe sagrado', detalhe: 'fere e cura' };
+                    case 'Fúria Berserker': return { icone: 'i-furia', nome: 'Fúria berserker', detalhe: c.effects.fury.turnsLeft > 0 ? `${ativa} · <span class="num">${c.effects.fury.turnsLeft}</span> turnos` : 'dano em dobro', indisponivel: c.effects.fury.turnsLeft > 0 };
+                    case 'Golpe Devastador': return { icone: 'i-golpe-devastador', nome: 'Golpe devastador', detalhe: c.cooldowns.devastatingBlow > 0 ? recarga(c.cooldowns.devastatingBlow) : '', indisponivel: c.cooldowns.devastatingBlow > 0 };
+                    case 'Barreira de Mana': return { icone: 'i-barreira', nome: 'Barreira de mana', detalhe: p.manaBarrierActive ? `${ativa} · desligar` : 'absorve dano', indisponivel: !p.manaBarrierActive && p.mana <= 0 };
+                    case 'Explosão Arcana': return { icone: 'i-explosao', nome: 'Explosão arcana', detalhe: '3d6 + Inteligência' };
+                    case 'Drenar Vida': return { icone: 'i-drenar', nome: 'Drenar vida', detalhe: `1 mana · restam <span class="num">${p.mana}</span>`, indisponivel: p.mana <= 0 };
+                    case 'Invocar Esqueleto': return { icone: 'i-invocar', nome: c.skeleton.active ? 'Esqueleto invocado' : 'Invocar esqueleto', detalhe: c.skeleton.active ? ativa : '', indisponivel: c.skeleton.active };
+                    case 'Lâmina Envenenada': return { icone: 'i-veneno', nome: 'Lâmina envenenada', detalhe: c.poisonBlade ? `${ativa} · desligar` : 'envenena o golpe' };
+                    case 'Golpe de Misericórdia': return { icone: 'i-misericordia', nome: 'Golpe de misericórdia', detalhe: c.cooldowns.mercyStrike > 0 ? recarga(c.cooldowns.mercyStrike) : 'alvo abaixo de 40%', indisponivel: c.cooldowns.mercyStrike > 0 || c.enemy.hp >= c.enemy.max_hp * 0.4 };
+                    case 'Passo de Sombra': return { icone: 'i-passo-sombra', nome: 'Passo de sombra', detalhe: c.cooldowns.shadowStep > 0 ? recarga(c.cooldowns.shadowStep) : 'evita o próximo golpe', indisponivel: c.cooldowns.shadowStep > 0 };
+                    case 'Ataque Sorrateiro': return { icone: 'i-sorrateiro', nome: 'Ataque sorrateiro', detalhe: '+3 de armadura' };
+                    default: return { icone: 'i-magia', nome: abil };
                 }
             }
 
             function showSpecializationAbilityMenu() {
-                const actionsPanel = document.getElementById('combat-actions-panel');
                 const spec = gameState.player.specialization;
                 const opts = SPECIALIZATIONS[gameState.player.class] && SPECIALIZATIONS[gameState.player.class][spec];
                 if (!opts) { showCombatMainMenu(); return; }
-                actionsPanel.innerHTML = '';
-                opts.abilities.forEach(abil => {
-                    const btn = document.createElement('button');
-                    btn.textContent = abilityLabel(abil);
-                    btn.onclick = () => handleSpecializationAbility(abil);
-                    actionsPanel.appendChild(btn);
-                });
-                const btnBack = document.createElement('button');
-                btnBack.textContent = "🔙 Voltar";
-                btnBack.style.gridColumn = "span 2";
-                btnBack.style.backgroundColor = "#443322";
-                btnBack.onclick = () => { restoreActionsPanelHTML(); showCombatMainMenu(); };
-                actionsPanel.appendChild(btnBack);
+                // as habilidades indisponíveis continuam clicáveis: o clique explica o motivo no relato
+                montarAcoes([
+                    ...opts.abilities.map(abil => botaoCombate({ ...abilityInfo(abil), aoClicar: () => handleSpecializationAbility(abil) })),
+                    botaoVoltar()
+                ]);
+                focarNoQuadro(() => document.querySelector('#combat-actions-panel button'));
             }
 
             function handleSpecializationAbility(abil) {
@@ -3459,13 +3526,13 @@
 
             function performHolyShield() {
                 const c = gameState.combat;
-                if (c.cooldowns.holyShield > 0) { addCombatLog(`❌ Escudo Sagrado em cooldown (${c.cooldowns.holyShield} turnos).`, 'info'); return; }
+                if (c.cooldowns.holyShield > 0) { addCombatLog(`❌ Escudo Sagrado em recarga (${c.cooldowns.holyShield} turnos).`, 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 const amount = 10 + getMod('con');
                 c.tempHp += amount;
                 c.cooldowns.holyShield = 3;
-                addCombatLog(`🛡️ <strong>Escudo Sagrado</strong> concede <strong>${amount}</strong> de HP temporário!`, 'success');
+                addCombatLog(`🛡️ <strong>Escudo Sagrado</strong> concede <strong>${amount}</strong> de vida temporária!`, 'success');
                 AudioEngine.playShield();
                 triggerImpactEffect('player', 'heal');
                 updateCombatUi();
@@ -3480,7 +3547,7 @@
                     const strMod = getMod('str');
                     const atkBonus = weaponAttackBonus() + strMod + (gameState.player.stats.bba || 1);
                     const totalAtk = roll + atkBonus;
-                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> + ${atkBonus} = <strong>${totalAtk}</strong> contra AC ${gameState.combat.enemy.ac}`);
+                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> + ${atkBonus} = <strong>${totalAtk}</strong> contra armadura ${gameState.combat.enemy.ac}`);
                     if (roll === 20 || totalAtk >= gameState.combat.enemy.ac) {
                         let damage = rollWeaponDamage() + strMod + rollDie(6);
                         if (roll === 20) damage += 5;
@@ -3489,7 +3556,7 @@
                         gameState.combat.enemy.hp -= damage;
                         const heal = rollDie(6);
                         gameState.player.health = Math.min(gameState.player.maxHealth, gameState.player.health + heal);
-                        addCombatLog(`<span class="success">🎯 Golpe Sagrado acertou!</span> <strong>${damage}</strong> de dano radiante e você cura <strong>${heal}</strong> HP.`, 'success');
+                        addCombatLog(`<span class="success">🎯 Golpe Sagrado acertou!</span> <strong>${damage}</strong> de dano radiante e você recupera <strong>${heal}</strong> de vida.`, 'success');
                         AudioEngine.playSlash(); AudioEngine.playHeal();
                         triggerImpactEffect('enemy', 'magic');
                         updateCombatUi(); updateStatsDisplay();
@@ -3515,7 +3582,7 @@
 
             function performDevastatingBlow() {
                 const c = gameState.combat;
-                if (c.cooldowns.devastatingBlow > 0) { addCombatLog(`❌ Golpe Devastador em cooldown (${c.cooldowns.devastatingBlow}t).`, 'info'); return; }
+                if (c.cooldowns.devastatingBlow > 0) { addCombatLog(`❌ Golpe Devastador em recarga (${c.cooldowns.devastatingBlow} turnos).`, 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 addCombatLog("💥 Você concentra força para um <strong>Golpe Devastador</strong>...");
@@ -3555,7 +3622,7 @@
                 const intMod = getMod('int');
                 const damage = rollingDice(6, 3).reduce((a, b) => a + b, 0) + intMod;
                 gameState.combat.enemy.hp -= damage;
-                addCombatLog(`<span class="success">💥 Explosão Arcana!</span> <strong>${damage}</strong> de dano mágico no ${gameState.combat.enemy.name}.`, 'success');
+                addCombatLog(`<span class="success">💥 Explosão Arcana!</span> <strong>${damage}</strong> de dano mágico ${inimigo('em')}.`, 'success');
                 AudioEngine.playSpell(); triggerImpactEffect('enemy', 'magic'); updateCombatUi();
                 setTimeout(() => { if (!checkCombatResolution()) enemyTurn(); }, 1200);
             }
@@ -3597,8 +3664,8 @@
 
             function performMercyStrike() {
                 const c = gameState.combat;
-                if (c.cooldowns.mercyStrike > 0) { addCombatLog(`❌ Golpe de Misericórdia em cooldown (${c.cooldowns.mercyStrike}t).`, 'info'); return; }
-                if (c.enemy.hp >= c.enemy.max_hp * 0.4) { addCombatLog("❌ O alvo não está abaixo de 40% de HP!", 'info'); return; }
+                if (c.cooldowns.mercyStrike > 0) { addCombatLog(`❌ Golpe de Misericórdia em recarga (${c.cooldowns.mercyStrike} turnos).`, 'info'); return; }
+                if (c.enemy.hp >= c.enemy.max_hp * 0.4) { addCombatLog("❌ O alvo ainda tem mais de 40% da vida!", 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 addCombatLog("🔪 Você mira no ponto vital com <strong>Golpe de Misericórdia</strong>...");
@@ -3624,7 +3691,7 @@
 
             function performShadowStep() {
                 const c = gameState.combat;
-                if (c.cooldowns.shadowStep > 0) { addCombatLog(`❌ Passo de Sombra em cooldown (${c.cooldowns.shadowStep}t).`, 'info'); return; }
+                if (c.cooldowns.shadowStep > 0) { addCombatLog(`❌ Passo de Sombra em recarga (${c.cooldowns.shadowStep} turnos).`, 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 c.shadowStepActive = true;

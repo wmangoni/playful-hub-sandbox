@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0, 1 e 2 prontas; a próxima é a Fase 3.
+**Status**: 🚧 Em andamento. Fases 0, 1 e 2 prontas. A Fase 3 (combate) está implementada e em revisão: falta fechar o aceite de desempenho e a rodada do juiz.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -72,7 +72,7 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - O timestamp do rAF oscila cerca de ±0,5 ms em volta do vsync, e um quadro de 3 vsyncs a 144 Hz aparece como 20,5 a 21,7 ms.
   - A folga separa 3 vsyncs de 4 (a partir de ~26,9 ms) sem aceitar um vsync a mais em 60, 75, 100, 120, 144, 165 ou 240 Hz.
   - "Nenhum quadro acima de 20,8 ms" quer dizer, na prática, "nenhum quadro de mais de 3 vsyncs a 144 Hz".
-- **Ferramenta:** `node ded/tools/desempenho.mjs` mede todos os cenários (abertura, exploração, texto longo, teste de d20, os dois críticos e o aceite do primeiro clique) com GPU e janela de verdade. Ela começa o jogo com cliques na seleção, como um jogador. A primeira interação da página liga o Web Audio e a voz, cerca de 10 ms de script.
+- **Ferramenta:** `node ded/tools/desempenho.mjs` mede todos os cenários (abertura, exploração, texto longo, teste de d20, os dois críticos, uma rodada de combate, a vitória e o aceite do primeiro clique) com GPU e janela de verdade. Ela começa o jogo com cliques na seleção, como um jogador. A primeira interação da página liga o Web Audio e a voz, cerca de 10 ms de script.
 - **Layout forçado:** nada de ler o layout (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`, `getComputedStyle`, `getClientRects`) logo depois de mudar o DOM, no meio da cena. Esse tipo de leitura espera o próximo quadro (`noProximoQuadro`, `focarNoQuadro`).
   - Na Fase 2, rolar a crônica a cada mensagem custava até 6 ms por cena.
   - Zerar o `scrollTop` do texto forçava o primeiro layout da folha inteira dentro do "Começar".
@@ -82,10 +82,19 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - As medições anteriores à Fase 2, das fases 0 e 1, podem ter sido feitas em movimento reduzido.
 - **`will-change: transform` em elemento parado borra:** o Chrome deixa de alinhar a camada ao pixel. Para dar camada própria a algo que fica parado, use `will-change: opacity`.
 - **Ambiente da medição:** o Puppeteer abre o Chrome com o processo de GPU frio, o que gera picos de 300 a 800 ms nos primeiros ~500 ms que não vêm da página. Meça com um perfil persistente (`userDataDir`) e uma página de aquecimento antes.
+- **Limpeza ociosa da GPU (Fase 3):** cerca de 1 s depois de a página parar de rasterizar, o processo de GPU do Chrome (Graphite sobre Dawn/D3D11) roda `GraphiteCacheController::ScheduleCleanUpAllResources` e devolve ao driver as texturas que o compositor descartou. Nesta máquina essa tarefa leva de 30 a 70 ms na thread principal da GPU, e o quadro que cai nela atrasa junto, sem trabalho da página naquele quadro.
+  - Ela aparece quando a página fica parada mais de 1 s dentro da janela medida, como na vitória do combate, entre o selo e a volta para a cena. O combate antigo não a mostrava porque repintava a tela em todo quadro (38 a 76 ladrilhos rasterizados a cada 250 ms).
+  - Com o Ganesh no lugar do Graphite (`--disable-features=SkiaGraphite`) ela some, mas os golpes ficam piores. O padrão do Chrome é o Graphite, e é com ele que se mede.
+  - A página reduz o custo descartando menos texturas: o que anima de novo e de novo mora numa camada que nunca some (ver abaixo).
+  - `desempenho.mjs` grava um rastreio leve de cada medição (`toplevel` e a marca da ação). Um quadro acima do limite que se sobrepõe a essa tarefa e que, descontada a tarefa, caberia no limite sai do veredito e é listado à parte, na coluna "GPU", com a duração da tarefa. Se o Chrome mudar o nome da tarefa, o quadro volta a contar contra a página.
 - **O que evitar:**
-  - animar qualquer coisa além de `transform` e `opacity`;
+  - animar qualquer coisa além de `transform` e `opacity`, inclusive com `transition` em `clip-path` (repinta a cada quadro, e as texturas descartadas voltam como a limpeza da GPU um segundo depois);
+  - camada animada recortada por um pai com `overflow: hidden` e `border-radius`: o compositor compila um shader de recorte arredondado no primeiro uso (50 a 130 ms na barra de vida, no primeiro golpe). Recorte retangular é de graça;
+  - criar e destruir camadas para efeitos que se repetem (números flutuantes, tremores): use peças fixas, com camada própria desde a abertura;
   - `backdrop-filter`;
-  - `filter` e `box-shadow` grandes com desfoque (use gradientes);
+  - `filter` e `box-shadow` grandes com desfoque (use gradientes), e qualquer `filter` em peça que repinta: o `drop-shadow` do medalhão do nível refazia o desfoque a cada XP;
+  - traço SVG com gradiente que muda (o anel de XP): o primeiro desenho dele compilava um pipeline novo na GPU (30 ms). Use cor sólida;
+  - camada da tela inteira sempre composta, mesmo a 1%: o clarão vermelho assim piorava todos os quadros (em duas medições seguidas, o primeiro clique teve 9 de 15 execuções acima do limite com ele a 1% e 1 de 15 com ele em 0). Ele fica em `opacity: 0` com `will-change: opacity`;
   - trocar `background-image` na hora de revelar um resultado (deixe as camadas pré-pintadas com `opacity: .01`).
 - **Movimento:** respeitar `prefers-reduced-motion`.
 
@@ -93,19 +102,18 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 
 - **Créditos no Diário (Fase 4):** a Fase 2 pôs o crédito dos ícones no pé da seleção. Repetir no Diário quando ele migrar.
 - **`alert()` que sobraram (Fase 4):**
-  - no jogo: mochila cheia (duas vezes), fuga pelo mapa durante o combate e erro ao carregar as cenas;
+  - no jogo: mochila cheia (duas vezes);
   - no `scenes.json`: o mercador ("Over rir…"), o isqueiro que falta e os dois finais.
   - O do mercador congela a página enquanto está aberto (a medição do "texto longo" passa por ele).
-- **Combate (Fase 3):**
-  - o `.game-container` virou só o palco do combate;
-  - o `.dice` e o `.critical-success-bg` do legado valem só no `#combat-screen` e saem junto com ele;
-  - o recorte do combate difere da Fase 1 só no antialiasing do texto. Agora ele é uma camada composta sobre a folha, e o texto sai em tons de cinza, não em subpixel.
 - **Mapa (Fase 4):** o painel antigo abre fixo sob o cabeçalho, com 72rem de largura. Os nós são clicáveis só quando adjacentes e não visitados (uma cadeia de `else if` em `renderMinimap`). A alavanca do lago nunca aparece, porque `LEVER_NODES` usa `lake_search`, que não é nó do mapa.
 - **Especialização (Fase 4):** a caixa legada usa `backdrop-filter: blur(10px)`, proibido pelo §6. Sai quando ela migrar.
 - **Mecânicas (fase própria):**
   - o `gameState.checkDifficulty = 10` roda depois do `onEnter`, então nenhuma cena muda a dificuldade (4 a 20 no `scenes.json`);
   - a vida máxima é 20 para todas as classes (a Constituição não conta);
-  - quem foge do combate quase sempre volta para a entrada (`lastScene` raramente é gravado).
+  - quem foge do combate quase sempre volta para a entrada (`lastScene` raramente é gravado);
+  - a vitória dá 50 de XP e 3d6 de ouro, e a cena `_success` seguinte dá XP de novo (o Goblin rende 75);
+  - a mana não se recupera: só enche ao escolher a especialização;
+  - ligar e desligar a Barreira de mana e a Lâmina envenenada não gasta o turno.
 - **CPU 4x (informativo):** em CPU 1x tudo fica dentro do limite. Em CPU 4x:
   - o "Começar" ainda tem um quadro de ~97 ms;
   - a máquina de escrever do texto longo tem quadros de 28 ms;
@@ -114,6 +122,8 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   Se a Fase 5 mirar aparelhos fracos, revisar a crônica e a troca de cena nesse cenário.
 - **Troca de cena no movimento reduzido (Fase 5):** em 2 de 5 rodadas, a troca de cena depois do teste de d20 tem um quadro de 27,7 ms. É a arte nova e o texto inteiro rasterizados no mesmo quadro. Rever junto com a conversão das artes para WebP, que também é da Fase 5.
 - **Créditos no celular (Fase 5):** a 390 px, a linha de créditos dos ícones encosta no filete interno da moldura.
+- **Combate no celular (Fase 5):** a 390 px, "Fantasma de Drakmor" quebra em duas linhas no card do inimigo.
+- **Ruído das capturas:** duas capturas seguidas da mesma página podem diferir em até 31 por canal na borda de alguns SVGs (rasterização em software). Acontece também no commit da Fase 2; comparar com `--tolerancia` quando a diferença for só essa.
 - **Mapa durante o avanço do d20 (Fase 4):** nos 1,8 s depois do resultado, o selo do mapa ainda navega, e o temporizador do dado dispara depois. O problema já existia antes da Fase 2.
 - **Abertura a frio (informativo):** com a exploração montada em espera, a abertura ganhou um quadro de ~48 ms. É a pintura a frio, fora do veredito.
 - **Acessibilidade (Fase 5):**
@@ -221,7 +231,7 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - o selo de cera ganhou piso de largura em px;
     - a asserção vazia do `qa_ded`;
     - a documentação do desempenho e o caminho de movimento reduzido.
-  - A 3ª rodada, sobre o `84ec91b`, deu "muito bom". Faltava a mesma pausa de 300 ms no "Começar uma nova aventura": um Enter duplo na escolha que leva a um final apagava o save antes de o final ser visto. Com a correção, o juiz dá "excelente".
+  - A 3ª rodada, sobre o `84ec91b`, deu "muito bom". Faltava a mesma pausa de 300 ms no "Começar uma nova aventura": um Enter duplo na escolha que leva a um final apagava o save antes de o final ser visto. A 4ª rodada, sobre o `ca48f04`, deu **"excelente"**.
 - **Desempenho:** `desempenho.mjs` em CPU 1x, com movimento padrão, numa tela de 144 Hz, saiu APROVADO.
   - O pior quadro de cada cenário (`desempenho-f2n`) foi:
     - exploração, 13,9 ms;
@@ -241,3 +251,52 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - O SVG do d20 era rasterizado de novo no primeiro número do giro (28 ms em ~1 de 15 execuções). Agora o dado tem camada própria desde a abertura (`will-change: opacity`, que não borra), e durante o giro a arte vem de uma cópia numa camada pré-rasterizada.
     - A própria ferramenta forçava layout no quadro da rolagem (`getClientRects`, `getComputedStyle`) e foi corrigida.
   - A máquina tem uma parada própria de ~500 ms uns 120 s depois de o Chrome abrir, que aparece até numa página vazia. A ferramenta refaz uma vez a execução em que ela cai (quadro acima de 100 ms com o LoAF sem script nem render) e avisa no relatório.
+
+## 10. Registro da Fase 3
+
+- **O combate virou um estado da folha de exploração.** O painel de combate toma o lugar da narrativa e o relato, o da crônica (`mostrarCombate()`); a ficha, o vitral e o nível ficam à vista. O palco antigo (`.game-container`) saiu.
+- **Card de inimigo:**
+  - retrato no medalhão rubro com o ícone do inimigo (`INIMIGOS`: Goblin, Lobo, Aranha e o Fantasma de Drakmor, como espectro; um nome desconhecido usa o monstro genérico);
+  - nome com gênero ("o Goblin", "a Aranha", em `inimigo()`), barra de vida em vinho com "x / y de vida" e a armadura no escudo;
+  - os selos de vitória e de derrota já nascem pintados e são carimbados sobre o retrato, que esmaece na vitória.
+- **Efeitos em jogo:** pílulas para magias, mana, barreira, escudo sagrado, fúria, armadura +3, passo de sombra, lâmina envenenada, esqueleto e veneno no inimigo (em rubro).
+- **Ações:** a peça das escolhas, com o ícone no medalhão e um detalhe à direita (recarga, custo, "ativa"), montada por `botaoCombate()`.
+  - No turno do inimigo, o título vira "Vez do Goblin" e as ações ficam com `aria-disabled`, sem perder o foco.
+  - Magias, itens e habilidades da especialização abrem submenus com "Voltar".
+  - Uma habilidade indisponível continua clicável e explica o motivo no relato.
+  - `#btn-combat-spell` existe sempre (oculto para quem não tem magia), como o `qa_ded_task003` espera.
+- **d20 do combate:** a bandeja da exploração, menor. O número gira, o resultado carimba um dos quatro selos e a conta sai na legenda. A rolagem do inimigo aparece na bandeja sem animação.
+- **Relato:** ícone e tom pelo emoji do começo (`RELATO_ICONES`), como na crônica, sem emojis no texto. Os textos foram revistos: "armadura" em vez de AC, "modificadores", "Acerto crítico!", "recarga", "de vida" e o gênero dos inimigos.
+- **Efeitos:**
+  - golpe no herói: a borda da tela pulsa em vermelho, a vida da ficha treme e brilha, e o dano sobe da vida;
+  - golpe no inimigo: brilho e recuo do retrato;
+  - números flutuantes em Grenze (XP, ouro, nível novo);
+  - tudo com Web Animations, só em `opacity` e `transform`. No movimento reduzido, sem tremor, e os números só esmaecem.
+- **Sem `alert()` no combate:** a fuga pelo mapa durante a luta vira um aviso no relato.
+- **Ícones:** 25 novos no sprite (inimigos, ações e habilidades), com os créditos (autores novos: Carl Olsen e DarkZaitzev).
+- **Legado:** 49 blocos do combate saíram do `legado.css` (palco, cartas, d20 legado, log, ações, impactos, flash vermelho e tremor), e depois os números flutuantes.
+- **Catálogo:** card de inimigo, barra do inimigo, ações de combate, efeitos em jogo, brilho de impacto, d20 do combate, o painel montado e o relato.
+- **Ferramentas:**
+  - `capturas.mjs` ganhou os estados do combate (aberto, o ataque, o golpe do inimigo, as magias, a vitória e o chefe), em 1080p e em 1366×768; o recorte legado do combate saiu;
+  - `desempenho.mjs` ganhou os cenários `combate` e `combate-vitoria` e a classificação da limpeza ociosa da GPU (§6).
+- **Desempenho, como se chegou lá.** Cada custo foi achado com rastreio do Chrome e conferido tirando a causa:
+  - O primeiro golpe custava 50 a 130 ms na GPU: a barra de vida deslizava com `translateX` sob um pai com `overflow: hidden` e `border-radius`, e o compositor compilava o shader de recorte arredondado. Um `clip-path` animado no lugar repintava a barra a cada quadro. Ficou uma janela de recorte retangular, o preenchimento numa camada própria e a ponta esquerda como um disco parado.
+  - A primeira vitória com nível novo custava 30 ms: o anel de XP, um traço SVG com gradiente, compilava um pipeline novo no primeiro desenho. Ficou em cor sólida.
+  - O medalhão do nível tinha `filter: drop-shadow`, refeito a cada XP; a sombra virou um disco com gradiente.
+  - Pré-pintar o clarão vermelho a 1% piorou todos os cenários (§6). Ele voltou para 0.
+  - Os números flutuantes viraram peças fixas reusadas, e o retrato e a vida, que tremem, ganharam camada própria desde a abertura: o compositor descarta menos texturas.
+  - O que sobrou na vitória é a limpeza ociosa da GPU do Chrome (§6). O combate antigo escondia esse custo porque repintava a tela em todo quadro.
+- **Prova:**
+  - Testes: `journey_ded`, `qa_ded` e `qa_ded_task003` passaram. O `qa_ded` usa o `server.js`, que escuta na porta 3000; com ela ocupada, rode com `PORT` em outra porta.
+  - Telas legadas: loja e diário idênticos à referência da Fase 2 (`--so legado`); a especialização, idêntica com `--tolerancia 8`, como na Fase 2.
+  - Contra o commit da Fase 2, a seleção ficou idêntica. Na exploração mudam a sombra do medalhão e, em até 3 níveis por canal na maior parte, a moldura do vitral (1.235 px acima de 8), pela fase de rasterização da camada dela.
+  - Os estados do combate foram revistos nas capturas, em 1080p e em 1366×768.
+  - Desempenho (`desempenho-f3-final`, CPU 1x, movimento padrão, 144 Hz): **REPROVADO, com 5 quadros**.
+    - Nas duas baterias completas com o código final, a vitória ficou em 13,9 ms nas duas. O combate ficou em 13,8 ms numa e teve, na outra, um quadro de 55,5 ms no golpe do inimigo (+4062 ms, LoAF de 64 ms sem script nem render).
+    - Na rodada final, o texto longo teve 27,8 ms na troca de cena (ver abaixo), e o primeiro clique teve 3 de 30 execuções com um quadro de 27,7 a 28 ms no início do giro. Na bateria anterior, com o ambiente mais ruidoso, foram o teste de d20 (6 quadros), o 1 natural (2) e o primeiro clique (6 de 30).
+    - No movimento reduzido, o `combate` ficou em 13,9 ms, e a vitória teve um quadro de 27,6 ms no acerto.
+    - Em CPU 4x (informativo), o combate tem quadros de 28 a 56 ms no acerto e no golpe do inimigo, e a vitória chega a 83 ms (o script dela leva ~43 ms em 4x: XP, nível novo, som e relato).
+    - Depois da rodada final, o script do acerto caiu de ~18 para ~10 ms em 4x: `spawnFloater` não chama mais `getAnimations()` e a preferência de movimento fica guardada em vez de um `matchMedia()` a cada golpe (as duas forçavam o estilo no meio do handler). Ainda não foi medido de novo.
+- **Ruído do ambiente nesta medição:** com outros programas abertos na máquina, o próprio commit da Fase 2 teve de 0 a 6 em 10 execuções do primeiro clique com um quadro acima do limite, sempre no início do giro (+250 a +340 ms). Numa comparação intercalada (três pares, 10 execuções cada), a Fase 2 e a Fase 3 ficaram limpas juntas nos dois primeiros pares e falharam juntas no terceiro.
+- **Texto longo no limite:** o quadro da troca para a cena de 1.332 caracteres fica em 20,8 ms (3 vsyncs) nas duas versões. Na Fase 3 ele passou a 27,7 ms em parte das rodadas (4 de 7 numa série, 0 de 5 na seguinte), e a Fase 2, em nenhuma de 7. O rastreio mostra o mesmo custo de thread principal nas duas (script de 8 a 10 ms, layout de 11 a 14 e pintura de 5); a Fase 3 tem 5 camadas compostas a mais na exploração (vida, brilho, barra, risquinhos e o clarão). Ver §7.
+- **Juiz:** pendente.
