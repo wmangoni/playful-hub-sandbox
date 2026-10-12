@@ -194,11 +194,11 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const attacksText = list => list.map(signed).join('/');
 const range = n => Array.from({ length: n }, (_, i) => i);
 
-/** Redução de dano de classe (3.0): bárbaro 1/— a 4/— (11º, 14º, 17º, 20º); monge 20/+1 no 20º. */
+/** Redução de dano de classe (3.5): bárbaro 1/— a 5/— (7º, 10º, 13º, 16º, 19º); monge 10/magia no 20º. */
 export function damageReduction(classKey, level) {
   const L = clampLevel(level);
-  if (classKey === 'bar' && L >= 11) return `${L >= 20 ? 4 : L >= 17 ? 3 : L >= 14 ? 2 : 1}/—`;
-  if (classKey === 'mon' && L >= 20) return '20/+1';
+  if (classKey === 'bar' && L >= 7) return `${L >= 19 ? 5 : L >= 16 ? 4 : L >= 13 ? 3 : L >= 10 ? 2 : 1}/—`;
+  if (classKey === 'mon' && L >= 20) return '10/magia';
   return null;
 }
 
@@ -229,7 +229,7 @@ export function classFeatures(classKey, level, mods, { small = false, sizeAttack
       if (L >= 15) add('Fúria maior: +6 For, +6 Con, +3 em Vontade');
       if (L >= 20) add('Não fica mais fatigado depois da fúria');
       add('Movimento rápido: +3 m (sem armadura pesada)', uncannyDodge(L, [2, 5, 10]));
-      if (L >= 11) add(`Redução de dano ${damageReduction('bar', L)}`);
+      if (L >= 7) add(`Redução de dano ${damageReduction('bar', L)}`);
       add('Analfabeto (2 pontos de perícia para aprender a ler e escrever)');
       break;
     }
@@ -273,9 +273,9 @@ export function classFeatures(classKey, level, mods, { small = false, sizeAttack
       if (mods.sab != null) add(`Bônus na CA sem armadura: Sab ${signed(Math.max(0, mods.sab))}${L >= 5 ? ` e +${Math.floor(L / 5)} de nível` : ''} (já somados)`);
       if (L >= 3) add('Mente tranquila (+2 contra encantamento)');
       if (L >= 4) add(`Queda lenta: ${L >= 18 ? 'qualquer distância' : L >= 8 ? '15 m' : L >= 6 ? '9 m' : '6 m'}`);
+      if (L >= 4) add(`Golpe ki (${L >= 16 ? 'adamante' : L >= 10 ? 'leal' : 'mágico'})`);
       if (L >= 5) add('Pureza corporal (imune a doenças)');
       if (L >= 7) add(`Integridade corporal: cura ${2 * L} PV/dia em si mesmo`, 'Salto das nuvens');
-      if (L >= 10) add(`Golpe ki +${L >= 16 ? 3 : L >= 13 ? 2 : 1}`);
       if (L >= 11) add('Corpo de diamante (imune a venenos)');
       if (L >= 12) add('Passo etéreo: porta dimensional 1/dia');
       if (L >= 13) add(`Alma de diamante: resistência à magia ${spellResistance('mon', L)}`);
@@ -291,8 +291,9 @@ export function classFeatures(classKey, level, mods, { small = false, sizeAttack
         `Cura pelas mãos: ${mods.car == null ? 'Car × nível' : Math.max(0, mods.car * L)} PV/dia`,
         'Detectar o mal',
         'Saúde divina',
+        `Destruir o mal ${1 + Math.floor(L / 5)}/dia (+Car no ataque, +${L} no dano)`,
       );
-      if (L >= 2) add('Aura de coragem', `Destruir o mal 1/dia (+Car no ataque, +${L} no dano)`);
+      if (L >= 2) add('Aura de coragem');
       if (L >= 3) add(`Remover doença ${Math.floor(L / 3)}/semana`, 'Expulsar mortos-vivos (como clérigo 2 níveis abaixo)');
       if (L >= 5) add('Montaria especial');
       break;
@@ -335,7 +336,7 @@ function speedFor(raceTraits, classKey, level, sizeName) {
   return racial;
 }
 
-const SIZE_BY_NAME = { minimo: 'Mínimo', minusculo: 'Minúsculo', pequeno: 'Pequeno', medio: 'Médio', grande: 'Grande', enorme: 'Enorme', imenso: 'Imenso', colossal: 'Colossal' };
+const SIZE_BY_NAME = { minimo: 'Minúsculo', minusculo: 'Minúsculo', diminuto: 'Diminuto', miudo: 'Miúdo', pequeno: 'Pequeno', medio: 'Médio', grande: 'Grande', enorme: 'Enorme', imenso: 'Imenso', colossal: 'Colossal' };
 
 /** Perícias de classe da 3.0 para uma classe básica (null para as demais). */
 function classSkillTest(classKey) {

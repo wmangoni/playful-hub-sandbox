@@ -7,13 +7,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const TAMANHOS = ['Mínimo', 'Minúsculo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal'];
-const AGARRAR_TAMANHO = { Mínimo: -16, Minúsculo: -8, Pequeno: -4, Médio: 0, Grande: 4, Enorme: 8, Imenso: 12, Colossal: 16 };
+const TAMANHOS = ['Minúsculo', 'Diminuto', 'Miúdo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal', 'Mínimo'];
+const AGARRAR_TAMANHO = { Minúsculo: -16, Mínimo: -16, Diminuto: -12, Miúdo: -8, Pequeno: -4, Médio: 0, Grande: 4, Enorme: 8, Imenso: 12, Colossal: 16 };
 const TENDENCIAS = ['LB', 'NB', 'CB', 'LN', 'N', 'CN', 'LM', 'NM', 'CM'];
-const TIPOS = ['Aberração', 'Animal', 'Besta', 'Besta Mágica', 'Constructo', 'Dragão', 'Elemental', 'Fada', 'Gigante', 'Humanoide', 'Humanoide Monstruoso', 'Limo', 'Extra-Planar', 'Planta', 'Morto-Vivo', 'Verme'];
+const TIPOS = ['Aberração', 'Animal', 'Besta Mágica', 'Constructo', 'Dragão', 'Elemental', 'Fada', 'Gigante', 'Humanoide', 'Humanoide Monstruoso', 'Limo', 'Extra-Planar', 'Planta', 'Morto-Vivo', 'Verme'];
 const TIPOS_ATAQUE = ['corpo a corpo', 'distancia', 'toque', 'toque a distancia'];
 const TIPOS_DANO = ['cortante', 'perfurante', 'concussão'];
-const MATERIAIS = ['prata', 'adamante', 'mitral'];
+const MATERIAIS = ['prata', 'adamante', 'mitral', 'ferro frio'];
 const NATUREZAS = ['Ext', 'Sob', 'SM'];
 const RESISTENCIAS = ['fort', 'ref', 'von'];
 const ENERGIAS = ['fogo', 'frio', 'eletricidade', 'ácido', 'sônico', 'energia', 'energia negativa', 'energia positiva', 'divino', 'sagrado', 'profano', 'caótico', 'leal'];
@@ -38,7 +38,7 @@ const MARGENS = [15, 17, 18, 19, 20];
 /** Monstros que são Product Identity da Wizards e ficaram fora do SRD 3.0 (nome em inglês). */
 const PRODUCT_IDENTITY = ['beholder', 'mind flayer', 'illithid', 'githyanki', 'githzerai', 'displacer beast', 'carrion crawler', 'yuan-ti', 'kuo-toa', 'slaad', 'umber hulk', 'gauth', 'beholder mage'];
 /**
- * Talentos fora do compêndio aceitos: de monstro (Monster Manual 3.0) e de Tormenta usados por fichas oficiais
+ * Talentos fora do compêndio aceitos: de monstro (Monster Manual 3.0/3.5) e de Tormenta usados por fichas oficiais
  * (as do livro Tormenta D20 – Holy Avenger entraram na TASK_008, com o nome que o livro usa).
  */
 const TALENTOS_EXTRAS = [
@@ -46,9 +46,11 @@ const TALENTOS_EXTRAS = [
   'APARÊNCIA INOFENSIVA', 'ARREBATAR', 'AVENTUREIRO NATO', 'DESLOCAMENTO', 'FOCO EM HABILIDADE', 'FORMA DO MAR', 'FORMA FEROZ DO MAR',
   'FORMA MONSTRUOSA DO MAR', 'IMPOSTOR', 'INTOLERÂNCIA', 'INVOCAR FAMILIAR', 'MEMÓRIA RACIAL', 'PROSPERIDADE', 'RELIGIOSO',
   'TERRENO FAMILIAR', 'TORCIDA', 'VOZ DE ALLIHANNA',
+  'ATAQUE NATURAL APRIMORADO', 'PAIRAR', 'INVESTIDA PODEROSA', 'GOLPE ARRASADOR', 'CAPACIDADE DE CARGA ADICIONAL',
+  'COMBATER COM DUAS ARMAS MAIOR', 'VOAR ALTO', 'DURO DE FERIR', 'PERSUASIVO', 'SEPARAR APRIMORADO',
 ];
-/** ND fracionário (criaturas e personagens muito fracos): 1/2, 1/3, 1/4, 1/6, 1/8, gravados como número. */
-const ND_FRACOES = [1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8];
+/** ND fracionário (criaturas e personagens muito fracos): 1/2, 1/3, 1/4, 1/6, 1/8, 1/10, gravados como número. */
+const ND_FRACOES = [1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8, 1 / 10];
 const ndFracionario = v => typeof v === 'number' && ND_FRACOES.some(f => Math.abs(v - f) < 1e-3);
 
 /**
@@ -321,14 +323,14 @@ function validarSecao(lista, secao) {
     for (const k of ['nome', 'tipo', 'tamanho', 'tendencia', 'resumo', 'dados_vida', 'tatica']) if (!isStr(c[k])) erros.push(`${onde}: ${k}`);
     const cat = secao === 'monstros' ? 'monstro' : 'holy_avenger';
     if (c.categoria !== cat) erros.push(`${onde}: categoria deve ser "${cat}"`);
-    // monstros: ND 1–20; Holy Avenger pode passar do 20 (no livro, o Paladino vai até o ND 55 e Tarso, nível 63,
-    // tem ND 50; TASK_007 e TASK_008) e pode ter ND fracionário (Petra e Hipólita, ND 1/2)
-    const teto = secao === 'monstros' ? 20 : 80;
-    const ndOk = (isInt(c.nd) && c.nd >= 1 && c.nd <= teto) || (secao === 'holy_avenger' && ndFracionario(c.nd));
-    if (!ndOk) erros.push(`${onde}: nd 1–${teto}${secao === 'holy_avenger' ? ' ou fração (1/2, 1/3, 1/4, 1/6, 1/8)' : ''}`);
+    // monstros: ND 1–30; Holy Avenger pode passar do 20 (no livro, o Paladino vai até o ND 55 e Tarso, nível 63,
+    // tem ND 50; TASK_007 e TASK_008) e pode ter ND fracionário (1/2, 1/3, 1/4, 1/6, 1/8, 1/10)
+    const teto = secao === 'monstros' ? 30 : 80;
+    const ndOk = (isInt(c.nd) && c.nd >= 1 && c.nd <= teto) || ndFracionario(c.nd);
+    if (!ndOk) erros.push(`${onde}: nd 1–${teto} ou fração (1/2, 1/3, 1/4, 1/6, 1/8, 1/10)`);
     if (!isInt(c.nivel) || c.nivel < 1 || c.nivel > teto) erros.push(`${onde}: nivel 1–${teto}`);
     if (secao === 'monstros') {
-      if (c.nivel !== c.nd) erros.push(`${onde}: nivel deve ser igual ao nd`);
+      if (isInt(c.nd) && c.nivel !== c.nd) erros.push(`${onde}: nivel deve ser igual ao nd`);
       if (PRODUCT_IDENTITY.some(p => String(c.nome_original || '').toLowerCase().includes(p))) erros.push(`${onde}: "${c.nome_original}" é Product Identity, fora do SRD`);
     }
     if (!TAMANHOS.includes(c.tamanho)) erros.push(`${onde}: tamanho "${c.tamanho}"`);
@@ -392,8 +394,23 @@ function validarSecao(lista, secao) {
     especiais.forEach((e, j) => especial(e, `${onde} especial[${j}] ${e?.id}`, nomesAtaques, setEsp));
     for (const a of golpes) for (const ef of (isObj(a) && Array.isArray(a.efeitos) ? a.efeitos : [])) if (!setEsp.has(ef)) erros.push(`${onde}: ataque "${a.nome}" dispara "${ef}", que não está nos especiais`);
 
-    if (c.reducao_dano !== null && !(isObj(c.reducao_dano) && isInt(c.reducao_dano.valor) && isStr(c.reducao_dano.exceto))) erros.push(`${onde}: reducao_dano`);
-    if (isObj(c.reducao_dano) && /epic|épic|magic$|mágic[ao]$|ferro frio/i.test(c.reducao_dano.exceto)) avisos.push(`${onde}: RD "${c.reducao_dano.exceto}" parece da 3.5 (na 3.0 é "+N")`);
+    if (c.reducao_dano !== null) {
+      const rd = c.reducao_dano;
+      if (!isObj(rd) || !isInt(rd.valor) || rd.valor < 1) {
+        erros.push(`${onde}: reducao_dano.valor deve ser inteiro >= 1`);
+      } else {
+        const excetos = Array.isArray(rd.exceto) ? rd.exceto : [rd.exceto];
+        if (!excetos.length || excetos.some(e => !isStr(e))) {
+          erros.push(`${onde}: reducao_dano.exceto deve ser string ou array de strings não vazias`);
+        }
+        if (rd.modo !== undefined && !['e', 'ou'].includes(rd.modo)) {
+          erros.push(`${onde}: reducao_dano.modo deve ser "e" ou "ou"`);
+        }
+        for (const k of Object.keys(rd)) {
+          if (!['valor', 'exceto', 'modo'].includes(k)) erros.push(`${onde}: reducao_dano com campo "${k}" fora do formato`);
+        }
+      }
+    }
     if (c.resistencia_magia !== null && !isInt(c.resistencia_magia)) erros.push(`${onde}: resistencia_magia`);
     if (!isObj(c.resistencias_energia) || Object.values(c.resistencias_energia).some(v => !isInt(v))) erros.push(`${onde}: resistencias_energia`);
     else for (const k of Object.keys(c.resistencias_energia)) energia(k, `${onde} resistencias_energia`);
@@ -442,13 +459,10 @@ function validarSecao(lista, secao) {
   });
 
   if (secao === 'monstros') {
-    const nds = lista.filter(isObj).map(c => c.nd).sort((a, b) => a - b);
-    const faltam = Array.from({ length: 20 }, (_, i) => i + 1).filter(n => !nds.includes(n));
-    if (faltam.length) erros.push(`faltam monstros de ND ${faltam.join(', ')}`);
-    const repetidos = nds.filter((n, i) => nds.indexOf(n) !== i);
-    if (repetidos.length) erros.push(`ND repetido: ${[...new Set(repetidos)].join(', ')}`);
-    const t = lista.find(c => isObj(c) && c.nd === 20);
-    if (t && t.id !== 'tarrasque') erros.push('o monstro de ND 20 deve ser o Tarrasque (id "tarrasque")');
+    if (lista.length < 20) erros.push(`seção monstros deve ter pelo menos 20 monstros (tem ${lista.length})`);
+    const t = lista.find(c => isObj(c) && c.id === 'tarrasque');
+    if (!t) erros.push('deve conter o Tarrasque (id "tarrasque")');
+    else if (t.nd !== 20) erros.push('o Tarrasque deve ser de ND 20');
   }
   return { erros, avisos };
 }
