@@ -7,11 +7,233 @@
 
 /* ---------- Loja ---------- */
 
+/* O ouro e a mochila ficam fixos no alto, as mercadorias rolam no corpo, e a
+   linha de status (o que a última compra fez) fica fixa embaixo, à vista */
+#loja { --largura-janela: 42rem; }
+#loja .janela-folha { grid-template-rows: auto auto minmax(0, 1fr) auto auto; row-gap: 0.9rem; }
+#loja .janela-status { margin-top: -0.3rem; }
+
+.loja-bolsa {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem 2.6rem;
+    margin: 0;
+    padding: 0.55rem 0;
+    border-block: var(--linha-pontilhada);
+}
+.loja-bolsa-item { display: flex; align-items: center; gap: 0.7rem; }
+.loja-bolsa dt {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font: var(--rotulo) var(--fonte-rotulo);
+    letter-spacing: 0.12em;
+    color: var(--sepia);
+}
+.loja-bolsa dd {
+    margin: 0;
+    font: 1.15rem/1 var(--fonte-texto);
+    color: var(--sepia);
+}
+.loja-bolsa dd .num { font-size: 1.6rem; line-height: 1; color: var(--tinta); }
+/* o ouro na moeda da ficha; a mochila num medalhão */
+.loja-bolsa-icone {
+    display: grid;
+    place-items: center;
+    width: 2.7rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/moeda.svg) center / contain no-repeat;
+}
+.loja-bolsa-icone svg { width: 1.3rem; height: 1.3rem; color: var(--tinta-2); }
+.loja-bolsa-item + .loja-bolsa-item .loja-bolsa-icone { background-image: url(../ui/ornamentos/medalhao.svg); }
+.loja-bolsa-cheia dd, .loja-bolsa-cheia dd .num { color: var(--rubro); }
+
+/* As mercadorias: a peça das ações do combate, com o ícone do item num medalhão
+   maior, o nome, a descrição embaixo e o preço à direita */
+#loja .escolha { grid-template-columns: 2.6rem minmax(0, 1fr) auto; padding-block: 0.5rem; }
+#loja .escolha-num { width: 2.5rem; height: 2.5rem; }
+#loja .acao-combate .escolha-num svg { width: 1.45rem; height: 1.45rem; }
+.loja-desc {
+    display: block;
+    font: italic max(0.98rem, 12.5px)/1.3 var(--fonte-texto);
+    color: var(--sepia);
+}
+#loja .acao-detalhe .num { font-size: 1.3rem; color: var(--tinta); }
+#loja .indisponivel .acao-detalhe .num { color: var(--rubro); }
+/* mochila cheia: todas indisponíveis, mas o preço não é o motivo e fica neutro */
+#loja .sem-espaco .acao-detalhe, #loja .sem-espaco .acao-detalhe .num { color: var(--apagado); }
+/* folga para o contorno do foco, que o corpo (com rolagem) recortaria */
+#loja .janela-corpo { padding: 0.25rem 0.3rem; }
+
+@media (max-width: 1099px), (orientation: portrait) {
+    /* o preço desce para baixo do nome, como o detalhe das ações */
+    #loja .escolha { grid-template-columns: 2.6rem minmax(0, 1fr); row-gap: 0.15rem; }
+    .loja-bolsa { gap: 0.5rem 1.4rem; }
+}
+
 
 /* ---------- Especialização ---------- */
 
+/* Obrigatória: sem rodapé nem medalhão de fechar. Duas opções lado a lado, cada
+   uma um card com moldura, como os da seleção do herói. */
+#especializacao { --largura-janela: 54rem; }
+#especializacao .janela-folha { grid-template-rows: auto minmax(0, 1fr); }
+/* reaberta depois de um fechamento forçado (Escape três vezes, ver o JS): sem a entrada */
+#especializacao.sem-entrada:not(.fechando)[open],
+#especializacao.sem-entrada:not(.fechando)[open]::backdrop { animation: none; }
+
+/* As quatro linhas de cada opção (medalhão, nome, descrição e habilidades) são
+   as mesmas nas duas (subgrid): um nome em duas linhas ("Dançarino das Sombras")
+   não desalinha a descrição ao lado */
+.especializacao-opcoes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto 1fr auto;
+    gap: 0 1.6rem;
+    padding: 0.5rem; /* folga para o contorno do foco e a subida no hover, que o corpo recortaria */
+}
+.especializacao-opcao {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+    justify-items: center;
+    row-gap: 0.6rem;
+    padding: 1.2rem 1.2rem 1.3rem;
+    border: 0.7rem solid transparent;
+    border-image: url(../ui/ornamentos/moldura.svg) 40 / 2.5rem / 0 stretch;
+    background: rgba(255, 250, 236, 0.3);
+    background-clip: padding-box;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.especializacao-opcao:hover { transform: translateY(-0.2rem); }
+.especializacao-opcao:focus-visible { outline: 0.15rem solid var(--rubro); outline-offset: 0.3rem; }
+.especializacao-medalhao {
+    display: grid;
+    place-items: center;
+    width: 5.6rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.especializacao-medalhao svg { width: 2.8rem; height: 2.8rem; color: var(--tinta-2); transition: color 0.15s ease; }
+.especializacao-nome {
+    align-self: center; /* no meio da linha, quando o nome ao lado ocupa duas */
+    font: 700 2.15rem/1 var(--fonte-titulo);
+    color: var(--tinta);
+    transition: color 0.15s ease;
+}
+.especializacao-opcao:hover .especializacao-medalhao svg, .especializacao-opcao:focus-visible .especializacao-medalhao svg,
+.especializacao-opcao:hover .especializacao-nome, .especializacao-opcao:focus-visible .especializacao-nome { color: var(--rubro); }
+.especializacao-desc {
+    font: italic 1.12rem/1.35 var(--fonte-texto);
+    color: var(--sepia);
+    text-wrap: balance;
+}
+/* em cima na linha delas (a outra opção pode ter as pílulas em duas linhas) */
+.especializacao-habilidades {
+    display: flex;
+    flex-wrap: wrap;
+    align-self: start;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .especializacao-opcao:hover { transform: none; }
+}
+@media (max-width: 1099px), (orientation: portrait) {
+    .especializacao-opcoes { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+    .especializacao-opcao + .especializacao-opcao { margin-top: 1rem; }
+    .especializacao-medalhao { width: 4.4rem; }
+    .especializacao-medalhao svg { width: 2.2rem; height: 2.2rem; }
+}
+
 
 /* ---------- Diário ---------- */
+
+/* Em andamento e concluídas; cada missão com o ícone num medalhão (rubro quando
+   concluída, como a bolha da ficha), o título, a descrição, o progresso e a
+   recompensa em pílulas. No rodapé, o crédito dos ícones. */
+#diario { --largura-janela: 46rem; }
+
+.diario-secao + .diario-secao { margin-top: 1.1rem; }
+.diario-lista { display: grid; margin: 0; padding: 0; list-style: none; }
+.diario-missao {
+    display: grid;
+    grid-template-columns: 3.6rem minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+    padding: 0.75rem 0.3rem 0.85rem;
+    border-bottom: var(--linha-pontilhada);
+}
+.diario-missao:last-child { border-bottom: 0; }
+.diario-medalhao {
+    display: grid;
+    place-items: center;
+    width: 3.6rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.diario-medalhao svg { width: 1.8rem; height: 1.8rem; color: var(--tinta-2); }
+.diario-concluida .diario-medalhao { background-image: url(../ui/ornamentos/medalhao-rubro.svg); }
+.diario-concluida .diario-medalhao svg { color: var(--creme); }
+.diario-titulo {
+    margin: 0.15rem 0 0;
+    font: 700 1.5rem/1.1 var(--fonte-titulo);
+    font-variant-numeric: lining-nums;
+    color: var(--tinta);
+}
+.diario-desc {
+    margin: 0.3rem 0 0.35rem;
+    font: 1.08rem/1.4 var(--fonte-texto);
+    color: var(--tinta);
+}
+/* rótulo numa coluna fixa e o valor ao lado: as pílulas quebram dentro da coluna */
+.diario-linha {
+    display: grid;
+    grid-template-columns: 6.6rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.3rem 0.6rem;
+    margin: 0.35rem 0 0;
+}
+.diario-rotulo {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.1em;
+    color: var(--sepia);
+}
+.diario-valor {
+    font: italic max(1rem, 12.5px)/1.35 var(--fonte-texto);
+    color: var(--sepia);
+}
+.diario-valor .num { font-style: normal; color: var(--tinta); }
+.diario-pilulas { display: flex; flex-wrap: wrap; gap: 0.35rem 0.4rem; }
+.diario-vazio {
+    margin: 0.1rem 0 0.4rem;
+    font: italic 1.05rem/1.4 var(--fonte-texto);
+    color: var(--apagado);
+    text-align: center;
+}
+/* Crédito dos ícones (o mesmo da seleção) */
+#diario .creditos {
+    margin: 0;
+    font: italic max(0.85rem, 11.5px)/1.4 var(--fonte-texto);
+    color: var(--apagado);
+    text-align: center;
+    text-wrap: balance;
+}
+#diario .creditos a { color: var(--sepia); white-space: nowrap; }
+#diario .creditos a:hover { color: var(--rubro); }
+
+@media (max-width: 1099px), (orientation: portrait) {
+    /* medalhão menor, e o rótulo de cada linha em cima do valor */
+    .diario-missao { grid-template-columns: 2.8rem minmax(0, 1fr); gap: 0.7rem; }
+    .diario-medalhao { width: 2.8rem; }
+    .diario-medalhao svg { width: 1.4rem; height: 1.4rem; }
+    .diario-linha { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
+}
 
 
 /* ---------- Mapa ---------- */
