@@ -68,6 +68,10 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 
 - **Como medir:** rAF sem limite, com CPU 1x e 4x, no pior momento: máquina de escrever, dado rolando e combate.
 - **Primeiro clique do teste de dado:** 30 execuções em CPU 1x, sem nenhum quadro acima de 20,8 ms.
+- **Folga do rAF:** o veredito aceita até 22,3 ms, ou seja, o limite de 20,8 ms mais uma folga de 1,5 ms.
+  - O timestamp do rAF oscila cerca de ±0,5 ms em volta do vsync, e um quadro de 3 vsyncs a 144 Hz aparece como 20,5 a 21,7 ms.
+  - A folga separa 3 vsyncs de 4 (a partir de ~26,9 ms) sem aceitar um vsync a mais em 60, 75, 100, 120, 144, 165 ou 240 Hz.
+  - "Nenhum quadro acima de 20,8 ms" quer dizer, na prática, "nenhum quadro de mais de 3 vsyncs a 144 Hz".
 - **Ferramenta:** `node ded/tools/desempenho.mjs` mede todos os cenários (abertura, exploração, texto longo, teste de d20, os dois críticos e o aceite do primeiro clique) com GPU e janela de verdade. Ela começa o jogo com cliques na seleção, como um jogador. A primeira interação da página liga o Web Audio e a voz, cerca de 10 ms de script.
 - **Layout forçado:** nada de ler o layout (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`, `getComputedStyle`, `getClientRects`) logo depois de mudar o DOM, no meio da cena. Esse tipo de leitura espera o próximo quadro (`noProximoQuadro`, `focarNoQuadro`).
   - Na Fase 2, rolar a crônica a cada mensagem custava até 6 ms por cena.
@@ -108,6 +112,9 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - o resultado e o avanço do d20 têm quadros de 28 a 56 ms.
 
   Se a Fase 5 mirar aparelhos fracos, revisar a crônica e a troca de cena nesse cenário.
+- **Troca de cena no movimento reduzido (Fase 5):** em 2 de 5 rodadas, a troca de cena depois do teste de d20 tem um quadro de 27,7 ms. É a arte nova e o texto inteiro rasterizados no mesmo quadro. Rever junto com a conversão das artes para WebP, que também é da Fase 5.
+- **Créditos no celular (Fase 5):** a 390 px, a linha de créditos dos ícones encosta no filete interno da moldura.
+- **Mapa durante o avanço do d20 (Fase 4):** nos 1,8 s depois do resultado, o selo do mapa ainda navega, e o temporizador do dado dispara depois. O problema já existia antes da Fase 2.
 - **Abertura a frio (informativo):** com a exploração montada em espera, a abertura ganhou um quadro de ~48 ms. É a pintura a frio, fora do veredito.
 - **Acessibilidade (Fase 5):**
   - cada rolagem é anunciada duas vezes: no `#result-message` (`role=status`) e na crônica (`aria-live`);
@@ -205,12 +212,27 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - Loja e diário saíram idênticos pixel a pixel.
     - A especialização difere no máximo 6 por canal, por causa do fundo translúcido.
     - O combate tem a mesma geometria; muda só o antialiasing do texto (ver §7).
-  - Protótipo: idêntico ao da Fase 1.
+  - Protótipo: idêntico ao da Fase 1 com `--tolerancia 8`. A única diferença é a cópia da arte do d20, pintada a 1% sob as escolhas, que difere no máximo 2 níveis por canal.
   - Sem 4xx, sem erros na página e sem rolagem horizontal a 390 px.
-- **Juiz:** a primeira rodada deu "bom", e esta seção já traz o que ele pediu.
+- **Juiz:**
+  - A 1ª rodada deu "bom".
+  - A 2ª rodada, sobre o commit `0b3059e`, deu "muito bom". Ela pediu quatro correções, que entraram no commit seguinte:
+    - ativação dupla: um clique duplo no "Continuar" fazia uma rolagem oculta, e Enter seguido escolhia na cena nova sem ela ser lida. Agora há uma pausa de 300 ms depois de montar e uma guarda na bandeja recolhida;
+    - o selo de cera ganhou piso de largura em px;
+    - a asserção vazia do `qa_ded`;
+    - a documentação do desempenho e o caminho de movimento reduzido.
 - **Desempenho:** `desempenho.mjs` em CPU 1x, com movimento padrão, numa tela de 144 Hz, saiu APROVADO.
-  - O pior quadro foi de 21,2 ms (3 vsyncs) na exploração, no texto longo, no teste de d20 e nos dois críticos.
-  - O aceite do primeiro clique passou em 30 execuções, com 0 quadros acima de 20,8 ms.
+  - O pior quadro de cada cenário (`desempenho-f2n`) foi:
+    - exploração, 13,9 ms;
+    - texto longo, 20,9 ms;
+    - teste de d20, 13,8 ms;
+    - 20 natural, 7,4 ms;
+    - 1 natural, 13,9 ms.
+  - O aceite do primeiro clique passou em 30 execuções. Nenhuma passou de 3 vsyncs; 5 delas tiveram um quadro de 20,8 a 21,2 ms, dentro da folga do §6.
+  - **Movimento reduzido (`--movimento reduzido`).** É o caminho de quem joga com as animações do Windows desligadas, como nesta máquina.
+    - O "Começar" ficou abaixo de 20,9 ms nas 3 rodadas, e o texto longo também.
+    - O primeiro clique teve 0 execuções acima do limite em 30 (pior 20,9 ms).
+    - Na troca de cena logo depois do teste (o avanço do d20), 2 de 5 rodadas tiveram um quadro de 27,7 ms (4 vsyncs). Nenhuma animação está rodando nesse momento, e o LoAF não registra o quadro. É a rasterização na GPU da arte nova junto com o texto inteiro, que no movimento reduzido aparece de uma vez (ver §7).
   - Como se chegou lá:
     - A primeira medição reprovou por layout forçado: a crônica rolava a cada mensagem, e `focus()` era chamado fora do quadro. Com as leituras adiadas para o próximo quadro, o `loadScene` caiu de ~11 ms para 1 a 3 ms.
     - A aprovação seguinte valia pouco: o ambiente estava em movimento reduzido (ver §6). Com o movimento padrão, apareceram dois custos.

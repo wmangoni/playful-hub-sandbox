@@ -124,7 +124,7 @@ async function recorte(page, pasta, nome, sufixo) {
 // Teste de Força na cripta (2ª escolha) com o resultado forçado
 async function rolar(page, aleatorio) {
     await page.evaluate(() => { loadScene('crypt'); skipTyping = true; });
-    await espera(300);
+    await espera(400); // escolhas recém-montadas ignoram cliques por 300 ms
     await page.evaluate(() => [...document.querySelectorAll('#choices button')][1].click());
     await espera(250);
     await page.evaluate(v => {

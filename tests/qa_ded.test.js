@@ -100,7 +100,9 @@ async function runTests() {
   // Verify game screen is now visible
   const isGameScreenVisible = await page.evaluate(() => {
     const el = document.getElementById('game-screen');
-    return el && !el.classList.contains('hidden');
+    // Fase 2: fora de vista a exploração fica em espera (montada e invisível), não .hidden
+    return !!el && !el.classList.contains('hidden') && !el.classList.contains('tela-em-espera')
+      && getComputedStyle(el).visibility === 'visible';
   });
   console.log(`Is Game Screen visible now? ${isGameScreenVisible}`);
   if (!isGameScreenVisible) throw new Error('Game screen did not load after starting the adventure');
@@ -427,9 +429,10 @@ async function runTests() {
   const continuar = await page.evaluate(async () => {
     loadScene('crypt');
     skipTyping = true;
+    await new Promise(r => setTimeout(r, 400)); // escolhas recém-montadas ignoram cliques por 300 ms
     [...document.querySelectorAll('#choices button')][1].click(); // teste de Força
     document.getElementById('dice-button').click();
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1700)); // resultado em 1,3 s; "Continuar" aceita clique 300 ms depois
     const rotulo = document.getElementById('dice-button').textContent;
     document.getElementById('dice-button').click(); // avança na hora, sem esperar 1,8 s
     return { rotulo, cena: gameState.currentScene, bandejaOculta: document.getElementById('dice-container').classList.contains('hidden') };

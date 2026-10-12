@@ -49,6 +49,7 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - `#choices` recebe o título e os botões das escolhas, na ordem do `scenes.json`.
   - Só as cenas de `CENAS_FINAIS` (mortes e vitórias) oferecem "Começar uma nova aventura". Uma cena sem escolhas que volta sozinha pelo `onEnter`, como a da poção, mostra só "A aventura continua…".
   - Depois do resultado, o `#dice-button` vira "Continuar" ("Enfrentar", no teste de combate) e avança na hora. Sem clique, o jogo avança sozinho em 1,8 s.
+  - Escolhas e "Continuar" recém-montados ignoram ativações por 300 ms (`PAUSA_ATIVACAO`): um segundo Enter não escolhe na cena nova sem ela ser lida. Testes e ferramentas esperam pelo menos 400 ms depois de um `loadScene` antes de clicar numa escolha.
 - **Nomes:** em português, exceto os que são contrato com o JS e os testes do jogo:
   - o d20: `#dice`, `.dice`, `.rolling-animation`, `.critical-success-bg` (20 natural), `.falha-critica` (1 natural), `#dice-container`, `#dice-button` e `#result-message`;
   - as escolhas: `#choices`;

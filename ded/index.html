@@ -1410,6 +1410,15 @@
                 if (focoNasAcoes) focarPrimeiraEscolha();
             }
 
+            // Escolhas e "Continuar" recém-montados ignoram ativações por um instante:
+            // um segundo Enter (ou clique duplo) não escolhe na cena nova sem ela ser lida
+            const PAUSA_ATIVACAO = 300;
+            let escolhasMontadasEm = -Infinity;
+            let avancoOferecidoEm = -Infinity;
+            function cedoDemais(desde) {
+                return performance.now() - desde < PAUSA_ATIVACAO;
+            }
+
             const NOMES_TESTE = { str: 'Força', dex: 'Destreza', con: 'Constituição', int: 'Inteligência', wis: 'Sabedoria', luck: 'Sorte' };
 
             // Finais da aventura (mortes e vitórias). Outras cenas sem escolhas, como a
@@ -1443,6 +1452,7 @@
                             : `<span class="teste"><svg aria-hidden="true"><use href="ui/icones.svg#i-d20"/></svg>${NOMES_TESTE[choice.checkType] || 'Teste'}</span>`;
                     button.innerHTML = `<span class="escolha-num">${i + 1}</span><span class="escolha-texto">${escaparHtml(choice.text)}</span>${teste}`;
                     button.onclick = () => {
+                        if (cedoDemais(escolhasMontadasEm)) return;
 
                         // Ao clicar na escolha, remove o listener de skip da cena atual
                         const sceneTextElement = document.getElementById('scene-text');
@@ -1475,6 +1485,8 @@
                     recomecar.onclick = recomecarAventura;
                     choicesElement.appendChild(recomecar);
                 }
+
+                escolhasMontadasEm = performance.now();
 
                 // Escolhas à vista e bandeja recolhida. Dentro de .acoes a classe
                 // .hidden só deixa invisível: as duas ocupam a mesma célula.
@@ -1524,6 +1536,7 @@
                 let feito = false;
                 const umaVez = () => { if (!feito) { feito = true; avancar(); } };
                 avancarDepoisDoDado = umaVez;
+                avancoOferecidoEm = performance.now();
                 const botao = document.getElementById('dice-button');
                 botao.textContent = rotulo;
                 activeDiceButton();
@@ -1547,7 +1560,13 @@
             // 1,3 s de giro; o resultado fica 1,8 s na bandeja e então a cena
             // seguinte carrega sozinha (ou o combate começa)
             function rollDice() {
-                if (avancarDepoisDoDado) return avancarDepoisDoDado(); // "Continuar"
+                // a bandeja só fica invisível: um clique que chegue com ela recolhida
+                // (o segundo de um clique duplo no "Continuar") não pode rolar escondido
+                if (document.getElementById('dice-container').classList.contains('hidden')) return;
+                if (avancarDepoisDoDado) {
+                    if (!cedoDemais(avancoOferecidoEm)) avancarDepoisDoDado(); // "Continuar"
+                    return;
+                }
                 const diceButton = document.getElementById('dice-button');
                 if (diceButton.getAttribute('aria-disabled') === 'true') return; // já está rolando
                 // quem rolou pelo teclado segue para as escolhas da cena seguinte
