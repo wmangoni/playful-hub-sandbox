@@ -8,10 +8,13 @@
 import { html, render } from '../core/dom.js';
 import { normalize, plural } from '../core/format.js';
 import { montarCardCatalogo } from '../rules/card30.js';
+import { ndRotulo } from '../rules/encontro30.js';
 import { icon } from '../ui/icons.js';
 import { emptyState, loadingState, pageHead } from '../ui/page.js';
 import { toast } from '../ui/toast.js';
-import { AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND, carregarCatalogo, contextoDoCard, rotuloFaixa } from './card-dados.js';
+import {
+  AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND, carregarCatalogo, carregarCombatente, carregarIndiceCatalogo, contextoDoCard, rotuloFaixa,
+} from './card-dados.js';
 import { abrirCard, cartaoCompacto } from './ficha-card.js';
 
 const ABAS = [
@@ -30,27 +33,58 @@ function cabecalho() {
 
 export async function renderBestiario({ root, router, query, store }) {
   render(root, html`${cabecalho()}${loadingState(4)}`);
-  let cat;
+  let indice;
   let contexto;
   try {
-    [cat, contexto] = await Promise.all([carregarCatalogo(), contextoDoCard(store)]);
+    [indice, contexto] = await Promise.all([carregarIndiceCatalogo(), contextoDoCard(store)]);
   } catch {
-    if (!root.isConnected) return undefined;
-    render(root, html`${cabecalho()}<section class="card">${emptyState({
-      glyph: 'alert',
-      title: 'Não foi possível carregar o bestiário',
-      text: 'O catálogo de monstros não chegou. Verifique a conexão e tente de novo.',
-      action: html`<button type="button" class="btn btn--primary" data-action="recarregar">${icon('restore')}Tentar de novo</button>`,
-    })}</section>`);
-    root.querySelector('[data-action="recarregar"]').addEventListener('click', () => router.reload());
-    return undefined;
+    // Fallback: tenta carregar o catálogo completo caso o índice falhe
+    try {
+      const cat = await carregarCatalogo();
+      indice = [...(cat.monstros || []), ...(cat.holy_avenger || [])];
+      contexto = await contextoDoCard(store);
+    } catch {
+      if (!root.isConnected) return undefined;
+      render(root, html`${cabecalho()}<section class="card">${emptyState({
+        glyph: 'alert',
+        title: 'Não foi possível carregar o bestiário',
+        text: 'O catálogo de monstros não chegou. Verifique a conexão e tente de novo.',
+        action: html`<button type="button" class="btn btn--primary" data-action="recarregar">${icon('restore')}Tentar de novo</button>`,
+      })}</section>`);
+      root.querySelector('[data-action="recarregar"]').addEventListener('click', () => router.reload());
+      return undefined;
+    }
   }
   if (!root.isConnected) return undefined;
 
-  const listas = { monstros: cat.monstros, holy: cat.holy_avenger };
-  const todos = [...cat.monstros, ...cat.holy_avenger];
-  const modelos = new Map(todos.map(e => [e.id, montarCardCatalogo(e, contexto)]));
-  const porId = new Map(todos.map(e => [e.id, e]));
+  const entradas = Array.isArray(indice) ? indice : [];
+  const listas = {
+    monstros: entradas.filter(e => e.categoria === 'monstro'),
+    holy: entradas.filter(e => e.categoria === 'holy_avenger'),
+  };
+  const porId = new Map(entradas.map(e => [e.id, e]));
+  const modelosCompletos = new Map();
+
+  function modeloCompacto(e) {
+    if (modelosCompletos.has(e.id)) return modelosCompletos.get(e.id);
+    const tipo = [e.tipo, e.tamanho && e.tamanho.toLowerCase(), (e.subtipos || []).length ? `(${e.subtipos.join(', ')})` : null].filter(Boolean).join(' ');
+    return {
+      id: e.id,
+      tema: e.categoria === 'holy_avenger' ? 'holy' : 'monstro',
+      icone: e.categoria === 'holy_avenger' ? 'shield' : 'flame',
+      nome: e.nome,
+      subtitulo: tipo,
+      selo: `ND ${ndRotulo(e.nd)}`,
+      identidade: '',
+      numeros: [
+        { rotulo: 'PV', valor: String(e.pv) },
+        { rotulo: 'CA', valor: String(e.ca?.total ?? e.ca) },
+        { rotulo: 'Inic.', valor: '—' },
+      ],
+      ataques: { unico: [] },
+      resumo: '',
+    };
+  }
 
   const pedido = query.get('ver');
   const alvo = pedido ? porId.get(pedido) : null;
@@ -79,8 +113,8 @@ export async function renderBestiario({ root, router, query, store }) {
       .filter(e => e.nd >= min && e.nd <= max)
       .filter(e => {
         if (!termo) return true;
-        const m = modelos.get(e.id);
-        return normalize(`${e.nome} ${e.nome_original || ''} ${m.subtitulo} ${m.identidade} ${e.resumo}`).includes(termo);
+        const subtitulo = [e.tipo, e.tamanho && e.tamanho.toLowerCase(), (e.subtipos || []).length ? `(${e.subtipos.join(', ')})` : null].filter(Boolean).join(' ');
+        return normalize(`${e.nome} ${e.nome_original || ''} ${subtitulo}`).includes(termo);
       })
       .sort((x, y) => x.nd - y.nd || x.nome.localeCompare(y.nome, 'pt-BR'));
   }
@@ -92,7 +126,7 @@ export async function renderBestiario({ root, router, query, store }) {
     return {
       contagem,
       corpo: itens.length
-        ? html`<ul class="bst-grid">${itens.map(e => html`<li>${cartaoCompacto(modelos.get(e.id))}</li>`)}</ul>`
+        ? html`<ul class="bst-grid">${itens.map(e => html`<li>${cartaoCompacto(modeloCompacto(e))}</li>`)}</ul>`
         : html`<div class="arena-picker__empty">${icon('search')}<p>Nenhuma ficha com esses filtros.</p></div>`,
     };
   }
@@ -126,23 +160,36 @@ export async function renderBestiario({ root, router, query, store }) {
       </section>`);
   }
 
-  function abrir(id) {
-    const modelo = modelos.get(id);
-    if (!modelo) return;
+  async function abrir(id) {
+    if (!id || !porId.has(id)) return;
     card?.fechar();
     state.aberto = id;
     salvarNaUrl();
-    card = abrirCard({
-      modelo,
-      aviso: contexto.semGlossario ? AVISO_SEM_GLOSSARIO : '',
-      aoFechar: () => {
-        card = null;
-        state.aberto = null;
-        if (!vivo) return;
-        salvarNaUrl();
-        if (recarregarDepois) router.reload();
-      },
-    });
+    try {
+      let modelo = modelosCompletos.get(id);
+      if (!modelo) {
+        const combatente = await carregarCombatente(id);
+        if (!combatente) throw new Error('Não encontrado');
+        modelo = montarCardCatalogo(combatente, contexto);
+        modelosCompletos.set(id, modelo);
+      }
+      if (state.aberto !== id || !vivo) return;
+      card = abrirCard({
+        modelo,
+        aviso: contexto.semGlossario ? AVISO_SEM_GLOSSARIO : '',
+        aoFechar: () => {
+          card = null;
+          state.aberto = null;
+          if (!vivo) return;
+          salvarNaUrl();
+          if (recarregarDepois) router.reload();
+        },
+      });
+    } catch {
+      toast({ type: 'warning', title: 'Ficha não encontrada', message: 'Não foi possível carregar a ficha completa do combatente.' });
+      state.aberto = null;
+      salvarNaUrl();
+    }
   }
 
   root.addEventListener('click', event => {
