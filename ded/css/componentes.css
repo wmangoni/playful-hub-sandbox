@@ -7,7 +7,7 @@
    ========================================================================== */
 
 /* Números em Alegreya com algarismos alinhados */
-.num, .medalhao-mod, .medalhao-valor, .emblema-valor, .nivel-valor, .escolha-num {
+.num, .medalhao-mod, .medalhao-valor, .emblema-valor, .nivel-valor, .escolha-num, .card-heroi-atributo-valor {
     font-family: var(--fonte-numero);
     font-weight: 500;
     font-variant-numeric: lining-nums tabular-nums;
@@ -27,6 +27,9 @@
         url(../ui/texturas/pergaminho.webp) 0 0 / 512px repeat,
         var(--pergaminho);
     background-clip: padding-box;
+    /* As camadas de dentro (dragões, fitas, medalhões) não disputam com os
+       overlays de fora da folha, que vêm depois dela no DOM */
+    isolation: isolate;
 }
 
 /* Dragões empoleirados nos cantos da moldura */
@@ -112,7 +115,7 @@
     transition: transform 0.15s ease, color 0.15s ease;
 }
 .selo:hover svg { transform: translateY(-0.12rem); color: var(--rubro); }
-.selo[aria-pressed="true"] svg { color: var(--rubro); }
+.selo[aria-pressed="true"] svg, .selo[aria-expanded="true"] svg { color: var(--rubro); }
 .selo[aria-pressed="false"] svg { opacity: 0.6; }
 .selo:focus-visible { outline: none; }
 .selo:focus-visible svg { box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro); }
@@ -340,6 +343,10 @@
     box-shadow: none;
 }
 .slot-vazio .slot-nome { font-style: italic; color: var(--apagado); }
+/* Mochila bloqueada durante o teste de dado (o clique ainda explica o motivo) */
+.slot.disabled { opacity: 0.55; cursor: not-allowed; }
+.slot-usavel.disabled:hover { outline-color: var(--ouro); }
+.slot-usavel.disabled:hover svg { color: var(--tinta-2); }
 
 /* ---------- Missões ---------- */
 
@@ -479,16 +486,23 @@
     color: var(--rubro);
     text-shadow: 0 0.06rem 0 rgba(255, 244, 220, 0.6);
 }
+/* Máquina de escrever: o texto já está montado, palavra por palavra; cada
+   uma só ganha opacidade na sua vez (sem refluxo, as escolhas não andam) */
+.cena-texto > span { transition: opacity 0.18s ease; }
+.cena-texto > .tw { opacity: 0; }
 
 /* ---------- Ações: escolhas e bandeja na mesma célula ---------- */
 
 /* A altura é sempre a do estado mais alto, então trocar de estado não move
    nada, e a bandeja já chega com estilo e layout calculados (só fica
-   invisível). O estado inativo também recebe o atributo inert. */
+   invisível). */
 .acoes { display: grid; }
 .acoes > .corrente { grid-area: 1 / 1; }
 .acoes > .escolhas, .acoes > .bandeja { grid-area: 2 / 1; align-self: start; }
-.estado-oculto { visibility: hidden; }
+/* O jogo e os testes alternam os dois estados com a classe .hidden, que no
+   legado é display: none; aqui ela só deixa invisível (legado.css a exclui
+   dos filhos de .acoes). Invisível, o estado também sai do foco e da leitura. */
+.estado-oculto, .acoes > .hidden { visibility: hidden; }
 
 .corrente {
     position: relative;
@@ -557,6 +571,8 @@
     color: var(--creme);
 }
 .escolha:focus-visible { outline-offset: 0.05rem; }
+/* Cena sem escolhas (morte e finais): só o botão de recomeçar */
+.escolhas > .botao-secundario { justify-self: center; margin-top: 0.5rem; }
 
 .teste {
     display: inline-flex;
@@ -623,9 +639,9 @@
 }
 
 /* O número é o texto do #dice; a arte do d20 é o fundo. Os nomes em inglês
-   (.dice, .rolling-animation) são contrato com o JS e os testes do jogo. O
-   escopo .bandeja-mesa > separa este dado do .dice legado do combate, e as
-   declarações neutras (borda, margem, sombra, transição) barram o legado. */
+   (.dice, .rolling-animation, .critical-success-bg) são contrato com o JS e
+   os testes do jogo. O escopo .bandeja-mesa > separa este dado do .dice do
+   combate, que segue legado até a Fase 3 (lá ele fica sob #combat-screen). */
 .bandeja-mesa > .dice {
     position: relative;
     z-index: var(--z-dado);
@@ -633,20 +649,36 @@
     place-items: center;
     width: 7rem;
     height: 7rem;
-    margin: 0;
     padding-top: 0.25rem;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
     background: url(../ui/ornamentos/d20.svg) center / contain no-repeat;
     font: 700 1.75rem/1 var(--fonte-titulo);
     font-variant-numeric: lining-nums;
-    transition: none;
     color: #fbeccb;
     text-shadow: 0 0.08rem 0 rgba(0, 0, 0, 0.55);
     user-select: none;
     contain: size layout style; /* o número troca a cada 60 ms sem refluir a bandeja */
+    /* camada própria desde a abertura, para o giro não criar camada no primeiro
+       clique; opacity, e não transform, mantém o dado nítido parado (com
+       will-change: transform o Chrome não alinha a camada ao pixel e ela borra) */
+    will-change: opacity;
 }
+/* Durante o giro, a arte vem de uma cópia numa camada própria, rasterizada (a
+   1%) desde a abertura: o número troca a cada 60 ms e só ele é redesenhado, sem
+   rasterizar o SVG de novo no primeiro giro. Parado, o dado volta à arte do
+   fundo, nítida (a camada, composta em posição fracionária, borra um pouco). */
+.bandeja-mesa > .dice::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background: url(../ui/ornamentos/d20.svg) center / contain no-repeat;
+    visibility: visible; /* pintada desde a abertura, mesmo com a bandeja oculta */
+    opacity: 0.01;
+    will-change: transform, opacity;
+    pointer-events: none;
+}
+.bandeja-mesa > .dice.rolling-animation { background: none; }
+.bandeja-mesa > .dice.rolling-animation::after { opacity: 1; }
 .bandeja-mesa > .dice.rolling-animation { animation: d20-rolar 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 @keyframes d20-rolar {
     0%   { transform: translate(0, 0) rotate(0) scale(1); }
@@ -671,6 +703,7 @@
     visibility: visible; /* pintado desde a abertura, mesmo com a bandeja oculta */
     opacity: 0.01;
     will-change: opacity;
+    pointer-events: none; /* com a bandeja oculta, as escolhas ocupam este lugar */
 }
 .bandeja-mesa.critico::after { animation: brilho-critico 1.4s ease-in-out infinite alternate; }
 @keyframes brilho-critico { from { opacity: 0.55; } to { opacity: 1; } }
@@ -683,6 +716,7 @@
     background: url(../ui/ornamentos/d20-apagado.svg) center / contain no-repeat;
     visibility: visible; /* pintado desde a abertura, mesmo com a bandeja oculta */
     opacity: 0.01;
+    pointer-events: none;
 }
 .bandeja-mesa > .dice.falha-critica::before { opacity: 1; }
 .bandeja-mesa > .dice.falha-critica { color: #d9c7b0; }
@@ -709,7 +743,35 @@
     transition: transform 0.15s ease;
 }
 .botao-fita:hover { transform: translateY(-0.1rem); }
-.botao-fita:disabled { cursor: default; opacity: 0.55; transform: none; }
+.botao-fita:disabled, .botao-fita[aria-disabled="true"] { cursor: default; opacity: 0.55; transform: none; }
+
+/* ---------- Botão secundário ---------- */
+
+/* Para ações de apoio (abrir a loja, voltar): a fita rubra fica para a ação principal */
+.botao-secundario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.7rem;
+    padding: 0.35rem 1.15rem 0.3rem;
+    border: 0.1rem solid var(--tinta-2);
+    border-radius: 0.25rem;
+    outline: 0.07rem solid var(--ouro);
+    outline-offset: -0.3rem;
+    background: linear-gradient(#f6eed9, #dcc79e);
+    box-shadow: 0 0.12rem 0 rgba(40, 20, 5, 0.25);
+    font: max(0.95rem, 13px) / 1.1 var(--fonte-rotulo);
+    letter-spacing: 0.1em;
+    color: var(--tinta-2);
+    cursor: pointer;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+.botao-secundario svg { width: 1.35rem; height: 1.35rem; flex: none; color: var(--sepia); transition: color 0.15s ease; }
+.botao-secundario:hover { transform: translateY(-0.08rem); color: var(--rubro); outline-color: var(--rubro); }
+.botao-secundario:hover svg { color: var(--rubro); }
+.botao-secundario:focus-visible { outline: 0.15rem solid var(--rubro); outline-offset: 0.12rem; }
+.botao-secundario:disabled { cursor: default; opacity: 0.55; transform: none; color: var(--tinta-2); outline-color: var(--ouro); }
 
 /* Selos de cera carimbados sobre o aro da bandeja: um por resultado, cada
    um com texto fixo e já pintado; revelar é só animar opacidade e transform */
@@ -741,6 +803,125 @@
     to   { opacity: 1; transform: scale(1) rotate(-10deg); }
 }
 
+/* ---------- Card de herói (seleção de personagem) ---------- */
+
+/* Cada card é um <label> com um rádio nativo escondido: setas, foco e leitor
+   de tela funcionam sem JS. O retrato coroa a moldura, e escolher o herói
+   carimba um selo de cera já pintado (só opacidade e transform). O estado
+   escolhido vem do :checked; a classe .selected, que o jogo também aplica,
+   é a reserva para navegador sem :has(). */
+.herois {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 21.5rem));
+    justify-content: center;
+    gap: 2.8rem;
+}
+.card-heroi {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 0.55rem;
+    padding: 5.1rem 1.4rem 1.2rem;
+    border: 0.7rem solid transparent;
+    border-image: url(../ui/ornamentos/moldura.svg) 40 / 2.5rem / 0 stretch;
+    background: rgba(255, 250, 236, 0.3);
+    background-clip: padding-box;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    contain: layout; /* o selo em repouso (escala 1,8) não cria rolagem em volta */
+}
+.card-heroi:hover { transform: translateY(-0.25rem); }
+.card-heroi:has(input:checked), .card-heroi.selected {
+    background-color: rgba(255, 246, 222, 0.62);
+    box-shadow: inset 0 0 0 0.14rem var(--rubro), inset 0 0 0 0.3rem rgba(201, 161, 79, 0.75);
+}
+.card-heroi:has(input:focus-visible) { outline: 0.15rem solid var(--rubro); outline-offset: 0.35rem; }
+.card-heroi-retrato {
+    position: absolute;
+    top: -3.5rem;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 7.4rem;
+    aspect-ratio: 1;
+    transform: translateX(-50%);
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.card-heroi-retrato svg { width: 3.7rem; height: 3.7rem; color: var(--tinta-2); transition: color 0.15s ease; }
+.card-heroi:hover .card-heroi-retrato svg,
+.card-heroi:has(input:checked) .card-heroi-retrato svg,
+.card-heroi.selected .card-heroi-retrato svg { color: var(--rubro); }
+.card-heroi-nome {
+    margin: 0;
+    font: 700 2.35rem/1 var(--fonte-titulo);
+    color: var(--tinta);
+}
+.card-heroi:has(input:checked) .card-heroi-nome, .card-heroi.selected .card-heroi-nome { color: var(--rubro); }
+.card-heroi-descricao {
+    min-height: 2.7em;
+    margin: 0 0 0.3rem;
+    font: italic 1.15rem/1.35 var(--fonte-texto);
+    color: var(--sepia);
+    text-wrap: balance;
+}
+/* Só <span> aqui dentro: o <label> aceita apenas conteúdo de frase */
+.card-heroi-atributos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.1rem 0.9rem;
+    width: 100%;
+}
+.card-heroi-atributo {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.22rem 0.1rem;
+    border-bottom: var(--linha-pontilhada);
+}
+.card-heroi-atributo-nome {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.08em;
+    color: var(--sepia);
+}
+.card-heroi-atributo-valor { font-size: 1.38rem; line-height: 1.1; color: var(--tinta); }
+/* o atributo mais forte da classe, em rubro */
+.card-heroi-atributo.forte .card-heroi-atributo-valor { font-weight: 700; color: var(--rubro); }
+/* Armadura e habilidade de combate da classe, como linhas da ficha */
+.card-heroi-extra {
+    display: grid;
+    width: 100%;
+    margin-top: 0.35rem;
+}
+.card-heroi-extra-item {
+    display: grid;
+    grid-template-columns: 1.2rem auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.3rem 0.1rem;
+    border-bottom: var(--linha-pontilhada);
+}
+.card-heroi-extra-item:last-child { border-bottom: 0; }
+.card-heroi-extra svg { width: 1.2rem; height: 1.2rem; color: var(--sepia); }
+.card-heroi-extra-rotulo {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.08em;
+    color: var(--sepia);
+}
+.card-heroi-extra-valor {
+    justify-self: end;
+    font-family: var(--fonte-texto);
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: lining-nums; /* sem o atalho font, que zeraria os algarismos alinhados do .num */
+    color: var(--tinta);
+}
+.card-heroi .selo-cera { top: -1.4rem; right: -2.2rem; }
+.card-heroi:has(input:checked) .selo-cera,
+.card-heroi.selected .selo-cera { animation: carimbar 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+
 /* ---------- Crônica ---------- */
 
 .cronica {
@@ -749,6 +930,12 @@
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--sepia-claro) transparent;
+}
+.cronica:empty::before {
+    content: 'Os feitos da aventura serão anotados aqui.';
+    padding: 0.32rem 0.1rem;
+    font: italic max(0.98rem, 12.5px)/1.4 var(--fonte-texto);
+    color: var(--apagado);
 }
 .cronica-item {
     display: grid;
@@ -775,7 +962,12 @@
 @media (prefers-reduced-motion: reduce) {
     .vitral-chama { animation: none; }
     .bandeja-mesa > .dice.rolling-animation { animation: d20-surgir 0.4s ease both; }
-    .selo-cera.visivel { animation-duration: 0.01s; }
+    .selo-cera.visivel,
+    .card-heroi:has(input:checked) .selo-cera,
+    .card-heroi.selected .selo-cera { animation-duration: 0.01s; }
+    .bandeja-mesa.critico::after { animation: none; opacity: 0.85; } /* brilho parado */
+    .card-heroi:hover, .botao-fita:hover, .botao-secundario:hover, .selo:hover svg { transform: none; }
+    .cena-texto > span { transition: none; }
     @keyframes d20-surgir { from { opacity: 0.2; } to { opacity: 1; } }
 }
 

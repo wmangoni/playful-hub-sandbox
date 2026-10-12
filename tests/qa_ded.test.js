@@ -125,13 +125,15 @@ async function runTests() {
   
   // Assertions for Warrior attributes and modifiers:
   // str: 16 (+3), dex: 12 (+1), con: 15 (+2), int: 8 (-1), wis: 10 (+0), luck: 8 (-1)
+  // Desde a Fase 2 da TASK_001 o modificador fica no medalhão, sem parênteses
+  // e com o sinal de menos tipográfico (U+2212).
   const expectedWarriorStats = {
-    str: { val: '16', mod: '(+3)' },
-    dex: { val: '12', mod: '(+1)' },
-    con: { val: '15', mod: '(+2)' },
-    int: { val: '8', mod: '(-1)' },
-    wis: { val: '10', mod: '(+0)' },
-    luck: { val: '8', mod: '(-1)' }
+    str: { val: '16', mod: '+3' },
+    dex: { val: '12', mod: '+1' },
+    con: { val: '15', mod: '+2' },
+    int: { val: '8', mod: '−1' },
+    wis: { val: '10', mod: '+0' },
+    luck: { val: '8', mod: '−1' }
   };
   
   for (const [stat, expected] of Object.entries(expectedWarriorStats)) {
@@ -170,19 +172,19 @@ async function runTests() {
     const slot = document.querySelector('.inventory-slot-box.occupied');
     if (!slot) return null;
     const nameEl = slot.querySelector('.item-name');
-    const emojiEl = slot.querySelector('.item-emoji');
-    const tooltipEl = slot.querySelector('.item-tooltip');
+    // Fase 2: o ícone do item vem do sprite (ui/icones.svg) em vez do emoji
+    const iconEl = slot.querySelector('.item-icone use');
     return {
       occupied: true,
       name: nameEl ? nameEl.textContent : null,
-      emoji: emojiEl ? emojiEl.textContent : null,
-      tooltip: tooltipEl ? tooltipEl.textContent : null,
+      icon: iconEl ? iconEl.getAttribute('href') : null,
+      tooltip: slot.title,
       isUsable: slot.classList.contains('usable')
     };
   });
   
   console.log('Occupied slot details:', itemInSlot);
-  if (!itemInSlot || itemInSlot.name !== 'Poção de Vida' || itemInSlot.emoji !== '🫙' || !itemInSlot.isUsable) {
+  if (!itemInSlot || itemInSlot.name !== 'Poção de Vida' || !String(itemInSlot.icon).endsWith('#i-pocao') || !itemInSlot.isUsable) {
     throw new Error('Poção de Vida slot was not rendered correctly or is not usable');
   }
   
@@ -395,8 +397,8 @@ async function runTests() {
     const dice = document.getElementById('dice');
     return {
       resultText: dice ? dice.textContent : null,
-      borderColor: dice ? dice.style.borderColor : null,
-      boxShadow: dice ? dice.style.boxShadow : null,
+      // Fase 2: o 1 natural apaga o d20 com a classe .falha-critica (antes era estilo inline)
+      critFailureMark: dice ? dice.classList.contains('falha-critica') : false,
       logContainsCritFailure: gameState.log.some(msg => msg.includes('FALHA CRÍTICA') || msg.includes('1 natural'))
     };
   });
@@ -405,8 +407,8 @@ async function runTests() {
   if (critFailureResult.resultText !== '1') {
     throw new Error(`Expected final dice face to show 1, got ${critFailureResult.resultText}`);
   }
-  if (!critFailureResult.borderColor.includes('rgb(255, 0, 0)') && !critFailureResult.borderColor.includes('#ff0000') && critFailureResult.borderColor === '') {
-    throw new Error('Dice border color did not change to red for natural 1');
+  if (!critFailureResult.critFailureMark) {
+    throw new Error('Dice was not marked with .falha-critica for natural 1');
   }
   if (!critFailureResult.logContainsCritFailure) {
     throw new Error('Log did not capture the critical failure log message');
@@ -417,6 +419,46 @@ async function runTests() {
   await new Promise(r => setTimeout(r, 2000));
   
   console.log('✅ PASS: Critical natural 1 displays red critical failure styles and logs correctly.');
+
+  // ----------------------------------------------------
+  // TEST CASE 6: "Continuar" depois do resultado e finais sem escolhas (Fase 2)
+  // ----------------------------------------------------
+  console.log('\n--- 6. Testing "Continuar" after the roll and the end scenes ---');
+  const continuar = await page.evaluate(async () => {
+    loadScene('crypt');
+    skipTyping = true;
+    [...document.querySelectorAll('#choices button')][1].click(); // teste de Força
+    document.getElementById('dice-button').click();
+    await new Promise(r => setTimeout(r, 1500));
+    const rotulo = document.getElementById('dice-button').textContent;
+    document.getElementById('dice-button').click(); // avança na hora, sem esperar 1,8 s
+    return { rotulo, cena: gameState.currentScene, bandejaOculta: document.getElementById('dice-container').classList.contains('hidden') };
+  });
+  console.log('After "Continuar":', continuar);
+  if (continuar.rotulo !== 'Continuar' || continuar.cena === 'crypt' || !continuar.bandejaOculta) {
+    throw new Error('The dice button did not offer "Continuar" or did not advance right away');
+  }
+
+  // Só os finais de verdade oferecem o recomeçar; a poção volta sozinha para a cena anterior
+  const fins = await page.evaluate(() => {
+    const ler = cena => {
+      loadScene(cena);
+      return {
+        titulo: document.querySelector('#choices .escolhas-titulo').textContent,
+        recomecar: !!document.querySelector('#choices .botao-secundario')
+      };
+    };
+    return { pocao: ler('potion_health'), morte: ler('death') };
+  });
+  console.log('End scenes:', fins);
+  if (fins.pocao.recomecar || fins.pocao.titulo === 'A aventura terminou') {
+    throw new Error('potion_health (a pass-through scene) must not offer "Começar uma nova aventura"');
+  }
+  if (!fins.morte.recomecar) {
+    throw new Error('The death scene must offer "Começar uma nova aventura"');
+  }
+  console.log('✅ PASS: "Continuar" advances right away, and only real endings offer a new adventure.');
+
 
   console.log('\n=============================================');
   console.log('🎉 ALL QA TEST CASES PASSED SUCCESSFULLY FOR RPG ADVENTURE QUEST!');

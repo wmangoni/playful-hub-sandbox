@@ -18,6 +18,8 @@ const SCENES_JSON = path.join(ROOT, 'ded', 'assets', 'scenes.json');
 
 const html = fs.readFileSync(GAME_HTML, 'utf8');
 const scenesData = JSON.parse(fs.readFileSync(SCENES_JSON, 'utf8'));
+// As artes do vitral (o jogo busca as duas no início; o changeImage real roda no sandbox)
+const vitraisData = JSON.parse(fs.readFileSync(path.join(path.dirname(SCENES_JSON), 'vitrais.json'), 'utf8'));
 
 // ---------------------------------------------------------------------------
 // 1) Checagem estática: toda transição de cena deve apontar para uma cena real
@@ -130,7 +132,7 @@ function buildSandbox() {
     },
     alert: () => {},
     Image: function () { return { src: '', onload: null, onerror: null }; },
-    fetch: () => Promise.resolve({ json: () => Promise.resolve(scenesData) })
+    fetch: (url) => Promise.resolve({ json: () => Promise.resolve(String(url).includes('vitrais') ? vitraisData : scenesData) })
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);

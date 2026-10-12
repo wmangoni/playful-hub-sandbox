@@ -8,11 +8,13 @@ Os ícones de `icones.svg` e a cabeça de dragão de `ornamentos/dragao.svg` vê
 alterados. Cada símbolo do sprite traz o autor e o nome original num comentário.
 
 - **Lorc**: battle-axe, brain, broadsword, candle-light, checked-shield, clover,
-  crossed-swords, dragon-head, feather, fist, heart-organ, lyre, meat, open-book, owl,
-  padlock, plain-dagger, quill-ink, scroll-unfurled, treasure-map.
-- **Delapouite**: dice-twenty-faces-twenty, health-potion, rope-coil, torch, two-coins,
-  water-flask.
-- **sbed**: shield.
+  crossed-swords, crystal-growth, cut-diamond, dragon-head, fairy-wand, feather, fist,
+  gem-pendant, hazard-sign, heart-organ, hood, jeweled-chalice, linked-rings, lyre, meat,
+  open-book, owl, padlock, plain-dagger, pointy-hat, quill-ink, scroll-unfurled,
+  skeleton-key, swap-bag, treasure-map, visored-helm, winged-sword.
+- **Delapouite**: dice-twenty-faces-twenty, health-potion, lighter, rope-coil, torch,
+  two-coins, upgrade, water-flask.
+- **sbed**: death-skull, shield.
 - **Skoll**: hearts.
 
 ## Ornamentos e texturas

@@ -3,11 +3,15 @@
 // capture depois e compare.
 //
 //   node ded/tools/capturas.mjs capturar <pasta> [--raiz <repo>] [--alvo jogo,prototipo,catalogo] [--kit]
-//   node ded/tools/capturas.mjs comparar <pastaA> <pastaB>
+//   node ded/tools/capturas.mjs comparar <pastaA> <pastaB> [--so prefixo] [--tolerancia N]
 //
 // --kit injeta o CSS do kit (fontes, tokens, base, componentes, exploracao e o
-// recorte do vitral) depois do legado no jogo, como na Fase 2: as telas
-// legadas têm de sair idênticas.
+// recorte do vitral) depois do legado no jogo. Serve para capturar a referência
+// num worktree de antes da Fase 2 (--raiz) com o kit carregado, como o jogo
+// carrega hoje: os recortes legado-*.png das telas antigas têm de sair
+// idênticos (comparar ... --so legado).
+// --so compara só os arquivos que começam com o prefixo; --tolerancia ignora
+// pixels cuja diferença em cada canal é de no máximo N (padrão 0).
 //
 // Detalhes que tornam as capturas repetíveis:
 // - rasterização por software (a da GPU varia alguns pixels entre execuções);
@@ -15,7 +19,9 @@
 // - GTM e áudio bloqueados; no jogo, também o Google Fonts (a Outfit das telas
 //   legadas chegava em momentos diferentes e mudava o texto entre capturas
 //   iguais; sem ela, o legado usa a fonte de reserva nas duas pontas);
-// - o alert() da abertura do jogo dispensado.
+// - o alert() da abertura do jogo dispensado;
+// - movimento padrão forçado (prefers-reduced-motion: no-preference), porque o
+//   Windows com as animações desligadas faz o Chrome pedir movimento reduzido.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,6 +78,10 @@ async function novaPagina(browser, erros, w, h, semGoogleFonts = false) {
     page.on('pageerror', e => erros.push(e.message));
     page.on('response', r => { if (r.status() >= 400 && !r.url().endsWith('favicon.ico')) erros.push(`${r.status()} ${r.url()}`); });
     await page.setViewport({ width: w, height: h });
+    // Movimento padrão, qualquer que seja o sistema: com as animações do Windows
+    // desligadas, o Chrome informa prefers-reduced-motion e o jogo pula a máquina
+    // de escrever, apaga a chama do vitral e para o brilho do 20 natural
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
     return page;
 }
 
@@ -83,9 +93,47 @@ async function foto(page, pasta, nome, inteira) {
 }
 
 // ---------------------------------------------------------------------------
-// Jogo (ded/index.html): as telas legadas em estados fixos.
+// Jogo (ded/index.html). Desde a Fase 2 a seleção, a exploração e o d20 vêm
+// do kit. As telas que seguem legadas (combate, loja, especialização e diário)
+// também saem recortadas em legado-*.png (1920x1080) e legado-*-768.png
+// (1366x768), só o overlay e sem os cantos arredondados: o fundo atrás delas
+// mudou, mas elas têm de sair idênticas a uma referência de antes da migração
+// capturada com --kit.
 // Mesma ordem de carga da Fase 2, depois do legado
 const KIT = ['css/fontes.css', 'css/tokens.css', 'css/base.css', 'css/componentes.css', 'css/exploracao.css', 'ui/ornamentos/vitral-recorte.css'];
+const LEGADOS = {
+    combate: ['#combat-screen', 8],
+    loja: ['#shop-modal .modal-content', 0],
+    especializacao: ['#specialization-modal .modal-content', 14],
+    diario: ['#quest-journal', 12]
+};
+
+async function recorte(page, pasta, nome, sufixo) {
+    const [seletor, canto] = LEGADOS[nome];
+    const caixa = await page.evaluate(s => {
+        const r = document.querySelector(s).getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }, seletor);
+    await page.screenshot({
+        path: path.join(pasta, `legado-${nome}${sufixo}.png`),
+        clip: { x: caixa.x + canto, y: caixa.y + canto, width: caixa.width - 2 * canto, height: caixa.height - 2 * canto }
+    });
+    console.log('  ', `legado-${nome}${sufixo}`);
+}
+
+// Teste de Força na cripta (2ª escolha) com o resultado forçado
+async function rolar(page, aleatorio) {
+    await page.evaluate(() => { loadScene('crypt'); skipTyping = true; });
+    await espera(300);
+    await page.evaluate(() => [...document.querySelectorAll('#choices button')][1].click());
+    await espera(250);
+    await page.evaluate(v => {
+        window.__aleatorio = Math.random;
+        Math.random = () => v;
+        document.getElementById('dice-button').click();
+    }, aleatorio);
+    await espera(1300 + 700); // giro + carimbo do selo
+}
 
 async function capturarJogo(browser, base, pasta, erros, comKit) {
     const tamanhos = [[1920, 1080, ''], [1366, 768, '-768'], [390, 844, '-390']];
@@ -108,12 +156,15 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         await espera(500);
         const tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, w < 800);
         await tira('selecao');
+        await page.evaluate(() => selectCharacter('wizard'));
+        await espera(600);
+        await tira('selecao-escolhido');
         await page.evaluate(() => { ttsEnabled = false; selectCharacter('warrior'); startGame(); });
         await espera(150);
         await page.evaluate(() => { skipTyping = true; });
         await espera(300);
         await tira('exploracao');
-        if (sufixo) { await page.close(); continue; }
+        if (sufixo === '-390') { await page.close(); continue; } // o celular é da Fase 5
 
         await page.evaluate(() => document.getElementById('btn-toggle-map').click());
         await espera(250);
@@ -125,12 +176,26 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         await page.evaluate(() => [...document.querySelectorAll('#choices button')][1].click());
         await espera(250);
         await tira('dado');
+
+        // os dois críticos; depois de cada um o jogo avança sozinho para a cena seguinte
+        await rolar(page, 0.96);
+        await tira('dado-20');
+        await espera(1600);
+        await rolar(page, 0);
+        await tira('dado-1');
+        await espera(1600);
+        await page.evaluate(() => { Math.random = window.__aleatorio; loadScene('death'); skipTyping = true; });
+        await espera(300);
+        await tira('fim');
+
         await page.evaluate(() => startInteractiveCombat({ name: 'Goblin', ac: 12, hp: 15, max_hp: 15, attack: 3, damage: 4 }));
         await espera(300);
         await tira('combate');
+        await recorte(page, pasta, 'combate', sufixo);
         await page.evaluate(() => { closeCombatScreen(); document.getElementById('shop-modal').classList.remove('hidden'); });
         await espera(250);
         await tira('loja');
+        await recorte(page, pasta, 'loja', sufixo);
         await page.evaluate(() => {
             document.getElementById('shop-modal').classList.add('hidden');
             gameState.player.level = 3;
@@ -138,12 +203,14 @@ async function capturarJogo(browser, base, pasta, erros, comKit) {
         });
         await espera(250);
         await tira('especializacao');
+        await recorte(page, pasta, 'especializacao', sufixo);
         await page.evaluate(() => {
             document.getElementById('specialization-modal').classList.add('hidden');
             document.getElementById('quest-journal-button').click();
         });
         await espera(250);
         await tira('diario');
+        await recorte(page, pasta, 'diario', sufixo);
         await page.close();
     }
 }
@@ -207,8 +274,8 @@ async function capturar(pasta, raiz, alvos, comKit) {
 
 // ---------------------------------------------------------------------------
 // Comparação: decodifica os PNGs num canvas do Chrome e conta os pixels diferentes.
-async function comparar(pastaA, pastaB) {
-    const nomes = fs.readdirSync(pastaA).filter(n => n.endsWith('.png')).sort();
+async function comparar(pastaA, pastaB, prefixo = '', tolerancia = 0) {
+    const nomes = fs.readdirSync(pastaA).filter(n => n.endsWith('.png') && n.startsWith(prefixo)).sort();
     const browser = await puppeteer.launch({ headless: 'new' });
     let diferentes = 0;
     try {
@@ -217,7 +284,7 @@ async function comparar(pastaA, pastaB) {
             const b = path.join(pastaB, nome);
             if (!fs.existsSync(b)) { console.log(`${nome.padEnd(34)} sem par em ${pastaB}`); diferentes++; continue; }
             const [da, db] = [path.join(pastaA, nome), b].map(f => 'data:image/png;base64,' + fs.readFileSync(f).toString('base64'));
-            const r = await page.evaluate(async (ua, ub) => {
+            const r = await page.evaluate(async (ua, ub, tol) => {
                 const carrega = u => new Promise((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = erro; i.src = u; });
                 const [ia, ib] = await Promise.all([carrega(ua), carrega(ub)]);
                 if (ia.width !== ib.width || ia.height !== ib.height) return { tamanho: `${ia.width}x${ia.height} x ${ib.width}x${ib.height}` };
@@ -225,14 +292,14 @@ async function comparar(pastaA, pastaB) {
                 const [pa, pb] = [px(ia), px(ib)];
                 let n = 0, x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
                 for (let i = 0; i < pa.length; i += 4) {
-                    if (pa[i] !== pb[i] || pa[i + 1] !== pb[i + 1] || pa[i + 2] !== pb[i + 2]) {
+                    if (Math.abs(pa[i] - pb[i]) > tol || Math.abs(pa[i + 1] - pb[i + 1]) > tol || Math.abs(pa[i + 2] - pb[i + 2]) > tol) {
                         n++;
                         const p = i / 4, x = p % ia.width, y = (p - x) / ia.width;
                         x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
                     }
                 }
                 return { n, caixa: n ? [x0, y0, x1, y1] : null };
-            }, da, db);
+            }, da, db, tolerancia);
             if (r.tamanho) { console.log(`${nome.padEnd(34)} TAMANHO ${r.tamanho}`); diferentes++; continue; }
             if (r.n) diferentes++;
             console.log(`${nome.padEnd(34)} ${r.n ? `${r.n} px diferentes, caixa ${JSON.stringify(r.caixa)}` : 'idêntico'}`);
@@ -252,10 +319,12 @@ if (comando === 'capturar' && resto.length) {
     const alvos = (opcao('--alvo') || 'jogo,prototipo,catalogo').split(',');
     const comKit = bandeira('--kit');
     await capturar(path.resolve(resto[0]), raiz, alvos, comKit);
-} else if (comando === 'comparar' && resto.length === 2) {
-    await comparar(path.resolve(resto[0]), path.resolve(resto[1]));
+} else if (comando === 'comparar' && resto.length >= 2) {
+    const prefixo = opcao('--so') || '';
+    const tolerancia = Number(opcao('--tolerancia') || 0);
+    await comparar(path.resolve(resto[0]), path.resolve(resto[1]), prefixo, tolerancia);
 } else {
     console.log('Uso:\n  node ded/tools/capturas.mjs capturar <pasta> [--raiz <repo>] [--alvo jogo,prototipo,catalogo] [--kit]\n' +
-        '  node ded/tools/capturas.mjs comparar <pastaA> <pastaB>');
+        '  node ded/tools/capturas.mjs comparar <pastaA> <pastaB> [--so prefixo] [--tolerancia N]');
     process.exitCode = 2;
 }

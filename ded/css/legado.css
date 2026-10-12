@@ -3,106 +3,46 @@
    visuais (Fase 1 da TASK_001). Os rem viraram px (1rem = 16px) para a escala
    do kit não afetar estas telas. Sai aos poucos, à medida que as fases 2 a 4
    trocam cada tela pelos componentes de componentes.css.
+
+   Fase 2: a seleção, a exploração e o d20 migraram e suas regras saíram daqui.
+   Os seletores de elemento e as classes genéricas que sobraram (button,
+   .hidden, .dice) ficam restritos às telas antigas com :where(), que não muda
+   a especificidade: o kit não herda nada deles.
    ========================================================================== */
 
 body {
     font-family: 'Outfit', 'Palatino', serif;
     font-size: 16px; /* fixo: a escala de rem do kit não chega ao texto legado */
-    background-color: #f5f1e6;
     color: #333;
-    max-width: 100%;
-    margin: 0 auto;
-    padding: 20px;
 }
 
-audio {
-    position: absolute;
-    top: 0px;
-    left: 0px;
-    box-shadow: 4px 1px 12px;
-    border-radius: 30px;
-}
-
+/* O .game-container virou só o palco do combate (legado até a Fase 3). Ele
+   repete a geometria do contêiner antigo (margem de 20px do body, borda de
+   2px, respiro de 20px e 90vh), então o #combat-screen sai idêntico. Fora do
+   combate é uma caixa vazia e transparente, que não captura cliques; durante
+   o combate veste a moldura antiga. O .shake-effect continua sacudindo o palco. */
 .game-container {
-    background-color: #fff;
-    border: 2px solid #7a5c3d;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    z-index: var(--z-overlay, 100);
     height: 90vh;
+    padding: 20px;
+    border: 2px solid transparent;
+    pointer-events: none;
+}
+.game-container > #combat-screen {
+    pointer-events: auto;
+}
+.game-container:has(> #combat-screen:not(.hidden)) {
+    border-color: #7a5c3d;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.game-container2 {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(5, 1fr);
-    gap: 8px;
-}
-
-.col1 {
-    grid-column: span 2 / span 2;
-    grid-row: span 5 / span 5;
-}
-
-.col2 {
-    grid-column: span 2 / span 2;
-    grid-row: span 5 / span 5;
-    grid-column-start: 3;
-}
-.col3 {
-    grid-row: span 5 / span 5;
-    grid-column-start: 5;
-}
-
-h1 {
-    color: #8b0000;
-    text-align: center;
-    font-size: 28px;
-    margin-bottom: 10px;
-}
-
-.subtitle {
-    text-align: center;
-    font-style: italic;
-    margin-bottom: 30px;
-    color: #555;
-}
-
-.scene-description {
-    border-left: 4px solid #8b0000;
-    padding: 10px 15px;
-    margin: 15px 0;
-    background-color: #f9f5eb;
-    overflow: auto;
-    max-height: 20vh;
-}
-
-.stats {
-    display: flex;
-    justify-content: space-between;
-    background-color: #eee8d9;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 15px 0;
-}
-
-.stat {
-    text-align: center;
-}
-
-.stat-value {
-    font-weight: bold;
-    font-size: 18px;
-}
-
-.choices {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-button {
+button:where(:not(.folha *)) {
     background-color: #7a5c3d;
     color: white;
     border: none;
@@ -114,39 +54,11 @@ button {
     transition: background-color 0.3s;
 }
 
-button:hover {
+button:where(:not(.folha *)):hover {
     background-color: #8b0000;
 }
 
-#image-container {
-    padding-top: 16px;
-}
-
-#image-container img {
-    max-width: 100%;
-    max-height: 76vh;
-}
-
-.inventory {
-    margin-top: 20px;
-    padding: 10px;
-    background-color: #eee8d9;
-    border-radius: 5px;
-}
-
-.inventory h3 {
-    margin-top: 0;
-    color: #7a5c3d;
-}
-
-.dice-roll {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 20px 0;
-}
-
-.dice {
+:where(#combat-screen) .dice {
     width: 60px;
     height: 60px;
     background-color: white;
@@ -160,58 +72,8 @@ button:hover {
     margin: 0 10px;
 }
 
-.roll-button {
-    margin-left: 20px;
-}
-
-.log {
-    overflow-y: auto;
-    margin-top: 15px;
-    border: 1px solid #ccc;
-    padding: 10px;
-    font-style: italic;
-    font-size: 14px;
-    color: #555;
-    border-radius: 5px;
-    max-height: 75vh;
-}
-
-.hidden {
+.hidden:where(:not(.acoes > *)) {
     display: none !important;
-}
-
-.character-select {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    margin-bottom: 30px;
-}
-
-.character-card {
-    border: 2px solid #7a5c3d;
-    border-radius: 5px;
-    padding: 15px;
-    text-align: center;
-    cursor: pointer;
-    width: 150px;
-    transition: all 0.3s;
-}
-
-.character-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-.character-card.selected {
-    border-color: #8b0000;
-    background-color: #f9e9e9;
-}
-
-.result-message {
-    padding: 15px;
-    margin: 15px 0;
-    border-radius: 5px;
-    font-weight: bold;
 }
 
 .success {
@@ -283,159 +145,6 @@ button:hover {
     background-color: #7a5c3d;
 }
 
-#info {
-    position: absolute;
-    top: 96px;
-    left: 26px;
-    font-size: 12px;
-}
-
-/* --- Ficha de Personagem Premium --- */
-.character-panel {
-    background: rgba(45, 38, 30, 0.75);
-    border: 2px solid #c5a880;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 15px;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.6), 0 4px 6px rgba(0,0,0,0.1);
-}
-.character-panel-title {
-    font-family: 'MedievalSharp', cursive, serif;
-    font-size: 16px;
-    color: #ffd700;
-    text-align: center;
-    margin-top: 0;
-    margin-bottom: 8px;
-    letter-spacing: 1px;
-    border-bottom: 1px solid rgba(197, 168, 128, 0.3);
-    padding-bottom: 4px;
-}
-.character-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-}
-.stat-card {
-    background: linear-gradient(135deg, rgba(80, 65, 50, 0.5), rgba(40, 32, 25, 0.5));
-    border: 1px solid rgba(197, 168, 128, 0.4);
-    border-radius: 6px;
-    padding: 6px 4px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: all 0.2s ease;
-}
-.stat-card:hover {
-    border-color: #ffd700;
-    transform: translateY(-2px);
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
-}
-.stat-emoji {
-    font-size: 17.6px;
-    margin-bottom: 2px;
-}
-.stat-label {
-    font-size: 10.4px;
-    color: #c5a880;
-    font-weight: bold;
-    letter-spacing: 0.5px;
-}
-.stat-val {
-    font-size: 16px;
-    font-weight: 800;
-    color: #ffffff;
-}
-.stat-mod {
-    font-size: 12px;
-    color: #ffd700;
-    font-weight: bold;
-}
-
-/* --- Novo Inventário em Slots --- */
-.inventory-slots-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-top: 8px;
-}
-.inventory-slot-box {
-    background: rgba(30, 25, 20, 0.7);
-    border: 2px dashed rgba(197, 168, 128, 0.4);
-    border-radius: 6px;
-    height: 65px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    font-family: inherit;
-    transition: all 0.2s ease;
-    box-sizing: border-box;
-}
-.inventory-slot-box.occupied {
-    border: 2px solid #c5a880;
-    background: linear-gradient(to bottom, #504030, #382c20);
-    cursor: default;
-}
-.inventory-slot-box.usable {
-    cursor: pointer;
-}
-.inventory-slot-box.usable:hover {
-    border-color: #ffd700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-    transform: scale(1.05);
-}
-.inventory-slot-box.disabled {
-    opacity: 0.5;
-    cursor: not-allowed !important;
-    border-color: rgba(100, 80, 60, 0.4) !important;
-    background: rgba(20, 15, 10, 0.4) !important;
-}
-.inventory-slot-box.disabled:hover {
-    transform: none !important;
-    box-shadow: none !important;
-}
-.empty-slot-text {
-    font-size: 11.2px;
-    color: #605040;
-    font-style: italic;
-}
-.item-emoji {
-    font-size: 22.4px;
-    margin-bottom: 1px;
-}
-.item-name {
-    font-size: 10.4px;
-    color: #e0dacd;
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis; 
-    white-space: nowrap;
-    width: 90%;
-    font-weight: 500;
-}
-.item-tooltip {
-    display: none;
-    position: absolute;
-    bottom: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1a120b;
-    border: 1px solid #c5a880;
-    color: #f0e0d0;
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 11.2px;
-    white-space: nowrap;
-    z-index: 50;
-    pointer-events: none;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.5);
-}
-.inventory-slot-box:hover .item-tooltip {
-    display: block;
-}
-
 /* --- Animação Épica de Dados D20 --- */
 @keyframes d20-epic-roll {
     0% { transform: scale(1) rotate(0deg); filter: blur(0); }
@@ -445,7 +154,7 @@ button:hover {
     85% { transform: scale(1.1) rotate(1150deg); filter: blur(1px); }
     100% { transform: scale(1) rotate(1260deg); filter: blur(0); }
 }
-.dice {
+:where(#combat-screen) .dice {
     width: 65px;
     height: 65px;
     background: linear-gradient(135deg, #8b0000, #4a0000);
@@ -462,10 +171,10 @@ button:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 215, 0, 0.3);
     transition: all 0.3s ease;
 }
-.dice.rolling-animation {
+:where(#combat-screen) .dice.rolling-animation {
     animation: d20-epic-roll 1.3s cubic-bezier(0.19, 1, 0.22, 1) forwards;
 }
-.critical-success-bg {
+:where(#combat-screen) .critical-success-bg {
     animation: crit-glow 1.5s infinite alternate;
     border: 2px solid #ffd700 !important;
     background-color: #155724 !important;
@@ -474,11 +183,6 @@ button:hover {
 @keyframes crit-glow {
     from { box-shadow: 0 0 10px #ffd700; }
     to { box-shadow: 0 0 25px #ff8c00, 0 0 10px #ffd700; }
-}
-
-/* --- Estilos da Ficha/Grid --- */
-.game-container {
-    position: relative;
 }
 
 /* --- Tela de Combate por Turnos Premium --- */
@@ -758,6 +462,7 @@ button:hover {
         r: 17px;
     }
 }
+/* --- Mapa da masmorra --- */
 .minimap-panel {
     background: #120c08;
     border: 2px solid #7a5c3d;
@@ -765,6 +470,17 @@ button:hover {
     padding: 10px;
     margin-top: 15px;
     box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+}
+/* Fase 2: o painel abre sobre a folha, logo abaixo do cabeçalho, pelo selo "Mapa"
+   (vira peça do kit na Fase 4). O rem segue a escala da folha. */
+#minimap-container {
+    position: fixed;
+    top: 8.6rem;
+    left: 50%;
+    z-index: var(--z-overlay, 100);
+    width: min(72rem, calc(100vw - 4rem));
+    margin: 0;
+    transform: translateX(-50%);
 }
 .minimap-view {
     overflow-x: auto;
@@ -839,20 +555,7 @@ button:hover {
 .spec-card .spec-desc { font-size: 12px; color: #c5a880; margin: 6px 0; line-height: 1.4; }
 .spec-card .spec-abilities { font-size: 11.52px; color: #9adfff; line-height: 1.4; }
 
-/* --- Diário de Missões --- */
-#quest-journal-button {
-    position: absolute;
-    top: 96px;
-    right: 26px;
-    z-index: 20;
-    background-color: #554433;
-    border: 1px solid #ffd700;
-    color: #f0e0d0;
-    font-size: 13px;
-    padding: 6px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-}
+/* --- Diário de Missões (aberto pelo selo "Diário") --- */
 #quest-journal {
     position: fixed;
     top: 50%;

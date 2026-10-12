@@ -7,28 +7,57 @@ Um jogo de RPG de aventura textual interativa (estilo livro-jogo de D&D) onde o 
 O jogo está estruturado com base nos seguintes arquivos:
 - **`index.html`**: O ponto de entrada principal que contém o HTML das telas (painel de estatísticas, tela de log, área de imagem de cenário e janelas modais de loja), além do motor principal JavaScript de controle da aventura. O CSS fica em `css/`.
 - **`assets/scenes.json`**: Base de dados em formato JSON que armazena a estrutura da árvore narrativa de decisões. Cada entrada representa uma cena contendo descrição, imagens, caminhos de escolha e callbacks associados (`onEnter`).
+- **`assets/vitrais.json`**: a arte de cada cena que tem imagem própria (a chave é o id da cena). Cada entrada traz:
+  - `arquivo`, em `images/`;
+  - `local`, o nome do lugar na fita sobre a narrativa;
+  - `foco`, o `object-position` que mantém o assunto dentro do arco do vitral;
+  - `alt`.
+
+  Uma cena sem arte própria mantém a do vitral. Arte nova entra aqui, conferida no recorte do vitral.
 - **`index_new.html` / `d3.html`**: Versões experimentais/alternativas que testam mecânicas e interfaces adicionais do ecossistema do jogo.
 
 ### 🎨 Interface "Ficha Iluminada" (em migração, `TASKS/TASK_001.md`)
 
 A interface está sendo trocada por fases. O plano, as fases e as regras de performance estão em `TASKS/TASK_001.md`.
 
-- **`css/legado.css`**: a interface antiga, extraída do `<style>` do `index.html` sem mudança visual (Fase 1). Os `rem` viraram `px` para a escala do kit não afetá-la. Sai aos poucos, conforme as fases 2 a 4 trocam cada tela.
-  - Enquanto conviver com o kit, o legado vem **antes** dele.
+- **`css/legado.css`**: a interface antiga das telas que ainda não migraram (combate, loja, especialização, diário e mapa), em `px` para a escala do kit não afetá-las. A seleção, a exploração e o d20 migraram na Fase 2; as outras telas saem nas fases 3 e 4.
+  - O legado vem **antes** do kit no `<head>`.
   - Nos dois sentidos, nada pode vazar.
     - O reset do kit (`base.css`) vale só dentro da `.folha`, com especificidade zero (`:where`). O fundo escuro fica no `body.ficha`.
-    - O `body` legado fixa `font-size: 16px`, e a `.folha` reancora em `1rem`: assim a escala do `html` do kit não chega ao texto legado. Ao restringir o `body` legado, esse `font-size` fica de fora da restrição.
-    - As telas legadas (combate, loja, especialização, diário, mapa) ficam **fora** da `.folha` até migrarem. Se o contêiner do jogo virar a `.folha` (Fase 2), tire o `#combat-screen` de dentro dele.
-    - Os seletores de elemento do legado (`button`, `button:hover`, `body`, `h1`) ainda valem para a página toda. Restrinja-os às telas antigas antes de carregar o kit no jogo (Fase 2).
+    - O `body` legado só define a fonte, o `font-size: 16px` e a cor que as telas antigas herdam. A `.folha` reancora em `1rem`, então a escala do `html` do kit não chega ao texto legado.
+    - As telas legadas ficam **fora** da `.folha`. O `.game-container` virou só o palco do combate: repete a geometria do contêiner antigo e fica vazio e transparente fora do combate.
+    - Os seletores genéricos que sobraram são restritos com `:where()`, que não muda a especificidade:
+      - `button` vale só fora da `.folha`;
+      - `.dice` vale só dentro do `#combat-screen`;
+      - `.hidden` (`display: none`) vale em tudo, menos nos filhos de `.acoes`.
 - **`css/` do kit novo**, nesta ordem de carga:
   - `fontes.css`: `@font-face` das fontes do projeto;
   - `tokens.css`: cores, tipografia e camadas (`--z-*`);
   - `base.css`: escala da tela em `rem`, o reset (só dentro da `.folha`), o fundo do `body.ficha` e utilitários;
   - `componentes.css`: as peças e o comportamento responsivo delas (folha, painel com fita, emblemas, medalhões, slots, escolhas, ações, bandeja do d20, selos de cera e crônica);
+  - `selecao.css`: só o arranjo da seleção de personagem, sob `.tela-selecao`;
   - `exploracao.css`: só o arranjo da tela de exploração, com tudo sob `.tela-exploracao`;
   - `ui/ornamentos/vitral-recorte.css`: o recorte em arco da cena, gerado.
-- **Telas:** a `.folha` recebe a classe da tela ativa (`tela-exploracao`, depois `tela-selecao` e outras), que o jogo troca conforme o estado. Overlays e toasts (fases 3 e 4) ficam **fora** da `.folha`, nas camadas `--z-overlay`, `--z-toast` e `--z-efeito`, para não herdar o arranjo da tela.
-- **Nomes:** em português, exceto os que são contrato com o JS e os testes do jogo, como `#dice`, `.dice`, `.rolling-animation`, `#dice-container` e `#choices`. No kit, o d20 vale só para `.bandeja-mesa > .dice` e neutraliza o `.dice` legado do combate.
+- **Telas:** cada tela é uma `.folha` com a classe dela: `#character-select.tela-selecao` e `#game-screen.tela-exploracao`. `mostrarTela()` alterna as duas.
+  - A seleção some com `.hidden`.
+  - A exploração, fora de vista, fica em `.tela-em-espera`: montada e invisível, com o layout pronto para o "Começar".
+  - Overlays e toasts ficam **fora** da `.folha`, nas camadas `--z-overlay`, `--z-toast` e `--z-efeito`.
+  - A `.folha` isola as próprias camadas, para não disputar com esses overlays.
+- **Escolhas e d20:** `#choices` e `#dice-container` dividem a mesma célula de `.acoes`.
+  - O jogo e os testes ainda os alternam com `.hidden`, que ali só deixa invisível. A altura não muda, e as camadas do resultado (selos de cera, brilho e d20 apagado) ficam pintadas com `opacity: .01`.
+  - Nenhum outro filho direto de `.acoes` pode usar `.hidden` esperando `display: none`.
+  - `#choices` recebe o título e os botões das escolhas, na ordem do `scenes.json`.
+  - Só as cenas de `CENAS_FINAIS` (mortes e vitórias) oferecem "Começar uma nova aventura". Uma cena sem escolhas que volta sozinha pelo `onEnter`, como a da poção, mostra só "A aventura continua…".
+  - Depois do resultado, o `#dice-button` vira "Continuar" ("Enfrentar", no teste de combate) e avança na hora. Sem clique, o jogo avança sozinho em 1,8 s.
+- **Nomes:** em português, exceto os que são contrato com o JS e os testes do jogo:
+  - o d20: `#dice`, `.dice`, `.rolling-animation`, `.critical-success-bg` (20 natural), `.falha-critica` (1 natural), `#dice-container`, `#dice-button` e `#result-message`;
+  - as escolhas: `#choices`;
+  - a seleção: `.character-card[data-class]` e `.selected`. O primeiro `<button>` de `#character-select` é o de começar;
+  - os atributos: `#val-*` e `#mod-*`. O modificador sai como `+3` e `−1`;
+  - o equipamento: `.inventory-slots-grid .inventory-slot-box`, com `.occupied`, `.usable`, `.disabled` e `.item-name`. O ícone fica em `.item-icone use` (`href` com `#i-*` do sprite) e a descrição no `title` do slot;
+  - os globais que as ferramentas usam: `scenes`, `gameState`, `skipTyping`, `ttsEnabled`, `selectCharacter`, `startGame`, `loadScene`, `startInteractiveCombat`, `closeCombatScreen` e `openSpecializationModal`.
+
+  No kit, o d20 vale só para `.bandeja-mesa > .dice`.
 - **`ui/`**: as artes da interface.
   - `ui/ornamentos/*.svg` e `vitral-recorte.css` são **gerados** por `node ded/tools/gerar-ornamentos.mjs`. Não edite os SVGs à mão: mude o script e rode de novo.
   - `ui/texturas/*.webp` vêm de `python -I ded/tools/gerar-texturas.py ded/ui/texturas`.
@@ -38,13 +67,20 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - `index.html` é a tela de exploração aprovada na Fase 0.
   - `componentes.html` é o catálogo do kit: cada peça e as variantes que o jogo usa.
 - **Prova visual:** `node ded/tools/capturas.mjs capturar <pasta>` gera capturas determinísticas do jogo, do protótipo e do catálogo. `node ded/tools/capturas.mjs comparar <antes> <depois>` compara pixel a pixel. Use os dois em toda mudança de CSS: capture antes, mude, capture depois e compare.
-  - Com `--kit`, o kit é injetado depois do legado no jogo. As telas legadas têm de sair iguais às capturadas sem ele.
   - Uma referência boa sai de um worktree no commit anterior, com `--raiz <worktree>`.
+  - As telas legadas também saem recortadas em `legado-*.png`, só o overlay.
+    - Compare-as com uma referência de antes da migração capturada com `--kit` (o kit injetado depois do legado): `comparar <ref> <nova> --so legado`.
+    - `--tolerancia N` ignora diferenças de até N por canal. Serve, por exemplo, para o fundo translúcido da especialização.
+- **Desempenho:** `node ded/tools/desempenho.mjs` mede o tempo dos quadros no Chrome com GPU. Cobre a digitação, o teste de d20, os críticos e o aceite do primeiro clique, repetido 30 vezes. Rode depois de mexer em animação, bandeja ou vitral.
+  - As duas ferramentas forçam o movimento padrão. Com as animações do Windows desligadas, o Chrome pede movimento reduzido e o jogo pula justamente a animação.
+  - Dentro da janela medida, a ferramenta não pode ler layout.
 - **`server.js`:** serve `/ded/css` e `/ded/ui` com `no-cache` (revalida por ETag), para um deploy não juntar HTML novo com CSS ou artes antigas.
   - A exceção é `/ded/ui/fontes`, com cache de 30 dias. Uma fonte nova entra com **outro nome de arquivo**: nunca substitua um `.woff2` mantendo o nome.
 - **Regras do kit:**
   - Números em Alegreya com algarismos alinhados (`.num`); os algarismos do Marcellus SC parecem letras. Há uma exceção: o número do d20, as fitas e o título ficam na Grenze Gotisch, com `font-variant-numeric: lining-nums`.
   - Animar só `transform` e `opacity`; a barra de vida desliza com `translateX`. Transições de cor só valem em hover e foco de elementos pequenos (escolhas, selos).
+  - Não ler o layout logo depois de mudar o DOM (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`). Leve a leitura para o próximo quadro com `noProximoQuadro()` ou `focarNoQuadro()`.
+  - Camada própria para algo que fica parado vem de `will-change: opacity`. Com `transform`, o Chrome não alinha a camada ao pixel e ela borra.
   - Nada de `backdrop-filter`, nem de `filter` ou sombra desfocada grandes (use gradientes).
   - Na hora de revelar um resultado, nunca troque `background-image`: deixe a camada pintada com `opacity: .01` e anime a opacidade.
   - O limite é de 48 FPS em Full HD.
@@ -58,7 +94,10 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
 
 - **Event-Driven (Programação Dirigida a Eventos)**: Toda a jogabilidade progride em resposta a eventos gerados pelas interações com botões de escolhas dinâmicas criados pela função `loadScene`, além de cliques no dado 20 faces virtual (`#dice-button`) e no modal de compras (`#shop-modal`).
 - **State Pattern (Padrão Estado)**: O objeto global `gameState` funciona como a única fonte da verdade do estado da partida. Ele controla a cena atual (`currentScene`), a vida do jogador (`player.health`), moedas de ouro (`player.gold`), nível de experiência (`player.xp`), inventário (`player.inventory`), atributos dinâmicos do jogador (`player.stats`), a memória lógica (`mem`) e o adversário atual no combate (`currentEnemy`).
-- **Typewriter Effect (Efeito Máquina de Escrever)**: A exibição do texto ocorre gradualmente através da função `typewriterEffect` para aumentar a imersão na leitura. O efeito suporta interrupção manual (pulo imediato para o fim da digitação) ao clicar no bloco de texto.
+- **Typewriter Effect (Efeito Máquina de Escrever)**: A exibição do texto ocorre gradualmente através da função `typewriterEffect` para aumentar a imersão na leitura.
+  - O texto entra montado, com uma `<span>` por palavra, e cada palavra só ganha opacidade na sua vez. Nada reflui e as escolhas não andam.
+  - O efeito pode ser pulado com um clique no texto ou com `skipTyping = true`.
+  - Respeita `prefers-reduced-motion`.
 - **Text-to-Speech (TTS - Narrador por Voz)**: Integra a API nativa do navegador `window.speechSynthesis` para criar uma experiência de acessibilidade por áudio. O sistema mapeia dinamicamente vozes localizadas em português do Brasil (ex: 'Daniel' ou 'Maria') e reproduz falas de forma sincronizada ao carregar novas cenas.
 
 ## 🛠️ Tecnologias e Bibliotecas Utilizadas
@@ -72,7 +111,14 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
 
 - `gameState`: Objeto global que rastreia os itens do inventário, inimigo atual, log da aventura e status do herói.
 - `characterStats`: Estrutura de dados com as tabelas de atributos de cada classe disponível.
-- `loadScene(sceneName)`: Limpa execuções anteriores de áudio/texto, troca a imagem do container (`changeImage`), carrega as opções disponíveis no JSON de cenas e monta dinamicamente o fluxo de botões e descrições na tela.
-- `typewriterEffect(element, text, speed, callback)`: Imprime o texto caractere por caractere com atraso temporal de `speed` ms.
+- `loadScene(sceneName)`: Limpa execuções anteriores de áudio/texto, troca a arte do vitral (`changeImage`, a partir de `vitrais.json`), carrega as opções disponíveis no JSON de cenas e monta dinamicamente o fluxo de botões e descrições na tela.
+- `typewriterEffect(element, text, speed, callback)`: Revela o texto já montado, palavra por palavra, no ritmo de um caractere a cada `speed` ms.
 - `rollDice()`: Executa uma rolagem aleatória de d20 (1 a 20) e adiciona os modificadores apropriados do personagem para decidir o sucesso ou falha em um teste narrativo de D&D.
+  - O 20 natural soma 5, e o 1 natural tira 5.
+  - A bandeja mostra a conta e carimba o selo do resultado. 1,8 s depois, a cena seguinte carrega sozinha.
+- `updateStatsDisplay()`: atualiza a ficha (vida, armadura, ouro, nível e anel de XP, atributos e missões).
+- `updateInventoryDisplay()`: monta os seis espaços do equipamento.
+- `addToLog(message)`: escreve na crônica.
+  - O ícone vem do emoji do começo da mensagem (`CRONICA_TIPOS`).
+  - Os emojis saem do texto, e só `<strong>` é aceito.
 - `speakText(text)` / `stopSpeech()`: Controla a síntese de fala baseada no navegador, filtrando vozes de fala em português do Brasil e evitando sobreposição de áudio.

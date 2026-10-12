@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0 e 1 prontas; a próxima é a Fase 2.
+**Status**: 🚧 Em andamento. Fases 0, 1 e 2 prontas; a próxima é a Fase 3.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -57,7 +57,7 @@ No celular a tela vira uma coluna única. A versão definitiva do celular fica p
 |---|---|---|
 | 0 ✅ | Protótipo estático da tela de exploração (`ded/prototipo/`) | Direção aprovada; juiz "excelente" |
 | 1 ✅ | Fundação: CSS do `index.html` extraído para `ded/css/legado.css` **sem mudança visual**, mais tokens, fontes próprias, o kit de componentes e o catálogo (`ded/prototipo/componentes.html`) | Capturas idênticas às atuais; testes do ded verdes |
-| 2 | Exploração, seleção de personagem e dado d20 no jogo real. Componentes novos: card de seleção de personagem e botão secundário | Layout novo no desktop; telas legadas idênticas com o kit carregado (1080p e 1366×768); aceite de performance; testes |
+| 2 ✅ | Exploração, seleção de personagem e dado d20 no jogo real. Componentes novos: card de seleção de personagem e botão secundário | Layout novo no desktop; telas legadas idênticas com o kit carregado (1080p e 1366×768); aceite de performance; testes |
 | 3 | Combate. Componentes novos: card de inimigo e barra de vida do inimigo | Idem |
 | 4 | Loja, especialização, diário, mapa, telas de fim e toasts. Componentes novos: moldura de modal e toast, fora da `.folha` (camadas `--z-overlay` e `--z-toast`) | Nenhum `alert()`; modais consistentes |
 | 5 | Celular, acessibilidade, transições, WebP, preview do hub e `npm run seo` | Sem rolagem horizontal em 375 px; contraste AA; `seo:check` |
@@ -68,6 +68,15 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 
 - **Como medir:** rAF sem limite, com CPU 1x e 4x, no pior momento: máquina de escrever, dado rolando e combate.
 - **Primeiro clique do teste de dado:** 30 execuções em CPU 1x, sem nenhum quadro acima de 20,8 ms.
+- **Ferramenta:** `node ded/tools/desempenho.mjs` mede todos os cenários (abertura, exploração, texto longo, teste de d20, os dois críticos e o aceite do primeiro clique) com GPU e janela de verdade. Ela começa o jogo com cliques na seleção, como um jogador. A primeira interação da página liga o Web Audio e a voz, cerca de 10 ms de script.
+- **Layout forçado:** nada de ler o layout (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`, `getComputedStyle`, `getClientRects`) logo depois de mudar o DOM, no meio da cena. Esse tipo de leitura espera o próximo quadro (`noProximoQuadro`, `focarNoQuadro`).
+  - Na Fase 2, rolar a crônica a cada mensagem custava até 6 ms por cena.
+  - Zerar o `scrollTop` do texto forçava o primeiro layout da folha inteira dentro do "Começar".
+  - A regra vale também para a ferramenta: as conferências dela dentro da janela medida só leem classes e atributos.
+- **Movimento reduzido no ambiente:** com as animações do Windows desligadas, o Chrome do Puppeteer informa `prefers-reduced-motion: reduce`. Nesse caso o jogo pula a máquina de escrever, troca o giro do d20 por um esmaecer e apaga a chama.
+  - `capturas.mjs` e `desempenho.mjs` forçam o movimento padrão (`--movimento reduzido` mede o outro caminho).
+  - As medições anteriores à Fase 2, das fases 0 e 1, podem ter sido feitas em movimento reduzido.
+- **`will-change: transform` em elemento parado borra:** o Chrome deixa de alinhar a camada ao pixel. Para dar camada própria a algo que fica parado, use `will-change: opacity`.
 - **Ambiente da medição:** o Puppeteer abre o Chrome com o processo de GPU frio, o que gera picos de 300 a 800 ms nos primeiros ~500 ms que não vêm da página. Meça com um perfil persistente (`userDataDir`) e uma página de aquecimento antes.
 - **O que evitar:**
   - animar qualquer coisa além de `transform` e `opacity`;
@@ -78,24 +87,42 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 
 ## 7. Pendências para as próximas fases
 
-- **Máquina de escrever:** revelar o texto já montado, por trechos, em vez de acrescentar caractere a caractere. Isso evita o refluxo e deixa as escolhas paradas.
-- **Medição real:** refazer o aceite de performance no fluxo real do dado (Fase 2).
-- **Créditos:** mostrar os créditos dos ícones dentro do jogo (por exemplo, no Diário).
-- **`alert()` na abertura:** quando as cenas terminam de carregar, o jogo chama `startGame()` sem personagem escolhido. Isso dispara o `alert("Escolha um personagem…")` para todo visitante novo. Corrigir na Fase 2, junto com a tela de seleção.
-- **Contratos dos testes:** preservar os IDs e classes usados por `qa_ded`, `qa_ded_task003` e `journey_ded`. O teste do 1 natural lê `dice.style.borderColor`, que hoje é estilo inline.
-- **Legado e kit juntos (Fase 2):** carregar o legado antes do kit.
-  - As telas legadas ficam fora da `.folha` até migrarem. Se o contêiner do jogo virar a `.folha`, tirar o `#combat-screen` de dentro dele, senão o combate (Fase 3) herda a fonte e o `border-box` do kit.
-  - O `<audio controls>` nativo responde à fonte da raiz: com o kit carregado, mudam 19 px. Ele vira um selo do cabeçalho nesta fase.
-  - Ao restringir o `body` legado, manter o `font-size: 16px` fora da restrição; a `.folha` reancora em `1rem`.
-  - Restringir às telas antigas os seletores de elemento do legado:
-  - `button` e `button:hover` (0,1,1), que hoje vencem `.selo`, `.slot` e `.botao-fita` e pintam o hover de vermelho;
-  - `body`, cujo `padding` e `max-width` quebram a folha de 100dvh;
-  - `h1`.
-  Quando o d20 migrar, apagar as regras de `.dice`, `.rolling-animation` e `.critical-success-bg` do legado: esta última usa `!important`, e o JS a aplica no 20 natural.
-- **Foco com `inert` (Fase 2):** ao abrir a bandeja, a escolha clicada fica inerte e o foco cai no `body`. Levar o foco para "Rolar o d20" e, depois do "Continuar", de volta à primeira escolha.
-- **Log com HTML cru (Fase 2, na crônica):** o log antigo mostra `<strong>` como texto ("Nova missão adicionada: <strong>…"). Corrigir ao trocar o log pela crônica.
+- **Créditos no Diário (Fase 4):** a Fase 2 pôs o crédito dos ícones no pé da seleção. Repetir no Diário quando ele migrar.
+- **`alert()` que sobraram (Fase 4):**
+  - no jogo: mochila cheia (duas vezes), fuga pelo mapa durante o combate e erro ao carregar as cenas;
+  - no `scenes.json`: o mercador ("Over rir…"), o isqueiro que falta e os dois finais.
+  - O do mercador congela a página enquanto está aberto (a medição do "texto longo" passa por ele).
+- **Combate (Fase 3):**
+  - o `.game-container` virou só o palco do combate;
+  - o `.dice` e o `.critical-success-bg` do legado valem só no `#combat-screen` e saem junto com ele;
+  - o recorte do combate difere da Fase 1 só no antialiasing do texto. Agora ele é uma camada composta sobre a folha, e o texto sai em tons de cinza, não em subpixel.
+- **Mapa (Fase 4):** o painel antigo abre fixo sob o cabeçalho, com 72rem de largura. Os nós são clicáveis só quando adjacentes e não visitados (uma cadeia de `else if` em `renderMinimap`). A alavanca do lago nunca aparece, porque `LEVER_NODES` usa `lake_search`, que não é nó do mapa.
+- **Especialização (Fase 4):** a caixa legada usa `backdrop-filter: blur(10px)`, proibido pelo §6. Sai quando ela migrar.
+- **Mecânicas (fase própria):**
+  - o `gameState.checkDifficulty = 10` roda depois do `onEnter`, então nenhuma cena muda a dificuldade (4 a 20 no `scenes.json`);
+  - a vida máxima é 20 para todas as classes (a Constituição não conta);
+  - quem foge do combate quase sempre volta para a entrada (`lastScene` raramente é gravado).
+- **CPU 4x (informativo):** em CPU 1x tudo fica dentro do limite. Em CPU 4x:
+  - o "Começar" ainda tem um quadro de ~97 ms;
+  - a máquina de escrever do texto longo tem quadros de 28 ms;
+  - o resultado e o avanço do d20 têm quadros de 28 a 56 ms.
+
+  Se a Fase 5 mirar aparelhos fracos, revisar a crônica e a troca de cena nesse cenário.
+- **Abertura a frio (informativo):** com a exploração montada em espera, a abertura ganhou um quadro de ~48 ms. É a pintura a frio, fora do veredito.
+- **Acessibilidade (Fase 5):**
+  - cada rolagem é anunciada duas vezes: no `#result-message` (`role=status`) e na crônica (`aria-live`);
+  - o foco vai direto à primeira escolha e pula o texto da cena para quem usa leitor de tela (focar o artigo da narrativa, com `tabindex=-1`);
+  - há dois `<main>` no DOM; o que está escondido deveria levar o atributo `hidden`;
+  - os selos Diário e Mapa precisam de `aria-haspopup` e de foco dentro do painel.
+- **Crônica (Fase 4):**
+  - uma linha só de emojis ("💍 👑 💵 💰 🪙 💎") aparece crua, porque sem eles não sobra texto;
+  - "Sua saúde já está no máximo!" sai com o tom de sucesso;
+  - o `changeMusic` de um `onEnter` volta a tocar a música mesmo depois de ela ser pausada pelo selo.
+- **Textos:** "Removido X ao inventário" e o "pq" na mensagem de morte (fase de enredo).
+- **Capturas:** o Puppeteer esconde as barras de rolagem (`--hide-scrollbars`). Na Fase 5, capturar com elas visíveis.
 - **Tamanho de fonte do navegador (Fase 5):** os `px` do legado e a raiz do kit ignoram a fonte padrão escolhida pelo usuário. Rever junto com a acessibilidade.
 - **Escala exata (Fase 5):** `min(0.8333vw, 1.4815vh)` dá 15,9994 px em 1920, e não 16. `calc(100vw / 120)` e `calc(100vh / 67.5)` dão 16 exatos, mas mexem em subpixels do protótipo.
+- **Celular (Fase 5):** "Começar uma nova aventura" quebra em duas linhas a 390 px.
 - **Servidor:** o `express.static('./')` depende do diretório atual do processo. Fora da raiz, `/ded` é servido sem a barra final e todos os caminhos relativos quebram. O `/ded/css` já é montado pelo `__dirname`; ver se vale fazer o mesmo para `/ded`.
 - **Erro de digitação em `assets/scenes.json`:** "Ira até a porta do fundo da cripta". Corrigir junto com os textos (fase de enredo).
 
@@ -118,3 +145,76 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - No celular, a bandeja passou de `min(19rem, 80vw)` para `min(17rem, 80vw)`, a mesma largura do desktop. Isso também corrige um transbordo de 3 px da Fase 0 (285 px numa coluna de 282), que deslocava a corrente e o "O que você faz?".
   - Convivência: com `capturas.mjs --kit`, o jogo com o kit carregado depois do legado sai idêntico ao da Fase 0 nas 12 capturas. A única exceção são 19 px no `<audio controls>` nativo, que responde à fonte da raiz e sai na Fase 2.
 - **Testes:** `journey_ded`, `qa_ded`, `qa_ded_task003` e `generate-seo --check` estão verdes.
+
+## 9. Registro da Fase 2
+
+- **Seleção de personagem (`#character-select.folha.tela-selecao`):**
+  - cards de herói com rádio nativo (setas, foco e leitor de tela sem JS), retrato em medalhão, atributos da classe (o mais forte em rubro) e o selo de cera "Escolhido";
+  - o botão "Começar a aventura" só habilita depois da escolha;
+  - o `alert()` da abertura saiu: sem save, o jogo só fica na seleção;
+  - o crédito dos ícones (CC BY 3.0) fica no pé da folha.
+- **Exploração (`#game-screen.folha.tela-exploracao`):** o protótipo com os dados do jogo.
+  - Vida, armadura (`getPlayerAC()`), ouro e a barra de vida.
+  - Nível com o anel de XP (50 e 150 XP).
+  - Atributos com o modificador no medalhão.
+  - Equipamento com os ícones dos 18 itens.
+  - Missões e crônica.
+  - Classe e caminho no cabeçalho, e os selos Mapa, Diário, Narrador e Música. A música não tem mais `<audio controls>`; os selos de música da seleção e da exploração ficam em sincronia.
+- **Vitral:** `ded/assets/vitrais.json` dá o arquivo, o local, o ponto focal e o texto alternativo das 39 artes. Uma cena sem arte própria mantém a do vitral. A arte é decodificada antes da troca, e acabaram os 404 das cenas sem imagem.
+- **Máquina de escrever:** texto montado com uma `<span>` por palavra, revelado só com opacidade, no ritmo de antes (40 ms por caractere). Nada reflui e as escolhas não andam. Respeita `prefers-reduced-motion`.
+- **d20:**
+  - a bandeja mostra o atributo, a dificuldade e o modificador;
+  - o resultado traz a conta completa (o 20 natural soma 5 e o 1 natural tira 5, como antes) e carimba um dos quatro selos já pintados. A crônica repete a conta e destaca o desfecho;
+  - o botão fica com `aria-disabled` durante a rolagem e não perde o foco;
+  - depois do resultado, o botão vira "Continuar", como no protótipo, e avança na hora. Sem clique, o jogo mantém o ritmo de antes e avança sozinho em 1,8 s, o que o `qa_ded` e o `journey_ded` usam;
+  - o foco vai para o dado ao abrir o teste e volta à primeira escolha da cena seguinte.
+- **Escolhas e bandeja:** dividem a célula de `.acoes`. A `.hidden` legada não vale ali dentro e virou só `visibility: hidden`. Assim o JS e os testes seguem alternando a mesma classe.
+- **Finais sem saída:** as seis cenas finais (`CENAS_FINAIS`) ganharam o botão secundário "Começar uma nova aventura", que apaga o save. Antes, quem morria e recarregava voltava à morte. A cena da poção também não tem escolhas, mas volta sozinha; ela mostra só "A aventura continua…".
+- **Abertura:**
+  - "Começar" só habilita quando as cenas chegam;
+  - com save, a seleção nem aparece: a página espera as cenas e abre direto a exploração;
+  - um erro ao carregar as cenas vira uma dica na seleção, sem `alert()`.
+- **Cards de herói:**
+  - o rádio leva o nome da classe (`aria-labelledby`); a descrição, os atributos, a armadura e a habilidade de combate entram como descrição;
+  - cada card mostra a armadura inicial e a habilidade de combate da classe: Golpe heroico, Magias arcanas e Ataque furtivo;
+  - a classe `.selected` serve de reserva para o `:has()`.
+- **Movimento reduzido:** também cobre o carimbo do card, o brilho do 20 natural (fica parado), os hovers que sobem e a transição das palavras.
+- **Crônica:** a crônica ganhou um ícone e um tom (sucesso ou falha) por mensagem, escolhidos pelo emoji do começo. Os emojis saem do texto, e o `<strong>` volta a ser negrito. O `gameState.log` guarda o texto original.
+- **Legado:**
+  - as regras da seleção, da exploração e do d20 saíram do `legado.css`;
+  - `button`, `.hidden` e `.dice` ficaram restritos com `:where()`, sem mudar a especificidade;
+  - o `body` legado só define fonte, tamanho e cor;
+  - o `h1` e o `audio` legados foram apagados;
+  - o `.game-container` virou o palco do combate, com a geometria do contêiner antigo, e veste a moldura antiga durante o combate;
+  - o mapa abre como painel fixo sob o cabeçalho e fecha com Esc.
+- **Componentes novos:**
+  - o card de herói (`.card-heroi`) e o botão secundário (`.botao-secundario`);
+  - também o estado bloqueado do equipamento (`.slot.disabled`), a crônica vazia e o selo do mapa aberto (`aria-expanded`).
+
+  Todos estão no catálogo.
+- **Ícones:** 16 novos no sprite (itens, classes e crônica), com créditos em `ded/ui/CREDITOS.md`.
+- **Contratos dos testes:** os IDs e classes ficaram. O `qa_ded` mudou em três pontos de propósito:
+  - o modificador sai como `+3` e `−1`;
+  - o ícone do item vem do sprite;
+  - o 1 natural marca o `#dice` com `.falha-critica`, e não mais com borda inline.
+- **Prova:**
+  - Testes: `journey_ded` (CI), `qa_ded` e `qa_ded_task003` passaram.
+    - O `qa_ded` ganhou um caso para o "Continuar" e para os finais.
+    - O sandbox do `journey_ded` passou a receber o `vitrais.json` de verdade, e o `changeImage` roda nele.
+  - Telas legadas: `capturas.mjs` passou a recortar os overlays em `legado-*.png`, em 1080p e em 1366×768 (`-768`). A referência foi o commit da Fase 1 com `--kit`.
+    - Loja e diário saíram idênticos pixel a pixel.
+    - A especialização difere no máximo 6 por canal, por causa do fundo translúcido.
+    - O combate tem a mesma geometria; muda só o antialiasing do texto (ver §7).
+  - Protótipo: idêntico ao da Fase 1.
+  - Sem 4xx, sem erros na página e sem rolagem horizontal a 390 px.
+- **Juiz:** a primeira rodada deu "bom", e esta seção já traz o que ele pediu.
+- **Desempenho:** `desempenho.mjs` em CPU 1x, com movimento padrão, numa tela de 144 Hz, saiu APROVADO.
+  - O pior quadro foi de 21,2 ms (3 vsyncs) na exploração, no texto longo, no teste de d20 e nos dois críticos.
+  - O aceite do primeiro clique passou em 30 execuções, com 0 quadros acima de 20,8 ms.
+  - Como se chegou lá:
+    - A primeira medição reprovou por layout forçado: a crônica rolava a cada mensagem, e `focus()` era chamado fora do quadro. Com as leituras adiadas para o próximo quadro, o `loadScene` caiu de ~11 ms para 1 a 3 ms.
+    - A aprovação seguinte valia pouco: o ambiente estava em movimento reduzido (ver §6). Com o movimento padrão, apareceram dois custos.
+    - O primeiro layout da folha no "Começar" (48 ms) foi resolvido assim: a exploração fica montada e invisível durante a seleção (`.tela-em-espera`), e o `scrollTop` do texto espera o quadro.
+    - O SVG do d20 era rasterizado de novo no primeiro número do giro (28 ms em ~1 de 15 execuções). Agora o dado tem camada própria desde a abertura (`will-change: opacity`, que não borra), e durante o giro a arte vem de uma cópia numa camada pré-rasterizada.
+    - A própria ferramenta forçava layout no quadro da rolagem (`getClientRects`, `getComputedStyle`) e foi corrigida.
+  - A máquina tem uma parada própria de ~500 ms uns 120 s depois de o Chrome abrir, que aparece até numa página vazia. A ferramenta refaz uma vez a execução em que ela cai (quadro acima de 100 ms com o LoAF sem script nem render) e avisa no relatório.
