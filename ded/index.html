@@ -377,12 +377,57 @@
             <div id="quest-journal-content"></div>
         </div>
 
-        <!-- Flash Neon de Barreira Mágica -->
-        <div id="barrier-flash"></div>
+        <!-- Barreira mágica (triggerBarrierBlocked): a borda da tela brilha em ouro e
+             verdete; o JS anima a opacidade -->
+        <div id="clarao-barreira" class="clarao-barreira" aria-hidden="true"></div>
 
         <!-- Camada de Floaters -->
 
-        <!-- Janela do fim da aventura (Fase 4) -->
+        <!-- Janela do fim da aventura (Fase 4): abre sozinha num final (CENAS_FINAIS),
+             depois de o texto da cena entrar. O selo, o título, a mensagem e o resumo
+             vêm de FINAIS e do gameState (preencherFim). -->
+        <dialog class="janela" id="fim" aria-labelledby="fim-fita fim-titulo" aria-describedby="fim-mensagem" data-desfecho="vitoria">
+            <div class="folha janela-folha fim-folha">
+                <h2 class="fita fita-rubra" id="fim-fita">Fim da aventura</h2>
+                <button class="janela-fechar" type="button" aria-label="Fechar"><svg aria-hidden="true"><use href="ui/icones.svg#i-fechar"/></svg></button>
+                <header class="fim-cabeca">
+                    <div class="fim-selo" aria-hidden="true"><svg><use href="ui/icones.svg#i-louros"/></svg></div>
+                    <h3 class="fim-titulo" id="fim-titulo">Vitória!</h3>
+                    <p class="janela-subtitulo fim-mensagem" id="fim-mensagem">Obrigado por jogar!</p>
+                </header>
+                <div class="janela-corpo">
+                    <div class="corrente" aria-hidden="true"></div>
+                    <h4 class="janela-secao">Resumo</h4>
+                    <dl class="fim-resumo">
+                        <div class="fim-dado">
+                            <dt><svg aria-hidden="true"><use href="ui/icones.svg#i-experiencia"/></svg>Nível</dt>
+                            <dd class="fim-valor"><span class="num" id="fim-nivel">1</span></dd>
+                            <dd class="fim-detalhe"><span class="num" id="fim-xp">0</span> XP</dd>
+                        </div>
+                        <div class="fim-dado">
+                            <dt><svg aria-hidden="true"><use href="ui/icones.svg#i-ouro"/></svg>Ouro</dt>
+                            <dd class="fim-valor"><span class="num" id="fim-ouro">0</span></dd>
+                            <dd class="fim-detalhe">moedas</dd>
+                        </div>
+                        <div class="fim-dado">
+                            <dt><svg aria-hidden="true"><use href="ui/icones.svg#i-diario"/></svg>Missões</dt>
+                            <dd class="fim-valor"><span class="num" id="fim-missoes">0</span><small> de <span class="num" id="fim-missoes-total">3</span></small></dd>
+                            <dd class="fim-detalhe">concluídas</dd>
+                        </div>
+                        <div class="fim-dado">
+                            <dt><svg aria-hidden="true"><use href="ui/icones.svg#i-pegadas"/></svg>Lugares</dt>
+                            <dd class="fim-valor"><span class="num" id="fim-lugares">1</span></dd>
+                            <dd class="fim-detalhe">visitados</dd>
+                        </div>
+                    </dl>
+                </div>
+                <div class="janela-rodape">
+                    <button class="botao-secundario" type="button" data-fechar-janela>Rever a cena</button>
+                    <!-- o foco chega aqui quando a janela abre (autofocus) -->
+                    <button class="botao-fita" type="button" id="fim-recomecar" autofocus>Começar uma nova aventura</button>
+                </div>
+            </div>
+        </dialog>
 
         <!-- Avisos (toasts): duas peças fixas reusadas por avisar(); o texto também
              vai para #avisos-leitor, que o leitor de tela anuncia -->
@@ -1539,6 +1584,8 @@
                 }
 
                 stopSpeech();
+                // a janela do fim que um final anterior agendou não abre mais
+                cancelarFim();
 
                 // Limpa qualquer digitação anterior em andamento
                 if (currentTypewriterInterval) {
@@ -1573,8 +1620,10 @@
                 speakText(scene.text); // Tenta ler o texto da cena
 
                 // O texto entra montado e é revelado por palavra; as escolhas já
-                // aparecem no lugar e ficam clicáveis durante a digitação
-                typewriterEffect(document.getElementById('scene-text'), scene.text, 40);
+                // aparecem no lugar e ficam clicáveis durante a digitação. Num final,
+                // a janela do fim abre depois de o texto entrar (agendarFim).
+                const aoTerminarTexto = ehFinal(sceneName) ? () => agendarFim(sceneName) : undefined;
+                typewriterEffect(document.getElementById('scene-text'), scene.text, 40, aoTerminarTexto);
                 setupSkipListener();
                 addChoiceInCurrentScene(scene);
 
@@ -1703,6 +1752,101 @@
                 try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* sem armazenamento */ }
                 location.reload();
             }
+
+            // ---------- Fim da aventura (Fase 4) ----------
+            // Num final, a janela #fim abre sozinha depois de o jogador ter tempo de ler:
+            // 1,2 s depois de a máquina de escrever terminar (ou de ele pular o texto) e,
+            // no movimento reduzido, ~1 s depois de o texto aparecer (ele espera a arte,
+            // até 250 ms). Uma cena nova cancela a abertura; um save restaurado num final
+            // abre a janela de novo. "Rever a cena", Escape, o medalhão e o fundo fecham,
+            // e o "Começar uma nova aventura" da folha continua lá.
+            const FINAIS = {
+                victory: { titulo: 'Vitória lendária!', vitoria: true, mensagem: 'Parabéns! Esse é o melhor final. Obrigado por jogar!' },
+                victory_partial: { titulo: 'Vitória!', vitoria: true, mensagem: 'Obrigado por jogar!' },
+                death: { titulo: 'Você morreu', mensagem: 'Seus pontos de vida chegaram a zero.' },
+                goblin_fight_failure: { titulo: 'Você morreu', mensagem: 'O goblin venceu esta luta.' },
+                death_net_trap: { titulo: 'Você morreu', mensagem: 'Preso na rede, longe do tesouro.' },
+                merchant_kill_you: { titulo: 'Fim da linha', mensagem: 'Roubar o mercador custou caro.' }
+            };
+            const ESPERA_DO_FIM = 1200;            // ms depois do texto inteiro à vista
+            const ESPERA_DO_FIM_SEM_MOVIMENTO = 1250; // o texto aparece até 250 ms depois da cena
+            let fimAgendado = null;
+            let fimGeracao = 0; // muda a cada cena: um temporizador ou espera antigos não abrem
+            let fimAbertoEm = -Infinity;
+
+            function ehFinal(cena) {
+                return CENAS_FINAIS.has(cena) && !!scenes[cena] && !scenes[cena].choices.length;
+            }
+
+            function cancelarFim() {
+                fimGeracao++;
+                if (fimAgendado) clearTimeout(fimAgendado);
+                fimAgendado = null;
+            }
+
+            // Abre a janela do fim daqui a `espera` ms, se o jogador ainda estiver no final
+            function agendarFim(cena, espera = movimentoReduzido() ? ESPERA_DO_FIM_SEM_MOVIMENTO : ESPERA_DO_FIM, tentativas = 20) {
+                if (fimAgendado) clearTimeout(fimAgendado);
+                const geracao = fimGeracao;
+                fimAgendado = setTimeout(() => {
+                    fimAgendado = null;
+                    if (geracao !== fimGeracao || gameState.currentScene !== cena) return;
+                    // nunca no meio de uma luta, nem por cima de outra janela (a
+                    // especialização, obrigatória, ou o diário que o jogador abriu):
+                    // espera a luta acabar ou a janela fechar
+                    if (gameState.combat && gameState.combat.active) {
+                        if (tentativas > 0) agendarFim(cena, 500, tentativas - 1);
+                        return;
+                    }
+                    const aberta = document.querySelector('dialog.janela[open]');
+                    if (aberta && aberta.id !== 'fim' && typeof aberta.addEventListener === 'function') {
+                        aberta.addEventListener('close', () => {
+                            if (geracao === fimGeracao && tentativas > 0) agendarFim(cena, 400, tentativas - 1);
+                        }, { once: true });
+                        return;
+                    }
+                    abrirFim(cena);
+                }, espera);
+            }
+
+            // Preenche e abre a janela do fim de `cena` (também serve às ferramentas)
+            function abrirFim(cena) {
+                if (!preencherFim(cena)) return null;
+                const janela = abrirJanela('fim');
+                fimAbertoEm = performance.now();
+                return janela;
+            }
+
+            // Selo, título e mensagem do final; o resumo sai do gameState. Escreve só o
+            // que mudou (a janela fica montada de uma abertura para a outra).
+            function preencherFim(cena) {
+                const janela = document.getElementById('fim');
+                const final = FINAIS[cena];
+                if (!janela || !final || typeof janela.querySelector !== 'function') return false;
+                const p = gameState.player;
+                const estados = gameState.quests || {};
+                const missoes = Object.keys(QUESTS);
+                const concluidas = missoes.filter(chave => estados[chave] && estados[chave].status === 'completed').length;
+                const lugares = new Set((gameState.visitedNodes || []).filter(no => DUNGEON_MAP[no])).size;
+                const porId = id => document.getElementById(id);
+                escreverAtributo(janela, 'data-desfecho', final.vitoria ? 'vitoria' : 'derrota');
+                escreverAtributo(janela.querySelector('.fim-selo use'), 'href', hrefIcone(final.vitoria ? 'i-louros' : 'i-lapide'));
+                escreverTexto(porId('fim-titulo'), final.titulo);
+                escreverTexto(porId('fim-mensagem'), final.mensagem);
+                escreverTexto(porId('fim-nivel'), p.level || 1);
+                escreverTexto(porId('fim-xp'), p.xp || 0);
+                escreverTexto(porId('fim-ouro'), (p.gold || 0).toLocaleString('pt-BR'));
+                escreverTexto(porId('fim-missoes'), concluidas);
+                escreverTexto(porId('fim-missoes-total'), missoes.length);
+                escreverTexto(porId('fim-lugares'), lugares);
+                return true;
+            }
+
+            // "Começar uma nova aventura" da janela: a mesma pausa das escolhas, para um
+            // Enter que já vinha da cena não apagar o save no instante em que ela abre
+            document.getElementById('fim-recomecar').addEventListener('click', () => {
+                if (!cedoDemais(fimAbertoEm)) recomecarAventura();
+            });
 
             // Abre a bandeja com o atributo, a dificuldade e o modificador do teste
             function prepararBandeja(checkType) {
@@ -2027,15 +2171,19 @@
                 const emoji = (texto.match(/\p{Extended_Pictographic}️?/u) || [''])[0];
                 const icone = RELATO_ICONES[emoji] || RELATO_ICONES[emoji.replace('️', '')] || 'i-d20';
                 const tom = type === 'success' ? 'sucesso' : type === 'failure' ? 'falha' : '';
-                // sem os emojis; o espaço que sobra logo depois de uma tag de abertura também sai
-                const html = texto.replace(EMOJIS, '').replace(/class="(success|failure)"/g, 'class="resultado"')
+                // sem os emojis; o espaço que sobra logo depois de uma tag de abertura também
+                // sai. Só emojis: em palavras, como na crônica; sem texto nenhum, a linha não entra.
+                let html = texto.replace(EMOJIS, '').replace(/class="(success|failure)"/g, 'class="resultado"')
                     .replace(/(<[a-z][^>]*>)\s+/gi, '$1').replace(/\s+/g, ' ').trim();
-                const lista = document.getElementById('combat-log-text');
-                const linha = document.createElement('li');
-                linha.className = 'cronica-item' + (tom ? ` cronica-${tom}` : '');
-                linha.innerHTML = `<svg aria-hidden="true"><use href="${hrefIcone(icone)}"/></svg><p>${html}</p>`;
-                lista.appendChild(linha);
-                noProximoQuadro('relato', () => { lista.scrollTop = lista.scrollHeight; });
+                if (!html.replace(/<[^>]*>/g, '').trim()) html = escaparHtml(emojisPorExtenso(texto.replace(/<[^>]*>/g, '')));
+                if (html) {
+                    const lista = document.getElementById('combat-log-text');
+                    const linha = document.createElement('li');
+                    linha.className = 'cronica-item' + (tom ? ` cronica-${tom}` : '');
+                    linha.innerHTML = `<svg aria-hidden="true"><use href="${hrefIcone(icone)}"/></svg><p>${html}</p>`;
+                    lista.appendChild(linha);
+                    noProximoQuadro('relato', () => { lista.scrollTop = lista.scrollHeight; });
+                }
 
                 // o desfecho da rolagem do herói carimba o selo da bandeja
                 if (rolagemDoCombate && !rolagemDoCombate.carimbada && tom) {
@@ -2716,10 +2864,20 @@
                 saveGame();
             }
 
+            // Um aviso igual a um que ainda está no ar não se repete: três itens de uma
+            // cena com a mochila cheia, ou cliques seguidos numa passagem selada, dão um
+            // aviso só. Lê só o texto e o prazo das peças (avisar), nada de layout.
+            function avisarSemRepetir(texto, opcoes) {
+                const agora = performance.now();
+                const pecas = document.querySelectorAll ? [...document.querySelectorAll('#avisos .aviso')] : [];
+                if (pecas.some(peca => !peca.hidden && (peca.noArAte || 0) > agora && peca.textContent === texto)) return;
+                avisar(texto, opcoes);
+            }
+
             function addToInventory(item) {
                 if (gameState.player.inventory.length >= INVENTORY_CAPACITY) {
                     addToLog("🎒 Sua mochila está cheia! Não há slots livres.");
-                    alert("Mochila Cheia! Consuma uma poção para liberar espaço.");
+                    avisarSemRepetir('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' });
                     return false;
                 }
                 gameState.player.inventory.push(item);
@@ -2967,7 +3125,8 @@
                 [/^☠️/u, 'i-caveira', 'falha'],
                 [/^🏴/u, 'i-caveira'],
                 [/^(⚠️|🎒|🚧)/u, 'i-alerta', 'falha'],
-                [/^(❤️|✨ Você usou)/u, 'i-vida', 'sucesso'],
+                [/^(❤️ Você|✨ Você usou)/u, 'i-vida', 'sucesso'],
+                [/^❤️/u, 'i-vida'], // "Sua saúde já está no máximo!": nada aconteceu, tom neutro
                 [/^(✨|🔮|⚡)/u, 'i-magia'],
                 [/^📋/u, 'i-diario'],
                 [/^(🎉|👍)/u, 'i-diario', 'sucesso'],
@@ -2984,16 +3143,29 @@
             const EMOJIS = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu;
             const MAX_CRONICA = 80; // linhas no DOM; o gameState.log guarda todas
 
+            // Uma linha só de emojis (o tesouro do cofre: "💍 👑 💵 💰 🪙 💎") ficaria vazia
+            // sem eles: vira palavras ("Anel, coroa, notas, bolsa de ouro, moeda e
+            // diamante."). Sem nenhum emoji conhecido, devolve ''.
+            const NOMES_DOS_EMOJIS = { '💍': 'anel', '👑': 'coroa', '💵': 'notas', '💰': 'bolsa de ouro', '🪙': 'moeda', '💎': 'diamante' };
+            function emojisPorExtenso(texto) {
+                const nomes = (String(texto).match(/\p{Extended_Pictographic}/gu) || []).map(e => NOMES_DOS_EMOJIS[e]).filter(Boolean);
+                if (!nomes.length) return '';
+                const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}` : nomes[0];
+                return lista.charAt(0).toUpperCase() + lista.slice(1) + '.';
+            }
+
             // A crônica mostra o texto sem os emojis (o ícone faz esse papel) e
-            // aceita só <strong> das mensagens, como negrito
+            // aceita só <strong> das mensagens, como negrito. Uma linha que fica sem
+            // texto nenhum não entra (o gameState.log guarda a mensagem original).
             function addToLog(message) {
                 gameState.log.push(message);
                 const lista = document.getElementById('game-log');
                 const original = String(message);
                 const tipo = CRONICA_TIPOS.find(([padrao]) => padrao.test(original)) || [null, 'i-cronica'];
                 const limpo = original.replace(/(\d+)\s*🪙/gu, '$1 de ouro').replace(/ por (\d+)g\./u, ' por $1 de ouro.')
-                    .replace(EMOJIS, '').replace(/\s+/g, ' ').trim();
-                const texto = escaparHtml(limpo || original).replace(/&lt;(\/?)strong&gt;/g, '<$1b>')
+                    .replace(EMOJIS, '').replace(/\s+/g, ' ').trim() || emojisPorExtenso(original);
+                if (!limpo) return;
+                const texto = escaparHtml(limpo).replace(/&lt;(\/?)strong&gt;/g, '<$1b>')
                     .replace(/ (Sucesso|Falha)\.$/u, ' <span class="resultado">$1.</span>'); // o desfecho do teste, na cor do tom
 
                 const linha = document.createElement('li');
@@ -3618,14 +3790,27 @@
                 }
             }
 
+            // Passagem selada: o som, a linha da crônica, um aviso (visível também por
+            // cima do mapa aberto, que é uma janela) e a borda da tela brilhando em ouro
+            // e verdete. O clarão é só opacidade (Web Animations), como o vermelho.
             function triggerBarrierBlocked() {
                 AudioEngine.playBarrierSealed();
                 addToLog('🚧 Uma barreira mágica neon bloqueia a passagem! Ative as 2 alavancas: uma na Câmara Cristal e outra na beira do Lago Subterrâneo.');
-                const flash = document.getElementById('barrier-flash');
-                if (flash) {
-                    flash.classList.add('barrier-active');
-                    setTimeout(() => flash.classList.remove('barrier-active'), 600);
+                avisarSemRepetir(`Uma barreira mágica bloqueia a passagem. ${dicaDasAlavancas()}`, { tom: 'falha', icone: 'i-cadeado' });
+                const clarao = document.getElementById('clarao-barreira');
+                if (clarao && clarao.animate) {
+                    clarao.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
                 }
+            }
+
+            // As alavancas que ainda faltam, para o aviso da barreira
+            function dicaDasAlavancas() {
+                const alavancas = gameState.levers || {};
+                const faltam = [];
+                if (!alavancas.lever_crystal) faltam.push('a da Câmara Cristal');
+                if (!alavancas.lever_lake) faltam.push('a da beira do Lago Subterrâneo');
+                if (faltam.length > 1) return `Ative as duas alavancas: ${faltam.join(' e ')}.`;
+                return faltam.length ? `Falta ativar uma alavanca: ${faltam[0]}.` : '';
             }
 
             function saveGame() {
@@ -3974,14 +4159,19 @@
                 teleportToNode, renderMinimap, SCENE_TO_NODE
             };
 
+            // Troca a faixa de fundo (o onEnter da câmara final) e respeita o selo
+            // "Música": se ela estava pausada, a faixa nova fica pausada também. O
+            // autoplay sai antes, porque trocar o src de um <audio autoplay> o faria
+            // tocar sozinho assim que carregasse.
             function changeMusic(musicPath) {
-                const audioElement = document.querySelector('audio');
-                if (audioElement) {
-                    audioElement.src = musicPath;
-                    audioElement.play().catch(error => {
-                        console.error('Erro ao tocar música:', error);
-                    });
-                }
+                const musica = document.getElementById('musica');
+                if (!musica) return;
+                const tocando = musica.paused === false;
+                musica.autoplay = false;
+                musica.src = musicPath;
+                if (!tocando) return;
+                const tocar = musica.play();
+                if (tocar && tocar.catch) tocar.catch(error => console.error('Erro ao tocar música:', error));
             }
 
         </script>
