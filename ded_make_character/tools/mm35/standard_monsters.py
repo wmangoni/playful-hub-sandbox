@@ -17,7 +17,7 @@ AGARRAR_TAMANHO = {
 
 TAMANHO_NORM = {
     "Miúda": "Miúdo", "Pequena": "Pequeno", "Média": "Médio",
-    "Imensa": "Imenso"
+    "Imensa": "Imenso", "Gargantuan": "Imenso"
 }
 
 TIPOS_VALIDOS = {
@@ -242,6 +242,7 @@ def parse_talentos(texto):
     # Substitui casos específicos onde falta vírgula entre talentos
     texto_limpo = re.sub(r'Persuasivo\s+Especializa', 'Persuasivo, Especializa', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Mobilidade\s+Contram', 'Mobilidade, Contram', texto_limpo, flags=re.I)
+    texto_limpo = re.sub(r'Vontade\s+de\s+Ferro\s+Armadura', 'Vontade de Ferro, Armadura', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'\.\s+([A-ZÁÉÍÓÚÂÊÔÃÕ])', r', \1', texto_limpo)
     texto_limpo = texto_limpo.replace('\r', ' ').replace('\n', ' ')
     texto_limpo = re.sub(r'Refl\s*exos', 'Reflexos', texto_limpo, flags=re.I)
@@ -271,6 +272,11 @@ def parse_talentos(texto):
         if not clean or re.match(r'^[\s—\-\–\.]+$', clean):
             continue
         
+        # Zumbi: perde todos os talentos da criatura-base e adquire Vitalidade
+        if 'perde todos' in clean.lower():
+            talentos.append('Vitalidade')
+            continue
+
         # Vitalidade (2) ou Vitalidade
         if re.search(r'\bVitalidade\b', clean, re.I):
             talentos.append('Vitalidade')
@@ -279,7 +285,24 @@ def parse_talentos(texto):
                 continue
 
         t_upper = clean.upper()
-        if 'GOLPE AVASSALADOR' in t_upper:
+        if 'HABILIDADE SIMILAR' in t_upper and 'ACELERAD' in t_upper:
+            m_p = re.search(r'\(([^)]+)\)', clean)
+            if m_p:
+                talentos.append(f"Acelerar Habilidade Similar à Magia ({m_p.group(1)})")
+            else:
+                talentos.append("Acelerar Habilidade Similar à Magia")
+        elif 'ARMADURA NATURAL APRIMORADA' in t_upper:
+            talentos.append(clean)
+        elif 'DUAS ARMAS' in t_upper:
+            if 'APRIMORADO' in t_upper:
+                talentos.append('Combater com Duas Armas Aprimorado')
+            elif 'MAIOR' in t_upper:
+                talentos.append('Combater com Duas Armas Maior')
+            else:
+                talentos.append('Combater com Duas Armas')
+        elif 'EXPULSÃO APRIMORADA' in t_upper or 'EXPULSAO APRIMORADA' in t_upper:
+            talentos.append('Expulsão Aprimorada')
+        elif 'GOLPE AVASSALADOR' in t_upper:
             talentos.append('Golpe Avassalador')
         elif 'TIRO MULTIPLO' in t_upper or 'TIRO MÚLTIPLO' in t_upper:
             talentos.append('Tiro Múltiplo')
