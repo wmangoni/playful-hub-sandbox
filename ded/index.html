@@ -11,10 +11,6 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>A Masmorra de Drakmor</title>
-        <!-- Fontes das telas legadas (combate, loja, especialização, diário e mapa) até migrarem -->
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <!-- Fontes da Ficha Iluminada: as três da abertura chegam antes; o itálico carrega sob demanda -->
         <link rel="preload" as="font" type="font/woff2" href="ui/fontes/alegreya.woff2" crossorigin>
         <link rel="preload" as="font" type="font/woff2" href="ui/fontes/grenze-gotisch.woff2" crossorigin>
@@ -25,8 +21,7 @@
         <link rel="preload" as="image" href="ui/ornamentos/selo-cera.svg">
         <link rel="preload" as="image" href="ui/ornamentos/selo-cera-escuro.svg">
         <link rel="preload" as="image" href="ui/ornamentos/selo-cera-critico.svg">
-        <!-- O legado vem antes do kit; o recorte do vitral fecha a lista (ded/CLAUDE.md) -->
-        <link rel="stylesheet" href="css/legado.css">
+        <!-- O kit da Ficha Iluminada; o recorte do vitral fecha a lista (ded/CLAUDE.md) -->
         <link rel="stylesheet" href="css/fontes.css">
         <link rel="stylesheet" href="css/tokens.css">
         <link rel="stylesheet" href="css/base.css">
@@ -332,7 +327,7 @@
             </main>
         </div>
 
-        <!-- ============ Telas legadas (fora da .folha até migrarem) ============ -->
+        <!-- ============ Janelas, avisos e efeitos de tela (fora da .folha) ============ -->
 
         <!-- Mapa da masmorra: janela aberta pelo selo "Mapa". Os caminhos (SVG) e os
              lugares (botões) são montados na primeira abertura (atualizarMapa) -->
@@ -3191,7 +3186,6 @@
                 [/^🕯️/u, 'i-vela'],
                 [/^🪢/u, 'i-corda'],
                 [/^⬅️/u, 'i-mapa'],
-                [/^Ouro insuficiente/u, 'i-ouro', 'falha'],
                 [/🪙|Você comprou|compras/u, 'i-ouro'],
                 [/de XP/u, 'i-experiencia'],
                 [/inventário/u, 'i-item']
@@ -4063,13 +4057,13 @@
                 if (!q.runesFound) q.runesFound = [];
                 if (!q.runesFound.includes(location)) {
                     q.runesFound.push(location);
-                    addToLog(`🔮 Você decifrou uma runa ancestral (${location})! (${q.runesFound.length}/3)`);
+                    addToLog(`🔮 Você decifrou uma runa ancestral (${LUGARES_DAS_RUNAS[location] || location})! (${q.runesFound.length}/3)`);
                     if (q.runesFound.length >= 3) {
                         q.status = 'completed';
                         const attr = PRIMARY_ATTR[gameState.player.class] || 'str';
                         gameState.player.stats[attr] += 2;
                         addToLog(`🎉 Missão concluída: <strong>Decifrador de Runas</strong>! +2 no atributo principal.`);
-                        spawnFloater('🎉 Missão concluída!', '#e6c983');
+                        spawnFloater('Missão concluída!', '#e6c983');
                         AudioEngine.playQuestComplete();
                         renderQuestJournal();
                     }
@@ -4164,6 +4158,8 @@
                     updateStatsDisplay();
                     updateInventoryDisplay();
                     loadScene(data.currentScene || 'start');
+                    // um save do nível 3 sem especialização volta com a escolha obrigatória
+                    openSpecializationModal(false);
                     return true;
                 } catch(e) { console.error('loadGame failed', e); return false; }
             }
