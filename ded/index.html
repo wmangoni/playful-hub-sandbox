@@ -1365,28 +1365,44 @@
             // por Escape nem por um clique no fundo.
             function abrirJanela(id, { obrigatoria = false } = {}) {
                 const janela = document.getElementById(id);
-                if (!janela || typeof janela.showModal !== 'function' || janela.open) return janela;
-                fecharJanelas(id);
-                janela.classList.remove('fechando');
+                if (!janela || typeof janela.showModal !== 'function') return janela;
                 janela.toggleAttribute('data-obrigatoria', obrigatoria);
+                // reaberta no meio da saída: a saída para, e a janela fica
+                if (janela.open && janela.encerrarSaida) janela.encerrarSaida(false);
+                if (janela.open) return janela;
+                fecharJanelas(id);
                 janela.showModal();
+                if (document.body) document.body.classList.add('com-janela');
                 trazerAvisosParaFrente();
                 return janela;
             }
 
+            // body.com-janela enquanto houver uma janela aberta (close não sobe: captura)
+            document.addEventListener('close', e => {
+                if (!e.target.matches || !e.target.matches('dialog.janela')) return;
+                if (!document.querySelector('dialog.janela[open]')) document.body.classList.remove('com-janela');
+            }, true);
+
             // Fecha com a animação de saída (sem ela no movimento reduzido)
             function fecharJanela(id) {
                 const janela = typeof id === 'string' ? document.getElementById(id) : id;
-                if (!janela || !janela.open || janela.classList.contains('fechando')) return;
+                if (!janela || !janela.open || janela.encerrarSaida) return;
                 if (movimentoReduzido() || typeof janela.getAnimations !== 'function') return janela.close();
                 janela.classList.add('fechando');
-                const fim = () => {
-                    janela.removeEventListener('animationend', fim);
+                let reserva = null;
+                // fechar = false: a janela foi reaberta e a saída só é desfeita
+                const encerrar = (fechar = true) => {
+                    janela.removeEventListener('animationend', aoTerminar);
+                    clearTimeout(reserva);
+                    janela.encerrarSaida = null;
                     janela.classList.remove('fechando');
-                    if (janela.open) janela.close();
+                    if (fechar && janela.open) janela.close();
                 };
-                janela.addEventListener('animationend', fim);
-                setTimeout(fim, 400); // se a animação não terminar (aba em segundo plano)
+                // o animationend dos filhos (o anel do mapa, por exemplo) também sobe até aqui
+                const aoTerminar = e => { if (e.target === janela) encerrar(); };
+                janela.encerrarSaida = encerrar;
+                janela.addEventListener('animationend', aoTerminar);
+                reserva = setTimeout(encerrar, 400); // se a animação não terminar (aba em segundo plano)
             }
 
             // Fecha as janelas abertas que não são obrigatórias (menos a de id `exceto`)
