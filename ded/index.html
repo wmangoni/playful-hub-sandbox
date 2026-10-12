@@ -33,6 +33,7 @@
         <link rel="stylesheet" href="css/componentes.css">
         <link rel="stylesheet" href="css/selecao.css">
         <link rel="stylesheet" href="css/exploracao.css">
+        <link rel="stylesheet" href="css/janelas.css">
         <link rel="stylesheet" href="ui/ornamentos/vitral-recorte.css">
     </head>
     <body class="ficha">
@@ -380,6 +381,16 @@
         <div id="barrier-flash"></div>
 
         <!-- Camada de Floaters -->
+
+        <!-- Janela do fim da aventura (Fase 4) -->
+
+        <!-- Avisos (toasts): duas peças fixas reusadas por avisar(); o texto também
+             vai para #avisos-leitor, que o leitor de tela anuncia -->
+        <div id="avisos" class="avisos" popover="manual" aria-hidden="true">
+            <p class="aviso" hidden><svg aria-hidden="true"><use href="ui/icones.svg#i-alerta"/></svg><span class="aviso-texto"></span></p>
+            <p class="aviso" hidden><svg aria-hidden="true"><use href="ui/icones.svg#i-alerta"/></svg><span class="aviso-texto"></span></p>
+        </div>
+        <p id="avisos-leitor" class="so-leitor" aria-live="polite"></p>
 
         <!-- Flash Vermelho para Impacto de Dano -->
         <div id="red-flash" class="red-flash-overlay"></div>
@@ -1346,6 +1357,104 @@
                 depoisDoProximoQuadro(() => { narrativa.style.visibility = ''; });
             }
 
+            // ---------- Janelas (Fase 4) ----------
+            // Loja, especialização, diário, mapa e fim são <dialog class="janela">,
+            // abertos com showModal(): o foco fica preso dentro, o resto da página fica
+            // inerte, e ao fechar o foco volta sozinho para quem abriu. Só uma janela
+            // fica aberta por vez. Uma janela obrigatória (a especialização) não fecha
+            // por Escape nem por um clique no fundo.
+            function abrirJanela(id, { obrigatoria = false } = {}) {
+                const janela = document.getElementById(id);
+                if (!janela || typeof janela.showModal !== 'function' || janela.open) return janela;
+                fecharJanelas(id);
+                janela.classList.remove('fechando');
+                janela.toggleAttribute('data-obrigatoria', obrigatoria);
+                janela.showModal();
+                trazerAvisosParaFrente();
+                return janela;
+            }
+
+            // Fecha com a animação de saída (sem ela no movimento reduzido)
+            function fecharJanela(id) {
+                const janela = typeof id === 'string' ? document.getElementById(id) : id;
+                if (!janela || !janela.open || janela.classList.contains('fechando')) return;
+                if (movimentoReduzido() || typeof janela.getAnimations !== 'function') return janela.close();
+                janela.classList.add('fechando');
+                const fim = () => {
+                    janela.removeEventListener('animationend', fim);
+                    janela.classList.remove('fechando');
+                    if (janela.open) janela.close();
+                };
+                janela.addEventListener('animationend', fim);
+                setTimeout(fim, 400); // se a animação não terminar (aba em segundo plano)
+            }
+
+            // Fecha as janelas abertas que não são obrigatórias (menos a de id `exceto`)
+            function fecharJanelas(exceto) {
+                document.querySelectorAll('dialog.janela[open]').forEach(janela => {
+                    if (janela.id !== exceto && !janela.hasAttribute('data-obrigatoria')) fecharJanela(janela);
+                });
+            }
+
+            // Fechar pelo medalhão, por Escape (cancel não sobe, daí a captura) e por um
+            // clique no fundo escuro (o clique no ::backdrop chega no próprio <dialog>)
+            document.addEventListener('click', e => {
+                const fechar = e.target.closest && e.target.closest('.janela-fechar, [data-fechar-janela]');
+                const janela = fechar ? fechar.closest('dialog.janela') : (e.target.matches && e.target.matches('dialog.janela') ? e.target : null);
+                if (janela && !janela.hasAttribute('data-obrigatoria')) fecharJanela(janela);
+            });
+            document.addEventListener('cancel', e => {
+                if (!e.target.matches || !e.target.matches('dialog.janela')) return;
+                e.preventDefault();
+                if (!e.target.hasAttribute('data-obrigatoria')) fecharJanela(e.target);
+            }, true);
+
+            // ---------- Avisos (Fase 4) ----------
+            // Substituem o alert(). Um aviso sobe do alto da tela e some sozinho; o texto
+            // vai também para #avisos-leitor. Com uma janela aberta, o resto da página
+            // fica inerte para o leitor de tela: o retorno de uma ação feita numa janela
+            // vai para a .janela-status dela, não para um aviso.
+            // tom: '' (neutro), 'sucesso' ou 'falha'; icone: um id do sprite.
+            function avisar(texto, { tom = '', icone = 'i-alerta', duracao } = {}) {
+                const leitor = document.getElementById('avisos-leitor');
+                if (leitor) leitor.textContent = texto;
+                const host = document.getElementById('avisos');
+                if (!host || typeof host.showPopover !== 'function') return;
+                const pecas = [...host.querySelectorAll('.aviso')];
+                if (!pecas.length) return;
+                const agora = performance.now();
+                const peca = pecas.find(p => !((p.noArAte || 0) > agora))
+                    || pecas.reduce((a, p) => (p.noArAte < a.noArAte ? p : a));
+                if (peca.saida) clearTimeout(peca.saida);
+                if (peca.animacao) peca.animacao.cancel();
+                escreverTexto(peca.querySelector('.aviso-texto'), texto);
+                escreverAtributo(peca.querySelector('use'), 'href', hrefIcone(icone));
+                peca.dataset.tom = tom;
+                peca.hidden = false;
+                if (!host.matches(':popover-open')) host.showPopover();
+                const tempo = duracao || Math.min(6000, 2600 + texto.length * 45);
+                peca.noArAte = agora + tempo;
+                const sobe = movimentoReduzido() ? [{ opacity: 0 }, { opacity: 1 }]
+                    : [{ opacity: 0, transform: 'translateY(-0.8rem)' }, { opacity: 1, transform: 'none' }];
+                peca.animacao = peca.animate(sobe, { duration: 220, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
+                peca.saida = setTimeout(() => {
+                    const sumir = () => {
+                        peca.hidden = true;
+                        if (pecas.every(p => p.hidden)) host.hidePopover();
+                    };
+                    peca.animacao = peca.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-in', fill: 'forwards' });
+                    if (peca.animacao) peca.animacao.onfinish = sumir; else sumir();
+                }, tempo);
+            }
+
+            // Uma janela aberta depois do aviso entra na frente dele: o aviso volta à frente
+            function trazerAvisosParaFrente() {
+                const host = document.getElementById('avisos');
+                if (!host || typeof host.showPopover !== 'function' || !host.matches(':popover-open')) return;
+                host.hidePopover();
+                host.showPopover();
+            }
+
             // No movimento reduzido, o texto da cena fica invisível (já no lugar) até um
             // quadro depois de a arte nova entrar no vitral, ou por no máximo 250 ms: a
             // arte e o texto inteiro no mesmo quadro passavam do limite. As escolhas
@@ -1444,6 +1553,9 @@
                 // sozinhos (veem combat.active falso)
                 if (gameState.combat && gameState.combat.active) closeCombatScreen();
                 mostrarCombate(false);
+                // e nunca começa com uma janela aberta por cima (a loja da cena anterior, o
+                // mapa de onde se viajou); a especialização, obrigatória, fica
+                fecharJanelas();
 
                 // Quem escolheu pelo teclado continua nas escolhas da cena nova
                 const ativo = document.activeElement;

@@ -1182,6 +1182,160 @@
 .cronica-sucesso svg, .cronica-sucesso .resultado { color: var(--verdete); }
 .cronica-falha svg, .cronica-falha .resultado { color: var(--rubro); }
 
+/* ---------- Janela: moldura de modal (fora da folha) ---------- */
+
+/* Loja, especialização, diário, mapa e fim da aventura são <dialog class="janela">
+   abertos com showModal() (abrirJanela no jogo). Ficam na camada de cima da página
+   (top layer), acima da folha e dos efeitos, com o foco preso dentro, Escape para
+   fechar e o resto da página inerte. Por dentro, cada uma é uma .folha menor
+   (.janela-folha): o reset, as fontes e o foco do kit valem nela sem regra a mais.
+   A largura vem de --largura-janela, definida por janela em janelas.css. */
+dialog.janela {
+    width: min(var(--largura-janela, 44rem), calc(100vw - 2rem));
+    max-width: none;
+    max-height: none;
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--tinta);
+    overflow: visible;
+}
+/* o fundo escurece a mesa, sem desfoque (backdrop-filter é proibido, §6) */
+dialog.janela::backdrop { background: rgba(14, 9, 5, 0.74); }
+.janela-folha {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 1.1rem;
+    max-height: calc(100dvh - 3rem);
+    padding: 2.5rem 2.2rem 1.5rem;
+}
+/* a fita do título fica sobre a moldura de cima, como nos painéis */
+.janela-folha > .fita { top: -1.25rem; font-size: 1.55rem; }
+.janela-subtitulo {
+    margin: 0;
+    font: italic 1.08rem/1.45 var(--fonte-texto);
+    color: var(--sepia);
+    text-align: center;
+}
+/* o corpo rola dentro da moldura quando não cabe; a moldura não rola */
+.janela-corpo {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sepia-claro) transparent;
+}
+.janela-rodape {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.8rem 1.2rem;
+}
+/* Fechar: um medalhão no canto de cima, sobre a moldura */
+.janela-fechar {
+    position: absolute;
+    top: -1.1rem;
+    right: -1.1rem;
+    z-index: var(--z-medalhao);
+    display: grid;
+    place-items: center;
+    width: 3.3rem;
+    height: 3.3rem;
+    padding: 0.95rem;
+    border: 0;
+    border-radius: 50%;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+    color: var(--tinta-2);
+    cursor: pointer;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+.janela-fechar svg { width: 100%; height: 100%; }
+.janela-fechar:hover { transform: translateY(-0.12rem); color: var(--rubro); }
+.janela-fechar:focus-visible { outline: none; box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro); }
+/* Título de seção dentro da janela (a mesma letra do título das escolhas) */
+.janela-secao {
+    margin: 0 0 0.4rem;
+    font: var(--rotulo) var(--fonte-rotulo);
+    letter-spacing: 0.16em;
+    color: var(--sepia);
+    text-align: center;
+}
+/* O que a última ação fez ("Você comprou…", "Mochila cheia"), dentro da janela:
+   role=status. Os avisos de fora ficam inertes enquanto uma janela está aberta,
+   então o retorno de uma ação feita na janela sai aqui. */
+.janela-status {
+    min-height: 1.45em;
+    margin: 0;
+    font: italic 1.02rem/1.45 var(--fonte-texto);
+    color: var(--sepia);
+    text-align: center;
+}
+.janela-status[data-tom="sucesso"] { color: var(--verdete); }
+.janela-status[data-tom="falha"] { color: var(--rubro); }
+/* Abrir e fechar: só opacidade e transform, na janela e no fundo */
+dialog.janela[open] { animation: janela-abrir 0.22s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+dialog.janela[open]::backdrop { animation: janela-escurecer 0.22s ease-out both; }
+dialog.janela.fechando { animation: janela-fechar 0.16s ease-in both; }
+dialog.janela.fechando::backdrop { animation: janela-clarear 0.16s ease-in both; }
+@keyframes janela-abrir { from { opacity: 0; transform: translateY(0.8rem); } }
+@keyframes janela-escurecer { from { opacity: 0; } }
+@keyframes janela-fechar { to { opacity: 0; transform: translateY(0.5rem); } }
+@keyframes janela-clarear { to { opacity: 0; } }
+
+/* ---------- Aviso: toast (fora da folha) ---------- */
+
+/* Os avisos substituem o alert() (mochila cheia, o mercador, o isqueiro que falta).
+   Ficam num popover (#avisos, top layer), para aparecer também sobre uma janela
+   aberta, em duas peças fixas reusadas por avisar(): uma peça por aviso, sem criar
+   nem remover elementos. O texto vai também para #avisos-leitor (aria-live), que o
+   leitor de tela anuncia. Sobem do alto da tela e somem sozinhos. */
+.avisos {
+    position: fixed;
+    inset: 1.2rem 0 auto;
+    display: grid;
+    justify-items: center;
+    gap: 0.6rem;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: visible;
+    pointer-events: none;
+}
+.avisos:not(:popover-open) { display: none; }
+.aviso {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, auto);
+    align-items: center;
+    gap: 0.8rem;
+    max-width: 38rem;
+    margin: 0;
+    padding: 0.5rem 1.3rem 0.5rem 0.55rem;
+    border: 0.7rem solid transparent;
+    border-image: url(../ui/ornamentos/moldura.svg) 40 / 2.5rem / 0 stretch;
+    background: linear-gradient(#f4e9d0, #e2cfa6);
+    background-clip: padding-box;
+    box-shadow: 0 0.3rem 0.7rem rgba(14, 9, 5, 0.45);
+    font: 1.12rem/1.35 var(--fonte-texto);
+    font-variant-numeric: lining-nums;
+    color: var(--tinta);
+    opacity: 0;
+    will-change: opacity; /* camada própria e nítida; o JS anima a entrada e a saída */
+}
+.aviso[hidden] { display: none; }
+.aviso svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0.6rem;
+    border-radius: 50%;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+    color: var(--sepia);
+}
+.aviso[data-tom="falha"] svg { color: var(--rubro); }
+.aviso[data-tom="sucesso"] svg { color: var(--verdete); }
+
 /* ---------- Efeitos de tela (fora da folha) ---------- */
 
 /* Golpe no herói: a borda da tela pulsa em vermelho (o JS anima a opacidade) */
@@ -1246,6 +1400,10 @@
     .bandeja-mesa.critico::after { animation: none; opacity: 0.85; } /* brilho parado */
     .card-heroi:hover, .botao-fita:hover, .botao-secundario:hover, .selo:hover svg { transform: none; }
     .cena-texto > span { transition: none; }
+    .janela-fechar:hover { transform: none; }
+    /* as janelas só esmaecem */
+    @keyframes janela-abrir { from { opacity: 0; } }
+    @keyframes janela-fechar { to { opacity: 0; } }
     @keyframes d20-surgir { from { opacity: 0.2; } to { opacity: 1; } }
 }
 
