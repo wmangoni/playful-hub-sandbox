@@ -7,7 +7,7 @@ const path = require('path');
 
 const root = path.join(__dirname, '..', 'ded_make_character');
 const catalogo = require(path.join(root, 'data', 'catalogo-combate.json'));
-const { validarCatalogo, validarSecao, EFEITOS } = require(path.join(root, 'tools', 'validar-catalogo.js'));
+const { validarCatalogo, validarSecao, validarIndice, validarDiretorioMonstros, EFEITOS } = require(path.join(root, 'tools', 'validar-catalogo.js'));
 
 const clone = obj => JSON.parse(JSON.stringify(obj));
 
@@ -294,6 +294,44 @@ function run() {
       assert.deepStrictEqual([...l.algum].sort(), [...new Set((r.algum || []).flat())].sort(), `${ef}: pelo menos um de`);
       assert.deepStrictEqual([...l.opcionais].sort(), [...r.opcionais].sort(), `${ef}: opcionais (rode tools/gerar-tabela-efeitos.js)`);
     }
+  });
+
+  test('o diretório particionado data/monstros/ e o indice.json passam na validação', () => {
+    const dirMonstros = path.join(root, 'data', 'monstros');
+    const { erros, avisos } = validarDiretorioMonstros(dirMonstros);
+    for (const a of avisos) console.log(`    aviso: ${a}`);
+    assert.deepStrictEqual(erros, []);
+
+    const indice = require(path.join(dirMonstros, 'indice.json'));
+    assert.strictEqual(indice.length, 74);
+    assert.strictEqual(indice.filter(c => c.categoria === 'monstro').length, 20);
+    assert.strictEqual(indice.filter(c => c.categoria === 'holy_avenger').length, 54);
+
+    // Conferir campos essenciais do formato leve
+    const camposEsperados = ['id', 'nome', 'nome_original', 'categoria', 'nd', 'nivel', 'tipo', 'subtipos', 'tamanho', 'pv', 'ca', 'letra', 'arquivo'].sort();
+    for (const c of indice) {
+      assert.deepStrictEqual(Object.keys(c).sort(), camposEsperados, `campos de ${c.id}`);
+      assert.ok(c.ca && typeof c.ca.total === 'number' && typeof c.ca.toque === 'number' && typeof c.ca.surpresa === 'number');
+      assert.ok(/^[a-z]$/.test(c.letra));
+    }
+  });
+
+  test('as ferramentas de particionar e montar mantêm paridade exata com o catálogo compilado', () => {
+    const { particionarCatalogo } = require(path.join(root, 'tools', 'particionar-catalogo.js'));
+    const { montarCatalogo } = require(path.join(root, 'tools', 'montar-catalogo.js'));
+    const dirMonstros = path.join(root, 'data', 'monstros');
+
+    const montado = montarCatalogo(dirMonstros, catalogo);
+    assert.strictEqual(montado.monstros.length, catalogo.monstros.length);
+    assert.strictEqual(montado.holy_avenger.length, catalogo.holy_avenger.length);
+    assert.deepStrictEqual(
+      montado.monstros.map(m => m.id).sort(),
+      catalogo.monstros.map(m => m.id).sort(),
+    );
+    assert.deepStrictEqual(
+      montado.holy_avenger.map(m => m.id),
+      catalogo.holy_avenger.map(m => m.id),
+    );
   });
 
   console.log(`\n${passed} testes passaram.`);

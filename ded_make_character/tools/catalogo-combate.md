@@ -13,12 +13,31 @@ Catálogo somente leitura do simulador de combate (TASK_006 / TASK_012), com dua
 }
 ```
 
-- O arquivo é **mantido à mão**. O `tools/sql-to-json.js` não o gera nem o apaga.
+- O arquivo é **mantido à mão** ou sincronizado pelas ferramentas de particionamento/montagem. O `tools/sql-to-json.js` não o gera nem o apaga.
 - Ao mudar o conteúdo, incremente `versao` e rode o validador:
   ```bash
   node ded_make_character/tools/validar-catalogo.js
   ```
-  Ele também valida um array com uma seção só: `validar-catalogo.js arquivo.json monstros`. O teste `tests/ded_make_character_catalogo.test.js` usa o mesmo validador. O que ele confere está marcado com ✔ neste documento.
+  Ele valida tanto `data/catalogo-combate.json` quanto o diretório particionado `data/monstros/` (arquivos por letra, `holy_avenger.json` e `indice.json`). Também pode validar um arquivo específico ou diretório:
+  - `node ded_make_character/tools/validar-catalogo.js ded_make_character/data/monstros`
+  - `node ded_make_character/tools/validar-catalogo.js ded_make_character/data/monstros/indice.json`
+  - `node ded_make_character/tools/validar-catalogo.js ded_make_character/data/monstros/a.json`
+  O teste `tests/ded_make_character_catalogo.test.js` usa o mesmo validador. O que ele confere está marcado com ✔ neste documento.
+
+## Estrutura particionada (`data/monstros/`)
+
+Para manter o carregamento inicial leve com o crescimento do catálogo (500+ monstros do Livro dos Monstros 3.5), o catálogo é particionado:
+
+- `data/monstros/indice.json`: lista ordenada e leve de todos os combatentes (monstros e Holy Avenger), contendo apenas os campos essenciais para galeria, filtros e busca:
+  `{ id, nome, nome_original, categoria, nd, nivel, tipo, subtipos, tamanho, pv, ca: { total, toque, surpresa }, letra, arquivo }`.
+- `data/monstros/[a-z].json`: combatentes monstros completos (`Combatente`), agrupados pela primeira letra normalizada do nome (minúscula, sem acento: "Água" em `a.json`, "Carniçal" em `c.json`).
+- `data/monstros/holy_avenger.json`: combatentes completos de Holy Avenger.
+
+### Ferramentas de sincronização
+
+- `node ded_make_character/tools/particionar-catalogo.js`: lê `data/catalogo-combate.json` e gera/atualiza `data/monstros/[a-z].json`, `holy_avenger.json` e `indice.json`.
+- `node ded_make_character/tools/montar-catalogo.js`: lê os arquivos particionados de `data/monstros/` e gera `data/catalogo-combate.json`.
+
 
 ## Regras gerais
 
