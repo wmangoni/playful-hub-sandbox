@@ -27,11 +27,18 @@ function run() {
     assert.deepStrictEqual(erros, []);
   });
 
-  test('20 monstros, com o Tarrasque no 20', () => {
-    assert.strictEqual(catalogo.monstros.length, 20);
-    assert.deepStrictEqual(catalogo.monstros.map(m => m.nd).sort((a, b) => a - b), [
-      1, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 15, 17, 19, 20, 20, 20
-    ]);
+  test('monstros do catálogo, com os 20 legados e o Tarrasque no 20', () => {
+    assert.ok(catalogo.monstros.length >= 20);
+    const legados = [
+      'arbusto-errante', 'balor', 'behir', 'carnical', 'cubo-gelatinoso',
+      'dragao-azul-antigo', 'dragao-de-prata-antigo', 'dragao-vermelho-adulto',
+      'elemental-do-fogo-anciao', 'gigante-do-gelo', 'glabrezu', 'golem-de-ferro',
+      'lorde-das-profundezas', 'medusa', 'naga-guardia', 'ogro', 'tarrasque',
+      'troll', 'urso-coruja', 'verme-purpura'
+    ];
+    for (const id of legados) {
+      assert.ok(catalogo.monstros.some(m => m.id === id), `monstro legado "${id}" ausente`);
+    }
     const t = catalogo.monstros.find(m => m.id === 'tarrasque');
     assert.strictEqual(t.nd, 20);
     assert.strictEqual(t.tamanho, 'Colossal');
@@ -57,7 +64,11 @@ function run() {
         assert.ok(typeof m.reducao_dano.valor === 'number' && m.reducao_dano.valor >= 1);
         assert.ok(m.reducao_dano.exceto);
       }
-      assert.strictEqual(m.nivel, m.nd);
+      if (Number.isInteger(m.nd)) {
+        assert.strictEqual(m.nivel, m.nd);
+      } else {
+        assert.strictEqual(m.nivel, 1);
+      }
     }
   });
 
@@ -303,8 +314,8 @@ function run() {
     assert.deepStrictEqual(erros, []);
 
     const indice = require(path.join(dirMonstros, 'indice.json'));
-    assert.strictEqual(indice.length, 74);
-    assert.strictEqual(indice.filter(c => c.categoria === 'monstro').length, 20);
+    assert.strictEqual(indice.length, catalogo.monstros.length + catalogo.holy_avenger.length);
+    assert.strictEqual(indice.filter(c => c.categoria === 'monstro').length, catalogo.monstros.length);
     assert.strictEqual(indice.filter(c => c.categoria === 'holy_avenger').length, 54);
 
     // Conferir campos essenciais do formato leve
