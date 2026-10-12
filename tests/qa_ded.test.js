@@ -423,9 +423,225 @@ async function runTests() {
   console.log('✅ PASS: Critical natural 1 displays red critical failure styles and logs correctly.');
 
   // ----------------------------------------------------
-  // TEST CASE 6: "Continuar" depois do resultado e finais sem escolhas (Fase 2)
+  // TEST CASE 6: Combate pelo caminho real, com o teclado (Fase 3)
   // ----------------------------------------------------
-  console.log('\n--- 6. Testing "Continuar" after the roll and the end scenes ---');
+  // Fica antes do caso dos finais: a cena da poção, visitada lá, agenda a volta para a
+  // cena anterior em 4,5 s. Desde a Fase 3 a volta só acontece se o jogador ainda estiver
+  // na poção, e uma cena nova encerra a luta; a ordem só evita depender disso.
+  console.log('\n--- 6. Testing the combat through the real path, with the keyboard ---');
+  const espera = ms => new Promise(r => setTimeout(r, ms));
+  // waitForFunction com uma mensagem clara no lugar do TimeoutError genérico
+  const aguardar = (condicao, falha, timeout = 3000) =>
+    page.waitForFunction(condicao, { timeout }).catch(() => { throw new Error(falha); });
+  const dialogos = [];
+  const contarDialogo = dialog => dialogos.push(`${dialog.type()}: ${dialog.message()}`);
+  page.on('dialog', contarDialogo);
+
+  // Acaso fixo pelo turno: 0,8 dá 17 no d20 do herói (acerto sem crítico contra a
+  // armadura 10 do Goblin) e 0,96 dá 20 ao inimigo (acerto). A vida cheia garante
+  // que o crítico do inimigo não derruba o herói.
+  const preparo = await page.evaluate(() => {
+    window.__randomAntesDoCombate = Math.random;
+    Math.random = () => (gameState.combat?.turn === 'enemy' ? 0.96 : 0.8);
+    gameState.player.health = gameState.player.maxHealth;
+    updateStatsDisplay();
+    return { xp: gameState.player.xp, nivel: gameState.player.level, vida: gameState.player.health };
+  });
+  console.log('Hero before the fight:', preparo);
+
+  try {
+    // O corredor leva ao Goblin pelo caminho da esquerda (1ª escolha); quem escolhe
+    // pelo teclado continua na 1ª escolha da cena nova, "Lutar contra o goblin"
+    await page.evaluate(() => loadScene('corridor'));
+    await espera(400); // escolhas recém-montadas ignoram ativações por 300 ms
+    await page.focus('#choices button');
+    await page.keyboard.press('Enter');
+    await aguardar(() => gameState.currentScene === 'goblin_encounter'
+      && document.activeElement === document.querySelector('#choices button'),
+      'Enter on "Pegar o caminho da esquerda" did not reach goblin_encounter with the focus on its first choice');
+    await espera(400);
+    await page.keyboard.press('Enter'); // "Lutar contra o goblin": teste de combate na bandeja
+    await aguardar(() => document.activeElement === document.getElementById('dice-button')
+      && !document.getElementById('dice-container').classList.contains('hidden'),
+      'The combat check did not open the d20 tray with the focus on the dice button');
+    await page.keyboard.press('Enter'); // rola o d20
+    await aguardar(() => document.getElementById('dice-button').textContent === 'Enfrentar',
+      'The dice button did not turn into "Enfrentar" after the combat check');
+    await espera(400); // o "Enfrentar" também ignora ativações por 300 ms (sozinho, avança em 1,8 s)
+    const antesDeEnfrentar = await page.evaluate(() => ({
+      foco: document.activeElement && document.activeElement.id,
+      rotulo: document.getElementById('dice-button').textContent,
+      emCombate: !!(gameState.combat && gameState.combat.active)
+    }));
+    if (antesDeEnfrentar.foco !== 'dice-button' || antesDeEnfrentar.rotulo !== 'Enfrentar' || antesDeEnfrentar.emCombate) {
+      throw new Error(`"Enfrentar" was not waiting for the keyboard: ${JSON.stringify(antesDeEnfrentar)}`);
+    }
+
+    // 1 e 2. Enter duplo rápido no "Enfrentar": o 1º abre a luta, o 2º não pode atacar
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await aguardar(() => document.activeElement === document.getElementById('btn-combat-attack'),
+      'Entering the combat with Enter did not move the focus to #btn-combat-attack', 2000);
+    const entrada = await page.evaluate(() => {
+      const exibido = id => {
+        const el = document.getElementById(id);
+        return !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+      };
+      return {
+        narrativa: exibido('narrativa'),
+        cronica: exibido('painel-cronica'),
+        painel: exibido('combat-screen'),
+        relato: exibido('combat-log-box'),
+        inimigo: document.getElementById('combat-enemy-name').textContent,
+        turno: gameState.combat.turn,
+        atacou: document.getElementById('combat-log-text').textContent.includes('Você se prepara')
+      };
+    });
+    console.log('Combat entered:', entrada);
+    if (entrada.narrativa || entrada.cronica || !entrada.painel || !entrada.relato) {
+      throw new Error('Entering the combat must hide #narrativa and #painel-cronica and show #combat-screen and #combat-log-box');
+    }
+    if (entrada.inimigo !== 'Goblin') {
+      throw new Error(`Expected to fight the Goblin, got "${entrada.inimigo}"`);
+    }
+    if (entrada.turno !== 'player' || entrada.atacou) {
+      throw new Error('A quick double Enter on "Enfrentar" must not attack (the attack ignores activations for 300 ms)');
+    }
+
+    // 3. O ataque, depois da pausa: o giro carimba um selo; na vez do inimigo, as
+    // ações ficam com aria-disabled e o foco fica no ataque
+    await espera(400);
+    await page.keyboard.press('Enter');
+    const atacou = await page.evaluate(() => document.getElementById('combat-log-text').textContent.includes('Você se prepara'));
+    if (!atacou) throw new Error('Enter on the attack (after the pause) did not attack');
+    await aguardar(() => !!document.querySelector('#combat-mesa [data-selo].visivel'),
+      'No seal was stamped on the combat tray after the hero roll');
+    const rolagem = await page.evaluate(() => ({
+      selos: [...document.querySelectorAll('#combat-mesa [data-selo].visivel')].map(s => s.dataset.selo),
+      dado: document.getElementById('combat-dice').textContent,
+      vidaDoInimigo: gameState.combat.enemy.hp
+    }));
+    console.log('Hero roll:', rolagem);
+    if (rolagem.selos.join() !== 'sucesso' || rolagem.dado !== '17' || rolagem.vidaDoInimigo <= 0) {
+      throw new Error('The hero roll (17, a hit without a critical) must stamp only the "sucesso" seal and leave the Goblin standing');
+    }
+    await aguardar(() => gameState.combat.turn === 'enemy', 'The enemy turn did not start after the hero attack');
+    const vezDoInimigo = await page.evaluate(() => {
+      const acoes = [...document.querySelectorAll('#combat-actions-panel button')];
+      return {
+        acoes: acoes.length,
+        desligadas: acoes.filter(b => b.getAttribute('aria-disabled') === 'true').length,
+        focoNoAtaque: document.activeElement === document.getElementById('btn-combat-attack'),
+        foco: document.activeElement ? `${document.activeElement.tagName}#${document.activeElement.id}` : null,
+        painel: !document.getElementById('combat-screen').classList.contains('hidden'),
+        turno: document.getElementById('combat-turno').textContent
+      };
+    });
+    console.log('Enemy turn:', vezDoInimigo);
+    if (!vezDoInimigo.painel) throw new Error('The combat panel disappeared in the middle of the fight');
+    if (!vezDoInimigo.acoes || vezDoInimigo.desligadas !== vezDoInimigo.acoes) {
+      throw new Error('Every combat action must have aria-disabled="true" during the enemy turn');
+    }
+    if (!vezDoInimigo.focoNoAtaque) {
+      throw new Error(`The focus must stay on the attack during the enemy turn, it is on ${vezDoInimigo.foco}`);
+    }
+    if (!vezDoInimigo.turno.startsWith('Vez')) {
+      throw new Error(`#combat-turno must say whose turn it is ("Vez do …"), got "${vezDoInimigo.turno}"`);
+    }
+
+    // 4. A vez volta: nenhuma ação desligada e o foco no ataque (remontado)
+    await aguardar(() => gameState.combat.turn === 'player'
+      && document.activeElement === document.getElementById('btn-combat-attack'),
+      'The turn did not come back to the hero with the focus on the attack', 5000);
+    const vezDeVolta = await page.evaluate(() => ({
+      desligadas: document.querySelectorAll('#combat-actions-panel [aria-disabled]').length,
+      turno: document.getElementById('combat-turno').textContent,
+      inimigoAcertou: document.getElementById('combat-log-text').textContent.includes('Você levou'),
+      vida: gameState.player.health,
+      vidaMaxima: gameState.player.maxHealth
+    }));
+    console.log('Turn back to the hero:', vezDeVolta);
+    if (vezDeVolta.desligadas) throw new Error('No combat action may keep aria-disabled when the turn comes back');
+    if (vezDeVolta.turno !== 'O que você faz?') throw new Error(`#combat-turno did not come back to "O que você faz?", got "${vezDeVolta.turno}"`);
+    if (!vezDeVolta.inimigoAcertou || vezDeVolta.vida >= vezDeVolta.vidaMaxima || vezDeVolta.vida <= 0) {
+      throw new Error('The enemy (a natural 20) should have hit the hero without knocking the hero down');
+    }
+
+    // 5. A vitória: o Goblin por um fio e o 20 natural forçado
+    await page.evaluate(() => {
+      gameState.combat.enemy.hp = 1;
+      Math.random = () => 0.96;
+    });
+    await espera(400); // as ações foram remontadas na volta da vez
+    await page.keyboard.press('Enter');
+    await aguardar(() => !!document.getElementById('btn-combat-continuar')
+      && document.activeElement === document.getElementById('btn-combat-continuar'),
+      'The victory did not offer #btn-combat-continuar with the focus on it', 5000);
+    const continuarEm = Date.now();
+    const vitoria = await page.evaluate(() => ({
+      seloVitoria: !!document.querySelector('#combat-enemy-card [data-desfecho="vitoria"].visivel'),
+      seloCritico: !!document.querySelector('#combat-mesa [data-selo="critico"].visivel'),
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      turno: document.getElementById('combat-turno').textContent
+    }));
+    console.log('Victory:', vitoria);
+    if (!vitoria.seloVitoria) throw new Error('The victory seal ([data-desfecho="vitoria"].visivel) was not stamped on the enemy card');
+    if (!vitoria.seloCritico) throw new Error('The natural 20 did not stamp the "critico" seal on the combat tray');
+    if (vitoria.acoes.join() !== 'btn-combat-continuar') {
+      throw new Error(`The actions must give way to a single "Continuar", got ${JSON.stringify(vitoria.acoes)}`);
+    }
+
+    await espera(400); // o "Continuar" também ignora ativações por 300 ms (sozinho, fecha em 2,2 s)
+    await page.keyboard.press('Enter');
+    const fechouEmMs = Date.now() - continuarEm;
+    const fechamento = await page.evaluate(() => {
+      const exibido = id => {
+        const el = document.getElementById(id);
+        return !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+      };
+      return {
+        painel: exibido('combat-screen'),
+        relato: exibido('combat-log-box'),
+        narrativa: exibido('narrativa'),
+        cronica: exibido('painel-cronica'),
+        emCombate: gameState.combat.active,
+        cena: gameState.currentScene
+      };
+    });
+    console.log(`After Enter on "Continuar" (${fechouEmMs} ms after it appeared):`, fechamento);
+    if (fechouEmMs >= 2000) {
+      throw new Error(`Enter on "Continuar" came ${fechouEmMs} ms late: it can no longer be told apart from the 2.2 s auto-close`);
+    }
+    if (fechamento.painel || fechamento.relato || !fechamento.narrativa || !fechamento.cronica || fechamento.emCombate) {
+      throw new Error('Enter on "Continuar" must close the combat: panel and report hidden, narrative and chronicle visible');
+    }
+    if (fechamento.cena !== 'goblin_fight_success') {
+      throw new Error(`The victory must load goblin_fight_success, got "${fechamento.cena}"`);
+    }
+    await aguardar(() => document.activeElement === document.querySelector('#choices button'),
+      'After the combat the focus must go to the first choice of the new scene', 2000);
+    const cronica = await page.evaluate(() => document.getElementById('game-log').textContent);
+    if (!cronica.includes('Vitória sobre o Goblin')) {
+      throw new Error('The chronicle (#game-log) does not record "Vitória sobre o Goblin"');
+    }
+
+    // 6. Nada de alert/confirm no caminho todo
+    if (dialogos.length) {
+      throw new Error(`Native dialogs opened during the combat: ${JSON.stringify(dialogos)}`);
+    }
+  } finally {
+    page.off('dialog', contarDialogo);
+    await page.evaluate(() => {
+      Math.random = window.__randomAntesDoCombate;
+      delete window.__randomAntesDoCombate;
+    }).catch(() => {});
+  }
+  console.log('✅ PASS: The combat opens and closes by keyboard through "Enfrentar", ignores the double Enter, locks the actions on the enemy turn and keeps the focus.');
+
+  // ----------------------------------------------------
+  // TEST CASE 7: "Continuar" depois do resultado e finais sem escolhas (Fase 2)
+  // ----------------------------------------------------
+  console.log('\n--- 7. Testing "Continuar" after the roll and the end scenes ---');
   const continuar = await page.evaluate(async () => {
     loadScene('crypt');
     skipTyping = true;

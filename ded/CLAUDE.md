@@ -54,14 +54,19 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - O painel tem o card do inimigo (retrato em medalhão do sprite, nome, barra de vida, armadura e os selos de vitória e derrota já pintados), os efeitos em jogo (`#combat-condicoes`, `atualizarCondicoes()`), a bandeja do d20 do combate (a mesma peça da exploração, menor) e as ações.
   - Nome, gênero e ícone de cada inimigo saem de `INIMIGOS`; `inimigo(prep, maiuscula)` escreve "o Goblin", "da Aranha" etc.
   - As ações são `.escolha.acao-combate` montadas por `botaoCombate()`, com o ícone no medalhão e um detalhe à direita (recarga, custo, "ativa"). No turno do inimigo elas ficam com `aria-disabled` e mantêm o foco. Uma habilidade indisponível continua clicável e explica o motivo no relato.
+  - Como as escolhas, as ações ignoram ativações nos 300 ms depois de montadas (`montarAcoes` grava o momento; `cedoDemais`). Testes e ferramentas esperam 400 ms antes de clicar numa ação recém-montada.
+  - O "Voltar" de um submenu devolve o foco à ação que o abriu.
+  - No fim da luta (vitória, derrota ou fuga), `mostrarDesfecho()` carimba o selo e troca as ações por um "Continuar" (`#btn-combat-continuar`), que fecha a luta e carrega a cena seguinte. Quem estava no painel pelo teclado fica nele e, depois, na primeira escolha da cena. Sem clique, a luta fecha sozinha em 2,2 s (2 s na derrota, 1,8 s na fuga).
   - O relato (`addCombatLog`) segue a crônica: ícone e tom pelo emoji do começo (`RELATO_ICONES`), sem emojis no texto, e o resultado do d20 carimba o selo da bandeja.
   - Efeitos: clarão vermelho (`#red-flash`), brilho de impacto (`.impacto`), tremor e números flutuantes, todos com Web Animations em `opacity` e `transform`. Os números flutuantes são quatro peças fixas em `#floater-layer` e uma na vida do herói, reusadas por `spawnFloater()`; não crie nem remova elementos para eles.
+  - Durante a luta, `body.em-combate` (de `mostrarCombate()`) dá camada própria ao que treme, brilha ou desliza a cada golpe; fora dela, a ficha não carrega essas camadas.
+  - A ficha e o card do inimigo escrevem só o que mudou (`escreverTexto`, `escreverAtributo`, `escreverHtml`): reatribuir o mesmo texto troca o nó e repinta a ficha inteira a cada golpe.
 - **Nomes:** em português, exceto os que são contrato com o JS e os testes do jogo:
   - o d20: `#dice`, `.dice`, `.rolling-animation`, `.critical-success-bg` (20 natural), `.falha-critica` (1 natural), `#dice-container`, `#dice-button` e `#result-message`;
   - as escolhas: `#choices`;
   - a seleção: `.character-card[data-class]` e `.selected`. O primeiro `<button>` de `#character-select` é o de começar;
   - os atributos: `#val-*` e `#mod-*`. O modificador sai como `+3` e `−1`;
-  - o combate: `#combat-screen` (alternado com `.hidden`), `#combat-enemy-name`, `#combat-enemy-ac`, `#combat-actions-panel` e os botões `#btn-combat-attack`, `#btn-combat-spell` (sempre presente; oculto para quem não tem magia), `#btn-combat-item` e `#btn-combat-flee`;
+  - o combate: `#combat-screen` (alternado com `.hidden`), `#combat-enemy-name`, `#combat-enemy-ac`, `#combat-actions-panel` e os botões `#btn-combat-attack`, `#btn-combat-spell` (sempre presente: leva a habilidade da classe ou as da especialização, e só fica oculto sem classe, nos testes), `#btn-combat-item` e `#btn-combat-flee`;
   - o equipamento: `.inventory-slots-grid .inventory-slot-box`, com `.occupied`, `.usable`, `.disabled` e `.item-name`. O ícone fica em `.item-icone use` (`href` com `#i-*` do sprite) e a descrição no `title` do slot;
   - os globais que as ferramentas usam: `scenes`, `gameState`, `skipTyping`, `ttsEnabled`, `selectCharacter`, `startGame`, `loadScene`, `startInteractiveCombat`, `closeCombatScreen` e `openSpecializationModal`.
 
@@ -70,6 +75,7 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - `ui/ornamentos/*.svg` e `vitral-recorte.css` são **gerados** por `node ded/tools/gerar-ornamentos.mjs`. Não edite os SVGs à mão: mude o script e rode de novo.
   - `ui/texturas/*.webp` vêm de `python -I ded/tools/gerar-texturas.py ded/ui/texturas`.
   - `ui/icones.svg` é o sprite de ícones do game-icons.net (CC BY 3.0). Cada símbolo traz a origem num comentário; os créditos estão em `ui/CREDITOS.md`.
+  - Na abertura, o jogo busca o sprite e o embute no documento. Ícone criado pelo JS usa `hrefIcone(id)`, que aponta para o sprite embutido (ou para o arquivo, enquanto ele não chega); o HTML fixo continua em `ui/icones.svg#…`. Um `<use>` novo apontando para o arquivo externo faz o Chrome refazer o layout da folha num segundo passe.
   - `ui/fontes/` guarda Alegreya, Grenze Gotisch e Marcellus SC (subconjunto latino, SIL OFL; licenças em `OFL-*.txt`).
 - **`prototipo/`**: referência viva do visual, sem lógica de jogo e com `noindex`.
   - `index.html` é a tela de exploração aprovada na Fase 0.
@@ -93,7 +99,7 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - Nada de `filter` em peça que repinta (o medalhão do nível tem a sombra num gradiente) e nenhuma camada da tela toda sempre composta (o clarão vermelho fica em `opacity: 0`, nunca a 1%).
   - O anel de XP é um traço SVG de cor sólida: com gradiente, o primeiro XP compilava um pipeline novo na GPU.
   - Não ler o layout logo depois de mudar o DOM (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`). Leve a leitura para o próximo quadro com `noProximoQuadro()` ou `focarNoQuadro()`.
-  - Camada própria para algo que fica parado vem de `will-change: opacity`. Com `transform`, o Chrome não alinha a camada ao pixel e ela borra.
+  - Camada própria para algo que fica parado vem de `will-change: opacity`. Com `transform`, o Chrome não alinha a camada ao pixel e ela borra. As exceções são peças sem texto parado que só deslizam ou sobem: o preenchimento da barra de vida e os números flutuantes (invisíveis em repouso).
   - Nada de `backdrop-filter`, nem de `filter` ou sombra desfocada grandes (use gradientes).
   - Na hora de revelar um resultado, nunca troque `background-image`: deixe a camada pintada com `opacity: .01` e anime a opacidade.
   - O limite é de 48 FPS em Full HD.

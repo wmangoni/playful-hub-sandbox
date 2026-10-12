@@ -1,8 +1,12 @@
 // Medição do tempo de quadro do ded (TASK_001 §6): nenhum quadro acima de
 // 20,8 ms (48 FPS) em Full HD com CPU 1x. A CPU 4x sai junto, só para informar.
 //
-//   node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--cpu 1|4|ambos] [--json saida.json]
-//                                 [--raiz <repo>] [--perfil <pasta>] [--movimento padrao|reduzido]
+//   node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]
+//                                 [--json saida.json] [--raiz <repo>] [--perfil <pasta>]
+//                                 [--movimento padrao|reduzido] [--sem-rastreio]
+//
+// Em CPU 1x, cada cenário roda --repeticoes vezes (10), cada vez numa aba nova; o primeiro clique
+// roda --execucoes vezes (30) e a abertura, uma. Em CPU 4x, que só informa, cada um roda uma vez.
 //
 // Cenários (todos em CPU 1x; os marcados com * repetem em 4x):
 //   abertura          da carga da página até a seleção parada (2 s depois das fontes). Só informa:
@@ -14,14 +18,22 @@
 //                     3,4 s de giro, resultado, selo de cera e avanço automático para a próxima cena.
 //   critico-20 *      o mesmo, com o 20 natural forçado (Math.random = () => 0.96 durante a rolagem).
 //   critico-1 *       o mesmo, com o 1 natural forçado (Math.random = () => 0).
+//   combate-entrada * o caminho real até a luta: na sala do Goblin, a escolha de lutar abre a bandeja, o d20
+//                     rola e o botão vira "Enfrentar". Do clique nele até 2 s depois: a narrativa e a crônica
+//                     dão lugar ao painel de combate e ao relato, e as ações são montadas.
 //   combate *         guerreiro contra o Goblin, aberto com startInteractiveCombat 800 ms antes. Do clique
 //                     em "Ataque" até 6 s depois, a rodada inteira: o d20 (~1,3 s), o acerto (clarão e
 //                     barra do inimigo), o turno do inimigo (~2,8 s), o golpe dele (~4 s: tremor, clarão
 //                     vermelho e barra do jogador) e a volta da vez para o jogador (~5,5 s). O Math.random
 //                     depende só do turno: 0,8 no do jogador (17, acerto sem crítico; o Goblin fica com 2
 //                     de 12) e 0,96 no do inimigo (o 20 natural, que sempre acerta).
-//   combate-vitoria * o mesmo começo, com o Goblin em 1 de vida e o 20 natural forçado: 6 s do clique, com a
-//                     vitória (~2,8 s: faixa, XP, ouro e o nível novo) e a volta para uma cena (~5 s).
+//   combate-vitoria * o mesmo começo, com o Goblin em 1 de vida e o 20 natural forçado: 7,5 s do clique, com a
+//                     vitória (~2,8 s: selo, XP, ouro e o nível novo), a volta para uma cena (~5 s) e o
+//                     segundo seguinte, quando a GPU limpa o que o painel deixou.
+//   combate-derrota * o mesmo começo, com o jogador em 1 de vida: o ataque (0,2) não derruba o Goblin, ele
+//                     acerta o 20 natural (~4 s), vem a derrota (~5,5 s) e a cena da morte (~7,5 s); 9 s do clique.
+//   combate-fuga *    o mesmo começo, com "Fugir" e o 20 natural: a fuga dá certo (~1,3 s) e a cena anterior
+//                     volta (~3,1 s); 5,5 s do clique.
 //   primeiro-clique   o aceite: --execucoes (30) rodadas, cada uma numa aba nova, com o save apagado e
 //                     jogo novo, do primeiro clique no teste até 1,8 s depois de rolar (a primeira vez
 //                     que a bandeja e a arte do dado aparecem naquela página).
@@ -29,15 +41,18 @@
 // Cada cenário informa quadros, mediana, p95, p99, máximo, quantos passaram do limite, quantos
 // desses foram a limpeza ociosa da GPU (ver as armadilhas), o pior bloqueio do LoAF
 // (long-animation-frame; o Chrome só registra quadros acima de 50 ms) e em que momento começou o
-// pior quadro, contado da ação. A última linha é APROVADO ou REPROVADO, só com os cenários de
-// CPU 1x (fora a abertura); reprovado ou erro de medição saem com código 1.
+// pior quadro, contado da ação; com mais de uma execução, também o máximo de cada uma. A última
+// linha é APROVADO ou REPROVADO, só com os cenários de CPU 1x (fora a abertura), e diz quantos
+// quadros ficaram fora do veredito na limpeza da GPU; reprovado ou erro de medição saem com código 1.
 //
 // Do jogo, o script usa só a API estável: selectCharacter, startGame, loadScene, gameState, scenes,
 // skipTyping, ttsEnabled, .character-card[data-class], o primeiro <button> de #character-select (o
 // de começar), os <button> de #choices, #dice-container e #dice-button. O #dice e a
 // classe .rolling-animation entram apenas em conferências que viram aviso. No combate:
 // startInteractiveCombat, gameState.combat (active, turn, enemy.hp), gameState.player (health, xp) e
-// #btn-combat-attack. As conferências do combate leem o gameState depois da janela medida.
+// #btn-combat-attack e #btn-combat-flee; na entrada, scenes.goblin_encounter (a escolha com checkType
+// "combat") e o rótulo "Enfrentar" do #dice-button. As conferências do combate leem o gameState
+// depois da janela medida.
 //
 // Armadilhas da medição (aprendidas neste projeto):
 // - GPU de verdade, sem --disable-gpu. O Puppeteer abre o Chrome com o processo de GPU frio, que gera
@@ -66,10 +81,14 @@
 //   página naquele quadro. Ela só aparece quando a página fica parada mais de 1 s dentro da janela
 //   (a vitória do combate, entre o selo e a volta para a cena); o combate antigo não a mostrava porque
 //   repintava a tela em todo quadro. Por isso cada medição grava um rastreio leve (só as tarefas de
-//   cada thread e a marca da ação) e um quadro acima do limite que se sobrepõe a essa tarefa sai da
-//   conta do veredito quando, descontada a tarefa, ele caberia no limite. O relatório lista esses
-//   quadros à parte, com a duração da tarefa. Se o Chrome mudar o nome da tarefa, eles simplesmente
-//   voltam a contar contra a página.
+//   cada thread e a marca da ação). Um quadro acima do limite sai da conta do veredito só quando as
+//   três coisas valem: a tarefa roda na thread principal da GPU (CrGpuMain) durante o quadro; o
+//   quadro, sem o trecho da tarefa que cai dentro dele, caberia no limite; e a thread principal da
+//   página trabalhou menos de 3 ms nesse intervalo. O relatório lista esses quadros à parte, com o
+//   trecho da tarefa e o trabalho da página, e o veredito diz quantos foram. A página influencia esse
+//   custo (ele cresce com as texturas descartadas), então uma aprovação que dependa dessa exclusão é
+//   decisão do dono do projeto. Se o Chrome mudar o nome da tarefa, os quadros voltam a contar contra
+//   a página. --sem-rastreio desliga o rastreio (para medir o custo dele): aí tudo conta.
 // - Movimento padrão emulado (prefers-reduced-motion: no-preference). Com as animações do Windows
 //   desligadas, o Chrome pede movimento reduzido e o jogo pularia a máquina de escrever, o giro do
 //   d20 e a chama do vitral, que são justamente o que se quer medir. --movimento reduzido mede o outro caminho.
@@ -89,15 +108,19 @@ let MOVIMENTO = 'no-preference'; // prefers-reduced-motion emulado (--movimento 
 const PERFIL_PADRAO = path.join(os.tmpdir(), 'ded-desempenho-perfil');
 const LIMITE_MS = 1000 / 48;
 const FOLGA_MS = 1.5; // ruído do timestamp do rAF; ver o cabeçalho
-const CENARIOS = ['abertura', 'exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate', 'combate-vitoria', 'primeiro-clique'];
-const EM_4X = new Set(['exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate', 'combate-vitoria']);
+const CENARIOS = ['abertura', 'exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
+    'combate-vitoria', 'combate-derrota', 'combate-fuga', 'primeiro-clique'];
+const EM_4X = new Set(['exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
+    'combate-vitoria', 'combate-derrota', 'combate-fuga']);
 const SO_INFORMA = new Set(['abertura']);
 const FORCAR = { 'teste-d20': null, 'critico-20': 0.96, 'critico-1': 0 }; // floor(0,96 * 20) + 1 = 20
-// Combate: o Math.random no turno do jogador e no do inimigo, a vida do inimigo antes do clique
-// (null mantém a cheia) e a janela medida, contada do clique
+// Combate: o desfecho esperado, a ação clicada, o Math.random no turno do jogador e no do
+// inimigo, as vidas antes do clique (null mantém a cheia) e a janela medida, contada do clique
 const COMBATE = {
-    combate: { jogador: 0.8, inimigo: 0.96, vidaInimigo: null, janela: 6000 },
-    'combate-vitoria': { jogador: 0.96, inimigo: 0.96, vidaInimigo: 1, janela: 6000 }
+    combate: { tipo: 'rodada', acao: 'btn-combat-attack', jogador: 0.8, inimigo: 0.96, vidaInimigo: null, vidaJogador: null, janela: 6000 },
+    'combate-vitoria': { tipo: 'vitoria', acao: 'btn-combat-attack', jogador: 0.96, inimigo: 0.96, vidaInimigo: 1, vidaJogador: null, janela: 7500 },
+    'combate-derrota': { tipo: 'derrota', acao: 'btn-combat-attack', jogador: 0.2, inimigo: 0.96, vidaInimigo: null, vidaJogador: 1, janela: 9000 },
+    'combate-fuga': { tipo: 'fuga', acao: 'btn-combat-flee', jogador: 0.96, inimigo: 0.96, vidaInimigo: null, vidaJogador: null, janela: 5500 }
 };
 const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 }; // o do scenes.json
 const BLOQUEIO = /googletagmanager|google-analytics|\.mp3(\?|$)/;
@@ -108,6 +131,8 @@ const MIME = {
 };
 const espera = ms => new Promise(r => setTimeout(r, ms));
 const passou = d => d > LIMITE_MS + FOLGA_MS;
+const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
+let RASTREAR = true; // --sem-rastreio desliga
 
 function servidor(raiz) {
     return new Promise(resolve => {
@@ -217,20 +242,21 @@ async function fluxoDado({ forcar, rolarApos, janela }) {
     return { ...r, comecou, resultado, cenaAntes, cena: gameState.currentScene };
 }
 
-// Dentro da página: um ataque físico no combate já aberto, medido do clique até janela ms
-// depois. O Math.random forçado sai do turno (gameState.combat.turn), e não da ordem das
-// chamadas nem do tempo: o áudio também sorteia, e a animação do dado pode passar a sortear.
+// Dentro da página: uma ação (ataque ou fuga) no combate já aberto, medida do clique até
+// janela ms depois. O Math.random forçado sai do turno (gameState.combat.turn), e não da ordem
+// das chamadas nem do tempo: o áudio também sorteia, e a animação do dado pode passar a sortear.
 // A ferramenta não confere nada dentro da janela: o estado do combate sai antes e depois dela.
-async function fluxoCombate({ jogador, inimigo, vidaInimigo, janela }) {
+async function fluxoCombate({ acao, jogador, inimigo, vidaInimigo, vidaJogador, janela }) {
     const m = window.__desempenho;
     const c = gameState.combat;
     if (!c || !c.active) throw new Error('startInteractiveCombat não abriu o combate (gameState.combat.active)');
     if (c.turn !== 'player') throw new Error(`o combate abriu no turno "${c.turn}", e não no do jogador`);
-    const atacar = document.getElementById('btn-combat-attack');
+    const atacar = document.getElementById(acao);
     if (!atacar || atacar.disabled || atacar.getAttribute('aria-disabled') === 'true') {
-        throw new Error('#btn-combat-attack ausente ou desabilitado no turno do jogador');
+        throw new Error(`#${acao} ausente ou desabilitado no turno do jogador`);
     }
     if (vidaInimigo !== null) c.enemy.hp = vidaInimigo;
+    if (vidaJogador !== null) { gameState.player.health = vidaJogador; updateStatsDisplay(); }
     const retrato = () => ({
         inimigo: gameState.combat.enemy.hp, jogador: gameState.player.health, xp: gameState.player.xp,
         turno: gameState.combat.turn, ativo: gameState.combat.active
@@ -309,9 +335,25 @@ async function naCripta(page) {
     await espera(400);
 }
 
+// Dentro da página: o "Enfrentar" da bandeja (o teste de combate já rolado) abre o combate.
+// Mede do clique até janela ms depois.
+async function fluxoEntrada({ janela }) {
+    const m = window.__desempenho;
+    const botao = document.getElementById('dice-button');
+    if (!botao || !/Enfrentar/.test(botao.textContent)) throw new Error(`o #dice-button não ofereceu "Enfrentar" (diz "${botao && botao.textContent}")`);
+    await m.iniciar();
+    m.marcar();
+    botao.click();
+    await new Promise(ok => setTimeout(ok, janela));
+    const r = await m.parar();
+    return { ...r, combate: { ativo: !!(gameState.combat && gameState.combat.active) } };
+}
+
 // Rastreio leve da janela medida: as tarefas de cada thread ('toplevel') e a marca da ação, de onde
-// saem as limpezas ociosas da GPU (ver as armadilhas), em ms contados da ação.
+// saem as limpezas ociosas da GPU e o trabalho da thread principal da página (ver as armadilhas),
+// em ms contados da ação.
 async function comRastreio(page, executar) {
+    if (!RASTREAR) return Object.assign(await executar(), { limpezas: null, trabalho: null });
     const arq = path.join(os.tmpdir(), `ded-desempenho-${process.pid}-${Date.now()}.json`);
     await page.tracing.start({ path: arq, categories: ['toplevel', 'blink.user_timing'] });
     let r;
@@ -320,28 +362,46 @@ async function comRastreio(page, executar) {
     } finally {
         await page.tracing.stop().catch(() => {});
     }
-    r.limpezas = limpezasDaGpu(arq);
+    Object.assign(r, lerRastreio(arq));
     fs.rmSync(arq, { force: true });
     return r;
 }
 
-function limpezasDaGpu(arq) {
+function lerRastreio(arq) {
     let eventos;
-    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return null; }
+    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return { limpezas: null, trabalho: null }; }
     const marca = eventos.find(e => e.name === 'desempenho:acao');
-    if (!marca) return null;
-    return eventos.filter(e => e.ph === 'X' && e.dur >= 5000 && e.args?.src_func === 'ScheduleCleanUpAllResources')
-        .map(e => ({ inicio: (e.ts - marca.ts) / 1000, duracao: e.dur / 1000 }));
+    if (!marca) return { limpezas: null, trabalho: null };
+    const threads = new Map();
+    for (const e of eventos) if (e.name === 'thread_name') threads.set(`${e.pid}:${e.tid}`, e.args && e.args.name);
+    const ms = ts => (ts - marca.ts) / 1000;
+    const tarefas = eventos.filter(e => e.ph === 'X' && e.name === 'ThreadControllerImpl::RunTask');
+    return {
+        limpezas: tarefas.filter(e => e.dur >= 5000 && e.args?.src_func === 'ScheduleCleanUpAllResources'
+            && threads.get(`${e.pid}:${e.tid}`) === 'CrGpuMain').map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        // a thread principal da página é a da marca
+        trabalho: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100).map(e => [ms(e.ts), ms(e.ts + e.dur)])
+    };
 }
 
-// Um quadro acima do limite é da limpeza ociosa da GPU quando se sobrepõe a ela e, descontada a
-// tarefa, caberia no limite.
-function tarefaDaLimpeza(e, i) {
-    const d = e.quadros[i], fim = e.fins[i], inicio = fim - d;
-    const sobre = (e.limpezas || []).filter(l => l.inicio < fim && l.inicio + l.duracao > inicio);
-    return sobre.length ? Math.max(...sobre.map(l => l.duracao)) : 0;
+// Um quadro acima do limite é da limpeza ociosa da GPU quando a tarefa roda durante ele, quando
+// ele caberia no limite sem o trecho dela que cai dentro do quadro e quando a página quase não
+// trabalhou nesse intervalo (menos de TRABALHO_MAX_MS na thread principal).
+const sobreposicao = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+const intervalo = (e, i) => [e.fins[i] - e.quadros[i], e.fins[i]];
+function trechoDaLimpeza(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return Math.max(0, ...(e.limpezas || []).map(l => sobreposicao(inicio, fim, l.inicio, l.inicio + l.duracao)));
 }
-const daLimpeza = (e, i) => passou(e.quadros[i]) && e.quadros[i] - tarefaDaLimpeza(e, i) <= LIMITE_MS + FOLGA_MS;
+function trabalhoDaPagina(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return (e.trabalho || []).reduce((t, [a, b]) => t + sobreposicao(inicio, fim, a, b), 0);
+}
+function daLimpeza(e, i) {
+    if (!passou(e.quadros[i]) || !e.limpezas || !e.trabalho) return false;
+    const trecho = trechoDaLimpeza(e, i);
+    return trecho > 0 && e.quadros[i] - trecho <= LIMITE_MS + FOLGA_MS && trabalhoDaPagina(e, i) < TRABALHO_MAX_MS;
+}
 const daPagina = (e, i) => passou(e.quadros[i]) && !daLimpeza(e, i);
 
 async function cenarioAbertura(browser, base, cpu, reg) {
@@ -412,22 +472,55 @@ async function cenarioDado(browser, base, cpu, reg, forcar, janela) {
     } finally { await page.close().catch(() => {}); }
 }
 
-// combate e combate-vitoria: jogo novo de guerreiro, o Goblin, 800 ms com o combate parado
-// (depois das imagens) e um ataque. As conferências viram aviso; só um clique que não mexe
-// em nada é erro.
-async function cenarioCombate(browser, base, cpu, reg, { jogador, inimigo, vidaInimigo, janela }) {
+// combate-entrada: na sala do Goblin, a escolha de lutar, o d20 e o "Enfrentar", que é clicado
+// depois da pausa de ativação (o avanço sozinho viria em 1,8 s).
+async function cenarioEntrada(browser, base, cpu, reg) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await novoJogo(page);
+        await page.evaluate(() => loadScene('goblin_encounter'));
+        await prontoParaEscolher(page);
+        await espera(400);
+        await page.evaluate(() => {
+            const i = scenes.goblin_encounter.choices.findIndex(c => c.checkType === 'combat');
+            if (i < 0) throw new Error('goblin_encounter não tem a escolha de combate (checkType "combat")');
+            [...document.querySelectorAll('#choices button')][i].click();
+        });
+        await espera(400);
+        await page.evaluate(() => document.getElementById('dice-button').click());
+        await page.waitForFunction(() => /Enfrentar/.test(document.getElementById('dice-button').textContent), { timeout: 5000 })
+            .catch(() => { throw new Error('o d20 do teste de combate não ofereceu "Enfrentar" em 5 s'); });
+        await espera(400);
+        const r = await comRastreio(page, () => page.evaluate(fluxoEntrada, { janela: 2000 }));
+        if (!r.combate.ativo) reg.avisos.push('o "Enfrentar" não abriu o combate');
+        reg.execucoes.push(r);
+        return r;
+    } finally { await page.close().catch(() => {}); }
+}
+
+// combate, vitória, derrota e fuga: jogo novo de guerreiro, o Goblin, 800 ms com o combate
+// parado (depois das imagens) e uma ação. As conferências viram aviso; só um clique que não
+// mexe em nada é erro.
+async function cenarioCombate(browser, base, cpu, reg, { tipo, acao, jogador, inimigo, vidaInimigo, vidaJogador, janela }) {
     const page = await abrirJogo(browser, base, cpu, reg);
     try {
         await novoJogo(page);
         await page.evaluate(g => startInteractiveCombat(g), GOBLIN);
         await page.waitForFunction(() => [...document.images].every(i => i.complete), { timeout: 5000 }).catch(() => {});
         await espera(800);
-        const r = await comRastreio(page, () => page.evaluate(fluxoCombate, { jogador, inimigo, vidaInimigo, janela }));
+        const r = await comRastreio(page, () => page.evaluate(fluxoCombate, { acao, jogador, inimigo, vidaInimigo, vidaJogador, janela }));
         const { antes, depois } = r.combate;
-        if (depois.ativo && depois.inimigo === antes.inimigo && depois.jogador === antes.jogador) {
-            throw new Error('o clique em #btn-combat-attack não atacou (nenhuma vida mudou)');
+        if (depois.ativo && depois.inimigo === antes.inimigo && depois.jogador === antes.jogador && tipo !== 'fuga') {
+            throw new Error(`o clique em #${acao} não fez nada (nenhuma vida mudou)`);
         }
-        if (vidaInimigo === null) {
+        if (tipo === 'derrota') {
+            reg.nota = `vida do jogador ${antes.jogador} → ${depois.jogador}, cena "${r.cenaAntes}" → "${r.cena}"`;
+            if (depois.ativo) reg.avisos.push(`em ${janela} ms o combate não fechou`);
+            else if (r.cena !== 'death') reg.avisos.push(`a derrota levou à cena "${r.cena}", e não à "death"`);
+        } else if (tipo === 'fuga') {
+            reg.nota = `cena "${r.cenaAntes}" → "${r.cena}"`;
+            if (depois.ativo) reg.avisos.push(`em ${janela} ms a fuga não fechou o combate`);
+        } else if (tipo === 'rodada') {
             reg.nota = `vida do Goblin ${antes.inimigo} → ${depois.inimigo}, do jogador ${antes.jogador} → ${depois.jogador}`;
             if (depois.inimigo <= 0) reg.avisos.push('o ataque forçado matou o Goblin: a rodada ficou sem o turno do inimigo');
             else if (depois.inimigo >= antes.inimigo) reg.avisos.push('o ataque forçado não tirou vida do Goblin');
@@ -494,7 +587,7 @@ function imprimir(resultados, meta) {
     console.log('\n' + linha(['cenário', 'CPU', 'quadros', 'mediana', 'p95', 'p99', 'máx', '>20,8', 'GPU', 'LoAF', 'pior em']));
     console.log('-'.repeat(LARGURAS.reduce((a, b) => a + b + 1, -1)));
     for (const r of resultados) {
-        const nome = r.cenario + (SO_INFORMA.has(r.cenario) ? ' (info)' : r.cenario === 'primeiro-clique' ? ` ×${r.tentativas}` : '');
+        const nome = r.cenario + (SO_INFORMA.has(r.cenario) ? ' (info)' : r.tentativas > 1 ? ` ×${r.tentativas}` : '');
         if (!r.execucoes.length) { console.log(linha([nome, `${r.cpu}x`, 'ERRO', '', '', '', '', '', '', '', ''])); continue; }
         const s = r.resumo;
         console.log(linha([nome, `${r.cpu}x`, s.quadros, num(s.mediana), num(s.p95), num(s.p99), num(s.max), s.acima, s.limpeza,
@@ -520,11 +613,11 @@ function imprimir(resultados, meta) {
         if (acima.length) console.log(`${rotulo}: acima do limite (ms@início): ${acima.slice(0, 40).map(fmt).join(', ')}${acima.length > 40 ? ', …' : ''}`);
         const naLimpeza = quadrosDe(daLimpeza);
         if (naLimpeza.length) {
-            console.log(`${rotulo}: na limpeza ociosa da GPU, fora do veredito (ms@início, tarefa): ` +
-                naLimpeza.map(x => `${fmt(x)} ${num(tarefaDaLimpeza(x.e, x.i))}`).join(', '));
+            console.log(`${rotulo}: na limpeza ociosa da GPU, fora do veredito (ms@início, trecho da tarefa no quadro, trabalho da página): ` +
+                naLimpeza.map(x => `${fmt(x)} ${num(trechoDaLimpeza(x.e, x.i))} ${num(trabalhoDaPagina(x.e, x.i))}`).join(', '));
         }
-        if (r.execucoes.some(e => e.limpezas === null)) r.avisos.push('sem o rastreio da GPU em alguma execução: os quadros dela contam todos contra a página');
-        if (r.cenario === 'primeiro-clique' && r.execucoes.length) {
+        if (RASTREAR && r.execucoes.some(e => e.limpezas === null)) r.avisos.push('sem o rastreio da GPU em alguma execução: os quadros dela contam todos contra a página');
+        if (r.execucoes.length > 1) {
             const maximos = r.execucoes.map(e => Math.max(...e.quadros));
             const comPagina = r.execucoes.filter(e => e.quadros.some((_, i) => daPagina(e, i))).length;
             console.log(`${rotulo}: máximo por execução: ${maximos.map(v => num(v)).join(' ')}`);
@@ -546,10 +639,13 @@ function veredito(resultados) {
     const contam = resultados.filter(r => r.cpu === 1 && !SO_INFORMA.has(r.cenario));
     if (!contam.length) return { texto: 'SEM VEREDITO (nenhum cenário de aceite em CPU 1x)', aprovado: true };
     const acima = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.acima : 0), 0);
+    const naLimpeza = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.limpeza : 0), 0);
     const erros = contam.reduce((t, r) => t + r.erros.length, 0);
-    if (!acima && !erros) return { texto: 'APROVADO', aprovado: true };
+    const fora = naLimpeza ? `${naLimpeza} ${naLimpeza === 1 ? 'quadro' : 'quadros'} na limpeza da GPU, fora do veredito` : '';
+    if (!acima && !erros) return { texto: `APROVADO${fora ? ` (${fora})` : ''}`, aprovado: true };
     const partes = [`${acima} ${acima === 1 ? 'quadro' : 'quadros'} acima de 20,8 ms em CPU 1x`];
     if (erros) partes.push(`${erros} erro(s) de medição`);
+    if (fora) partes.push(fora);
     return { texto: `REPROVADO (${partes.join('; ')})`, aprovado: false };
 }
 
@@ -575,7 +671,7 @@ async function comRefacao(reg, executar) {
     return r;
 }
 
-async function medir({ cenarios, execucoes, cpus, json, raiz, perfil }) {
+async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil }) {
     const srv = await servidor(path.resolve(raiz));
     const base = `http://127.0.0.1:${srv.address().port}`;
     fs.mkdirSync(perfil, { recursive: true });
@@ -599,29 +695,30 @@ async function medir({ cenarios, execucoes, cpus, json, raiz, perfil }) {
         for (const cpu of cpus) {
             for (const cenario of cenarios) {
                 if (cpu !== 1 && !EM_4X.has(cenario)) continue;
-                const reg = { cenario, cpu, tentativas: cenario === 'primeiro-clique' ? execucoes : 1, execucoes: [], erros: [], avisos: [], nota: '' };
+                const vezes = cenario === 'primeiro-clique' ? execucoes : cenario === 'abertura' || cpu !== 1 ? 1 : repeticoes;
+                const reg = { cenario, cpu, tentativas: vezes, execucoes: [], erros: [], avisos: [], nota: '' };
                 resultados.push(reg);
                 process.stdout.write(`${cenario} ${cpu}x... `);
-                try {
-                    if (cenario === 'abertura') await cenarioAbertura(browser, base, cpu, reg);
-                    else if (cenario === 'exploracao') await comRefacao(reg, () => cenarioExploracao(browser, base, cpu, reg));
-                    else if (cenario === 'texto-longo') await comRefacao(reg, () => cenarioTextoLongo(browser, base, cpu, reg));
-                    else if (cenario in FORCAR) await comRefacao(reg, () => cenarioDado(browser, base, cpu, reg, FORCAR[cenario], 3400));
-                    else if (cenario in COMBATE) await comRefacao(reg, () => cenarioCombate(browser, base, cpu, reg, COMBATE[cenario]));
-                    else {
-                        for (let i = 0; i < execucoes; i++) {
-                            try {
-                                const r = await comRefacao(reg, () => cenarioDado(browser, base, cpu, reg, null, 1800));
-                                process.stdout.write(`${num(Math.max(...r.quadros))} `);
-                            } catch (e) {
-                                reg.erros.push(`execução ${i + 1}: ${e.message.split('\n')[0]}`);
-                                process.stdout.write('x ');
-                            }
-                            await espera(300);
+                const executar = {
+                    exploracao: () => cenarioExploracao(browser, base, cpu, reg),
+                    'texto-longo': () => cenarioTextoLongo(browser, base, cpu, reg),
+                    'combate-entrada': () => cenarioEntrada(browser, base, cpu, reg),
+                    'primeiro-clique': () => cenarioDado(browser, base, cpu, reg, null, 1800)
+                }[cenario] || (cenario in FORCAR ? () => cenarioDado(browser, base, cpu, reg, FORCAR[cenario], 3400)
+                    : cenario in COMBATE ? () => cenarioCombate(browser, base, cpu, reg, COMBATE[cenario]) : null);
+                if (cenario === 'abertura') {
+                    try { await cenarioAbertura(browser, base, cpu, reg); } catch (e) { reg.erros.push(e.message.split('\n')[0]); }
+                } else {
+                    for (let i = 0; i < vezes; i++) {
+                        try {
+                            await comRefacao(reg, executar);
+                            if (vezes > 1) process.stdout.write(`${num(Math.max(...reg.execucoes[reg.execucoes.length - 1].quadros))} `);
+                        } catch (e) {
+                            reg.erros.push(`${vezes > 1 ? `execução ${i + 1}: ` : ''}${e.message.split('\n')[0]}`);
+                            if (vezes > 1) process.stdout.write('x ');
                         }
+                        await espera(300);
                     }
-                } catch (e) {
-                    reg.erros.push(e.message.split('\n')[0]);
                 }
                 if (reg.execucoes.length) reg.resumo = estatistica(reg.execucoes);
                 console.log(reg.erros.length ? `→ ${reg.erros.length} erro(s)` : `→ máx ${num(reg.resumo.max)} ms`);
@@ -645,6 +742,7 @@ async function medir({ cenarios, execucoes, cpus, json, raiz, perfil }) {
                     aposLancamentoMs: Math.round(e.epoca - lancamento), quadros: e.quadros.map(r2), fins: e.fins.map(r2), loaf: e.loaf,
                     limpezasGpu: e.limpezas && e.limpezas.map(l => ({ inicio: r2(l.inicio), duracao: r2(l.duracao) })),
                     quadrosNaLimpeza: e.quadros.map((_, i) => i).filter(i => daLimpeza(e, i)),
+                    rastreio: !!(e.limpezas && e.trabalho),
                     comecou: e.comecou, resultado: e.resultado, cenaAntes: e.cenaAntes, cena: e.cena, combate: e.combate
                 }))
             }))
@@ -667,6 +765,8 @@ const opcao = nome => {
 };
 const cenarios = (opcao('--cenarios') || CENARIOS.join(',')).split(',').map(s => s.trim()).filter(Boolean);
 const execucoes = Number(opcao('--execucoes') ?? 30);
+const repeticoes = Number(opcao('--repeticoes') ?? 10);
+if (args.includes('--sem-rastreio')) { args.splice(args.indexOf('--sem-rastreio'), 1); RASTREAR = false; }
 const cpu = opcao('--cpu') ?? 'ambos';
 const json = opcao('--json');
 const raiz = opcao('--raiz') || RAIZ_PADRAO;
@@ -674,13 +774,15 @@ const perfil = path.resolve(opcao('--perfil') || PERFIL_PADRAO);
 const movimento = opcao('--movimento') ?? 'padrao';
 MOVIMENTO = movimento === 'reduzido' ? 'reduce' : 'no-preference';
 const desconhecidos = cenarios.filter(c => !CENARIOS.includes(c));
-if (invalido || args.length || desconhecidos.length || !Number.isInteger(execucoes) || execucoes < 1 || !['1', '4', 'ambos'].includes(cpu)
+if (invalido || args.length || desconhecidos.length || !Number.isInteger(execucoes) || execucoes < 1
+    || !Number.isInteger(repeticoes) || repeticoes < 1 || !['1', '4', 'ambos'].includes(cpu)
     || !['padrao', 'reduzido'].includes(movimento)) {
     if (desconhecidos.length) console.log(`Cenário(s) desconhecido(s): ${desconhecidos.join(', ')}`);
-    console.log('Uso:\n  node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--cpu 1|4|ambos] [--json saida.json]\n' +
-        '                                [--raiz <repo>] [--perfil <pasta>] [--movimento padrao|reduzido]\n' +
+    console.log('Uso:\n  node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]\n' +
+        '                                [--json saida.json] [--raiz <repo>] [--perfil <pasta>]\n' +
+        '                                [--movimento padrao|reduzido] [--sem-rastreio]\n' +
         `Cenários (* repete em CPU 4x): ${CENARIOS.map(c => c + (EM_4X.has(c) ? ' *' : '')).join(', ')}`);
     process.exitCode = 2;
 } else {
-    await medir({ cenarios, execucoes, cpus: cpu === 'ambos' ? [1, 4] : [Number(cpu)], json, raiz, perfil });
+    await medir({ cenarios, execucoes, repeticoes, cpus: cpu === 'ambos' ? [1, 4] : [Number(cpu)], json, raiz, perfil });
 }

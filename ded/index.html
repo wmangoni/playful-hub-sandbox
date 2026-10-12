@@ -311,7 +311,7 @@
                                     <div class="selo-cera selo-cera-escuro" data-selo="desastre" aria-hidden="true">Desastre</div>
                                     <div class="selo-cera selo-cera-critico" data-selo="critico" aria-hidden="true">Crítico</div>
                                 </div>
-                                <p class="bandeja-conta" id="combat-dice-result" role="status"></p>
+                                <p class="bandeja-conta" id="combat-dice-result"></p>
                             </div>
                             <div class="acoes-combate">
                                 <p class="escolhas-titulo" id="combat-turno">O que você faz?</p>
@@ -1004,6 +1004,23 @@
             // sem trocar a arte.
             let scenes = {};
             let vitrais = {};
+
+            // O sprite de ícones entra no próprio documento, e os ícones que o JS cria
+            // (crônica, relato, ações, escolhas, equipamento) passam a apontar para ele
+            // (hrefIcone). Um <use> novo que aponta para o arquivo externo faz o
+            // Chrome reprocessar o sprite e refazer o layout da folha num segundo
+            // passe, a cada cena e a cada golpe (2,7 ms no quadro da cena mais longa).
+            // Até ele chegar, vale o arquivo externo; o HTML fixo continua nele.
+            let spriteEmbutido = false;
+            const hrefIcone = id => (spriteEmbutido ? '#' : 'ui/icones.svg#') + id;
+            fetch('ui/icones.svg').then(r => r.text()).then(svg => {
+                const caixa = document.createElement('div');
+                caixa.hidden = true;
+                caixa.innerHTML = svg;
+                document.body.prepend(caixa);
+                spriteEmbutido = true;
+            }).catch(() => { /* sem o sprite embutido, o arquivo externo serve */ });
+
             Promise.all([
                 fetch('assets/scenes.json').then(response => response.json()),
                 fetch('assets/vitrais.json').then(response => response.json()).catch(() => ({}))
@@ -1197,7 +1214,7 @@
                     if (callback) callback();
                 };
 
-                const semMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                const semMovimento = movimentoReduzido();
                 if (partes.length < 2 || semMovimento) {
                     element.textContent = text;
                     if (callback) callback();
@@ -1368,7 +1385,11 @@
                 const ativo = document.activeElement;
                 const focoNasAcoes = !!(ativo && ativo.closest && ativo.closest('.acoes')) || focarEscolhasDepoisDoCombate;
                 focarEscolhasDepoisDoCombate = false;
-                mostrarCombate(false); // uma cena nova nunca começa no meio de um combate
+                // uma cena nova nunca começa no meio de um combate: se uma luta estava
+                // aberta (um temporizador de cena que chegou atrasado), ela acaba aqui, e
+                // os temporizadores da rodada param sozinhos (veem combat.active falso)
+                if (gameState.combat && gameState.combat.active) gameState.combat.active = false;
+                mostrarCombate(false);
 
                 changeImage(sceneName);
 
@@ -1408,6 +1429,17 @@
 
             // Escolhas e "Continuar" recém-montados ignoram ativações por um instante:
             // um segundo Enter (ou clique duplo) não escolhe na cena nova sem ela ser lida
+            // A preferência fica guardada e muda por evento: criar o matchMedia a cada
+            // golpe (e a cada cena) custava uma avaliação no meio do handler, depois de mexer no DOM
+            const PREFERE_MENOS_MOVIMENTO = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+            let semMovimentoAgora = !!(PREFERE_MENOS_MOVIMENTO && PREFERE_MENOS_MOVIMENTO.matches);
+            if (PREFERE_MENOS_MOVIMENTO && PREFERE_MENOS_MOVIMENTO.addEventListener) {
+                PREFERE_MENOS_MOVIMENTO.addEventListener('change', e => { semMovimentoAgora = e.matches; });
+            }
+            function movimentoReduzido() {
+                return semMovimentoAgora;
+            }
+
             const PAUSA_ATIVACAO = 300;
             let escolhasMontadasEm = -Infinity;
             let avancoOferecidoEm = -Infinity;
@@ -1444,8 +1476,8 @@
                     button.className = 'escolha';
                     const teste = !choice.requiresCheck ? ''
                         : choice.checkType === 'combat'
-                            ? '<span class="teste"><svg aria-hidden="true"><use href="ui/icones.svg#i-combate"/></svg>Combate</span>'
-                            : `<span class="teste"><svg aria-hidden="true"><use href="ui/icones.svg#i-d20"/></svg>${NOMES_TESTE[choice.checkType] || 'Teste'}</span>`;
+                            ? `<span class="teste"><svg aria-hidden="true"><use href="${hrefIcone('i-combate')}"/></svg>Combate</span>`
+                            : `<span class="teste"><svg aria-hidden="true"><use href="${hrefIcone('i-d20')}"/></svg>${NOMES_TESTE[choice.checkType] || 'Teste'}</span>`;
                     button.innerHTML = `<span class="escolha-num">${i + 1}</span><span class="escolha-texto">${escaparHtml(choice.text)}</span>${teste}`;
                     button.onclick = () => {
                         if (cedoDemais(escolhasMontadasEm)) return;
@@ -1477,7 +1509,7 @@
                     const recomecar = document.createElement('button');
                     recomecar.type = 'button';
                     recomecar.className = 'botao-secundario';
-                    recomecar.innerHTML = '<svg aria-hidden="true"><use href="ui/icones.svg#i-dragao"/></svg>Começar uma nova aventura';
+                    recomecar.innerHTML = `<svg aria-hidden="true"><use href="${hrefIcone('i-dragao')}"/></svg>Começar uma nova aventura`;
                     // a mesma pausa das escolhas: um Enter duplo na escolha que leva ao
                     // final não pode apagar o save antes de o final ser visto
                     recomecar.onclick = () => { if (!cedoDemais(escolhasMontadasEm)) recomecarAventura(); };
@@ -1679,17 +1711,15 @@
                 'Fantasma de Drakmor': { nome: 'Fantasma de Drakmor', icone: 'i-espectro' }
             };
 
+            // Um nome fora da tabela ainda ganha o ícone pelo que ele lembra
+            // ("Goblin Saqueador" é goblin); sem pista, o monstro genérico
+            const ICONE_POR_PISTA = [['goblin', 'i-goblin'], ['lobo', 'i-lobo'], ['wolf', 'i-lobo'], ['aranha', 'i-aranha'],
+                ['spider', 'i-aranha'], ['fantasma', 'i-espectro'], ['espectro', 'i-espectro'], ['esqueleto', 'i-esqueleto']];
             function dadosDoInimigo(nome) {
                 if (INIMIGOS[nome]) return INIMIGOS[nome];
-                const achado = Object.values(INIMIGOS).find(i => i.nome === nome);
-                if (achado) return achado;
                 const baixo = String(nome).toLowerCase();
-                const icone = baixo.includes('goblin') ? 'i-goblin'
-                    : baixo.includes('lobo') || baixo.includes('wolf') ? 'i-lobo'
-                    : baixo.includes('aranha') || baixo.includes('spider') ? 'i-aranha'
-                    : baixo.includes('fantasma') || baixo.includes('espectro') ? 'i-espectro'
-                    : baixo.includes('esqueleto') ? 'i-esqueleto' : 'i-monstro';
-                return { nome, icone };
+                const pista = ICONE_POR_PISTA.find(([trecho]) => baixo.includes(trecho));
+                return { nome, icone: pista ? pista[1] : 'i-monstro' };
             }
 
             // O inimigo com artigo: inimigo() → "o Goblin"; inimigo('de') → "da
@@ -1731,19 +1761,21 @@
                 // Card do inimigo
                 document.getElementById('combat-enemy-name').textContent = dados.nome;
                 document.getElementById('combat-enemy-ac').textContent = enemy.ac;
-                document.getElementById('combat-enemy-icone').setAttribute('href', `ui/icones.svg#${dados.icone}`);
+                document.getElementById('combat-enemy-icone').setAttribute('href', hrefIcone(dados.icone));
                 const card = document.getElementById('combat-enemy-card');
                 card.classList.remove('derrotado');
                 card.querySelectorAll('[data-desfecho]').forEach(selo => selo.classList.remove('visivel'));
+                document.getElementById('combat-enemy-health').setAttribute('aria-label', `Vida ${inimigo('de')}`);
 
                 // Relato novo e d20 em repouso
                 document.getElementById('combat-log-text').innerHTML = '';
-                addCombatLog(`⚔️ O combate ${inimigo('com', false, true)} começou!`, 'info');
                 limparBandejaCombate('Role o d20 ao atacar.');
 
                 const ativo = document.activeElement;
                 const comFoco = !!(ativo && ativo.closest && ativo.closest('.folha'));
                 mostrarCombate(true);
+                // escrita com o relato já à vista, para o leitor de tela anunciar
+                addCombatLog(`⚔️ O combate ${inimigo('com', false, true)} começou!`, 'info');
                 updateInventoryDisplay(); // a mochila da ficha fica bloqueada durante a luta
 
                 updateCombatUi();
@@ -1753,8 +1785,10 @@
                 if (comFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
             }
 
-            // Troca a narrativa e a crônica pelo painel de combate e o relato (e volta)
+            // Troca a narrativa e a crônica pelo painel de combate e o relato (e volta).
+            // body.em-combate dá camada própria ao que se mexe na luta (ver o CSS).
             function mostrarCombate(ativo) {
+                if (document.body) document.body.classList.toggle('em-combate', ativo);
                 document.getElementById('combat-screen').classList.toggle('hidden', !ativo);
                 document.getElementById('combat-log-box').classList.toggle('hidden', !ativo);
                 document.getElementById('narrativa').classList.toggle('hidden', ativo);
@@ -1768,14 +1802,16 @@
                 return 'Aventureiro';
             }
 
+            // O card do inimigo, a ficha e os efeitos em jogo. Tudo escreve só o que
+            // mudou (escreverTexto): a ficha não repinta a cada golpe.
             function updateCombatUi() {
                 const e = gameState.combat.enemy;
                 const vida = Math.max(0, e.hp);
                 const barra = document.getElementById('combat-enemy-health');
-                barra.setAttribute('style', `--v: ${(e.max_hp ? Math.min(1, vida / e.max_hp) : 0).toFixed(3)}`);
-                barra.setAttribute('aria-valuenow', vida);
-                barra.setAttribute('aria-valuemax', e.max_hp);
-                document.getElementById('combat-enemy-hp-text').textContent = `${vida} / ${e.max_hp}`;
+                escreverAtributo(barra, 'style', `--v: ${(e.max_hp ? Math.min(1, vida / e.max_hp) : 0).toFixed(3)}`);
+                escreverAtributo(barra, 'aria-valuenow', vida);
+                escreverAtributo(barra, 'aria-valuemax', e.max_hp);
+                escreverTexto(document.getElementById('combat-enemy-hp-text'), `${vida} / ${e.max_hp}`);
                 // a vida, a armadura e a mana do herói ficam na ficha
                 updateStatsDisplay();
                 atualizarCondicoes();
@@ -1791,14 +1827,14 @@
                 if (['Arcanista', 'Necromante'].includes(p.specialization)) itens.push(['i-mana', `Mana <span class="num">${p.mana}/${p.maxMana}</span>`]);
                 if (p.manaBarrierActive) itens.push(['i-barreira', 'Barreira de mana']);
                 if (c.tempHp > 0) itens.push(['i-escudo-sagrado', `Escudo sagrado <span class="num">+${c.tempHp}</span>`]);
-                if (c.effects.fury.turnsLeft > 0) itens.push(['i-furia', `Fúria · ${turnos(c.effects.fury.turnsLeft)}`]);
+                if (c.effects.fury.turnsLeft > 0) itens.push(['i-furia', `Fúria · armadura <span class="num">−2</span> · ${turnos(c.effects.fury.turnsLeft)}`]);
                 if (c.effects.sneakBoost.turnsLeft > 0) itens.push(['i-armadura', `Armadura <span class="num">+3</span> · ${turnos(c.effects.sneakBoost.turnsLeft)}`]);
                 if (c.shadowStepActive) itens.push(['i-passo-sombra', 'Passo de sombra']);
                 if (c.poisonBlade) itens.push(['i-veneno', 'Lâmina envenenada']);
                 if (c.skeleton.active) itens.push(['i-esqueleto', 'Esqueleto invocado']);
                 if (c.enemyPoison.turnsLeft > 0) itens.push(['i-veneno', `Veneno ${inimigo('em')} · ${turnos(c.enemyPoison.turnsLeft)}`, 'condicao-alvo']);
-                document.getElementById('combat-condicoes').innerHTML = itens.map(([icone, texto, classe]) =>
-                    `<li class="condicao${classe ? ' ' + classe : ''}"><svg aria-hidden="true"><use href="ui/icones.svg#${icone}"/></svg><span>${texto}</span></li>`).join('');
+                escreverHtml(document.getElementById('combat-condicoes'), itens.map(([icone, texto, classe]) =>
+                    `<li class="condicao${classe ? ' ' + classe : ''}"><svg aria-hidden="true"><use href="${hrefIcone(icone)}"/></svg><span>${texto}</span></li>`).join(''));
             }
 
             // O relato usa as linhas da crônica: ícone pelo primeiro emoji da
@@ -1823,7 +1859,7 @@
                 const lista = document.getElementById('combat-log-text');
                 const linha = document.createElement('li');
                 linha.className = 'cronica-item' + (tom ? ` cronica-${tom}` : '');
-                linha.innerHTML = `<svg aria-hidden="true"><use href="ui/icones.svg#${icone}"/></svg><p>${html}</p>`;
+                linha.innerHTML = `<svg aria-hidden="true"><use href="${hrefIcone(icone)}"/></svg><p>${html}</p>`;
                 lista.appendChild(linha);
                 noProximoQuadro('relato', () => { lista.scrollTop = lista.scrollHeight; });
 
@@ -1851,22 +1887,23 @@
                 if (legenda !== undefined) document.getElementById('combat-dice-result').innerHTML = legenda;
             }
 
-            // Mantido para compatibilidade: as ações de combate usam onclick (sem
-            // listeners duplicados), atribuído ao montar cada botão
-            function setupCombatActionListeners() {}
-
             // Ação do combate no formato das escolhas: ícone no medalhão, nome e um
             // detalhe à direita. Durante o turno do inimigo ela fica com
-            // aria-disabled (o foco não se perde) e ignora cliques.
-            function botaoCombate({ id, icone, nome, detalhe = '', aoClicar, indisponivel = false }) {
+            // aria-disabled (o foco não se perde) e ignora cliques. Como as escolhas,
+            // ignora ativações nos primeiros 300 ms depois de montada: um clique ou
+            // Enter duplo não cai na ação que nasceu no mesmo lugar (o ataque depois
+            // do "Enfrentar", a 2ª magia depois de "Magias arcanas"). O "Continuar"
+            // do desfecho (livre) vale também fora do turno do herói.
+            function botaoCombate({ id, icone, nome, detalhe = '', aoClicar, indisponivel = false, livre = false }) {
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'escolha acao-combate' + (indisponivel ? ' indisponivel' : '');
                 if (id) b.id = id;
-                b.innerHTML = `<span class="escolha-num" aria-hidden="true"><svg><use href="ui/icones.svg#${icone}"/></svg></span>` +
+                b.innerHTML = `<span class="escolha-num" aria-hidden="true"><svg><use href="${hrefIcone(icone)}"/></svg></span>` +
                     `<span class="escolha-texto">${nome}</span>` + (detalhe ? `<span class="acao-detalhe">${algarismosAlinhados(detalhe)}</span>` : '');
                 b.onclick = () => {
-                    if (b.getAttribute('aria-disabled') === 'true' || gameState.combat.turn !== 'player') return;
+                    if (b.getAttribute('aria-disabled') === 'true' || cedoDemais(acoesMontadasEm)) return;
+                    if (!livre && gameState.combat.turn !== 'player') return;
                     aoClicar();
                 };
                 return b;
@@ -1878,10 +1915,12 @@
                 return html.replace(/(^|>)([^<]+)/g, (m, tag, texto) => tag + texto.replace(/\d+/g, '<span class="num">$&</span>'));
             }
 
+            let acoesMontadasEm = 0;
             function montarAcoes(botoes) {
                 const painel = document.getElementById('combat-actions-panel');
                 painel.innerHTML = '';
                 botoes.forEach(b => painel.appendChild(b));
+                acoesMontadasEm = performance.now();
             }
 
             function setCombatButtonsDisabled(disabled) {
@@ -1901,12 +1940,15 @@
                 'Necromante': 'i-invocar', 'Assassino': 'i-veneno', 'Dançarino das Sombras': 'i-passo-sombra'
             };
             const recarga = n => `recarga · <span class="num">${n}</span> ${n === 1 ? 'turno' : 'turnos'}`;
+            const emTurnos = n => `${n} ${n === 1 ? 'turno' : 'turnos'}`;
+            // "+ 3" ou "− 1", como na legenda da bandeja
+            const comSinal = n => `${n < 0 ? '−' : '+'} ${Math.abs(n)}`;
 
             // As quatro ações do turno (ids contrato dos testes). Remontar não tira o
-            // foco de quem estava nas ações: ele vai para o ataque.
+            // foco de quem estava no painel de combate: ele vai para o ataque.
             function restoreActionsPanelHTML() {
                 const ativo = document.activeElement;
-                const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-actions-panel'));
+                const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
                 const c = gameState.combat;
                 const p = gameState.player;
                 const pocoes = p.inventory.filter(i => i.toLowerCase().includes('poção')).length;
@@ -1916,7 +1958,7 @@
                 } else if (p.class === 'warrior') {
                     const cd = c.cooldowns.heroStrike;
                     especial = { ...HABILIDADE_DA_CLASSE.warrior, detalhe: cd > 0 ? recarga(cd) : 'vantagem no d20', indisponivel: cd > 0, aoClicar: () => {
-                        if (c.cooldowns.heroStrike > 0) { addCombatLog(`❌ Golpe heroico em recarga (${c.cooldowns.heroStrike} turnos).`, 'info'); return; }
+                        if (c.cooldowns.heroStrike > 0) { addCombatLog(`❌ Golpe heroico em recarga (${emTurnos(c.cooldowns.heroStrike)}).`, 'info'); return; }
                         performHeroicStrike();
                     } };
                 } else if (p.class === 'wizard') {
@@ -1938,22 +1980,20 @@
                 if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
             }
 
+            // A vez volta para o herói (restoreActionsPanelHTML cuida do foco)
             function showCombatMainMenu() {
                 gameState.combat.turn = 'player';
-                const ativo = document.activeElement;
-                const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(false);
-                document.getElementById('combat-turno').textContent = 'O que você faz?';
+                escreverTexto(document.getElementById('combat-turno'), 'O que você faz?');
                 atualizarCondicoes();
-                // os botões foram remontados: quem estava neles (teclado) continua no primeiro
-                if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
             }
 
-            function botaoVoltar() {
+            // "Voltar" de um submenu: o foco volta para a ação que o abriu
+            function botaoVoltar(origem) {
                 return botaoCombate({ icone: 'i-voltar', nome: 'Voltar', aoClicar: () => {
                     showCombatMainMenu();
-                    focarNoQuadro(() => document.getElementById('btn-combat-spell') || document.getElementById('btn-combat-attack'));
+                    focarNoQuadro(() => document.getElementById(origem) || document.getElementById('btn-combat-attack'));
                 } });
             }
 
@@ -1962,7 +2002,7 @@
                 montarAcoes([
                     botaoCombate({ id: 'btn-spell-missile', icone: 'i-missil', nome: 'Míssil mágico', detalhe: 'acerta sempre', aoClicar: performMagicMissile }),
                     botaoCombate({ id: 'btn-spell-heal', icone: 'i-cura', nome: 'Curar ferimentos', detalhe: `1 magia · restam <span class="num">${c.magicSlots}</span>`, indisponivel: c.magicSlots <= 0, aoClicar: performHealSpell }),
-                    botaoVoltar()
+                    botaoVoltar('btn-combat-spell')
                 ]);
                 focarNoQuadro(() => document.getElementById('btn-spell-missile'));
             }
@@ -1975,7 +2015,7 @@
                 }
                 montarAcoes([
                     ...items.map(item => botaoCombate({ icone: ICONES_ITEM[item] || 'i-pocao', nome: escaparHtml(item), detalhe: 'recupera <span class="num">10</span>', aoClicar: () => performUseItemInCombat(item) })),
-                    botaoVoltar()
+                    botaoVoltar('btn-combat-item')
                 ]);
                 focarNoQuadro(() => document.querySelector('#combat-actions-panel button'));
             }
@@ -1984,7 +2024,6 @@
             // (acerto ou erro) chega pelo relato e carimba o selo.
             function rollCombatDice(callback) {
                 const diceElement = document.getElementById('combat-dice');
-                const diceResult = document.getElementById('combat-dice-result');
                 limparBandejaCombate('');
                 diceElement.className = "dice rolling-animation";
                 const giro = setInterval(() => {
@@ -1993,24 +2032,26 @@
 
                 setTimeout(() => {
                     clearInterval(giro);
+                    if (!gameState.combat.active) return; // a luta acabou durante o giro
                     diceElement.classList.remove('rolling-animation');
                     const roll = Math.floor(Math.random() * 20) + 1;
-                    diceElement.textContent = roll;
-
-                    if (roll === 20) {
-                        diceElement.classList.add('critical-success-bg');
-                        document.getElementById('combat-mesa').classList.add('critico');
-                        diceResult.innerHTML = '<b>20</b> natural!';
-                    } else if (roll === 1) {
-                        diceElement.classList.add('falha-critica');
-                        diceResult.innerHTML = '<b>1</b> natural';
-                    } else {
-                        diceResult.innerHTML = `Você tirou <b>${roll}</b>`;
-                    }
-                    rolagemDoCombate = { valor: roll, carimbada: false };
-
+                    mostrarRolagemDoHeroi(roll);
                     callback(roll);
                 }, 1300);
+            }
+
+            // O resultado do herói na bandeja: o número, as marcas do 20 e do 1, a
+            // legenda e a rolagem que o relato vai carimbar. O Golpe heroico chama
+            // de novo com o dado escolhido e a vantagem na legenda.
+            function mostrarRolagemDoHeroi(roll, legenda) {
+                const dado = document.getElementById('combat-dice');
+                dado.textContent = roll;
+                dado.classList.toggle('critical-success-bg', roll === 20);
+                dado.classList.toggle('falha-critica', roll === 1);
+                document.getElementById('combat-mesa').classList.toggle('critico', roll === 20);
+                document.getElementById('combat-dice-result').innerHTML = legenda
+                    || (roll === 20 ? '<b>20</b> natural!' : roll === 1 ? '<b>1</b> natural' : `Você tirou <b>${roll}</b>`);
+                rolagemDoCombate = { valor: roll, carimbada: false };
             }
 
             function performPlayerAttack() {
@@ -2039,7 +2080,7 @@
                     const totalAtk = roll + atkBonus + attrMod + (gameState.player.stats.bba || 1);
                     const isCrit = roll === 20;
                     
-                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> + modificadores (${atkBonus + attrMod + (gameState.player.stats.bba || 1)}) = <strong>${totalAtk}</strong> contra armadura ${gameState.combat.enemy.ac}`);
+                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> ${comSinal(atkBonus + attrMod + (gameState.player.stats.bba || 1))} = <strong>${totalAtk}</strong> contra armadura ${gameState.combat.enemy.ac}`);
                     
                     if (isCrit || totalAtk >= gameState.combat.enemy.ac) {
                         // Acertou!
@@ -2080,6 +2121,7 @@
                     setTimeout(() => {
                         rollCombatDice((roll2) => {
                             const chosenRoll = Math.max(roll1, roll2);
+                            mostrarRolagemDoHeroi(chosenRoll, `Vantagem: <b>${roll1}</b> e <b>${roll2}</b> → <b>${chosenRoll}</b>`);
                             addCombatLog(`Segundo dado: <strong>${roll2}</strong>. Escolhido: <strong>${chosenRoll}</strong>`);
                             
                             let atkBonus = 0;
@@ -2170,7 +2212,6 @@
                 AudioEngine.playHeal();
                 triggerImpactEffect('player', 'heal');
                 updateCombatUi();
-                updateStatsDisplay();
                 
                 setTimeout(() => {
                     enemyTurn();
@@ -2180,7 +2221,7 @@
             function performSneakAttack() {
                 setCombatButtonsDisabled(true);
                 const isFullHp = gameState.combat.enemy.hp === gameState.combat.enemy.max_hp;
-                addCombatLog(`🗡️ Ladino prepara um <strong>Ataque Furtivo</strong>... ${isFullHp ? "🔥 Alvo com HP cheio (+1d6 dano bônus ativo!)" : "Alvo ferido (sem dano bônus furtivo)"}`);
+                addCombatLog(`🗡️ Você prepara um <strong>ataque furtivo</strong>… ${isFullHp ? 'O alvo está intacto: +1d6 de dano.' : 'O alvo já está ferido: sem o dano extra.'}`);
                 
                 rollCombatDice((roll) => {
                     let atkBonus = 0;
@@ -2247,7 +2288,6 @@
                 triggerImpactEffect('player', 'heal');
                 
                 updateCombatUi();
-                updateStatsDisplay();
                 updateInventoryDisplay();
                 
                 setTimeout(() => {
@@ -2263,17 +2303,13 @@
                     const dexMod = Math.floor((gameState.player.stats.dex - 10) / 2);
                     const totalRoll = roll + dexMod;
                     
-                    addCombatLog(`Rolagem de fuga: <strong>${roll}</strong> ${dexMod < 0 ? '−' : '+'} ${Math.abs(dexMod)} (Destreza) = <strong>${totalRoll}</strong> contra 12`);
+                    addCombatLog(`Rolagem de fuga: <strong>${roll}</strong> ${comSinal(dexMod)} (Destreza) = <strong>${totalRoll}</strong> contra 12`);
                     
                     if (totalRoll >= 12) {
                         addCombatLog("<span class=\"success\">🏃 Fuga bem-sucedida!</span> Você escapou em segurança.", "success");
                         AudioEngine.playFlee();
-                        
-                        setTimeout(() => {
-                            closeCombatScreen();
-                            // Carrega a cena anterior segura
-                            loadScene(gameState.lastScene || "start");
-                        }, 1800);
+                        // volta para a cena anterior segura
+                        mostrarDesfecho('fuga', 'Você escapou.', () => loadScene(gameState.lastScene || 'start'), 1800);
                     } else {
                         addCombatLog(`<span class="failure">❌ A fuga falhou!</span> ${inimigo('', true)} bloqueou a passagem!`, "failure");
                         
@@ -2285,6 +2321,7 @@
             }
 
             function enemyTurn() {
+                if (!gameState.combat.active) return; // a luta acabou antes da vez dele
                 gameState.combat.turn = 'enemy';
                 setCombatButtonsDisabled(true);
                 document.getElementById('combat-turno').textContent = `Vez ${inimigo('de')}`;
@@ -2292,6 +2329,7 @@
                 addCombatLog(`👹 Turno do inimigo! ${inimigo('', true, true)} se prepara para atacar...`, 'info');
 
                 setTimeout(() => {
+                    if (!gameState.combat.active) return;
                     const roll = Math.floor(Math.random() * 20) + 1;
                     const enemyStr = gameState.combat.enemy.str || 10;
                     const strMod = Math.floor((enemyStr - 10) / 2);
@@ -2305,9 +2343,9 @@
                     const dado = document.getElementById('combat-dice');
                     dado.textContent = roll;
                     document.getElementById('combat-dice-result').innerHTML =
-                        `${inimigo('', true)} tirou <b>${roll}</b> ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = <b>${totalAtk}</b> contra sua armadura ${playerAC}`;
+                        `${inimigo('', true)} tirou <b>${roll}</b> ${comSinal(bonus)} = <b>${totalAtk}</b> contra sua armadura ${playerAC}`;
 
-                    addCombatLog(`${inimigo('', true, true)} ataca e rola: <strong>${roll}</strong> + modificadores (${bonus}) = <strong>${totalAtk}</strong> contra sua armadura ${playerAC}`);
+                    addCombatLog(`${inimigo('', true, true)} ataca e rola: <strong>${roll}</strong> ${comSinal(bonus)} = <strong>${totalAtk}</strong> contra sua armadura ${playerAC}`);
 
                     if (roll === 20 || totalAtk >= playerAC) {
                         // Acertou!
@@ -2325,7 +2363,6 @@
                         triggerScreenShakeAndFlash();
                         triggerImpactEffect('player', 'slash');
                         updateCombatUi();
-                        updateStatsDisplay();
                         if (dealt > 0) spawnFloater(`−${dealt}`, '#f2b8a8', 'heroi');
                     } else {
                         addCombatLog(`🛡️ ${inimigo('', true)} errou o ataque!`);
@@ -2341,6 +2378,7 @@
             }
 
             function checkCombatResolution() {
+                if (!gameState.combat.active) return true; // já acabou (uma cena nova interrompeu a luta)
                 if (gameState.combat.enemy.hp <= 0) {
                     setCombatButtonsDisabled(true);
 
@@ -2370,15 +2408,9 @@
 
                     AudioEngine.playVictory();
 
-                    // O selo da vitória carimba o card do inimigo
-                    mostrarDesfecho('vitoria', `${inimigo('', true)} caiu.`);
-
-                    setTimeout(() => {
-                        closeCombatScreen();
-                        // Carrega cena de sucesso do combate
-                        const successScene = gameState.mem.nextSceneSuccess || "corridor";
-                        loadScene(successScene);
-                    }, 2200);
+                    // O selo da vitória carimba o card do inimigo; depois, a cena de sucesso
+                    mostrarDesfecho('vitoria', `${inimigo('', true)} caiu.`, () => loadScene(gameState.mem.nextSceneSuccess || 'corridor'),
+                        2200, `+${xpGain} XP · +${goldGain} de ouro`);
                     return true;
                 }
 
@@ -2387,26 +2419,38 @@
                     addCombatLog(`<span class="failure">☠️ Derrota!</span> Você caiu em combate...`, 'failure');
                     addToLog(`☠️ Você caiu em combate contra ${inimigo()}.`);
                     AudioEngine.playDefeat();
-                    mostrarDesfecho('derrota', 'Você caiu em combate.');
-
-                    setTimeout(() => {
-                        closeCombatScreen();
-                        loadScene('death');
-                    }, 2000);
+                    mostrarDesfecho('derrota', 'Você caiu em combate.', () => loadScene('death'), 2000);
                     return true;
                 }
 
                 return false;
             }
 
-            // Fim da luta: o selo no card, o turno vira o desfecho e as ações somem
-            function mostrarDesfecho(desfecho, texto) {
+            // Fim da luta (vitória, derrota ou fuga): o selo no card, o turno vira o
+            // desfecho e as ações dão lugar a um "Continuar", que fecha a luta e
+            // segue. Quem estava no painel (teclado) fica no "Continuar" e, depois,
+            // na primeira escolha da cena seguinte. Sem clique, a luta fecha sozinha
+            // em `espera` ms, como antes (o jogo e os testes contam com isso).
+            const ICONE_DO_DESFECHO = { vitoria: 'i-experiencia', derrota: 'i-caveira', fuga: 'i-fugir' };
+            function mostrarDesfecho(desfecho, texto, seguir, espera, detalhe = '') {
                 const card = document.getElementById('combat-enemy-card');
                 if (desfecho === 'vitoria') card.classList.add('derrotado');
                 const selo = card.querySelector(`[data-desfecho="${desfecho}"]`);
                 if (selo) selo.classList.add('visivel');
                 document.getElementById('combat-turno').textContent = texto;
-                montarAcoes([]);
+                const ativo = document.activeElement;
+                const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
+                let fechado = false, automatico = null;
+                const fechar = () => {
+                    if (fechado) return;
+                    fechado = true;
+                    if (automatico) clearTimeout(automatico);
+                    closeCombatScreen();
+                    seguir();
+                };
+                montarAcoes([botaoCombate({ id: 'btn-combat-continuar', icone: ICONE_DO_DESFECHO[desfecho], nome: 'Continuar', detalhe, aoClicar: fechar, livre: true })]);
+                if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-continuar'));
+                automatico = setTimeout(fechar, espera);
             }
 
             // Fecha o painel de combate e devolve a narrativa. Os efeitos que mexem
@@ -2422,7 +2466,6 @@
                 focarEscolhasDepoisDoCombate = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
                 limparBandejaCombate('');
                 mostrarCombate(false);
-                restoreActionsPanelHTML();
                 updateStatsDisplay();
                 updateInventoryDisplay();
             }
@@ -2442,17 +2485,6 @@
                 { transform: 'translateX(0.3rem) rotate(2deg)' }, { transform: 'translateX(-0.2rem)' },
                 { transform: 'translateX(0)' }
             ];
-
-            // A preferência fica guardada e muda por evento: criar o matchMedia a cada
-            // golpe custava uma avaliação no meio do handler, depois de mexer no DOM
-            const PREFERE_MENOS_MOVIMENTO = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-            let semMovimentoAgora = !!(PREFERE_MENOS_MOVIMENTO && PREFERE_MENOS_MOVIMENTO.matches);
-            if (PREFERE_MENOS_MOVIMENTO && PREFERE_MENOS_MOVIMENTO.addEventListener) {
-                PREFERE_MENOS_MOVIMENTO.addEventListener('change', e => { semMovimentoAgora = e.matches; });
-            }
-            function movimentoReduzido() {
-                return semMovimentoAgora;
-            }
 
             // Brilho sobre o retrato do inimigo ou a vida do herói: corte (rubro),
             // magia (ouro) ou cura (verde). O card do inimigo também recua no golpe.
@@ -2496,7 +2528,7 @@
                 if (newLevel > gameState.player.level) {
                     gameState.player.level = newLevel;
                     addToLog("🌟 Você subiu para o Nível " + newLevel + "!");
-                    spawnFloater(`Nível ${newLevel}!`, '#ffd700');
+                    spawnFloater(`Nível ${newLevel}!`, '#e6c983');
                     AudioEngine.playLevelUp();
                 }
                 if (gameState.player.level >= 3 && !gameState.player.specialization) {
@@ -2557,38 +2589,57 @@
                 return level === 2 ? 150 : 50;
             }
 
+            // Escrevem só o que mudou. Reatribuir o mesmo texto troca o nó e repinta;
+            // a ficha é atualizada a cada golpe, e repintá-la inteira descartava as
+            // texturas dela (a GPU paga essa limpeza um segundo depois, ver o §6).
+            function escreverTexto(el, texto) {
+                texto = String(texto);
+                if (el.textContent !== texto) el.textContent = texto;
+            }
+            function escreverAtributo(el, nome, valor) {
+                valor = String(valor);
+                if (el.getAttribute(nome) !== valor) el.setAttribute(nome, valor);
+            }
+            const htmlEscrito = new WeakMap();
+            function escreverHtml(el, html) {
+                if (htmlEscrito.get(el) === html) return;
+                htmlEscrito.set(el, html);
+                el.innerHTML = html;
+            }
+
             function updateStatsDisplay() {
                 const p = gameState.player;
+                const porId = id => document.getElementById(id);
 
                 // Vida, armadura e ouro
-                document.getElementById('health').textContent = p.health;
-                document.getElementById('max-health').textContent = p.maxHealth;
-                const barra = document.getElementById('barra-vida');
+                escreverTexto(porId('health'), p.health);
+                escreverTexto(porId('max-health'), p.maxHealth);
+                const barra = porId('barra-vida');
                 const vida = p.maxHealth ? Math.max(0, Math.min(1, p.health / p.maxHealth)) : 0;
-                barra.setAttribute('style', `--v: ${vida.toFixed(3)}`);
-                barra.setAttribute('aria-valuenow', p.health);
-                barra.setAttribute('aria-valuemax', p.maxHealth);
-                document.getElementById('armor-class').textContent = p.stats ? getPlayerAC() : 10;
-                document.getElementById('gold').textContent = p.gold;
+                escreverAtributo(barra, 'style', `--v: ${vida.toFixed(3)}`);
+                escreverAtributo(barra, 'aria-valuenow', p.health);
+                escreverAtributo(barra, 'aria-valuemax', p.maxHealth);
+                escreverTexto(porId('armor-class'), p.stats ? getPlayerAC() : 10);
+                escreverTexto(porId('gold'), p.gold);
 
                 // Nível e anel de XP
                 const nivel = p.level || 1;
                 const meta = metaDeXp(nivel);
-                document.getElementById('level').textContent = nivel;
-                document.getElementById('xp').textContent = p.xp;
-                document.getElementById('xp-meta').textContent = meta ? ` / ${meta}` : '';
-                const anel = document.getElementById('anel-xp');
+                escreverTexto(porId('level'), nivel);
+                escreverTexto(porId('xp'), p.xp);
+                escreverTexto(porId('xp-meta'), meta ? ` / ${meta}` : '');
+                const anel = porId('anel-xp');
                 const feito = meta ? Math.min(100, (p.xp / meta) * 100) : 100;
-                anel.setAttribute('stroke-dasharray', `${feito.toFixed(1)} 100`);
-                anel.setAttribute('stroke-opacity', feito > 0 ? 1 : 0); // sem XP, nem a ponta redonda aparece
-                document.getElementById('nivel').setAttribute('aria-label', meta
+                escreverAtributo(anel, 'stroke-dasharray', `${feito.toFixed(1)} 100`);
+                escreverAtributo(anel, 'stroke-opacity', feito > 0 ? 1 : 0); // sem XP, nem a ponta redonda aparece
+                escreverAtributo(porId('nivel'), 'aria-label', meta
                     ? `Nível ${nivel}, ${p.xp} de ${meta} pontos de experiência`
                     : `Nível ${nivel}, o último, com ${p.xp} pontos de experiência`);
 
                 // Classe e caminho de prestígio, no cabeçalho
-                document.getElementById('campo-classe').textContent = getPlayerClassNamePt();
-                const caminho = document.getElementById('specialization-badge');
-                caminho.textContent = p.specialization || 'escolhido no nível 3';
+                escreverTexto(porId('campo-classe'), getPlayerClassNamePt());
+                const caminho = porId('specialization-badge');
+                escreverTexto(caminho, p.specialization || 'escolhido no nível 3');
                 caminho.classList.toggle('campo-vazio', !p.specialization);
 
                 // Atributos: o modificador em destaque no medalhão, o valor na pílula
@@ -2596,11 +2647,11 @@
                     ['str', 'dex', 'con', 'int', 'wis', 'luck'].forEach(stat => {
                         const val = p.stats[stat] || 10;
                         const mod = Math.floor((val - 10) / 2);
-                        document.getElementById(`val-${stat}`).textContent = val;
-                        document.getElementById(`mod-${stat}`).textContent = formatarMod(mod);
-                        const atributo = document.getElementById(`atributo-${stat}`);
+                        escreverTexto(porId(`val-${stat}`), val);
+                        escreverTexto(porId(`mod-${stat}`), formatarMod(mod));
+                        const atributo = porId(`atributo-${stat}`);
                         atributo.classList.toggle('negativo', mod < 0);
-                        atributo.setAttribute('aria-label', `${NOMES_TESTE[stat]} ${val}, modificador ${formatarMod(mod)}`);
+                        escreverAtributo(atributo, 'aria-label', `${NOMES_TESTE[stat]} ${val}, modificador ${formatarMod(mod)}`);
                     });
                 }
 
@@ -2610,7 +2661,7 @@
             // Missões da ficha: as três do diário, com o estado de cada uma
             function renderMissoes() {
                 const estados = gameState.quests || {};
-                document.getElementById('missoes').innerHTML = Object.keys(QUESTS).map(chave => {
+                escreverHtml(document.getElementById('missoes'), Object.keys(QUESTS).map(chave => {
                     const q = estados[chave] || { status: 'inactive' };
                     const classe = { completed: 'missao-concluida', active: 'missao-ativa' }[q.status] || 'missao-inativa';
                     let estado = { completed: 'concluída', active: 'ativa' }[q.status] || 'não iniciada';
@@ -2619,7 +2670,7 @@
                     }
                     return `<li class="missao ${classe}"><span class="bolha" aria-hidden="true"></span>` +
                         `<span>${escaparHtml(QUESTS[chave].title)}</span><span class="missao-estado">${estado}</span></li>`;
-                }).join('');
+                }).join(''));
             }
 
             const ITEM_DATABASE = {
@@ -2676,14 +2727,21 @@
                 }
             }
 
+            // Remonta os espaços só quando os itens ou o bloqueio mudam: a troca de
+            // cena chama esta função sempre, e refazer os seis espaços (com os ícones)
+            // custava layout e pintura no quadro da cena nova
+            let inventarioMontado = null;
             function updateInventoryDisplay() {
                 const lista = document.getElementById('inventory-items');
                 if (!lista) return;
-                lista.innerHTML = '';
 
                 // Durante o teste de dado a mochila fica bloqueada, mas o clique
                 // ainda avisa por quê (por isso aria-disabled, e não disabled)
                 const bloqueada = isInteractionDisabled();
+                const montagem = JSON.stringify([gameState.player.inventory.slice(0, INVENTORY_CAPACITY), bloqueada]);
+                if (montagem === inventarioMontado && lista.children && lista.children.length) return;
+                inventarioMontado = montagem;
+                lista.innerHTML = '';
 
                 for (let i = 0; i < INVENTORY_CAPACITY; i++) {
                     const espaco = document.createElement('li');
@@ -2699,7 +2757,7 @@
                     const slot = document.createElement(usavel ? 'button' : 'div');
                     slot.className = 'slot inventory-slot-box occupied' + (usavel ? ' slot-usavel usable' : '') + (bloqueada ? ' disabled' : '');
                     slot.title = dbItem ? `${item} · ${dbItem.desc}` : item;
-                    slot.innerHTML = `<svg class="item-icone" aria-hidden="true"><use href="ui/icones.svg#${ICONES_ITEM[item] || 'i-item'}"/></svg>` +
+                    slot.innerHTML = `<svg class="item-icone" aria-hidden="true"><use href="${hrefIcone(ICONES_ITEM[item] || 'i-item')}"/></svg>` +
                         `<span class="slot-nome item-name">${escaparHtml(item)}</span>` +
                         (usavel ? '<span class="slot-usar" aria-hidden="true">usar</span>' : '');
 
@@ -2763,7 +2821,7 @@
 
                 const linha = document.createElement('li');
                 linha.className = 'cronica-item' + (tipo[2] ? ` cronica-${tipo[2]}` : '');
-                linha.innerHTML = `<svg aria-hidden="true"><use href="ui/icones.svg#${tipo[1]}"/></svg><p>${texto}</p>`;
+                linha.innerHTML = `<svg aria-hidden="true"><use href="${hrefIcone(tipo[1])}"/></svg><p>${texto}</p>`;
                 lista.appendChild(linha);
                 for (let sobra = lista.children.length - MAX_CRONICA; sobra > 0; sobra--) {
                     const velha = lista.firstElementChild;
@@ -3226,7 +3284,8 @@
 
             function tickRoundEndEffects() {
                 const c = gameState.combat;
-                if (!c) return;
+                if (!c || !c.active) return;
+                const armaduraAntes = getPlayerAC();
                 if (c.effects.fury.turnsLeft > 0) {
                     c.effects.fury.turnsLeft--;
                     if (c.effects.fury.turnsLeft === 0) addCombatLog("🔥 A Fúria Berserker se esgota.");
@@ -3234,6 +3293,7 @@
                 if (c.effects.sneakBoost.turnsLeft > 0) {
                     c.effects.sneakBoost.turnsLeft--;
                 }
+                if (getPlayerAC() !== armaduraAntes) updateStatsDisplay(); // a armadura da ficha volta ao normal
                 if (c.enemyPoison.turnsLeft > 0 && c.enemy.hp > 0) {
                     c.enemy.hp -= c.enemyPoison.dmg;
                     addCombatLog(`☠️ O veneno corrói ${inimigo()} causando <strong>${c.enemyPoison.dmg}</strong> de dano.`);
@@ -3348,7 +3408,7 @@
                         const attr = PRIMARY_ATTR[gameState.player.class] || 'str';
                         gameState.player.stats[attr] += 2;
                         addToLog(`🎉 Missão concluída: <strong>Decifrador de Runas</strong>! +2 no atributo principal.`);
-                        spawnFloater('🎉 Missão concluída!', '#ffd700');
+                        spawnFloater('🎉 Missão concluída!', '#e6c983');
                         AudioEngine.playQuestComplete();
                         renderQuestJournal();
                     }
@@ -3437,17 +3497,16 @@
             // Números e avisos que sobem e somem (Grenze, nas cores da folha). Na
             // tela ficam empilhados, para dois ao mesmo tempo não se cobrirem; com
             // alvo 'heroi', saem da vida na ficha (o dano que o herói levou).
-            const CORES_ANTIGAS = { '#ffd700': '#e6c983', '#00d2ff': '#f3d995' };
             // Números que sobem e somem: as peças são fixas (ver .floater no CSS) e
             // reusadas em rodízio; as que estão no ar empilham a próxima mais abaixo.
+            // Quem está no ar fica anotado na peça: getAnimations() forçaria o estilo
+            // no meio do golpe, logo depois das mudanças no DOM.
             const SUBIDA = [
                 { opacity: 0, transform: 'translateY(0) scale(0.8)' },
                 { opacity: 1, transform: 'translateY(-0.5rem) scale(1.1)', offset: 0.15 },
                 { opacity: 0, transform: 'translateY(-5.6rem) scale(1)' }
             ];
             const ESMAECER = [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }];
-            // Quem está no ar fica anotado na peça (getAnimations() forçaria o estilo no
-            // meio do golpe, logo depois das mudanças no DOM)
             function spawnFloater(text, color, alvo) {
                 const heroi = alvo === 'heroi';
                 const pecas = [...document.querySelectorAll(heroi ? '.emblema-vida .floater' : '#floater-layer .floater')];
@@ -3457,7 +3516,7 @@
                 if (!el || !el.animate) return;
                 if (el.subida) el.subida.cancel();
                 el.textContent = text;
-                el.style.color = CORES_ANTIGAS[color] || color || '#e6c983';
+                el.style.color = color || '#e6c983';
                 if (!heroi) el.style.top = `calc(40% + ${pecas.filter(noAr).length * 3.2}rem)`;
                 el.subida = el.animate(movimentoReduzido() ? ESMAECER : SUBIDA, { duration: 1600, easing: 'ease-out' });
                 el.noArAte = agora + 1600;
@@ -3500,7 +3559,7 @@
                 // as habilidades indisponíveis continuam clicáveis: o clique explica o motivo no relato
                 montarAcoes([
                     ...opts.abilities.map(abil => botaoCombate({ ...abilityInfo(abil), aoClicar: () => handleSpecializationAbility(abil) })),
-                    botaoVoltar()
+                    botaoVoltar('btn-combat-spell')
                 ]);
                 focarNoQuadro(() => document.querySelector('#combat-actions-panel button'));
             }
@@ -3526,7 +3585,7 @@
 
             function performHolyShield() {
                 const c = gameState.combat;
-                if (c.cooldowns.holyShield > 0) { addCombatLog(`❌ Escudo Sagrado em recarga (${c.cooldowns.holyShield} turnos).`, 'info'); return; }
+                if (c.cooldowns.holyShield > 0) { addCombatLog(`❌ Escudo Sagrado em recarga (${emTurnos(c.cooldowns.holyShield)}).`, 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 const amount = 10 + getMod('con');
@@ -3547,7 +3606,7 @@
                     const strMod = getMod('str');
                     const atkBonus = weaponAttackBonus() + strMod + (gameState.player.stats.bba || 1);
                     const totalAtk = roll + atkBonus;
-                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> + ${atkBonus} = <strong>${totalAtk}</strong> contra armadura ${gameState.combat.enemy.ac}`);
+                    addCombatLog(`Rolagem de ataque: <strong>${roll}</strong> ${comSinal(atkBonus)} = <strong>${totalAtk}</strong> contra armadura ${gameState.combat.enemy.ac}`);
                     if (roll === 20 || totalAtk >= gameState.combat.enemy.ac) {
                         let damage = rollWeaponDamage() + strMod + rollDie(6);
                         if (roll === 20) damage += 5;
@@ -3559,7 +3618,7 @@
                         addCombatLog(`<span class="success">🎯 Golpe Sagrado acertou!</span> <strong>${damage}</strong> de dano radiante e você recupera <strong>${heal}</strong> de vida.`, 'success');
                         AudioEngine.playSlash(); AudioEngine.playHeal();
                         triggerImpactEffect('enemy', 'magic');
-                        updateCombatUi(); updateStatsDisplay();
+                        updateCombatUi();
                     } else {
                         addCombatLog(`<span class="failure">❌ Golpe Sagrado errou!</span>`, 'failure');
                     }
@@ -3573,7 +3632,7 @@
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 c.effects.fury.turnsLeft = 3;
-                addCombatLog("🔥 <strong>Fúria Berserker!</strong> Dano físico dobrado por 3 turnos, mas sua AC cai em 2 pontos.", 'success');
+                addCombatLog("🔥 <strong>Fúria Berserker!</strong> Dano físico dobrado por 3 turnos, mas sua armadura cai 2 pontos.", 'success');
                 AudioEngine.playFury();
                 triggerImpactEffect('player', 'magic');
                 updateCombatUi();
@@ -3582,7 +3641,7 @@
 
             function performDevastatingBlow() {
                 const c = gameState.combat;
-                if (c.cooldowns.devastatingBlow > 0) { addCombatLog(`❌ Golpe Devastador em recarga (${c.cooldowns.devastatingBlow} turnos).`, 'info'); return; }
+                if (c.cooldowns.devastatingBlow > 0) { addCombatLog(`❌ Golpe Devastador em recarga (${emTurnos(c.cooldowns.devastatingBlow)}).`, 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 addCombatLog("💥 Você concentra força para um <strong>Golpe Devastador</strong>...");
@@ -3664,7 +3723,7 @@
 
             function performMercyStrike() {
                 const c = gameState.combat;
-                if (c.cooldowns.mercyStrike > 0) { addCombatLog(`❌ Golpe de Misericórdia em recarga (${c.cooldowns.mercyStrike} turnos).`, 'info'); return; }
+                if (c.cooldowns.mercyStrike > 0) { addCombatLog(`❌ Golpe de Misericórdia em recarga (${emTurnos(c.cooldowns.mercyStrike)}).`, 'info'); return; }
                 if (c.enemy.hp >= c.enemy.max_hp * 0.4) { addCombatLog("❌ O alvo ainda tem mais de 40% da vida!", 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
@@ -3691,7 +3750,7 @@
 
             function performShadowStep() {
                 const c = gameState.combat;
-                if (c.cooldowns.shadowStep > 0) { addCombatLog(`❌ Passo de Sombra em recarga (${c.cooldowns.shadowStep} turnos).`, 'info'); return; }
+                if (c.cooldowns.shadowStep > 0) { addCombatLog(`❌ Passo de Sombra em recarga (${emTurnos(c.cooldowns.shadowStep)}).`, 'info'); return; }
                 restoreActionsPanelHTML();
                 setCombatButtonsDisabled(true);
                 c.shadowStepActive = true;
@@ -3717,7 +3776,7 @@
                         applyPoisonOnHit();
                         gameState.combat.enemy.hp -= damage;
                         gameState.combat.effects.sneakBoost.turnsLeft = 2;
-                        addCombatLog(`<span class="success">🗡️ Ataque Sorrateiro acertou!</span> <strong>${damage}</strong> de dano. (+3 AC por 2 turnos)`, 'success');
+                        addCombatLog(`<span class="success">🗡️ Ataque Sorrateiro acertou!</span> <strong>${damage}</strong> de dano (+3 de armadura por 2 turnos).`, 'success');
                         AudioEngine.playSlash(); triggerImpactEffect('enemy', 'slash'); updateCombatUi();
                     } else {
                         addCombatLog(`<span class="failure">❌ Ataque Sorrateiro errou!</span>`, 'failure');

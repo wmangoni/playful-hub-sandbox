@@ -54,10 +54,13 @@ function servidor(raiz) {
     });
 }
 
-// Congela as animações CSS/Web Animations e as SMIL dos SVGs.
-function congelar() {
+// Congela as animações CSS/Web Animations e as SMIL dos SVGs. As finitas vão para o
+// fim; com instante (ms), param nesse ponto, para mostrar um efeito no meio.
+function congelar(instante = null) {
     document.getAnimations().forEach(a => {
-        if (a.effect.getTiming().iterations === Infinity) { a.pause(); a.currentTime = 0; } else a.finish();
+        if (a.effect.getTiming().iterations === Infinity) { a.pause(); a.currentTime = 0; }
+        else if (instante === null) a.finish();
+        else { a.pause(); a.currentTime = Math.min(instante, a.effect.getComputedTiming().endTime); }
     });
     document.querySelectorAll('svg').forEach(s => { try { s.pauseAnimations(); s.setCurrentTime(0); } catch { /* sem SMIL */ } });
     document.querySelectorAll('audio').forEach(a => a.pause());
@@ -86,8 +89,8 @@ async function novaPagina(browser, erros, w, h, semGoogleFonts = false) {
     return page;
 }
 
-async function foto(page, pasta, nome, inteira) {
-    await page.evaluate(congelar);
+async function foto(page, pasta, nome, inteira, instante = null) {
+    await page.evaluate(congelar, instante);
     await espera(150);
     await page.screenshot({ path: path.join(pasta, `${nome}.png`), fullPage: inteira });
     console.log('  ', nome);
@@ -173,6 +176,9 @@ async function comecar(page, classe) {
 // lados e o dano sai sempre o mesmo. Cada foto espera o estado do jogo mudar
 // (vida, XP, turno) e só depois conta o próprio atraso; as animações finitas
 // terminam no congelar(), então alguns ms a mais ou a menos não mudam a captura.
+// As fotos "-golpe" e "-ganhos" param os efeitos no meio (clarão, brilho, tremor e
+// números que sobem), num instante fixo das animações. As ações ignoram cliques nos
+// 300 ms depois de montadas, então os cliques esperam 400 ms.
 // Inimigos do scenes.json: o Goblin da entrada e o chefe da cripta
 const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 };
 const CHEFE = { name: 'Fantasma de Drakmor', ac: 18, hp: 40, max_hp: 40, str: 16, dex: 14, con: 10, bba: 4 };
@@ -187,14 +193,16 @@ async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo
     let tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, false);
     await comecar(page, 'warrior');
     await page.evaluate(g => { Math.random = () => 0.96; startInteractiveCombat(g); }, GOBLIN);
-    await espera(300);
+    await espera(400);
     await tira('combate');
 
-    // Vitória: o Goblin com 1 de vida. A foto sai 0,6 s depois de a vitória ser
-    // declarada (o XP sobe), com a faixa e os ganhos; a volta para a cena vem 2,2 s depois dela
+    // Vitória: o Goblin com 1 de vida. Os ganhos sobem logo que a vitória é declarada
+    // (o XP sobe); a foto da vitória sai 0,6 s depois, com o selo e o "Continuar". A
+    // volta para a cena vem 2,2 s depois da vitória.
     const xp = await page.evaluate(() => { gameState.combat.enemy.hp = 1; return gameState.player.xp; });
     await clica(page, 'btn-combat-attack');
     await aguarda(page, x => gameState.player.xp > x, xp);
+    await foto(page, pasta, `jogo-combate-ganhos${sufixo}`, false, 400);
     await espera(600);
     await tira('combate-vitoria');
     await aguarda(page, () => !gameState.combat.active);
@@ -202,7 +210,7 @@ async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo
     await espera(300);
 
     await page.evaluate(c => startInteractiveCombat(c), CHEFE);
-    await espera(300);
+    await espera(400);
     await tira('combate-chefe');
     // 20 natural contra o chefe (sobram 24 de 40): o resultado no dado, 0,3 s depois
     // de a vida dele cair (~1,6 s do clique)
@@ -213,6 +221,7 @@ async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo
     // O turno do chefe: o 20 natural dele (9 de dano), 0,3 s depois do golpe
     const vida = await page.evaluate(() => gameState.player.health);
     await aguarda(page, v => gameState.player.health < v, vida);
+    await foto(page, pasta, `jogo-combate-golpe${sufixo}`, false, 110);
     await espera(300);
     await tira('combate-inimigo');
     await aguarda(page, () => gameState.combat.turn === 'player');
@@ -223,7 +232,7 @@ async function capturarCombate(browser, base, pasta, erros, comKit, w, h, sufixo
     tira = async nome => foto(page, pasta, `jogo-${nome}${sufixo}`, false);
     await comecar(page, 'wizard');
     await page.evaluate(g => { Math.random = () => 0.96; startInteractiveCombat(g); }, GOBLIN);
-    await espera(300);
+    await espera(400);
     await clica(page, 'btn-combat-spell');
     await espera(250);
     await tira('combate-magias');
