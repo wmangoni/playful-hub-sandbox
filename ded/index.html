@@ -174,7 +174,7 @@
                             <div class="emblema emblema-ouro"><span class="emblema-valor" id="gold">5</span></div>
                             <span class="vital-rotulo">Ouro</span>
                         </div>
-                        <div class="barra-vida" id="barra-vida" role="meter" aria-label="Vida" aria-valuemin="0" aria-valuemax="20" aria-valuenow="20" style="--v: 1"><span></span></div>
+                        <div class="barra-vida" id="barra-vida" role="meter" aria-label="Vida" aria-valuemin="0" aria-valuemax="20" aria-valuenow="20" style="--v: 1"><span class="barra-vida-janela"></span></div>
                     </div>
 
                     <section class="painel">
@@ -239,6 +239,8 @@
                         </div>
                         <img class="vitral-moldura" src="ui/ornamentos/vitral.svg" alt="">
                     </figure>
+                    <!-- números que sobem (spawnFloater): peças fixas, reusadas -->
+                    <div id="floater-layer" aria-hidden="true"><div class="floater"></div><div class="floater"></div><div class="floater"></div><div class="floater"></div></div>
                 </section>
 
                 <!-- Coluna 3: narrativa e crônica -->
@@ -286,7 +288,7 @@
                             </div>
                             <div class="card-inimigo-dados">
                                 <h3 class="card-inimigo-nome" id="combat-enemy-name">Inimigo</h3>
-                                <div class="barra-vida barra-vida-inimigo" id="combat-enemy-health" role="meter" aria-label="Vida do inimigo" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10" style="--v: 1"><span></span></div>
+                                <div class="barra-vida barra-vida-inimigo" id="combat-enemy-health" role="meter" aria-label="Vida do inimigo" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10" style="--v: 1"><span class="barra-vida-janela"></span></div>
                                 <p class="card-inimigo-vida"><span class="num" id="combat-enemy-hp-text">10 / 10</span> de vida</p>
                             </div>
                             <div class="vital card-inimigo-ca">
@@ -378,10 +380,10 @@
         <div id="barrier-flash"></div>
 
         <!-- Camada de Floaters -->
-        <div id="floater-layer" aria-hidden="true"><div class="floater"></div><div class="floater"></div><div class="floater"></div><div class="floater"></div></div>
 
         <!-- Flash Vermelho para Impacto de Dano -->
         <div id="red-flash" class="red-flash-overlay"></div>
+        <div class="aquecer-gpu" aria-hidden="true"></div>
         <script>
             // --- Sintetizador de Áudio Procedural Premium (Web Audio API) ---
             const AudioEngine = {
@@ -1044,6 +1046,7 @@
                             atualizarDicaSelecao();
                         }
                     }
+                    aquecerGpu();
                 })
                 .catch(error => {
                     console.error('Erro ao carregar as cenas:', error);
@@ -1302,6 +1305,7 @@
             // de vista, a exploração fica "em espera": montada e invisível, com estilo
             // e layout prontos, para o "Começar" não pagar o primeiro layout da folha.
             function mostrarTela(tela) {
+                if (tela === 'exploracao') encerrarAquecimento();
                 document.getElementById('character-select').classList.toggle('hidden', tela !== 'selecao');
                 document.getElementById('game-screen').classList.toggle('tela-em-espera', tela !== 'exploracao');
             }
@@ -1381,15 +1385,17 @@
                     skipTyping = false; // Reseta a flag
                 }
 
+                // Uma cena nova nunca começa no meio de um combate: se uma luta estava
+                // aberta (um temporizador de cena que chegou atrasado), ela fecha aqui pelo
+                // caminho de sempre, e os temporizadores da rodada e do desfecho param
+                // sozinhos (veem combat.active falso)
+                if (gameState.combat && gameState.combat.active) closeCombatScreen();
+                mostrarCombate(false);
+
                 // Quem escolheu pelo teclado continua nas escolhas da cena nova
                 const ativo = document.activeElement;
                 const focoNasAcoes = !!(ativo && ativo.closest && ativo.closest('.acoes')) || focarEscolhasDepoisDoCombate;
                 focarEscolhasDepoisDoCombate = false;
-                // uma cena nova nunca começa no meio de um combate: se uma luta estava
-                // aberta (um temporizador de cena que chegou atrasado), ela acaba aqui, e
-                // os temporizadores da rodada param sozinhos (veem combat.active falso)
-                if (gameState.combat && gameState.combat.active) gameState.combat.active = false;
-                mostrarCombate(false);
 
                 changeImage(sceneName);
 
@@ -1427,8 +1433,6 @@
                 if (focoNasAcoes) focarPrimeiraEscolha();
             }
 
-            // Escolhas e "Continuar" recém-montados ignoram ativações por um instante:
-            // um segundo Enter (ou clique duplo) não escolhe na cena nova sem ela ser lida
             // A preferência fica guardada e muda por evento: criar o matchMedia a cada
             // golpe (e a cada cena) custava uma avaliação no meio do handler, depois de mexer no DOM
             const PREFERE_MENOS_MOVIMENTO = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -1440,6 +1444,8 @@
                 return semMovimentoAgora;
             }
 
+            // Escolhas e "Continuar" recém-montados ignoram ativações por um instante:
+            // um segundo Enter (ou clique duplo) não escolhe na cena nova sem ela ser lida
             const PAUSA_ATIVACAO = 300;
             let escolhasMontadasEm = -Infinity;
             let avancoOferecidoEm = -Infinity;
@@ -1783,6 +1789,26 @@
                 showCombatMainMenu();
                 // quem chegou pelo teclado (o "Enfrentar" da bandeja) segue para as ações
                 if (comFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
+            }
+
+            // Aquecimento da GPU: logo depois da abertura, uma peça mínima com o mesmo
+            // desenho do preenchimento da barra de vida em combate (retângulo arredondado
+            // com gradiente, numa camada própria) aparece a 1% por meio segundo (ver
+            // .aquecer-gpu no CSS). Só o combate desenha isso, e a primeira luta de uma
+            // página aberta havia minutos esperava ~40 ms o Chrome compilar o pipeline no
+            // quadro do "Enfrentar"; compilado aqui, ele fica em memória até o fim da
+            // página. Acaba sozinho, ou no "Começar"; body[data-aquecimento] diz em que pé
+            // está (as ferramentas esperam "feito").
+            function aquecerGpu() {
+                if (!document.body || document.body.dataset.aquecimento) return;
+                document.body.dataset.aquecimento = 'aquecendo';
+                document.body.classList.add('aquecendo-gpu');
+                setTimeout(encerrarAquecimento, 500);
+            }
+            function encerrarAquecimento() {
+                if (!document.body || document.body.dataset.aquecimento !== 'aquecendo') return;
+                document.body.classList.remove('aquecendo-gpu');
+                document.body.dataset.aquecimento = 'feito';
             }
 
             // Troca a narrativa e a crônica pelo painel de combate e o relato (e volta).
@@ -2363,7 +2389,7 @@
                         triggerScreenShakeAndFlash();
                         triggerImpactEffect('player', 'slash');
                         updateCombatUi();
-                        if (dealt > 0) spawnFloater(`−${dealt}`, '#f2b8a8', 'heroi');
+                        if (dealt > 0) spawnFloater(`−${dealt}`, 'var(--rubro)', 'heroi');
                     } else {
                         addCombatLog(`🛡️ ${inimigo('', true)} errou o ataque!`);
                     }
@@ -2410,7 +2436,7 @@
 
                     // O selo da vitória carimba o card do inimigo; depois, a cena de sucesso
                     mostrarDesfecho('vitoria', `${inimigo('', true)} caiu.`, () => loadScene(gameState.mem.nextSceneSuccess || 'corridor'),
-                        2200, `+${xpGain} XP · +${goldGain} de ouro`);
+                        2200, `+${xpGain} de experiência · +${goldGain} de ouro`);
                     return true;
                 }
 
@@ -2442,7 +2468,7 @@
                 const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
                 let fechado = false, automatico = null;
                 const fechar = () => {
-                    if (fechado) return;
+                    if (fechado || !gameState.combat.active) return; // já fechou (ou uma cena nova fechou)
                     fechado = true;
                     if (automatico) clearTimeout(automatico);
                     closeCombatScreen();
@@ -3246,8 +3272,9 @@
                 let armorBonus = 0;
                 if (gameState.player.inventory.includes("Escudo")) armorBonus += 4;
                 let ac = 10 + getMod('dex') + (gameState.player.stats.armor || 0) + armorBonus;
-                if (gameState.combat && gameState.combat.effects && gameState.combat.effects.fury.turnsLeft > 0) ac -= 2;
-                if (gameState.combat && gameState.combat.effects && gameState.combat.effects.sneakBoost.turnsLeft > 0) ac += 3;
+                const luta = gameState.combat && gameState.combat.active ? gameState.combat.effects : null; // efeitos só valem na luta
+                if (luta && luta.fury.turnsLeft > 0) ac -= 2;
+                if (luta && luta.sneakBoost.turnsLeft > 0) ac += 3;
                 return ac;
             }
 

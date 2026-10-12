@@ -155,6 +155,9 @@ async function abrirJogo(browser, base, erros, w, h, comKit) {
         }, KIT);
     }
     await page.evaluate(() => document.fonts.ready);
+    // o aquecimento da GPU (aquecerGpu) acaba antes da captura; o jogo antigo não o tem
+    await page.waitForFunction(() => typeof aquecerGpu !== 'function' || document.body.dataset.aquecimento === 'feito',
+        { timeout: 5000 }).catch(() => {});
     await espera(500);
     return page;
 }

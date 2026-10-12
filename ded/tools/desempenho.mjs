@@ -3,7 +3,13 @@
 //
 //   node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]
 //                                 [--json saida.json] [--raiz <repo>] [--perfil <pasta>]
-//                                 [--movimento padrao|reduzido] [--sem-rastreio]
+//                                 [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]
+//                                 [--aquecimento d20|combate|nenhum]
+//
+// A aba de aquecimento joga o teste de d20 com o 20 natural (d20, o padrão); com combate, também
+// abre uma luta e vence; com nenhum, só mede o intervalo de atualização, com a sessão fria.
+// O rastreio de cada execução com um quadro acima do limite fica guardado em --rastreios (o padrão
+// é ded-desempenho-rastreios na pasta temporária do sistema), e o relatório diz o arquivo.
 //
 // Em CPU 1x, cada cenário roda --repeticoes vezes (10), cada vez numa aba nova; o primeiro clique
 // roda --execucoes vezes (30) e a abertura, uma. Em CPU 4x, que só informa, cada um roda uma vez.
@@ -73,7 +79,8 @@
 //   cada quadro acima do limite com o início contado da ação: os da página se repetem no mesmo
 //   momento do fluxo (no clique, na revelação); os do ambiente caem em qualquer lugar, com o LoAF
 //   sem script nem render. O JSON traz aposLancamentoMs de cada medição. Uma execução com um quadro
-//   acima de 100 ms em que o LoAF não tem script nem render é refeita uma vez, com aviso no relatório.
+//   acima de 100 ms em que o LoAF não tem script nem render (até 2 ms de script e 5 de render, o do
+//   próprio quadro) é refeita uma vez, com aviso no relatório.
 // - A limpeza ociosa da GPU. Cerca de 1 s depois de a página parar de rasterizar, o processo de GPU
 //   do Chrome (Graphite sobre Dawn/D3D11) roda GraphiteCacheController::ScheduleCleanUpAllResources
 //   e devolve ao driver as texturas que o compositor descartou. Nesta máquina essa tarefa leva de 30
@@ -133,6 +140,8 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const passou = d => d > LIMITE_MS + FOLGA_MS;
 const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
 let RASTREAR = true; // --sem-rastreio desliga
+let AQUECIMENTO = 'd20'; // --aquecimento
+let PASTA_RASTREIOS = path.join(os.tmpdir(), 'ded-desempenho-rastreios'); // --rastreios
 
 function servidor(raiz) {
     return new Promise(resolve => {
@@ -300,6 +309,9 @@ async function abrirJogo(browser, base, cpu, reg, autoIniciar = false) {
         throw new Error('as cenas (scenes) não carregaram em 30 s');
     }
     await page.evaluate(() => document.fonts.ready);
+    // o aquecimento da GPU (aquecerGpu) acaba antes da medição; o jogo antigo não o tem
+    await page.waitForFunction(() => typeof aquecerGpu !== 'function' || document.body.dataset.aquecimento === 'feito',
+        { timeout: 5000 }).catch(() => {});
     await page.evaluate(() => { ttsEnabled = false; });
     return page;
 }
@@ -363,6 +375,12 @@ async function comRastreio(page, executar) {
         await page.tracing.stop().catch(() => {});
     }
     Object.assign(r, lerRastreio(arq));
+    // o rastreio de uma execução que passou do limite fica guardado, para achar a causa
+    if (r.quadros.some(passou)) {
+        fs.mkdirSync(PASTA_RASTREIOS, { recursive: true });
+        r.rastreioGuardado = path.join(PASTA_RASTREIOS, path.basename(arq));
+        fs.copyFileSync(arq, r.rastreioGuardado);
+    }
     fs.rmSync(arq, { force: true });
     return r;
 }
@@ -539,13 +557,26 @@ async function cenarioCombate(browser, base, cpu, reg, { tipo, acao, jogador, in
 
 // Joga uma vez (o 20 natural, o caminho com mais arte) para aquecer a GPU, os
 // caches e o perfil, e mede o intervalo de atualização com a página parada.
-async function aquecer(browser, base) {
+async function aquecer(browser, base, modo) {
     const reg = { avisos: [] };
     const page = await abrirJogo(browser, base, 1, reg);
     try {
         try {
-            await naCripta(page);
-            await page.evaluate(fluxoDado, { forcar: 0.96, rolarApos: 300, janela: 3400 });
+            if (modo !== 'nenhum') {
+                await naCripta(page);
+                await page.evaluate(fluxoDado, { forcar: 0.96, rolarApos: 300, janela: 3400 });
+            }
+            if (modo === 'combate') {
+                // uma luta aberta e vencida (o 20 natural no Goblin com 1 de vida)
+                await page.evaluate(g => startInteractiveCombat(g), GOBLIN);
+                await espera(800);
+                await page.evaluate(() => {
+                    gameState.combat.enemy.hp = 1;
+                    Math.random = () => 0.96;
+                    document.getElementById('btn-combat-attack').click();
+                });
+                await espera(5500);
+            }
         } catch (e) { reg.avisos.push(`aquecimento incompleto: ${e.message}`); }
         await espera(500);
         const r = await page.evaluate(async () => {
@@ -611,6 +642,8 @@ function imprimir(resultados, meta) {
         const fmt = x => `${num(x.d)}@${x.inicio >= 0 ? '+' : ''}${Math.round(x.inicio)}${r.execucoes.length > 1 ? ` (exec ${x.k + 1})` : ''}`;
         const acima = quadrosDe(daPagina);
         if (acima.length) console.log(`${rotulo}: acima do limite (ms@início): ${acima.slice(0, 40).map(fmt).join(', ')}${acima.length > 40 ? ', …' : ''}`);
+        const guardados = [...new Set(acima.map(x => x.e.rastreioGuardado).filter(Boolean))];
+        if (guardados.length) console.log(`${rotulo}: rastreio guardado: ${guardados.join(', ')}`);
         const naLimpeza = quadrosDe(daLimpeza);
         if (naLimpeza.length) {
             console.log(`${rotulo}: na limpeza ociosa da GPU, fora do veredito (ms@início, trecho da tarefa no quadro, trabalho da página): ` +
@@ -630,7 +663,7 @@ function imprimir(resultados, meta) {
     }
     for (const a of new Set(meta.avisosAquecimento)) console.log(`aquecimento: aviso: ${a}`);
     const hz = meta.intervaloMs ? Math.round(1000 / meta.intervaloMs) : NaN;
-    console.log(`\nmovimento ${MOVIMENTO === 'reduce' ? 'reduzido' : 'padrão'} | ${meta.chrome} | intervalo de atualização medido ${num(meta.intervaloMs, 2)} ms (~${hz} Hz; ` +
+    console.log(`\nmovimento ${MOVIMENTO === 'reduce' ? 'reduzido' : 'padrão'} | aquecimento ${AQUECIMENTO} | ${meta.chrome} | intervalo de atualização medido ${num(meta.intervaloMs, 2)} ms (~${hz} Hz; ` +
         `mediana ${num(meta.intervaloMedianaMs, 2)}) | LoAF ${meta.loafSuportado ? 'disponível' : 'indisponível'} | ` +
         `limite ${num(LIMITE_MS, 2)} ms + folga ${num(FOLGA_MS)} ms`);
 }
@@ -655,7 +688,8 @@ function veredito(resultados) {
 // relatório avisa. Um quadro longo com script ou render é da página e fica.
 function paradaDoAmbiente(e) {
     const longos = (e.loaf || []).filter(l => l.duracao > 100);
-    return Math.max(...e.quadros) > 100 && longos.length > 0 && longos.every(l => l.scripts <= 2 && l.render <= 3);
+    // render até 5 ms: é o do próprio quadro (uma parada de 503 ms teve 3,2)
+    return Math.max(...e.quadros) > 100 && longos.length > 0 && longos.every(l => l.scripts <= 2 && l.render <= 5);
 }
 
 async function comRefacao(reg, executar) {
@@ -687,7 +721,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
     let meta;
     try {
         console.log('aquecendo...');
-        const aq = await aquecer(browser, base);
+        const aq = await aquecer(browser, base, AQUECIMENTO);
         meta = {
             chrome: await browser.version(), intervaloMs: aq.intervalo, intervaloMedianaMs: aq.mediana,
             loafSuportado: aq.loafSuportado, avisosAquecimento: aq.avisos
@@ -742,7 +776,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
                     aposLancamentoMs: Math.round(e.epoca - lancamento), quadros: e.quadros.map(r2), fins: e.fins.map(r2), loaf: e.loaf,
                     limpezasGpu: e.limpezas && e.limpezas.map(l => ({ inicio: r2(l.inicio), duracao: r2(l.duracao) })),
                     quadrosNaLimpeza: e.quadros.map((_, i) => i).filter(i => daLimpeza(e, i)),
-                    rastreio: !!(e.limpezas && e.trabalho),
+                    rastreio: !!(e.limpezas && e.trabalho), rastreioGuardado: e.rastreioGuardado || null,
                     comecou: e.comecou, resultado: e.resultado, cenaAntes: e.cenaAntes, cena: e.cena, combate: e.combate
                 }))
             }))
@@ -767,6 +801,9 @@ const cenarios = (opcao('--cenarios') || CENARIOS.join(',')).split(',').map(s =>
 const execucoes = Number(opcao('--execucoes') ?? 30);
 const repeticoes = Number(opcao('--repeticoes') ?? 10);
 if (args.includes('--sem-rastreio')) { args.splice(args.indexOf('--sem-rastreio'), 1); RASTREAR = false; }
+const pastaRastreios = opcao('--rastreios');
+if (pastaRastreios) PASTA_RASTREIOS = path.resolve(pastaRastreios);
+AQUECIMENTO = opcao('--aquecimento') ?? 'd20';
 const cpu = opcao('--cpu') ?? 'ambos';
 const json = opcao('--json');
 const raiz = opcao('--raiz') || RAIZ_PADRAO;
@@ -776,11 +813,13 @@ MOVIMENTO = movimento === 'reduzido' ? 'reduce' : 'no-preference';
 const desconhecidos = cenarios.filter(c => !CENARIOS.includes(c));
 if (invalido || args.length || desconhecidos.length || !Number.isInteger(execucoes) || execucoes < 1
     || !Number.isInteger(repeticoes) || repeticoes < 1 || !['1', '4', 'ambos'].includes(cpu)
+    || !['d20', 'combate', 'nenhum'].includes(AQUECIMENTO)
     || !['padrao', 'reduzido'].includes(movimento)) {
     if (desconhecidos.length) console.log(`Cenário(s) desconhecido(s): ${desconhecidos.join(', ')}`);
     console.log('Uso:\n  node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]\n' +
         '                                [--json saida.json] [--raiz <repo>] [--perfil <pasta>]\n' +
-        '                                [--movimento padrao|reduzido] [--sem-rastreio]\n' +
+        '                                [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]\n' +
+        '                                [--aquecimento d20|combate|nenhum]\n' +
         `Cenários (* repete em CPU 4x): ${CENARIOS.map(c => c + (EM_4X.has(c) ? ' *' : '')).join(', ')}`);
     process.exitCode = 2;
 } else {

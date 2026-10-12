@@ -687,6 +687,235 @@ async function runTests() {
   }
   console.log('✅ PASS: "Continuar" advances right away, and only real endings offer a new adventure.');
 
+  // ----------------------------------------------------
+  // TEST CASE 8: Submenu, Golpe heroico, derrota e fuga, com o teclado (Fase 3)
+  // ----------------------------------------------------
+  // A luta abre direto (startInteractiveCombat) com o foco numa escolha, como quem
+  // chega pelo teclado: o foco segue para as ações. O herói é o guerreiro do caso 1.
+  console.log('\n--- 8. Testing the item submenu, the Heroic Strike, the defeat and the flight, with the keyboard ---');
+  const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 };
+  // o Math.random que dá a face d no d20 (Math.floor(r * 20) + 1)
+  const faceDoD20 = d => (d - 1) / 20 + 0.01;
+  const abrirCombate = async (cena, inimigo) => {
+    await page.evaluate(c => loadScene(c), cena);
+    await espera(400); // escolhas recém-montadas ignoram ativações por 300 ms
+    await page.focus('#choices button');
+    await page.evaluate(e => startInteractiveCombat(e), inimigo);
+    await aguardar(() => gameState.combat.active
+      && document.activeElement === document.getElementById('btn-combat-attack'),
+      `Opening the combat from a focused choice (scene ${cena}) did not move the focus to #btn-combat-attack`);
+    await espera(400); // as ações recém-montadas também ignoram ativações por 300 ms
+  };
+  const acoesDoPainel = () => page.evaluate(() =>
+    [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id || b.querySelector('.escolha-texto').textContent));
+  const estadoDaFolha = () => page.evaluate(() => ({
+    painel: !document.getElementById('combat-screen').classList.contains('hidden')
+      && getComputedStyle(document.getElementById('combat-screen')).display !== 'none',
+    emCombate: gameState.combat.active,
+    cena: gameState.currentScene
+  }));
+
+  const heroi = await page.evaluate(() => {
+    window.__randomAntesDosDesfechos = Math.random;
+    gameState.player.health = gameState.player.maxHealth;
+    gameState.player.inventory = ['Poção de Vida']; // uma poção e nenhuma arma: as somas do ataque ficam previsíveis
+    updateInventoryDisplay();
+    updateStatsDisplay();
+    return { classe: gameState.player.class, especializacao: gameState.player.specialization || null };
+  });
+  if (heroi.classe !== 'warrior' || heroi.especializacao) {
+    throw new Error(`Case 8 needs the warrior without a specialization (the Heroic Strike), got ${JSON.stringify(heroi)}`);
+  }
+  dialogos.length = 0;
+  page.on('dialog', contarDialogo);
+
+  try {
+    // 1. "Usar item" abre o submenu (a poção e "Voltar"); o "Voltar" devolve o foco ao
+    // "Usar item" e as quatro ações. O Goblin tem 40 de vida para ficar de pé depois do
+    // Golpe heroico do passo 2 (um crítico tira 15).
+    await abrirCombate('corridor', { ...GOBLIN, hp: 40, max_hp: 40 });
+    await page.focus('#btn-combat-item');
+    await page.keyboard.press('Enter');
+    await aguardar(() => {
+      const botoes = [...document.querySelectorAll('#combat-actions-panel button')];
+      return botoes.length === 2 && document.activeElement === botoes[0];
+    }, 'Enter on "Usar item" did not open the item submenu with the focus on its first button');
+    const submenu = await acoesDoPainel();
+    console.log('Item submenu:', submenu);
+    if (submenu.join() !== 'Poção de Vida,Voltar') {
+      throw new Error(`The item submenu must list the potion and "Voltar", got ${JSON.stringify(submenu)}`);
+    }
+    await espera(400);
+    await page.keyboard.press('Tab');
+    const noVoltar = await page.evaluate(() => document.activeElement && document.activeElement.textContent.trim());
+    if (noVoltar !== 'Voltar') throw new Error(`Tab from the potion must reach "Voltar", the focus is on "${noVoltar}"`);
+    await page.keyboard.press('Enter');
+    await aguardar(() => document.activeElement === document.getElementById('btn-combat-item'),
+      '"Voltar" in the item submenu did not give the focus back to #btn-combat-item');
+    const deVolta = await page.evaluate(() => ({
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      foco: document.activeElement && document.activeElement.id,
+      turno: gameState.combat.turn,
+      mochila: [...gameState.player.inventory]
+    }));
+    console.log('After "Voltar":', deVolta);
+    if (deVolta.acoes.join() !== 'btn-combat-attack,btn-combat-spell,btn-combat-item,btn-combat-flee') {
+      throw new Error(`"Voltar" must bring back the four main actions, got ${JSON.stringify(deVolta.acoes)}`);
+    }
+    if (deVolta.foco !== 'btn-combat-item') {
+      throw new Error(`The focus must stay on #btn-combat-item after "Voltar", it moved to #${deVolta.foco}`);
+    }
+    if (deVolta.turno !== 'player' || deVolta.mochila.join() !== 'Poção de Vida') {
+      throw new Error('Opening and leaving the item submenu must not spend the turn nor the potion');
+    }
+
+    // 2. Golpe heroico: dois d20, fica o maior. O giro também chama Math.random, então
+    // uma fila de valores não serve: o acaso muda quando o relato registra o 1º dado.
+    // O mesmo valor do 2º dado vale para o dano e para a vez do inimigo (7: erra a armadura 17).
+    const PRIMEIRO_DADO = 20, SEGUNDO_DADO = 7;
+    const dadoEscolhido = Math.max(PRIMEIRO_DADO, SEGUNDO_DADO);
+    const seloDoGolpe = dadoEscolhido === 20 ? 'critico' : 'sucesso';
+    await page.evaluate((r1, r2) => {
+      Math.random = () => (document.getElementById('combat-log-text').textContent.includes('Primeiro dado') ? r2 : r1);
+    }, faceDoD20(PRIMEIRO_DADO), faceDoD20(SEGUNDO_DADO));
+    await espera(400); // o "Voltar" remontou as ações
+    await page.focus('#btn-combat-spell');
+    const habilidade = await page.evaluate(() => document.querySelector('#btn-combat-spell .escolha-texto').textContent);
+    if (habilidade !== 'Golpe heroico') throw new Error(`#btn-combat-spell must be the warrior's "Golpe heroico", got "${habilidade}"`);
+    await page.keyboard.press('Enter');
+    const golpe = await (await aguardar(() => {
+      const selos = [...document.querySelectorAll('#combat-mesa [data-selo].visivel')].map(s => s.dataset.selo);
+      if (!selos.length) return false;
+      const dado = document.getElementById('combat-dice');
+      return {
+        selos,
+        dado: dado.textContent,
+        girando: dado.classList.contains('rolling-animation'),
+        legenda: document.getElementById('combat-dice-result').textContent.replace(/\s+/g, ' ').trim(),
+        vidaDoInimigo: gameState.combat.enemy.hp
+      };
+    }, 'The Heroic Strike did not stamp a seal on the combat tray', 6000)).jsonValue();
+    console.log('Heroic Strike:', golpe);
+    const legendaEsperada = `Vantagem: ${PRIMEIRO_DADO} e ${SEGUNDO_DADO} → ${dadoEscolhido}`;
+    if (golpe.legenda !== legendaEsperada) {
+      throw new Error(`#combat-dice-result must read "${legendaEsperada}", got "${golpe.legenda}"`);
+    }
+    if (golpe.dado !== String(dadoEscolhido) || golpe.girando) {
+      throw new Error(`#combat-dice must rest on the higher die (${dadoEscolhido}), got "${golpe.dado}"`);
+    }
+    if (golpe.selos.join() !== seloDoGolpe) {
+      throw new Error(`The Heroic Strike (${dadoEscolhido}) must stamp only the "${seloDoGolpe}" seal, got ${JSON.stringify(golpe.selos)}`);
+    }
+    if (golpe.vidaDoInimigo >= 40 || golpe.vidaDoInimigo <= 0) {
+      throw new Error(`The Heroic Strike must hit and leave the Goblin standing, its life is ${golpe.vidaDoInimigo}`);
+    }
+    await aguardar(() => gameState.combat.turn === 'player'
+      && document.activeElement === document.getElementById('btn-combat-attack'),
+      'The turn did not come back to the hero (focus on the attack) after the Heroic Strike', 8000);
+
+    // 3. Derrota: o herói com 1 de vida erra (2 no d20) e o inimigo acerta (20 natural)
+    await page.evaluate(() => {
+      gameState.player.health = 1;
+      updateStatsDisplay();
+      Math.random = () => (gameState.combat?.turn === 'enemy' ? 0.96 : 0.05);
+    });
+    await espera(400); // as ações foram remontadas na volta da vez
+    await page.keyboard.press('Enter');
+    await aguardar(() => !!document.getElementById('btn-combat-continuar')
+      && document.activeElement === document.getElementById('btn-combat-continuar'),
+      'The defeat did not offer #btn-combat-continuar with the focus on it', 10000);
+    const continuarDaDerrotaEm = Date.now();
+    const derrota = await page.evaluate(() => ({
+      selosNoCard: [...document.querySelectorAll('#combat-enemy-card [data-desfecho].visivel')].map(s => s.dataset.desfecho),
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      turno: document.getElementById('combat-turno').textContent,
+      vida: gameState.player.health
+    }));
+    console.log('Defeat:', derrota);
+    if (derrota.selosNoCard.join() !== 'derrota') {
+      throw new Error(`The defeat must stamp only the "derrota" seal on the enemy card, got ${JSON.stringify(derrota.selosNoCard)}`);
+    }
+    if (derrota.acoes.join() !== 'btn-combat-continuar' || derrota.vida > 0) {
+      throw new Error('The defeat must leave the hero at 0 and the actions must give way to a single "Continuar"');
+    }
+    await espera(400); // o "Continuar" ignora ativações por 300 ms (sozinho, fecha em 2 s)
+    await page.keyboard.press('Enter');
+    const derrotaFechouEmMs = Date.now() - continuarDaDerrotaEm;
+    const depoisDaDerrota = await estadoDaFolha();
+    console.log(`After Enter on "Continuar" (${derrotaFechouEmMs} ms after it appeared):`, depoisDaDerrota);
+    if (derrotaFechouEmMs >= 2000) {
+      throw new Error(`Enter on the defeat "Continuar" came ${derrotaFechouEmMs} ms late: it can no longer be told apart from the 2 s auto-close`);
+    }
+    if (depoisDaDerrota.cena !== 'death' || depoisDaDerrota.painel || depoisDaDerrota.emCombate !== false) {
+      throw new Error('Enter on the defeat "Continuar" must close the combat and load the death scene');
+    }
+    // o foco vai para a 1ª escolha do final (o recomeçar): nenhuma tecla depois disto
+    await aguardar(() => document.activeElement === document.querySelector('#choices button'),
+      'After the defeat the focus must go to the first choice of the death scene', 2000);
+
+    // De volta a um estado jogável
+    await page.evaluate(() => {
+      gameState.player.health = gameState.player.maxHealth;
+      updateStatsDisplay();
+      loadScene('corridor');
+    });
+
+    // 4. Fuga: 20 natural + 1 (Destreza) contra 12. A fuga volta para gameState.lastScene;
+    // o caso fixa o corredor (de onde se chega ao Goblin) para não depender do caso 7.
+    await page.evaluate(() => { gameState.lastScene = 'corridor'; });
+    await abrirCombate('goblin_encounter', GOBLIN);
+    await page.evaluate(() => { Math.random = () => 0.96; });
+    await page.focus('#btn-combat-flee');
+    await page.keyboard.press('Enter');
+    await aguardar(() => !!document.getElementById('btn-combat-continuar')
+      && document.activeElement === document.getElementById('btn-combat-continuar'),
+      'The flight did not offer #btn-combat-continuar with the focus on it', 5000);
+    const continuarDaFugaEm = Date.now();
+    const fuga = await page.evaluate(() => ({
+      selosNoCard: [...document.querySelectorAll('#combat-enemy-card [data-desfecho].visivel')].map(s => s.dataset.desfecho),
+      derrotado: document.getElementById('combat-enemy-card').classList.contains('derrotado'),
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      turno: document.getElementById('combat-turno').textContent,
+      escapou: document.getElementById('combat-log-text').textContent.includes('Fuga bem-sucedida')
+    }));
+    console.log('Flight:', fuga);
+    if (!fuga.escapou) throw new Error('The natural 20 must make the flight succeed');
+    if (fuga.selosNoCard.length || fuga.derrotado) {
+      throw new Error(`The flight must not stamp an outcome seal on the enemy card, got ${JSON.stringify(fuga.selosNoCard)}`);
+    }
+    if (fuga.acoes.join() !== 'btn-combat-continuar') {
+      throw new Error(`The actions must give way to a single "Continuar", got ${JSON.stringify(fuga.acoes)}`);
+    }
+    await espera(400); // o "Continuar" ignora ativações por 300 ms (sozinho, fecha em 1,8 s)
+    await page.keyboard.press('Enter');
+    const fugaFechouEmMs = Date.now() - continuarDaFugaEm;
+    const depoisDaFuga = await estadoDaFolha();
+    console.log(`After Enter on "Continuar" (${fugaFechouEmMs} ms after it appeared):`, depoisDaFuga);
+    if (fugaFechouEmMs >= 1800) {
+      throw new Error(`Enter on the flight "Continuar" came ${fugaFechouEmMs} ms late: it can no longer be told apart from the 1.8 s auto-close`);
+    }
+    if (depoisDaFuga.painel || depoisDaFuga.emCombate !== false) {
+      throw new Error('Enter on the flight "Continuar" must close the combat (panel hidden, combat.active false)');
+    }
+    if (depoisDaFuga.cena !== 'corridor') {
+      throw new Error(`The flight must go back to gameState.lastScene ("corridor"), got "${depoisDaFuga.cena}"`);
+    }
+    await aguardar(() => document.activeElement === document.querySelector('#choices button'),
+      'After the flight the focus must go to the first choice of the loaded scene', 2000);
+
+    // 5. Nada de alert/confirm no caso todo
+    if (dialogos.length) {
+      throw new Error(`Native dialogs opened during case 8: ${JSON.stringify(dialogos)}`);
+    }
+  } finally {
+    page.off('dialog', contarDialogo);
+    await page.evaluate(() => {
+      Math.random = window.__randomAntesDosDesfechos;
+      delete window.__randomAntesDosDesfechos;
+    }).catch(() => {});
+  }
+  console.log('✅ PASS: "Voltar" gives the focus back to "Usar item", the Heroic Strike keeps the higher die, and the defeat and the flight close by keyboard.');
+
 
   console.log('\n=============================================');
   console.log('🎉 ALL QA TEST CASES PASSED SUCCESSFULLY FOR RPG ADVENTURE QUEST!');

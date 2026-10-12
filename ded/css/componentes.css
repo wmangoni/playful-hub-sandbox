@@ -213,14 +213,14 @@
 }
 /* O preenchimento (span::before) tem a largura toda, numa camada própria, e
    desliza para a esquerda só com transform, dentro de uma janela de recorte
-   retangular (o span) que começa no meio da ponta esquerda; a ponta é um disco
+   retangular (.barra-vida-janela) que começa no meio da ponta esquerda; a ponta é um disco
    parado (.barra-vida::before). Assim o golpe não rasteriza nada. Não volte ao
    overflow: hidden no pai arredondado (o compositor compilava um shader de
    recorte arredondado no primeiro golpe, 50 a 130 ms) nem a um clip-path animado
    (repintava a barra a cada quadro, e a GPU pagava a limpeza dessas texturas
    num quadro de 30 a 60 ms um segundo depois). */
 .barra-vida::before,
-.barra-vida span::before {
+.barra-vida-janela::before {
     background: linear-gradient(#c45444, var(--rubro) 55%, #561713);
     box-shadow: inset 0 0.1rem 0 rgba(255, 214, 190, 0.4);
 }
@@ -234,12 +234,12 @@
     border-radius: 50%;
     opacity: calc(var(--v) * 1000); /* some só sem vida nenhuma */
 }
-.barra-vida span {
+.barra-vida-janela {
     position: absolute;
     inset: 0 0 0 calc(var(--altura) / 2);
     overflow: hidden;
 }
-.barra-vida span::before {
+.barra-vida-janela::before {
     content: '';
     position: absolute;
     top: 0;
@@ -1003,7 +1003,7 @@
     box-shadow: 0 0 0 0.1rem var(--sepia-claro), 0 0 0 0.22rem var(--tinta), inset 0 0.1rem 0.25rem rgba(0, 0, 0, 0.6);
 }
 .barra-vida-inimigo::before,
-.barra-vida-inimigo span::before {
+.barra-vida-inimigo .barra-vida-janela::before {
     background: linear-gradient(#8a3a2c, #5a1a14 55%, #2c0b08);
     box-shadow: inset 0 0.1rem 0 rgba(255, 200, 180, 0.3);
 }
@@ -1030,7 +1030,31 @@
    exceção à regra do §6): ele só desliza, e a borda dele é um gradiente, sem
    texto que borre. */
 .em-combate .emblema-vida, .card-inimigo-retrato, .em-combate .impacto { will-change: opacity; }
-.em-combate .barra-vida span::before { will-change: transform; }
+/* com classe à direita: um seletor terminado em tag (span) faria ligar a
+   em-combate invalidar o estilo de todos os <span> da página, inclusive as palavras
+   da narrativa, justo no quadro do "Enfrentar" */
+.em-combate .barra-vida-janela::before { will-change: transform; }
+
+/* Aquecimento da GPU (body.aquecendo-gpu, meio segundo depois da abertura; ver
+   aquecerGpu no jogo): o mesmo desenho do preenchimento acima, numa camada própria,
+   a 1% num canto à vista, para o Chrome compilar o pipeline dele antes da primeira
+   luta. Ele precisa estar à vista: coberto pela seleção, não seria rasterizado. */
+.aquecer-gpu { display: none; }
+.aquecendo-gpu .aquecer-gpu {
+    display: block;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-efeito);
+    width: 8rem;
+    height: 0.71rem;
+    border-radius: 1rem;
+    background: linear-gradient(#c45444, var(--rubro) 55%, #561713);
+    box-shadow: inset 0 0.1rem 0 rgba(255, 214, 190, 0.4);
+    opacity: 0.01;
+    pointer-events: none;
+    will-change: transform;
+}
 
 /* ---------- Combate: efeitos em jogo ---------- */
 
@@ -1174,8 +1198,9 @@
    camada); o JS só troca o texto e anima transform e opacidade (spawnFloater).
    Criar e remover um div por número fazia o compositor destruir as texturas
    dele, e a GPU pagava a limpeza num quadro de 30 ms um segundo depois. */
+/* a camada fica sobre o vitral (na coluna dele), e os números sobem no meio do arco */
 #floater-layer {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: var(--z-toast);
     overflow: hidden;
@@ -1184,9 +1209,8 @@
 .floater {
     position: absolute;
     top: 40%;
-    left: 50%;
-    width: 40rem;
-    translate: -50% 0;
+    left: 0;
+    width: 100%;
     text-align: center;
     white-space: nowrap;
     font: 700 2.6rem/1 var(--fonte-titulo);
@@ -1196,8 +1220,18 @@
     will-change: transform, opacity;
     pointer-events: none;
 }
-/* o dano que o herói leva sai da vida na ficha (com camada só durante o combate) */
-.floater-heroi { top: -0.4rem; z-index: 1; width: 8rem; font-size: 2rem; will-change: auto; }
+/* o dano que o herói leva sai de cima do medalhão da vida, em rubro com halo de
+   pergaminho (com camada só durante o combate) */
+.floater-heroi {
+    top: -2rem;
+    left: 50%;
+    z-index: 1;
+    width: 8rem;
+    translate: -50% 0;
+    font-size: 2rem;
+    text-shadow: 0 0 0.2rem rgba(255, 246, 222, 0.95), 0 0 0.55rem rgba(255, 246, 222, 0.85);
+    will-change: auto;
+}
 .em-combate .floater-heroi { will-change: transform, opacity; }
 
 /* ---------- Movimento reduzido ---------- */
