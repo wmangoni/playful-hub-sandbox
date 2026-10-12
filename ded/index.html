@@ -1046,7 +1046,6 @@
                             atualizarDicaSelecao();
                         }
                     }
-                    aquecerGpu();
                 })
                 .catch(error => {
                     console.error('Erro ao carregar as cenas:', error);
@@ -1305,7 +1304,6 @@
             // de vista, a exploração fica "em espera": montada e invisível, com estilo
             // e layout prontos, para o "Começar" não pagar o primeiro layout da folha.
             function mostrarTela(tela) {
-                if (tela === 'exploracao') encerrarAquecimento();
                 document.getElementById('character-select').classList.toggle('hidden', tela !== 'selecao');
                 document.getElementById('game-screen').classList.toggle('tela-em-espera', tela !== 'exploracao');
             }
@@ -1316,15 +1314,37 @@
             }
 
             // focus() exige layout em dia: feito fora do quadro, força um layout a mais
-            // no meio das mudanças do DOM. Aqui ele espera o próximo quadro.
-            function focarNoQuadro(alvo) {
-                const focar = () => { const el = alvo(); if (el) el.focus({ preventScroll: true }); };
+            // no meio das mudanças do DOM. Aqui ele espera o próximo quadro. Se o alvo
+            // ainda não aceita foco (a narrativa fica invisível no primeiro quadro da
+            // volta do combate), tenta de novo nos quadros seguintes.
+            function focarNoQuadro(alvo, tentativas = 3) {
+                const focar = () => {
+                    const el = alvo();
+                    if (!el) return;
+                    el.focus({ preventScroll: true });
+                    if (document.activeElement !== el && tentativas > 1) focarNoQuadro(alvo, tentativas - 1);
+                };
                 if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focar); else focar();
             }
 
             // Até o próximo quadro, junta numa função só o que precisa ler o layout
             // (rolar a crônica, acompanhar o texto), para não forçar um layout por mudança
             const depoisDoLayout = new Map();
+            // Roda depois que o próximo quadro for pintado (o rAF seguinte ao próximo)
+            function depoisDoProximoQuadro(funcao) {
+                if (typeof requestAnimationFrame !== 'function') return funcao();
+                requestAnimationFrame(() => requestAnimationFrame(funcao));
+            }
+
+            // Aquecimento da GPU: a peça .aquecer-gpu (ver o CSS) entra na primeira
+            // pintura da abertura e sai dois quadros depois, com o resto da pintura a
+            // frio, longe do "Começar".
+            function encerrarAquecimento() {
+                const peca = document.querySelector && document.querySelector('.aquecer-gpu');
+                if (peca && peca.remove) peca.remove();
+            }
+            depoisDoProximoQuadro(encerrarAquecimento);
+
             function noProximoQuadro(chave, funcao) {
                 if (typeof requestAnimationFrame !== 'function') return funcao();
                 if (!depoisDoLayout.size) requestAnimationFrame(() => {
@@ -1789,26 +1809,6 @@
                 showCombatMainMenu();
                 // quem chegou pelo teclado (o "Enfrentar" da bandeja) segue para as ações
                 if (comFoco) focarNoQuadro(() => document.getElementById('btn-combat-attack'));
-            }
-
-            // Aquecimento da GPU: logo depois da abertura, uma peça mínima com o mesmo
-            // desenho do preenchimento da barra de vida em combate (retângulo arredondado
-            // com gradiente, numa camada própria) aparece a 1% por meio segundo (ver
-            // .aquecer-gpu no CSS). Só o combate desenha isso, e a primeira luta de uma
-            // página aberta havia minutos esperava ~40 ms o Chrome compilar o pipeline no
-            // quadro do "Enfrentar"; compilado aqui, ele fica em memória até o fim da
-            // página. Acaba sozinho, ou no "Começar"; body[data-aquecimento] diz em que pé
-            // está (as ferramentas esperam "feito").
-            function aquecerGpu() {
-                if (!document.body || document.body.dataset.aquecimento) return;
-                document.body.dataset.aquecimento = 'aquecendo';
-                document.body.classList.add('aquecendo-gpu');
-                setTimeout(encerrarAquecimento, 500);
-            }
-            function encerrarAquecimento() {
-                if (!document.body || document.body.dataset.aquecimento !== 'aquecendo') return;
-                document.body.classList.remove('aquecendo-gpu');
-                document.body.dataset.aquecimento = 'feito';
             }
 
             // Troca a narrativa e a crônica pelo painel de combate e o relato (e volta).
@@ -2467,12 +2467,19 @@
                 const ativo = document.activeElement;
                 const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
                 let fechado = false, automatico = null;
+                // A volta para a cena rasteriza de novo a crônica (fora da tela durante a
+                // luta) e a narrativa nova: a narrativa fica invisível no primeiro quadro
+                // (já no lugar, sem mexer no resto) e aparece no seguinte, para o trabalho
+                // da GPU caber em dois quadros.
                 const fechar = () => {
                     if (fechado || !gameState.combat.active) return; // já fechou (ou uma cena nova fechou)
                     fechado = true;
                     if (automatico) clearTimeout(automatico);
+                    const narrativa = document.getElementById('narrativa');
+                    narrativa.style.visibility = 'hidden';
                     closeCombatScreen();
                     seguir();
+                    depoisDoProximoQuadro(() => { narrativa.style.visibility = ''; });
                 };
                 montarAcoes([botaoCombate({ id: 'btn-combat-continuar', icone: ICONE_DO_DESFECHO[desfecho], nome: 'Continuar', detalhe, aoClicar: fechar, livre: true })]);
                 if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-continuar'));

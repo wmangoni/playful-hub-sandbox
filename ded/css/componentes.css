@@ -218,9 +218,12 @@
    overflow: hidden no pai arredondado (o compositor compilava um shader de
    recorte arredondado no primeiro golpe, 50 a 130 ms) nem a um clip-path animado
    (repintava a barra a cada quadro, e a GPU pagava a limpeza dessas texturas
-   num quadro de 30 a 60 ms um segundo depois). */
+   num quadro de 30 a 60 ms um segundo depois). A peça de aquecimento da GPU
+   (.aquecer-gpu, abaixo) copia o desenho do preenchimento: as duas ficam nesta
+   regra, e a barra do inimigo mantém o mesmo número de paradas no gradiente. */
 .barra-vida::before,
-.barra-vida-janela::before {
+.barra-vida-janela::before,
+.aquecer-gpu {
     background: linear-gradient(#c45444, var(--rubro) 55%, #561713);
     box-shadow: inset 0 0.1rem 0 rgba(255, 214, 190, 0.4);
 }
@@ -1021,27 +1024,27 @@
 .impacto-magic { background: radial-gradient(circle, rgba(255, 244, 210, 0.95), rgba(224, 161, 69, 0.6) 45%, transparent 70%); }
 .impacto-heal { background: radial-gradient(circle, rgba(232, 246, 220, 0.95), rgba(63, 90, 61, 0.55) 45%, transparent 70%); }
 .emblema-vida { position: relative; }
-/* O retrato do inimigo e a vida do herói tremem no golpe (Web Animations): cada um
-   tem camada própria desde a abertura, para o tremor não criar nem destruir uma */
-/* Durante o combate (body.em-combate, de mostrarCombate), o que treme, brilha ou
-   desliza a cada golpe ganha camada própria e a mantém até o fim da luta: o
-   tremor e o brilho não criam nem destroem camadas. Fora do combate, a ficha não
-   carrega essas camadas. O preenchimento da barra usa will-change: transform (a
-   exceção à regra do §6): ele só desliza, e a borda dele é um gradiente, sem
-   texto que borre. */
+/* Durante o combate (body.em-combate, de mostrarCombate), o que treme ou brilha a
+   cada golpe ganha camada própria e a mantém até o fim da luta: o tremor e o brilho
+   não criam nem destroem camadas. Fora do combate, a ficha não carrega essas
+   camadas. Seletores ligados a essa classe terminam em classe: terminado em tag
+   (span), ligá-la invalidaria o estilo de todos os <span> da página no quadro do
+   "Enfrentar". O preenchimento da barra usa will-change: transform (a exceção à
+   regra do §6): ele só desliza, e a borda dele é um gradiente, sem texto que
+   borre. Com camada o tempo todo, ele mudava a rasterização do texto da
+   exploração inteira em 1366x768. */
 .em-combate .emblema-vida, .card-inimigo-retrato, .em-combate .impacto { will-change: opacity; }
-/* com classe à direita: um seletor terminado em tag (span) faria ligar a
-   em-combate invalidar o estilo de todos os <span> da página, inclusive as palavras
-   da narrativa, justo no quadro do "Enfrentar" */
 .em-combate .barra-vida-janela::before { will-change: transform; }
 
-/* Aquecimento da GPU (body.aquecendo-gpu, meio segundo depois da abertura; ver
-   aquecerGpu no jogo): o mesmo desenho do preenchimento acima, numa camada própria,
-   a 1% num canto à vista, para o Chrome compilar o pipeline dele antes da primeira
-   luta. Ele precisa estar à vista: coberto pela seleção, não seria rasterizado. */
-.aquecer-gpu { display: none; }
-.aquecendo-gpu .aquecer-gpu {
-    display: block;
+/* Aquecimento da GPU: o preenchimento da barra numa camada própria (retângulo
+   arredondado com gradiente, sem MSAA) é o único desenho que só o combate faz, e o
+   Chrome compilava o pipeline dele (~40 ms) no quadro do primeiro "Enfrentar" de
+   uma sessão longa. Esta peça tem o mesmo desenho, a 1% num canto à vista: entra
+   na primeira pintura da abertura (que já é a pintura a frio) e sai dois quadros
+   depois (encerrarAquecimento no jogo). Coberta, não seria rasterizada. Removida
+   mais tarde, a limpeza da GPU que a remoção dispara um segundo depois caía no
+   "Começar". */
+.aquecer-gpu {
     position: fixed;
     right: 0;
     bottom: 0;
@@ -1049,8 +1052,6 @@
     width: 8rem;
     height: 0.71rem;
     border-radius: 1rem;
-    background: linear-gradient(#c45444, var(--rubro) 55%, #561713);
-    box-shadow: inset 0 0.1rem 0 rgba(255, 214, 190, 0.4);
     opacity: 0.01;
     pointer-events: none;
     will-change: transform;

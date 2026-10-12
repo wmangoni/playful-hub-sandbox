@@ -103,6 +103,7 @@
 // - GTM, Google Analytics e os .mp3 bloqueados; os alert() dispensados; o áudio sintetizado toca, mudo.
 // - O tempo do quadro é a diferença entre os timestamps do rAF (mesma base do performance.now()), que
 //   caem no vsync. O performance.now() lido dentro do callback oscila alguns ms e daria falsos 21 ms.
+import { execFileSync } from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -309,9 +310,6 @@ async function abrirJogo(browser, base, cpu, reg, autoIniciar = false) {
         throw new Error('as cenas (scenes) não carregaram em 30 s');
     }
     await page.evaluate(() => document.fonts.ready);
-    // o aquecimento da GPU (aquecerGpu) acaba antes da medição; o jogo antigo não o tem
-    await page.waitForFunction(() => typeof aquecerGpu !== 'function' || document.body.dataset.aquecimento === 'feito',
-        { timeout: 5000 }).catch(() => {});
     await page.evaluate(() => { ttsEnabled = false; });
     return page;
 }
@@ -663,7 +661,8 @@ function imprimir(resultados, meta) {
     }
     for (const a of new Set(meta.avisosAquecimento)) console.log(`aquecimento: aviso: ${a}`);
     const hz = meta.intervaloMs ? Math.round(1000 / meta.intervaloMs) : NaN;
-    console.log(`\nmovimento ${MOVIMENTO === 'reduce' ? 'reduzido' : 'padrão'} | aquecimento ${AQUECIMENTO} | ${meta.chrome} | intervalo de atualização medido ${num(meta.intervaloMs, 2)} ms (~${hz} Hz; ` +
+    const codigo = meta.commit ? `${meta.commit}${meta.sujo ? ` + ${meta.alterados.length} alterado(s)` : ''}` : 'fora do git';
+    console.log(`\ncódigo ${codigo} | movimento ${MOVIMENTO === 'reduce' ? 'reduzido' : 'padrão'} | aquecimento ${AQUECIMENTO} | ${meta.chrome} | intervalo de atualização medido ${num(meta.intervaloMs, 2)} ms (~${hz} Hz; ` +
         `mediana ${num(meta.intervaloMedianaMs, 2)}) | LoAF ${meta.loafSuportado ? 'disponível' : 'indisponível'} | ` +
         `limite ${num(LIMITE_MS, 2)} ms + folga ${num(FOLGA_MS)} ms`);
 }
@@ -705,6 +704,17 @@ async function comRefacao(reg, executar) {
     return r;
 }
 
+// Qual código foi medido: o commit da raiz servida e os arquivos alterados fora dele
+function versaoDoCodigo(raiz) {
+    const git = (...args) => execFileSync('git', args, { cwd: raiz, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    try {
+        const alterados = git('status', '--porcelain').split('\n').filter(Boolean).map(l => l.slice(3));
+        return { commit: git('rev-parse', '--short', 'HEAD').trim(), sujo: alterados.length > 0, alterados };
+    } catch {
+        return { commit: null, sujo: null, alterados: [] }; // raiz fora de um repositório (cópia solta)
+    }
+}
+
 async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil }) {
     const srv = await servidor(path.resolve(raiz));
     const base = `http://127.0.0.1:${srv.address().port}`;
@@ -723,6 +733,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
         console.log('aquecendo...');
         const aq = await aquecer(browser, base, AQUECIMENTO);
         meta = {
+            ...versaoDoCodigo(path.resolve(raiz)),
             chrome: await browser.version(), intervaloMs: aq.intervalo, intervaloMedianaMs: aq.mediana,
             loafSuportado: aq.loafSuportado, avisosAquecimento: aq.avisos
         };
