@@ -12,7 +12,7 @@
 // Detalhes que tornam as capturas repetíveis:
 // - rasterização por software (a da GPU varia alguns pixels entre execuções);
 // - animações congeladas: as infinitas no início e as finitas no fim (a entrada
-//   das janelas, o carimbo do selo do fim, o anel do mapa e a subida dos avisos);
+//   das janelas, o carimbo do selo do fim e a subida dos avisos);
 // - GTM, Google Fonts e áudio bloqueados;
 // - diálogos nativos dispensados (o jogo não abre mais nenhum);
 // - o acaso forçado: Math.random preso nos testes de d20 e no combate;

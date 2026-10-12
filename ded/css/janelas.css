@@ -242,7 +242,7 @@
    lugares como botões posicionados em porcentagem pelo JS (atualizarMapa), com o
    nome embaixo. O estado de cada lugar vem em data-estado (atual, visitado,
    pode-ir, selado ou desconhecido), e a legenda usa as mesmas peças. Nada anima
-   sem parar: só um anel sai uma vez do lugar atual quando a janela abre. */
+   na carta (ver "Você está aqui", abaixo). */
 #mapa { --largura-janela: 78rem; }
 /* abaixo da largura mínima da carta (celular), o corpo rola de lado */
 #mapa .janela-corpo { overflow-x: auto; padding: 0.35rem 0.25rem 0.5rem; }
@@ -320,15 +320,9 @@
 }
 .mapa-medalhao svg { width: 56%; height: 56%; }
 .mapa-medalhao[data-icone=""] svg { display: none; }
-/* o lugar atual: o medalhão rubro em cor sólida, com as mesmas peças dos outros
-   estados (borda, fundo e anel). A arte (medalhao-rubro.svg) ali, numa posição
-   fracionária (o translate(-50%) do lugar), ia para um pipeline da GPU que nenhuma
-   outra tela usa, e o mapa compilava 40 a 50 ms ao abrir pela primeira vez numa
-   sessão do Chrome (TASK_001 §6); tirar o border-radius não bastava */
 [data-estado="atual"] > .mapa-medalhao {
-    border: 0.2rem solid var(--ouro);
-    background: var(--rubro);
-    box-shadow: 0 0 0 0.1rem var(--tinta-2);
+    border: 0;
+    background: url(../ui/ornamentos/medalhao-rubro.svg) center / contain no-repeat;
     color: var(--creme);
 }
 [data-estado="visitado"] > .mapa-medalhao {
@@ -373,21 +367,10 @@
 .mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] > .mapa-medalhao { --anel-mapa: var(--sepia-claro); border-color: var(--pergaminho-3); }
 .mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] .mapa-no-nome { color: var(--sepia); }
 
-/* Você está aqui: um anel sai do medalhão uma vez, quando a janela abre */
-.mapa-no[data-estado="atual"] > .mapa-medalhao::after {
-    content: '';
-    position: absolute;
-    inset: -0.1rem;
-    border: 0.16rem solid var(--rubro);
-    border-radius: 50%;
-    opacity: 0;
-    pointer-events: none;
-    animation: mapa-aqui 0.9s 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-@keyframes mapa-aqui {
-    from { opacity: 0.9; transform: scale(1); }
-    to { opacity: 0; transform: scale(1.9); }
-}
+/* Você está aqui: o medalhão rubro e o nome em rubro, sem animação. Um anel que
+   saía do medalhão na abertura (uma camada animada dentro da janela) fazia a GPU
+   desenhar a textura da folha por outro caminho, e a primeira abertura do mapa
+   numa sessão do Chrome compilava um pipeline (40 a 50 ms, TASK_001 §6) */
 
 /* Alavanca: uma insígnia no alto do medalhão, cheia quando puxada */
 .mapa-alavanca {
@@ -426,11 +409,6 @@
 .mapa-legenda li { display: flex; align-items: center; gap: 0.5rem; }
 .mapa-legenda .mapa-medalhao { --medalhao-mapa: 1.75rem; }
 .mapa-legenda .mapa-alavanca { position: static; }
-
-/* No movimento reduzido, o anel não sai (a janela só esmaece, pela fundação) */
-@media (prefers-reduced-motion: reduce) {
-    .mapa-no[data-estado="atual"] > .mapa-medalhao::after { animation: none; }
-}
 
 /* Telas estreitas: a moldura da janela fica mais justa e a carta rola de lado */
 @media (max-width: 1099px), (orientation: portrait) {
