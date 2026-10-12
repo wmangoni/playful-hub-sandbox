@@ -451,14 +451,23 @@ async function runTests() {
         recomecar: !!document.querySelector('#choices .botao-secundario')
       };
     };
-    return { pocao: ler('potion_health'), morte: ler('death') };
+    const resultado = { pocao: ler('potion_health'), morte: ler('death') };
+    // logo depois de montar, o recomeçar ignora o clique (não apaga o save nem recarrega)
+    window.__semRecarga = true;
+    document.querySelector('#choices .botao-secundario').click();
+    resultado.saveIntacto = !!localStorage.getItem('ded_save_v1');
+    return resultado;
   });
+  const naoRecarregou = await page.evaluate(() => window.__semRecarga === true);
   console.log('End scenes:', fins);
   if (fins.pocao.recomecar || fins.pocao.titulo === 'A aventura terminou') {
     throw new Error('potion_health (a pass-through scene) must not offer "Começar uma nova aventura"');
   }
   if (!fins.morte.recomecar) {
     throw new Error('The death scene must offer "Começar uma nova aventura"');
+  }
+  if (!fins.saveIntacto || !naoRecarregou) {
+    throw new Error('"Começar uma nova aventura" must ignore a click right after the scene is mounted');
   }
   console.log('✅ PASS: "Continuar" advances right away, and only real endings offer a new adventure.');
 

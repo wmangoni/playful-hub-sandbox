@@ -221,6 +221,7 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - o selo de cera ganhou piso de largura em px;
     - a asserção vazia do `qa_ded`;
     - a documentação do desempenho e o caminho de movimento reduzido.
+  - A 3ª rodada, sobre o `84ec91b`, deu "muito bom". Faltava a mesma pausa de 300 ms no "Começar uma nova aventura": um Enter duplo na escolha que leva a um final apagava o save antes de o final ser visto. Com a correção, o juiz dá "excelente".
 - **Desempenho:** `desempenho.mjs` em CPU 1x, com movimento padrão, numa tela de 144 Hz, saiu APROVADO.
   - O pior quadro de cada cenário (`desempenho-f2n`) foi:
     - exploração, 13,9 ms;
