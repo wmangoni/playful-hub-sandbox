@@ -107,48 +107,62 @@ async function runTests() {
   }
   console.log('✅ Teste 1: Combate interativo por turnos e UI dedicada validados.');
 
-  // 2. Validar Minimapa de Exploração da Masmorra (Dynamic Dungeon Map & Fog of War)
-  console.log('\n--- Test 2: Minimapa da Masmorra (SVG Graph & Névoa de Guerra) ---');
+  // 2. Validar o mapa da masmorra: uma janela (<dialog id="mapa">) com os caminhos
+  // num SVG e os lugares como botões
+  console.log('\n--- Test 2: Mapa da Masmorra (janela, caminhos e lugares) ---');
   const mapCheck = await page.evaluate(() => {
     const rpg = window.__rpg;
 
-    // Encerrar combate para testar minimapa
+    // Encerrar combate para testar o mapa
     rpg.gameState.combat.active = false;
     document.getElementById('combat-screen').classList.add('hidden');
 
-    // Abrir container do minimapa
+    // Abrir a janela do mapa pelo selo
     const btnToggleMap = document.getElementById('btn-toggle-map');
     btnToggleMap.click();
+    const janela = document.getElementById('mapa');
+    const isMapOpen = janela.open === true && btnToggleMap.getAttribute('aria-expanded') === 'true';
 
-    const minimapContainer = document.getElementById('minimap-container');
-    const isMapVisible = !minimapContainer.classList.contains('hidden');
-
-    // Renderizar e inspecionar SVG do minimapa
+    // Redesenhar (nada mudou) e inspecionar a carta
     rpg.renderMinimap();
-    const svgEl = document.querySelector('#minimap-view svg');
-    const circleNodes = document.querySelectorAll('#minimap-view circle');
-    const lineEdges = document.querySelectorAll('#minimap-view line');
+    const nodes = [...janela.querySelectorAll('button.mapa-no')];
+    const edges = janela.querySelectorAll('.mapa-caminhos line');
+    const lugar = id => janela.querySelector(`.mapa-no[data-no="${id}"]`);
+    const current = janela.querySelector('.mapa-no[aria-current="location"]');
+    const offered = nodes.filter(b => b.getAttribute('aria-disabled') !== 'true').map(b => b.dataset.no);
 
-    // Testar navegação por nó adjacente
-    rpg.teleportToNode('corridor');
+    // Viajar pelo botão de um lugar vizinho (a cena nova fecha a janela)
+    lugar('corridor').click();
     const newCurrentScene = rpg.gameState.currentScene;
     const isVisited = rpg.gameState.visitedNodes.includes('corridor');
+    const mapClosing = !janela.open || janela.classList.contains('fechando');
+
+    // A Porta Selada não tem cena: nunca é oferecida, e teleportToNode não sai do lugar
+    rpg.teleportToNode('crypt_door');
 
     return {
-      isMapVisible,
-      hasSvg: !!svgEl,
-      nodesCount: circleNodes.length,
-      edgesCount: lineEdges.length,
+      isMapOpen,
+      nodesCount: nodes.length,
+      graphNodes: Object.keys(rpg.DUNGEON_MAP).length,
+      edgesCount: edges.length,
+      currentLabel: current && current.getAttribute('aria-label'),
+      offered,
       navigatedScene: newCurrentScene,
-      isVisitedCorridor: isVisited
+      isVisitedCorridor: isVisited,
+      mapClosing,
+      sceneAfterCryptDoor: rpg.gameState.currentScene
     };
   });
 
-  console.log('Resultados do Minimapa:', JSON.stringify(mapCheck, null, 2));
-  if (!mapCheck.isMapVisible || !mapCheck.hasSvg || mapCheck.nodesCount === 0 || mapCheck.navigatedScene !== 'corridor') {
-    throw new Error('Falha na renderização ou navegação pelo minimapa dinâmico.');
+  console.log('Resultados do Mapa:', JSON.stringify(mapCheck, null, 2));
+  if (!mapCheck.isMapOpen || mapCheck.nodesCount !== mapCheck.graphNodes || mapCheck.edgesCount === 0 ||
+      mapCheck.currentLabel !== 'Entrada, você está aqui' ||
+      mapCheck.offered.join() !== 'buy_supplies,entrance_inspection,corridor' ||
+      mapCheck.navigatedScene !== 'corridor' || !mapCheck.isVisitedCorridor || !mapCheck.mapClosing ||
+      mapCheck.sceneAfterCryptDoor !== 'corridor') {
+    throw new Error('Falha na renderização ou navegação pelo mapa da masmorra.');
   }
-  console.log('✅ Teste 2: Minimapa SVG e névoa de guerra validados.');
+  console.log('✅ Teste 2: Mapa da masmorra (janela, lugares e viagem) validado.');
 
   // 3. Validar Síntese de Áudio Procedural (Web Audio API)
   console.log('\n--- Test 3: Síntese de Áudio Procedural (Web Audio API) ---');

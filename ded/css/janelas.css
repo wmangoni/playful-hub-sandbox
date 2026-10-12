@@ -16,6 +16,202 @@
 
 /* ---------- Mapa ---------- */
 
+/* A carta da masmorra (#mapa): os caminhos num SVG só de traços e, por cima, os
+   lugares como botões posicionados em porcentagem pelo JS (atualizarMapa), com o
+   nome embaixo. O estado de cada lugar vem em data-estado (atual, visitado,
+   pode-ir, selado ou desconhecido), e a legenda usa as mesmas peças. Nada anima
+   sem parar: só um anel sai uma vez do lugar atual quando a janela abre. */
+#mapa { --largura-janela: 78rem; }
+/* abaixo da largura mínima da carta (celular), o corpo rola de lado */
+#mapa .janela-corpo { overflow-x: auto; padding: 0.35rem 0.25rem 0.5rem; }
+#mapa .janela-status { margin-top: -0.3rem; }
+
+.mapa-carta {
+    position: relative;
+    min-width: 50rem;
+    border: 0.1rem solid var(--sepia-claro);
+    border-radius: 0.3rem;
+    /* o pergaminho da carta, um tom abaixo do da janela, com a borda mais escura */
+    background:
+        radial-gradient(ellipse 70% 75% at 50% 50%, transparent 60%, color-mix(in srgb, var(--pergaminho-3) 32%, transparent)),
+        color-mix(in srgb, var(--pergaminho-2) 34%, transparent);
+    box-shadow: inset 0 0 0 0.28rem color-mix(in srgb, var(--pergaminho) 55%, transparent),
+        inset 0 0 0 0.36rem color-mix(in srgb, var(--sepia-claro) 45%, transparent);
+}
+
+/* Caminhos: o traço não escala com a carta (vector-effect) */
+.mapa-caminhos {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+.mapa-caminhos line {
+    fill: none;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+.mapa-caminhos .caminho-percorrido { stroke: var(--sepia); stroke-width: 0.2rem; }
+.mapa-caminhos .caminho-aberto { stroke: var(--sepia); stroke-width: 0.15rem; stroke-dasharray: 0.55rem 0.4rem; }
+.mapa-caminhos .caminho-desconhecido { stroke: var(--sepia-claro); stroke-width: 0.12rem; stroke-dasharray: 0.25rem 0.45rem; opacity: 0.6; }
+
+/* Lugares: o medalhão fica sobre o ponto (x, y) e o nome, embaixo dele */
+.mapa-nos { position: absolute; inset: 0; }
+.mapa-no {
+    position: absolute;
+    display: grid;
+    justify-items: center;
+    gap: 0.18rem;
+    width: max-content;
+    padding: 0;
+    border: 0;
+    background: none;
+    transform: translate(-50%, -1.25rem);
+    text-align: center;
+    cursor: default;
+}
+/* nome em cima do medalhão (onde embaixo ele bateria no do vizinho) */
+.mapa-no-acima { transform: translate(-50%, calc(-100% + 1.25rem)); }
+.mapa-no-acima .mapa-no-nome { order: -1; }
+.mapa-no-nome {
+    max-width: max(5.2rem, 66px);
+    padding: 0 0.28rem 0.06rem;
+    border-radius: 0.3rem;
+    background: color-mix(in srgb, var(--pergaminho) 78%, transparent);
+    font: 500 max(0.92rem, 12px) / 1.08 var(--fonte-texto);
+    color: var(--tinta-2);
+    text-wrap: balance;
+}
+
+/* O medalhão de cada estado (também na legenda) */
+.mapa-medalhao {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--medalhao-mapa, 2.5rem);
+    aspect-ratio: 1;
+    border: 0.14rem solid var(--sepia-claro);
+    border-radius: 50%;
+    background: var(--pergaminho);
+    color: var(--sepia);
+}
+.mapa-medalhao svg { width: 56%; height: 56%; }
+.mapa-medalhao[data-icone=""] svg { display: none; }
+[data-estado="atual"] > .mapa-medalhao {
+    border: 0;
+    background: url(../ui/ornamentos/medalhao-rubro.svg) center / contain no-repeat;
+    color: var(--creme);
+}
+[data-estado="visitado"] > .mapa-medalhao {
+    border-color: var(--tinta-2);
+    background: radial-gradient(circle at 38% 32%, var(--ouro-claro), var(--ouro) 48%, var(--bronze));
+    color: var(--tinta);
+}
+[data-estado="pode-ir"] > .mapa-medalhao {
+    border: 0.2rem solid var(--ouro);
+    box-shadow: 0 0 0 0.1rem var(--anel-mapa, var(--tinta-2));
+    color: var(--tinta-2);
+}
+[data-estado="selado"] > .mapa-medalhao {
+    border-color: var(--sepia);
+    background: var(--pergaminho-2);
+    color: var(--rubro);
+}
+[data-estado="desconhecido"] > .mapa-medalhao {
+    border-style: dashed;
+    background: color-mix(in srgb, var(--pergaminho) 70%, var(--pergaminho-2));
+    color: var(--sepia-claro);
+}
+.mapa-no[data-estado="atual"] .mapa-no-nome { font-weight: 700; color: var(--rubro); }
+.mapa-no[data-estado="visitado"] .mapa-no-nome,
+.mapa-no[data-estado="pode-ir"] .mapa-no-nome { color: var(--tinta); }
+.mapa-no[data-estado="selado"] .mapa-no-nome { color: var(--sepia); }
+.mapa-no[data-estado="desconhecido"] .mapa-no-nome { font-style: italic; color: var(--apagado); }
+
+/* Aonde dá para ir: cursor de clique e rubro no hover e no foco */
+.mapa-no:not([aria-disabled="true"]) { cursor: pointer; }
+.mapa-no:not([aria-disabled="true"]) > .mapa-medalhao,
+.mapa-no:not([aria-disabled="true"]) .mapa-no-nome { transition: border-color 0.15s ease, color 0.15s ease; }
+.mapa-no:not([aria-disabled="true"]):hover > .mapa-medalhao,
+.mapa-no:not([aria-disabled="true"]):focus-visible > .mapa-medalhao { border-color: var(--rubro); color: var(--rubro); }
+.mapa-no:not([aria-disabled="true"]):hover .mapa-no-nome,
+.mapa-no:not([aria-disabled="true"]):focus-visible .mapa-no-nome { color: var(--rubro); }
+.mapa-no:focus-visible { outline: none; }
+.mapa-no:focus-visible > .mapa-medalhao { box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro); }
+/* No meio da luta, do d20 ou da especialização, nada leva a lugar nenhum */
+.mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] > .mapa-medalhao { --anel-mapa: var(--sepia-claro); border-color: var(--pergaminho-3); }
+.mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] .mapa-no-nome { color: var(--sepia); }
+
+/* Você está aqui: um anel sai do medalhão uma vez, quando a janela abre */
+.mapa-no[data-estado="atual"] > .mapa-medalhao::after {
+    content: '';
+    position: absolute;
+    inset: -0.1rem;
+    border: 0.16rem solid var(--rubro);
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    animation: mapa-aqui 0.9s 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes mapa-aqui {
+    from { opacity: 0.9; transform: scale(1); }
+    to { opacity: 0; transform: scale(1.9); }
+}
+
+/* Alavanca: uma insígnia no alto do medalhão, cheia quando puxada */
+.mapa-alavanca {
+    position: absolute;
+    top: -0.5rem;
+    left: calc(50% + 0.55rem);
+    display: grid;
+    place-items: center;
+    width: 1.45rem;
+    aspect-ratio: 1;
+    border: 0.1rem dashed var(--sepia);
+    border-radius: 50%;
+    background: var(--pergaminho);
+    color: var(--sepia);
+}
+.mapa-alavanca svg { width: 74%; height: 74%; }
+.mapa-alavanca[data-puxada="true"] {
+    border: 0.1rem solid var(--tinta-2);
+    background: radial-gradient(circle at 38% 32%, var(--ouro-claro), var(--ouro));
+    color: var(--tinta);
+}
+
+/* Legenda */
+.mapa-legenda {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.06em;
+    color: var(--sepia);
+}
+.mapa-legenda li { display: flex; align-items: center; gap: 0.5rem; }
+.mapa-legenda .mapa-medalhao { --medalhao-mapa: 1.75rem; }
+.mapa-legenda .mapa-alavanca { position: static; }
+
+/* No movimento reduzido, o anel não sai (a janela só esmaece, pela fundação) */
+@media (prefers-reduced-motion: reduce) {
+    .mapa-no[data-estado="atual"] > .mapa-medalhao::after { animation: none; }
+}
+
+/* Telas estreitas: a moldura da janela fica mais justa e a carta rola de lado */
+@media (max-width: 1099px), (orientation: portrait) {
+    #mapa .janela-folha { padding-inline: 1.3rem; }
+    .mapa-carta { min-width: 60rem; }
+}
+/* no celular, a fonte dos nomes fica maior que a carta: mais espaço entre os lugares */
+@media (max-width: 760px) {
+    .mapa-carta { min-width: 66rem; }
+}
+
 
 /* ---------- Fim da aventura ---------- */
 
