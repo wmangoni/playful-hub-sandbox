@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0, 1, 2 e 3 prontas (a Fase 3 com resíduos de desempenho para decisão do dono, §7).
+**Status**: 🚧 Em andamento. Fases 0, 1, 2 e 3 prontas (a Fase 3 com resíduos de desempenho para decisão do dono, §7). A Fase 4 (janelas) está implementada e em revisão, com a 1ª rodada do juiz.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -72,7 +72,7 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - O timestamp do rAF oscila cerca de ±0,5 ms em volta do vsync, e um quadro de 3 vsyncs a 144 Hz aparece como 20,5 a 21,7 ms.
   - A folga separa 3 vsyncs de 4 (a partir de ~26,9 ms) sem aceitar um vsync a mais em 60, 75, 100, 120, 144, 165 ou 240 Hz.
   - "Nenhum quadro acima de 20,8 ms" quer dizer, na prática, "nenhum quadro de mais de 3 vsyncs a 144 Hz".
-- **Ferramenta:** `node ded/tools/desempenho.mjs` mede todos os cenários com GPU e janela de verdade: abertura, exploração, texto longo, teste de d20, os dois críticos, a entrada no combate pelo "Enfrentar", uma rodada, a vitória, a derrota, a fuga e o aceite do primeiro clique. Ela começa o jogo com cliques na seleção, como um jogador. A primeira interação da página liga o Web Audio e a voz, cerca de 10 ms de script.
+- **Ferramenta:** `node ded/tools/desempenho.mjs` mede todos os cenários com GPU e janela de verdade: abertura, exploração, texto longo, teste de d20, os dois críticos, a entrada no combate pelo "Enfrentar", uma rodada, a vitória, a derrota, a fuga, as janelas (abrir e fechar o mapa, viajar por ele, a loja, uma compra, o diário, a especialização e o fim), um aviso, a barreira e o aceite do primeiro clique. Ela começa o jogo com cliques na seleção, como um jogador. A primeira interação da página liga o Web Audio e a voz, cerca de 10 ms de script.
   - Em CPU 1x, cada cenário roda 10 vezes (`--repeticoes`), cada vez numa aba nova; o primeiro clique roda 30 (`--execucoes`). Uma execução só não separa ruído de uma taxa de falha.
 - **Layout forçado:** nada de ler o layout (`scrollHeight`, `offsetTop`, `scrollTop`, `focus()`, `getComputedStyle`, `getClientRects`) logo depois de mudar o DOM, no meio da cena. Esse tipo de leitura espera o próximo quadro (`noProximoQuadro`, `focarNoQuadro`).
   - Na Fase 2, rolar a crônica a cada mensagem custava até 6 ms por cena.
@@ -94,7 +94,7 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - a thread principal da página trabalhou menos de 3 ms nesse intervalo.
   - Esses quadros saem listados à parte, na coluna "GPU", com o trecho da tarefa e o trabalho da página, e o veredito diz quantos foram. Como a página influencia o custo (ele cresce com as texturas descartadas), uma aprovação que dependa dessa exclusão é decisão do dono do projeto.
   - Se o Chrome mudar o nome da tarefa, o quadro volta a contar contra a página. `--sem-rastreio` desliga o rastreio, para medir o custo dele. O rastreio leve não mudou a distribuição: em dois pares de baterias (texto longo e rodada de combate, 10 execuções cada), a mediana, o p95 e o p99 saíram iguais com e sem ele (6,9, 7,2 a 7,3 e 7,3 a 7,4 ms).
-  - O rastreio de cada execução com um quadro acima do limite fica guardado (`--rastreios`), para achar a causa sem medir de novo. `--aquecimento d20|combate|nenhum` escolhe o que a aba de aquecimento joga (o padrão é o d20); com `nenhum`, a sessão começa fria.
+  - O rastreio de cada execução com um quadro acima do limite fica guardado (`--rastreios`), para achar a causa sem medir de novo. `--aquecimento janelas|d20|combate|nenhum` escolhe o que a aba de aquecimento joga. O padrão, desde a Fase 4, é `janelas`: o d20 e uma passada por cada janela e efeito novo, porque o primeiro desenho de cada coisa nova numa sessão do Chrome compila pipelines da GPU (§7, "Pipelines das janelas"); com `nenhum`, a sessão começa fria.
 - **O que evitar:**
   - animar qualquer coisa além de `transform` e `opacity`, inclusive com `transition` em `clip-path` (repinta a cada quadro, e as texturas descartadas voltam como a limpeza da GPU um segundo depois);
   - camada animada recortada por um pai com `overflow: hidden` e `border-radius`: o compositor compila um shader de recorte arredondado no primeiro uso (50 a 130 ms na barra de vida, no primeiro golpe). Recorte retangular é de graça;
@@ -111,17 +111,13 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - um desenho que só uma tela faz, sem aquecimento. O preenchimento da barra em combate (retângulo arredondado com gradiente linear, numa camada própria: o pipeline `AnalyticRRectRenderStep + LinearGradient4` do Graphite) só aparece na luta. O Graphite compila cada pipeline no primeiro uso e não o guarda para sempre: numa página aberta havia minutos, ou depois de muitas páginas no mesmo navegador, o Chrome compilava esse no quadro do "Enfrentar" (~40 ms no D3D11). A peça `.aquecer-gpu` tem o mesmo desenho: entra na primeira pintura da abertura, a 1% num canto à vista (coberta, não seria rasterizada), e sai dois quadros depois. Na prova, a primeira luta depois de 5 minutos parado na exploração, duas vezes, não teve quadro lento nem compilação no rastreio. Não se sabe por quanto tempo o Chrome guarda o pipeline, e uma sessão mais longa ainda pode compilá-lo. Para achar um caso assim, o rastreio com as categorias `gpu.dawn` e `skia.gpu` nomeia o pipeline em `CreatePipelineAsyncEvent`.
   - mudar de momento uma peça de aquecimento sem medir de novo o "Começar". Criada meio segundo depois da abertura e removida meio segundo depois disso, ela deixou o "Começar" em 3 vsyncs em 7 a 10 de cada 10 execuções (`r5` e `r6`). Sem ela, ou na primeira pintura, ele voltou a 2 vsyncs em 16 a 19 de cada 20. O mecanismo não foi isolado: no rastreio da `r6`, o quadro do "Começar" tinha 13 ms de rasterização na GPU, e não a limpeza.
   - mostrar tudo de uma vez quando muita coisa chega junto. Na volta do combate, a crônica (fora da tela durante a luta) e a narrativa nova rasterizadas no mesmo quadro chegavam a 28 ms; a narrativa agora aparece um quadro depois (`esconderNarrativaUmQuadro`). No movimento reduzido, sem a máquina de escrever, o texto inteiro e a arte nova (que entra depois de decodificada, num quadro qualquer) chegavam a 34,7 ms; o texto agora espera a arte (`mostrarTextoDepoisDe`). O foco espera a narrativa aparecer (`focarNoQuadro` tenta de novo).
+  - `toLocaleString` (ou `Intl`) no quadro de uma ação: a primeira chamada na página carrega os dados do locale (11 a 13 ms). Ela caía no quadro em que a janela do fim abre; o ouro de lá usa `milhares()`.
+  - abrir uma janela no mesmo quadro da cena que a pediu: o `showModal()` recalcula o estilo e o layout da página inteira para mover o foco (~8 ms na primeira abertura de cada janela, ~2 ms depois). A loja abre um quadro depois da cena; a especialização, dois depois do XP.
+  - elemento absoluto deixado no fim do `body`: na posição estática, ele estica a página (o `#avisos-leitor` fazia a seleção rolar 17 px, e depois 1 px). Ele fica no começo do `body`, com `margin: 0`.
 - **Movimento:** respeitar `prefers-reduced-motion`.
 
 ## 7. Pendências para as próximas fases
 
-- **Créditos no Diário (Fase 4):** a Fase 2 pôs o crédito dos ícones no pé da seleção. Repetir no Diário quando ele migrar.
-- **`alert()` que sobraram (Fase 4):**
-  - no jogo: mochila cheia (duas vezes);
-  - no `scenes.json`: o mercador ("Over rir…"), o isqueiro que falta e os dois finais.
-  - O do mercador congela a página enquanto está aberto (a medição do "texto longo" passa por ele).
-- **Mapa (Fase 4):** o painel antigo abre fixo sob o cabeçalho, com 72rem de largura. Os nós são clicáveis só quando adjacentes e não visitados (uma cadeia de `else if` em `renderMinimap`). A alavanca do lago nunca aparece, porque `LEVER_NODES` usa `lake_search`, que não é nó do mapa.
-- **Especialização (Fase 4):** a caixa legada usa `backdrop-filter: blur(10px)`, proibido pelo §6. Sai quando ela migrar.
 - **Mecânicas (fase própria):**
   - o `gameState.checkDifficulty = 10` roda depois do `onEnter`, então nenhuma cena muda a dificuldade (4 a 20 no `scenes.json`);
   - a vida máxima é 20 para todas as classes (a Constituição não conta);
@@ -151,18 +147,24 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 - **Créditos no celular (Fase 5):** a 390 px, a linha de créditos dos ícones encosta no filete interno da moldura.
 - **Combate no celular (Fase 5):** a 390 px, "Fantasma de Drakmor" quebra em duas linhas no card do inimigo.
 - **Ruído das capturas:** duas capturas seguidas da mesma página podem diferir em até 31 por canal na borda de alguns SVGs (rasterização em software). Acontece também no commit da Fase 2; comparar com `--tolerancia` quando a diferença for só essa.
-- **Mapa durante o avanço do d20 (Fase 4):** nos 1,8 s depois do resultado, o selo do mapa ainda navega, e o temporizador do dado dispara depois. O problema já existia antes da Fase 2.
 - **Abertura a frio (informativo):** com a exploração montada em espera, a abertura ganhou um quadro de ~48 ms. É a pintura a frio, fora do veredito.
 - **Acessibilidade (Fase 5):**
   - cada rolagem é anunciada duas vezes: no `#result-message` (`role=status`) e na crônica (`aria-live`);
   - o foco vai direto à primeira escolha e pula o texto da cena para quem usa leitor de tela (focar o artigo da narrativa, com `tabindex=-1`);
-  - há dois `<main>` no DOM; o que está escondido deveria levar o atributo `hidden`;
-  - os selos Diário e Mapa precisam de `aria-haspopup` e de foco dentro do painel.
-- **Crônica (Fase 4):**
-  - uma linha só de emojis ("💍 👑 💵 💰 🪙 💎") aparece crua, porque sem eles não sobra texto;
-  - "Sua saúde já está no máximo!" sai com o tom de sucesso;
-  - o `changeMusic` de um `onEnter` volta a tocar a música mesmo depois de ela ser pausada pelo selo.
-- **Textos:** "Removido X ao inventário" e o "pq" na mensagem de morte (fase de enredo).
+  - há dois `<main>` no DOM; o que está escondido deveria levar o atributo `hidden`.
+- **Pipelines das janelas na primeira vez (informativo):** numa sessão nova do Chrome, a primeira vez que cada janela ou efeito aparece compila pipelines da GPU, de 30 a 50 ms cada. Rastreio com as categorias do Graphite, uma sessão por janela:
+  - a barreira: o gradiente radial de 8 paradas do clarão, numa camada própria (39 ms);
+  - o mapa: os gradientes radiais dos medalhões (com e sem MSAA) e uma imagem num passe com MSAA, quatro compilações e ~160 ms de GPU na primeira abertura;
+  - a primeira compra: a máscara com desfoque e as imagens do equipamento que muda atrás da janela, cinco compilações de 11 a 35 ms;
+  - o fim: a arte da morte num passe com MSAA (49 ms) e um gradiente linear (41 ms).
+  A medição tira esse custo com o aquecimento `janelas` (§6). Para tirá-lo do jogo, seria preciso aquecer esses desenhos na abertura, como a `.aquecer-gpu` faz com a barra do combate, ou trocar desenhos (os medalhões do mapa sem gradiente radial, por exemplo). A ferramenta também chegou a tratar uma dessas compilações como parada do ambiente (um quadro acima de 100 ms com o LoAF sem script nem render) e a refazer a execução.
+- **Mecânicas vistas na Fase 4 (fase própria):**
+  - a loja só abre de novo voltando à cena dela, e com a janela aberta não dá para usar um item: com a mochila cheia, a compra não tem saída;
+  - a loja vende "Poção de Vida", mas a cena da poção só gasta "Poção de cura";
+  - pelo mapa, `last_fight` leva à vitória sem o chefe, e `crystal_chamber` leva à saída da cripta sem o teste; os caminhos do mapa e os das cenas não batem (`start→check_supplies`, `treasure_room→cavern` e outros);
+  - `SCENE_TO_NODE` cita 19 cenas que não existem (`goblin_fight`, `wolf_fight`…), sem efeito no jogo.
+- **Celular (Fase 5), das janelas:** a 360 px, a fita da janela do fim fica ~12 px mais larga que o conteúdo, e o resumo rola; abaixo de ~60rem, a carta do mapa rola de lado.
+- **Textos:** "Removido X ao inventário" e o "pq" na mensagem de morte (fase de enredo). Também: "barreira mágica neon" na crônica (a barreira e as alavancas), as descrições "Recupera 10 HP" e "Item utilitário" que a loja mostra, e o texto de `merchant_items`, cópia do de `merchant_question`.
 - **Capturas:** o Puppeteer esconde as barras de rolagem (`--hide-scrollbars`). Na Fase 5, capturar com elas visíveis.
 - **Tamanho de fonte do navegador (Fase 5):** os `px` do legado e a raiz do kit ignoram a fonte padrão escolhida pelo usuário. Rever junto com a acessibilidade.
 - **Escala exata (Fase 5):** `min(0.8333vw, 1.4815vh)` dá 15,9994 px em 1920, e não 16. `calc(100vw / 120)` e `calc(100vh / 67.5)` dão 16 exatos, mas mexem em subpixels do protótipo.
@@ -349,3 +351,49 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - A 2ª rodada, sobre o `b0d8de3`, deu "muito bom". O bloqueante era o custo da primeira entrada no combate, sem diagnóstico; ele foi achado e corrigido (o pipeline do preenchimento da barra e `aquecerGpu()`, acima). As sugestões também entraram: a guarda no fechamento automático do desfecho e a cena nova fechando a luta pelo caminho de sempre, a armadura só com a luta ativa, os números flutuantes no meio do vitral, o dano no herói em rubro com halo e acima do medalhão, o seletor com classe à direita, o comentário da pausa no lugar, o caso 8 do `qa_ded`, "de experiência" no "Continuar", e a ferramenta guardando o rastreio de quem falha e escolhendo o aquecimento (`--rastreios`, `--aquecimento`).
   - A 3ª rodada, sobre o `f26edeb`, deu "muito bom". Pediu: devolver o "Começar" a 2 vsyncs com uma bissecção; dividir a volta da vitória em dois quadros; e a bateria final no commit exato, com o commit gravado no JSON e o movimento reduzido refeito. Sugeriu aquecer de forma robusta ao tempo de jogo e testar 5 minutos ou mais antes da primeira luta, tirar a cópia dos valores do gradiente, identificar a tarefa de 61,6 ms da `r5b`, corrigir duas afirmações da prova e cobrir o caminho com save. Tudo entrou nos commits seguintes (`b70f287`, `956eb99`, `7d4fdc7`): a bissecção e o aquecimento na primeira pintura, a volta em dois quadros (e, no movimento reduzido, a troca de cena com o texto esperando a arte), o commit no JSON, os 5 minutos parado, a regra única do gradiente, a tarefa (o `InteractiveDetector` do Chrome) e a abertura com save.
   - A 4ª rodada, sobre o `d4cf48c`, deu **"excelente"**. O juiz rodou controles: o "Começar" da Fase 2 aprovada tem o mesmo resíduo (1 de 30), o `InteractiveDetector` é leve numa carga parada, e a parada de ~500 ms é o `GetDawnInfo`. Pediu, sem bloquear: o título dos resíduos sem "do ambiente", com o controle de cada um, e o golpe do inimigo no movimento reduzido, os dois no §7 (feitos); e, para o dono decidir, tratar por nome as tarefas do Chrome na ferramenta e aquecer de novo antes da luta (§7).
+
+## 11. Registro da Fase 4
+
+- **As janelas viraram `<dialog>`.** Loja, especialização, diário, mapa e fim da aventura são `<dialog class="janela">` abertos com `showModal()`, com uma `.folha.janela-folha` dentro: a moldura da folha, a fita rubra no título e o medalhão de fechar (`i-fechar`). O foco entra na janela e volta para quem a abriu; o resto da página fica inerte. Escape, o medalhão e um clique no fundo fecham, com a saída animada. A especialização é obrigatória. A camada de cima da página (top layer) deixa as janelas acima da folha e dos efeitos sem `z-index`.
+- **Aviso (toast):** `avisar()` substitui os seis `alert()`: a mochila cheia (no jogo), o mercador, o isqueiro que falta e as duas vitórias (no `scenes.json`, que só chama a função). Fica num popover acima de uma janela aberta, com o texto também numa região `aria-live`. O alerta do mercador congelava a página no meio do `loadScene`.
+- **Mapa:** a carta em pergaminho, com os caminhos num SVG de traços e os lugares como botões. Ela funciona pelo teclado, tem legenda e não tem mais a animação infinita. Correções:
+  - "Porta Selada" não tem cena e quebrava o `loadScene`; não é mais oferecida;
+  - o mapa não navega durante o d20 nem no avanço depois dele: o temporizador velho carregava a cena do teste antigo;
+  - a alavanca do lago aparece;
+  - as cenas que não são lugares (alavancas, runas) mostram o lugar de onde vieram, e não a entrada;
+  - na luta, com a especialização pendente e nos finais, o mapa diz por que está parado.
+- **Loja:** as mercadorias com ícone, descrição e preço, o ouro e a mochila no alto. Sem ouro ou sem espaço, a linha explica o motivo na própria janela. Uma compra grava o save.
+- **Especialização:** as duas opções viraram botões, que antes não funcionavam pelo teclado. Ela não abre por cima do desfecho de uma luta (espera a luta fechar), não remonta nem toca o som de novo a cada XP, e reabre se o Chrome a fechar à força no terceiro Escape. Um save do nível 3 sem especialização volta com a escolha. O `backdrop-filter` saiu.
+- **Diário:** só as missões descobertas (antes, as inativas apareciam como "ativas"), com o progresso que os dados guardam (alavancas, runas) e as recompensas com ícones. Os créditos dos ícones ficam no rodapé, com os autores da Fase 3, que faltavam também na seleção.
+- **Fim da aventura:** uma janela abre ~1,2 s depois do texto de cada final, com o selo (louros ou lápide), o título, a mensagem dos antigos `alert()` das vitórias e o resumo (nível, ouro, missões, lugares). Ela não abre no meio de uma luta, e uma cena nova cancela.
+- **Barreira:** o clarão neon virou um clarão em verdete e ouro, com um aviso que diz quais alavancas faltam.
+- **Crônica:** a linha só de emojis vira palavras, "Sua saúde já está no máximo!" saiu do tom de sucesso, e o `changeMusic` respeita a música pausada pelo selo.
+- **Sem legado:** com a última tela migrada, o `legado.css` e as fontes do Google (MedievalSharp e Outfit) saíram. O `.hidden` passou para o `base.css`.
+- **Ícones:** sete novos, todos de Lorc: fechar, mochila, alavanca, louros, lápide, pegadas e runa.
+- **Catálogo:** a janela, uma janela de verdade, os avisos e uma amostra de cada janela.
+- **Como foi feito.** A fundação (janela, aviso, funções e catálogo) veio primeiro, num commit (`7ca9f67`). Três agentes trabalharam em paralelo, cada um num worktree e numa branch saídos dela, com regiões de arquivo separadas: o mapa; a loja, a especialização e o diário; o fim, os avisos, a barreira e a crônica. As três branches foram juntadas na desta tarefa, com dois conflitos esperados (os dois selos do cabeçalho, em linhas vizinhas, e o fim do `catalogo.css`). Os agentes acharam três defeitos na fundação, corrigidos antes da junção:
+  - o temporizador de reserva da saída fechava uma janela reaberta logo depois;
+  - o `animationend` de um filho encerrava a saída antes da hora;
+  - fora da `.folha`, o ícone do aviso crescia com o padding.
+- **Ferramentas:**
+  - `capturas.mjs` abre cada janela pelas funções do jogo e captura um aviso sobre o diário aberto; saíram o `--kit` e os recortes `legado-*`;
+  - `desempenho.mjs` ganhou nove cenários e o aquecimento `janelas`;
+  - o `qa_ded` aceita `PORT`.
+- **Prova:**
+  - Testes: `journey_ded`, `qa_ded` e `qa_ded_task003` passaram. O `qa_ded` ganhou quatro casos, pelo teclado:
+    - o 9: o mapa abre pelo selo com o foco em "você está aqui", viaja com Tab e Espaço, fica parado na luta e não oferece a porta sem cena;
+    - o 10: a loja explica o ouro que falta, compra e grava; a especialização resiste a quatro Escapes e sai pelo teclado;
+    - o 11: o diário mostra só as missões descobertas, o progresso e os créditos;
+    - o 12: a janela do fim (um Enter logo depois não recomeça), o cancelamento por uma cena nova, os avisos do mercador e da mochila (um só por leva), a barreira e a crônica em palavras. Nenhum diálogo nativo abre nos quatro.
+  - O `qa_ded_task003` teve o teste do mapa reescrito para a janela nova.
+  - Capturas contra a Fase 3 (`f3-r10`): a exploração, o d20, o combate e as telas do protótipo ficaram iguais, salvo o ruído de borda dos SVGs (§7). Mudou a linha de créditos da seleção, com os autores novos. As janelas foram revistas nas capturas, em 1080p e em 1366×768.
+  - Desempenho, bateria final no commit `d04cdd6` (árvore limpa), CPU 1x, 144 Hz, aquecimento `janelas`, 10 execuções por cenário:
+    - movimento padrão (`f4-final`, 200 execuções e 30 primeiros cliques): **APROVADO**, nos 21 cenários. As janelas ficaram no máximo em 3 vsyncs, e quase tudo em 2: mapa 14,3 ms, viagem 20,9, loja 14,1, compra 14,0, diário 14,1, especialização 14,0, fim 20,8, aviso 14,0 e barreira 13,9. Os cenários das fases anteriores seguem dentro do limite. Dois quadros da derrota caíram na limpeza da GPU e ficaram fora do veredito.
+    - movimento reduzido (`f4-reduzido`): **REPROVADO por 9 quadros**:
+      - três "Começar" (27,6 a 34,7 ms);
+      - quatro das lutas: entrada, golpe do inimigo e fuga (27,5 a 27,8 ms);
+      - um no mapa (27,9), um na loja (34,8) e um no fim (27,8).
+    - Nesta bateria, o p95 de todos os cenários do reduzido subiu de 7,3 para 13,8 ms, inclusive o do aviso. Um controle no mesmo dia, intercalado e com 5 execuções, mostrou o código da Fase 3 (`e89cf81`) com o mesmo p95 de 13,8 ms e os mesmos picos no "Começar" (34,7 contra 41,6 ms): é o ambiente. As pendências do reduzido no §7 (o golpe do inimigo e o "Começar") seguem valendo.
+    - O reduzido refeito só com as janelas (`f4-reduzido-janelas`, 90 execuções): o mapa, a loja e o fim ficaram em 0 de 10 cada. Sobrou um quadro de 27,7 ms num aviso (1 de 10).
+  - CPU 4x (informativo): a abertura das janelas tem um quadro de 55 a 118 ms (mapa 118, loja 104, especialização 97, fim 69, diário 55). A viagem pelo mapa, a compra, o aviso e a barreira ficam entre 21 e 70 ms. O resto segue como no §7.
+- **Juiz:** a 1ª rodada está em andamento.

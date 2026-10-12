@@ -16,32 +16,38 @@ O jogo está estruturado com base nos seguintes arquivos:
   Uma cena sem arte própria mantém a do vitral. Arte nova entra aqui, conferida no recorte do vitral.
 - **`index_new.html` / `d3.html`**: Versões experimentais/alternativas que testam mecânicas e interfaces adicionais do ecossistema do jogo.
 
-### 🎨 Interface "Ficha Iluminada" (em migração, `TASKS/TASK_001.md`)
+### 🎨 Interface "Ficha Iluminada" (`TASKS/TASK_001.md`)
 
-A interface está sendo trocada por fases. O plano, as fases e as regras de performance estão em `TASKS/TASK_001.md`.
+A interface foi trocada por fases. O plano, as fases e as regras de performance estão em `TASKS/TASK_001.md`.
 
-- **`css/legado.css`**: a interface antiga das telas que ainda não migraram (loja, especialização, diário e mapa), em `px` para a escala do kit não afetá-las. A seleção, a exploração e o d20 migraram na Fase 2, e o combate na Fase 3; as outras telas saem na Fase 4.
-  - O legado vem **antes** do kit no `<head>`.
-  - Nos dois sentidos, nada pode vazar.
-    - O reset do kit (`base.css`) vale só dentro da `.folha`, com especificidade zero (`:where`). O fundo escuro fica no `body.ficha`.
-    - O `body` legado só define a fonte, o `font-size: 16px` e a cor que as telas antigas herdam. A `.folha` reancora em `1rem`, então a escala do `html` do kit não chega ao texto legado.
-    - As telas legadas ficam **fora** da `.folha`.
-    - Os seletores genéricos que sobraram são restritos com `:where()`, que não muda a especificidade:
-      - `button` vale só fora da `.folha`;
-      - `.hidden` (`display: none`) vale em tudo, menos nos filhos de `.acoes`.
-- **`css/` do kit novo**, nesta ordem de carga:
+- **Sem telas legadas desde a Fase 4.** O `legado.css` e as fontes do Google saíram. Tudo o que aparece é uma `.folha` (as duas telas e, por dentro, cada janela) ou uma peça do kit com fonte e cor próprias (avisos e efeitos de tela).
+  - O reset do kit (`base.css`) vale só dentro da `.folha`, com especificidade zero (`:where`). O fundo escuro fica no `body.ficha`.
+  - `.hidden` (`display: none`, no `base.css`) vale em tudo, menos nos filhos de `.acoes`.
+- **`css/` do kit**, nesta ordem de carga:
   - `fontes.css`: `@font-face` das fontes do projeto;
   - `tokens.css`: cores, tipografia e camadas (`--z-*`);
   - `base.css`: escala da tela em `rem`, o reset (só dentro da `.folha`), o fundo do `body.ficha` e utilitários;
   - `componentes.css`: as peças e o comportamento responsivo delas (folha, painel com fita, emblemas, medalhões, slots, escolhas, ações, bandeja do d20, selos de cera, crônica, card de inimigo, efeitos em jogo, ações de combate, clarão vermelho e números flutuantes);
   - `selecao.css`: só o arranjo da seleção de personagem, sob `.tela-selecao`;
   - `exploracao.css`: só o arranjo da tela de exploração (e do combate, que é um estado dela), com tudo sob `.tela-exploracao`;
+  - `janelas.css`: o miolo de cada janela (loja, especialização, diário, mapa e fim), sob o id dela, com a largura em `--largura-janela`;
   - `ui/ornamentos/vitral-recorte.css`: o recorte em arco da cena, gerado.
 - **Telas:** cada tela é uma `.folha` com a classe dela: `#character-select.tela-selecao` e `#game-screen.tela-exploracao`. `mostrarTela()` alterna as duas.
   - A seleção some com `.hidden`.
   - A exploração, fora de vista, fica em `.tela-em-espera`: montada e invisível, com o layout pronto para o "Começar".
-  - Overlays e toasts ficam **fora** da `.folha`, nas camadas `--z-overlay`, `--z-toast` e `--z-efeito`.
-  - A `.folha` isola as próprias camadas, para não disputar com esses overlays.
+  - Janelas, avisos e efeitos de tela ficam **fora** da `.folha`. As janelas e os avisos vão para a camada de cima da página (top layer); os efeitos usam `--z-efeito`.
+  - A `.folha` isola as próprias camadas, para não disputar com o que fica fora dela.
+- **Janelas (Fase 4):** loja, especialização, diário, mapa e fim da aventura são `<dialog class="janela" id="…">` com uma `.folha.janela-folha` dentro (fita rubra no título, medalhão `.janela-fechar`, `.janela-corpo` que rola, `.janela-rodape`, `.janela-secao` e a `.janela-status`, com `role="status"`).
+  - `abrirJanela(id, { obrigatoria })` abre com `showModal()`: o foco entra (no `autofocus`, se houver), o resto da página fica inerte e, ao fechar, o foco volta sozinho para quem o tinha antes. `fecharJanela(id)` fecha com a animação de saída; reaberta no meio dela, a janela fica.
+  - Fecham a janela: Escape, o medalhão, um `[data-fechar-janela]` e um clique no fundo. A obrigatória (a especialização) só fecha pela escolha; como o Chrome fecha um modal à força no terceiro Escape seguido, ela reabre no evento `close` enquanto não houver escolha.
+  - Só uma janela fica aberta por vez. `loadScene` e `startInteractiveCombat` fecham as que não são obrigatórias. Com uma janela aberta, `body.com-janela` para a chama do vitral.
+  - Com uma janela aberta, o resto da página fica inerte também para o leitor de tela: o retorno de uma ação feita na janela (comprar, um lugar selado) vai para a `.janela-status` dela.
+  - **Mapa (`#mapa`)**: o selo alterna a janela (`aria-expanded` acompanha). Os caminhos são um SVG só de traços, e os lugares, botões posicionados por porcentagem (`.mapa-no[data-no][data-estado]`), montados uma vez e atualizados só no que muda (`atualizarMapa`; `renderMinimap` não faz nada com o mapa fechado). Só um vizinho ainda não visitado e com cena leva a algum lugar; um vizinho selado continua clicável e diz por quê. O mapa fica parado (`aria-disabled` e o motivo em `#mapa-status`) na luta, durante o d20 e o avanço depois dele (`dadoEmJogo`), com a especialização pendente e nos finais.
+  - **Loja (`#loja`)**: `abrirLoja()`, chamada pelo `scenes.json`, abre a janela um quadro depois da cena. As mercadorias vêm de `MERCADORIAS`; sem ouro ou com a mochila cheia, a linha fica `.indisponivel`, continua clicável e explica o motivo em `#loja-status`. Uma compra grava o save.
+  - **Especialização (`#especializacao`)**: `openSpecializationModal()` abre dois quadros depois do pedido e, com uma luta aberta, espera ela fechar (`abrirEspecializacaoPendente`, chamada por `closeCombatScreen`). Aberta ou pendente, não remonta nem toca o som de novo. `chooseSpecialization(nome)` escolhe e fecha. Um save do nível 3 sem especialização volta com a janela.
+  - **Diário (`#diario`)**: `renderQuestJournal()` só remonta com o diário aberto. Lista as missões em andamento e as concluídas (as inativas não aparecem), com o progresso que os dados guardam (alavancas, runas) e os créditos dos ícones no rodapé.
+  - **Fim (`#fim`)**: um final de `CENAS_FINAIS` abre a janela ~1,2 s depois de o texto terminar (`agendarFim`; nunca no meio de uma luta, e depois de uma janela obrigatória). Uma cena nova cancela (`cancelarFim`). `FINAIS` tem o título e a mensagem de cada final, e o resumo sai do `gameState`. O "Começar uma nova aventura" da cena continua lá.
+- **Avisos (Fase 4):** `avisar(texto, { tom, icone, duracao })` substitui o `alert()`: duas peças fixas reusadas no popover `#avisos` (acima de uma janela aberta), e o texto também em `#avisos-leitor` (`aria-live`). `avisarSemRepetir` não repete um aviso igual que ainda está na tela (a mochila cheia de três itens seguidos dá um aviso só).
 - **Escolhas e d20:** `#choices` e `#dice-container` dividem a mesma célula de `.acoes`.
   - O jogo e os testes ainda os alternam com `.hidden`, que ali só deixa invisível. A altura não muda, e as camadas do resultado (selos de cera, brilho e d20 apagado) ficam pintadas com `opacity: .01`.
   - Nenhum outro filho direto de `.acoes` pode usar `.hidden` esperando `display: none`.
@@ -58,7 +64,7 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - O "Voltar" de um submenu devolve o foco à ação que o abriu.
   - No fim da luta (vitória, derrota ou fuga), `mostrarDesfecho()` carimba o selo e troca as ações por um "Continuar" (`#btn-combat-continuar`), que fecha a luta e carrega a cena seguinte. Quem estava no painel pelo teclado fica nele e, depois, na primeira escolha da cena. Sem clique, a luta fecha sozinha em 2,2 s (2 s na derrota, 1,8 s na fuga).
   - O relato (`addCombatLog`) segue a crônica: ícone e tom pelo emoji do começo (`RELATO_ICONES`), sem emojis no texto, e o resultado do d20 carimba o selo da bandeja.
-  - Efeitos: clarão vermelho (`#red-flash`), brilho de impacto (`.impacto`), tremor e números flutuantes, todos com Web Animations em `opacity` e `transform`. Os números flutuantes são quatro peças fixas em `#floater-layer` e uma na vida do herói, reusadas por `spawnFloater()`; não crie nem remova elementos para eles.
+  - Efeitos: clarão vermelho (`#red-flash`), brilho de impacto (`.impacto`), tremor e números flutuantes, todos com Web Animations em `opacity` e `transform`. A barreira mágica tem o clarão dela (`#clarao-barreira`, em verdete e ouro), do mesmo jeito. Os números flutuantes são quatro peças fixas em `#floater-layer` e uma na vida do herói, reusadas por `spawnFloater()`; não crie nem remova elementos para eles.
   - Durante a luta, `body.em-combate` (de `mostrarCombate()`) dá camada própria ao que treme, brilha ou desliza a cada golpe; fora dela, a ficha não carrega essas camadas. Seletores ligados a essa classe terminam em classe, nunca em tag.
   - Aquecimento da GPU: a peça `.aquecer-gpu` tem o desenho do preenchimento da barra em combate (retângulo arredondado com gradiente, numa camada própria), o único que só o combate faz. Ela nasce no HTML, a 1% num canto à vista, entra na primeira pintura da abertura e sai dois quadros depois (`encerrarAquecimento`). Sem ela, a primeira luta de uma sessão longa esperava ~40 ms o Chrome compilar o pipeline. A peça e o preenchimento dividem a mesma regra de gradiente, e a barra do inimigo mantém o mesmo número de paradas. Não a mude de momento sem medir o "Começar": criada meio segundo depois da abertura, ela o deixava em 3 vsyncs. Não dê camada permanente ao preenchimento: ela muda a rasterização do texto da exploração em 1366×768. Se outra peça do combate passar a usar um desenho novo, aqueça-o junto.
   - A volta do combate para a cena (`fechar` em `mostrarDesfecho`) deixa a narrativa nova invisível no primeiro quadro e a mostra no seguinte (`esconderNarrativaUmQuadro`): a crônica e a narrativa rasterizadas de novo não cabiam num quadro só. O foco espera a narrativa aparecer (`focarNoQuadro` tenta de novo).
@@ -71,7 +77,9 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - os atributos: `#val-*` e `#mod-*`. O modificador sai como `+3` e `−1`;
   - o combate: `#combat-screen` (alternado com `.hidden`), `#combat-enemy-name`, `#combat-enemy-ac`, `#combat-actions-panel` e os botões `#btn-combat-attack`, `#btn-combat-spell` (sempre presente: leva a habilidade da classe ou as da especialização, e só fica oculto sem classe, nos testes), `#btn-combat-item` e `#btn-combat-flee`;
   - o equipamento: `.inventory-slots-grid .inventory-slot-box`, com `.occupied`, `.usable`, `.disabled` e `.item-name`. O ícone fica em `.item-icone use` (`href` com `#i-*` do sprite) e a descrição no `title` do slot;
-  - os globais que as ferramentas usam: `scenes`, `gameState`, `skipTyping`, `ttsEnabled`, `selectCharacter`, `startGame`, `loadScene`, `startInteractiveCombat`, `closeCombatScreen` e `openSpecializationModal`.
+  - as janelas: `#mapa` (e o selo `#btn-toggle-map`, que a alterna), `.mapa-no[data-no][data-estado]` e `#mapa-status`; `#loja`, `#loja-mercadorias` e `#loja-status`; `#especializacao` e `[data-especializacao]`; `#diario` (e o selo `#quest-journal-button`); `#fim`, `#fim-titulo` e `#fim-recomecar`; o fechar de todas, `.janela-fechar`; os avisos, `#avisos .aviso`;
+  - os globais que o `scenes.json` chama (pelo nome, no escopo global): `abrirLoja`, `renderQuestJournal`, `activateQuest`, `decodeRune`, `toggleLever`, `avisar`, `spawnFloater`, `changeMusic` e os de estado (`gameState`, `changeXP`, `changeGold`, `changeHealth`, `addToInventory` etc.);
+  - os globais que as ferramentas usam: `scenes`, `gameState`, `skipTyping`, `ttsEnabled`, `selectCharacter`, `startGame`, `loadScene`, `startInteractiveCombat`, `closeCombatScreen`, `openSpecializationModal`, `chooseSpecialization`, `SPECIALIZATIONS`, `changeXP`, `abrirLoja`, `abrirJanela`, `fecharJanela`, `abrirFim`, `cancelarFim`, `avisar`, `teleportToNode` e `renderMinimap`.
 
   No kit, o d20 vale só para `.bandeja-mesa > .dice`.
 - **`ui/`**: as artes da interface.
@@ -85,10 +93,10 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
   - `componentes.html` é o catálogo do kit: cada peça e as variantes que o jogo usa.
 - **Prova visual:** `node ded/tools/capturas.mjs capturar <pasta>` gera capturas determinísticas do jogo, do protótipo e do catálogo. `node ded/tools/capturas.mjs comparar <antes> <depois>` compara pixel a pixel. Use os dois em toda mudança de CSS: capture antes, mude, capture depois e compare.
   - Uma referência boa sai de um worktree no commit anterior, com `--raiz <worktree>`.
-  - As telas legadas também saem recortadas em `legado-*.png`, só o overlay.
-    - Compare-as com uma referência de antes da migração capturada com `--kit` (o kit injetado depois do legado): `comparar <ref> <nova> --so legado`.
-    - `--tolerancia N` ignora diferenças de até N por canal. Serve, por exemplo, para o fundo translúcido da especialização.
-- **Desempenho:** `node ded/tools/desempenho.mjs` mede o tempo dos quadros no Chrome com GPU. Cobre a digitação, o teste de d20, os críticos, uma rodada de combate, a vitória e o aceite do primeiro clique, repetido 30 vezes. Rode depois de mexer em animação, bandeja, combate ou vitral.
+  - As janelas saem abertas pelas funções do jogo (`jogo-mapa`, `-loja`, `-especializacao`, `-diario`, `-fim-morte`, `-fim-vitoria`) e um aviso sobre o diário aberto (`jogo-aviso`), em 1080p e 1366×768.
+  - `--tolerancia N` ignora diferenças de até N por canal. A borda de alguns SVGs varia até ~31 entre duas capturas iguais (TASK_001 §7).
+- **Desempenho:** `node ded/tools/desempenho.mjs` mede o tempo dos quadros no Chrome com GPU. Cobre a digitação, o teste de d20, os críticos, o combate (entrada, rodada, vitória, derrota e fuga), as janelas (abrir e fechar, viajar pelo mapa, comprar, escolher a especialização, o fim), os avisos, a barreira e o aceite do primeiro clique, repetido 30 vezes. Rode depois de mexer em animação, bandeja, combate, vitral ou janelas.
+  - A aba de aquecimento passa uma vez por cada janela antes de medir (`--aquecimento janelas`, o padrão): o primeiro desenho de cada coisa nova numa sessão do Chrome compila pipelines da GPU (30 a 50 ms cada), um custo de primeira vez registrado à parte no §7 da TASK_001.
   - Um quadro que cai na limpeza ociosa da GPU do Chrome (uns 30 a 70 ms, cerca de 1 s depois de a página parar de rasterizar) sai listado à parte e fora do veredito, com a prova no rastreio. Ver o cabeçalho do script e o §6 da TASK_001.
   - As duas ferramentas forçam o movimento padrão. Com as animações do Windows desligadas, o Chrome pede movimento reduzido e o jogo pula justamente a animação.
   - Dentro da janela medida, a ferramenta não pode ler layout.
@@ -114,7 +122,7 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
 
 ## 🧩 Padrões de Projeto Aplicados
 
-- **Event-Driven (Programação Dirigida a Eventos)**: Toda a jogabilidade progride em resposta a eventos gerados pelas interações com botões de escolhas dinâmicas criados pela função `loadScene`, além de cliques no dado 20 faces virtual (`#dice-button`) e no modal de compras (`#shop-modal`).
+- **Event-Driven (Programação Dirigida a Eventos)**: Toda a jogabilidade progride em resposta a eventos gerados pelas interações com botões de escolhas dinâmicas criados pela função `loadScene`, além de cliques no dado 20 faces virtual (`#dice-button`) e nas janelas (a loja, `#loja`).
 - **State Pattern (Padrão Estado)**: O objeto global `gameState` funciona como a única fonte da verdade do estado da partida. Ele controla a cena atual (`currentScene`), a vida do jogador (`player.health`), moedas de ouro (`player.gold`), nível de experiência (`player.xp`), inventário (`player.inventory`), atributos dinâmicos do jogador (`player.stats`), a memória lógica (`mem`) e o adversário atual no combate (`currentEnemy`).
 - **Typewriter Effect (Efeito Máquina de Escrever)**: A exibição do texto ocorre gradualmente através da função `typewriterEffect` para aumentar a imersão na leitura.
   - O texto entra montado, com uma `<span>` por palavra, e cada palavra só ganha opacidade na sua vez. Nada reflui e as escolhas não andam.
@@ -142,5 +150,5 @@ A interface está sendo trocada por fases. O plano, as fases e as regras de perf
 - `updateInventoryDisplay()`: monta os seis espaços do equipamento.
 - `addToLog(message)`: escreve na crônica.
   - O ícone vem do emoji do começo da mensagem (`CRONICA_TIPOS`).
-  - Os emojis saem do texto, e só `<strong>` é aceito.
+  - Os emojis saem do texto, e só `<strong>` é aceito. Uma linha só de emojis vira palavras (`emojisPorExtenso`), e uma linha vazia não entra.
 - `speakText(text)` / `stopSpeech()`: Controla a síntese de fala baseada no navegador, filtrando vozes de fala em português do Brasil e evitando sobreposição de áudio.
