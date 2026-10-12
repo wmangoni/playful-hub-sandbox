@@ -1336,6 +1336,17 @@
                 requestAnimationFrame(() => requestAnimationFrame(funcao));
             }
 
+            // Quando muita coisa chega à tela de uma vez (a arte nova e o texto inteiro,
+            // ou a crônica de volta depois da luta), a narrativa fica invisível no
+            // primeiro quadro, já no lugar e sem mexer no resto, e aparece no seguinte:
+            // o trabalho da GPU se divide em dois quadros. O foco espera ela aparecer
+            // (focarNoQuadro).
+            function esconderNarrativaUmQuadro() {
+                const narrativa = document.getElementById('narrativa');
+                narrativa.style.visibility = 'hidden';
+                depoisDoProximoQuadro(() => { narrativa.style.visibility = ''; });
+            }
+
             // Aquecimento da GPU: a peça .aquecer-gpu (ver o CSS) entra na primeira
             // pintura da abertura e sai dois quadros depois, com o resto da pintura a
             // frio, longe do "Começar".
@@ -1417,6 +1428,8 @@
                 const focoNasAcoes = !!(ativo && ativo.closest && ativo.closest('.acoes')) || focarEscolhasDepoisDoCombate;
                 focarEscolhasDepoisDoCombate = false;
 
+                // Sem a máquina de escrever, o texto inteiro chegaria no quadro da arte nova
+                if (movimentoReduzido()) esconderNarrativaUmQuadro();
                 changeImage(sceneName);
 
                 gameState.currentScene = sceneName;
@@ -2468,18 +2481,14 @@
                 const tinhaFoco = !!(ativo && ativo.closest && ativo.closest('#combat-screen'));
                 let fechado = false, automatico = null;
                 // A volta para a cena rasteriza de novo a crônica (fora da tela durante a
-                // luta) e a narrativa nova: a narrativa fica invisível no primeiro quadro
-                // (já no lugar, sem mexer no resto) e aparece no seguinte, para o trabalho
-                // da GPU caber em dois quadros.
+                // luta) e a narrativa nova: a narrativa aparece um quadro depois.
                 const fechar = () => {
                     if (fechado || !gameState.combat.active) return; // já fechou (ou uma cena nova fechou)
                     fechado = true;
                     if (automatico) clearTimeout(automatico);
-                    const narrativa = document.getElementById('narrativa');
-                    narrativa.style.visibility = 'hidden';
+                    esconderNarrativaUmQuadro();
                     closeCombatScreen();
                     seguir();
-                    depoisDoProximoQuadro(() => { narrativa.style.visibility = ''; });
                 };
                 montarAcoes([botaoCombate({ id: 'btn-combat-continuar', icone: ICONE_DO_DESFECHO[desfecho], nome: 'Continuar', detalhe, aoClicar: fechar, livre: true })]);
                 if (tinhaFoco) focarNoQuadro(() => document.getElementById('btn-combat-continuar'));
