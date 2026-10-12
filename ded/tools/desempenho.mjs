@@ -19,7 +19,7 @@
 //
 // Em CPU 1x, cada cenário roda --repeticoes vezes (10), cada vez numa aba nova; o primeiro clique
 // roda --execucoes vezes (30) e a abertura, uma. Em CPU 4x, que só informa, cada um roda uma vez.
-// Entre uma aba e a seguinte, a ferramenta espera 1,5 s o Chrome desmontar a fechada (fecharAba).
+// Depois de carregar cada aba, a ferramenta espera 1,5 s antes de jogar (ASSENTAR_MS).
 //
 // Cenários (todos em CPU 1x; os marcados com * repetem em 4x):
 //   abertura          da carga da página até a seleção parada (2 s depois das fontes). Só informa:
@@ -185,15 +185,12 @@ const MIME = {
     '.json': 'application/json', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg'
 };
 const espera = ms => new Promise(r => setTimeout(r, ms));
-// Fecha a aba e espera o Chrome desmontá-la antes da próxima. As abas do jogo dividem o mesmo
-// processo, e o desmonte de uma aba fechada (WidgetBase::Shutdown, 15 a 30 ms na thread principal,
-// com o compositor parado e uma tarefa na GPU) roda ~1 s depois do fechamento: caía no meio da
-// medição da aba seguinte, por volta de +350 ms (TASK_001 §6).
-const DESMONTE_MS = 1500;
-async function fecharAba(page) {
-    await page.close().catch(() => {});
-    await espera(DESMONTE_MS);
-}
+// A aba nova assenta antes da ação. Cerca de 1 s depois da carga, o Chrome roda na thread principal
+// um desmonte (WidgetBase::Shutdown e ProxyMain::Stop, de 4 a 28 ms, mais uma tarefa na GPU),
+// provavelmente o do documento inicial da aba, trocado pela navegação. Sem a espera, ele caía no
+// meio da medição do d20 e do primeiro clique, por volta de +340 ms, em 24 de 25 execuções; com
+// ela, em 0 de 25. Um jogador leva mais que isso para escolher a classe (TASK_001 §6).
+const ASSENTAR_MS = 1500;
 const passou = d => d > LIMITE_MS + FOLGA_MS;
 const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
 let RASTREAR = true; // --sem-rastreio desliga
@@ -368,6 +365,7 @@ async function abrirJogo(browser, base, cpu, reg, autoIniciar = false) {
     }
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => { ttsEnabled = false; });
+    if (!autoIniciar) await espera(ASSENTAR_MS); // a abertura mede justamente a carga
     return page;
 }
 
@@ -542,7 +540,7 @@ async function cenarioAbertura(browser, base, cpu, reg) {
     try {
         await espera(2000);
         reg.execucoes.push(await page.evaluate(() => window.__desempenho.parar()));
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 async function cenarioExploracao(browser, base, cpu, reg) {
@@ -560,7 +558,7 @@ async function cenarioExploracao(browser, base, cpu, reg) {
         }, 3000));
         if (r.cena !== 'start') reg.avisos.push(`startGame() deixou o jogo em "${r.cena}", não em "start"`);
         reg.execucoes.push(r);
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 async function cenarioTextoLongo(browser, base, cpu, reg) {
@@ -584,7 +582,7 @@ async function cenarioTextoLongo(browser, base, cpu, reg) {
         }, { id: alvo.id, janela: 4000 }));
         if (r.cena !== alvo.id) throw new Error(`loadScene('${alvo.id}') não entrou na cena (ficou em "${r.cena}")`);
         reg.execucoes.push(r);
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 // teste-d20, critico-20, critico-1 e cada rodada do primeiro-clique.
@@ -602,7 +600,7 @@ async function cenarioDado(browser, base, cpu, reg, forcar, janela) {
         if (janela >= 3400 && r.cena === r.cenaAntes) reg.avisos.push(`a cena não saiu de "${r.cenaAntes}" sozinha depois do dado (há um "Continuar"?)`);
         reg.execucoes.push(r);
         return r;
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 // combate-entrada: na sala do Goblin, a escolha de lutar, o d20 e o "Enfrentar", que é clicado
@@ -628,7 +626,7 @@ async function cenarioEntrada(browser, base, cpu, reg) {
         if (!r.combate.ativo) reg.avisos.push('o "Enfrentar" não abriu o combate');
         reg.execucoes.push(r);
         return r;
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 // As janelas e os avisos: jogo novo de guerreiro na entrada; o mapa ou a loja já abertos, quando o
@@ -665,7 +663,7 @@ async function cenarioJanela(browser, base, cpu, reg, cenario, { preparo, janela
         if (confere && !confere()) reg.avisos.push(`${cenario}: o estado depois não é o esperado (${r.cenaAntes} → ${r.cena}, ${r.resultado})`);
         reg.execucoes.push(r);
         return r;
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 // combate, vitória, derrota e fuga: jogo novo de guerreiro, o Goblin, 800 ms com o combate
@@ -704,7 +702,7 @@ async function cenarioCombate(browser, base, cpu, reg, { tipo, acao, jogador, in
         }
         reg.execucoes.push(r);
         return r;
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 // Joga uma vez (o 20 natural, o caminho com mais arte) para aquecer a GPU, os
@@ -760,7 +758,7 @@ async function aquecer(browser, base, modo) {
         const normais = r.quadros.filter(d => d > mediana / 2 && d < mediana * 1.5);
         const intervalo = normais.reduce((a, b) => a + b, 0) / normais.length;
         return { intervalo, mediana, loafSuportado: r.loafSuportado, avisos: reg.avisos };
-    } finally { await fecharAba(page); }
+    } finally { await page.close().catch(() => {}); }
 }
 
 // ---------------------------------------------------------------------------
