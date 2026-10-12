@@ -152,7 +152,7 @@
                 <h1 class="titulo">A Masmorra de Drakmor</h1>
 
                 <nav class="selos" aria-label="Menu da aventura">
-                    <button class="selo" id="btn-toggle-map" type="button" aria-expanded="false" aria-controls="minimap-container"><svg aria-hidden="true"><use href="ui/icones.svg#i-mapa"/></svg><span>Mapa</span></button>
+                    <button class="selo" id="btn-toggle-map" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mapa"><svg aria-hidden="true"><use href="ui/icones.svg#i-mapa"/></svg><span>Mapa</span></button>
                     <button class="selo" id="quest-journal-button" type="button"><svg aria-hidden="true"><use href="ui/icones.svg#i-diario"/></svg><span>Diário</span></button>
                     <button class="selo" id="tts-toggle-button" type="button" aria-pressed="true"><svg aria-hidden="true"><use href="ui/icones.svg#i-narrador"/></svg><span>Narrador</span></button>
                     <button class="selo" type="button" data-musica aria-pressed="false"><svg aria-hidden="true"><use href="ui/icones.svg#i-musica"/></svg><span>Música</span></button>
@@ -334,13 +334,31 @@
 
         <!-- ============ Telas legadas (fora da .folha até migrarem) ============ -->
 
-        <!-- Mapa da masmorra (Fase 4): painel antigo, aberto pelo selo "Mapa" -->
-        <div id="minimap-container" class="hidden minimap-panel" role="region" aria-label="Mapa da masmorra">
-            <div id="minimap-view" class="minimap-view"></div>
-            <div style="text-align: center; font-size: 12px; color: #887766; margin-top: 5px;">
-                * Clique nos nós azuis adjacentes para navegar diretamente *
+        <!-- Mapa da masmorra: janela aberta pelo selo "Mapa". Os caminhos (SVG) e os
+             lugares (botões) são montados na primeira abertura (atualizarMapa) -->
+        <dialog id="mapa" class="janela" aria-labelledby="mapa-titulo">
+            <div class="folha janela-folha">
+                <h2 class="fita fita-rubra" id="mapa-titulo">Mapa da masmorra</h2>
+                <button class="janela-fechar" type="button" aria-label="Fechar"><svg aria-hidden="true"><use href="ui/icones.svg#i-fechar"/></svg></button>
+                <!-- o que fazer, ou por que o mapa não leva a lugar nenhum agora -->
+                <p class="janela-status" id="mapa-status" role="status">Escolha um lugar vizinho ainda não visitado para ir até ele.</p>
+                <div class="janela-corpo">
+                    <div class="mapa-carta" id="mapa-carta">
+                        <svg class="mapa-caminhos" id="mapa-caminhos" aria-hidden="true"></svg>
+                        <div class="mapa-nos" id="mapa-nos" role="group" aria-label="Lugares da masmorra"></div>
+                    </div>
+                </div>
+                <div class="janela-rodape">
+                    <ul class="mapa-legenda" aria-label="Legenda">
+                        <li data-estado="atual"><span class="mapa-medalhao"><svg aria-hidden="true"><use href="ui/icones.svg#i-pegadas"/></svg></span>Você está aqui</li>
+                        <li data-estado="visitado"><span class="mapa-medalhao"></span>Visitado</li>
+                        <li data-estado="pode-ir"><span class="mapa-medalhao"></span>Pode ir</li>
+                        <li data-estado="selado"><span class="mapa-medalhao"><svg aria-hidden="true"><use href="ui/icones.svg#i-cadeado"/></svg></span>Selado</li>
+                        <li><span class="mapa-alavanca" data-puxada="true"><svg aria-hidden="true"><use href="ui/icones.svg#i-alavanca"/></svg></span>Alavanca puxada</li>
+                    </ul>
+                </div>
             </div>
-        </div>
+        </dialog>
 
         <div id="shop-modal" class="modal hidden">
             <div class="modal-content">
@@ -1585,14 +1603,11 @@
                 // Reset check difficulty after scene load
                 gameState.checkDifficulty = 10;
 
-                // --- Integração do Minimapa na Mudança de Cena ---
+                // O lugar da cena fica marcado como visitado no mapa (a janela do mapa já
+                // fechou lá em cima, com as outras)
                 const nodeId = SCENE_TO_NODE[sceneName];
                 if (nodeId && !gameState.visitedNodes.includes(nodeId)) {
                     gameState.visitedNodes.push(nodeId);
-                }
-                const mapContainer = document.getElementById('minimap-container');
-                if (mapContainer && !mapContainer.classList.contains('hidden')) {
-                    renderMinimap();
                 }
 
                 updateStatsDisplay();
@@ -1947,6 +1962,8 @@
 
                 const ativo = document.activeElement;
                 const comFoco = !!(ativo && ativo.closest && ativo.closest('.folha'));
+                // a luta não começa embaixo de uma janela (o mapa aberto durante o "Enfrentar")
+                fecharJanelas();
                 mostrarCombate(true);
                 // escrita com o relato já à vista, para o leitor de tela anunciar
                 addCombatLog(`⚔️ O combate ${inimigo('com', false, true)} começou!`, 'info');
@@ -3042,149 +3059,208 @@
                 });
             });
 
-            // --- CONTROLE E NAVEGAÇÃO DO MINIMAPA ---
+            // --- MAPA DA MASMORRA ---
+            // Uma janela (<dialog id="mapa">) aberta pelo selo "Mapa". Os caminhos ficam
+            // num SVG só de traços; os lugares são botões por cima dele, posicionados em
+            // porcentagem, com o nome embaixo. A carta é montada uma vez, na primeira
+            // abertura; depois, cada abertura reescreve só o estado que mudou.
+
+            // Cada lugar abre a cena de mesmo nome. Um lugar sem cena (a "Porta Selada",
+            // que só se abre pelo teste na cripta) nunca é oferecido: carregá-lo
+            // quebrava o loadScene.
+            const NODE_TO_SCENE = Object.fromEntries(Object.keys(DUNGEON_MAP).map(id => [id, id]));
+            function cenaDoNo(nodeId) {
+                const cena = NODE_TO_SCENE[nodeId];
+                return cena && scenes[cena] ? cena : null;
+            }
+
+            // O d20 está rolando, ou o resultado espera na bandeja pelo "Continuar" (ou
+            // pelos 1,8 s): o temporizador do dado ainda vai carregar a cena seguinte (ou
+            // abrir a luta) e desfaria uma viagem feita agora
+            function dadoEmJogo() {
+                if (avancarDepoisDoDado) return true;
+                const bandeja = document.getElementById('dice-container');
+                const botao = document.getElementById('dice-button');
+                return !!(bandeja && botao) && !bandeja.classList.contains('hidden') && botao.getAttribute('aria-disabled') === 'true';
+            }
+
             function teleportToNode(nodeId) {
                 if (gameState.combat && gameState.combat.active) {
                     addCombatLog("⚠️ Não dá para fugir pelo mapa no meio do combate.", "info");
                     return;
                 }
-                if (gameState.isPaused) {
-                    return;
-                }
+                if (gameState.isPaused || dadoEmJogo()) return;
+                const targetScene = cenaDoNo(nodeId);
+                if (!targetScene) return;
                 if (isNodeLocked(nodeId)) {
                     triggerBarrierBlocked();
                     return;
                 }
-                const NODE_TO_SCENE = {
-                    "start": "start",
-                    "buy_supplies": "buy_supplies",
-                    "entrance_inspection": "entrance_inspection",
-                    "check_supplies": "check_supplies",
-                    "corridor": "corridor",
-                    "goblin_encounter": "goblin_encounter",
-                    "treasure_room": "treasure_room",
-                    "dark_chamber": "dark_chamber",
-                    "cavern": "cavern",
-                    "crypt": "crypt",
-                    "crypt_merchant": "crypt_merchant",
-                    "crypt_door": "crypt_door",
-                    "crypt_puzzle_entrance": "crypt_puzzle_entrance",
-                    "crypt_treasure_room": "crypt_treasure_room",
-                    "crypt_exit": "crypt_exit",
-                    "victory_partial": "victory_partial",
-                    "crystal_cave": "crystal_cave",
-                    "crystal_chamber": "crystal_chamber",
-                    "secret_passage": "secret_passage",
-                    "underground_lake": "underground_lake",
-                    "final_chamber_entrance": "final_chamber_entrance",
-                    "last_fight": "last_fight",
-                    "victory": "victory"
-                };
-                const targetScene = NODE_TO_SCENE[nodeId];
-                if (targetScene) {
-                    AudioEngine.init();
-                    loadScene(targetScene);
-                }
+                AudioEngine.init();
+                loadScene(targetScene);
             }
             window.teleportToNode = teleportToNode;
 
+            // A carta usa o x do DUNGEON_MAP (0 a 1150) e estica o y: com os 220 de
+            // altura do desenho original, os nomes embaixo dos lugares não cabiam
+            const CARTA = { largura: 1150, altura: 415, topo: 20, esticar: 2 };
+            const yDaCarta = no => (no.y - CARTA.topo) * CARTA.esticar;
+            const porcento = (valor, total) => `${(valor / total * 100).toFixed(3)}%`;
+            // Lugares com o nome em cima do medalhão: embaixo, ele batia no do vizinho
+            const NOME_EM_CIMA = new Set(['crypt_door', 'crypt_exit', 'last_fight']);
+
+            const ICONE_DO_LUGAR = { merchant: 'i-ouro', combat: 'i-combate', boss: 'i-espectro' };
+            const NOME_DO_ESTADO = { atual: 'você está aqui', visitado: 'visitado', 'pode-ir': 'pode ir', selado: 'selado', desconhecido: 'não visitado' };
+            const MAPA_INSTRUCAO = 'Escolha um lugar vizinho ainda não visitado para ir até ele.';
+
+            // O lugar do mapa onde o herói está. As cenas de passagem fora do mapa (as
+            // alavancas, as runas e a devolução do amuleto) voltam a um lugar só, e o mapa
+            // mostra esse lugar (antes mostrava a entrada). A morte não fica no mapa.
+            function noAtualDoMapa() {
+                const no = SCENE_TO_NODE[gameState.currentScene];
+                if (no) return DUNGEON_MAP[no] ? no : null;
+                const cena = scenes[gameState.currentScene];
+                const volta = cena && cena.choices ? cena.choices.map(c => SCENE_TO_NODE[c.nextScene]).find(n => DUNGEON_MAP[n]) : null;
+                return volta || null;
+            }
+
+            // Por que o mapa não leva a lugar nenhum agora ('' quando leva)
+            function motivoMapaParado() {
+                if (gameState.combat && gameState.combat.active) return 'Não dá para fugir pelo mapa no meio do combate.';
+                if (gameState.isPaused) return 'Escolha a sua especialização antes de seguir viagem.';
+                if (dadoEmJogo()) return 'Espere o d20: o resultado do teste leva você adiante.';
+                if (CENAS_FINAIS.has(gameState.currentScene)) return 'A aventura terminou: o mapa não leva a mais nenhum lugar.';
+                return '';
+            }
+
+            // Estado de um lugar visto de `atual`: 'atual', 'visitado', 'pode-ir' (vizinho
+            // ainda não visitado e com cena), 'selado' (atrás da barreira) ou
+            // 'desconhecido'. Um vizinho selado continua clicável: é a barreira que
+            // responde, com o retorno dela.
+            function estadoDoNo(nodeId, atual) {
+                if (nodeId === atual) return { estado: 'atual', clicavel: false };
+                const visitado = gameState.visitedNodes.includes(nodeId);
+                const vizinho = !!atual && DUNGEON_MAP[atual].connections.includes(nodeId);
+                const clicavel = vizinho && !visitado && !!cenaDoNo(nodeId);
+                if (visitado) return { estado: 'visitado', clicavel: false };
+                if (isNodeLocked(nodeId)) return { estado: 'selado', clicavel };
+                return { estado: clicavel ? 'pode-ir' : 'desconhecido', clicavel };
+            }
+
+            // Os caminhos e os botões dos lugares, uma vez só (sem estado: o estado é
+            // escrito por atualizarMapa)
+            let mapaMontado = false;
+            function montarMapa() {
+                const caminhos = document.getElementById('mapa-caminhos');
+                const lugares = document.getElementById('mapa-nos');
+                if (mapaMontado || !caminhos || !lugares) return;
+                mapaMontado = true;
+                document.getElementById('mapa-carta').style.aspectRatio = `${CARTA.largura} / ${CARTA.altura}`;
+                caminhos.setAttribute('viewBox', `0 0 ${CARTA.largura} ${CARTA.altura}`);
+                caminhos.setAttribute('preserveAspectRatio', 'none');
+                const feitos = new Set();
+                let linhas = '';
+                for (const id in DUNGEON_MAP) {
+                    const de = DUNGEON_MAP[id];
+                    for (const outro of de.connections) {
+                        const para = DUNGEON_MAP[outro];
+                        const par = [id, outro].sort().join(' ');
+                        if (!para || feitos.has(par)) continue;
+                        feitos.add(par);
+                        linhas += `<line data-de="${id}" data-para="${outro}" x1="${de.x}" y1="${yDaCarta(de)}" x2="${para.x}" y2="${yDaCarta(para)}"/>`;
+                    }
+                }
+                caminhos.innerHTML = linhas;
+                lugares.innerHTML = Object.values(DUNGEON_MAP).map(no =>
+                    `<button type="button" class="mapa-no${NOME_EM_CIMA.has(no.id) ? ' mapa-no-acima' : ''}" data-no="${no.id}" style="left: ${porcento(no.x, CARTA.largura)}; top: ${porcento(yDaCarta(no), CARTA.altura)}">` +
+                    '<span class="mapa-medalhao"><svg aria-hidden="true"><use/></svg></span>' +
+                    (LEVER_NODES[no.id] ? '<span class="mapa-alavanca"><svg aria-hidden="true"><use/></svg></span>' : '') +
+                    `<span class="mapa-no-nome">${escaparHtml(no.label)}</span></button>`).join('');
+            }
+
+            // Escreve o estado de cada lugar e caminho, e a linha de status (só o que mudou)
+            function atualizarMapa() {
+                montarMapa();
+                const lugares = document.getElementById('mapa-nos');
+                if (!lugares || !lugares.querySelectorAll) return;
+                const atual = noAtualDoMapa();
+                const motivo = motivoMapaParado();
+                const estados = {};
+                for (const id in DUNGEON_MAP) estados[id] = estadoDoNo(id, atual);
+
+                lugares.querySelectorAll('.mapa-no').forEach(botao => {
+                    const id = botao.dataset.no;
+                    const no = DUNGEON_MAP[id];
+                    const { estado, clicavel } = estados[id];
+                    const alavanca = LEVER_NODES[id];
+                    const puxada = !!(alavanca && gameState.levers[alavanca]);
+                    escreverAtributo(botao, 'data-estado', estado);
+                    escreverAtributo(botao, 'aria-disabled', String(!clicavel || !!motivo));
+                    escreverAtributo(botao, 'aria-label', `${no.label}, ${NOME_DO_ESTADO[estado]}` +
+                        (alavanca ? (puxada ? ', alavanca puxada' : ', alavanca por puxar') : ''));
+                    // o foco abre no lugar onde o herói está
+                    botao.toggleAttribute('autofocus', estado === 'atual');
+                    if (estado === 'atual') escreverAtributo(botao, 'aria-current', 'location');
+                    else if (botao.hasAttribute('aria-current')) botao.removeAttribute('aria-current');
+                    const icone = estado === 'atual' ? 'i-pegadas' : estado === 'selado' ? 'i-cadeado' : ICONE_DO_LUGAR[no.type] || '';
+                    const medalhao = botao.querySelector('.mapa-medalhao');
+                    escreverAtributo(medalhao, 'data-icone', icone);
+                    if (icone) escreverAtributo(medalhao.querySelector('use'), 'href', hrefIcone(icone));
+                    if (alavanca) {
+                        const peca = botao.querySelector('.mapa-alavanca');
+                        escreverAtributo(peca, 'data-puxada', String(puxada));
+                        escreverAtributo(peca.querySelector('use'), 'href', hrefIcone('i-alavanca'));
+                    }
+                });
+
+                // Caminhos: percorrido (as duas pontas visitadas), aberto (daqui até um
+                // lugar aonde dá para ir agora) e desconhecido
+                const visitado = id => gameState.visitedNodes.includes(id);
+                const aberto = (de, para) => !motivo && de === atual && estados[para].estado === 'pode-ir';
+                document.querySelectorAll('#mapa-caminhos line').forEach(linha => {
+                    const de = linha.getAttribute('data-de');
+                    const para = linha.getAttribute('data-para');
+                    const tipo = visitado(de) && visitado(para) ? 'percorrido'
+                        : aberto(de, para) || aberto(para, de) ? 'aberto' : 'desconhecido';
+                    escreverAtributo(linha, 'class', `caminho-${tipo}`);
+                });
+
+                escreverAtributo(document.getElementById('mapa-carta'), 'data-parado', String(!!motivo));
+                const algumLugar = Object.values(estados).some(e => e.clicavel);
+                escreverStatusDoMapa(motivo || (algumLugar ? MAPA_INSTRUCAO : 'Daqui, o mapa não leva a nenhum lugar novo.'), motivo ? 'falha' : '');
+            }
+
+            function escreverStatusDoMapa(texto, tom = '') {
+                const status = document.getElementById('mapa-status');
+                escreverTexto(status, texto);
+                escreverAtributo(status, 'data-tom', tom);
+            }
+
+            // Redesenha o mapa se a janela está aberta (o toggleLever chama ao puxar uma
+            // alavanca). Fechada, não faz nada: o mapa se atualiza ao abrir.
             function renderMinimap() {
-                const viewEl = document.getElementById('minimap-view');
-                if (!viewEl) return;
-                
-                const currNodeId = SCENE_TO_NODE[gameState.currentScene] || "start";
-                const currNode = DUNGEON_MAP[currNodeId];
-                
-                let svgHtml = `<svg width="100%" height="100%" viewBox="0 0 1150 220" style="background-color: #120e0a; border-radius: 6px;">`;
-                
-                // Desenhar conexões (arestas)
-                const renderedEdges = new Set();
-                for (const nodeId in DUNGEON_MAP) {
-                    const node = DUNGEON_MAP[nodeId];
-                    node.connections.forEach(connId => {
-                        const connNode = DUNGEON_MAP[connId];
-                        if (connNode) {
-                            const edgeKey = [nodeId, connId].sort().join('-');
-                            if (!renderedEdges.has(edgeKey)) {
-                                renderedEdges.add(edgeKey);
-                                
-                                // Aresta visitada?
-                                const bothVisited = gameState.visitedNodes.includes(nodeId) && gameState.visitedNodes.includes(connId);
-                                const strokeColor = bothVisited ? '#ffd700' : '#30251c';
-                                const strokeWidth = bothVisited ? '2.5' : '1.5';
-                                const strokeDash = bothVisited ? '' : '3,3';
-                                
-                                svgHtml += `<line x1="${node.x}" y1="${node.y}" x2="${connNode.x}" y2="${connNode.y}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDash}" />`;
-                            }
-                        }
-                    });
+                const janela = document.getElementById('mapa');
+                if (!janela || janela.open !== true || janela.classList.contains('fechando')) return;
+                atualizarMapa();
+            }
+
+            // Um clique (ou Enter/Espaço) num lugar do mapa
+            function escolherNoDoMapa(nodeId) {
+                atualizarMapa(); // com a janela aberta, o d20 ou a luta podem ter mudado o estado
+                if (motivoMapaParado()) return; // a linha de status já diz por quê
+                if (!estadoDoNo(nodeId, noAtualDoMapa()).clicavel) return;
+                if (isNodeLocked(nodeId)) {
+                    teleportToNode(nodeId); // a barreira: o som, a crônica e o clarão
+                    escreverStatusDoMapa('Uma barreira mágica sela a passagem. Puxe as duas alavancas: uma na Câmara Cristal e outra na beira do Lago Subterrâneo.', 'falha');
+                    return;
                 }
-                
-                // Desenhar nós (vértices)
-                for (const nodeId in DUNGEON_MAP) {
-                    const node = DUNGEON_MAP[nodeId];
-                    const isCurrent = nodeId === currNodeId;
-                    const isVisited = gameState.visitedNodes.includes(nodeId);
-                    const isAdjacent = currNode && currNode.connections.includes(nodeId);
-                    
-                    let fillColor = '#30251c';
-                    let strokeColor = '#4e3f30';
-                    let r = 8;
-                    let cursorStyle = 'default';
-                    let clickAttr = '';
-                    let glowEffect = '';
-                    
-                    if (isCurrent) {
-                        fillColor = '#00ffcc';
-                        strokeColor = '#ffffff';
-                        r = 11;
-                        glowEffect = `<circle cx="${node.x}" cy="${node.y}" r="16" fill="none" stroke="#00ffcc" stroke-width="1.5" opacity="0.6">
-                            <animate attributeName="r" values="11;19;11" dur="1.8s" repeatCount="indefinite" />
-                            <animate attributeName="opacity" values="0.8;0;0.8" dur="1.8s" repeatCount="indefinite" />
-                        </circle>`;
-                    } else if (isVisited) {
-                        fillColor = '#ffd700';
-                        strokeColor = '#b8860b';
-                        r = 8;
-                    } else if (isAdjacent) {
-                        fillColor = '#00a2ff';
-                        strokeColor = '#ffffff';
-                        r = 9;
-                        cursorStyle = 'pointer';
-                        clickAttr = `onclick="teleportToNode('${nodeId}')"`;
-                        glowEffect = `<circle cx="${node.x}" cy="${node.y}" r="13" fill="none" stroke="#00a2ff" stroke-width="1" opacity="0.4">
-                            <animate attributeName="r" values="9;14;9" dur="1.5s" repeatCount="indefinite" />
-                        </circle>`;
-                    }
-                    
-                    // Diferenciar tipos de nós visualmente
-                    let iconEmoji = '';
-                    if (node.type === 'merchant') iconEmoji = '🪙 ';
-                    if (node.type === 'combat' || node.type === 'boss') iconEmoji = '⚔️ ';
-                    
-                    let extraIndicator = '';
-                    if (LEVER_NODES[nodeId]) {
-                        const pulled = gameState.levers[LEVER_NODES[nodeId]];
-                        extraIndicator += `<text x="${node.x}" y="${node.y + r + 11}" fill="${pulled ? '#00ffcc' : '#ff4d4d'}" font-size="10" text-anchor="middle">${pulled ? '🎚️' : '⚙️'}</text>`;
-                    }
-                    if (LOCKED_NODES.includes(nodeId) && isNodeLocked(nodeId)) {
-                        extraIndicator += `<text x="${node.x}" y="${node.y + r + 11}" fill="#ff4d4d" font-size="10" text-anchor="middle">🔒</text>`;
-                    }
-                    
-                    svgHtml += `
-                        <g style="cursor: ${cursorStyle};" ${clickAttr}>
-                            ${glowEffect}
-                            <circle cx="${node.x}" cy="${node.y}" r="${r}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-                            <text x="${node.x}" y="${node.y - r - 4}" fill="${isCurrent ? '#00ffcc' : (isVisited ? '#ffd700' : '#887766')}" font-size="9" font-family="'Outfit', sans-serif" font-weight="${isCurrent ? 'bold' : 'normal'}" text-anchor="middle">
-                                ${iconEmoji}${node.label}
-                            </text>
-                            ${extraIndicator}
-                        </g>
-                    `;
+                const antes = gameState.currentScene;
+                teleportToNode(nodeId);
+                // A cena nova fecha a janela e o foco volta ao selo; quem viajou segue
+                // para as escolhas da cena
+                if (gameState.currentScene !== antes) {
+                    document.getElementById('mapa').addEventListener('close', () => focarPrimeiraEscolha(), { once: true });
                 }
-                
-                svgHtml += `</svg>`;
-                viewEl.innerHTML = svgHtml;
             }
 
             function init() {
@@ -3203,24 +3279,21 @@
                 // --- Bandeja do d20 ---
                 document.getElementById('dice-button').addEventListener('click', rollDice);
 
-                // --- Selo "Mapa": abre e fecha o mapa da masmorra (painel legado até a Fase 4) ---
-                const btnToggleMap = document.getElementById('btn-toggle-map');
-                const minimapContainer = document.getElementById('minimap-container');
-                const alternarMapa = abrir => {
-                    minimapContainer.classList.toggle('hidden', !abrir);
-                    btnToggleMap.setAttribute('aria-expanded', String(abrir));
-                    if (abrir) renderMinimap();
-                };
-                btnToggleMap.addEventListener('click', () => {
+                // --- Selo "Mapa": abre e fecha a janela do mapa da masmorra. Escape, o
+                // medalhão, o fundo e a troca de cena fecham pelo caminho das janelas ---
+                const seloMapa = document.getElementById('btn-toggle-map');
+                const janelaMapa = document.getElementById('mapa');
+                seloMapa.addEventListener('click', () => {
                     AudioEngine.init();
-                    alternarMapa(minimapContainer.classList.contains('hidden'));
+                    if (janelaMapa.open) return fecharJanela(janelaMapa);
+                    atualizarMapa(); // antes de abrir: o primeiro quadro já sai com o estado certo
+                    abrirJanela('mapa');
+                    seloMapa.setAttribute('aria-expanded', String(janelaMapa.open === true));
                 });
-                // Esc fecha o mapa e devolve o foco ao selo
-                document.addEventListener('keydown', evento => {
-                    if (evento.key === 'Escape' && !minimapContainer.classList.contains('hidden')) {
-                        alternarMapa(false);
-                        btnToggleMap.focus();
-                    }
+                janelaMapa.addEventListener('close', () => seloMapa.setAttribute('aria-expanded', 'false'));
+                document.getElementById('mapa-nos').addEventListener('click', evento => {
+                    const lugar = evento.target.closest && evento.target.closest('.mapa-no');
+                    if (lugar) escolherNoDoMapa(lugar.dataset.no);
                 });
 
                 // --- Selos "Música" (na seleção e na exploração): tocam e pausam o <audio> ---
@@ -3355,7 +3428,9 @@
             };
 
             const LOCKED_NODES = ["final_chamber_entrance", "crypt_puzzle_entrance"];
-            const LEVER_NODES = { crystal_chamber: 'lever_crystal', lake_search: 'lever_lake' };
+            // Onde o mapa mostra cada alavanca (só o mapa usa): a do lago fica no Lago
+            // Subterrâneo, porque a cena lake_search não é um lugar do mapa
+            const LEVER_NODES = { crystal_chamber: 'lever_crystal', underground_lake: 'lever_lake' };
 
             const SAVE_KEY = 'ded_save_v1';
 
