@@ -100,6 +100,11 @@
 //   O intervalo de atualização medido sai no relatório.
 // - A janela não pode ser minimizada: sem quadros, não há rAF. Coberta por outras janelas ela continua
 //   pintando (CalculateNativeWinOcclusion desligado), mas o ideal é deixá-la à vista e o PC quieto.
+//   Com alguém usando o PC, o Chrome chegou a passar baterias inteiras em meia taxa: a mediana dos
+//   quadros em 2 vsyncs (13,9 ms a 144 Hz), com a GPU parada fora delas, alternando entre uma bateria
+//   e a seguinte com o mesmo código e a mesma ferramenta. Os cenários do jogo têm mediana de 1 vsync.
+//   Uma execução em meia taxa (mediana de 1,8 intervalo de atualização ou mais) é refeita uma vez;
+//   se a segunda também sair assim, o veredito sai INVÁLIDO: o ambiente estava degradado.
 // - O ambiente tem ruído próprio. Na máquina do projeto (GTX 1660 SUPER, 144 Hz), uma página vazia
 //   só com um translateX teve uma parada de ~500 ms uns 120 s depois de o Chrome abrir, além de
 //   quadros soltos de 28 a 42 ms a cada ~30 s. Para separar página de ambiente, o relatório lista
@@ -193,6 +198,7 @@ const passou = d => d > LIMITE_MS + FOLGA_MS;
 const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
 let RASTREAR = true; // --sem-rastreio desliga
 let AQUECIMENTO = 'd20'; // --aquecimento
+let INTERVALO_MS = null; // o intervalo de atualização medido no aquecimento (para achar a meia taxa)
 let PASTA_RASTREIOS = path.join(os.tmpdir(), 'ded-desempenho-rastreios'); // --rastreios
 
 function servidor(raiz) {
@@ -841,11 +847,14 @@ function veredito(resultados) {
     const naLimpeza = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.limpeza : 0), 0);
     const erros = contam.reduce((t, r) => t + r.erros.length, 0);
     const fora = naLimpeza ? `${naLimpeza} ${naLimpeza === 1 ? 'quadro' : 'quadros'} na limpeza da GPU, fora do veredito` : '';
-    if (!acima && !erros) return { texto: `APROVADO${fora ? ` (${fora})` : ''}`, aprovado: true };
+    const meia = contam.reduce((t, r) => t + (r.meiaTaxa || 0), 0);
+    const invalido = meia ? `INVÁLIDO: ${meia} ${meia === 1 ? 'execução ficou' : 'execuções ficaram'} em meia taxa mesmo refeitas ` +
+        '(o ambiente degradado; refaça com a janela do Chrome à vista e o PC quieto). Sem isso: ' : '';
+    if (!acima && !erros) return { texto: `${invalido}APROVADO${fora ? ` (${fora})` : ''}`, aprovado: !meia };
     const partes = [`${acima} ${acima === 1 ? 'quadro' : 'quadros'} acima de 20,8 ms em CPU 1x`];
     if (erros) partes.push(`${erros} erro(s) de medição`);
     if (fora) partes.push(fora);
-    return { texto: `REPROVADO (${partes.join('; ')})`, aprovado: false };
+    return { texto: `${invalido}REPROVADO (${partes.join('; ')})`, aprovado: false };
 }
 
 // Parada do ambiente: a tarefa GpuServiceImpl::GetDawnInfo, de ~500 ms na thread principal
@@ -867,10 +876,24 @@ function paradaDoAmbiente(e) {
     return longos.length > 0 && longos.every(l => l.scripts <= 2 && l.render <= 5);
 }
 
+// Meia taxa: a execução inteira a 2 vsyncs por quadro, o ambiente degradado (ver o cabeçalho)
+function emMeiaTaxa(e) {
+    if (!INTERVALO_MS || !e.quadros.length) return false;
+    const ord = [...e.quadros].sort((a, b) => a - b);
+    return ord[Math.floor(ord.length / 2)] >= 1.8 * INTERVALO_MS;
+}
+
 async function comRefacao(reg, executar) {
     const antes = reg.execucoes.length;
     const r = await executar();
     const e = reg.execucoes[reg.execucoes.length - 1];
+    if (reg.execucoes.length > antes && emMeiaTaxa(e)) {
+        reg.execucoes.pop();
+        reg.avisos.push('execução refeita: em meia taxa (a mediana dos quadros em 2 vsyncs)');
+        const r2 = await executar();
+        if (reg.execucoes.length > antes && emMeiaTaxa(reg.execucoes[reg.execucoes.length - 1])) reg.meiaTaxa = (reg.meiaTaxa || 0) + 1;
+        return r2;
+    }
     if (reg.execucoes.length > antes && paradaDoAmbiente(e)) {
         reg.execucoes.pop();
         reg.avisos.push(`execução refeita: parada do ambiente de ${Math.round(Math.max(...e.quadros))} ms ` +
@@ -908,6 +931,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
     try {
         console.log('aquecendo...');
         const aq = await aquecer(browser, base, AQUECIMENTO);
+        INTERVALO_MS = aq.intervalo;
         meta = {
             ...versaoDoCodigo(path.resolve(raiz)),
             chrome: await browser.version(), intervaloMs: aq.intervalo, intervaloMedianaMs: aq.mediana,
@@ -960,6 +984,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
             data: new Date().toISOString(), ...meta, limiteMs: LIMITE_MS, folgaMs: FOLGA_MS, viewport: '1920x1080', veredito: v.texto,
             resultados: resultados.map(r => ({
                 cenario: r.cenario, cpu: r.cpu, nota: r.nota, resumo: r.resumo ?? null, erros: r.erros, avisos: [...new Set(r.avisos)],
+                emMeiaTaxa: r.meiaTaxa || 0,
                 execucoes: r.execucoes.map(e => ({
                     aposLancamentoMs: Math.round(e.epoca - lancamento), quadros: e.quadros.map(r2), fins: e.fins.map(r2), loaf: e.loaf,
                     limpezasGpu: e.limpezas && e.limpezas.map(l => ({ inicio: r2(l.inicio), duracao: r2(l.duracao) })),
