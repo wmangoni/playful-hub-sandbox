@@ -157,6 +157,67 @@ def executar_lote_1():
 
     print("\n[SUCESSO] Lote 1 concluido com sucesso e 100% validado!")
 
+def executar_lote_2():
+    print("=== Executando Lote 2 (E–M) ===")
+    with open(INVENTARIO_PATH, encoding='utf-8') as f:
+        inv = json.load(f)
+
+    lote2_items = [
+        i for i in inv
+        if i['id'][0] in 'efghijklm'
+        and i['status'] not in ('ja-existe', 'product-identity', 'modelo')
+    ]
+    print(f"Total de criaturas elegíveis no Lote 2: {len(lote2_items)}")
+
+    # 1. Gerar combatentes de E a M
+    novos_combatentes = []
+    for meta in lote2_items:
+        p, txt = achar_pagina_exata(meta, PAGINAS_DIR)
+        rotulos = extrair_secoes_rotuladas(txt)
+        ficha = enriquecer_combatente(meta, rotulos, txt)
+        novos_combatentes.append(ficha)
+
+    print(f"[OK] {len(novos_combatentes)} combatentes de E a M gerados com sucesso.")
+
+    novos_por_letra = {}
+    for c in novos_combatentes:
+        letra = c['id'][0]
+        novos_por_letra.setdefault(letra, []).append(c)
+
+    # 2. Integrar nos arquivos particionados e..m
+    for letra in 'efghijklm':
+        arquivo = os.path.join(MONSTROS_DIR, f"{letra}.json")
+        existentes = []
+        if os.path.exists(arquivo):
+            with open(arquivo, encoding='utf-8') as f:
+                existentes = json.load(f)
+
+        existentes_ids = {m['id'] for m in existentes}
+        adicionar = [m for m in novos_por_letra.get(letra, []) if m['id'] not in existentes_ids]
+        
+        combinados = existentes + adicionar
+        combinados.sort(key=lambda m: m['id'])
+
+        with open(arquivo, 'w', encoding='utf-8') as f:
+            json.dump(combinados, f, ensure_ascii=False, indent=2)
+
+        print(f"[OK] {letra}.json atualizado: {len(existentes)} pre-existentes + {len(adicionar)} novos = {len(combinados)} total.")
+
+    # 3. Remontar catálogo unificado e particionar/atualizar índice
+    print("\nExecutando ferramentas de montagem e particionamento...")
+    subprocess.run(["node", os.path.join(TOOLS_DIR, "montar-catalogo.js")], check=True)
+    subprocess.run(["node", os.path.join(TOOLS_DIR, "particionar-catalogo.js")], check=True)
+
+    # 4. Validação rigorosa
+    print("\nValidando catalogo compilado...")
+    res = subprocess.run(["node", os.path.join(TOOLS_DIR, "validar-catalogo.js")], capture_output=True, text=True)
+    print(res.stdout)
+    if res.returncode != 0 or "0 erro(s)" not in res.stdout:
+        print("ERRO na validacao:", res.stderr)
+        sys.exit(1)
+
+    print("\n[SUCESSO] Lote 2 concluido com sucesso e 100% validado!")
+
 def main():
     parser = argparse.ArgumentParser(description="Gerador de monstros MM 3.5")
     parser.add_argument("--lote", type=int, default=1, choices=[1, 2, 3], help="Número do lote a executar")
@@ -164,6 +225,8 @@ def main():
 
     if args.lote == 1:
         executar_lote_1()
+    elif args.lote == 2:
+        executar_lote_2()
     else:
         print(f"Lote {args.lote} ainda não configurado para execução automática.")
 

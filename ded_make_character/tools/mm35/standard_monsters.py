@@ -152,35 +152,38 @@ def parse_deslocamento(texto):
 
 def parse_ca(texto, atributos=None, tamanho="Médio"):
     ca = {"total": 10, "toque": 10, "surpresa": 10, "composicao": ""}
-    if not texto:
-        return ca
-    m_tot = re.search(r'^\s*(\d+)', texto)
-    if m_tot: ca["total"] = int(m_tot.group(1))
-    m_toq = re.search(r'toque\s*(\d+)', texto, re.IGNORECASE)
-    if m_toq: ca["toque"] = int(m_toq.group(1))
-    m_sur = re.search(r'surpresa\s*(\d+)', texto, re.IGNORECASE)
-    if m_sur: ca["surpresa"] = int(m_sur.group(1))
-    
-    # Validações de consistência: toque e surpresa nunca excedem o total
-    if ca["toque"] > ca["total"]:
-        ca["toque"] = ca["total"]
-    if ca["surpresa"] > ca["total"]:
-        ca["surpresa"] = ca["total"]
+    if texto:
+        m_tot = re.search(r'^\s*(\d+)', texto)
+        if m_tot: ca["total"] = int(m_tot.group(1))
+        m_toq = re.search(r'toque\s*(\d+)', texto, re.IGNORECASE)
+        if m_toq: ca["toque"] = int(m_toq.group(1))
+        m_sur = re.search(r'surpresa\s*(\d+)', texto, re.IGNORECASE)
+        if m_sur: ca["surpresa"] = int(m_sur.group(1))
+        
+        # Validações de consistência: toque e surpresa nunca excedem o total
+        if ca["toque"] > ca["total"]:
+            ca["toque"] = ca["total"]
+        if ca["surpresa"] > ca["total"]:
+            ca["surpresa"] = ca["total"]
 
-    m_comp = re.search(r'\(([^)]+)\)', texto)
-    if m_comp:
-        raw_comp = m_comp.group(1).strip()
-        raw_comp = raw_comp.replace('-', '−').replace('', '−').replace('\xad', '−')
-        raw_comp = re.sub(r'[\s]+', ' ', raw_comp)
-        ca["composicao"] = raw_comp
+        m_comp = re.search(r'\(([^)]+)\)', texto)
+        if m_comp:
+            raw_comp = m_comp.group(1).strip()
+            raw_comp = raw_comp.replace('-', '−').replace('–', '−').replace('\xad', '−')
+            raw_comp = re.sub(r'[\s]+', ' ', raw_comp)
+            ca["composicao"] = raw_comp
     
     if not ca["composicao"]:
         mod_des = mod(atributos["des"]) if atributos and atributos.get("des") is not None else 0
         comp_itens = []
+        ca_tam_map = {"Minúsculo": 8, "Diminuto": 4, "Miúdo": 2, "Pequeno": 1, "Médio": 0, "Grande": -1, "Enorme": -2, "Imenso": -4, "Colossal": -8}
+        tam_ca = ca_tam_map.get(tamanho, 0)
+        if tam_ca != 0: comp_itens.append(f"{tam_ca:+d} tamanho")
         if mod_des != 0: comp_itens.append(f"{mod_des:+d} Des")
-        nat = ca["total"] - 10 - mod_des
+        nat = ca["total"] - 10 - mod_des - tam_ca
         if nat != 0: comp_itens.append(f"{nat:+d} natural")
         ca["composicao"] = ", ".join(comp_itens) if comp_itens else "+0 natural"
+        ca["composicao"] = ca["composicao"].replace('-', '−')
     return ca
 
 def parse_bba_agarrar(texto):
@@ -232,20 +235,30 @@ def parse_resistencias(texto):
 
 def parse_talentos(texto):
     if not texto: return []
-    texto_limpo = texto.replace('\r', ' ').replace('\n', ' ')
+    # Protege vírgulas dentro de parênteses (ex: "Ataque Natural Aprimorado (mordida, garra)")
+    def _sub_paren(match):
+        return match.group(0).replace(',', '\x00')
+    texto_limpo = re.sub(r'\([^)]*\)', _sub_paren, texto)
+    # Substitui casos específicos onde falta vírgula entre talentos
+    texto_limpo = re.sub(r'Persuasivo\s+Especializa', 'Persuasivo, Especializa', texto_limpo, flags=re.I)
+    texto_limpo = re.sub(r'Mobilidade\s+Contram', 'Mobilidade, Contram', texto_limpo, flags=re.I)
+    texto_limpo = re.sub(r'\.\s+([A-ZÁÉÍÓÚÂÊÔÃÕ])', r', \1', texto_limpo)
+    texto_limpo = texto_limpo.replace('\r', ' ').replace('\n', ' ')
     texto_limpo = re.sub(r'Refl\s*exos', 'Reflexos', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'ás\s+Cegas', 'às Cegas', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Arma\s+Natural\s+Aprimorada', 'Ataque Natural Aprimorado', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Ataque\s+em\s+Movimento', 'Ataque em Movimento', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Ignorar\s+Componentes\s+Materiais', 'Ignorar Componentes Materiais', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Magias\s+em\s+Combate', 'Magias em Combate', texto_limpo, flags=re.I)
+    texto_limpo = re.sub(r'Magias\s+Sem\s+Cestos', 'Magias sem Gestos', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Foco\s+em\s+Magia', 'Foco em Magia', texto_limpo, flags=re.I)
     texto_limpo = re.sub(r'Reflexos\s+em\s+Combate', 'Reflexos de Combate', texto_limpo, flags=re.I)
+    texto_limpo = re.sub(r'Talento\s+de\s+cria[çc][ãa]o\s+de\s+item.*', 'Criar Item Maravilhoso', texto_limpo, flags=re.I)
     
     # Trunca se houver Ambiente ou seção subsequente
     texto_limpo = re.split(r'\b(Ambiente|Ambiento|Organização|Nível)\b', texto_limpo, flags=re.I)[0]
 
-    partes = [p.strip() for p in re.split(r'[,;]', texto_limpo) if p.strip()]
+    partes = [p.replace('\x00', ',').strip() for p in re.split(r'[,;]', texto_limpo) if p.strip()]
     talentos = []
     for p in partes:
         clean = re.sub(r'[\sBᵇ]+$', '', p).strip()
@@ -253,79 +266,119 @@ def parse_talentos(texto):
         clean = re.sub(r'(Águia Gigante|ALLIP|Barghest|Basilisco).*$', '', clean, flags=re.I).strip()
         clean = re.sub(r'^[\d\s\*\-\+]+', '', clean).strip()
         clean = re.sub(r'[\*\d\s]+$', '', clean).strip()
+        clean = clean.rstrip('.').strip()
         clean = re.sub(r'\s+', ' ', clean).strip()
         if not clean or re.match(r'^[\s—\-\–\.]+$', clean):
             continue
         
-        # Trata caso de múltiplos talentos grudados sem vírgula (ex: Foco em Arma (...) Vitalidade)
-        if 'Vitalidade' in clean:
-            clean = clean.replace('Vitalidade', '').strip()
+        # Vitalidade (2) ou Vitalidade
+        if re.search(r'\bVitalidade\b', clean, re.I):
             talentos.append('Vitalidade')
-        
-        if clean and clean not in ['—', '-', 'Nenhum']:
-            t_upper = clean.upper()
-            if 'SORRATEIRO' in t_upper:
-                talentos.append('Sorrateiro')
-            elif 'ACUIDADE' in t_upper:
-                talentos.append('Acuidade com Arma')
-            elif 'PODEROSO' in t_upper:
-                talentos.append('Ataque Poderoso')
-            elif 'ESQUIVA' in t_upper:
-                talentos.append('Esquiva')
-            elif 'PRONTIDÃO' in t_upper or 'PRONTIDAO' in t_upper:
-                talentos.append('Prontidão')
-            elif 'INICIATIVA' in t_upper:
-                talentos.append('Iniciativa Aprimorada')
-            elif 'VONTADE DE FERRO' in t_upper:
-                talentos.append('Vontade de Ferro')
-            elif 'REFLEXOS DE COMBATE' in t_upper:
-                talentos.append('Reflexos de Combate')
-            elif 'REFLEXOS' in t_upper and 'RAPID' in t_upper:
-                talentos.append('Reflexos Rápidos')
-            elif 'LUTAR' in t_upper and 'CEGAS' in t_upper:
-                talentos.append('Lutar às Cegas')
-            elif 'IGNORAR COMPONENTES' in t_upper:
-                talentos.append('Ignorar Componentes Materiais')
-            elif 'MAGIAS EM COMBATE' in t_upper:
-                talentos.append('Magias em Combate')
-            elif 'FOCO EM MAGIA' in t_upper:
-                talentos.append('Foco em Magia')
-            elif 'FORTITUDE MAIOR' in t_upper or 'GRANDE FORTITUDE' in t_upper:
-                talentos.append('Fortitude Maior')
-            elif 'ROBUSTEZ' in t_upper or 'VITALIDADE' in t_upper:
-                talentos.append('Vitalidade')
-            elif 'TRESPASSAR MAIOR' in t_upper:
-                talentos.append('Trespassar Maior')
-            elif 'TRESPASSAR' in t_upper:
-                talentos.append('Trespassar')
-            elif 'MOBILIDADE' in t_upper:
-                talentos.append('Mobilidade')
-            elif 'ATAQUES MULTIPLOS' in t_upper or 'ATAQUES MÚLTIPLOS' in t_upper:
-                talentos.append('Ataques Múltiplos')
-            elif 'FOCO EM ARMA' in t_upper:
-                talentos.append(clean)
-            elif 'ATAQUE NATURAL APRIMORADO' in t_upper:
-                talentos.append('Ataque Natural Aprimorado')
-            elif 'ATAQUE EM MOVIMENTO' in t_upper:
-                talentos.append('Ataque em Movimento')
-            elif 'AGARRAR APRIMORADO' in t_upper:
-                talentos.append('Agarrar Aprimorado')
-            elif 'ATROPELAR APRIMORADO' in t_upper:
-                talentos.append('Atropelar Aprimorado')
-            elif 'SEPARAR APRIMORADO' in t_upper:
-                talentos.append('Separar Aprimorado')
-            elif 'CORRER' in t_upper or 'CORRIDA' in t_upper:
-                talentos.append('Corrida')
-            elif 'RASTREAR' in t_upper or 'RASTREAMENTO' in t_upper:
-                talentos.append('Rastrear')
-            elif 'INVERSÃO' in t_upper or 'INVERSAO' in t_upper:
-                talentos.append('Inversão')
-            elif 'SUCESSO DECISIVO' in t_upper or 'ACERTO CRÍTICO' in t_upper:
-                talentos.append('Sucesso Decisivo Aprimorado')
-            elif t_upper in TALENTOS_VALIDOS:
-                talentos.append(clean)
-            else:
-                talentos.append(clean)
+            clean = re.sub(r'Vitalidade(\s*\(\d+\))?', '', clean, flags=re.I).strip()
+            if not clean:
+                continue
+
+        t_upper = clean.upper()
+        if 'GOLPE AVASSALADOR' in t_upper:
+            talentos.append('Golpe Avassalador')
+        elif 'TIRO MULTIPLO' in t_upper or 'TIRO MÚLTIPLO' in t_upper:
+            talentos.append('Tiro Múltiplo')
+        elif 'TIRO PRECISO' in t_upper:
+            talentos.append('Tiro Preciso')
+        elif 'TIRO CERTEIRO' in t_upper:
+            talentos.append('Tiro Certeiro')
+        elif 'TIRO RAPIDO' in t_upper or 'TIRO RÁPIDO' in t_upper:
+            talentos.append('Tiro Rápido')
+        elif 'TIRO LONGO' in t_upper:
+            talentos.append('Tiro Longo')
+        elif 'DURO DE MATAR' in t_upper:
+            talentos.append('Duro de Matar')
+        elif 'VIGOR' in t_upper and 'MOSTRAR' not in t_upper:
+            talentos.append('Fortitude Maior')
+        elif 'FORTITUDE MAIOR' in t_upper or 'GRANDE FORTITUDE' in t_upper:
+            talentos.append('Fortitude Maior')
+        elif 'CONTRAMÁGICA APRIMORADA' in t_upper or 'CONTRAMAGICA APRIMORADA' in t_upper:
+            talentos.append('Contramágica Aprimorada')
+        elif 'MAXIMIZAR' in t_upper:
+            talentos.append('Maximizar Magia')
+        elif 'ACELERAR MAGIA' in t_upper:
+            talentos.append('Acelerar Magia')
+        elif 'CRIAR ITEM' in t_upper:
+            talentos.append('Criar Item Maravilhoso')
+        elif 'ESCREVER PERGAMINHO' in t_upper:
+            talentos.append('Escrever Pergaminho')
+        elif 'SILENCIOSA' in t_upper:
+            talentos.append('Magia Silenciosa')
+        elif 'ENCONTRÃO APRIMORADO' in t_upper or 'ENCONTRAO APRIMORADO' in t_upper:
+            talentos.append('Encontrão Aprimorado')
+        elif 'ARMA EXÓTICA' in t_upper or 'ARMA EXOTICA' in t_upper:
+            talentos.append(clean)
+        elif 'MAGIAS SEM GESTOS' in t_upper:
+            talentos.append('Magias sem Gestos')
+        elif 'DESARME APRIMORADO' in t_upper or 'DESARMAR APRIMORADO' in t_upper:
+            talentos.append('Desarme Aprimorado')
+        elif 'ESPECIALIZAÇÃO EM COMBATE' in t_upper or 'ESPECIALIZACAO EM COMBATE' in t_upper:
+            talentos.append('Especialização em Combate')
+        elif 'SORRATEIRO' in t_upper:
+            talentos.append('Sorrateiro')
+        elif 'ACUIDADE' in t_upper:
+            talentos.append('Acuidade com Arma')
+        elif 'PODEROSO' in t_upper:
+            talentos.append('Ataque Poderoso')
+        elif 'ESQUIVA' in t_upper:
+            talentos.append('Esquiva')
+        elif 'PRONTIDÃO' in t_upper or 'PRONTIDAO' in t_upper:
+            talentos.append('Prontidão')
+        elif 'INICIATIVA' in t_upper:
+            talentos.append('Iniciativa Aprimorada')
+        elif 'VONTADE DE FERRO' in t_upper:
+            talentos.append('Vontade de Ferro')
+        elif 'REFLEXOS DE COMBATE' in t_upper:
+            talentos.append('Reflexos de Combate')
+        elif 'REFLEXOS' in t_upper and 'RAPID' in t_upper:
+            talentos.append('Reflexos Rápidos')
+        elif 'LUTAR' in t_upper and 'CEGAS' in t_upper:
+            talentos.append('Lutar às Cegas')
+        elif 'IGNORAR COMPONENTES' in t_upper:
+            talentos.append('Ignorar Componentes Materiais')
+        elif 'MAGIAS EM COMBATE' in t_upper:
+            talentos.append('Magias em Combate')
+        elif 'FOCO EM MAGIA' in t_upper:
+            talentos.append(clean if '(' in clean else 'Foco em Magia')
+        elif 'ROBUSTEZ' in t_upper or 'VITALIDADE' in t_upper:
+            talentos.append('Vitalidade')
+        elif 'TRESPASSAR MAIOR' in t_upper:
+            talentos.append('Trespassar Maior')
+        elif 'TRESPASSAR' in t_upper:
+            talentos.append('Trespassar')
+        elif 'MOBILIDADE' in t_upper:
+            talentos.append('Mobilidade')
+        elif 'ATAQUES MULTIPLOS' in t_upper or 'ATAQUES MÚLTIPLOS' in t_upper:
+            talentos.append('Ataques Múltiplos')
+        elif 'FOCO EM ARMA' in t_upper:
+            talentos.append(clean)
+        elif 'ATAQUE NATURAL APRIMORADO' in t_upper:
+            talentos.append('Ataque Natural Aprimorado')
+        elif 'ATAQUE EM MOVIMENTO' in t_upper:
+            talentos.append('Ataque em Movimento')
+        elif 'AGARRAR APRIMORADO' in t_upper:
+            talentos.append('Agarrar Aprimorado')
+        elif 'ATROPELAR APRIMORADO' in t_upper:
+            talentos.append('Atropelar Aprimorado')
+        elif 'SEPARAR APRIMORADO' in t_upper:
+            talentos.append('Separar Aprimorado')
+        elif 'CORRER' in t_upper or 'CORRIDA' in t_upper:
+            talentos.append('Corrida')
+        elif 'RASTREAR' in t_upper or 'RASTREAMENTO' in t_upper:
+            talentos.append('Rastrear')
+        elif 'INVERSÃO' in t_upper or 'INVERSAO' in t_upper:
+            talentos.append('Inversão')
+        elif 'SUCESSO DECISIVO' in t_upper or 'ACERTO CRÍTICO' in t_upper:
+            talentos.append(clean if '(' in clean else 'Sucesso Decisivo Aprimorado')
+        elif t_upper in TALENTOS_VALIDOS:
+            talentos.append(clean)
+        else:
+            talentos.append(clean)
     return talentos
 
 def parse_pericias(texto):
@@ -438,6 +491,18 @@ def achar_pagina_exata(meta, paginas_dir):
     return pg_base, t
 
 def extrair_secoes_rotuladas(texto):
+    if not texto: return {}
+    texto_norm = texto
+    texto_norm = re.sub(r'Classe\s+de\s+Armadura:', 'Classe de Armadura:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Ataque\s+Base\s*/\s*Agarrar:', 'Ataque Base/Agarrar:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Ataque\s+Total:', 'Ataque Total:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Espaço\s*/\s*Alcance:', 'Espaço/Alcance:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Ataques\s+Especiais:', 'Ataques Especiais:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Qualidades\s+Especiais:', 'Qualidades Especiais:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Testes\s+de\s+Resistência:', 'Testes de Resistência:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Nível\s+de\s+Desafi\s*o:', 'Nível de Desafio:', texto_norm, flags=re.I)
+    texto_norm = re.sub(r'Ajuste\s+de\s+Nível:', 'Ajuste de Nível:', texto_norm, flags=re.I)
+
     rotulos = [
         "Dados de Vida:", "Iniciativa:", "Deslocamento:", "Classe de Armadura:", "CA:",
         "Ataque Base/Agarrar:", "Ataque Base / Agarrar:", "Ataque:", "Ataque Total:",
@@ -447,7 +512,7 @@ def extrair_secoes_rotuladas(texto):
         "Tesouro:", "Tendência:", "Progressão:", "Ajuste de Nível:"
     ]
     padrao = re.compile(r'(' + '|'.join(re.escape(r) for r in rotulos) + r')', re.IGNORECASE)
-    partes = padrao.split(texto)
+    partes = padrao.split(texto_norm)
     dados = {}
     rotulo_atual = None
     for item in partes:
