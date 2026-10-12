@@ -916,6 +916,220 @@ async function runTests() {
   }
   console.log('✅ PASS: "Voltar" gives the focus back to "Usar item", the Heroic Strike keeps the higher die, and the defeat and the flight close by keyboard.');
 
+  // ----------------------------------------------------
+  // TEST CASES 9 a 12: as janelas e os avisos (Fase 4), com o teclado
+  // ----------------------------------------------------
+  // As janelas são <dialog> abertos com showModal(): o foco entra nelas, Escape fecha
+  // (menos a especialização, obrigatória) e o foco volta para quem abriu. Nenhum
+  // diálogo nativo pode abrir. As esperas de 400 ms cobrem a pausa de 300 ms dos
+  // botões recém-montados e a entrada das janelas (0,22 s).
+  const pausa = ms => new Promise(r => setTimeout(r, ms));
+  const esperarJanela = (id, aberta = true) => page.waitForFunction((i, a) => !!document.getElementById(i).open === a, { timeout: 5000 }, id, aberta)
+    .catch(() => { throw new Error(`#${id} did not ${aberta ? 'open' : 'close'} in 5 s`); });
+  const focado = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return el ? { id: el.id, rotulo: el.getAttribute('aria-label'), texto: el.textContent.trim().slice(0, 60), especializacao: el.dataset.especializacao || null, escolha: !!el.closest('#choices') } : null;
+  });
+  dialogos.length = 0;
+  page.on('dialog', contarDialogo);
+  try {
+    // --- 9. O mapa ---
+    console.log('\n--- 9. Testing the map window with the keyboard ---');
+    await page.evaluate(() => {
+      if (gameState.combat && gameState.combat.active) closeCombatScreen();
+      gameState.visitedNodes = ['start'];
+      gameState.levers = { lever_crystal: false, lever_lake: false };
+      gameState.isPaused = false;
+      loadScene('start');
+      skipTyping = true;
+    });
+    await pausa(500);
+    await page.focus('#btn-toggle-map');
+    await page.keyboard.press('Enter');
+    await esperarJanela('mapa');
+    await pausa(400);
+    const mapa = await page.evaluate(() => ({
+      expandido: document.getElementById('btn-toggle-map').getAttribute('aria-expanded'),
+      lugares: document.querySelectorAll('#mapa .mapa-no').length,
+      podeIr: [...document.querySelectorAll('#mapa .mapa-no:not([aria-disabled="true"])')].map(b => b.dataset.no).sort(),
+      portaSelada: document.querySelector('#mapa [data-no="crypt_door"]').getAttribute('aria-disabled')
+    }));
+    const focoNoMapa = await focado();
+    console.log('Map opened:', mapa, focoNoMapa);
+    if (mapa.expandido !== 'true' || mapa.lugares !== 23) throw new Error('The map seal must open #mapa with its 23 places and aria-expanded="true"');
+    if (focoNoMapa.rotulo !== 'Entrada, você está aqui') throw new Error(`The focus must land on the current place, got ${JSON.stringify(focoNoMapa)}`);
+    if (JSON.stringify(mapa.podeIr) !== JSON.stringify(['buy_supplies', 'corridor', 'entrance_inspection'])) throw new Error(`At the entrance the map must offer the shop, the inspection and the corridor, got ${mapa.podeIr}`);
+    if (mapa.portaSelada !== 'true') throw new Error('"Porta Selada" (crypt_door) has no scene and must not be offered');
+    await page.keyboard.press('Escape');
+    await esperarJanela('mapa', false);
+    const focoAoFechar = await focado();
+    if (focoAoFechar.id !== 'btn-toggle-map') throw new Error(`Escape must give the focus back to the map seal, got ${JSON.stringify(focoAoFechar)}`);
+    // Viagem pelo teclado: Tab duas vezes (Loja, Inspeção) e Espaço
+    await page.keyboard.press('Enter');
+    await esperarJanela('mapa');
+    await pausa(400);
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    const destino = await focado();
+    if (!/^Inspeção, pode ir/.test(destino.rotulo || '')) throw new Error(`Two Tabs from "Entrada" must reach "Inspeção", got ${JSON.stringify(destino)}`);
+    await page.keyboard.press('Space');
+    await esperarJanela('mapa', false);
+    await pausa(700);
+    const viagem = await page.evaluate(() => gameState.currentScene);
+    const focoDepoisDaViagem = await focado();
+    if (viagem !== 'entrance_inspection' || !focoDepoisDaViagem.escolha) throw new Error(`Travelling must load entrance_inspection and focus its first choice, got ${viagem} / ${JSON.stringify(focoDepoisDaViagem)}`);
+    // A porta sem cena não quebra nada, e no meio da luta o mapa só mostra
+    const semCena = await page.evaluate(() => { const antes = gameState.currentScene; teleportToNode('crypt_door'); return antes === gameState.currentScene; });
+    if (!semCena) throw new Error('teleportToNode("crypt_door") must not move the hero');
+    await page.evaluate(g => startInteractiveCombat(g), GOBLIN);
+    await pausa(500);
+    await page.evaluate(() => document.getElementById('btn-toggle-map').click());
+    await esperarJanela('mapa');
+    const naLuta = await page.evaluate(() => ({
+      status: document.getElementById('mapa-status').textContent,
+      podeIr: document.querySelectorAll('#mapa .mapa-no:not([aria-disabled="true"])').length
+    }));
+    if (!/combate/i.test(naLuta.status) || naLuta.podeIr !== 0) throw new Error(`During a combat the map must say why and offer nothing, got ${JSON.stringify(naLuta)}`);
+    await page.keyboard.press('Escape');
+    await esperarJanela('mapa', false);
+    await page.evaluate(() => closeCombatScreen());
+    console.log('✅ PASS: The map opens by the seal, travels by keyboard, gives the focus back and stays put in combat and on a scene-less node.');
+
+    // --- 10. A loja e a especialização ---
+    console.log('\n--- 10. Testing the shop and the specialization windows ---');
+    await page.evaluate(() => {
+      gameState.player.gold = 5;
+      gameState.player.inventory = [];
+      updateInventoryDisplay();
+      updateStatsDisplay();
+      loadScene('buy_supplies');
+    });
+    await esperarJanela('loja');
+    await pausa(400);
+    const focoNaLoja = await focado();
+    if (!/Poção de Vida/.test(focoNaLoja.texto)) throw new Error(`The shop must focus its first good, got ${JSON.stringify(focoNaLoja)}`);
+    await page.keyboard.press('Enter'); // a poção custa 10; há 5
+    await pausa(200);
+    const semOuro = await page.evaluate(() => ({ status: document.getElementById('loja-status').textContent, tom: document.getElementById('loja-status').dataset.tom, ouro: gameState.player.gold }));
+    if (!/faltam 5 de ouro/.test(semOuro.status) || semOuro.tom !== 'falha' || semOuro.ouro !== 5) throw new Error(`An unaffordable good must explain itself in the window, got ${JSON.stringify(semOuro)}`);
+    await page.evaluate(() => [...document.querySelectorAll('#loja-mercadorias button')].pop().click()); // a tocha, 2 de ouro
+    await pausa(200);
+    const comprou = await page.evaluate(() => ({
+      ouro: gameState.player.gold,
+      mochila: gameState.player.inventory,
+      salvo: JSON.parse(localStorage.getItem('ded_save_v1')).player.inventory,
+      status: document.getElementById('loja-status').textContent
+    }));
+    if (comprou.ouro !== 3 || !comprou.mochila.includes('Tocha') || !comprou.salvo.includes('Tocha') || !/Você comprou Tocha/.test(comprou.status)) {
+      throw new Error(`Buying the torch must take 2 gold, add it, save the game and say so, got ${JSON.stringify(comprou)}`);
+    }
+    await page.keyboard.press('Escape');
+    await esperarJanela('loja', false);
+    await pausa(300);
+    const focoForaDaLoja = await focado();
+    if (!focoForaDaLoja.escolha) throw new Error(`Closing the shop must leave the focus on the scene choices, got ${JSON.stringify(focoForaDaLoja)}`);
+    // Especialização: o nível 3 abre a janela obrigatória
+    await page.evaluate(() => { gameState.player.specialization = null; gameState.player.xp = 140; gameState.player.level = 2; changeXP(20); });
+    await esperarJanela('especializacao');
+    await pausa(400);
+    const espec = await page.evaluate(() => ({ obrigatoria: document.getElementById('especializacao').hasAttribute('data-obrigatoria'), pausado: gameState.isPaused }));
+    const focoNaEspec = await focado();
+    if (!espec.obrigatoria || !espec.pausado || focoNaEspec.especializacao !== 'Paladino') {
+      throw new Error(`The specialization window must be mandatory, pause the game and focus the first option, got ${JSON.stringify({ espec, focoNaEspec })}`);
+    }
+    for (let i = 0; i < 4; i++) { await page.keyboard.press('Escape'); await pausa(250); }
+    if (!(await page.evaluate(() => document.getElementById('especializacao').open))) throw new Error('Escape must not close the mandatory specialization window');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao', false);
+    const escolheu = await page.evaluate(() => ({ espec: gameState.player.specialization, pausado: gameState.isPaused, selo: document.getElementById('specialization-badge').textContent.trim() }));
+    if (escolheu.espec !== 'Berserker' || escolheu.pausado || escolheu.selo !== 'Berserker') throw new Error(`Tab + Enter must choose Berserker and resume the game, got ${JSON.stringify(escolheu)}`);
+    console.log('✅ PASS: The shop explains, buys and saves by keyboard, and the mandatory specialization survives Escape and is chosen by keyboard.');
+
+    // --- 11. O diário ---
+    console.log('\n--- 11. Testing the journal window ---');
+    await page.evaluate(() => {
+      gameState.quests.purify_crypt.status = 'active';
+      gameState.quests.decode_runes.status = 'active';
+      gameState.quests.decode_runes.runesFound = ['crypt'];
+      gameState.quests.merchant_amulet.status = 'inactive';
+    });
+    await page.focus('#quest-journal-button');
+    await page.keyboard.press('Enter');
+    await esperarJanela('diario');
+    await pausa(400);
+    const diario = await page.evaluate(() => ({
+      missoes: [...document.querySelectorAll('#diario .diario-missao')].map(m => m.textContent.replace(/\s+/g, ' ').trim()),
+      vazios: document.querySelectorAll('#diario .diario-vazio').length,
+      creditos: /Carl Olsen/.test(document.getElementById('diario').textContent)
+    }));
+    console.log('Journal:', diario);
+    if (diario.missoes.length !== 2 || diario.missoes.some(m => /Amuleto/.test(m))) throw new Error('The journal must list the two active quests and hide the inactive one');
+    if (!diario.missoes.some(m => /Alavancas/.test(m) && /de 2/.test(m)) || !diario.missoes.some(m => /1 de 3/.test(m))) throw new Error('The journal must show the levers (n de 2) and the runes (1 de 3)');
+    if (!diario.creditos) throw new Error('The journal must carry the icon credits, with the up-to-date authors');
+    await page.keyboard.press('Escape');
+    await esperarJanela('diario', false);
+    if ((await focado()).id !== 'quest-journal-button') throw new Error('Escape must give the focus back to the journal seal');
+    console.log('✅ PASS: The journal lists only the discovered quests with their progress and the credits, and closes by keyboard.');
+
+    // --- 12. O fim, os avisos, a barreira e a crônica ---
+    console.log('\n--- 12. Testing the end window, the toasts, the barrier and the chronicle ---');
+    // a janela abre sozinha, por um temporizador: ao fechar, o foco volta para quem o
+    // tinha antes dela (aqui, o selo do diário, que o caso 11 acabou de fechar)
+    const focoAntesDoFim = await page.evaluate(() => { loadScene('death'); skipTyping = true; return document.activeElement.id; });
+    await esperarJanela('fim');
+    const fim = await page.evaluate(() => ({
+      titulo: document.getElementById('fim-titulo').textContent,
+      desfecho: document.getElementById('fim').dataset.desfecho,
+      foco: document.activeElement && document.activeElement.id
+    }));
+    if (fim.titulo !== 'Você morreu' || fim.desfecho !== 'derrota' || fim.foco !== 'fim-recomecar') throw new Error(`The death must open the end window focused on "Começar uma nova aventura", got ${JSON.stringify(fim)}`);
+    await page.evaluate(() => { window.__semRecarga = true; });
+    await page.keyboard.press('Enter'); // logo depois de abrir: ignorado
+    await pausa(100);
+    const intacto = await page.evaluate(() => !!localStorage.getItem('ded_save_v1') && window.__semRecarga === true);
+    if (!intacto) throw new Error('An Enter right after the end window opens must not start a new adventure');
+    await page.keyboard.press('Escape');
+    await esperarJanela('fim', false);
+    const focoNoFim = await focado();
+    if (!focoAntesDoFim || focoNoFim.id !== focoAntesDoFim) throw new Error(`Closing the end window must give the focus back to "${focoAntesDoFim}", got ${JSON.stringify(focoNoFim)}`);
+    // uma cena nova antes da hora cancela a janela
+    await page.evaluate(() => { loadScene('death'); skipTyping = true; });
+    await pausa(300);
+    await page.evaluate(() => loadScene('corridor'));
+    await pausa(2500);
+    if (await page.evaluate(() => document.getElementById('fim').open)) throw new Error('A new scene must cancel the pending end window');
+    // avisos no lugar dos alert(): o mercador e a mochila cheia (um aviso só)
+    const avisos = () => page.evaluate(() => [...document.querySelectorAll('#avisos .aviso:not([hidden]) .aviso-texto')].map(a => a.textContent));
+    await page.evaluate(() => { loadScene('crypt_merchant'); skipTyping = true; });
+    await pausa(400);
+    const doMercador = await avisos();
+    if (!doMercador.some(t => /Over rir/.test(t))) throw new Error(`The merchant must speak through a toast, got ${JSON.stringify(doMercador)}`);
+    await pausa(6500); // o aviso some sozinho
+    await page.evaluate(() => {
+      gameState.player.inventory = ['Corda', 'Corda', 'Corda', 'Corda', 'Corda', 'Corda'];
+      updateInventoryDisplay();
+      loadScene('check_supplies');
+      skipTyping = true;
+    });
+    await pausa(400);
+    const daMochila = (await avisos()).filter(t => /Mochila cheia/.test(t));
+    if (daMochila.length !== 1) throw new Error(`A full backpack must raise exactly one toast, got ${JSON.stringify(daMochila)}`);
+    // a barreira recusa a passagem com um aviso
+    await page.evaluate(() => { gameState.levers = { lever_crystal: false, lever_lake: false }; loadScene('corridor'); });
+    await pausa(300);
+    const barreira = await page.evaluate(() => { const antes = gameState.currentScene; loadScene('final_chamber_entrance'); return antes === gameState.currentScene; });
+    await pausa(400);
+    if (!barreira || !(await avisos()).some(t => /barreira/i.test(t))) throw new Error('The barrier must keep the hero out and say so in a toast');
+    // a linha só de emojis vira palavras na crônica
+    const linha = await page.evaluate(() => { addToLog('💍 👑 💵 💰 🪙 💎'); const li = [...document.querySelectorAll('#game-log li')].pop(); return li.textContent.trim(); });
+    if (linha !== 'Anel, coroa, notas, bolsa de ouro, moeda e diamante.') throw new Error(`The emoji-only chronicle line must read in words, got "${linha}"`);
+    if (dialogos.length) throw new Error(`Native dialogs opened during cases 9 to 12: ${JSON.stringify(dialogos)}`);
+    console.log('✅ PASS: The end window opens after the death and can be dismissed, a new scene cancels it, toasts replace the alerts, the barrier says why, and the chronicle reads in words.');
+  } finally {
+    page.off('dialog', contarDialogo);
+  }
+
 
   console.log('\n=============================================');
   console.log('🎉 ALL QA TEST CASES PASSED SUCCESSFULLY FOR RPG ADVENTURE QUEST!');
