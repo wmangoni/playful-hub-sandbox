@@ -3220,7 +3220,7 @@
                 // Classe e caminho de prestígio, no cabeçalho
                 escreverTexto(porId('campo-classe'), getPlayerClassNamePt());
                 const caminho = porId('specialization-badge');
-                escreverTexto(caminho, p.specialization || 'escolhido no nível 3');
+                escreverTexto(caminho, p.specialization || (precisaDeEspecializacao() ? 'a escolher' : 'escolhido no nível 3'));
                 caminho.classList.toggle('campo-vazio', !p.specialization);
 
                 // Atributos: o modificador em destaque no medalhão, o valor na pílula
@@ -3865,9 +3865,10 @@
                         stopSpeech(); // Para a fala imediatamente se for desabilitado
                         return;
                     }
-                    // ligado no meio de uma cena, ele lê a cena à vista (fora da luta)
+                    // ligado no meio de uma cena, ele lê a cena à vista (fora da luta), ou o aviso da pausa
                     const cena = gameState.currentScene && scenes[gameState.currentScene];
-                    if (cena && !(gameState.combat && gameState.combat.active)) speakText(cena.text);
+                    if (document.querySelector('#choices[data-pausa]')) speakText(TEXTO_DA_PAUSA);
+                    else if (cena && !(gameState.combat && gameState.combat.active)) speakText(cena.text);
                 });
                 atualizarSeloNarrador(); // Define o estado inicial do selo
             }
@@ -4100,6 +4101,8 @@
             let especializacaoPendente = null; // { comSom, agendada } até a janela abrir
             let especializacaoAbertaEm = -Infinity;
             let especializacaoAdiada = false; // a janela fechou sem a escolha
+            let pausaMontadaEm = -Infinity; // o aviso recebeu o foco (a mesma pausa de ativação das escolhas)
+            const TEXTO_DA_PAUSA = 'Você chegou ao nível 3. A aventura fica em pausa até você escolher a sua especialização.';
 
             function precisaDeEspecializacao() {
                 const p = gameState.player;
@@ -4174,12 +4177,20 @@
                 });
                 // Fechada sem a escolha: o jogo segue em pausa, com o aviso fixo no lugar das
                 // escolhas e o foco nele (o foco que o <dialog> devolveu pode ter ido para uma
-                // escolha da cena, agora escondida)
+                // escolha da cena, agora escondida). Um Enter segurado no medalhão de fechar não
+                // reabre a janela pelo aviso (pausaMontadaEm). No estreito, o aviso entra à vista;
+                // com o narrador ligado, ele é lido.
                 janela.addEventListener('close', () => {
                     if (!precisaDeEspecializacao()) return; // fechou pela escolha
                     especializacaoAdiada = true;
                     montarPausaDaEspecializacao();
+                    pausaMontadaEm = performance.now();
                     focarPrimeiraEscolha();
+                    if (telaEstreita) noProximoQuadro('pausa-a-vista', () => {
+                        const aviso = document.querySelector('#choices .pausa-especializacao');
+                        if (aviso && typeof aviso.scrollIntoView === 'function') aviso.scrollIntoView({ block: 'nearest', behavior: movimentoReduzido() ? 'auto' : 'smooth' });
+                    });
+                    speakText(TEXTO_DA_PAUSA);
                 });
             })();
             devolverFocoAsEscolhas('especializacao');
@@ -4202,10 +4213,18 @@
                 const aviso = document.createElement('div');
                 aviso.className = 'pausa-especializacao';
                 aviso.innerHTML = '<p class="escolhas-titulo" id="pausa-titulo">Antes de seguir</p>' +
-                    '<p class="pausa-texto" id="pausa-texto">Você chegou ao nível 3. A aventura fica em pausa até você escolher a sua especialização.</p>' +
+                    `<p class="pausa-texto" id="pausa-texto">${TEXTO_DA_PAUSA}</p>` +
                     `<button class="escolha" type="button"><span class="escolha-num"><svg aria-hidden="true"><use href="${hrefIcone('i-magia')}"/></svg></span><span class="escolha-texto">Escolher a especialização</span></button>`;
-                aviso.querySelector('button').onclick = () => mostrarEspecializacao(false, { reaberta: true });
+                const botao = aviso.querySelector('button');
+                botao.onclick = () => { if (!cedoDemais(pausaMontadaEm)) mostrarEspecializacao(false, { reaberta: true }); };
+                // o foco que a janela devolve ao fechar chega antes do evento close: a pausa de
+                // ativação conta dele (um Tab de outro lugar até o aviso não trava)
+                botao.addEventListener('focus', e => {
+                    const de = e.relatedTarget;
+                    if (!de || (de.closest && de.closest('#especializacao'))) pausaMontadaEm = performance.now();
+                });
                 escolhas.prepend(aviso);
+                pausaMontadaEm = performance.now();
             }
 
             function tirarPausaDaEspecializacao() {

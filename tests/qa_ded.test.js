@@ -1040,17 +1040,18 @@ async function runTests() {
     // Escape fecha; o jogo segue em pausa, com o aviso fixo no lugar das escolhas da cena
     await page.keyboard.press('Escape');
     await esperarJanela('especializacao', false);
-    await pausa(300);
+    await pausa(400);
     const pausa1 = await page.evaluate(() => {
       const escolhas = document.getElementById('choices');
       const visiveis = [...escolhas.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim());
       const cena = gameState.currentScene;
       teleportToNode('corridor');
-      return { pausado: gameState.isPaused, visiveis, rotulo: escolhas.getAttribute('aria-labelledby'), mapaParado: motivoMapaParado(), ficouNaCena: gameState.currentScene === cena };
+      return { pausado: gameState.isPaused, visiveis, rotulo: escolhas.getAttribute('aria-labelledby'), mapaParado: motivoMapaParado(), ficouNaCena: gameState.currentScene === cena,
+        caminho: document.getElementById('specialization-badge').textContent.trim() };
     });
     const focoNaPausa = await focado();
     if (!pausa1.pausado || pausa1.visiveis.length !== 1 || !/Escolher a especialização/.test(pausa1.visiveis[0]) || !/especialização/.test(pausa1.mapaParado) || !pausa1.ficouNaCena
-      || pausa1.rotulo !== 'pausa-titulo pausa-texto' || !/Escolher a especialização/.test(focoNaPausa.texto)) {
+      || pausa1.rotulo !== 'pausa-titulo pausa-texto' || !/Escolher a especialização/.test(focoNaPausa.texto) || pausa1.caminho !== 'a escolher') {
       throw new Error(`Closing the specialization window must keep the game paused, with the notice instead of the scene choices, the focus on it and the map stopped, got ${JSON.stringify({ pausa1, focoNaPausa })}`);
     }
     // o aviso reabre a janela, e a escolha pelo teclado tira a pausa
@@ -1059,6 +1060,19 @@ async function runTests() {
     await pausa(400);
     const focoReaberta = await focado();
     if (focoReaberta.especializacao !== 'Paladino') throw new Error(`The notice must reopen the window on the first option, got ${JSON.stringify(focoReaberta)}`);
+    // um Enter repetido logo depois de fechar pelo medalhão (a tecla segurada) não reabre pelo aviso
+    await page.focus('#especializacao .janela-fechar');
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao', false);
+    await page.waitForFunction(() => document.activeElement && !!document.activeElement.closest('.pausa-especializacao'), { timeout: 3000 })
+      .catch(() => { throw new Error('Closing by the medallion must put the focus on the pause notice'); });
+    await page.keyboard.press('Enter');
+    await pausa(150);
+    if (await page.evaluate(() => document.getElementById('especializacao').open)) throw new Error('An Enter right after closing (a held key) must not reopen the window through the notice');
+    await pausa(300);
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao');
+    await pausa(400);
     await page.keyboard.press('Tab');
     await page.keyboard.press('Enter');
     await esperarJanela('especializacao', false);
