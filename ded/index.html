@@ -1536,10 +1536,14 @@
                 peca.hidden = false;
                 const tempo = duracao || Math.min(6000, 2600 + texto.length * 45);
                 peca.noArAte = agora + tempo;
+                // Um aviso novo na peça anula a entrada ainda pendente do anterior: com três
+                // avisos em menos de dois quadros, a entrada do primeiro deixava o temporizador
+                // de saída dele valendo, e o terceiro sumia antes da hora
+                const vez = peca.vez = (peca.vez || 0) + 1;
                 // Aparece depois do próximo quadro: o aviso pedido por uma cena (o mercador
                 // fala na cena de texto mais longo) não pesa no quadro da cena
                 depoisDoProximoQuadro(() => {
-                    if (peca.hidden) return; // outro aviso já ocupou e soltou a peça
+                    if (peca.hidden || peca.vez !== vez) return; // outro aviso já ocupou a peça
                     if (!host.matches(':popover-open')) host.showPopover();
                     const sobe = movimentoReduzido() ? [{ opacity: 0 }, { opacity: 1 }]
                         : [{ opacity: 0, transform: 'translateY(-0.8rem)' }, { opacity: 1, transform: 'none' }];

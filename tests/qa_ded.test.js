@@ -1121,6 +1121,12 @@ async function runTests() {
     const barreira = await page.evaluate(() => { const antes = gameState.currentScene; loadScene('final_chamber_entrance'); return antes === gameState.currentScene; });
     await pausa(400);
     if (!barreira || !(await avisos()).some(t => /barreira/i.test(t))) throw new Error('The barrier must keep the hero out and say so in a toast');
+    // três avisos em menos de dois quadros: o terceiro reusa a peça do primeiro e fica o tempo dele
+    await pausa(6500); // os avisos anteriores somem
+    await page.evaluate(() => { avisar('Primeiro', { duracao: 300 }); avisar('Segundo', { duracao: 4000 }); avisar('Terceiro', { duracao: 4000 }); });
+    await pausa(1500);
+    const corrida = await avisos();
+    if (!corrida.includes('Terceiro')) throw new Error(`A toast that reuses a piece must keep its own time, got ${JSON.stringify(corrida)}`);
     // a linha só de emojis vira palavras na crônica
     const linha = await page.evaluate(() => { addToLog('💍 👑 💵 💰 🪙 💎'); const li = [...document.querySelectorAll('#game-log li')].pop(); return li.textContent.trim(); });
     if (linha !== 'Anel, coroa, notas, bolsa de ouro, moeda e diamante.') throw new Error(`The emoji-only chronicle line must read in words, got "${linha}"`);
