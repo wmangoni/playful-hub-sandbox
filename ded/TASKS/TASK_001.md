@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 (celular, acessibilidade, transições, WebP e o preview do hub) está implementada e medida (a 60 Hz, §12), na 3ª rodada do juiz.
+**Status**: ✅ Fases 0 a 5 prontas, todas com o juiz em "excelente" (a 3 e a 4 com resíduos de desempenho anotados no §7, a 3 com decisões do dono, e a 5 medida a 60 Hz, sem regressão à mesma taxa). Falta a revisão do dono no PR e as decisões do §7, entre elas se o aceite de desempenho passa a valer a 60 Hz.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -60,7 +60,7 @@ No celular a tela vira uma coluna única, na ordem de jogo: o vitral, a narrativ
 | 2 ✅ | Exploração, seleção de personagem e dado d20 no jogo real. Componentes novos: card de seleção de personagem e botão secundário | Layout novo no desktop; telas legadas idênticas com o kit carregado (1080p e 1366×768); aceite de performance; testes |
 | 3 ✅ | Combate. Componentes novos: card de inimigo e barra de vida do inimigo | Idem |
 | 4 ✅ | Loja, especialização, diário, mapa, telas de fim e toasts. Componentes novos: moldura de modal e toast, fora da `.folha` (camadas `--z-overlay` e `--z-toast`) | Nenhum `alert()`; modais consistentes |
-| 5 | Celular, acessibilidade, transições, WebP, preview do hub e `npm run seo` | Sem rolagem horizontal em 375 px; contraste AA; `seo:check` |
+| 5 ✅ | Celular, acessibilidade, transições, WebP, preview do hub e `npm run seo` | Sem rolagem horizontal em 375 px; contraste AA; `seo:check` |
 
 ## 6. Regras de performance
 
@@ -498,7 +498,7 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - o `qa_ded` três vezes seguidas, com 15 de 15 em cada;
     - `qa_ded_task003`, `journey_ded`, `seo:check` e `tests/seo.test.js` passam;
     - o zoom do navegador de 100% a 200% não faz nada rolar de lado, e o texto cresce a partir de 175% (§7).
-- **2ª rodada do juiz** (sobre o `edfdaf3`): "muito bom", com um bloqueante pequeno: a medição dos estados do mapa era otimista. Ela media só o primeiro medalhão de cada estado, contra o ponto mais claro de três em volta, e não media o mapa a 390. Medido em todos os medalhões contra o P10 do fundo em volta, o "não visitado" ficava em 2,46 a 2,95:1 (as manchas escuras da carta e a legenda, no rodapé queimado). O juiz refez a auditoria (as mesmas 4.605 medições, com capturas idênticas byte a byte) e mostrou que o desempenho não muda (o `ded/index.html` igual ao do `cc218e0`, o layout do desktop igual em 9 tamanhos e 4 estados, e nenhum pipeline novo na primeira vez). O que entrou (`ad851e9`):
+- **2ª rodada do juiz** (sobre o `edfdaf3`): "muito bom", com um bloqueante pequeno: a medição dos estados do mapa era otimista. Ela media só o primeiro medalhão de cada estado, contra o ponto mais claro de três em volta, e não media o mapa a 390. Medido em todos os medalhões contra o P10 do fundo em volta, o "não visitado" ficava em 2,46 a 2,95:1 (as manchas escuras da carta e a legenda, no rodapé queimado). O juiz refez a auditoria (as mesmas 4.605 medições; 68 das 72 capturas idênticas byte a byte, e as 4 que diferem são estados que dependem do tempo, dois resultados de dado, a loja e a cena longa, sem mudar nenhuma medição) e mostrou que o desempenho não muda (o `ded/index.html` igual ao do `cc218e0`, o layout do desktop igual em 9 tamanhos e 4 estados, e nenhum pipeline novo na primeira vez). O que entrou (`ad851e9`):
   - a borda do não visitado em `--sepia-medio` (`#745638`, novo; o `--sepia-claro` dos caminhos e das barras de rolagem ficou): o pior caso foi para 3,36:1, na legenda a 1920;
   - `contraste.mjs` mede todos os medalhões da carta e da legenda, a 1920 e a 390 (no celular, por trechos da rolagem da janela), contra um anel de 3 a 8 px em volta, tirado de uma captura sem os medalhões, os caminhos, as alavancas e o texto, com o P10 e o P90, como no texto. O miolo em bronze do visitado fica dentro da borda de tinta e não encosta no fundo: ele é medido contra o miolo do não visitado e do "pode ir" (3,34:1), e a borda dele, contra o fundo (3,64:1 no pior caso, a legenda a 1920, onde o rodapé é mais queimado);
   - os links dos créditos: o anel triplo cobria a letra vizinha a 1920 e, no celular, envolvia o alvo de toque inteiro e cortava a linha de cima. Agora o foco realça a palavra (fundo de tinta e letra creme, com 2 px de folga), e o alvo de 44 px saiu do `padding` para um `::after`. O realce fica entre 5,01 e 7,79:1;
@@ -511,4 +511,8 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - a auditoria inteira, 36 estados a 1920 e a 390: 4.658 medições, 36 abaixo de AA, todas de controles desabilitados (isentos);
     - o `qa_ded` duas vezes, com 15 de 15 em cada; `journey_ded`, `qa_ded_task003`, `seo:check` e `tests/seo.test.js` passam;
     - sem bateria de desempenho nova: as mudanças são uma cor sólida na borda, o realce e o contorno transparente, que só aparecem com o foco do teclado, e um `::after` vazio nos créditos do celular.
-  - A 3ª rodada está em andamento.
+- **3ª rodada do juiz** (sobre o `0d6eafe`): **"excelente"**, sem bloqueante. A Fase 5 está aceita.
+  - O juiz refez a auditoria inteira (4.658 medições, 36 abaixo de AA, todas de controles desabilitados, sem medalhão fora de vista) e conferiu o mapa com a sonda dele, independente da ferramenta: o pior caso da carta ficou entre 3,61 (o Lago Subterrâneo, com a alavanca no anel do fundo) e 3,85:1, e a legenda em 3,36:1, igual à ferramenta. Ele achou certa a leitura do visitado (a borda contra o fundo e o miolo contra o miolo dos outros).
+  - Conferiu também: o alvo dos créditos em 8 tamanhos estreitos (45 px de altura, sem cobrir outro controle), o alto contraste emulado a 1920 e a 390 em todos os focos com sombras, e os pipelines de uma sessão nova, duas vezes (nenhum novo em relação ao `edfdaf3` e ao `cc218e0`).
+  - As sugestões entraram (`1767864`): a correção da frase das capturas "byte a byte" (acima) e o caso 15 do `qa_ded` conferindo o alvo de 44 px dos links dos créditos, na seleção e no diário, pelo `elementFromPoint` 21 px acima e abaixo do meio do link (o `getBoundingClientRect` dá só a altura da letra). Sem o `::after`, o caso falha.
+  - **Prova:** o `qa_ded` duas vezes, com 15 de 15 em cada.
