@@ -1136,6 +1136,175 @@ async function runTests() {
     page.off('dialog', contarDialogo);
   }
 
+  // ----------------------------------------------------
+  // TEST CASES 13 a 15: o vitral, o leitor de tela e o celular (Fase 5)
+  // ----------------------------------------------------
+  // --- 13. As artes em WebP e o esmaecer do vitral ---
+  console.log('\n--- 13. Testing the WebP arts and the vitral crossfade ---');
+  const vitrais = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'ded', 'assets', 'vitrais.json'), 'utf8'));
+  {
+    const usados = new Set(Object.values(vitrais).map(v => v.arquivo));
+    const naPasta = require('fs').readdirSync(require('path').join(__dirname, '..', 'ded', 'images'));
+    const faltam = [...usados].filter(a => !a.endsWith('.webp') || !naPasta.includes(a));
+    const soltos = naPasta.filter(a => !usados.has(a));
+    if (faltam.length || soltos.length) throw new Error(`Every vitral art must be a WebP in ded/images, and every file there must be used: missing ${JSON.stringify(faltam)}, unused ${JSON.stringify(soltos)}`);
+  }
+  const estadoDoVitral = () => page.evaluate(() => {
+    const camadas = [...document.querySelectorAll('.vitral-arte')];
+    const img = document.getElementById('image');
+    const outra = camadas.find(c => c !== img);
+    return {
+      camadas: camadas.length, imagens: document.querySelectorAll('#image').length, src: img.getAttribute('src'), alt: img.alt,
+      opacidade: getComputedStyle(img).opacity, emCima: img.classList.contains('vitral-arte-cima'),
+      outraOculta: !!outra && outra.getAttribute('aria-hidden') === 'true' && outra.alt === '' && getComputedStyle(outra).opacity === '0',
+      local: document.getElementById('local').textContent
+    };
+  });
+  const esperarArte = arquivo => page.waitForFunction(a => (document.getElementById('image').getAttribute('src') || '').endsWith('images/' + a)
+    && !document.getAnimations().some(n => n.playState === 'running' && n.effect && n.effect.target && n.effect.target.classList
+      && n.effect.target.classList.contains('vitral-arte')), { timeout: 5000 }, arquivo)
+    .catch(() => { throw new Error(`The vitral did not settle on ${arquivo} in 5 s`); });
+  const conferirVitral = async cena => {
+    await esperarArte(vitrais[cena].arquivo);
+    const v = await estadoDoVitral();
+    if (v.camadas !== 2 || v.imagens !== 1 || v.alt !== vitrais[cena].alt || v.opacidade !== '1' || !v.emCima || !v.outraOculta || v.local !== vitrais[cena].local) {
+      throw new Error(`The vitral must show ${cena} on top, with its alt and place, over a hidden empty layer, got ${JSON.stringify(v)}`);
+    }
+  };
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  await page.evaluate(() => { if (gameState.combat && gameState.combat.active) closeCombatScreen(); loadScene('start'); skipTyping = true; });
+  await conferirVitral('start');
+  await page.evaluate(() => { loadScene('corridor'); skipTyping = true; });
+  await pausa(120);
+  const esmaecer = await page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.id === 'image')
+    .map(a => ({ duracao: a.effect.getTiming().duration, opacidade: a.effect.getKeyframes().map(k => k.opacity) })));
+  if (!esmaecer.some(a => a.duracao === 400 && String(a.opacidade) === '0,1')) throw new Error(`The new art must fade in over the old one (opacity 0 to 1, 400 ms), got ${JSON.stringify(esmaecer)}`);
+  await conferirVitral('corridor');
+  // três cenas em seguida: o vitral para na última, inteiro
+  await page.evaluate(() => { loadScene('crystal_cave'); loadScene('underground_lake'); setTimeout(() => loadScene('treasure_room'), 30); });
+  await pausa(1500);
+  await conferirVitral('treasure_room');
+  // no movimento reduzido, a troca é na hora, sem esmaecer
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await page.evaluate(() => { window.__esmaeceu = false; const o = new MutationObserver(() => { if (document.getAnimations().some(a => a.effect && a.effect.target && a.effect.target.classList && a.effect.target.classList.contains('vitral-arte'))) window.__esmaeceu = true; }); o.observe(document.getElementById('image-container') || document.body, { attributes: true, subtree: true }); window.__observador = o; loadScene('crypt'); skipTyping = true; });
+  await conferirVitral('crypt');
+  const reduzido = await page.evaluate(() => { window.__observador.disconnect(); return { esmaeceu: window.__esmaeceu, willChange: [...document.querySelectorAll('.vitral-arte')].map(c => getComputedStyle(c).willChange) }; });
+  if (reduzido.esmaeceu || reduzido.willChange.some(w => w !== 'auto')) throw new Error(`With reduced motion the art must swap without a fade or layer hints, got ${JSON.stringify(reduzido)}`);
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  console.log('✅ PASS: The arts are WebP, the vitral fades from one art to the next and settles on the last one, and swaps at once with reduced motion.');
+
+  // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas ---
+  console.log('\n--- 14. Testing the screen-reader structure ---');
+  const leitor = await page.evaluate(() => ({
+    mains: document.querySelectorAll('main:not([hidden])').length,
+    papelDoResultado: document.getElementById('result-message').getAttribute('role'),
+    resultadoEmRegiaoViva: !!document.getElementById('result-message').closest('[aria-live], [role="status"], [role="log"], [role="alert"]'),
+    descricaoDoDado: document.getElementById('dice-button').getAttribute('aria-describedby'),
+    mapa: document.getElementById('mapa').getAttribute('aria-describedby'),
+    diario: document.getElementById('diario').getAttribute('aria-describedby'),
+    lang: document.documentElement.lang
+  }));
+  console.log('Screen-reader structure:', leitor);
+  if (leitor.mains !== 1) throw new Error(`Only one <main> may be exposed, got ${leitor.mains}`);
+  if (leitor.papelDoResultado || leitor.resultadoEmRegiaoViva) throw new Error('#result-message must not be a live region (the chronicle line announces the roll)');
+  if (leitor.descricaoDoDado !== 'bandeja-titulo result-message') throw new Error(`#dice-button must be described by the tray title and the result, got ${leitor.descricaoDoDado}`);
+  if (leitor.mapa !== 'mapa-status' || leitor.diario !== 'diario-subtitulo') throw new Error('#mapa and #diario must be described by their status and subtitle');
+  if (leitor.lang !== 'pt-BR') throw new Error(`The document language must be pt-BR, got ${leitor.lang}`);
+  await page.evaluate(() => { loadScene('start'); skipTyping = true; });
+  await pausa(500);
+  await page.focus('#choices button');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.closest && !!document.activeElement.closest('#choices')
+    && document.getElementById('choices').getAttribute('aria-labelledby') === 'local scene-text escolhas-titulo', { timeout: 5000 })
+    .catch(() => { throw new Error('After a choice by keyboard, the focus must land on the new choices, named by the place, the scene text and the question'); });
+  await page.focus('#btn-toggle-map');
+  await pausa(100);
+  if (await page.evaluate(() => document.getElementById('choices').hasAttribute('aria-labelledby'))) throw new Error('The long name of #choices must go away once the focus leaves it');
+  console.log('✅ PASS: One <main>, the roll announced once, and the scene read before the choices.');
+
+  // --- 15. O celular a 375 px: sem rolagem de lado e alvos de toque de 44 px ---
+  console.log('\n--- 15. Testing the phone layout at 375 px ---');
+  const celular = await browser.newPage();
+  try {
+    await celular.setViewport({ width: 375, height: 667, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    await celular.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+    await celular.evaluateOnNewDocument(() => { try { localStorage.clear(); } catch (e) { /* sem armazenamento */ } });
+    celular.on('dialog', d => d.dismiss().catch(() => {}));
+    await celular.goto(`http://127.0.0.1:${PORT}/ded/index.html`, { waitUntil: 'domcontentloaded' });
+    await celular.waitForFunction(() => typeof scenes === 'object' && scenes && Object.keys(scenes).length > 50, { timeout: 15000 });
+    await celular.evaluate(() => { ttsEnabled = false; });
+    const deLado = async estado => {
+      const m = await celular.evaluate(() => ({ largura: document.documentElement.scrollWidth, tela: window.innerWidth }));
+      if (m.largura > m.tela) throw new Error(`At 375 px the page must not scroll sideways (${estado}): scrollWidth ${m.largura} > ${m.tela}`);
+    };
+    const alvosPequenos = seletor => celular.evaluate(s => [...document.querySelectorAll(s)].filter(e => {
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' && (r.width < 43.5 || r.height < 43.5);
+    }).map(e => `${e.id || e.className} ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`), seletor);
+    const janela = async (id, abrir) => {
+      await celular.evaluate(abrir);
+      await celular.waitForFunction(i => document.getElementById(i).open, { timeout: 5000 }, id).catch(() => { throw new Error(`#${id} did not open at 375 px`); });
+      await pausa(400);
+      await deLado(`#${id}`);
+      const pequenos = await alvosPequenos(`#${id} .janela-fechar, #${id} .mapa-no, #${id} #loja-mercadorias .escolha`);
+      if (pequenos.length) throw new Error(`Touch targets in #${id} must be at least 44 px: ${JSON.stringify(pequenos)}`);
+    };
+    await deLado('selection');
+    await celular.evaluate(() => { selectCharacter('warrior'); startGame(); skipTyping = true; });
+    await pausa(800);
+    await deLado('exploration');
+    const pequenos = await alvosPequenos('#choices .escolha, .selo');
+    if (pequenos.length) throw new Error(`Choices and seals must be at least 44 px at 375 px: ${JSON.stringify(pequenos)}`);
+    const narrativa = await celular.evaluate(() => parseFloat(getComputedStyle(document.getElementById('scene-text')).fontSize));
+    if (narrativa < 16) throw new Error(`The narrative must be at least 16 px on a phone, got ${narrativa}`);
+    await celular.evaluate(() => { loadScene('crypt'); skipTyping = true; });
+    await pausa(600);
+    await celular.evaluate(() => [...document.querySelectorAll('#choices button')][1].click());
+    await pausa(500);
+    await deLado('the d20 tray');
+    if ((await alvosPequenos('#dice-button')).length) throw new Error('The d20 button must be at least 44 px at 375 px');
+    await celular.evaluate(g => { loadScene('start'); startInteractiveCombat(g); }, GOBLIN);
+    await pausa(800);
+    await deLado('combat');
+    await celular.evaluate(() => closeCombatScreen());
+    await pausa(400);
+    await janela('mapa', () => document.getElementById('btn-toggle-map').click());
+    const sobrepostos = await celular.evaluate(() => {
+      // só os lugares da carta: a legenda fica no rodapé, fora da rolagem do corpo
+      const caixas = [...document.querySelectorAll('#mapa .mapa-carta .mapa-medalhao')].map(e => e.getBoundingClientRect());
+      let n = 0;
+      for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
+        const a = caixas[i], b = caixas[j];
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) n++;
+      }
+      return { n, corpoDeLado: document.querySelector('#mapa .janela-corpo').scrollWidth > document.querySelector('#mapa .janela-corpo').clientWidth };
+    });
+    if (sobrepostos.n || sobrepostos.corpoDeLado) throw new Error(`The portrait map must fit the window with no overlapping places, got ${JSON.stringify(sobrepostos)}`);
+    await celular.evaluate(() => fecharJanela('mapa'));
+    await pausa(400);
+    await janela('loja', () => { loadScene('buy_supplies'); skipTyping = true; });
+    await celular.evaluate(() => fecharJanela('loja'));
+    await pausa(400);
+    await janela('diario', () => document.getElementById('quest-journal-button').click());
+    await celular.evaluate(() => fecharJanela('diario'));
+    await pausa(400);
+    await janela('especializacao', () => { gameState.player.level = 3; gameState.player.specialization = null; openSpecializationModal(false); });
+    await celular.evaluate(() => document.querySelector('#especializacao [data-especializacao]').click());
+    await pausa(400);
+    await celular.evaluate(() => { loadScene('death'); skipTyping = true; });
+    await celular.waitForFunction(() => document.getElementById('fim').open, { timeout: 8000 }).catch(() => { throw new Error('#fim did not open at 375 px'); });
+    await pausa(600);
+    await deLado('#fim');
+    await celular.evaluate(() => fecharJanela('fim'));
+    await pausa(400);
+    await celular.evaluate(() => avisar('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' }));
+    await pausa(400);
+    await deLado('a toast');
+    console.log('✅ PASS: At 375 px nothing scrolls sideways (selection, exploration, the d20 tray, combat, the five windows and a toast), the targets are 44 px and the narrative is 16 px or more.');
+  } finally {
+    await celular.close();
+  }
+
 
   console.log('\n=============================================');
   console.log('🎉 ALL QA TEST CASES PASSED SUCCESSFULLY FOR RPG ADVENTURE QUEST!');
