@@ -1391,6 +1391,7 @@
                 gameState.visitedNodes = ["start"];
                 resetProgression();
                 mostrarTela('exploracao');
+                voltarAoTopo();
                 //Start the game with the 'start' scene
                 loadScene('start');
                 updateStatsDisplay();
@@ -1442,6 +1443,39 @@
                 const narrativa = document.getElementById('narrativa');
                 narrativa.style.visibility = 'hidden';
                 depoisDoProximoQuadro(() => { narrativa.style.visibility = ''; });
+            }
+
+            // ---------- Celular e tablet (Fase 5) ----------
+            // Na tela estreita, a folha vira uma coluna (duas no tablet) e a página rola.
+            // Quem escolheu lá embaixo, nas escolhas, ficaria olhando o fim da cena nova:
+            // ela vem à vista, a partir do vitral se a arte mudou, ou da narrativa; a luta
+            // traz o painel dela. No desktop, que não rola, nada disso roda. A leitura do
+            // layout espera o próximo quadro (noProximoQuadro).
+            const TELA_ESTREITA = window.matchMedia ? window.matchMedia('(max-width: 68.6875em), (orientation: portrait)') : null;
+            let telaEstreita = !!(TELA_ESTREITA && TELA_ESTREITA.matches);
+            if (TELA_ESTREITA && TELA_ESTREITA.addEventListener) {
+                TELA_ESTREITA.addEventListener('change', e => { telaEstreita = e.matches; });
+            }
+            // Recarregar a página (o recomeçar recarrega) volta ao alto, e não ao meio
+            if (typeof history !== 'undefined' && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+            function trazerAVista(id) {
+                if (!telaEstreita) return;
+                noProximoQuadro('a-vista', () => {
+                    const el = document.getElementById(id);
+                    if (!el || typeof el.scrollIntoView !== 'function') return;
+                    const topo = el.getBoundingClientRect().top;
+                    if (topo >= 0 && topo < window.innerHeight * 0.6) return; // já está à vista
+                    el.scrollIntoView({ block: 'start', behavior: movimentoReduzido() ? 'auto' : 'smooth' });
+                });
+            }
+            function mostrarCenaNova(sceneName) {
+                if (!telaEstreita) return;
+                trazerAVista(vitrais[sceneName] && vitrais[sceneName].arquivo ? 'nivel' : 'narrativa');
+            }
+            // A exploração começa no alto, mesmo que a seleção estivesse rolada até o botão
+            function voltarAoTopo() {
+                if (telaEstreita) noProximoQuadro('topo', () => window.scrollTo(0, 0));
             }
 
             // ---------- Janelas (Fase 4) ----------
@@ -1763,6 +1797,7 @@
                 typewriterEffect(document.getElementById('scene-text'), scene.text, 40, aoTerminarTexto);
                 setupSkipListener();
                 addChoiceInCurrentScene(scene);
+                mostrarCenaNova(sceneName);
 
                 // Run onEnter function if it exists for the scene
                 if (scene.onEnter) {
@@ -2251,6 +2286,7 @@
                 document.getElementById('combat-log-box').classList.toggle('hidden', !ativo);
                 document.getElementById('narrativa').classList.toggle('hidden', ativo);
                 document.getElementById('painel-cronica').classList.toggle('hidden', ativo);
+                if (ativo) trazerAVista('combat-screen');
             }
 
             function getPlayerClassNamePt() {

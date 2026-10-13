@@ -66,10 +66,16 @@
 /* folga para o contorno do foco, que o corpo (com rolagem) recortaria */
 #loja .janela-corpo { padding: 0.25rem 0.3rem; }
 
-@media (max-width: 1099px), (orientation: portrait) {
-    /* o preço desce para baixo do nome, como o detalhe das ações */
+@media (max-width: 68.6875em), (orientation: portrait) {
+    /* o preço desce para baixo do nome (o "faltam X de ouro" não cabe ao lado); o
+       ouro e a mochila numa linha só */
     #loja .escolha { grid-template-columns: 2.6rem minmax(0, 1fr); row-gap: 0.15rem; }
-    .loja-bolsa { gap: 0.5rem 1.4rem; }
+    #loja .acao-detalhe { grid-column: 2; justify-self: start; }
+    .loja-bolsa { gap: 0.5rem 1.3rem; }
+    .loja-bolsa-item { gap: 0.5rem; }
+    .loja-bolsa dt { gap: 0.45rem; letter-spacing: 0.08em; }
+    .loja-bolsa-icone { width: 2.3rem; }
+    .loja-bolsa-icone svg { width: 1.15rem; height: 1.15rem; }
 }
 
 
@@ -144,11 +150,14 @@
 @media (prefers-reduced-motion: reduce) {
     .especializacao-opcao:hover { transform: none; }
 }
-@media (max-width: 1099px), (orientation: portrait) {
-    .especializacao-opcoes { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
-    .especializacao-opcao + .especializacao-opcao { margin-top: 1rem; }
-    .especializacao-medalhao { width: 4.4rem; }
-    .especializacao-medalhao svg { width: 2.2rem; height: 2.2rem; }
+/* Celular: as duas opções empilhadas e mais baixas (no tablet, lado a lado) */
+@media (max-width: 43.6875em) {
+    .especializacao-opcoes { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; padding: 0.4rem 0.25rem; }
+    .especializacao-opcao { row-gap: 0.45rem; padding: 0.9rem 0.9rem 1rem; }
+    .especializacao-opcao + .especializacao-opcao { margin-top: 0.9rem; }
+    .especializacao-medalhao { width: 4.2rem; }
+    .especializacao-medalhao svg { width: 2.1rem; height: 2.1rem; }
+    .especializacao-nome { font-size: 1.9rem; }
 }
 
 
@@ -227,11 +236,16 @@
 #diario .creditos a { color: var(--sepia); white-space: nowrap; }
 #diario .creditos a:hover { color: var(--rubro); }
 
-@media (max-width: 1099px), (orientation: portrait) {
-    /* medalhão menor, e o rótulo de cada linha em cima do valor */
-    .diario-missao { grid-template-columns: 2.8rem minmax(0, 1fr); gap: 0.7rem; }
+@media (max-width: 68.6875em), (orientation: portrait) {
+    /* os links dos créditos com toque de 44 px */
+    #diario .creditos a { padding-block: 0.9rem; }
+}
+/* Celular: medalhão menor, e o rótulo de cada linha em cima do valor */
+@media (max-width: 43.6875em) {
+    .diario-missao { grid-template-columns: 2.8rem minmax(0, 1fr); gap: 0.7rem; padding-inline: 0; }
     .diario-medalhao { width: 2.8rem; }
     .diario-medalhao svg { width: 1.4rem; height: 1.4rem; }
+    .diario-titulo { font-size: 1.4rem; }
     .diario-linha { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
 }
 
@@ -410,14 +424,50 @@
 .mapa-legenda .mapa-medalhao { --medalhao-mapa: 1.75rem; }
 .mapa-legenda .mapa-alavanca { position: static; }
 
-/* Telas estreitas: a moldura da janela fica mais justa e a carta rola de lado */
-@media (max-width: 1099px), (orientation: portrait) {
+/* Tela estreita deitada (o celular deitado): a moldura fica mais justa, e a carta,
+   que precisa de 60rem para os nomes não baterem, rola de lado dentro da janela */
+@media (max-width: 68.6875em) and (orientation: landscape) {
     #mapa .janela-folha { padding-inline: 1.3rem; }
     .mapa-carta { min-width: 60rem; }
+    .mapa-no { min-width: 44px; } /* o toque: o lugar de nome curto ("Loja") tinha 37 px */
 }
-/* no celular, a fonte dos nomes fica maior que a carta: mais espaço entre os lugares */
-@media (max-width: 760px) {
-    .mapa-carta { min-width: 66rem; }
+/* Em pé (celular e tablet): a carta deita, com a entrada no alto e a vitória
+   embaixo, na largura da janela; o corpo rola para baixo, e nada rola de lado.
+   Os lugares continuam onde o JS os põe (left e top em porcentagem da carta
+   deitada, e os caminhos no viewBox dela): a camada dos caminhos e a dos lugares
+   têm o tamanho da carta deitada (100cqh por 100cqw) e são transpostas
+   (matrix(0, 1, 1, 0, 0, 0) troca x por y), e cada lugar é transposto de volta,
+   em pé, com o medalhão no ponto e o nome embaixo. A altura é fixa em rem, e não
+   proporcional à largura: dois lugares seguidos na mesma linha (70 unidades da
+   carta) ficam sempre a ~73 px, mais que um lugar com o nome em duas linhas,
+   qualquer que seja a largura da tela. Nada disso anima. */
+@media (orientation: portrait) {
+    #mapa .janela-folha { padding-inline: 1rem; }
+    #mapa .janela-corpo { overflow-x: hidden; }
+    #mapa .mapa-carta {
+        container-type: size;
+        min-width: 0;
+        width: min(100%, 27rem);
+        height: 80rem; /* o aspect-ratio que o JS grava não vale com as duas medidas */
+        margin-inline: auto;
+    }
+    #mapa .mapa-caminhos,
+    #mapa .mapa-nos {
+        inset: 0 auto auto 0;
+        width: 100cqh;
+        height: 100cqw;
+        transform-origin: 0 0;
+        transform: matrix(0, 1, 1, 0, 0, 0);
+    }
+    #mapa .mapa-no {
+        min-width: 44px; /* o toque: o lugar de nome curto ("Loja") tinha 37 px */
+        transform-origin: 0 0;
+        transform: matrix(0, 1, 1, 0, 0, 0) translate(-50%, -1.25rem);
+    }
+    /* o nome sempre embaixo e um pouco mais estreito ("Porta Selada" em duas
+       linhas não bate no Mercador da Cripta, ao lado) */
+    #mapa .mapa-no-acima .mapa-no-nome { order: 0; }
+    #mapa .mapa-no-nome { max-width: 4.6rem; }
 }
 
 
@@ -511,16 +561,32 @@ dialog.janela[open] .fim-selo { animation: carimbar 0.45s cubic-bezier(0.3, 1.5,
     dialog.janela[open] .fim-selo { animation: none; }
 }
 
-@media (max-width: 1099px), (orientation: portrait) {
-    /* o resumo em duas colunas, o selo e o título menores, e a fita do recomeçar
-       numa linha só a 390 px (mais larga que a folha, ela alargaria a janela) */
-    .fim-folha { padding-inline: 1.2rem; }
-    .fim-selo { width: 5.8rem; }
-    .fim-selo svg { width: 2.7rem; height: 2.7rem; }
-    .fim-titulo { font-size: 2.3rem; }
-    .fim-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 0.9rem; }
+@media (max-width: 68.6875em), (orientation: portrait) {
+    /* o selo e o título menores, e a fita do recomeçar mais curta (rabos menores),
+       numa linha só e dentro da folha a 360 px */
+    .fim-folha { padding-inline: 1rem; }
+    .fim-cabeca { padding-top: 0.2rem; }
+    .fim-selo { width: 5.2rem; }
+    .fim-selo svg { width: 2.4rem; height: 2.4rem; }
+    .fim-titulo { font-size: 2.2rem; }
+    .fim-folha .janela-rodape { gap: 0.7rem 1rem; }
+    .fim-folha .janela-rodape .botao-fita {
+        height: 3.1rem;
+        border-width: 0 2.4rem;
+        border-image-width: 0 2.4rem;
+        padding: 0 0.4rem;
+        font-size: 1.1rem;
+        line-height: 2.7rem;
+    }
+}
+/* Celular: o resumo em duas colunas, com o ícone ao lado do rótulo, para caber sem
+   rolar a 360 px */
+@media (max-width: 37.4375em) {
+    .fim-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 0.7rem; }
     .fim-dado:nth-child(odd) { border-left: 0; }
-    .fim-folha .janela-rodape .botao-fita { font-size: 1.1rem; }
+    .fim-dado dt { grid-auto-flow: column; align-items: center; gap: 0.4rem; }
+    .fim-dado dt svg { width: 1.3rem; height: 1.3rem; }
+    .fim-valor { font-size: 2rem; }
 }
 
 

@@ -141,24 +141,103 @@
     contain: layout style;
 }
 
-/* ---------- Telas estreitas ou em retrato: coluna única (refinado na Fase 5) ---------- */
+/* ---------- Telas estreitas ou em retrato: celular e tablet (Fase 5) ---------- */
 
-@media (max-width: 1099px), (orientation: portrait) {
+/* A folha cresce com o conteúdo e a página rola. As colunas da ficha e da
+   narrativa somem do layout (display: contents): cada peça entra na grade da mesa
+   e toma o lugar que serve ao jogo. A coluna do vitral fica, porque o medalhão do
+   nível se posiciona nela.
+
+   Celular: uma coluna, na ordem de jogar. O vitral com a cena, a narrativa (ou o
+   combate) com as escolhas, a vida logo abaixo das ações, a crônica (ou o relato)
+   e, por fim, a ficha. */
+@media (max-width: 68.6875em), (orientation: portrait) {
     .folha.tela-exploracao {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: auto auto;
         height: auto;
         min-height: 100dvh;
-        padding: 0 0.4rem;
+        padding: 0 0.35rem;
     }
-    .tela-exploracao .cabecalho { grid-template-columns: minmax(0, 1fr); row-gap: 0.7rem; padding: 0.8rem 0 0; }
+    .tela-exploracao .cabecalho { grid-template-columns: minmax(0, 1fr); row-gap: 0.7rem; padding: 0.7rem 0 0; }
     .tela-exploracao .titulo { order: -1; }
-    .tela-exploracao .campos { grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0; }
+    .tela-exploracao .campos { grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0 0.3rem; }
     .tela-exploracao .selos { justify-content: center; padding: 0; }
-    .tela-exploracao .mesa { grid-template-columns: minmax(0, 1fr); row-gap: 2.6rem; padding: 1.4rem 0 1rem; }
-    .tela-exploracao .coluna-vitral { order: -2; padding-top: 4.2rem; }
-    .tela-exploracao .coluna-narrativa { order: -1; }
-    .tela-exploracao .vitral { height: auto; width: min(100%, 30rem); }
-    .tela-exploracao .painel-narrativa { padding: 2.2rem 1.1rem 1rem; }
-    .tela-exploracao .painel-cronica { flex-basis: auto; }
+
+    .tela-exploracao .mesa { grid-template-columns: minmax(0, 1fr); row-gap: 2.5rem; padding: 1.2rem 0 1rem; }
+    .tela-exploracao .coluna-ficha,
+    .tela-exploracao .coluna-narrativa { display: contents; }
+    .tela-exploracao .coluna-vitral { order: 1; padding-top: 4.2rem; }
+    .tela-exploracao .painel-narrativa,
+    .tela-exploracao .painel-combate { order: 2; }
+    .tela-exploracao .vitais { order: 3; padding: 0.4rem 0.6rem 0; }
+    .tela-exploracao .painel-cronica { order: 4; }
+    .tela-exploracao .coluna-ficha > .painel { order: 5; }
+
+    /* O vitral não passa de ~53% da altura da tela: a arte e o começo do texto
+       cabem juntos quando a cena nova entra */
+    .tela-exploracao .vitral { height: auto; width: min(100%, 30rem, 40svh); }
+    .tela-exploracao .painel-narrativa { padding: 2.2rem 0.9rem 1rem; }
+    /* o texto cresce com a página e não rola por dentro (com a capitular mais alta
+       que um texto curto, sobravam uns pixels de rolagem que prendiam o dedo) */
+    .tela-exploracao .cena-texto { overflow-y: visible; }
+    /* a crônica e o relato não empurram a ficha para longe: rolam por dentro, com o
+       mais recente à vista */
+    .tela-exploracao .painel-cronica { padding: 1.8rem 0.9rem 0.6rem; }
+    .tela-exploracao .cronica { max-height: 19rem; }
+
+    /* A página rola: os números que sobem flutuam no meio da tela, onde ela estiver,
+       e não só sobre o vitral */
+    .tela-exploracao #floater-layer { position: fixed; }
+
+    /* Onde a página para quando a cena nova ou a luta vem à vista (trazerAVista, no
+       jogo): com a fita do painel e o medalhão do nível inteiros */
+    .tela-exploracao .nivel { scroll-margin-top: 0.6rem; }
+    .tela-exploracao .painel-narrativa,
+    .tela-exploracao .painel-combate { scroll-margin-top: 2.6rem; }
+}
+
+/* Tablet e celular deitado (de 43,75em, 700 px na fonte padrão): duas colunas.
+   O vitral e a vida à esquerda, a narrativa (ou o combate) à direita; embaixo, a
+   crônica na largura toda e a ficha em duas colunas. O cabeçalho ganha duas
+   linhas: o título, e os campos com os selos. A ordem dos painéis da ficha
+   (atributos, equipamento e missões) é a do HTML. */
+@media (min-width: 43.75em) and (max-width: 68.6875em), (min-width: 43.75em) and (orientation: portrait) {
+    .folha.tela-exploracao { padding: 0 0.8rem; }
+    .tela-exploracao .cabecalho {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "titulo titulo" "campos selos";
+        column-gap: 2rem;
+        padding: 0.8rem 3rem 0;
+    }
+    .tela-exploracao .titulo { grid-area: titulo; }
+    .tela-exploracao .campos { grid-area: campos; align-self: center; max-width: 30rem; }
+    .tela-exploracao .selos { grid-area: selos; }
+
+    .tela-exploracao .mesa {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        grid-template-rows: auto 1fr;
+        grid-template-areas:
+            "vitral narrativa"
+            "vitais narrativa"
+            "cronica cronica"
+            "atributos equipamento"
+            "missoes missoes";
+        column-gap: 1.6rem;
+        row-gap: 2.3rem;
+    }
+    .tela-exploracao .coluna-vitral { grid-area: vitral; }
+    .tela-exploracao .painel-narrativa,
+    .tela-exploracao .painel-combate { grid-area: narrativa; align-self: start; }
+    .tela-exploracao .vitais { grid-area: vitais; align-self: start; }
+    .tela-exploracao .painel-cronica { grid-area: cronica; }
+    .tela-exploracao .coluna-ficha > .painel:nth-child(2) { grid-area: atributos; }
+    .tela-exploracao .coluna-ficha > .painel:nth-child(3) { grid-area: equipamento; }
+    .tela-exploracao .coluna-ficha > .painel:nth-child(4) { grid-area: missoes; }
+    /* o vitral (e o medalhão em cima dele) cabem na altura da tela */
+    .tela-exploracao .vitral { width: min(100%, 30rem, calc((100svh - 6rem) * 0.75)); }
+    .tela-exploracao .painel-narrativa { padding: 2.2rem 1.4rem 1rem; }
+    .tela-exploracao .cronica { max-height: 14rem; }
+    /* com o vitral à vista, ao lado do texto, os números voltam a subir sobre ele */
+    .tela-exploracao #floater-layer { position: absolute; }
 }
