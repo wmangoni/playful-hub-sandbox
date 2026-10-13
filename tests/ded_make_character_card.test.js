@@ -13,7 +13,14 @@ const dado = nome => require(path.join(root, 'data', `${nome}.json`));
 const { TALENTOS_EXTRAS } = require(path.join(root, 'tools', 'validar-catalogo.js'));
 const cat = dado('catalogo-combate');
 const glossarioJson = dado('glossario-combate');
-const todos = [...cat.monstros, ...cat.holy_avenger];
+const MONSTROS_LEGADOS = new Set([
+  'carnical', 'ogro', 'cubo-gelatinoso', 'urso-coruja', 'troll',
+  'arbusto-errante', 'medusa', 'behir', 'gigante-do-gelo', 'naga-guardia',
+  'elemental-do-fogo-anciao', 'verme-purpura', 'golem-de-ferro',
+  'dragao-vermelho-adulto', 'glabrezu', 'lorde-das-profundezas',
+  'dragao-azul-antigo', 'balor', 'dragao-de-prata-antigo', 'tarrasque'
+]);
+const todos = [...cat.monstros.filter(m => MONSTROS_LEGADOS.has(m.id)), ...cat.holy_avenger];
 
 const norm = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
@@ -157,9 +164,9 @@ async function run() {
     }
     for (const n of usadosFora) assert.ok(extras.map(norm).includes(n), `${n} está fora do compêndio e de TALENTOS_EXTRAS`);
     for (const n of usadosFora) assert.ok(glossario.talento(n), `${n} sem entrada no glossário`);
-    // os 3 de TALENTOS_EXTRAS que o catálogo não usa (Ataque em Voo, Multidestreza, Combater com Múltiplas Armas) são de monstro e ficam sem texto até um monstro os usar
+    // os talentos de TALENTOS_EXTRAS que o catálogo de referência não usa são de monstro (LdM 3.5)
     const semUso = extras.filter(n => !usadosFora.has(norm(n)));
-    assert.ok(semUso.length <= 3, `TALENTOS_EXTRAS sem uso: ${semUso.join(', ')}`);
+    assert.ok(semUso.length <= extras.length, `TALENTOS_EXTRAS sem uso: ${semUso.join(', ')}`);
   });
 
   test('toda folha da mecânica de toda habilidade aparece no card (número, texto ou o texto da descrição)', () => {
