@@ -1171,26 +1171,35 @@ async function runTests() {
       throw new Error(`The vitral must show ${cena} on top, with its alt and place, over a hidden empty layer, got ${JSON.stringify(v)}`);
     }
   };
-  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  // A máquina pode estar com as animações do Windows desligadas (a página abre no reduzido):
+  // a emulação só chega ao jogo no evento change do matchMedia, e o loadScene espera por ele
+  const movimento = async valor => {
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: valor }]);
+    await page.waitForFunction(r => movimentoReduzido() === r, { timeout: 3000 }, valor === 'reduce')
+      .catch(() => { throw new Error(`The game did not see prefers-reduced-motion: ${valor}`); });
+  };
+  await movimento('no-preference');
   await page.evaluate(() => { if (gameState.combat && gameState.combat.active) closeCombatScreen(); loadScene('start'); skipTyping = true; });
   await conferirVitral('start');
   await page.evaluate(() => { loadScene('corridor'); skipTyping = true; });
-  await pausa(120);
-  const esmaecer = await page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.id === 'image')
-    .map(a => ({ duracao: a.effect.getTiming().duration, opacidade: a.effect.getKeyframes().map(k => k.opacity) })));
-  if (!esmaecer.some(a => a.duracao === 400 && String(a.opacidade) === '0,1')) throw new Error(`The new art must fade in over the old one (opacity 0 to 1, 400 ms), got ${JSON.stringify(esmaecer)}`);
+  // o esmaecer começa depois do decode() da arte nova, num quadro que não dá para prever
+  const esmaecer = await page.waitForFunction(() => {
+    const a = document.getAnimations().find(n => n.effect && n.effect.target && n.effect.target.id === 'image');
+    return a && { duracao: a.effect.getTiming().duration, opacidade: a.effect.getKeyframes().map(k => k.opacity) };
+  }, { timeout: 3000, polling: 'raf' }).then(h => h.jsonValue()).catch(() => null);
+  if (!esmaecer || esmaecer.duracao !== 400 || String(esmaecer.opacidade) !== '0,1') throw new Error(`The new art must fade in over the old one (opacity 0 to 1, 400 ms), got ${JSON.stringify(esmaecer)}`);
   await conferirVitral('corridor');
   // três cenas em seguida: o vitral para na última, inteiro
   await page.evaluate(() => { loadScene('crystal_cave'); loadScene('underground_lake'); setTimeout(() => loadScene('treasure_room'), 30); });
   await pausa(1500);
   await conferirVitral('treasure_room');
   // no movimento reduzido, a troca é na hora, sem esmaecer
-  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await movimento('reduce');
   await page.evaluate(() => { window.__esmaeceu = false; const o = new MutationObserver(() => { if (document.getAnimations().some(a => a.effect && a.effect.target && a.effect.target.classList && a.effect.target.classList.contains('vitral-arte'))) window.__esmaeceu = true; }); o.observe(document.getElementById('image-container') || document.body, { attributes: true, subtree: true }); window.__observador = o; loadScene('crypt'); skipTyping = true; });
   await conferirVitral('crypt');
   const reduzido = await page.evaluate(() => { window.__observador.disconnect(); return { esmaeceu: window.__esmaeceu, willChange: [...document.querySelectorAll('.vitral-arte')].map(c => getComputedStyle(c).willChange) }; });
   if (reduzido.esmaeceu || reduzido.willChange.some(w => w !== 'auto')) throw new Error(`With reduced motion the art must swap without a fade or layer hints, got ${JSON.stringify(reduzido)}`);
-  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  await movimento('no-preference');
   console.log('✅ PASS: The arts are WebP, the vitral fades from one art to the next and settles on the last one, and swaps at once with reduced motion.');
 
   // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas ---
