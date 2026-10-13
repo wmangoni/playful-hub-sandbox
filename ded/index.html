@@ -2017,7 +2017,7 @@
                     fimAgendado = null;
                     if (geracao !== fimGeracao || gameState.currentScene !== cena) return;
                     // nunca no meio de uma luta, nem por cima de outra janela (a
-                    // especialização, obrigatória, ou o diário que o jogador abriu):
+                    // especialização ou o diário que o jogador abriu):
                     // espera a luta acabar ou a janela fechar
                     if (gameState.combat && gameState.combat.active) {
                         if (tentativas > 0) agendarFim(cena, 500, tentativas - 1);
@@ -4186,10 +4186,17 @@
 
             // O aviso fixo da pausa: o primeiro filho de #choices (o foco das escolhas vai a
             // ele), com as escolhas da cena montadas e escondidas pelo CSS ([data-pausa]).
-            // Uma cena nova remonta as escolhas e chama de novo (addChoiceInCurrentScene).
+            // Uma cena nova remonta as escolhas e chama de novo (addChoiceInCurrentScene). Num
+            // final a aventura acabou, e o "Começar uma nova aventura" fica à vista.
             function montarPausaDaEspecializacao() {
                 const escolhas = document.getElementById('choices');
-                if (!escolhas || !especializacaoAdiada || !precisaDeEspecializacao()) return;
+                if (!escolhas) return;
+                if (!especializacaoAdiada || !precisaDeEspecializacao() || CENAS_FINAIS.has(gameState.currentScene)) {
+                    delete escolhas.dataset.pausa;
+                    const aviso = escolhas.querySelector('.pausa-especializacao');
+                    if (aviso) aviso.remove();
+                    return;
+                }
                 escolhas.dataset.pausa = 'especializacao';
                 if (escolhas.querySelector('.pausa-especializacao')) return;
                 const aviso = document.createElement('div');
@@ -4203,11 +4210,7 @@
 
             function tirarPausaDaEspecializacao() {
                 especializacaoAdiada = false;
-                const escolhas = document.getElementById('choices');
-                if (!escolhas) return;
-                delete escolhas.dataset.pausa;
-                const aviso = escolhas.querySelector('.pausa-especializacao');
-                if (aviso) aviso.remove();
+                montarPausaDaEspecializacao();
             }
 
             function chooseSpecialization(name) {
