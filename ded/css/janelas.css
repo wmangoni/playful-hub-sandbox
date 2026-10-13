@@ -238,8 +238,10 @@
 #diario .creditos a:hover { color: var(--rubro); }
 
 @media (max-width: 68.6875em), (orientation: portrait) {
-    /* os links dos créditos com toque de 44 px */
-    #diario .creditos a { padding-block: 0.9rem; }
+    /* os links dos créditos com toque de 44 px, num ::after: com padding, o anel de foco
+       envolvia a caixa toda e cortava a linha de cima */
+    #diario .creditos a { position: relative; }
+    #diario .creditos a::after { content: ""; position: absolute; inset: -0.9rem 0; }
 }
 /* Celular: medalhão menor, e o rótulo de cada linha em cima do valor */
 @media (max-width: 43.6875em) {
@@ -341,10 +343,12 @@
     box-shadow: 0 0 0 0.1rem var(--tinta); /* o aro escuro da arte tem menos de 1 px */
     color: var(--creme);
 }
-/* Cada estado se distingue por uma peça de 3:1 ou mais contra a carta: o visitado pelo
-   miolo em bronze, o "pode ir" pelo anel escuro de fora (depois da faixa de ouro), o não
-   visitado pela borda sépia contínua, o selado pela borda sépia e o cadeado, e o atual
-   pelo anel de tinta em volta da arte rubra (Fase 5, contraste AA) */
+/* Cada estado se distingue por uma peça de 3:1 ou mais (Fase 5, contraste AA; medido em
+   todos os medalhões, contra o fundo em volta, por ded/tools/contraste.mjs): o visitado pela
+   borda de tinta e pelo miolo em bronze, que tem 3:1 contra o miolo claro do "não visitado"
+   e do "pode ir"; o "pode ir" pelo anel escuro de fora (depois da faixa de ouro); o não
+   visitado pela borda em sépia médio; o selado pela borda sépia e o cadeado; e o atual pelo
+   anel de tinta em volta da arte rubra */
 [data-estado="visitado"] > .mapa-medalhao {
     border-color: var(--tinta-2);
     background: var(--bronze);
@@ -361,9 +365,10 @@
     color: var(--rubro);
 }
 /* borda contínua, não tracejada (um círculo tracejado é rasterizado à parte e compilava
-   um pipeline da GPU na primeira vez que o mapa abria numa sessão), em sépia, com 3:1 */
+   um pipeline da GPU na primeira vez que o mapa abria numa sessão), em sépia médio: o
+   sépia claro ficava abaixo de 3:1 nas manchas escuras da carta e no rodapé da legenda */
 [data-estado="desconhecido"] > .mapa-medalhao {
-    border-color: var(--sepia-claro);
+    border-color: var(--sepia-medio);
     background: color-mix(in srgb, var(--pergaminho) 70%, var(--pergaminho-2));
     color: var(--sepia-claro);
 }
@@ -381,7 +386,7 @@
 .mapa-no:not([aria-disabled="true"]):focus-visible > .mapa-medalhao { border-color: var(--rubro); color: var(--rubro); }
 .mapa-no:not([aria-disabled="true"]):hover .mapa-no-nome,
 .mapa-no:not([aria-disabled="true"]):focus-visible .mapa-no-nome { color: var(--rubro); }
-.mapa-no:focus-visible { outline: none; }
+.mapa-no:focus-visible { outline: 0.15rem solid transparent; } /* o anel de alto contraste (forced-colors) */
 .mapa-no:focus-visible > .mapa-medalhao { box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro), 0 0 0 0.44rem var(--tinta); }
 /* No meio da luta, do d20 ou da especialização, nada leva a lugar nenhum */
 .mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] > .mapa-medalhao { --anel-mapa: var(--sepia-claro); border-color: var(--pergaminho-3); }

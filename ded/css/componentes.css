@@ -119,7 +119,9 @@
 .selo:hover svg { transform: translateY(-0.12rem); color: var(--rubro); }
 .selo[aria-pressed="true"] svg, .selo[aria-expanded="true"] svg { color: var(--rubro); }
 .selo[aria-pressed="false"] svg { opacity: 0.72; } /* desligado, mas o ícone fica acima de 3:1 */
-.selo:focus-visible { outline: none; }
+/* O contorno transparente fica no lugar do de sempre: some na tela normal e aparece no modo de
+   alto contraste (forced-colors), onde as sombras dos anéis não são pintadas */
+.selo:focus-visible { outline: 0.15rem solid transparent; }
 .selo:focus-visible svg { box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro), 0 0 0 0.44rem var(--tinta); }
 
 /* ---------- Painel com moldura e fita ---------- */
@@ -382,13 +384,22 @@
 /* Anel triplo (rubro, ouro e tinta), como nos selos: onde o anel pode cair sobre a
    moldura escura ou rente a uma borda escura (os créditos perto do filete, o espaço do
    equipamento), um dos três tem 3:1 contra o que fica em volta */
-.creditos a:focus-visible,
 .slot-usavel:focus-visible {
-    outline: none;
-    border-radius: 0.1rem;
+    z-index: 1; /* o anel passa por cima do espaço vizinho */
+    outline: 0.15rem solid transparent;
     box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro), 0 0 0 0.44rem var(--tinta);
 }
-.slot-usavel:focus-visible { z-index: 1; } /* o anel passa por cima do espaço vizinho */
+/* Nos links dos créditos, no meio do texto, o foco realça a palavra (fundo de tinta e letra
+   creme, com 2 px de folga): um anel em volta cobria a letra vizinha. O sépia e o rubro do
+   link (e do hover) viram creme só nele. O alvo de toque do celular fica num ::after */
+.creditos a:focus-visible {
+    --sepia: var(--creme);
+    --rubro: var(--creme);
+    outline: 0.15rem solid transparent;
+    border-radius: 0.1rem;
+    background: var(--tinta);
+    box-shadow: 0 0 0 0.12rem var(--tinta);
+}
 /* Mochila bloqueada durante o teste de dado (o clique ainda explica o motivo). A 0.72,
    o nome do item fica legível (4,5:1) e a mochila ainda parece travada */
 .slot.disabled { opacity: 0.72; cursor: not-allowed; }
@@ -1279,10 +1290,11 @@ dialog.janela::backdrop { background: rgba(14, 9, 5, 0.74); }
 }
 .janela-fechar svg { position: relative; width: 100%; height: 100%; }
 .janela-fechar:hover { transform: translateY(-0.12rem); color: var(--rubro); }
-.janela-fechar:focus-visible { outline: none; box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro), 0 0 0 0.44rem var(--tinta); }
+.janela-fechar:focus-visible { outline: 0.15rem solid transparent; box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro), 0 0 0 0.44rem var(--tinta); }
 /* No rodapé, sobre o pergaminho escurecido junto da moldura, o contorno de foco
-   desce para o rubro escuro: o rubro ficava abaixo de 3:1 ali */
-.janela-folha .janela-rodape :focus-visible { outline-color: var(--rubro-escuro); }
+   desce para o rubro escuro: o rubro ficava abaixo de 3:1 ali (os links dos créditos têm o
+   realce próprio, e o contorno deles fica transparente) */
+.janela-folha .janela-rodape :focus-visible:not(.creditos a) { outline-color: var(--rubro-escuro); }
 /* Título de seção dentro da janela (a mesma letra do título das escolhas) */
 .janela-secao {
     margin: 0 0 0.4rem;

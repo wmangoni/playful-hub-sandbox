@@ -1,10 +1,11 @@
 // Auditoria de contraste do ded (WCAG 2.2 AA), sem axe: para cada texto à vista,
 // a cor computada (com a opacidade dos ancestrais) contra o fundo REALMENTE
 // pintado, amostrado de uma captura com todo o texto transparente
-// (-webkit-text-fill-color) e sem sombras de texto. Do fundo de cada caixa de
-// texto saem a média dos 10% mais escuros e a dos 10% mais claros; vale a pior razão.
+// (-webkit-text-fill-color) e sem sombras de texto. Do fundo em volta dos traços de
+// cada texto saem os percentis 10 e 90 da luminância; vale a pior razão (a média dos
+// decis extremos fica de referência na tabela).
 // Também mede o anel de foco e algumas peças não textuais (as barras de vida, os ícones dos
-// selos e a peça que distingue cada estado do mapa).
+// selos e, em todos os medalhões do mapa e da legenda, a peça que distingue cada estado).
 //
 //   node ded/tools/contraste.mjs <saida> [--tamanhos 1920x1080,390x844] [--so estado1,estado2] [--raiz <repo>]
 //
@@ -316,7 +317,9 @@ async function anelDeFoco(page, estado, tamanho, seletor, { desc } = {}) {
         const cs = getComputedStyle(alvo);
         const b = alvo.getBoundingClientRect();
         const aneis = []; // [cor, de, ate] em px a partir da borda
-        if (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0) {
+        // um contorno transparente é o do modo de alto contraste: o anel são as sombras
+        const transparente = /rgba\(.*,\s*0\)$|transparent/.test(cs.outlineColor);
+        if (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && !transparente) {
             const off = parseFloat(cs.outlineOffset), w = parseFloat(cs.outlineWidth);
             aneis.push([cs.outlineColor, off, off + w]);
         } else if (cs.boxShadow !== 'none') {
@@ -326,7 +329,11 @@ async function anelDeFoco(page, estado, tamanho, seletor, { desc } = {}) {
         return { aneis, semBaixo: el.matches('.selo, .mapa-no'), semCima: !!el.closest('.card-heroi') || el.matches('.mapa-no'), b: { l: b.left + scrollX, t: b.top + scrollY, r: b.right + scrollX, bt: b.bottom + scrollY } };
     }, seletor);
     if (!info.aneis.length) { resultados.push({ estado, tamanho, naoTexto: true, elemento: seletor, erro: 'sem anel' }); return; }
+    // o fundo sem o texto, como no texto: num link no meio da frase, as letras vizinhas não são fundo
+    const h = await page.addStyleTag({ content: SEM_TEXTO });
+    await espera(60);
     const tela = await page.screenshot({ encoding: 'base64', fullPage: inteira, captureBeyondViewport: inteira });
+    await h.evaluate(e => e.remove());
     const r = await aux.evaluate(async (u, info) => {
         const img = await new Promise((ok, e) => { const i = new Image(); i.onload = () => ok(i); i.onerror = e; i.src = 'data:image/png;base64,' + u; });
         const c = new OffscreenCanvas(img.width, img.height); const g = c.getContext('2d'); g.drawImage(img, 0, 0);
@@ -403,12 +410,8 @@ async function pares(page, estado, tamanho, gerar) {
         const lum = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
         const razao = (a, b) => { const [x, y] = a > b ? [a, b] : [b, a]; return (x + 0.05) / (y + 0.05); };
         const hex = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
-        const cor = ([x, y], k = 1) => { const s = [0, 0, 0]; let n = 0; for (let dy = -k; dy <= k; dy++) for (let dx = -k; dx <= k; dx++) { const i = ((Math.round(y) + dy) * W + Math.round(x) + dx) * 4; s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; n++; } return s.map(v => v / n); };
-        return lista.map(p => {
-            // vários pontos de fundo: vale o mais claro (o pergaminho, e não um traço que passe perto)
-            const b = (p.bs || [p.b]).map(q => cor(q)).sort((x, y) => lum(...y) - lum(...x))[0];
-            // vários pontos (uma borda fina): vale o de maior contraste, o que não caiu na suavização da borda
-            const a = (p.as || [p.a]).map(q => cor(q, p.raio ?? 1)).sort((x, y) => razao(lum(...y), lum(...b)) - razao(lum(...x), lum(...b)))[0]; return { desc: p.desc, cor: hex(a), fundoEscuro: hex(b), fundoClaro: hex(b), razao: Math.round(razao(lum(...a), lum(...b)) * 100) / 100, exigido: p.exigido || 3 }; });
+        const cor = ([x, y]) => { const s = [0, 0, 0]; let n = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const i = ((Math.round(y) + dy) * W + Math.round(x) + dx) * 4; s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; n++; } return s.map(v => v / n); };
+        return lista.map(p => { const a = cor(p.a), b = cor(p.b); return { desc: p.desc, cor: hex(a), fundoEscuro: hex(b), fundoClaro: hex(b), razao: Math.round(razao(lum(...a), lum(...b)) * 100) / 100, exigido: p.exigido || 3 }; });
     }, tela, lista);
     r.forEach(x => resultados.push({ estado, tamanho, naoTexto: true, elemento: x.desc, ...x, passa: x.razao >= x.exigido }));
 }
@@ -448,25 +451,101 @@ const parBarra = (sel, desc) => new Function(`
     const y = b.top + b.height / 2;
     return [{ desc: ${JSON.stringify(desc)} + ' (cheio contra vazio, vida ' + Math.round(v * 100) + '%)', a: [b.left + scrollX + b.width * v * 0.45, y + scrollY], b: [b.left + scrollX + b.width * (v + (1 - v) * 0.55), y + scrollY] }];`);
 
-// medalhões do mapa: a peça que distingue cada estado, contra o pergaminho da carta (o miolo
-// em bronze do visitado; o anel escuro de fora do "pode ir" e do atual, amostrado num pixel;
-// a borda dos outros)
-function paresMapa() {
-    if (document.activeElement) document.activeElement.blur(); // o mapa abre com o foco no lugar atual
-    const out = [];
-    const vistos = new Set();
-    document.querySelectorAll('#mapa .mapa-carta .mapa-no').forEach(no => {
-        const est = no.dataset.estado; if (vistos.has(est)) return; vistos.add(est);
-        const m = no.querySelector('.mapa-medalhao'); const b = m.getBoundingClientRect(); const cs = getComputedStyle(m);
-        const bw = parseFloat(cs.borderTopWidth) || 0; const cx = b.left + b.width / 2;
-        // o alto do medalhão (os caminhos chegam pelos lados e por baixo) e, de fundo, o mais
-        // claro de três pontos em volta
-        const bs = [[b.left - 5, b.top - 5], [b.right + 5, b.top - 5], [cx, b.top - 7]];
-        if (est === 'visitado') out.push({ desc: 'mapa: "visitado", o miolo em bronze contra a carta', a: [cx, b.top + b.height * 0.3], bs });
-        else if (est === 'pode-ir' || est === 'atual') out.push({ desc: `mapa: "${est}", o anel escuro de fora contra a carta`, as: [[cx, b.top - 0.6], [cx, b.top - 1.1]], bs, raio: 0 });
-        else out.push({ desc: `mapa: "${est}", a borda contra a carta`, as: [0.5, 1, 1.5, 2].filter(d => d < bw).map(d => [cx, b.top + d]), bs, raio: 0 });
-    });
-    return out;
+// Medalhões do mapa e da legenda, todos: a peça de fora de cada estado (a cor computada: o anel
+// escuro do "pode ir" e do atual, a borda dos outros) contra o fundo em volta, um anel de 3 a 8 px
+// fora do medalhão, em todos os ângulos, tirado de uma captura sem os medalhões, os caminhos, as
+// alavancas e o texto. Vale o pior de P10 e P90, como no texto. O miolo em bronze do visitado não
+// encosta no fundo (fica dentro da borda de tinta): ele é o que o separa do "não visitado" e do
+// "pode ir", e é medido contra o miolo deles. No celular, a carta rola dentro da janela: mede por
+// trechos.
+const SEM_MAPA = SEM_TEXTO + '\n#mapa .mapa-caminhos, #mapa .mapa-alavanca, #mapa .mapa-medalhao { visibility: hidden !important; }';
+async function medalhoes(page, estado, tamanho) {
+    if (SO && !SO.has(estado)) return;
+    await page.evaluate(() => { if (document.activeElement) document.activeElement.blur(); }); // o mapa abre com o foco no lugar atual
+    const feitos = new Set();
+    let total = 0;
+    for (let trecho = 0; trecho < 30; trecho++) {
+        await espera(150);
+        const lista = await page.evaluate(feitos => {
+            // o color-mix() sai como color(srgb r g b)
+            const paraRgb = s => { const m = s.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/); return m ? `rgba(${m[1] * 255}, ${m[2] * 255}, ${m[3] * 255}, ${m[4] ?? 1})` : s; };
+            const miolo = est => paraRgb(getComputedStyle(document.querySelector(`#mapa .mapa-legenda [data-estado="${est}"] > .mapa-medalhao`)).backgroundColor);
+            const miolos = { visitado: miolo('visitado'), desconhecido: miolo('desconhecido'), 'pode-ir': miolo('pode-ir') };
+            const corpo = document.querySelector('#mapa .janela-corpo').getBoundingClientRect();
+            const todos = [...document.querySelectorAll('#mapa .mapa-medalhao')];
+            const out = [];
+            todos.forEach((m, k) => {
+                if (feitos.includes(k)) return;
+                const dono = m.closest('[data-estado]'), est = dono.dataset.estado, legenda = !!m.closest('.mapa-legenda');
+                const b = m.getBoundingClientRect(), cs = getComputedStyle(m);
+                const R = b.width / 2, cx = b.left + R, cy = b.top + b.height / 2;
+                // só o que está inteiro à vista, com o anel do fundo
+                const lim = legenda ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight } : corpo, f = 12;
+                if (!b.width || cx - R - f < Math.max(0, lim.left) || cy - R - f < Math.max(0, lim.top) || cx + R + f > Math.min(innerWidth, lim.right) || cy + R + f > Math.min(innerHeight, lim.bottom)) return;
+                let op = 1; for (let e = m; e; e = e.parentElement) op *= Number(getComputedStyle(e).opacity);
+                const sombra = cs.boxShadow.match(/^(rgba?\([^)]+\))\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px/);
+                let cor, peca, extra = 0;
+                if ((est === 'pode-ir' || est === 'atual') && sombra) { cor = sombra[1]; extra = Number(sombra[5]); peca = 'o anel escuro de fora'; }
+                else { cor = cs.borderTopColor; peca = 'a borda'; }
+                const nome = legenda ? dono.textContent.trim() : (dono.querySelector('.mapa-no-nome')?.textContent.trim() || '');
+                out.push({ k, elemento: `${legenda ? 'legenda' : 'mapa'}: "${est}", ${peca}`, desc: nome, cor: paraRgb(cor), op, cx, cy, de: R + extra + 3, ate: R + extra + 8 });
+            });
+            return { out, total: todos.length, miolos };
+        }, [...feitos]);
+        total = lista.total;
+        if (trecho === 0) {
+            const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+            const rgb = s => s.match(/rgba?\(([^)]+)\)/)[1].split(/[ ,/]+/).filter(Boolean).map(Number).slice(0, 3);
+            const lum = s => { const [r, g, b] = rgb(s).map(lin); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+            const hex = s => '#' + rgb(s).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+            const razao = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+            const { visitado, desconhecido } = lista.miolos, podeIr = lista.miolos['pode-ir'];
+            const rD = razao(lum(visitado), lum(desconhecido)), rP = razao(lum(visitado), lum(podeIr));
+            const r = Math.round(Math.min(rD, rP) * 100) / 100;
+            resultados.push({ estado, tamanho, naoTexto: true, elemento: 'mapa: "visitado", o miolo em bronze contra o miolo dos outros', desc: '"não visitado" e "pode ir" (cores computadas)',
+                cor: hex(visitado), fundoEscuro: hex(desconhecido), fundoClaro: hex(podeIr), razao: r, razaoEscuro: Math.round(rD * 100) / 100, razaoClaro: Math.round(rP * 100) / 100, exigido: 3, passa: r >= 3 });
+        }
+        if (lista.out.length) {
+            const h = await page.addStyleTag({ content: SEM_MAPA });
+            await espera(60);
+            const fundo = await page.screenshot({ encoding: 'base64' });
+            await h.evaluate(e => e.remove());
+            fs.writeFileSync(path.join(saida, `${estado}-fundo-dos-medalhoes-${tamanho}-${trecho + 1}.png`), Buffer.from(fundo, 'base64'));
+            const r = await aux.evaluate(async (u, lista) => {
+                const img = await new Promise((ok, e) => { const i = new Image(); i.onload = () => ok(i); i.onerror = e; i.src = 'data:image/png;base64,' + u; });
+                const c = new OffscreenCanvas(img.width, img.height); const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+                const d = g.getImageData(0, 0, img.width, img.height).data, W = img.width, H = img.height;
+                const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+                const lum = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+                const razao = (a, b) => { const [x, y] = a > b ? [a, b] : [b, a]; return (x + 0.05) / (y + 0.05); };
+                const hex = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+                const rgb = s => s.match(/rgba?\(([^)]+)\)/)[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+                return lista.map(p => {
+                    const anel = [];
+                    for (let y = Math.floor(p.cy - p.ate); y <= Math.ceil(p.cy + p.ate); y++) {
+                        for (let x = Math.floor(p.cx - p.ate); x <= Math.ceil(p.cx + p.ate); x++) {
+                            if (x < 0 || y < 0 || x >= W || y >= H) continue;
+                            const dist = Math.hypot(x + 0.5 - p.cx, y + 0.5 - p.cy);
+                            if (dist >= p.de && dist <= p.ate) { const i = (y * W + x) * 4; anel.push([d[i], d[i + 1], d[i + 2]]); }
+                        }
+                    }
+                    anel.sort((a, b) => lum(...a) - lum(...b));
+                    const escuro = anel[Math.floor(anel.length * 0.1)], claro = anel[Math.min(anel.length - 1, Math.floor(anel.length * 0.9))];
+                    const [r0, g0, b0, a0 = 1] = rgb(p.cor), alfa = a0 * p.op;
+                    const sobre = bg => [r0, g0, b0].map((v, k) => v * alfa + bg[k] * (1 - alfa));
+                    const rEsc = razao(lum(...sobre(escuro)), lum(...escuro)), rCla = razao(lum(...sobre(claro)), lum(...claro));
+                    return { k: p.k, elemento: p.elemento, desc: p.desc, cor: hex(sobre(escuro)), fundoEscuro: hex(escuro), fundoClaro: hex(claro),
+                        razao: Math.round(Math.min(rEsc, rCla) * 100) / 100, razaoEscuro: Math.round(rEsc * 100) / 100, razaoClaro: Math.round(rCla * 100) / 100, pixels: anel.length };
+                });
+            }, fundo, lista.out);
+            r.forEach(({ k, ...x }) => { feitos.add(k); resultados.push({ estado, tamanho, naoTexto: true, ...x, exigido: 3, passa: x.razao >= 3 }); });
+        }
+        // o próximo trecho da carta (no desktop ela cabe inteira e o laço para aqui)
+        const rolou = await page.evaluate(() => { const c = document.querySelector('#mapa .janela-corpo'); const antes = c.scrollTop; c.scrollTop += c.clientHeight * 0.6; return c.scrollTop !== antes; });
+        if (!rolou || feitos.size === total) break;
+    }
+    await page.evaluate(() => { document.querySelector('#mapa .janela-corpo').scrollTop = 0; });
+    if (feitos.size !== total) erros.push(`${estado}-${tamanho}: ${total - feitos.size} de ${total} medalhões do mapa não ficaram inteiros à vista`);
 }
 
 // ---------------------------------------------------------------------------
@@ -612,7 +691,7 @@ async function rodada(tamanho, w, h) {
     await page.evaluate(() => document.getElementById('btn-toggle-map').click());
     await espera(700);
     await A(page, 'mapa');
-    if (!inteira) await pares(page, 'mapa', tamanho, paresMapa);
+    await medalhoes(page, 'mapa', tamanho);
     if (!inteira) await icones(page, 'mapa', tamanho, ['#mapa .janela-fechar svg', '#mapa .mapa-no[data-estado="selado"] .mapa-medalhao svg', '#mapa .mapa-no[data-estado="atual"] .mapa-medalhao svg']);
     await anelDeFoco(page, 'mapa', tamanho, '#mapa .janela-fechar');
     await anelDeFoco(page, 'mapa', tamanho, '#mapa .mapa-no[data-estado="pode-ir"]');
