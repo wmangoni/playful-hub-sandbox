@@ -232,7 +232,12 @@
 
                     <figure class="vitral" id="image-container">
                         <div class="vitral-cena">
-                            <img id="image" src="images/start.webp" alt="" style="--foco: 50% 50%">
+                            <!-- a arte em duas camadas fixas (changeImage): a visível é a #image; a
+                                 outra fica escondida e recebe a arte seguinte, que esmaece por cima -->
+                            <div class="vitral-artes">
+                                <img class="vitral-arte vitral-arte-cima" id="image" src="images/start.webp" alt="" style="--foco: 50% 50%">
+                                <img class="vitral-arte vitral-arte-oculta" alt="" aria-hidden="true">
+                            </div>
                             <div class="vitral-sombra"></div>
                             <div class="vitral-chama"></div>
                         </div>
@@ -1614,30 +1619,95 @@
                 return lugar && vitrais[lugar] && vitrais[lugar].arquivo ? lugar : 'start';
             }
 
-            // Devolve uma promessa que se cumpre quando a arte nova entra no vitral
-            // (na hora, se a arte não muda)
+            // A arte fica em duas camadas fixas (.vitral-arte), uma sobre a outra, cada
+            // uma com camada própria na GPU desde a abertura (will-change: opacity, no
+            // movimento padrão). A visível é a #image; a outra fica escondida (opacity 0,
+            // aria-hidden) e recebe a arte seguinte. Na troca, a escondida passa para
+            // cima e esmaece sobre a antiga (só a opacidade anima); no fim, a antiga se
+            // esconde e espera a próxima arte. No movimento reduzido, a troca é na hora.
+            const ESMAECER_ARTE = 400;
+            let camadasArte = null; // as duas <img>, procuradas uma vez
+            let esmaecerArte = null; // a animação da troca em curso
+            let pedidoArte = 0; // só o último pedido troca a arte
+
+            function obterCamadasArte() {
+                if (camadasArte === null) {
+                    const lista = document.querySelectorAll ? [...document.querySelectorAll('#image-container .vitral-arte')] : [];
+                    camadasArte = lista.length === 2 ? lista : false;
+                }
+                return camadasArte;
+            }
+
+            // decode() que nunca falha: uma arte que não carrega entra assim mesmo, como antes
+            function decodificar(img) {
+                const pronta = typeof img.decode === 'function' ? img.decode() : null;
+                return pronta && typeof pronta.then === 'function' ? pronta.catch(() => {}) : Promise.resolve();
+            }
+
+            // Devolve uma promessa que se cumpre quando a arte nova está no vitral: no
+            // fim do esmaecer, na troca (movimento reduzido) ou já, se a arte não muda ou
+            // se outra cena pediu outra arte antes
             function changeImage(sceneName) {
                 const arte = arteDaCena(sceneName);
                 const vitral = vitrais[arte];
                 if (!vitral || !vitral.arquivo || arte === vitralAtual) return Promise.resolve();
                 vitralAtual = arte;
                 document.getElementById('local').textContent = vitral.local;
-                const src = 'images/' + vitral.arquivo;
-                const img = document.getElementById('image');
-                return new Promise(trocou => {
-                    const trocar = () => {
-                        if (vitralAtual === arte) { // outra cena pode já ter pedido outra arte
-                            img.src = src;
-                            img.alt = vitral.alt;
-                            img.setAttribute('style', `--foco: ${vitral.foco}`);
-                        }
-                        trocou();
+                const pedido = ++pedidoArte;
+                const valendo = () => pedido === pedidoArte;
+                // Durante um esmaecer as duas camadas estão à vista: a arte seguinte espera
+                // ele terminar (cenas seguidas, como a do Isqueiro, que muda em 300 ms)
+                const livre = esmaecerArte ? esmaecerArte.finished.catch(() => {}) : Promise.resolve();
+                return livre.then(() => (valendo() ? mostrarArte('images/' + vitral.arquivo, vitral, valendo) : null));
+            }
+
+            function mostrarArte(src, vitral, valendo) {
+                const camadas = obterCamadasArte();
+                if (!camadas) { // sem as duas camadas (o teste de jornada, fora do navegador): troca na hora
+                    const img = document.getElementById('image');
+                    img.src = src;
+                    img.alt = vitral.alt;
+                    img.setAttribute('style', `--foco: ${vitral.foco}`);
+                    return null;
+                }
+                const [atual, nova] = camadas[0].id === 'image' ? camadas : [camadas[1], camadas[0]];
+                // A mesma arte em outra cena (o acampamento, a abertura, ou a volta à arte
+                // visível antes de a pedida entrar): só o texto e o foco, e ela fica por cima
+                if (atual.getAttribute('src') === src) {
+                    nova.classList.remove('vitral-arte-cima');
+                    atual.classList.add('vitral-arte-cima');
+                    atual.alt = vitral.alt;
+                    atual.setAttribute('style', `--foco: ${vitral.foco}`);
+                    return null;
+                }
+                // A escondida passa para cima ainda invisível, carrega e decodifica a arte
+                // antes da troca: sem quadro vazio no vitral, sem decodificar no quadro da
+                // troca, e a camada dela já pode ir para a GPU (por cima, nada a cobre)
+                atual.classList.remove('vitral-arte-cima');
+                nova.classList.add('vitral-arte-cima');
+                if (nova.getAttribute('src') !== src) nova.src = src;
+                nova.setAttribute('style', `--foco: ${vitral.foco}`);
+                return decodificar(nova).then(() => {
+                    if (!valendo()) return null; // outra cena já pediu outra arte
+                    atual.removeAttribute('id');
+                    atual.alt = '';
+                    atual.setAttribute('aria-hidden', 'true');
+                    nova.id = 'image';
+                    nova.alt = vitral.alt;
+                    nova.removeAttribute('aria-hidden');
+                    nova.classList.remove('vitral-arte-oculta');
+                    const esmaecer = movimentoReduzido() || typeof nova.animate !== 'function' ? null
+                        : nova.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ESMAECER_ARTE, easing: 'ease-in-out' });
+                    if (!esmaecer) {
+                        atual.classList.add('vitral-arte-oculta');
+                        return null;
+                    }
+                    esmaecerArte = esmaecer;
+                    const fim = () => {
+                        if (esmaecerArte === esmaecer) esmaecerArte = null;
+                        atual.classList.add('vitral-arte-oculta');
                     };
-                    // Decodifica antes de trocar: sem quadro vazio no vitral e sem
-                    // decodificar a arte no quadro da troca
-                    const nova = new Image();
-                    nova.src = src;
-                    if (nova.decode) nova.decode().then(trocar, trocar); else trocar();
+                    return esmaecer.finished.then(fim, fim);
                 });
             }
 
