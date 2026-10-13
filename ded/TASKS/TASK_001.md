@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 espera o aval do dono.
+**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 (celular, acessibilidade, transições, WebP e o preview do hub) está implementada; falta a medição final de desempenho e o juiz.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -49,7 +49,7 @@ Grade de 3 colunas no desktop: a ficha à esquerda, o vitral com a cena no centr
 
 A tela inteira é medida em `rem`, com `1rem = 16px` em 1920x1080, e escala com a janela. Os rótulos pequenos têm piso em px.
 
-No celular a tela vira uma coluna única. A versão definitiva do celular fica para a Fase 5.
+No celular a tela vira uma coluna única, na ordem de jogo: o vitral, a narrativa (ou o combate) com as escolhas, os vitais, a crônica e a ficha. A partir de 700 px (43.75em), duas colunas: o vitral e os vitais à esquerda, a narrativa à direita, e a crônica e a ficha embaixo. Os pontos de quebra são em `em`, e a raiz estreita segue a fonte escolhida no navegador (Fase 5, §12).
 
 ## 5. Fases
 
@@ -58,8 +58,8 @@ No celular a tela vira uma coluna única. A versão definitiva do celular fica p
 | 0 ✅ | Protótipo estático da tela de exploração (`ded/prototipo/`) | Direção aprovada; juiz "excelente" |
 | 1 ✅ | Fundação: CSS do `index.html` extraído para `ded/css/legado.css` **sem mudança visual**, mais tokens, fontes próprias, o kit de componentes e o catálogo (`ded/prototipo/componentes.html`) | Capturas idênticas às atuais; testes do ded verdes |
 | 2 ✅ | Exploração, seleção de personagem e dado d20 no jogo real. Componentes novos: card de seleção de personagem e botão secundário | Layout novo no desktop; telas legadas idênticas com o kit carregado (1080p e 1366×768); aceite de performance; testes |
-| 3 | Combate. Componentes novos: card de inimigo e barra de vida do inimigo | Idem |
-| 4 | Loja, especialização, diário, mapa, telas de fim e toasts. Componentes novos: moldura de modal e toast, fora da `.folha` (camadas `--z-overlay` e `--z-toast`) | Nenhum `alert()`; modais consistentes |
+| 3 ✅ | Combate. Componentes novos: card de inimigo e barra de vida do inimigo | Idem |
+| 4 ✅ | Loja, especialização, diário, mapa, telas de fim e toasts. Componentes novos: moldura de modal e toast, fora da `.folha` (camadas `--z-overlay` e `--z-toast`) | Nenhum `alert()`; modais consistentes |
 | 5 | Celular, acessibilidade, transições, WebP, preview do hub e `npm run seo` | Sem rolagem horizontal em 375 px; contraste AA; `seo:check` |
 
 ## 6. Regras de performance
@@ -126,6 +126,9 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - `toLocaleString` (ou `Intl`) no quadro de uma ação: a primeira chamada na página carrega os dados do locale (11 a 13 ms). Ela caía no quadro em que a janela do fim abre; o ouro de lá usa `milhares()`.
   - abrir uma janela no mesmo quadro da cena que a pediu: o `showModal()` recalcula o estilo e o layout da página inteira para mover o foco (~8 ms na primeira abertura de cada janela, ~2 ms depois). A loja abre um quadro depois da cena; a especialização, dois depois do XP.
   - elemento absoluto deixado no fim do `body`: na posição estática, ele estica a página (o `#avisos-leitor` fazia a seleção rolar 17 px, e depois 1 px). Ele fica no começo do `body`, com `margin: 0`.
+  - trocar a arte do vitral num `src` só: ela trocava sem transição, e a decodificação caía no quadro da troca. Desde a Fase 5, duas camadas fixas (`.vitral-arte`) esmaecem uma sobre a outra, com a arte nova decodificada antes (CLAUDE.md, "Vitral").
+  - montar o miolo de uma janela no clique que a abre: a carta do mapa é montada num `requestIdleCallback` depois da carga, e o clique só escreve o estado.
+- **Arte em WebP (Fase 5):** a arte WebP com perda chega à GPU em YUV, e o primeiro desenho de uma arte numa sessão compila um pipeline próprio (`HWYUVImageNoSwizzle`, 71 a 80 ms no "Começar" de uma sessão nova), no lugar do da arte em PNG (`ImageShaderClamp`, ~67 ms). As trocas seguintes reusam. Isso fica dentro do custo de primeira vez do "Começar" (§7, "Pipelines na primeira vez").
 - **Movimento:** respeitar `prefers-reduced-motion`.
 
 ## 7. Pendências para as próximas fases
@@ -157,14 +160,8 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 - **Aquecer de novo antes da luta (opcional):** não se sabe por quanto tempo o Chrome guarda o pipeline do preenchimento da barra (§6). Aquecer de novo quando a escolha de combate monta a bandeja tornaria a correção independente do tempo de jogo.
 - **"Começar" no limite:** o quadro do "Começar" monta a folha inteira (~12 ms na thread principal, estilo, layout e pintura) e rasteriza ~10 a 12 ms na GPU. Fica em 2 vsyncs em 16 a 19 de cada 20 execuções e, de vez em quando, passa a 3 ou 4 (§10). Deixar a exploração pintada sob a seleção tiraria o estilo e a pintura do clique, mas o fundo da `.folha` não cobre a moldura (`background-clip: padding-box`), e a exploração apareceria pelas partes vazadas dela; ficou para quando a seleção mudar.
 - **Pipelines na primeira vez (informativo):** numa sessão em que o Chrome ainda não tinha os pipelines da exploração, o primeiro "Começar" compilou mais de uma dúzia de uma vez (gradientes, texto, imagens e curvas do passe com MSAA, inclusive o do preenchimento da barra nessa variante), e a GPU parou 178 ms. Aconteceu na primeira execução de uma bateria, mesmo depois da aba de aquecimento, e nas 19 seguintes não. É o custo de primeira vez do Graphite, que não depende de uma peça só.
-- **Créditos no celular (Fase 5):** a 390 px, a linha de créditos dos ícones encosta no filete interno da moldura.
-- **Combate no celular (Fase 5):** a 390 px, "Fantasma de Drakmor" quebra em duas linhas no card do inimigo.
 - **Ruído das capturas:** duas capturas seguidas da mesma página podem diferir em até 31 por canal na borda de alguns SVGs (rasterização em software). Acontece também no commit da Fase 2; comparar com `--tolerancia` quando a diferença for só essa.
 - **Abertura a frio (informativo):** com a exploração montada em espera, a abertura ganhou um quadro de ~48 ms. É a pintura a frio, fora do veredito.
-- **Acessibilidade (Fase 5):**
-  - cada rolagem é anunciada duas vezes: no `#result-message` (`role=status`) e na crônica (`aria-live`);
-  - o foco vai direto à primeira escolha e pula o texto da cena para quem usa leitor de tela (focar o artigo da narrativa, com `tabindex=-1`);
-  - há dois `<main>` no DOM; o que está escondido deveria levar o atributo `hidden`.
 - **Primeira vez das janelas (resolvido na 1ª rodada do juiz, §11):** a 1920×1080, numa sessão nova do Chrome com perfil vazio, nenhuma janela nem efeito compila um pipeline na primeira vez (4 sessões). Numa delas, a especialização compilou um de 6 ms, sem quadro lento. O que sobra:
   - a 1366×768 e a 1600×900, a primeira compra compila 36 a 46 ms (`TessellateWedgesRenderStep[Convex] + SolidColor` com `AnalyticClip`, num passe com MSAA: um caminho convexo recortado). O mapa não compila nessas resoluções. O desenho não foi isolado (a suspeita do juiz é um ícone recortado). Isolar na Fase 5 com a mesma sonda, a 1366×768;
   - na primeira abertura do mapa numa aba recém-aberta, a GPU rasteriza a janela inteira (~23 ms). A sonda de perfil vazio mediu 20,7 a 27,8 ms nesse quadro; na bateria, a primeira execução do mapa ficou em 13,9 ms.
@@ -173,23 +170,30 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - por momento, os quadros acima do limite, a duração das limpezas da GPU e o p75 do trabalho da GPU por quadro;
   - se a diferença continuar, uma bissecção com CSS injetado das mudanças da Fase 4 (o espaço do equipamento, o botão secundário, as sombras, o `will-change` das janelas e as peças de aquecimento), como a do anel do mapa.
 - **Folga da GPU (Fase 5):** enquanto algo anima, a thread principal da GPU gasta ~6,5 ms por quadro (p75), quase todo o intervalo de 6,9 ms a 144 Hz. É igual nos rastreios das fases 2, 3 e 4, e por isso qualquer rasterização ou limpeza leva o quadro a 3 ou 4 vsyncs. Medir as camadas de tela inteira e a sobreposição das texturas.
-- **Abertura do mapa (sugestão do juiz):** uma abertura do mapa chegou a 34,6 ms na medição do juiz, com 11,3 ms de script no clique (`montarMapa`, `atualizarMapa` e `showModal`) e uma tarefa de 15 ms na GPU logo depois, sem compilação. Montar a carta num momento ocioso depois da carga deixaria só a atualização para o clique.
-- **Ferramenta (sugestões do juiz):**
-  - um cenário informativo de "abertura com save", sem a espera de 1,5 s: é o único caminho em que a página joga logo depois da carga (a máquina de escrever da cena salva), e a espera pode escondê-lo;
-  - o número de execuções refeitas por meia taxa na linha do veredito. A regra só pega a degradação total (mediana em 2 vsyncs): na medição do juiz, o "Começar" ficou em 3 vsyncs em 9 de 10 execuções, no código da 1ª rodada e no atual, e passou batido;
-  - um controle de referência intercalado quando a bateria tiver muitos quadros em 3 vsyncs.
 - **Especialização obrigatória (decisão de produto):** ela reabre quando o Chrome a fecha à força no terceiro Escape seguido. O juiz sugeriu outra saída: deixá-la fechar e manter o jogo pausado, com um aviso fixo para escolher.
 - **Mecânicas vistas na Fase 4 (fase própria):**
   - a loja só abre de novo voltando à cena dela, e com a janela aberta não dá para usar um item: com a mochila cheia, a compra não tem saída;
   - a loja vende "Poção de Vida", mas a cena da poção só gasta "Poção de cura";
   - pelo mapa, `last_fight` leva à vitória sem o chefe, e `crystal_chamber` leva à saída da cripta sem o teste; os caminhos do mapa e os das cenas não batem (`start→check_supplies`, `treasure_room→cavern` e outros);
   - `SCENE_TO_NODE` cita 19 cenas que não existem (`goblin_fight`, `wolf_fight`…), sem efeito no jogo.
-- **Celular (Fase 5), das janelas:** a 360 px, a fita da janela do fim fica ~12 px mais larga que o conteúdo, e o resumo rola; abaixo de ~60rem, a carta do mapa rola de lado.
 - **Textos:** "Removido X ao inventário" e o "pq" na mensagem de morte (fase de enredo). Também: "barreira mágica neon" na crônica (a barreira e as alavancas), as descrições "Recupera 10 HP" e "Item utilitário" que a loja mostra, e o texto de `merchant_items`, cópia do de `merchant_question`.
-- **Capturas:** o Puppeteer esconde as barras de rolagem (`--hide-scrollbars`). Na Fase 5, capturar com elas visíveis.
-- **Tamanho de fonte do navegador (Fase 5):** os `px` do legado e a raiz do kit ignoram a fonte padrão escolhida pelo usuário. Rever junto com a acessibilidade.
+- **Capturas:** o Puppeteer esconde as barras de rolagem (`--hide-scrollbars`); capturar com elas visíveis numa revisão do celular. Numa captura de página inteira a 390, a barra `sticky` do "Começar a aventura" aparece no fim da primeira tela, por cima do card do Mago; no celular de verdade ela fica presa no rodapé.
+- **Tamanho de fonte do navegador:** desde a Fase 5, o celular e o tablet seguem a fonte escolhida no navegador (a raiz estreita em `93.75%`, e os pontos de quebra em `em`, que levam uma fonte maior ao layout que rola). O desktop, não: uma raiz `calc(1em * min(0.8333vw, 1.4815vh) / 16px)` funciona no Chrome 149 e é idêntica a 16 px, mas, a 20 px, a grade de 3 colunas que cabe na tela passa 199 px da altura dela e a ficha sai da moldura. Rever se o desktop ganhar um layout que rola.
 - **Escala exata (Fase 5):** `min(0.8333vw, 1.4815vh)` dá 15,9994 px em 1920, e não 16. `calc(100vw / 120)` e `calc(100vh / 67.5)` dão 16 exatos, mas mexem em subpixels do protótipo.
-- **Celular (Fase 5):** "Começar uma nova aventura" quebra em duas linhas a 390 px.
+- **Celular, o que sobrou (Fase 5):**
+  - no combate a 375×667, a vida do herói fica logo abaixo da dobra, sob as ações (a partir de 390×844, as duas cabem). Um resumo da vida dentro do painel do combate pediria markup novo;
+  - a ordem do DOM põe a ficha antes da cena, e no celular ela aparece por último: o foco vai às escolhas em toda cena, então só os espaços usáveis do equipamento ficam fora da ordem;
+  - os avisos cobrem a fita e o fechar de uma janela enquanto estão no ar (no desktop também);
+  - no desktop, um texto de cena menor que a capitular vira um contêiner de rolagem de ~10 px (a morte em 1920: 101 contra 111 px; `componentes.css`, `.cena-texto` com `overflow-y: auto`). No estreito já não;
+  - numa sessão nova emulada a 390×844, a primeira luta compila três pipelines a mais que na Fase 4 (caminhos convexos num passe com MSAA, de 11 a 72 ms). É informativo: a régua é o Full HD, e a GPU de um celular de verdade segue outro caminho (Vulkan ou GL, e não D3D11).
+- **Acessibilidade, o que sobrou (Fase 5):**
+  - o rótulo "Classe" do cabeçalho fica em 4,47:1 num estado (já na cor mais escura, a tinta); só uma mudança de layout resolve;
+  - a cena lida antes das escolhas depende de o NVDA e o JAWS anunciarem o nome do grupo quando o foco entra nele: falta conferir com um leitor de tela de verdade. A alternativa (focar o `#scene-text`) mudaria as asserções de foco do `qa_ded`;
+  - o narrador (TTS) vem ligado e lê a cena por cima de um leitor de tela (decisão de produto: desligado por padrão?);
+  - o `#dice-button` segue "Rolar o d20" durante o giro ("Rolando…" mudaria a largura no quadro do clique);
+  - os links dos créditos abrem outra aba sem avisar.
+- **Artes, o que sobrou (Fase 5):** as duas artes pequenas (601×547 e 625×546) seguem ampliadas no vitral; não há pré-carga das artes das próximas cenas (pré-carregar as das escolhas da cena seria barato); e o `index_new.html` (legado, fora do escopo) pede `images/placeholder.png`, que nunca existiu, e monta o caminho da arte pelo nome da cena (depois da troca do acampamento, a do `check_supplies` não existe).
+- **Nome no hub:** o card e a página do hub chamam o jogo de "RPG Adventure Quest", e o jogo se chama "A Masmorra de Drakmor". Trocar o nome no hub (título, descrição, SEO) é decisão do dono.
 - **Servidor:** o `express.static('./')` depende do diretório atual do processo. Fora da raiz, `/ded` é servido sem a barra final e todos os caminhos relativos quebram. O `/ded/css` já é montado pelo `__dirname`; ver se vale fazer o mesmo para `/ded`.
 - **Erro de digitação em `assets/scenes.json`:** "Ira até a porta do fundo da cripta". Corrigir junto com os textos (fase de enredo).
 
@@ -453,3 +457,15 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
     - passaram o `journey_ded` e o `qa_ded`.
   - Achou a espera depois da carga e a meia taxa honestas. A espera só tira um desmonte que cai quando o jogador ainda está na seleção, e a meia taxa no máximo invalida uma bateria. O reduzido não bloqueia: os momentos e os custos são os mesmos, e um quadro de 340 ms foi preempção (22 ms de CPU). As sugestões e o plano para o reduzido estão no §7.
   - Também achou uma corrida no `avisar()`: com três avisos em menos de dois quadros, a entrada pendente do primeiro deixava o temporizador de saída dele valendo na peça reusada, e o terceiro sumia antes da hora. Ela foi reproduzida e corrigida: um aviso novo na peça anula a entrada pendente do anterior. O caso 12 do `qa_ded` ganhou a verificação.
+
+## 12. Registro da Fase 5
+
+- **Celular e tablet.** A tela vira uma coluna no celular e duas a partir de 700 px (§4), com todas as telas e janelas revistas. Sem rolagem de lado em 8 tamanhos (360×740, 375×667, 375×812, 390×844, 414×896, 768×1024, 1024×768 e 812×375) e 22 telas e estados, alvos de toque de 44 px, nenhum texto abaixo de 12 px e a narrativa a 19,8 px. Itens do §7 resolvidos: os créditos a 390, "Fantasma de Drakmor" numa linha, a fita e o resumo do fim a 360, a carta do mapa (que vira de lado no retrato, só no CSS) e "Começar uma nova aventura" numa linha. No celular, a cena nova e o combate entram à vista com uma rolagem. O desktop ficou igual, salvo o ruído das capturas.
+- **Acessibilidade.** Uma auditoria de contraste própria, contra o fundo pintado de verdade (o texto transparente numa segunda captura), em 30 estados a 1920×1080 e 390×844: de 112 casos abaixo de AA para 33, dos quais 22 são controles desabilitados e o resto está no §7. As cores de apoio escureceram (`--sepia`, `--apagado`, `--verdete`, e `--sepia-escuro` novo), o d20 e os selos clarearam, o trilho vazio da barra de vida ficou claro, e os anéis de foco ganharam um terceiro anel de tinta onde o fundo é escuro. Os três itens do §7 foram resolvidos: a rolagem é anunciada uma vez, o leitor de tela ouve a cena antes das escolhas, e só um `<main>` fica exposto. Também: `lang="pt-BR"`, as barras com `aria-valuetext`, o nível novo e a mochila travada anunciados no relato da luta, e o espaço travado dizendo por quê.
+- **Transição e WebP.** As 40 artes foram de 14,5 MB em PNG para 3,2 MB em WebP com perda (qualidade 80, escolhida por medição; as duas de 2048 px foram reduzidas a 1024, e duas idênticas viraram uma). No vitral do jogo, a diferença média é de 1,3 nível por canal. A arte esmaece de uma cena para a outra (400 ms), com duas camadas fixas; no movimento reduzido, troca na hora. `ded/tools/converter-artes.py` converte uma arte nova.
+- **Preview do hub.** `assets/images/ded_preview.png` é a exploração na entrada da masmorra, em 1280×720 (16:9, como o card). `npm run seo` não muda nada (o nome e a URL são os mesmos), e `seo:check` e `tests/seo.test.js` passam.
+- **Movimento:** no reduzido, a barra de vida pula para o valor novo e a arte troca sem esmaecer.
+- **Como foi feito.** Três agentes em paralelo, cada um num worktree a partir do `8ce8a0b`: o celular, a acessibilidade e as artes. As três branches foram juntadas sem conflito. A auditoria de contraste rodada de novo no código juntado achou duas coisas que nenhum agente via sozinho, corrigidas em seguida: o anel de foco da especialização sobre a moldura a 390 px, e o nome de um item comum na mochila travada durante o d20. Depois vieram as sugestões do juiz da Fase 4: a carta do mapa montada no ocioso e, no `desempenho.mjs`, a abertura com save, a contagem da meia taxa e o aviso de muitos quadros em 3 vsyncs.
+- **Testes:** `journey_ded`, `qa_ded_task003` e o `qa_ded`, que ganhou três casos (13: as artes em WebP e o esmaecer, inclusive três cenas seguidas e o reduzido; 14: a estrutura para o leitor de tela; 15: o celular a 375 px, sem rolagem de lado em todas as telas e janelas, com os alvos de toque e o mapa em retrato).
+- **Pipelines na primeira vez:** o rastreio de uma sessão inteira, de perfil vazio, no mesmo fluxo nas duas versões (a da Fase 4 e a atual), a 1920×1080: só o pipeline da arte mudou (o YUV do WebP, 80 ms, no lugar do da arte em PNG, 67 ms, no "Começar"). O esmaecer não compila nada. A 390×844, a primeira luta compila três a mais (§7).
+- **Desempenho:** a medir.
