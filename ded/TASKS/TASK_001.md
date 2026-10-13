@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 (celular, acessibilidade, transições, WebP e o preview do hub) está implementada e medida (a 60 Hz, §12), na 2ª rodada do juiz.
+**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 (celular, acessibilidade, transições, WebP e o preview do hub) está implementada e medida (a 60 Hz, §12), na 3ª rodada do juiz.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -130,8 +130,8 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - trocar a arte do vitral num `src` só: ela trocava sem transição, e a decodificação caía no quadro da troca. Desde a Fase 5, duas camadas fixas (`.vitral-arte`) esmaecem uma sobre a outra, com a arte nova decodificada antes (CLAUDE.md, "Vitral").
   - montar o miolo de uma janela no clique que a abre: a carta do mapa é montada num `requestIdleCallback` depois da carga, e o clique só escreve o estado.
 - **Contraste AA (Fase 5):** texto de 4,5:1 (3:1 o grande) e peças que dizem estado ou foco de 3:1, medidos contra o fundo pintado de verdade com `node ded/tools/contraste.mjs <pasta>` (as cores computadas mentem sobre o pergaminho, os gradientes e a arte). Duas regras que a auditoria ensinou:
-  - um anel de foco que pode cair sobre a moldura escura ou rente a uma borda escura (os créditos perto do filete, o espaço do equipamento, um card que ocupa a largura toda no celular) é o anel triplo dos selos: rubro, ouro e tinta. Um dos três sempre tem 3:1 contra o que fica em volta;
-  - cada estado de uma peça se distingue por algo de 3:1 ou mais contra o fundo, e não só pela cor do miolo: no mapa, o miolo em bronze do visitado, o anel escuro do "pode ir" e do atual, e a borda sépia contínua do não visitado e do selado.
+  - um anel de foco que pode cair sobre a moldura escura ou rente a uma borda escura (o espaço do equipamento, um card que ocupa a largura toda no celular, os medalhões) é o anel triplo dos selos: rubro, ouro e tinta. Um dos três sempre tem 3:1 contra o que fica em volta. Um link no meio do texto (os créditos) não leva anel, que cobriria a letra vizinha: a palavra fica realçada, com fundo de tinta e letra creme. E o foco desenhado com sombras leva um `outline` transparente, nunca `outline: none`: no modo de alto contraste (forced-colors) as sombras somem, e o contorno aparece na cor do sistema;
+  - cada estado de uma peça se distingue por algo de 3:1 ou mais, e não só pela cor do miolo: no mapa, a borda de tinta do visitado (e o miolo em bronze dele, contra o miolo claro do não visitado e do "pode ir"), o anel escuro do "pode ir" e do atual, a borda em `--sepia-medio` do não visitado e a borda sépia do selado. Meça em todas as peças, contra o fundo pior em volta (o P10 de um anel de 3 a 8 px): o mesmo estado cai numa mancha escura da carta ou no rodapé queimado da legenda, e o primeiro medalhão de cada estado não basta.
 - **Arte em WebP (Fase 5):** a arte WebP com perda chega à GPU em YUV, e o primeiro desenho de uma arte numa sessão compila um pipeline próprio (`HWYUVImageNoSwizzle`, 71 a 80 ms no "Começar" de uma sessão nova), no lugar do da arte em PNG (`ImageShaderClamp`, ~67 ms). As trocas seguintes reusam. Isso fica dentro do custo de primeira vez do "Começar" (§7, "Pipelines na primeira vez").
 - **Movimento:** respeitar `prefers-reduced-motion`.
 
@@ -488,14 +488,27 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
   - **CPU 4x** (informativo, a 60 Hz): a abertura das janelas fica em 2 a 4 vsyncs (mapa, especialização e fim com 66,7 ms), o texto longo chega a 83 ms e a vitória, a 100 ms.
 - **1ª rodada do juiz** (sobre o `cc218e0`): "muito bom", com um bloqueante. O aceite de contraste AA não estava fechado: a auditoria do código juntado ainda tinha 15 casos não isentos, e o registro dizia que só sobravam o "Classe" e o medalhão atual. O que entrou (`71ca244` a `93b3493`):
   - anéis de foco de 3:1: os links dos créditos (na seleção e no diário), o espaço usável do equipamento e o card de herói no estreito ganharam o anel triplo dos selos;
-  - cada estado do mapa com uma peça de 3:1 contra a carta: o visitado em bronze (3,37:1), o "pode ir" pelo anel escuro (7,88:1), o atual com um anel de tinta em volta da arte (10,71:1), e o não visitado e o selado pela borda sépia (3,40 e 10,68:1);
-  - o "Classe": os campos do cabeçalho desceram 0.4rem, para longe da borda queimada, e o campo vazio tem a altura do preenchido (o cabeçalho não pula quando o caminho é escolhido);
+  - cada estado do mapa com uma peça de 3:1 contra a carta: o visitado em bronze (3,37:1), o "pode ir" pelo anel escuro (7,88:1), o atual com um anel de tinta em volta da arte (10,71:1), e o não visitado e o selado pela borda sépia (3,40 e 10,68:1). Esses números são do primeiro medalhão de cada estado, contra o ponto mais claro de três em volta; a 2ª rodada mostrou que a medição era otimista (abaixo);
+  - o "Classe": os campos do cabeçalho ganharam 0.4rem de folga no alto, longe da borda queimada, e o campo vazio tem a altura do preenchido. Como o cabeçalho centra os campos, o "Classe" desceu 1,3 px (3,2 px contra o estado com caminho), e o cabeçalho não pula mais quando o caminho é escolhido. Ele ficou em 5,17:1 ou mais;
   - `ded/tools/contraste.mjs`, a auditoria no repositório: o mapa medido pela peça que distingue cada estado (sem o foco, no alto do medalhão, longe dos caminhos), e a barra presa da seleção fora de cima dos cards na captura de página inteira (no celular, o que fica embaixo dela está coberto);
   - o caso 13 do `qa_ded` estável (ele esperava 120 ms fixos, e a emulação do movimento chegava ao jogo depois) e o preview do hub sem o anel de foco;
   - o fechamento do popover dos avisos num momento ocioso, sugestão do juiz, foi medido e desfeito. A 60 Hz, intercalado com o `cc218e0`, os quadros perdidos na saída do aviso não caíram: 15 e 15 antes, 18 e 16 depois.
-  - **Prova** (no `5fcc13a`; o `93b3493` só desfaz o popover, e o `qa_ded` e a jornada rodaram de novo nele):
-    - a auditoria inteira, 30 estados a 1920 e a 390 (4.605 medições), com 36 abaixo de AA, todos controles desabilitados (isentos);
+  - **Prova** (no `5fcc13a`, que foi reescrito e tem a mesma árvore do `f5b160f`; o `93b3493` só desfaz o popover, e o `qa_ded` e a jornada rodaram de novo nele):
+    - a auditoria inteira, 36 estados a 1920 e a 390 (4.605 medições), com 36 abaixo de AA, todos controles desabilitados (isentos);
     - o `qa_ded` três vezes seguidas, com 15 de 15 em cada;
     - `qa_ded_task003`, `journey_ded`, `seo:check` e `tests/seo.test.js` passam;
     - o zoom do navegador de 100% a 200% não faz nada rolar de lado, e o texto cresce a partir de 175% (§7).
-  - A 2ª rodada está em andamento.
+- **2ª rodada do juiz** (sobre o `edfdaf3`): "muito bom", com um bloqueante pequeno: a medição dos estados do mapa era otimista. Ela media só o primeiro medalhão de cada estado, contra o ponto mais claro de três em volta, e não media o mapa a 390. Medido em todos os medalhões contra o P10 do fundo em volta, o "não visitado" ficava em 2,46 a 2,95:1 (as manchas escuras da carta e a legenda, no rodapé queimado). O juiz refez a auditoria (as mesmas 4.605 medições, com capturas idênticas byte a byte) e mostrou que o desempenho não muda (o `ded/index.html` igual ao do `cc218e0`, o layout do desktop igual em 9 tamanhos e 4 estados, e nenhum pipeline novo na primeira vez). O que entrou (`ad851e9`):
+  - a borda do não visitado em `--sepia-medio` (`#745638`, novo; o `--sepia-claro` dos caminhos e das barras de rolagem ficou): o pior caso foi para 3,36:1, na legenda a 1920;
+  - `contraste.mjs` mede todos os medalhões da carta e da legenda, a 1920 e a 390 (no celular, por trechos da rolagem da janela), contra um anel de 3 a 8 px em volta, tirado de uma captura sem os medalhões, os caminhos, as alavancas e o texto, com o P10 e o P90, como no texto. O miolo em bronze do visitado fica dentro da borda de tinta e não encosta no fundo: ele é medido contra o miolo do não visitado e do "pode ir" (3,34:1), e a borda dele, contra o fundo (3,64:1 no pior caso, a legenda a 1920, onde o rodapé é mais queimado);
+  - os links dos créditos: o anel triplo cobria a letra vizinha a 1920 e, no celular, envolvia o alvo de toque inteiro e cortava a linha de cima. Agora o foco realça a palavra (fundo de tinta e letra creme, com 2 px de folga), e o alvo de 44 px saiu do `padding` para um `::after`. O realce fica entre 5,01 e 7,79:1;
+  - o modo de alto contraste: `outline: 0.15rem solid transparent` no lugar do `outline: none` nos selos, no medalhão de fechar, nos lugares do mapa, no espaço do equipamento, nos créditos e no card de herói. Conferido com o forced-colors emulado: o contorno sai na cor do sistema. O rodapé das janelas, que escurece o contorno, deixa os créditos de fora;
+  - o espaço do equipamento mantém o próprio canto no foco;
+  - a ferramenta lê o anel pelas sombras quando o contorno é transparente, e amostra o fundo do anel numa captura sem o texto (num link no meio da frase, as letras vizinhas não são fundo). Nenhum outro anel mudou de razão;
+  - o registro: os números do mapa da 1ª rodada, "36 estados", o `5fcc13a` (reescrito, com a mesma árvore do `f5b160f`) e o quanto o "Classe" desceu.
+  - O juiz achou que o `qa_ded_task003` regrava um PNG versionado a cada execução. É um padrão de 31 testes do repositório, de antes desta fase, e ficou para uma tarefa à parte.
+  - **Prova** (no `ad851e9`):
+    - a auditoria inteira, 36 estados a 1920 e a 390: 4.658 medições, 36 abaixo de AA, todas de controles desabilitados (isentos);
+    - o `qa_ded` duas vezes, com 15 de 15 em cada; `journey_ded`, `qa_ded_task003`, `seo:check` e `tests/seo.test.js` passam;
+    - sem bateria de desempenho nova: as mudanças são uma cor sólida na borda, o realce e o contorno transparente, que só aparecem com o foco do teclado, e um `::after` vazio nos créditos do celular.
+  - A 3ª rodada está em andamento.
