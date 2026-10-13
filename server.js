@@ -71,6 +71,20 @@ app.use('/ded_make_character', express.static(path.join(__dirname, 'ded_make_cha
     setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
 }));
 
+// O CSS do ded saiu do index.html para ded/css/, e as artes que ele usa estão
+// em ded/ui/ (TASK_001). O HTML já é no-cache; CSS e artes também revalidam
+// (ETag → 304), para um deploy não juntar HTML novo com CSS ou SVG antigos.
+// As fontes nunca mudam de conteúdo (uma versão nova entra com outro nome):
+// cache longo, montado antes do no-cache de /ded/ui.
+app.use('/ded/ui/fontes', express.static(path.join(__dirname, 'ded', 'ui', 'fontes'), { maxAge: '30d' }));
+for (const pasta of ['css', 'ui']) {
+    app.use(`/ded/${pasta}`, express.static(path.join(__dirname, 'ded', pasta), {
+        etag: true,
+        lastModified: true,
+        setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+    }));
+}
+
 // Servir arquivos estáticos da pasta raiz com cache
 app.use(express.static('./', {
     maxAge: '1h', // Cache de 1 hora para assets estáticos

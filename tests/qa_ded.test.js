@@ -6,7 +6,7 @@ let browser;
 let page;
 let puppeteer;
 
-const PORT = 3003;
+const PORT = Number(process.env.PORT) || 3003; // outra porta quando a 3003 estiver ocupada
 
 async function startServer() {
   return new Promise((resolve) => {
@@ -100,7 +100,9 @@ async function runTests() {
   // Verify game screen is now visible
   const isGameScreenVisible = await page.evaluate(() => {
     const el = document.getElementById('game-screen');
-    return el && !el.classList.contains('hidden');
+    // Fase 2: fora de vista a exploração fica em espera (montada e invisível), não .hidden
+    return !!el && !el.classList.contains('hidden') && !el.classList.contains('tela-em-espera')
+      && getComputedStyle(el).visibility === 'visible';
   });
   console.log(`Is Game Screen visible now? ${isGameScreenVisible}`);
   if (!isGameScreenVisible) throw new Error('Game screen did not load after starting the adventure');
@@ -125,13 +127,15 @@ async function runTests() {
   
   // Assertions for Warrior attributes and modifiers:
   // str: 16 (+3), dex: 12 (+1), con: 15 (+2), int: 8 (-1), wis: 10 (+0), luck: 8 (-1)
+  // Desde a Fase 2 da TASK_001 o modificador fica no medalhão, sem parênteses
+  // e com o sinal de menos tipográfico (U+2212).
   const expectedWarriorStats = {
-    str: { val: '16', mod: '(+3)' },
-    dex: { val: '12', mod: '(+1)' },
-    con: { val: '15', mod: '(+2)' },
-    int: { val: '8', mod: '(-1)' },
-    wis: { val: '10', mod: '(+0)' },
-    luck: { val: '8', mod: '(-1)' }
+    str: { val: '16', mod: '+3' },
+    dex: { val: '12', mod: '+1' },
+    con: { val: '15', mod: '+2' },
+    int: { val: '8', mod: '−1' },
+    wis: { val: '10', mod: '+0' },
+    luck: { val: '8', mod: '−1' }
   };
   
   for (const [stat, expected] of Object.entries(expectedWarriorStats)) {
@@ -170,19 +174,19 @@ async function runTests() {
     const slot = document.querySelector('.inventory-slot-box.occupied');
     if (!slot) return null;
     const nameEl = slot.querySelector('.item-name');
-    const emojiEl = slot.querySelector('.item-emoji');
-    const tooltipEl = slot.querySelector('.item-tooltip');
+    // Fase 2: o ícone do item vem do sprite (ui/icones.svg) em vez do emoji
+    const iconEl = slot.querySelector('.item-icone use');
     return {
       occupied: true,
       name: nameEl ? nameEl.textContent : null,
-      emoji: emojiEl ? emojiEl.textContent : null,
-      tooltip: tooltipEl ? tooltipEl.textContent : null,
+      icon: iconEl ? iconEl.getAttribute('href') : null,
+      tooltip: slot.title,
       isUsable: slot.classList.contains('usable')
     };
   });
   
   console.log('Occupied slot details:', itemInSlot);
-  if (!itemInSlot || itemInSlot.name !== 'Poção de Vida' || itemInSlot.emoji !== '🫙' || !itemInSlot.isUsable) {
+  if (!itemInSlot || itemInSlot.name !== 'Poção de Vida' || !String(itemInSlot.icon).endsWith('#i-pocao') || !itemInSlot.isUsable) {
     throw new Error('Poção de Vida slot was not rendered correctly or is not usable');
   }
   
@@ -395,8 +399,8 @@ async function runTests() {
     const dice = document.getElementById('dice');
     return {
       resultText: dice ? dice.textContent : null,
-      borderColor: dice ? dice.style.borderColor : null,
-      boxShadow: dice ? dice.style.boxShadow : null,
+      // Fase 2: o 1 natural apaga o d20 com a classe .falha-critica (antes era estilo inline)
+      critFailureMark: dice ? dice.classList.contains('falha-critica') : false,
       logContainsCritFailure: gameState.log.some(msg => msg.includes('FALHA CRÍTICA') || msg.includes('1 natural'))
     };
   });
@@ -405,8 +409,8 @@ async function runTests() {
   if (critFailureResult.resultText !== '1') {
     throw new Error(`Expected final dice face to show 1, got ${critFailureResult.resultText}`);
   }
-  if (!critFailureResult.borderColor.includes('rgb(255, 0, 0)') && !critFailureResult.borderColor.includes('#ff0000') && critFailureResult.borderColor === '') {
-    throw new Error('Dice border color did not change to red for natural 1');
+  if (!critFailureResult.critFailureMark) {
+    throw new Error('Dice was not marked with .falha-critica for natural 1');
   }
   if (!critFailureResult.logContainsCritFailure) {
     throw new Error('Log did not capture the critical failure log message');
@@ -417,6 +421,913 @@ async function runTests() {
   await new Promise(r => setTimeout(r, 2000));
   
   console.log('✅ PASS: Critical natural 1 displays red critical failure styles and logs correctly.');
+
+  // ----------------------------------------------------
+  // TEST CASE 6: Combate pelo caminho real, com o teclado (Fase 3)
+  // ----------------------------------------------------
+  // Fica antes do caso dos finais: a cena da poção, visitada lá, agenda a volta para a
+  // cena anterior em 4,5 s. Desde a Fase 3 a volta só acontece se o jogador ainda estiver
+  // na poção, e uma cena nova encerra a luta; a ordem só evita depender disso.
+  console.log('\n--- 6. Testing the combat through the real path, with the keyboard ---');
+  const espera = ms => new Promise(r => setTimeout(r, ms));
+  // waitForFunction com uma mensagem clara no lugar do TimeoutError genérico
+  const aguardar = (condicao, falha, timeout = 3000) =>
+    page.waitForFunction(condicao, { timeout }).catch(() => { throw new Error(falha); });
+  const dialogos = [];
+  const contarDialogo = dialog => dialogos.push(`${dialog.type()}: ${dialog.message()}`);
+  page.on('dialog', contarDialogo);
+
+  // Acaso fixo pelo turno: 0,8 dá 17 no d20 do herói (acerto sem crítico contra a
+  // armadura 10 do Goblin) e 0,96 dá 20 ao inimigo (acerto). A vida cheia garante
+  // que o crítico do inimigo não derruba o herói.
+  const preparo = await page.evaluate(() => {
+    window.__randomAntesDoCombate = Math.random;
+    Math.random = () => (gameState.combat?.turn === 'enemy' ? 0.96 : 0.8);
+    gameState.player.health = gameState.player.maxHealth;
+    updateStatsDisplay();
+    return { xp: gameState.player.xp, nivel: gameState.player.level, vida: gameState.player.health };
+  });
+  console.log('Hero before the fight:', preparo);
+
+  try {
+    // O corredor leva ao Goblin pelo caminho da esquerda (1ª escolha); quem escolhe
+    // pelo teclado continua na 1ª escolha da cena nova, "Lutar contra o goblin"
+    await page.evaluate(() => loadScene('corridor'));
+    await espera(400); // escolhas recém-montadas ignoram ativações por 300 ms
+    await page.focus('#choices button');
+    await page.keyboard.press('Enter');
+    await aguardar(() => gameState.currentScene === 'goblin_encounter'
+      && document.activeElement === document.querySelector('#choices button'),
+      'Enter on "Pegar o caminho da esquerda" did not reach goblin_encounter with the focus on its first choice');
+    await espera(400);
+    await page.keyboard.press('Enter'); // "Lutar contra o goblin": teste de combate na bandeja
+    await aguardar(() => document.activeElement === document.getElementById('dice-button')
+      && !document.getElementById('dice-container').classList.contains('hidden'),
+      'The combat check did not open the d20 tray with the focus on the dice button');
+    await page.keyboard.press('Enter'); // rola o d20
+    await aguardar(() => document.getElementById('dice-button').textContent === 'Enfrentar',
+      'The dice button did not turn into "Enfrentar" after the combat check');
+    await espera(400); // o "Enfrentar" também ignora ativações por 300 ms (sozinho, avança em 1,8 s)
+    const antesDeEnfrentar = await page.evaluate(() => ({
+      foco: document.activeElement && document.activeElement.id,
+      rotulo: document.getElementById('dice-button').textContent,
+      emCombate: !!(gameState.combat && gameState.combat.active)
+    }));
+    if (antesDeEnfrentar.foco !== 'dice-button' || antesDeEnfrentar.rotulo !== 'Enfrentar' || antesDeEnfrentar.emCombate) {
+      throw new Error(`"Enfrentar" was not waiting for the keyboard: ${JSON.stringify(antesDeEnfrentar)}`);
+    }
+
+    // 1 e 2. Enter duplo rápido no "Enfrentar": o 1º abre a luta, o 2º não pode atacar
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await aguardar(() => document.activeElement === document.getElementById('btn-combat-attack'),
+      'Entering the combat with Enter did not move the focus to #btn-combat-attack', 2000);
+    const entrada = await page.evaluate(() => {
+      const exibido = id => {
+        const el = document.getElementById(id);
+        return !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+      };
+      return {
+        narrativa: exibido('narrativa'),
+        cronica: exibido('painel-cronica'),
+        painel: exibido('combat-screen'),
+        relato: exibido('combat-log-box'),
+        inimigo: document.getElementById('combat-enemy-name').textContent,
+        turno: gameState.combat.turn,
+        atacou: document.getElementById('combat-log-text').textContent.includes('Você se prepara')
+      };
+    });
+    console.log('Combat entered:', entrada);
+    if (entrada.narrativa || entrada.cronica || !entrada.painel || !entrada.relato) {
+      throw new Error('Entering the combat must hide #narrativa and #painel-cronica and show #combat-screen and #combat-log-box');
+    }
+    if (entrada.inimigo !== 'Goblin') {
+      throw new Error(`Expected to fight the Goblin, got "${entrada.inimigo}"`);
+    }
+    if (entrada.turno !== 'player' || entrada.atacou) {
+      throw new Error('A quick double Enter on "Enfrentar" must not attack (the attack ignores activations for 300 ms)');
+    }
+
+    // 3. O ataque, depois da pausa: o giro carimba um selo; na vez do inimigo, as
+    // ações ficam com aria-disabled e o foco fica no ataque
+    await espera(400);
+    await page.keyboard.press('Enter');
+    const atacou = await page.evaluate(() => document.getElementById('combat-log-text').textContent.includes('Você se prepara'));
+    if (!atacou) throw new Error('Enter on the attack (after the pause) did not attack');
+    await aguardar(() => !!document.querySelector('#combat-mesa [data-selo].visivel'),
+      'No seal was stamped on the combat tray after the hero roll');
+    const rolagem = await page.evaluate(() => ({
+      selos: [...document.querySelectorAll('#combat-mesa [data-selo].visivel')].map(s => s.dataset.selo),
+      dado: document.getElementById('combat-dice').textContent,
+      vidaDoInimigo: gameState.combat.enemy.hp
+    }));
+    console.log('Hero roll:', rolagem);
+    if (rolagem.selos.join() !== 'sucesso' || rolagem.dado !== '17' || rolagem.vidaDoInimigo <= 0) {
+      throw new Error('The hero roll (17, a hit without a critical) must stamp only the "sucesso" seal and leave the Goblin standing');
+    }
+    await aguardar(() => gameState.combat.turn === 'enemy', 'The enemy turn did not start after the hero attack');
+    const vezDoInimigo = await page.evaluate(() => {
+      const acoes = [...document.querySelectorAll('#combat-actions-panel button')];
+      return {
+        acoes: acoes.length,
+        desligadas: acoes.filter(b => b.getAttribute('aria-disabled') === 'true').length,
+        focoNoAtaque: document.activeElement === document.getElementById('btn-combat-attack'),
+        foco: document.activeElement ? `${document.activeElement.tagName}#${document.activeElement.id}` : null,
+        painel: !document.getElementById('combat-screen').classList.contains('hidden'),
+        turno: document.getElementById('combat-turno').textContent
+      };
+    });
+    console.log('Enemy turn:', vezDoInimigo);
+    if (!vezDoInimigo.painel) throw new Error('The combat panel disappeared in the middle of the fight');
+    if (!vezDoInimigo.acoes || vezDoInimigo.desligadas !== vezDoInimigo.acoes) {
+      throw new Error('Every combat action must have aria-disabled="true" during the enemy turn');
+    }
+    if (!vezDoInimigo.focoNoAtaque) {
+      throw new Error(`The focus must stay on the attack during the enemy turn, it is on ${vezDoInimigo.foco}`);
+    }
+    if (!vezDoInimigo.turno.startsWith('Vez')) {
+      throw new Error(`#combat-turno must say whose turn it is ("Vez do …"), got "${vezDoInimigo.turno}"`);
+    }
+
+    // 4. A vez volta: nenhuma ação desligada e o foco no ataque (remontado)
+    await aguardar(() => gameState.combat.turn === 'player'
+      && document.activeElement === document.getElementById('btn-combat-attack'),
+      'The turn did not come back to the hero with the focus on the attack', 5000);
+    const vezDeVolta = await page.evaluate(() => ({
+      desligadas: document.querySelectorAll('#combat-actions-panel [aria-disabled]').length,
+      turno: document.getElementById('combat-turno').textContent,
+      inimigoAcertou: document.getElementById('combat-log-text').textContent.includes('Você levou'),
+      vida: gameState.player.health,
+      vidaMaxima: gameState.player.maxHealth
+    }));
+    console.log('Turn back to the hero:', vezDeVolta);
+    if (vezDeVolta.desligadas) throw new Error('No combat action may keep aria-disabled when the turn comes back');
+    if (vezDeVolta.turno !== 'O que você faz?') throw new Error(`#combat-turno did not come back to "O que você faz?", got "${vezDeVolta.turno}"`);
+    if (!vezDeVolta.inimigoAcertou || vezDeVolta.vida >= vezDeVolta.vidaMaxima || vezDeVolta.vida <= 0) {
+      throw new Error('The enemy (a natural 20) should have hit the hero without knocking the hero down');
+    }
+
+    // 5. A vitória: o Goblin por um fio e o 20 natural forçado
+    await page.evaluate(() => {
+      gameState.combat.enemy.hp = 1;
+      Math.random = () => 0.96;
+    });
+    await espera(400); // as ações foram remontadas na volta da vez
+    await page.keyboard.press('Enter');
+    await aguardar(() => !!document.getElementById('btn-combat-continuar')
+      && document.activeElement === document.getElementById('btn-combat-continuar'),
+      'The victory did not offer #btn-combat-continuar with the focus on it', 5000);
+    const continuarEm = Date.now();
+    const vitoria = await page.evaluate(() => ({
+      seloVitoria: !!document.querySelector('#combat-enemy-card [data-desfecho="vitoria"].visivel'),
+      seloCritico: !!document.querySelector('#combat-mesa [data-selo="critico"].visivel'),
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      turno: document.getElementById('combat-turno').textContent
+    }));
+    console.log('Victory:', vitoria);
+    if (!vitoria.seloVitoria) throw new Error('The victory seal ([data-desfecho="vitoria"].visivel) was not stamped on the enemy card');
+    if (!vitoria.seloCritico) throw new Error('The natural 20 did not stamp the "critico" seal on the combat tray');
+    if (vitoria.acoes.join() !== 'btn-combat-continuar') {
+      throw new Error(`The actions must give way to a single "Continuar", got ${JSON.stringify(vitoria.acoes)}`);
+    }
+
+    await espera(400); // o "Continuar" também ignora ativações por 300 ms (sozinho, fecha em 2,2 s)
+    await page.keyboard.press('Enter');
+    const fechouEmMs = Date.now() - continuarEm;
+    const fechamento = await page.evaluate(() => {
+      const exibido = id => {
+        const el = document.getElementById(id);
+        return !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+      };
+      return {
+        painel: exibido('combat-screen'),
+        relato: exibido('combat-log-box'),
+        narrativa: exibido('narrativa'),
+        cronica: exibido('painel-cronica'),
+        emCombate: gameState.combat.active,
+        cena: gameState.currentScene
+      };
+    });
+    console.log(`After Enter on "Continuar" (${fechouEmMs} ms after it appeared):`, fechamento);
+    if (fechouEmMs >= 2000) {
+      throw new Error(`Enter on "Continuar" came ${fechouEmMs} ms late: it can no longer be told apart from the 2.2 s auto-close`);
+    }
+    if (fechamento.painel || fechamento.relato || !fechamento.narrativa || !fechamento.cronica || fechamento.emCombate) {
+      throw new Error('Enter on "Continuar" must close the combat: panel and report hidden, narrative and chronicle visible');
+    }
+    if (fechamento.cena !== 'goblin_fight_success') {
+      throw new Error(`The victory must load goblin_fight_success, got "${fechamento.cena}"`);
+    }
+    await aguardar(() => document.activeElement === document.querySelector('#choices button'),
+      'After the combat the focus must go to the first choice of the new scene', 2000);
+    const cronica = await page.evaluate(() => document.getElementById('game-log').textContent);
+    if (!cronica.includes('Vitória sobre o Goblin')) {
+      throw new Error('The chronicle (#game-log) does not record "Vitória sobre o Goblin"');
+    }
+
+    // 6. Nada de alert/confirm no caminho todo
+    if (dialogos.length) {
+      throw new Error(`Native dialogs opened during the combat: ${JSON.stringify(dialogos)}`);
+    }
+  } finally {
+    page.off('dialog', contarDialogo);
+    await page.evaluate(() => {
+      Math.random = window.__randomAntesDoCombate;
+      delete window.__randomAntesDoCombate;
+    }).catch(() => {});
+  }
+  console.log('✅ PASS: The combat opens and closes by keyboard through "Enfrentar", ignores the double Enter, locks the actions on the enemy turn and keeps the focus.');
+
+  // ----------------------------------------------------
+  // TEST CASE 7: "Continuar" depois do resultado e finais sem escolhas (Fase 2)
+  // ----------------------------------------------------
+  console.log('\n--- 7. Testing "Continuar" after the roll and the end scenes ---');
+  const continuar = await page.evaluate(async () => {
+    loadScene('crypt');
+    skipTyping = true;
+    await new Promise(r => setTimeout(r, 400)); // escolhas recém-montadas ignoram cliques por 300 ms
+    [...document.querySelectorAll('#choices button')][1].click(); // teste de Força
+    document.getElementById('dice-button').click();
+    await new Promise(r => setTimeout(r, 1700)); // resultado em 1,3 s; "Continuar" aceita clique 300 ms depois
+    const rotulo = document.getElementById('dice-button').textContent;
+    document.getElementById('dice-button').click(); // avança na hora, sem esperar 1,8 s
+    return { rotulo, cena: gameState.currentScene, bandejaOculta: document.getElementById('dice-container').classList.contains('hidden') };
+  });
+  console.log('After "Continuar":', continuar);
+  if (continuar.rotulo !== 'Continuar' || continuar.cena === 'crypt' || !continuar.bandejaOculta) {
+    throw new Error('The dice button did not offer "Continuar" or did not advance right away');
+  }
+
+  // Só os finais de verdade oferecem o recomeçar; a poção volta sozinha para a cena anterior
+  const fins = await page.evaluate(() => {
+    const ler = cena => {
+      loadScene(cena);
+      return {
+        titulo: document.querySelector('#choices .escolhas-titulo').textContent,
+        recomecar: !!document.querySelector('#choices .botao-secundario')
+      };
+    };
+    const resultado = { pocao: ler('potion_health'), morte: ler('death') };
+    // logo depois de montar, o recomeçar ignora o clique (não apaga o save nem recarrega)
+    window.__semRecarga = true;
+    document.querySelector('#choices .botao-secundario').click();
+    resultado.saveIntacto = !!localStorage.getItem('ded_save_v1');
+    return resultado;
+  });
+  const naoRecarregou = await page.evaluate(() => window.__semRecarga === true);
+  console.log('End scenes:', fins);
+  if (fins.pocao.recomecar || fins.pocao.titulo === 'A aventura terminou') {
+    throw new Error('potion_health (a pass-through scene) must not offer "Começar uma nova aventura"');
+  }
+  if (!fins.morte.recomecar) {
+    throw new Error('The death scene must offer "Começar uma nova aventura"');
+  }
+  if (!fins.saveIntacto || !naoRecarregou) {
+    throw new Error('"Começar uma nova aventura" must ignore a click right after the scene is mounted');
+  }
+  console.log('✅ PASS: "Continuar" advances right away, and only real endings offer a new adventure.');
+
+  // ----------------------------------------------------
+  // TEST CASE 8: Submenu, Golpe heroico, derrota e fuga, com o teclado (Fase 3)
+  // ----------------------------------------------------
+  // A luta abre direto (startInteractiveCombat) com o foco numa escolha, como quem
+  // chega pelo teclado: o foco segue para as ações. O herói é o guerreiro do caso 1.
+  console.log('\n--- 8. Testing the item submenu, the Heroic Strike, the defeat and the flight, with the keyboard ---');
+  const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 };
+  // o Math.random que dá a face d no d20 (Math.floor(r * 20) + 1)
+  const faceDoD20 = d => (d - 1) / 20 + 0.01;
+  const abrirCombate = async (cena, inimigo) => {
+    await page.evaluate(c => loadScene(c), cena);
+    await espera(400); // escolhas recém-montadas ignoram ativações por 300 ms
+    await page.focus('#choices button');
+    await page.evaluate(e => startInteractiveCombat(e), inimigo);
+    await aguardar(() => gameState.combat.active
+      && document.activeElement === document.getElementById('btn-combat-attack'),
+      `Opening the combat from a focused choice (scene ${cena}) did not move the focus to #btn-combat-attack`);
+    await espera(400); // as ações recém-montadas também ignoram ativações por 300 ms
+  };
+  const acoesDoPainel = () => page.evaluate(() =>
+    [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id || b.querySelector('.escolha-texto').textContent));
+  const estadoDaFolha = () => page.evaluate(() => ({
+    painel: !document.getElementById('combat-screen').classList.contains('hidden')
+      && getComputedStyle(document.getElementById('combat-screen')).display !== 'none',
+    emCombate: gameState.combat.active,
+    cena: gameState.currentScene
+  }));
+
+  const heroi = await page.evaluate(() => {
+    window.__randomAntesDosDesfechos = Math.random;
+    gameState.player.health = gameState.player.maxHealth;
+    gameState.player.inventory = ['Poção de Vida']; // uma poção e nenhuma arma: as somas do ataque ficam previsíveis
+    updateInventoryDisplay();
+    updateStatsDisplay();
+    return { classe: gameState.player.class, especializacao: gameState.player.specialization || null };
+  });
+  if (heroi.classe !== 'warrior' || heroi.especializacao) {
+    throw new Error(`Case 8 needs the warrior without a specialization (the Heroic Strike), got ${JSON.stringify(heroi)}`);
+  }
+  dialogos.length = 0;
+  page.on('dialog', contarDialogo);
+
+  try {
+    // 1. "Usar item" abre o submenu (a poção e "Voltar"); o "Voltar" devolve o foco ao
+    // "Usar item" e as quatro ações. O Goblin tem 40 de vida para ficar de pé depois do
+    // Golpe heroico do passo 2 (um crítico tira 15).
+    await abrirCombate('corridor', { ...GOBLIN, hp: 40, max_hp: 40 });
+    await page.focus('#btn-combat-item');
+    await page.keyboard.press('Enter');
+    await aguardar(() => {
+      const botoes = [...document.querySelectorAll('#combat-actions-panel button')];
+      return botoes.length === 2 && document.activeElement === botoes[0];
+    }, 'Enter on "Usar item" did not open the item submenu with the focus on its first button');
+    const submenu = await acoesDoPainel();
+    console.log('Item submenu:', submenu);
+    if (submenu.join() !== 'Poção de Vida,Voltar') {
+      throw new Error(`The item submenu must list the potion and "Voltar", got ${JSON.stringify(submenu)}`);
+    }
+    await espera(400);
+    await page.keyboard.press('Tab');
+    const noVoltar = await page.evaluate(() => document.activeElement && document.activeElement.textContent.trim());
+    if (noVoltar !== 'Voltar') throw new Error(`Tab from the potion must reach "Voltar", the focus is on "${noVoltar}"`);
+    await page.keyboard.press('Enter');
+    await aguardar(() => document.activeElement === document.getElementById('btn-combat-item'),
+      '"Voltar" in the item submenu did not give the focus back to #btn-combat-item');
+    const deVolta = await page.evaluate(() => ({
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      foco: document.activeElement && document.activeElement.id,
+      turno: gameState.combat.turn,
+      mochila: [...gameState.player.inventory]
+    }));
+    console.log('After "Voltar":', deVolta);
+    if (deVolta.acoes.join() !== 'btn-combat-attack,btn-combat-spell,btn-combat-item,btn-combat-flee') {
+      throw new Error(`"Voltar" must bring back the four main actions, got ${JSON.stringify(deVolta.acoes)}`);
+    }
+    if (deVolta.foco !== 'btn-combat-item') {
+      throw new Error(`The focus must stay on #btn-combat-item after "Voltar", it moved to #${deVolta.foco}`);
+    }
+    if (deVolta.turno !== 'player' || deVolta.mochila.join() !== 'Poção de Vida') {
+      throw new Error('Opening and leaving the item submenu must not spend the turn nor the potion');
+    }
+
+    // 2. Golpe heroico: dois d20, fica o maior. O giro também chama Math.random, então
+    // uma fila de valores não serve: o acaso muda quando o relato registra o 1º dado.
+    // O mesmo valor do 2º dado vale para o dano e para a vez do inimigo (7: erra a armadura 17).
+    const PRIMEIRO_DADO = 20, SEGUNDO_DADO = 7;
+    const dadoEscolhido = Math.max(PRIMEIRO_DADO, SEGUNDO_DADO);
+    const seloDoGolpe = dadoEscolhido === 20 ? 'critico' : 'sucesso';
+    await page.evaluate((r1, r2) => {
+      Math.random = () => (document.getElementById('combat-log-text').textContent.includes('Primeiro dado') ? r2 : r1);
+    }, faceDoD20(PRIMEIRO_DADO), faceDoD20(SEGUNDO_DADO));
+    await espera(400); // o "Voltar" remontou as ações
+    await page.focus('#btn-combat-spell');
+    const habilidade = await page.evaluate(() => document.querySelector('#btn-combat-spell .escolha-texto').textContent);
+    if (habilidade !== 'Golpe heroico') throw new Error(`#btn-combat-spell must be the warrior's "Golpe heroico", got "${habilidade}"`);
+    await page.keyboard.press('Enter');
+    const golpe = await (await aguardar(() => {
+      const selos = [...document.querySelectorAll('#combat-mesa [data-selo].visivel')].map(s => s.dataset.selo);
+      if (!selos.length) return false;
+      const dado = document.getElementById('combat-dice');
+      return {
+        selos,
+        dado: dado.textContent,
+        girando: dado.classList.contains('rolling-animation'),
+        legenda: document.getElementById('combat-dice-result').textContent.replace(/\s+/g, ' ').trim(),
+        vidaDoInimigo: gameState.combat.enemy.hp
+      };
+    }, 'The Heroic Strike did not stamp a seal on the combat tray', 6000)).jsonValue();
+    console.log('Heroic Strike:', golpe);
+    const legendaEsperada = `Vantagem: ${PRIMEIRO_DADO} e ${SEGUNDO_DADO} → ${dadoEscolhido}`;
+    if (golpe.legenda !== legendaEsperada) {
+      throw new Error(`#combat-dice-result must read "${legendaEsperada}", got "${golpe.legenda}"`);
+    }
+    if (golpe.dado !== String(dadoEscolhido) || golpe.girando) {
+      throw new Error(`#combat-dice must rest on the higher die (${dadoEscolhido}), got "${golpe.dado}"`);
+    }
+    if (golpe.selos.join() !== seloDoGolpe) {
+      throw new Error(`The Heroic Strike (${dadoEscolhido}) must stamp only the "${seloDoGolpe}" seal, got ${JSON.stringify(golpe.selos)}`);
+    }
+    if (golpe.vidaDoInimigo >= 40 || golpe.vidaDoInimigo <= 0) {
+      throw new Error(`The Heroic Strike must hit and leave the Goblin standing, its life is ${golpe.vidaDoInimigo}`);
+    }
+    await aguardar(() => gameState.combat.turn === 'player'
+      && document.activeElement === document.getElementById('btn-combat-attack'),
+      'The turn did not come back to the hero (focus on the attack) after the Heroic Strike', 8000);
+
+    // 3. Derrota: o herói com 1 de vida erra (2 no d20) e o inimigo acerta (20 natural)
+    await page.evaluate(() => {
+      gameState.player.health = 1;
+      updateStatsDisplay();
+      Math.random = () => (gameState.combat?.turn === 'enemy' ? 0.96 : 0.05);
+    });
+    await espera(400); // as ações foram remontadas na volta da vez
+    await page.keyboard.press('Enter');
+    await aguardar(() => !!document.getElementById('btn-combat-continuar')
+      && document.activeElement === document.getElementById('btn-combat-continuar'),
+      'The defeat did not offer #btn-combat-continuar with the focus on it', 10000);
+    const continuarDaDerrotaEm = Date.now();
+    const derrota = await page.evaluate(() => ({
+      selosNoCard: [...document.querySelectorAll('#combat-enemy-card [data-desfecho].visivel')].map(s => s.dataset.desfecho),
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      turno: document.getElementById('combat-turno').textContent,
+      vida: gameState.player.health
+    }));
+    console.log('Defeat:', derrota);
+    if (derrota.selosNoCard.join() !== 'derrota') {
+      throw new Error(`The defeat must stamp only the "derrota" seal on the enemy card, got ${JSON.stringify(derrota.selosNoCard)}`);
+    }
+    if (derrota.acoes.join() !== 'btn-combat-continuar' || derrota.vida > 0) {
+      throw new Error('The defeat must leave the hero at 0 and the actions must give way to a single "Continuar"');
+    }
+    await espera(400); // o "Continuar" ignora ativações por 300 ms (sozinho, fecha em 2 s)
+    await page.keyboard.press('Enter');
+    const derrotaFechouEmMs = Date.now() - continuarDaDerrotaEm;
+    const depoisDaDerrota = await estadoDaFolha();
+    console.log(`After Enter on "Continuar" (${derrotaFechouEmMs} ms after it appeared):`, depoisDaDerrota);
+    if (derrotaFechouEmMs >= 2000) {
+      throw new Error(`Enter on the defeat "Continuar" came ${derrotaFechouEmMs} ms late: it can no longer be told apart from the 2 s auto-close`);
+    }
+    if (depoisDaDerrota.cena !== 'death' || depoisDaDerrota.painel || depoisDaDerrota.emCombate !== false) {
+      throw new Error('Enter on the defeat "Continuar" must close the combat and load the death scene');
+    }
+    // o foco vai para a 1ª escolha do final (o recomeçar): nenhuma tecla depois disto
+    await aguardar(() => document.activeElement === document.querySelector('#choices button'),
+      'After the defeat the focus must go to the first choice of the death scene', 2000);
+
+    // De volta a um estado jogável
+    await page.evaluate(() => {
+      gameState.player.health = gameState.player.maxHealth;
+      updateStatsDisplay();
+      loadScene('corridor');
+    });
+
+    // 4. Fuga: 20 natural + 1 (Destreza) contra 12. A fuga volta para gameState.lastScene;
+    // o caso fixa o corredor (de onde se chega ao Goblin) para não depender do caso 7.
+    await page.evaluate(() => { gameState.lastScene = 'corridor'; });
+    await abrirCombate('goblin_encounter', GOBLIN);
+    await page.evaluate(() => { Math.random = () => 0.96; });
+    await page.focus('#btn-combat-flee');
+    await page.keyboard.press('Enter');
+    await aguardar(() => !!document.getElementById('btn-combat-continuar')
+      && document.activeElement === document.getElementById('btn-combat-continuar'),
+      'The flight did not offer #btn-combat-continuar with the focus on it', 5000);
+    const continuarDaFugaEm = Date.now();
+    const fuga = await page.evaluate(() => ({
+      selosNoCard: [...document.querySelectorAll('#combat-enemy-card [data-desfecho].visivel')].map(s => s.dataset.desfecho),
+      derrotado: document.getElementById('combat-enemy-card').classList.contains('derrotado'),
+      acoes: [...document.querySelectorAll('#combat-actions-panel button')].map(b => b.id),
+      turno: document.getElementById('combat-turno').textContent,
+      escapou: document.getElementById('combat-log-text').textContent.includes('Fuga bem-sucedida')
+    }));
+    console.log('Flight:', fuga);
+    if (!fuga.escapou) throw new Error('The natural 20 must make the flight succeed');
+    if (fuga.selosNoCard.length || fuga.derrotado) {
+      throw new Error(`The flight must not stamp an outcome seal on the enemy card, got ${JSON.stringify(fuga.selosNoCard)}`);
+    }
+    if (fuga.acoes.join() !== 'btn-combat-continuar') {
+      throw new Error(`The actions must give way to a single "Continuar", got ${JSON.stringify(fuga.acoes)}`);
+    }
+    await espera(400); // o "Continuar" ignora ativações por 300 ms (sozinho, fecha em 1,8 s)
+    await page.keyboard.press('Enter');
+    const fugaFechouEmMs = Date.now() - continuarDaFugaEm;
+    const depoisDaFuga = await estadoDaFolha();
+    console.log(`After Enter on "Continuar" (${fugaFechouEmMs} ms after it appeared):`, depoisDaFuga);
+    if (fugaFechouEmMs >= 1800) {
+      throw new Error(`Enter on the flight "Continuar" came ${fugaFechouEmMs} ms late: it can no longer be told apart from the 1.8 s auto-close`);
+    }
+    if (depoisDaFuga.painel || depoisDaFuga.emCombate !== false) {
+      throw new Error('Enter on the flight "Continuar" must close the combat (panel hidden, combat.active false)');
+    }
+    if (depoisDaFuga.cena !== 'corridor') {
+      throw new Error(`The flight must go back to gameState.lastScene ("corridor"), got "${depoisDaFuga.cena}"`);
+    }
+    await aguardar(() => document.activeElement === document.querySelector('#choices button'),
+      'After the flight the focus must go to the first choice of the loaded scene', 2000);
+
+    // 5. Nada de alert/confirm no caso todo
+    if (dialogos.length) {
+      throw new Error(`Native dialogs opened during case 8: ${JSON.stringify(dialogos)}`);
+    }
+  } finally {
+    page.off('dialog', contarDialogo);
+    await page.evaluate(() => {
+      Math.random = window.__randomAntesDosDesfechos;
+      delete window.__randomAntesDosDesfechos;
+    }).catch(() => {});
+  }
+  console.log('✅ PASS: "Voltar" gives the focus back to "Usar item", the Heroic Strike keeps the higher die, and the defeat and the flight close by keyboard.');
+
+  // ----------------------------------------------------
+  // TEST CASES 9 a 12: as janelas e os avisos (Fase 4), com o teclado
+  // ----------------------------------------------------
+  // As janelas são <dialog> abertos com showModal(): o foco entra nelas, Escape fecha
+  // (menos a especialização, obrigatória) e o foco volta para quem abriu. Nenhum
+  // diálogo nativo pode abrir. As esperas de 400 ms cobrem a pausa de 300 ms dos
+  // botões recém-montados e a entrada das janelas (0,22 s).
+  const pausa = ms => new Promise(r => setTimeout(r, ms));
+  const esperarJanela = (id, aberta = true) => page.waitForFunction((i, a) => !!document.getElementById(i).open === a, { timeout: 5000 }, id, aberta)
+    .catch(() => { throw new Error(`#${id} did not ${aberta ? 'open' : 'close'} in 5 s`); });
+  const focado = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return el ? { id: el.id, rotulo: el.getAttribute('aria-label'), texto: el.textContent.trim().slice(0, 60), especializacao: el.dataset.especializacao || null, escolha: !!el.closest('#choices') } : null;
+  });
+  dialogos.length = 0;
+  page.on('dialog', contarDialogo);
+  try {
+    // --- 9. O mapa ---
+    console.log('\n--- 9. Testing the map window with the keyboard ---');
+    await page.evaluate(() => {
+      if (gameState.combat && gameState.combat.active) closeCombatScreen();
+      gameState.visitedNodes = ['start'];
+      gameState.levers = { lever_crystal: false, lever_lake: false };
+      gameState.isPaused = false;
+      loadScene('start');
+      skipTyping = true;
+    });
+    await pausa(500);
+    await page.focus('#btn-toggle-map');
+    await page.keyboard.press('Enter');
+    await esperarJanela('mapa');
+    await pausa(400);
+    const mapa = await page.evaluate(() => ({
+      expandido: document.getElementById('btn-toggle-map').getAttribute('aria-expanded'),
+      lugares: document.querySelectorAll('#mapa .mapa-no').length,
+      podeIr: [...document.querySelectorAll('#mapa .mapa-no:not([aria-disabled="true"])')].map(b => b.dataset.no).sort(),
+      portaSelada: document.querySelector('#mapa [data-no="crypt_door"]').getAttribute('aria-disabled')
+    }));
+    const focoNoMapa = await focado();
+    console.log('Map opened:', mapa, focoNoMapa);
+    if (mapa.expandido !== 'true' || mapa.lugares !== 23) throw new Error('The map seal must open #mapa with its 23 places and aria-expanded="true"');
+    if (focoNoMapa.rotulo !== 'Entrada, você está aqui') throw new Error(`The focus must land on the current place, got ${JSON.stringify(focoNoMapa)}`);
+    if (JSON.stringify(mapa.podeIr) !== JSON.stringify(['buy_supplies', 'corridor', 'entrance_inspection'])) throw new Error(`At the entrance the map must offer the shop, the inspection and the corridor, got ${mapa.podeIr}`);
+    if (mapa.portaSelada !== 'true') throw new Error('"Porta Selada" (crypt_door) has no scene and must not be offered');
+    await page.keyboard.press('Escape');
+    await esperarJanela('mapa', false);
+    const focoAoFechar = await focado();
+    if (focoAoFechar.id !== 'btn-toggle-map') throw new Error(`Escape must give the focus back to the map seal, got ${JSON.stringify(focoAoFechar)}`);
+    // Viagem pelo teclado: Tab duas vezes (Loja, Inspeção) e Espaço
+    await page.keyboard.press('Enter');
+    await esperarJanela('mapa');
+    await pausa(400);
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    const destino = await focado();
+    if (!/^Inspeção, pode ir/.test(destino.rotulo || '')) throw new Error(`Two Tabs from "Entrada" must reach "Inspeção", got ${JSON.stringify(destino)}`);
+    await page.keyboard.press('Space');
+    await esperarJanela('mapa', false);
+    await pausa(700);
+    const viagem = await page.evaluate(() => gameState.currentScene);
+    const focoDepoisDaViagem = await focado();
+    if (viagem !== 'entrance_inspection' || !focoDepoisDaViagem.escolha) throw new Error(`Travelling must load entrance_inspection and focus its first choice, got ${viagem} / ${JSON.stringify(focoDepoisDaViagem)}`);
+    // A porta sem cena não quebra nada, e no meio da luta o mapa só mostra
+    const semCena = await page.evaluate(() => { const antes = gameState.currentScene; teleportToNode('crypt_door'); return antes === gameState.currentScene; });
+    if (!semCena) throw new Error('teleportToNode("crypt_door") must not move the hero');
+    await page.evaluate(g => startInteractiveCombat(g), GOBLIN);
+    await pausa(500);
+    await page.evaluate(() => document.getElementById('btn-toggle-map').click());
+    await esperarJanela('mapa');
+    const naLuta = await page.evaluate(() => ({
+      status: document.getElementById('mapa-status').textContent,
+      podeIr: document.querySelectorAll('#mapa .mapa-no:not([aria-disabled="true"])').length
+    }));
+    if (!/combate/i.test(naLuta.status) || naLuta.podeIr !== 0) throw new Error(`During a combat the map must say why and offer nothing, got ${JSON.stringify(naLuta)}`);
+    await page.keyboard.press('Escape');
+    await esperarJanela('mapa', false);
+    await page.evaluate(() => closeCombatScreen());
+    console.log('✅ PASS: The map opens by the seal, travels by keyboard, gives the focus back and stays put in combat and on a scene-less node.');
+
+    // --- 10. A loja e a especialização ---
+    console.log('\n--- 10. Testing the shop and the specialization windows ---');
+    await page.evaluate(() => {
+      gameState.player.gold = 5;
+      gameState.player.inventory = [];
+      updateInventoryDisplay();
+      updateStatsDisplay();
+      loadScene('buy_supplies');
+    });
+    await esperarJanela('loja');
+    await pausa(400);
+    const focoNaLoja = await focado();
+    if (!/Poção de Vida/.test(focoNaLoja.texto)) throw new Error(`The shop must focus its first good, got ${JSON.stringify(focoNaLoja)}`);
+    await page.keyboard.press('Enter'); // a poção custa 10; há 5
+    await pausa(200);
+    const semOuro = await page.evaluate(() => ({ status: document.getElementById('loja-status').textContent, tom: document.getElementById('loja-status').dataset.tom, ouro: gameState.player.gold }));
+    if (!/faltam 5 de ouro/.test(semOuro.status) || semOuro.tom !== 'falha' || semOuro.ouro !== 5) throw new Error(`An unaffordable good must explain itself in the window, got ${JSON.stringify(semOuro)}`);
+    await page.evaluate(() => [...document.querySelectorAll('#loja-mercadorias button')].pop().click()); // a tocha, 2 de ouro
+    await pausa(200);
+    const comprou = await page.evaluate(() => ({
+      ouro: gameState.player.gold,
+      mochila: gameState.player.inventory,
+      salvo: JSON.parse(localStorage.getItem('ded_save_v1')).player.inventory,
+      status: document.getElementById('loja-status').textContent
+    }));
+    if (comprou.ouro !== 3 || !comprou.mochila.includes('Tocha') || !comprou.salvo.includes('Tocha') || !/Você comprou Tocha/.test(comprou.status)) {
+      throw new Error(`Buying the torch must take 2 gold, add it, save the game and say so, got ${JSON.stringify(comprou)}`);
+    }
+    await page.keyboard.press('Escape');
+    await esperarJanela('loja', false);
+    await pausa(300);
+    const focoForaDaLoja = await focado();
+    if (!focoForaDaLoja.escolha) throw new Error(`Closing the shop must leave the focus on the scene choices, got ${JSON.stringify(focoForaDaLoja)}`);
+    // Especialização: o nível 3 abre a janela obrigatória
+    await page.evaluate(() => { gameState.player.specialization = null; gameState.player.xp = 140; gameState.player.level = 2; changeXP(20); });
+    await esperarJanela('especializacao');
+    await pausa(400);
+    const espec = await page.evaluate(() => ({ obrigatoria: document.getElementById('especializacao').hasAttribute('data-obrigatoria'), pausado: gameState.isPaused }));
+    const focoNaEspec = await focado();
+    if (!espec.obrigatoria || !espec.pausado || focoNaEspec.especializacao !== 'Paladino') {
+      throw new Error(`The specialization window must be mandatory, pause the game and focus the first option, got ${JSON.stringify({ espec, focoNaEspec })}`);
+    }
+    for (let i = 0; i < 4; i++) { await page.keyboard.press('Escape'); await pausa(250); }
+    if (!(await page.evaluate(() => document.getElementById('especializacao').open))) throw new Error('Escape must not close the mandatory specialization window');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao', false);
+    const escolheu = await page.evaluate(() => ({ espec: gameState.player.specialization, pausado: gameState.isPaused, selo: document.getElementById('specialization-badge').textContent.trim() }));
+    if (escolheu.espec !== 'Berserker' || escolheu.pausado || escolheu.selo !== 'Berserker') throw new Error(`Tab + Enter must choose Berserker and resume the game, got ${JSON.stringify(escolheu)}`);
+    console.log('✅ PASS: The shop explains, buys and saves by keyboard, and the mandatory specialization survives Escape and is chosen by keyboard.');
+
+    // --- 11. O diário ---
+    console.log('\n--- 11. Testing the journal window ---');
+    await page.evaluate(() => {
+      gameState.quests.purify_crypt.status = 'active';
+      gameState.quests.decode_runes.status = 'active';
+      gameState.quests.decode_runes.runesFound = ['crypt'];
+      gameState.quests.merchant_amulet.status = 'inactive';
+    });
+    await page.focus('#quest-journal-button');
+    await page.keyboard.press('Enter');
+    await esperarJanela('diario');
+    await pausa(400);
+    const diario = await page.evaluate(() => ({
+      missoes: [...document.querySelectorAll('#diario .diario-missao')].map(m => m.textContent.replace(/\s+/g, ' ').trim()),
+      vazios: document.querySelectorAll('#diario .diario-vazio').length,
+      creditos: /Carl Olsen/.test(document.getElementById('diario').textContent)
+    }));
+    console.log('Journal:', diario);
+    if (diario.missoes.length !== 2 || diario.missoes.some(m => /Amuleto/.test(m))) throw new Error('The journal must list the two active quests and hide the inactive one');
+    if (!diario.missoes.some(m => /Alavancas/.test(m) && /de 2/.test(m)) || !diario.missoes.some(m => /1 de 3/.test(m))) throw new Error('The journal must show the levers (n de 2) and the runes (1 de 3)');
+    if (!diario.creditos) throw new Error('The journal must carry the icon credits, with the up-to-date authors');
+    await page.keyboard.press('Escape');
+    await esperarJanela('diario', false);
+    if ((await focado()).id !== 'quest-journal-button') throw new Error('Escape must give the focus back to the journal seal');
+    console.log('✅ PASS: The journal lists only the discovered quests with their progress and the credits, and closes by keyboard.');
+
+    // --- 12. O fim, os avisos, a barreira e a crônica ---
+    console.log('\n--- 12. Testing the end window, the toasts, the barrier and the chronicle ---');
+    // a janela abre sozinha, por um temporizador: ao fechar, o foco volta para quem o
+    // tinha antes dela (aqui, o selo do diário, que o caso 11 acabou de fechar)
+    const focoAntesDoFim = await page.evaluate(() => { loadScene('death'); skipTyping = true; return document.activeElement.id; });
+    await esperarJanela('fim');
+    const fim = await page.evaluate(() => ({
+      titulo: document.getElementById('fim-titulo').textContent,
+      desfecho: document.getElementById('fim').dataset.desfecho,
+      foco: document.activeElement && document.activeElement.textContent.trim()
+    }));
+    // o foco vai para "Rever a cena", não para o botão que apaga o save
+    if (fim.titulo !== 'Você morreu' || fim.desfecho !== 'derrota' || fim.foco !== 'Rever a cena') throw new Error(`The death must open the end window focused on "Rever a cena", got ${JSON.stringify(fim)}`);
+    await page.evaluate(() => { window.__semRecarga = true; document.getElementById('fim-recomecar').click(); }); // logo depois de abrir: ignorado
+    await pausa(100);
+    const intacto = await page.evaluate(() => !!localStorage.getItem('ded_save_v1') && window.__semRecarga === true);
+    if (!intacto) throw new Error('A click on "Começar uma nova aventura" right after the end window opens must not start a new adventure');
+    await page.keyboard.press('Escape');
+    await esperarJanela('fim', false);
+    const focoNoFim = await focado();
+    if (!focoAntesDoFim || focoNoFim.id !== focoAntesDoFim) throw new Error(`Closing the end window must give the focus back to "${focoAntesDoFim}", got ${JSON.stringify(focoNoFim)}`);
+    // uma cena nova antes da hora cancela a janela
+    await page.evaluate(() => { loadScene('death'); skipTyping = true; });
+    await pausa(300);
+    await page.evaluate(() => loadScene('corridor'));
+    await pausa(2500);
+    if (await page.evaluate(() => document.getElementById('fim').open)) throw new Error('A new scene must cancel the pending end window');
+    // avisos no lugar dos alert(): o mercador e a mochila cheia (um aviso só)
+    const avisos = () => page.evaluate(() => [...document.querySelectorAll('#avisos .aviso:not([hidden]) .aviso-texto')].map(a => a.textContent));
+    await page.evaluate(() => { loadScene('crypt_merchant'); skipTyping = true; });
+    await pausa(400);
+    const doMercador = await avisos();
+    if (!doMercador.some(t => /Over rir/.test(t))) throw new Error(`The merchant must speak through a toast, got ${JSON.stringify(doMercador)}`);
+    await pausa(6500); // o aviso some sozinho
+    await page.evaluate(() => {
+      gameState.player.inventory = ['Corda', 'Corda', 'Corda', 'Corda', 'Corda', 'Corda'];
+      updateInventoryDisplay();
+      loadScene('check_supplies');
+      skipTyping = true;
+    });
+    await pausa(400);
+    const daMochila = (await avisos()).filter(t => /Mochila cheia/.test(t));
+    if (daMochila.length !== 1) throw new Error(`A full backpack must raise exactly one toast, got ${JSON.stringify(daMochila)}`);
+    // a barreira recusa a passagem com um aviso
+    await page.evaluate(() => { gameState.levers = { lever_crystal: false, lever_lake: false }; loadScene('corridor'); });
+    await pausa(300);
+    const barreira = await page.evaluate(() => { const antes = gameState.currentScene; loadScene('final_chamber_entrance'); return antes === gameState.currentScene; });
+    await pausa(400);
+    if (!barreira || !(await avisos()).some(t => /barreira/i.test(t))) throw new Error('The barrier must keep the hero out and say so in a toast');
+    // três avisos em menos de dois quadros: o terceiro reusa a peça do primeiro e fica o tempo dele
+    await pausa(6500); // os avisos anteriores somem
+    await page.evaluate(() => { avisar('Primeiro', { duracao: 300 }); avisar('Segundo', { duracao: 4000 }); avisar('Terceiro', { duracao: 4000 }); });
+    await pausa(1500);
+    const corrida = await avisos();
+    if (!corrida.includes('Terceiro')) throw new Error(`A toast that reuses a piece must keep its own time, got ${JSON.stringify(corrida)}`);
+    // a linha só de emojis vira palavras na crônica
+    const linha = await page.evaluate(() => { addToLog('💍 👑 💵 💰 🪙 💎'); const li = [...document.querySelectorAll('#game-log li')].pop(); return li.textContent.trim(); });
+    if (linha !== 'Anel, coroa, notas, bolsa de ouro, moeda e diamante.') throw new Error(`The emoji-only chronicle line must read in words, got "${linha}"`);
+    if (dialogos.length) throw new Error(`Native dialogs opened during cases 9 to 12: ${JSON.stringify(dialogos)}`);
+    console.log('✅ PASS: The end window opens after the death focused on "Rever a cena" and can be dismissed, a new scene cancels it, toasts replace the alerts, the barrier says why, and the chronicle reads in words.');
+  } finally {
+    page.off('dialog', contarDialogo);
+  }
+
+  // ----------------------------------------------------
+  // TEST CASES 13 a 15: o vitral, o leitor de tela e o celular (Fase 5)
+  // ----------------------------------------------------
+  // --- 13. As artes em WebP e o esmaecer do vitral ---
+  console.log('\n--- 13. Testing the WebP arts and the vitral crossfade ---');
+  const vitrais = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'ded', 'assets', 'vitrais.json'), 'utf8'));
+  {
+    const usados = new Set(Object.values(vitrais).map(v => v.arquivo));
+    const naPasta = require('fs').readdirSync(require('path').join(__dirname, '..', 'ded', 'images'));
+    const faltam = [...usados].filter(a => !a.endsWith('.webp') || !naPasta.includes(a));
+    const soltos = naPasta.filter(a => !usados.has(a));
+    if (faltam.length || soltos.length) throw new Error(`Every vitral art must be a WebP in ded/images, and every file there must be used: missing ${JSON.stringify(faltam)}, unused ${JSON.stringify(soltos)}`);
+  }
+  const estadoDoVitral = () => page.evaluate(() => {
+    const camadas = [...document.querySelectorAll('.vitral-arte')];
+    const img = document.getElementById('image');
+    const outra = camadas.find(c => c !== img);
+    return {
+      camadas: camadas.length, imagens: document.querySelectorAll('#image').length, src: img.getAttribute('src'), alt: img.alt,
+      opacidade: getComputedStyle(img).opacity, emCima: img.classList.contains('vitral-arte-cima'),
+      outraOculta: !!outra && outra.getAttribute('aria-hidden') === 'true' && outra.alt === '' && getComputedStyle(outra).opacity === '0',
+      local: document.getElementById('local').textContent
+    };
+  });
+  const esperarArte = arquivo => page.waitForFunction(a => (document.getElementById('image').getAttribute('src') || '').endsWith('images/' + a)
+    && !document.getAnimations().some(n => n.playState === 'running' && n.effect && n.effect.target && n.effect.target.classList
+      && n.effect.target.classList.contains('vitral-arte')), { timeout: 5000 }, arquivo)
+    .catch(() => { throw new Error(`The vitral did not settle on ${arquivo} in 5 s`); });
+  const conferirVitral = async cena => {
+    await esperarArte(vitrais[cena].arquivo);
+    const v = await estadoDoVitral();
+    if (v.camadas !== 2 || v.imagens !== 1 || v.alt !== vitrais[cena].alt || v.opacidade !== '1' || !v.emCima || !v.outraOculta || v.local !== vitrais[cena].local) {
+      throw new Error(`The vitral must show ${cena} on top, with its alt and place, over a hidden empty layer, got ${JSON.stringify(v)}`);
+    }
+  };
+  // A máquina pode estar com as animações do Windows desligadas (a página abre no reduzido):
+  // a emulação só chega ao jogo no evento change do matchMedia, e o loadScene espera por ele
+  const movimento = async valor => {
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: valor }]);
+    await page.waitForFunction(r => movimentoReduzido() === r, { timeout: 3000 }, valor === 'reduce')
+      .catch(() => { throw new Error(`The game did not see prefers-reduced-motion: ${valor}`); });
+  };
+  await movimento('no-preference');
+  await page.evaluate(() => { if (gameState.combat && gameState.combat.active) closeCombatScreen(); loadScene('start'); skipTyping = true; });
+  await conferirVitral('start');
+  await page.evaluate(() => { loadScene('corridor'); skipTyping = true; });
+  // o esmaecer começa depois do decode() da arte nova, num quadro que não dá para prever
+  const esmaecer = await page.waitForFunction(() => {
+    const a = document.getAnimations().find(n => n.effect && n.effect.target && n.effect.target.id === 'image');
+    return a && { duracao: a.effect.getTiming().duration, opacidade: a.effect.getKeyframes().map(k => k.opacity) };
+  }, { timeout: 3000, polling: 'raf' }).then(h => h.jsonValue()).catch(() => null);
+  if (!esmaecer || esmaecer.duracao !== 400 || String(esmaecer.opacidade) !== '0,1') throw new Error(`The new art must fade in over the old one (opacity 0 to 1, 400 ms), got ${JSON.stringify(esmaecer)}`);
+  await conferirVitral('corridor');
+  // três cenas em seguida: o vitral para na última, inteiro
+  await page.evaluate(() => { loadScene('crystal_cave'); loadScene('underground_lake'); setTimeout(() => loadScene('treasure_room'), 30); });
+  await pausa(1500);
+  await conferirVitral('treasure_room');
+  // no movimento reduzido, a troca é na hora, sem esmaecer
+  await movimento('reduce');
+  await page.evaluate(() => { window.__esmaeceu = false; const o = new MutationObserver(() => { if (document.getAnimations().some(a => a.effect && a.effect.target && a.effect.target.classList && a.effect.target.classList.contains('vitral-arte'))) window.__esmaeceu = true; }); o.observe(document.getElementById('image-container') || document.body, { attributes: true, subtree: true }); window.__observador = o; loadScene('crypt'); skipTyping = true; });
+  await conferirVitral('crypt');
+  const reduzido = await page.evaluate(() => { window.__observador.disconnect(); return { esmaeceu: window.__esmaeceu, willChange: [...document.querySelectorAll('.vitral-arte')].map(c => getComputedStyle(c).willChange) }; });
+  if (reduzido.esmaeceu || reduzido.willChange.some(w => w !== 'auto')) throw new Error(`With reduced motion the art must swap without a fade or layer hints, got ${JSON.stringify(reduzido)}`);
+  await movimento('no-preference');
+  console.log('✅ PASS: The arts are WebP, the vitral fades from one art to the next and settles on the last one, and swaps at once with reduced motion.');
+
+  // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas ---
+  console.log('\n--- 14. Testing the screen-reader structure ---');
+  const leitor = await page.evaluate(() => ({
+    mains: document.querySelectorAll('main:not([hidden])').length,
+    papelDoResultado: document.getElementById('result-message').getAttribute('role'),
+    resultadoEmRegiaoViva: !!document.getElementById('result-message').closest('[aria-live], [role="status"], [role="log"], [role="alert"]'),
+    descricaoDoDado: document.getElementById('dice-button').getAttribute('aria-describedby'),
+    mapa: document.getElementById('mapa').getAttribute('aria-describedby'),
+    diario: document.getElementById('diario').getAttribute('aria-describedby'),
+    lang: document.documentElement.lang
+  }));
+  console.log('Screen-reader structure:', leitor);
+  if (leitor.mains !== 1) throw new Error(`Only one <main> may be exposed, got ${leitor.mains}`);
+  if (leitor.papelDoResultado || leitor.resultadoEmRegiaoViva) throw new Error('#result-message must not be a live region (the chronicle line announces the roll)');
+  if (leitor.descricaoDoDado !== 'bandeja-titulo result-message') throw new Error(`#dice-button must be described by the tray title and the result, got ${leitor.descricaoDoDado}`);
+  if (leitor.mapa !== 'mapa-status' || leitor.diario !== 'diario-subtitulo') throw new Error('#mapa and #diario must be described by their status and subtitle');
+  if (leitor.lang !== 'pt-BR') throw new Error(`The document language must be pt-BR, got ${leitor.lang}`);
+  await page.evaluate(() => { loadScene('start'); skipTyping = true; });
+  await pausa(500);
+  await page.focus('#choices button');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.closest && !!document.activeElement.closest('#choices')
+    && document.getElementById('choices').getAttribute('aria-labelledby') === 'local scene-text escolhas-titulo', { timeout: 5000 })
+    .catch(() => { throw new Error('After a choice by keyboard, the focus must land on the new choices, named by the place, the scene text and the question'); });
+  await page.focus('#btn-toggle-map');
+  await pausa(100);
+  if (await page.evaluate(() => document.getElementById('choices').hasAttribute('aria-labelledby'))) throw new Error('The long name of #choices must go away once the focus leaves it');
+  console.log('✅ PASS: One <main>, the roll announced once, and the scene read before the choices.');
+
+  // --- 15. O celular a 375 px: sem rolagem de lado e alvos de toque de 44 px ---
+  console.log('\n--- 15. Testing the phone layout at 375 px ---');
+  const celular = await browser.newPage();
+  try {
+    await celular.setViewport({ width: 375, height: 667, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    await celular.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+    await celular.evaluateOnNewDocument(() => { try { localStorage.clear(); } catch (e) { /* sem armazenamento */ } });
+    celular.on('dialog', d => d.dismiss().catch(() => {}));
+    await celular.goto(`http://127.0.0.1:${PORT}/ded/index.html`, { waitUntil: 'domcontentloaded' });
+    await celular.waitForFunction(() => typeof scenes === 'object' && scenes && Object.keys(scenes).length > 50, { timeout: 15000 });
+    await celular.evaluate(() => { ttsEnabled = false; });
+    const deLado = async estado => {
+      const m = await celular.evaluate(() => ({ largura: document.documentElement.scrollWidth, tela: window.innerWidth }));
+      if (m.largura > m.tela) throw new Error(`At 375 px the page must not scroll sideways (${estado}): scrollWidth ${m.largura} > ${m.tela}`);
+    };
+    const alvosPequenos = seletor => celular.evaluate(s => [...document.querySelectorAll(s)].filter(e => {
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' && (r.width < 43.5 || r.height < 43.5);
+    }).map(e => `${e.id || e.className} ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`), seletor);
+    // Os links dos créditos têm o alvo de 44 px num ::after (o foco realça só a palavra), e o
+    // getBoundingClientRect dá a altura da letra: quem responde ao toque 21 px acima e abaixo
+    // do meio do link tem que ser o próprio link
+    const creditosPequenos = seletor => celular.evaluate(s => [...document.querySelectorAll(s)].filter(a => a.getClientRects().length).map(a => {
+      a.scrollIntoView({ block: 'center' });
+      const r = a.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const fora = [-21, 21].filter(d => document.elementFromPoint(x, y + d)?.closest('a') !== a);
+      return fora.length ? `${a.textContent.trim()} (${fora.join(', ')} px)` : null;
+    }).filter(Boolean), seletor);
+    const janela = async (id, abrir) => {
+      await celular.evaluate(abrir);
+      await celular.waitForFunction(i => document.getElementById(i).open, { timeout: 5000 }, id).catch(() => { throw new Error(`#${id} did not open at 375 px`); });
+      await pausa(400);
+      await deLado(`#${id}`);
+      const pequenos = await alvosPequenos(`#${id} .janela-fechar, #${id} .mapa-no, #${id} #loja-mercadorias .escolha`);
+      if (pequenos.length) throw new Error(`Touch targets in #${id} must be at least 44 px: ${JSON.stringify(pequenos)}`);
+    };
+    await deLado('selection');
+    const creditosSelecao = await creditosPequenos('.tela-selecao .creditos a');
+    if (creditosSelecao.length) throw new Error(`The credits links on the selection screen must have a 44 px touch target: ${JSON.stringify(creditosSelecao)}`);
+    await celular.evaluate(() => window.scrollTo(0, 0));
+    await celular.evaluate(() => { selectCharacter('warrior'); startGame(); skipTyping = true; });
+    await pausa(800);
+    await deLado('exploration');
+    const pequenos = await alvosPequenos('#choices .escolha, .selo');
+    if (pequenos.length) throw new Error(`Choices and seals must be at least 44 px at 375 px: ${JSON.stringify(pequenos)}`);
+    const narrativa = await celular.evaluate(() => parseFloat(getComputedStyle(document.getElementById('scene-text')).fontSize));
+    if (narrativa < 16) throw new Error(`The narrative must be at least 16 px on a phone, got ${narrativa}`);
+    await celular.evaluate(() => { loadScene('crypt'); skipTyping = true; });
+    await pausa(600);
+    await celular.evaluate(() => [...document.querySelectorAll('#choices button')][1].click());
+    await pausa(500);
+    await deLado('the d20 tray');
+    if ((await alvosPequenos('#dice-button')).length) throw new Error('The d20 button must be at least 44 px at 375 px');
+    await celular.evaluate(g => { loadScene('start'); startInteractiveCombat(g); }, GOBLIN);
+    await pausa(800);
+    await deLado('combat');
+    await celular.evaluate(() => closeCombatScreen());
+    await pausa(400);
+    await janela('mapa', () => document.getElementById('btn-toggle-map').click());
+    const sobrepostos = await celular.evaluate(() => {
+      // só os lugares da carta: a legenda fica no rodapé, fora da rolagem do corpo
+      const caixas = [...document.querySelectorAll('#mapa .mapa-carta .mapa-medalhao')].map(e => e.getBoundingClientRect());
+      let n = 0;
+      for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
+        const a = caixas[i], b = caixas[j];
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) n++;
+      }
+      return { n, corpoDeLado: document.querySelector('#mapa .janela-corpo').scrollWidth > document.querySelector('#mapa .janela-corpo').clientWidth };
+    });
+    if (sobrepostos.n || sobrepostos.corpoDeLado) throw new Error(`The portrait map must fit the window with no overlapping places, got ${JSON.stringify(sobrepostos)}`);
+    await celular.evaluate(() => fecharJanela('mapa'));
+    await pausa(400);
+    await janela('loja', () => { loadScene('buy_supplies'); skipTyping = true; });
+    await celular.evaluate(() => fecharJanela('loja'));
+    await pausa(400);
+    await janela('diario', () => document.getElementById('quest-journal-button').click());
+    const creditosDiario = await creditosPequenos('#diario .creditos a');
+    if (creditosDiario.length) throw new Error(`The credits links in the journal must have a 44 px touch target: ${JSON.stringify(creditosDiario)}`);
+    await celular.evaluate(() => fecharJanela('diario'));
+    await pausa(400);
+    await janela('especializacao', () => { gameState.player.level = 3; gameState.player.specialization = null; openSpecializationModal(false); });
+    await celular.evaluate(() => document.querySelector('#especializacao [data-especializacao]').click());
+    await pausa(400);
+    await celular.evaluate(() => { loadScene('death'); skipTyping = true; });
+    await celular.waitForFunction(() => document.getElementById('fim').open, { timeout: 8000 }).catch(() => { throw new Error('#fim did not open at 375 px'); });
+    await pausa(600);
+    await deLado('#fim');
+    await celular.evaluate(() => fecharJanela('fim'));
+    await pausa(400);
+    await celular.evaluate(() => avisar('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' }));
+    await pausa(400);
+    await deLado('a toast');
+    console.log('✅ PASS: At 375 px nothing scrolls sideways (selection, exploration, the d20 tray, combat, the five windows and a toast), the targets are 44 px (the credits links too) and the narrative is 16 px or more.');
+  } finally {
+    await celular.close();
+  }
+
 
   console.log('\n=============================================');
   console.log('🎉 ALL QA TEST CASES PASSED SUCCESSFULLY FOR RPG ADVENTURE QUEST!');
