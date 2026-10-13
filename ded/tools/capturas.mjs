@@ -131,7 +131,7 @@ async function comecar(page, classe) {
 }
 
 // ---------------------------------------------------------------------------
-// Combate (Fase 3), em 1920x1080 e 1366x768, em páginas próprias: a vitória dá XP
+// Combate (Fase 3), em 1920x1080, 1366x768 e 390x844, em páginas próprias: a vitória dá XP
 // e ouro, escreve na crônica e troca a cena, e o resto do fluxo do jogo não pode
 // depender disso.
 // O Math.random fica preso em 0,96 do começo ao fim: o d20 dá 20 natural dos dois
@@ -212,7 +212,6 @@ async function capturarJogo(browser, base, pasta, erros) {
         await tira('selecao-escolhido');
         await comecar(page, 'warrior');
         await tira('exploracao');
-        if (sufixo === '-390') { await page.close(); continue; } // o celular é da Fase 5
 
         // O mapa na entrada: você está aqui, três lugares aonde ir
         await page.evaluate(() => document.getElementById('btn-toggle-map').click());
