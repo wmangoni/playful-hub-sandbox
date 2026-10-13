@@ -1250,6 +1250,15 @@ async function runTests() {
       const r = e.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' && (r.width < 43.5 || r.height < 43.5);
     }).map(e => `${e.id || e.className} ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`), seletor);
+    // Os links dos créditos têm o alvo de 44 px num ::after (o foco realça só a palavra), e o
+    // getBoundingClientRect dá a altura da letra: quem responde ao toque 21 px acima e abaixo
+    // do meio do link tem que ser o próprio link
+    const creditosPequenos = seletor => celular.evaluate(s => [...document.querySelectorAll(s)].filter(a => a.getClientRects().length).map(a => {
+      a.scrollIntoView({ block: 'center' });
+      const r = a.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const fora = [-21, 21].filter(d => document.elementFromPoint(x, y + d)?.closest('a') !== a);
+      return fora.length ? `${a.textContent.trim()} (${fora.join(', ')} px)` : null;
+    }).filter(Boolean), seletor);
     const janela = async (id, abrir) => {
       await celular.evaluate(abrir);
       await celular.waitForFunction(i => document.getElementById(i).open, { timeout: 5000 }, id).catch(() => { throw new Error(`#${id} did not open at 375 px`); });
@@ -1259,6 +1268,9 @@ async function runTests() {
       if (pequenos.length) throw new Error(`Touch targets in #${id} must be at least 44 px: ${JSON.stringify(pequenos)}`);
     };
     await deLado('selection');
+    const creditosSelecao = await creditosPequenos('.tela-selecao .creditos a');
+    if (creditosSelecao.length) throw new Error(`The credits links on the selection screen must have a 44 px touch target: ${JSON.stringify(creditosSelecao)}`);
+    await celular.evaluate(() => window.scrollTo(0, 0));
     await celular.evaluate(() => { selectCharacter('warrior'); startGame(); skipTyping = true; });
     await pausa(800);
     await deLado('exploration');
@@ -1295,6 +1307,8 @@ async function runTests() {
     await celular.evaluate(() => fecharJanela('loja'));
     await pausa(400);
     await janela('diario', () => document.getElementById('quest-journal-button').click());
+    const creditosDiario = await creditosPequenos('#diario .creditos a');
+    if (creditosDiario.length) throw new Error(`The credits links in the journal must have a 44 px touch target: ${JSON.stringify(creditosDiario)}`);
     await celular.evaluate(() => fecharJanela('diario'));
     await pausa(400);
     await janela('especializacao', () => { gameState.player.level = 3; gameState.player.specialization = null; openSpecializationModal(false); });
@@ -1309,7 +1323,7 @@ async function runTests() {
     await celular.evaluate(() => avisar('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' }));
     await pausa(400);
     await deLado('a toast');
-    console.log('✅ PASS: At 375 px nothing scrolls sideways (selection, exploration, the d20 tray, combat, the five windows and a toast), the targets are 44 px and the narrative is 16 px or more.');
+    console.log('✅ PASS: At 375 px nothing scrolls sideways (selection, exploration, the d20 tray, combat, the five windows and a toast), the targets are 44 px (the credits links too) and the narrative is 16 px or more.');
   } finally {
     await celular.close();
   }
