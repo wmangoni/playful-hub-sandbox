@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
     <head>
         <!-- Google Tag Manager -->
         <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -157,7 +157,10 @@
                 </nav>
             </header>
 
-            <main class="mesa">
+            <!-- hidden enquanto a tela está fora de vista (mostrarTela): um <main> só no
+                 documento. O display: grid da .mesa vence o do hidden, e o layout da
+                 exploração em espera continua pronto para o "Começar" -->
+            <main class="mesa" hidden>
                 <!-- Coluna 1: ficha -->
                 <section class="coluna coluna-ficha" aria-label="Ficha do herói">
                     <div class="vitais">
@@ -173,7 +176,7 @@
                             <div class="emblema emblema-ouro"><span class="emblema-valor" id="gold">5</span></div>
                             <span class="vital-rotulo">Ouro</span>
                         </div>
-                        <div class="barra-vida" id="barra-vida" role="meter" aria-label="Vida" aria-valuemin="0" aria-valuemax="20" aria-valuenow="20" style="--v: 1"><span class="barra-vida-janela"></span></div>
+                        <div class="barra-vida" id="barra-vida" role="meter" aria-label="Vida" aria-valuemin="0" aria-valuemax="20" aria-valuenow="20" aria-valuetext="20 de 20" style="--v: 1"><span class="barra-vida-janela"></span></div>
                     </div>
 
                     <section class="painel">
@@ -258,7 +261,9 @@
                              .hidden aqui só deixa invisível (ver componentes.css). -->
                         <div class="acoes">
                             <div class="corrente" aria-hidden="true"></div>
-                            <div class="escolhas" id="choices"></div>
+                            <!-- grupo das escolhas: quem chega pelo teclado ouve o lugar e a cena
+                                 como nome dele, antes da escolha focada (focarPrimeiraEscolha) -->
+                            <div class="escolhas" id="choices" role="group"></div>
                             <div class="bandeja hidden" id="dice-container">
                                 <p class="bandeja-titulo" id="bandeja-titulo">Teste de <b>Força</b> · dificuldade <span class="num">10</span></p>
                                 <div class="bandeja-mesa" id="bandeja-mesa">
@@ -269,8 +274,10 @@
                                     <div class="selo-cera selo-cera-escuro" data-selo="desastre" aria-hidden="true">Desastre</div>
                                     <div class="selo-cera selo-cera-critico" data-selo="critico" aria-hidden="true">Crítico</div>
                                 </div>
-                                <p class="bandeja-conta" id="result-message" role="status"></p>
-                                <button class="botao-fita" id="dice-button" type="button">Rolar o d20</button>
+                                <!-- sem role=status: a crônica anuncia a rolagem (uma vez só); o botão
+                                     lê o teste e a conta como descrição -->
+                                <p class="bandeja-conta" id="result-message"></p>
+                                <button class="botao-fita" id="dice-button" type="button" aria-describedby="bandeja-titulo result-message">Rolar o d20</button>
                             </div>
                         </div>
                     </article>
@@ -292,7 +299,7 @@
                             </div>
                             <div class="card-inimigo-dados">
                                 <h3 class="card-inimigo-nome" id="combat-enemy-name">Inimigo</h3>
-                                <div class="barra-vida barra-vida-inimigo" id="combat-enemy-health" role="meter" aria-label="Vida do inimigo" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10" style="--v: 1"><span class="barra-vida-janela"></span></div>
+                                <div class="barra-vida barra-vida-inimigo" id="combat-enemy-health" role="meter" aria-label="Vida do inimigo" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10" aria-valuetext="10 de 10" style="--v: 1"><span class="barra-vida-janela"></span></div>
                                 <p class="card-inimigo-vida"><span class="num" id="combat-enemy-hp-text">10 / 10</span> de vida</p>
                             </div>
                             <div class="vital card-inimigo-ca">
@@ -339,7 +346,7 @@
 
         <!-- Mapa da masmorra: janela aberta pelo selo "Mapa". Os caminhos (SVG) e os
              lugares (botões) são montados na primeira abertura (atualizarMapa) -->
-        <dialog id="mapa" class="janela" aria-labelledby="mapa-titulo">
+        <dialog id="mapa" class="janela" aria-labelledby="mapa-titulo" aria-describedby="mapa-status">
             <div class="folha janela-folha">
                 <h2 class="fita fita-rubra" id="mapa-titulo">Mapa da masmorra</h2>
                 <button class="janela-fechar" type="button" aria-label="Fechar"><svg aria-hidden="true"><use href="ui/icones.svg#i-fechar"/></svg></button>
@@ -406,11 +413,11 @@
         </dialog>
 
         <!-- Diário: aberto pelo selo "Diário". Lista só as missões já descobertas. -->
-        <dialog class="janela" id="diario" aria-labelledby="diario-titulo">
+        <dialog class="janela" id="diario" aria-labelledby="diario-titulo" aria-describedby="diario-subtitulo">
             <div class="folha janela-folha">
                 <h2 class="fita fita-rubra" id="diario-titulo">Diário</h2>
                 <button class="janela-fechar" type="button" aria-label="Fechar"><svg aria-hidden="true"><use href="ui/icones.svg#i-fechar"/></svg></button>
-                <p class="janela-subtitulo">As missões que você descobriu na masmorra.</p>
+                <p class="janela-subtitulo" id="diario-subtitulo">As missões que você descobriu na masmorra.</p>
                 <div class="janela-corpo" id="diario-missoes"></div>
                 <div class="janela-rodape">
                     <!-- Atribuição exigida pela licença dos ícones (lista completa em ui/CREDITOS.md) -->
@@ -1403,12 +1410,25 @@
             // de vista, a exploração fica "em espera": montada e invisível, com estilo
             // e layout prontos, para o "Começar" não pagar o primeiro layout da folha.
             function mostrarTela(tela) {
-                document.getElementById('character-select').classList.toggle('hidden', tela !== 'selecao');
-                document.getElementById('game-screen').classList.toggle('tela-em-espera', tela !== 'exploracao');
+                const selecao = document.getElementById('character-select');
+                const jogo = document.getElementById('game-screen');
+                selecao.classList.toggle('hidden', tela !== 'selecao');
+                jogo.classList.toggle('tela-em-espera', tela !== 'exploracao');
+                // Um <main> só no documento: o da tela fora de vista leva hidden. Na
+                // exploração em espera, o display: grid da .mesa vence o do hidden, e o
+                // layout continua pronto para o "Começar".
+                selecao.querySelector('main').hidden = tela !== 'selecao';
+                jogo.querySelector('main').hidden = tela !== 'exploracao';
             }
 
-            // Leva o foco à primeira escolha (quem navega pelo teclado não fica no <body>)
+            // Leva o foco à primeira escolha (quem navega pelo teclado não fica no <body>).
+            // O grupo das escolhas ganha antes, como nome, o lugar, o texto da cena e a
+            // pergunta: o leitor de tela lê a cena ao entrar no grupo e depois a escolha
+            // focada, e o teclado continua a um Enter dela. O nome sai quando o foco deixa
+            // o grupo (quem lê a página em sequência não ouve a cena duas vezes).
             function focarPrimeiraEscolha() {
+                const escolhas = document.getElementById('choices');
+                if (escolhas && escolhas.querySelector('button')) escolhas.setAttribute('aria-labelledby', 'local scene-text escolhas-titulo');
                 focarNoQuadro(() => document.querySelector('#choices button'));
             }
 
@@ -1556,10 +1576,10 @@
             // vai também para #avisos-leitor. Com uma janela aberta, o resto da página
             // fica inerte para o leitor de tela: o retorno de uma ação feita numa janela
             // vai para a .janela-status dela, não para um aviso.
-            // tom: '' (neutro), 'sucesso' ou 'falha'; icone: um id do sprite.
-            function avisar(texto, { tom = '', icone = 'i-alerta', duracao } = {}) {
-                const leitor = document.getElementById('avisos-leitor');
-                if (leitor) leitor.textContent = texto;
+            // tom: '' (neutro), 'sucesso' ou 'falha'; icone: um id do sprite. leitor: false
+            // quando a crônica já anuncia o mesmo fato (o leitor de tela ouviria duas vezes).
+            function avisar(texto, { tom = '', icone = 'i-alerta', duracao, leitor = true } = {}) {
+                if (leitor) anunciar(texto);
                 const host = document.getElementById('avisos');
                 if (!host || typeof host.showPopover !== 'function') return;
                 const pecas = [...host.querySelectorAll('.aviso')];
@@ -1596,6 +1616,14 @@
                         if (peca.animacao) peca.animacao.onfinish = sumir; else sumir();
                     }, tempo);
                 });
+            }
+
+            // Um texto para o leitor de tela, pela região viva do começo do body
+            // (#avisos-leitor): a dos avisos e a de um fato que não vai para a crônica.
+            // Escrever de novo o mesmo texto troca o nó, e ele é anunciado de novo.
+            function anunciar(texto) {
+                const leitor = document.getElementById('avisos-leitor');
+                if (leitor) leitor.textContent = texto;
             }
 
             // Uma janela aberta depois do aviso entra na frente dele: o aviso volta à frente
@@ -1860,7 +1888,7 @@
                 const semEscolhas = !scene.choices.length;
                 const fim = semEscolhas && CENAS_FINAIS.has(gameState.currentScene);
                 const titulo = fim ? 'A aventura terminou' : semEscolhas ? 'A aventura continua…' : 'O que você faz?';
-                choicesElement.innerHTML = `<p class="escolhas-titulo">${titulo}</p>`;
+                choicesElement.innerHTML = `<p class="escolhas-titulo" id="escolhas-titulo">${titulo}</p>`;
 
                 scene.choices.forEach((choice, i) => {
                     const button = document.createElement('button');
@@ -2133,8 +2161,11 @@
                     };
 
                     if (gameState.mem.checkType === "combat") {
-                        // no teste de combate o número é só a abertura da luta
+                        // no teste de combate o número é só a abertura da luta; ele não vai
+                        // para a crônica e a conta da bandeja não é região viva: o leitor de
+                        // tela ouve por anunciar()
                         resultMessageElement.innerHTML = `Você tirou <b>${diceResult}</b>. Prepare-se para o combate!`;
+                        anunciar(`Você tirou ${diceResult}. Prepare-se para o combate!`);
                         oferecerAvanco('Enfrentar', () => {
                             fechar();
                             startInteractiveCombat(gameState.currentEnemy);
@@ -2154,6 +2185,8 @@
                     const selo = checkSuccess ? (diceResult === 20 ? 'critico' : 'sucesso') : (diceResult === 1 ? 'desastre' : 'falha');
                     const desfecho = { sucesso: 'sucesso', critico: 'sucesso crítico', falha: 'falha', desastre: 'desastre' }[selo];
 
+                    // a conta fica na bandeja (o botão a lê como descrição), e o leitor de tela
+                    // ouve a rolagem uma vez só, pela linha da crônica logo abaixo
                     resultMessageElement.innerHTML = `<b>${diceResult}</b>${crit} ${parcela} = <b>${soma}</b> contra ${dificuldade}` +
                         `<span class="so-leitor">: ${desfecho}</span>`; // o selo de cera é aria-hidden
                     // cada selo tem texto fixo e já está pintado: revelar é só animar
@@ -2305,6 +2338,7 @@
                 escreverAtributo(barra, 'style', `--v: ${(e.max_hp ? Math.min(1, vida / e.max_hp) : 0).toFixed(3)}`);
                 escreverAtributo(barra, 'aria-valuenow', vida);
                 escreverAtributo(barra, 'aria-valuemax', e.max_hp);
+                escreverAtributo(barra, 'aria-valuetext', `${vida} de ${e.max_hp}`);
                 escreverTexto(document.getElementById('combat-enemy-hp-text'), `${vida} / ${e.max_hp}`);
                 // a vida, a armadura e a mana do herói ficam na ficha
                 updateStatsDisplay();
@@ -3055,8 +3089,9 @@
 
             function addToInventory(item) {
                 if (gameState.player.inventory.length >= INVENTORY_CAPACITY) {
-                    addToLog("🎒 Sua mochila está cheia! Não há slots livres.");
-                    avisarSemRepetir('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' });
+                    // a crônica anuncia e o aviso só aparece (três itens: uma linha e um aviso)
+                    addToLogSemRepetir("🎒 Sua mochila está cheia! Não há slots livres.");
+                    avisarSemRepetir('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila', leitor: false });
                     return false;
                 }
                 gameState.player.inventory.push(item);
@@ -3133,6 +3168,7 @@
                 escreverAtributo(barra, 'style', `--v: ${vida.toFixed(3)}`);
                 escreverAtributo(barra, 'aria-valuenow', p.health);
                 escreverAtributo(barra, 'aria-valuemax', p.maxHealth);
+                escreverAtributo(barra, 'aria-valuetext', `${p.health} de ${p.maxHealth}`);
                 escreverTexto(porId('armor-class'), p.stats ? getPlayerAC() : 10);
                 escreverTexto(porId('gold'), p.gold);
 
@@ -3218,9 +3254,16 @@
                 return diceContainer && !diceContainer.classList.contains('hidden');
             }
 
+            // Por que a mochila não abre agora. Na luta a crônica fica escondida: o motivo
+            // vai para o relato, à vista e anunciado.
+            function avisarMochilaBloqueada() {
+                const texto = "⚠️ Você não pode vasculhar sua mochila no calor da batalha!";
+                if (gameState.combat && gameState.combat.active) addCombatLog(texto, 'info'); else addToLog(texto);
+            }
+
             function useConsumableItem(itemName, index) {
                 if (isInteractionDisabled()) {
-                    addToLog("⚠️ Você não pode vasculhar sua mochila no calor da batalha!");
+                    avisarMochilaBloqueada();
                     return;
                 }
 
@@ -3278,11 +3321,12 @@
                     // Se for consumível, permite clicar para usar
                     if (usavel) {
                         slot.type = 'button';
-                        slot.setAttribute('aria-label', `Usar ${item}: ${dbItem.desc}`);
+                        // bloqueado, o nome diz por quê (o clique também diz)
+                        slot.setAttribute('aria-label', `Usar ${item}: ${dbItem.desc}` + (bloqueada ? '. Indisponível durante um teste ou uma luta' : ''));
                         if (bloqueada) slot.setAttribute('aria-disabled', 'true');
                         slot.onclick = () => {
                             if (isInteractionDisabled()) {
-                                addToLog("⚠️ Você não pode vasculhar sua mochila no calor da batalha!");
+                                avisarMochilaBloqueada();
                                 return;
                             }
                             useConsumableItem(item, i);
@@ -3330,6 +3374,14 @@
                 if (!nomes.length) return '';
                 const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}` : nomes[0];
                 return lista.charAt(0).toUpperCase() + lista.slice(1) + '.';
+            }
+
+            // Uma linha igual à última da crônica não entra de novo: cada linha é anunciada
+            // pelo leitor de tela, e três itens com a mochila cheia (ou cliques seguidos numa
+            // passagem selada) repetiam a mesma frase
+            function addToLogSemRepetir(message) {
+                if (gameState.log[gameState.log.length - 1] === message) return;
+                addToLog(message);
             }
 
             // A crônica mostra o texto sem os emojis (o ícone faz esse papel) e
@@ -3688,6 +3740,13 @@
                 // o navegador pode restaurar o rádio marcado ao recarregar a página
                 const marcado = document.querySelector('.character-card input:checked');
                 if (marcado && typeof marcado.value === 'string') selectCharacter(marcado.value);
+
+                // --- Escolhas: o nome do grupo (a cena, ver focarPrimeiraEscolha) sai quando o
+                // foco deixa o grupo ---
+                document.getElementById('choices').addEventListener('focusout', evento => {
+                    const escolhas = evento.currentTarget;
+                    if (!escolhas.contains(evento.relatedTarget)) escolhas.removeAttribute('aria-labelledby');
+                });
 
                 // --- Bandeja do d20 ---
                 document.getElementById('dice-button').addEventListener('click', rollDice);
@@ -4228,8 +4287,9 @@
             // e verdete. O clarão é só opacidade (Web Animations), como o vermelho.
             function triggerBarrierBlocked() {
                 AudioEngine.playBarrierSealed();
-                addToLog('🚧 Uma barreira mágica neon bloqueia a passagem! Ative as 2 alavancas: uma na Câmara Cristal e outra na beira do Lago Subterrâneo.');
-                avisarSemRepetir(`Uma barreira mágica bloqueia a passagem. ${dicaDasAlavancas()}`, { tom: 'falha', icone: 'i-cadeado' });
+                // a crônica anuncia (sem repetir a linha a cada clique) e o aviso só aparece
+                addToLogSemRepetir('🚧 Uma barreira mágica neon bloqueia a passagem! Ative as 2 alavancas: uma na Câmara Cristal e outra na beira do Lago Subterrâneo.');
+                avisarSemRepetir(`Uma barreira mágica bloqueia a passagem. ${dicaDasAlavancas()}`, { tom: 'falha', icone: 'i-cadeado', leitor: false });
                 const clarao = document.getElementById('clarao-barreira');
                 if (clarao && clarao.animate) {
                     clarao.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
