@@ -24,6 +24,9 @@
 // Cenários (todos em CPU 1x; os marcados com * repetem em 4x):
 //   abertura          da carga da página até a seleção parada (2 s depois das fontes). Só informa:
 //                     é a pintura a frio e fica fora do veredito.
+//   abertura-save     a carga com um save (o guerreiro no corredor): o jogo abre direto na exploração e
+//                     digita a cena salva, sem a espera de assentar; até 3,5 s depois das fontes. Só
+//                     informa, como a abertura: é o único caminho em que a página joga logo na carga.
 //   exploracao *      selectCharacter + startGame e 3 s da cena inicial com a máquina de escrever
 //                     rodando (inclui a troca da seleção para a exploração e a chama do vitral).
 //   texto-longo *     loadScene da cena de texto mais longo do scenes.json e 4 s de máquina de escrever.
@@ -148,7 +151,7 @@ let MOVIMENTO = 'no-preference'; // prefers-reduced-motion emulado (--movimento 
 const PERFIL_PADRAO = path.join(os.tmpdir(), 'ded-desempenho-perfil');
 const LIMITE_MS = 1000 / 48;
 const FOLGA_MS = 1.5; // ruído do timestamp do rAF; ver o cabeçalho
-const CENARIOS = ['abertura', 'exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
+const CENARIOS = ['abertura', 'abertura-save', 'exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
     'combate-vitoria', 'combate-derrota', 'combate-fuga', 'mapa', 'mapa-viajar', 'loja', 'loja-comprar', 'diario',
     'especializacao', 'fim', 'aviso', 'barreira', 'primeiro-clique'];
 const EM_4X = new Set(['exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
@@ -167,7 +170,7 @@ const JANELAS = {
     aviso: { preparo: 'jogo', janela: 6500 },
     barreira: { preparo: 'jogo', janela: 2000 }
 };
-const SO_INFORMA = new Set(['abertura']);
+const SO_INFORMA = new Set(['abertura', 'abertura-save']);
 const FORCAR = { 'teste-d20': null, 'critico-20': 0.96, 'critico-1': 0 }; // floor(0,96 * 20) + 1 = 20
 // Combate: o desfecho esperado, a ação clicada, o Math.random no turno do jogador e no do
 // inimigo, as vidas antes do clique (null mantém a cheia) e a janela medida, contada do clique
@@ -218,9 +221,12 @@ function servidor(raiz) {
 // ---------------------------------------------------------------------------
 // Dentro da página. Instalado antes dos scripts do jogo (evaluateOnNewDocument):
 // apaga o save e deixa window.__desempenho com iniciar/marcar/parar.
-function instalarMedidor(autoIniciar) {
+function instalarMedidor(autoIniciar, save) {
     if (window !== window.top) return;
-    try { localStorage.clear(); } catch { /* sem armazenamento */ }
+    try {
+        localStorage.clear();
+        if (save) localStorage.setItem('ded_save_v1', save); // a abertura com save
+    } catch { /* sem armazenamento */ }
     const tipos = (window.PerformanceObserver && PerformanceObserver.supportedEntryTypes) || [];
     const m = window.__desempenho = { loafSuportado: tipos.includes('long-animation-frame'), ativo: false };
     let ultimo = null, observador = null, pronto = null;
@@ -343,7 +349,7 @@ async function fluxoCombate({ acao, jogador, inimigo, vidaInimigo, vidaJogador, 
 
 // ---------------------------------------------------------------------------
 // Uma aba nova do navegador aquecido, com o save apagado e o jogo pronto na seleção.
-async function abrirJogo(browser, base, cpu, reg, autoIniciar = false) {
+async function abrirJogo(browser, base, cpu, reg, autoIniciar = false, save = null) {
     const page = await browser.newPage();
     await page.bringToFront();
     page.on('dialog', d => d.dismiss().catch(() => {}));
@@ -351,7 +357,7 @@ async function abrirJogo(browser, base, cpu, reg, autoIniciar = false) {
     page.on('response', r => { if (r.status() >= 400 && !r.url().endsWith('favicon.ico')) reg.avisos.push(`${r.status()} ${r.url()}`); });
     await page.setRequestInterception(true);
     page.on('request', r => (BLOQUEIO.test(r.url()) ? r.abort() : r.continue()));
-    await page.evaluateOnNewDocument(instalarMedidor, autoIniciar);
+    await page.evaluateOnNewDocument(instalarMedidor, autoIniciar, save);
     // O padrão é medir o movimento completo: com as animações do Windows desligadas,
     // o Chrome informa prefers-reduced-motion e o jogo pularia a máquina de escrever,
     // o giro do d20 e a chama do vitral. --movimento reduzido mede o outro caminho.
@@ -540,6 +546,29 @@ async function cenarioAbertura(browser, base, cpu, reg) {
     try {
         await espera(2000);
         reg.execucoes.push(await page.evaluate(() => window.__desempenho.parar()));
+    } finally { await page.close().catch(() => {}); }
+}
+
+// O save de um guerreiro no corredor, feito por uma partida de verdade numa aba à parte
+async function fazerSave(browser, base, reg) {
+    const page = await abrirJogo(browser, base, 1, reg);
+    try {
+        await novoJogo(page);
+        await page.evaluate(() => loadScene('corridor'));
+        await prontoParaEscolher(page);
+        return await page.evaluate(() => { saveGame(); return localStorage.getItem('ded_save_v1'); });
+    } finally { await page.close().catch(() => {}); }
+}
+
+async function cenarioAberturaSave(browser, base, cpu, reg) {
+    const save = await fazerSave(browser, base, reg);
+    if (!save) throw new Error('o jogo não gravou o save (ded_save_v1)');
+    const page = await abrirJogo(browser, base, cpu, reg, true, save);
+    try {
+        await espera(3500);
+        const r = await page.evaluate(async () => ({ ...(await window.__desempenho.parar()), cena: gameState.currentScene }));
+        if (r.cena !== 'corridor') reg.avisos.push(`a abertura com save parou na cena "${r.cena}", e não no corredor`);
+        reg.execucoes.push(r);
     } finally { await page.close().catch(() => {}); }
 }
 
@@ -838,6 +867,15 @@ function imprimir(resultados, meta) {
         `limite ${num(LIMITE_MS, 2)} ms + folga ${num(FOLGA_MS)} ms`);
 }
 
+// Quantas execuções de aceite têm o pior quadro em 3 vsyncs. Numa bateria sã nesta máquina, de
+// 13 a 18%; com o ambiente degradado, de 36 a 72% (TASK_001 §6)
+function emTresVsyncs(resultados, intervaloMs) {
+    const iv = intervaloMs || 1000 / 144;
+    const execs = resultados.filter(r => r.cpu === 1 && !SO_INFORMA.has(r.cenario)).flatMap(r => r.execucoes);
+    const n = execs.filter(e => { const m = Math.max(...e.quadros); return m >= 2.5 * iv && m < 3.5 * iv; }).length;
+    return { n, total: execs.length, parte: execs.length ? n / execs.length : 0 };
+}
+
 function veredito(resultados) {
     const contam = resultados.filter(r => r.cpu === 1 && !SO_INFORMA.has(r.cenario));
     if (!contam.length) return { texto: 'SEM VEREDITO (nenhum cenário de aceite em CPU 1x)', aprovado: true };
@@ -846,13 +884,15 @@ function veredito(resultados) {
     const erros = contam.reduce((t, r) => t + r.erros.length, 0);
     const fora = naLimpeza ? `${naLimpeza} ${naLimpeza === 1 ? 'quadro' : 'quadros'} na limpeza da GPU, fora do veredito` : '';
     const meia = contam.reduce((t, r) => t + (r.meiaTaxa || 0), 0);
+    const refeitas = contam.reduce((t, r) => t + (r.refeitasMeiaTaxa || 0), 0);
+    const nota = refeitas ? ` [${refeitas} ${refeitas === 1 ? 'execução refeita' : 'execuções refeitas'} em meia taxa]` : '';
     const invalido = meia ? `INVÁLIDO: ${meia} ${meia === 1 ? 'execução ficou' : 'execuções ficaram'} em meia taxa mesmo refeitas ` +
         '(o ambiente degradado; refaça com a janela do Chrome à vista e o PC quieto). Sem isso: ' : '';
-    if (!acima && !erros) return { texto: `${invalido}APROVADO${fora ? ` (${fora})` : ''}`, aprovado: !meia };
+    if (!acima && !erros) return { texto: `${invalido}APROVADO${fora ? ` (${fora})` : ''}${nota}`, aprovado: !meia };
     const partes = [`${acima} ${acima === 1 ? 'quadro' : 'quadros'} acima de 20,8 ms em CPU 1x`];
     if (erros) partes.push(`${erros} erro(s) de medição`);
     if (fora) partes.push(fora);
-    return { texto: `${invalido}REPROVADO (${partes.join('; ')})`, aprovado: false };
+    return { texto: `${invalido}REPROVADO (${partes.join('; ')})${nota}`, aprovado: false };
 }
 
 // Parada do ambiente: a tarefa GpuServiceImpl::GetDawnInfo, de ~500 ms na thread principal
@@ -888,6 +928,7 @@ async function comRefacao(reg, executar) {
     if (reg.execucoes.length > antes && emMeiaTaxa(e)) {
         reg.execucoes.pop();
         reg.avisos.push('execução refeita: em meia taxa (a mediana dos quadros em 2 vsyncs)');
+        reg.refeitasMeiaTaxa = (reg.refeitasMeiaTaxa || 0) + 1;
         const r2 = await executar();
         if (reg.execucoes.length > antes && emMeiaTaxa(reg.execucoes[reg.execucoes.length - 1])) reg.meiaTaxa = (reg.meiaTaxa || 0) + 1;
         return r2;
@@ -938,7 +979,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
         for (const cpu of cpus) {
             for (const cenario of cenarios) {
                 if (cpu !== 1 && !EM_4X.has(cenario)) continue;
-                const vezes = cenario === 'primeiro-clique' ? execucoes : cenario === 'abertura' || cpu !== 1 ? 1 : repeticoes;
+                const vezes = cenario === 'primeiro-clique' ? execucoes : SO_INFORMA.has(cenario) || cpu !== 1 ? 1 : repeticoes;
                 const reg = { cenario, cpu, tentativas: vezes, execucoes: [], erros: [], avisos: [], nota: '' };
                 resultados.push(reg);
                 process.stdout.write(`${cenario} ${cpu}x... `);
@@ -950,8 +991,9 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
                 }[cenario] || (cenario in FORCAR ? () => cenarioDado(browser, base, cpu, reg, FORCAR[cenario], 3400)
                     : cenario in COMBATE ? () => cenarioCombate(browser, base, cpu, reg, COMBATE[cenario])
                     : cenario in JANELAS ? () => cenarioJanela(browser, base, cpu, reg, cenario, JANELAS[cenario]) : null);
-                if (cenario === 'abertura') {
-                    try { await cenarioAbertura(browser, base, cpu, reg); } catch (e) { reg.erros.push(e.message.split('\n')[0]); }
+                if (SO_INFORMA.has(cenario)) {
+                    const so = cenario === 'abertura' ? cenarioAbertura : cenarioAberturaSave;
+                    try { await so(browser, base, cpu, reg); } catch (e) { reg.erros.push(e.message.split('\n')[0]); }
                 } else {
                     for (let i = 0; i < vezes; i++) {
                         try {
@@ -974,6 +1016,12 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
         srv.close();
     }
     imprimir(resultados, meta);
+    const tres = emTresVsyncs(resultados, meta.intervaloMs);
+    if (tres.parte >= 0.3) {
+        console.log(`aviso: ${tres.n} de ${tres.total} execuções têm o pior quadro em 3 vsyncs (${Math.round(tres.parte * 100)}%; ` +
+            'numa bateria sã, 13 a 18%). O ambiente pode estar degradado: compare com um controle intercalado ' +
+            '(a mesma bateria com --raiz numa cópia de referência, alternando com esta).');
+    }
     const v = veredito(resultados);
     console.log(v.texto);
     if (json) {
@@ -982,7 +1030,7 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
             data: new Date().toISOString(), ...meta, limiteMs: LIMITE_MS, folgaMs: FOLGA_MS, viewport: '1920x1080', veredito: v.texto,
             resultados: resultados.map(r => ({
                 cenario: r.cenario, cpu: r.cpu, nota: r.nota, resumo: r.resumo ?? null, erros: r.erros, avisos: [...new Set(r.avisos)],
-                emMeiaTaxa: r.meiaTaxa || 0,
+                emMeiaTaxa: r.meiaTaxa || 0, refeitasEmMeiaTaxa: r.refeitasMeiaTaxa || 0,
                 execucoes: r.execucoes.map(e => ({
                     aposLancamentoMs: Math.round(e.epoca - lancamento), quadros: e.quadros.map(r2), fins: e.fins.map(r2), loaf: e.loaf,
                     limpezasGpu: e.limpezas && e.limpezas.map(l => ({ inicio: r2(l.inicio), duracao: r2(l.duracao) })),
