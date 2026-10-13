@@ -8,9 +8,9 @@
  * null = não pode lançar esse nível; 0 = só com magias adicionais por atributo.
  */
 export const T30 = {
-  pontosPericia: {"bar":4,"bad":4,"cle":2,"dru":4,"gue":2,"mon":4,"pal":2,"ran":4,"lad":8,"fei":2,"mag":2},
-  dadoVida: {"bar":12,"bad":6,"cle":8,"dru":8,"gue":10,"mon":8,"pal":10,"ran":10,"lad":6,"fei":4,"mag":4},
-  salvamentosBons: {"bar":["fort"],"bad":["ref","von"],"cle":["fort","von"],"dru":["fort","von"],"gue":["fort"],"mon":["fort","ref","von"],"pal":["fort"],"ran":["fort"],"lad":["ref"],"fei":["von"],"mag":["von"]},
+  pontosPericia: {"bar":4,"bad":6,"cle":2,"dru":4,"gue":2,"mon":4,"pal":2,"ran":6,"lad":8,"fei":2,"mag":2},
+  dadoVida: {"bar":12,"bad":6,"cle":8,"dru":8,"gue":10,"mon":8,"pal":10,"ran":8,"lad":6,"fei":4,"mag":4},
+  salvamentosBons: {"bar":["fort"],"bad":["ref","von"],"cle":["fort","von"],"dru":["fort","von"],"gue":["fort"],"mon":["fort","ref","von"],"pal":["fort"],"ran":["fort","ref"],"lad":["ref"],"fei":["von"],"mag":["von"]},
   bbaPorClasse: {"bar":"bom","bad":"medio","cle":"medio","dru":"medio","gue":"bom","mon":"medio","pal":"bom","ran":"bom","lad":"medio","fei":"ruim","mag":"ruim"},
   atributoConjuracao: {"bad":"CAR","cle":"SAB","dru":"SAB","pal":"SAB","ran":"SAB","fei":"CAR","mag":"INT"},
   magiasPorDia: {
@@ -251,14 +251,16 @@ export const T30 = {
   /** A edição brasileira converte 1 libra ≈ 0,5 kg (30 pés = 9 m). */
   kgPorLibra: 0.5,
   tamanho: {
-    minimo: { ca: 8, ataque: 8, esconder: 16, carga: 1 / 8 },
-    minusculo: { ca: 2, ataque: 2, esconder: 8, carga: 1 / 2 },
-    pequeno: { ca: 1, ataque: 1, esconder: 4, carga: 3 / 4 },
-    medio: { ca: 0, ataque: 0, esconder: 0, carga: 1 },
-    grande: { ca: -1, ataque: -1, esconder: -4, carga: 2 },
-    enorme: { ca: -2, ataque: -2, esconder: -8, carga: 4 },
-    imenso: { ca: -4, ataque: -4, esconder: -12, carga: 8 },
-    colossal: { ca: -8, ataque: -8, esconder: -16, carga: 16 },
+    minusculo: { ca: 8, ataque: 8, agarrar: -16, esconder: 16, carga: 1 / 8 },
+    minimo: { ca: 8, ataque: 8, agarrar: -16, esconder: 16, carga: 1 / 8 }, // alias de compatibilidade para Minúsculo (Fine)
+    diminuto: { ca: 4, ataque: 4, agarrar: -12, esconder: 12, carga: 1 / 4 },
+    miudo: { ca: 2, ataque: 2, agarrar: -8, esconder: 8, carga: 1 / 2 },
+    pequeno: { ca: 1, ataque: 1, agarrar: -4, esconder: 4, carga: 3 / 4 },
+    medio: { ca: 0, ataque: 0, agarrar: 0, esconder: 0, carga: 1 },
+    grande: { ca: -1, ataque: -1, agarrar: 4, esconder: -4, carga: 2 },
+    enorme: { ca: -2, ataque: -2, agarrar: 8, esconder: -8, carga: 4 },
+    imenso: { ca: -4, ataque: -4, agarrar: 12, esconder: -12, carga: 8 },
+    colossal: { ca: -8, ataque: -8, agarrar: 16, esconder: -16, carga: 16 },
   },
   /** Monge 3.0: coluna própria de ataque desarmado, deslocamento sem armadura e bônus de CA. */
   monge: {

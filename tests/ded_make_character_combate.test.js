@@ -72,23 +72,23 @@ async function run() {
     assert.match(textos(b), /imune a crítico/);
   });
 
-  test('RD 3.0: +N pela melhoria; arma mágica vence x/prata; arma natural conta como a RD do dono; magia e energia ignoram', () => {
-    const b = luta(ficha('tarrasque'), [boneco({ rd: { valor: 10, exceto: '+1' } }), boneco({ rd: { valor: 10, exceto: 'prata' } }), ficha('balor')]);
-    const [um, prata, balor] = ['B1', 'B2', 'B3'].map(b.get);
+  test('RD 3.5: magia, material e épica; arma natural de criatura com RD conta como a sua RD; magia e energia ignoram', () => {
+    const b = luta(ficha('tarrasque'), [boneco({ rd: { valor: 10, exceto: 'magia' } }), boneco({ rd: { valor: 10, exceto: 'prata' } }), boneco({ rd: { valor: 15, exceto: 'épica' } })]);
+    const [magia, prata, epico] = ['B1', 'B2', 'B3'].map(b.get);
     const quinze = over => ataque({ dano: '0d0+15', ...over });
     const bater = (alvo, a) => K.causarDano(b, alvo, [{ valor: 15, tipo: 'fisico' }], { fonte: b.get('A1'), ataque: a });
-    assert.strictEqual(bater(um, quinze()), 5);
-    assert.strictEqual(bater(um, quinze({ magico: '+1' })), 15);
+    assert.strictEqual(bater(magia, quinze()), 5);
+    assert.strictEqual(bater(magia, quinze({ magico: '+1' })), 15);
     assert.strictEqual(bater(prata, quinze()), 5);
     assert.strictEqual(bater(prata, quinze({ material: 'prata' })), 15);
-    assert.strictEqual(bater(prata, quinze({ magico: '+1' })), 15);
-    // mordida do Tarrasque (RD 25/+5) contra a RD 30/+3 do Balor: conta como +5 e passa inteira
+    assert.strictEqual(bater(prata, quinze({ magico: '+1' })), 5, 'em 3.5 magia não vence prata');
+    // mordida do Tarrasque (RD 15/épica): arma natural conta como épica e passa inteira contra RD 15/épica
     const mordida = entrada('tarrasque').ataque_total.find(a => a.nome === 'Mordida');
-    assert.strictEqual(K.causarDano(b, balor, [{ valor: 40, tipo: 'fisico' }], { fonte: b.get('A1'), ataque: mordida }), 40);
-    assert.strictEqual(K.venceRD(b.get('A1'), { ...mordida, natural: false }, balor.rd), false);
+    assert.strictEqual(K.causarDano(b, epico, [{ valor: 40, tipo: 'fisico' }], { fonte: b.get('A1'), ataque: mordida }), 40);
+    assert.strictEqual(K.venceRD(b.get('A1'), { ...mordida, natural: false }, epico.rd), false);
     // magia (dano sem tipo) e energia ignoram a RD
-    assert.strictEqual(K.causarDano(b, um, [{ valor: 15, tipo: 'fisico' }], { fonte: b.get('A1'), ignoraRD: true }), 15);
-    assert.strictEqual(K.causarDano(b, um, [{ valor: 15, tipo: 'fogo' }], { fonte: b.get('A1'), ataque: quinze() }), 15);
+    assert.strictEqual(K.causarDano(b, magia, [{ valor: 15, tipo: 'fisico' }], { fonte: b.get('A1'), ignoraRD: true }), 15);
+    assert.strictEqual(K.causarDano(b, magia, [{ valor: 15, tipo: 'fogo' }], { fonte: b.get('A1'), ataque: quinze() }), 15);
   });
 
   test('resistência a energia vale por rodada (4 × 10 de fogo contra resistência 20 perdem só 20); imunidade anula', () => {
@@ -433,16 +433,16 @@ async function run() {
     K.golpe(b, tork, b.get('B1'), foice); // 15 acerta; falha 10 (≤ 50) erraria, mas a nova rolagem dá 90
     assert.match(textos(b), /Lutar às Cegas: rola a chance de falha de novo e passa/);
     assert.ok(b.get('B1').pv < 1000);
-    // Helena: "a RD ainda se aplica" no dano feito por dentro (RD 15/+3 contra a espada curta comum)
+    // Helena: "a RD ainda se aplica" no dano feito por dentro (RD 10/adamante contra a espada curta comum)
     b = luta(ficha('ha-helena'), ficha('ha-sandro-gladiador'), [20, 1, 20, 6]);
     const [h, sandro] = [b.get('A1'), b.get('B1')];
     h.agarrando = sandro.uid;
     sandro.agarradoPor = h.uid;
     assert.strictEqual(SP.forcedTurn(K, b, h), true);
     assert.strictEqual(sandro.engolidoPor, h.uid);
-    SP.forcedTurn(K, b, sandro); // 20 acerta, 1d6+3 = 9, a RD 15 absorve tudo
+    SP.forcedTurn(K, b, sandro); // 20 acerta, 1d6+3 = 9, a RD 10 absorve tudo
     assert.strictEqual(sandro.danoInterno, 0);
-    assert.match(textos(b), /RD 15\/\+3 absorve 9/);
+    assert.match(textos(b), /RD 10\/adamante absorve 9/);
     // Aspis: o agarrão não soma o dano da mordida, só a constrição (2d6+10)
     b = luta(ficha('ha-aspis'), boneco(), [20, 1, 20, 1, 1, 1]);
     const [aspis, alvo] = [b.get('A1'), b.get('B1')];
@@ -454,16 +454,16 @@ async function run() {
   });
 
   test('IA: o valor de esmagar e atropelar desconta a RD que o corpo não vence (Tarso contra o Paladino Desperto)', () => {
-    // a rasteira de Tarso (2d8+21, média 30) não passa da RD 30/+5 do Desperto: vale 0; sem RD, vale o dano
+    // a rasteira de Tarso (2d8+21, média 30) desconta a RD 15 do Desperto (RD 15/épica); sem RD, vale o dano
     const b = luta(ficha('ha-tarso'), [ficha('ha-paladino-desperto'), boneco({ tamanho: 'Médio' })]); // a rasteira pega até Médio
     const [tarso, paladino, semRD] = [b.get('A1'), b.get('B1'), b.get('B2')];
     paladino.pos = semRD.pos = tarso.pos;
     const rasteira = () => SP.options(K, b, tarso, paladino).find(o => o.tipo === 'atropelar');
     semRD.estado = 'morto';
-    assert.strictEqual(rasteira().ev, 0, 'RD 30 absorve a média de 30');
+    assert.strictEqual(rasteira().ev, 14.25, 'RD 15 desconta da média de 30');
     semRD.estado = 'ativo';
     paladino.estado = 'morto';
-    assert.ok(rasteira().ev > 0, 'quem não tem RD sofre o dano');
+    assert.ok(rasteira().ev > 25, 'quem não tem RD sofre o dano');
     // com o valor certo, Tarso usa o ataque total e vence (antes empatava em 50 rodadas)
     const lote = C.simulate({ ladoA: [ficha('ha-tarso')], ladoB: [ficha('ha-paladino-desperto')] }, { vezes: 20, semente: 3 });
     assert.ok(lote.vitoriasA >= 0.9, `Tarso vence o Desperto (${lote.vitoriasA})`);
