@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -247,7 +247,7 @@ async function runTests() {
   console.log('✅ Teste 5: Balão atingido com sucesso pela trajetória balística corrigida.');
 
   // Capturar screenshot de evidência
-  const evidencePath = path.join(__dirname, 'archer_arrow_physics_evidence.png');
+  const evidencePath = shotPath('archer_arrow_physics_evidence.png');
   await page.screenshot({ path: evidencePath });
   console.log(`\n📸 Screenshot de evidência capturada em: ${evidencePath}`);
 

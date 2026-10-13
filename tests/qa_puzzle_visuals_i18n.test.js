@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -9,6 +9,12 @@ let page;
 let puppeteer;
 
 const PORT = process.env.TEST_PORT || 3097;
+
+async function captureEvidence(name) {
+  const screenshotPath = shotPath(name);
+  await page.screenshot({ path: screenshotPath });
+  console.log(`📸 Screenshot de evidência capturada em: ${screenshotPath}`);
+}
 
 async function startServer() {
   return new Promise((resolve) => {
@@ -87,7 +93,7 @@ async function runTests() {
     throw new Error('Falha na validação do idioma Português (PT).');
   }
 
-  await page.screenshot({ path: path.join(__dirname, 'puzzle_evidence_pt_start.png') });
+  await captureEvidence('puzzle_evidence_pt_start.png');
 
   // Testar alternância para Inglês pelo seletor de entrada
   await page.click('#lang-en-btn');
@@ -115,7 +121,7 @@ async function runTests() {
     throw new Error('Falha na alternância para o idioma Inglês (EN).');
   }
 
-  await page.screenshot({ path: path.join(__dirname, 'puzzle_evidence_en_start.png') });
+  await captureEvidence('puzzle_evidence_en_start.png');
 
   // Testar alternância via botão rápido no cabeçalho
   await page.click('#lang-quick-toggle');
@@ -225,7 +231,7 @@ async function runTests() {
     throw new Error('Falha na exibição do Grimório em Português.');
   }
 
-  await page.screenshot({ path: path.join(__dirname, 'puzzle_evidence_grimoire.png') });
+  await captureEvidence('puzzle_evidence_grimoire.png');
 
   // Fecha grimório e muda para EN
   await page.evaluate(() => {
@@ -271,7 +277,7 @@ async function runTests() {
   if (!campaignStartPT.running || !campaignStartPT.narrativeText.startsWith('Você se encontra')) {
     throw new Error('Falha ao iniciar campanha em Português.');
   }
-  await page.screenshot({ path: path.join(__dirname, 'puzzle_evidence_gameplay_pt.png') });
+  await captureEvidence('puzzle_evidence_gameplay_pt.png');
 
   // Mudar idioma para Inglês no meio do jogo
   await page.evaluate(() => {
@@ -293,7 +299,7 @@ async function runTests() {
       campaignSwitchedEN.levelLabel !== 'Level:') {
     throw new Error('Falha na troca de idioma em tempo real durante a partida.');
   }
-  await page.screenshot({ path: path.join(__dirname, 'puzzle_evidence_gameplay_en.png') });
+  await captureEvidence('puzzle_evidence_gameplay_en.png');
 
   // Responder corretamente e verificar feedback em Inglês
   await page.evaluate(() => {

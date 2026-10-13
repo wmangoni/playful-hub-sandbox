@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -201,7 +201,7 @@ async function runTests() {
   console.log('✅ Teste 6: Simulação executou com 0 erros.');
 
   // Tirar Screenshot de Evidência
-  const screenshotPath = path.join(__dirname, 'pinball_task001_qa_evidence.png');
+  const screenshotPath = shotPath('pinball_task001_qa_evidence.png');
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`\n📸 Screenshot de evidência capturada em: ${screenshotPath}`);
 

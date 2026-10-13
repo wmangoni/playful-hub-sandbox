@@ -12,6 +12,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { shotPath } = require('./shots');
 const puppeteer = require('puppeteer');
 
 const PORT = 3097;
@@ -341,7 +342,7 @@ async function runTests() {
   });
   await new Promise(r => setTimeout(r, 300));
 
-  const screenshotPath = path.join(ROOT_DIR, 'tests', 'archer_etapa3_metagame_evidence.png');
+  const screenshotPath = shotPath('archer_etapa3_metagame_evidence.png');
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`\n📸 Screenshot de evidência capturada em: ${screenshotPath}`);
 
