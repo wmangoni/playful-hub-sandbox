@@ -1230,7 +1230,7 @@ async function runTests() {
   await movimento('no-preference');
   console.log('✅ PASS: The arts are WebP, the vitral fades from one art to the next and settles on the last one, and swaps at once with reduced motion.');
 
-  // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas ---
+  // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas, o narrador desligado ---
   console.log('\n--- 14. Testing the screen-reader structure ---');
   const leitor = await page.evaluate(() => ({
     mains: document.querySelectorAll('main:not([hidden])').length,
@@ -1239,9 +1239,12 @@ async function runTests() {
     descricaoDoDado: document.getElementById('dice-button').getAttribute('aria-describedby'),
     mapa: document.getElementById('mapa').getAttribute('aria-describedby'),
     diario: document.getElementById('diario').getAttribute('aria-describedby'),
-    lang: document.documentElement.lang
+    lang: document.documentElement.lang,
+    // ninguém clicou no selo "Narrador" nesta página: ele segue como começou
+    narrador: ttsEnabled, seloNarrador: document.getElementById('tts-toggle-button').getAttribute('aria-pressed')
   }));
   console.log('Screen-reader structure:', leitor);
+  if (leitor.narrador !== false || leitor.seloNarrador !== 'false') throw new Error(`The narrator must start off (it would read over a screen reader), got ${JSON.stringify({ narrador: leitor.narrador, selo: leitor.seloNarrador })}`);
   if (leitor.mains !== 1) throw new Error(`Only one <main> may be exposed, got ${leitor.mains}`);
   if (leitor.papelDoResultado || leitor.resultadoEmRegiaoViva) throw new Error('#result-message must not be a live region (the chronicle line announces the roll)');
   if (leitor.descricaoDoDado !== 'bandeja-titulo result-message') throw new Error(`#dice-button must be described by the tray title and the result, got ${leitor.descricaoDoDado}`);
