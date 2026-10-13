@@ -123,7 +123,7 @@ A interface foi trocada por fases. O plano, as fases e as regras de performance 
   - Depois de carregar cada aba, a ferramenta espera 1,5 s antes de jogar (`ASSENTAR_MS`). Cerca de 1 s depois da carga, o Chrome desmonta o documento inicial da aba (até ~28 ms na thread principal), e isso caía no meio da medição.
   - Uma execução em meia taxa (a mediana dos quadros em 2 vsyncs, o ambiente degradado com alguém usando o PC) é refeita uma vez, e o veredito diz quantas foram. Se continuar, o veredito sai INVÁLIDO: refaça com a janela do Chrome à vista e o PC quieto. Com 30% ou mais das execuções no pior quadro em 3 vsyncs, o relatório sugere um controle intercalado (numa bateria sã, 13 a 18%).
   - `abertura-save` (só informa) mede a carga com um save: o jogo abre direto na exploração e digita a cena salva, sem a espera de assentar.
-  - A régua de 20,8 ms vale a 144 Hz e em outras taxas: a 60 Hz, ela quer todo quadro em 1 vsync (2 vsyncs são 33,3 ms). As baterias das fases 2 a 5 foram a 144 Hz.
+  - A régua de 20,8 ms vale a 144 Hz e em outras taxas: a 60 Hz, ela quer todo quadro em 1 vsync (2 vsyncs são 33,3 ms). As baterias das fases 2 a 4 foram a 144 Hz; as da Fase 5, a 60 Hz (TASK_001 §12). Compare versões sempre à mesma taxa.
   - Um quadro que cai na limpeza ociosa da GPU do Chrome (uns 30 a 70 ms, cerca de 1 s depois de a página parar de rasterizar) sai listado à parte e fora do veredito, com a prova no rastreio. Ver o cabeçalho do script e o §6 da TASK_001.
   - As duas ferramentas forçam o movimento padrão. Com as animações do Windows desligadas, o Chrome pede movimento reduzido e o jogo pula justamente a animação.
   - Dentro da janela medida, a ferramenta não pode ler layout.

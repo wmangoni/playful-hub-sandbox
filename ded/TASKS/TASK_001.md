@@ -1,6 +1,6 @@
 # 🎨 Tarefa 001 - Melhoria Visual: "Ficha Iluminada"
 
-**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 (celular, acessibilidade, transições, WebP e o preview do hub) está implementada; falta a medição final de desempenho e o juiz.
+**Status**: 🚧 Em andamento. Fases 0, 1, 2, 3 e 4 prontas (a 3 e a 4 com resíduos de desempenho anotados no §7, e a 3 com decisões do dono). A Fase 5 (celular, acessibilidade, transições, WebP e o preview do hub) está implementada e medida (a 60 Hz, §12), em revisão pelo juiz.
 **Responsável**: Claude (Dev)
 **Branch**: `feat/ded-ficha-iluminada`. Um PR em draft acompanha os commits de todas as fases.
 
@@ -165,10 +165,8 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 - **Primeira vez das janelas (resolvido na 1ª rodada do juiz, §11):** a 1920×1080, numa sessão nova do Chrome com perfil vazio, nenhuma janela nem efeito compila um pipeline na primeira vez (4 sessões). Numa delas, a especialização compilou um de 6 ms, sem quadro lento. O que sobra:
   - a 1366×768 e a 1600×900, a primeira compra compila 36 a 46 ms (`TessellateWedgesRenderStep[Convex] + SolidColor` com `AnalyticClip`, num passe com MSAA: um caminho convexo recortado). O mapa não compila nessas resoluções. O desenho não foi isolado (a suspeita do juiz é um ícone recortado). Isolar na Fase 5 com a mesma sonda, a 1366×768;
   - na primeira abertura do mapa numa aba recém-aberta, a GPU rasteriza a janela inteira (~23 ms). A sonda de perfil vazio mediu 20,7 a 27,8 ms nesse quadro; na bateria, a primeira execução do mapa ficou em 13,9 ms.
-- **Movimento reduzido na Fase 4 (Fase 5):** no controle intercalado com o código da Fase 3 (§11), os quadros acima do limite do reduzido caíram nos mesmos momentos, só que mais vezes: 42 contra 24, em 80 execuções de cada lado. Os momentos são a troca para a cena mais longa, o golpe do inimigo, o desfecho da luta, a volta à cena e a cena da morte. O perfil direto da volta da vitória (6 de cada, no mesmo fluxo da ferramenta) não mostrou diferença: nos dois, o quadro mais pesado da thread principal foi de 6,4 a 19,5 ms, e a GPU ficou parecida. Não se achou causa. Nas janelas, o reduzido teve a abertura do mapa acima do limite em 2 de 10 execuções (41,6 e 34,6 ms) e a da loja em 1 de 10 (27,8 ms); no movimento padrão, as duas ficam em 2 vsyncs. O CSS da janela é o mesmo nos dois movimentos. Uma hipótese, não medida: sem a chama do vitral, nada anima na página do reduzido, e a GPU rasteriza a janela depois de um tempo parada. É o movimento em que o dono joga nesta máquina, então é a primeira coisa da Fase 5. O plano do juiz (2ª rodada):
-  - PC quieto e pelo menos 3 pares intercalados de 10 execuções, só `combate` e `combate-derrota`;
-  - por momento, os quadros acima do limite, a duração das limpezas da GPU e o p75 do trabalho da GPU por quadro;
-  - se a diferença continuar, uma bissecção com CSS injetado das mudanças da Fase 4 (o espaço do equipamento, o botão secundário, as sombras, o `will-change` das janelas e as peças de aquecimento), como a do anel do mapa.
+- **Movimento reduzido na Fase 4 (resolvido na Fase 5, §12):** no controle a 144 Hz, o reduzido da Fase 4 tinha mais quadros acima do limite que o da Fase 3 (42 contra 24). Com o plano do juiz (3 pares intercalados, rodada e derrota, a 60 Hz), a atual teve menos: 73 contra 96, nos mesmos momentos e com as limpezas da GPU da mesma duração.
+- **60 Hz (decisão do dono):** a 60 Hz, nenhuma fase passa na régua, que quer todo quadro em 1 vsync. Na Fase 4 foram ~300 a 400 quadros acima do limite nos cinco cenários mais pesados (§12), e a Fase 5 ficou igual. A régua do projeto foi pensada e aceita a 144 Hz (3 vsyncs). Passar a 60 Hz pediria tirar trabalho de cada quadro com animação (ver "Folga da GPU", abaixo) e partir os quadros pesados: a troca de cena, o d20, o golpe e a volta da luta. Cabe ao dono decidir se 60 Hz entra no aceite.
 - **Folga da GPU (Fase 5):** enquanto algo anima, a thread principal da GPU gasta ~6,5 ms por quadro (p75), quase todo o intervalo de 6,9 ms a 144 Hz. É igual nos rastreios das fases 2, 3 e 4, e por isso qualquer rasterização ou limpeza leva o quadro a 3 ou 4 vsyncs. Medir as camadas de tela inteira e a sobreposição das texturas.
 - **Especialização obrigatória (decisão de produto):** ela reabre quando o Chrome a fecha à força no terceiro Escape seguido. O juiz sugeriu outra saída: deixá-la fechar e manter o jogo pausado, com um aviso fixo para escolher.
 - **Mecânicas vistas na Fase 4 (fase própria):**
@@ -468,4 +466,20 @@ O limite é **nunca cair abaixo de 48 FPS em Full HD**, o que dá quadros de at�
 - **Como foi feito.** Três agentes em paralelo, cada um num worktree a partir do `8ce8a0b`: o celular, a acessibilidade e as artes. As três branches foram juntadas sem conflito. A auditoria de contraste rodada de novo no código juntado achou duas coisas que nenhum agente via sozinho, corrigidas em seguida: o anel de foco da especialização sobre a moldura a 390 px, e o nome de um item comum na mochila travada durante o d20. Depois vieram as sugestões do juiz da Fase 4: a carta do mapa montada no ocioso e, no `desempenho.mjs`, a abertura com save, a contagem da meia taxa e o aviso de muitos quadros em 3 vsyncs.
 - **Testes:** `journey_ded`, `qa_ded_task003` e o `qa_ded`, que ganhou três casos (13: as artes em WebP e o esmaecer, inclusive três cenas seguidas e o reduzido; 14: a estrutura para o leitor de tela; 15: o celular a 375 px, sem rolagem de lado em todas as telas e janelas, com os alvos de toque e o mapa em retrato).
 - **Pipelines na primeira vez:** o rastreio de uma sessão inteira, de perfil vazio, no mesmo fluxo nas duas versões (a da Fase 4 e a atual), a 1920×1080: só o pipeline da arte mudou (o YUV do WebP, 80 ms, no lugar do da arte em PNG, 67 ms, no "Começar"). O esmaecer não compila nada. A 390×844, a primeira luta compila três a mais (§7).
-- **Desempenho:** a medir.
+- **Desempenho, a 60 Hz.** O monitor desta máquina estava a 60 Hz (as fases 2 a 4 foram aceitas a 144 Hz), e o dono escolheu medir assim. A 60 Hz, a régua de 20,8 ms quer todo quadro em 1 vsync (16,7 ms), porque 2 vsyncs são 33,3 ms. Baterias no `40e777b` (árvore limpa), aquecimento `d20`, com a primeira execução contando:
+  - **Movimento padrão: REPROVADO**, com 499 quadros acima do limite em CPU 1x, mais 32 na limpeza da GPU, fora do veredito:
+    - as janelas quase limpas, de 0 a 5 por cenário (o diário e a barreira em 0);
+    - o resto no combate (51 a 101 por cenário de 10 execuções), nos avisos (34), nos d20 (12 a 35), na exploração (21) e no primeiro clique (21 de 30).
+  - **Movimento reduzido: REPROVADO**, com 80 quadros, mais 19 na limpeza da GPU.
+  - **Controle no padrão**, intercalado com o código da Fase 4 (`8ce8a0b`), nos cinco cenários mais pesados (exploração, crítico 20, rodada, vitória e aviso), 2 pares:
+    - a Fase 4 teve 297 e 385 quadros acima do limite; a atual, 327 e 378;
+    - a mesma versão varia quase 90 quadros de uma bateria para a outra. A 60 Hz, a Fase 4 já reprova do mesmo tanto.
+  - **Controle no reduzido**, intercalado com o código da Fase 3 (`e89cf81`), o plano do juiz: rodada e derrota, 3 pares de 10:
+    - a Fase 3 teve 33, 33 e 30 quadros; a atual, 21, 25 e 27;
+    - os quadros caem nos mesmos momentos: o ataque e o d20, o golpe do inimigo, a volta à cena e a cena da morte;
+    - as limpezas da GPU duram o mesmo (mediana de 38 ms na Fase 3 e de 39 ms na atual);
+    - o reduzido da Fase 4, que piorava no controle a 144 Hz (24 contra 42), não piora aqui.
+  - **A/B das camadas fixas da arte** (o `will-change: opacity` das duas `.vitral-arte` contra `auto`), no aviso e na exploração, 3 pares: inconclusivo.
+    - Com as camadas, 56, 464 e 176 quadros; sem elas, 105, 185 e 68. Uma das baterias com as camadas pegou o ambiente degradado (p99 de 33,3 ms).
+    - As camadas ficam. Sem elas, o esmaecer criaria e destruiria camadas a cada troca (§6).
+  - **CPU 4x** (informativo, a 60 Hz): a abertura das janelas fica em 2 a 4 vsyncs (mapa, especialização e fim com 66,7 ms), o texto longo chega a 83 ms e a vitória, a 100 ms.
