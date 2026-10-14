@@ -35,6 +35,19 @@ function request(path) {
     const robots = await request('/robots.txt');
     assert.strictEqual(robots.status, 200, 'robots.txt deve retornar 200');
 
+    // 4) Arquivos do projeto na raiz não podem ser servidos (código, dependências, config)
+    for (const privado of ['/server.js', '/package.json', '/package-lock.json', '/games_control.json', '/README.md', '/tests/smoke.test.js', '/.git/config']) {
+      const res = await request(privado);
+      assert.strictEqual(res.status, 404, `${privado} deve retornar 404`);
+      assert.ok(!/require\(|"dependencies"/.test(res.body), `${privado} não pode vazar o conteúdo`);
+    }
+
+    // 5) Controle positivo: o que o site usa continua público
+    const games = await request('/games.json');
+    assert.strictEqual(games.status, 200, 'games.json deve continuar público');
+    const pagina = await request('/jogos/block_stacker');
+    assert.strictEqual(pagina.status, 200, 'página de jogo deve continuar servida');
+
     console.log('All smoke tests passed');
     process.exit(0);
   } catch (err) {
