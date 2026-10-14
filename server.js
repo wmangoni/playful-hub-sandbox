@@ -85,6 +85,28 @@ for (const pasta of ['css', 'ui']) {
     }));
 }
 
+// O express.static abaixo serve a raiz do repositório inteira, então código do
+// servidor, dependências, configuração, testes e docs ficariam públicos. Este
+// middleware responde 404 para eles antes do static. Pastas de jogos, assets,
+// jogos/ e as páginas/arquivos do site continuam liberados.
+const PASTAS_RAIZ_PRIVADAS = new Set(['config', 'marketing', 'node_modules', 'reports', 'scratch', 'scripts', 'templates', 'test-artifacts', 'tests']);
+const ARQUIVOS_RAIZ_PRIVADOS = /^(server\.js|package(-lock)?\.json|opencode\.json|games_control\.json|Procfile)$/;
+const ocultarArquivosDoProjeto = (req, res, next) => {
+    let partes;
+    try {
+        partes = decodeURIComponent(req.path).split(/[\\/]+/).filter(Boolean);
+    } catch {
+        return res.status(404).send('Not Found');
+    }
+    const [primeira] = partes;
+    const privado = partes.some(p => p.startsWith('.') || /\.md$/i.test(p))
+        || PASTAS_RAIZ_PRIVADAS.has(primeira)
+        || (partes.length === 1 && ARQUIVOS_RAIZ_PRIVADOS.test(primeira));
+    if (privado) return res.status(404).send('Not Found');
+    next();
+};
+app.use(ocultarArquivosDoProjeto);
+
 // Servir arquivos estáticos da pasta raiz com cache
 app.use(express.static('./', {
     maxAge: '1h', // Cache de 1 hora para assets estáticos
