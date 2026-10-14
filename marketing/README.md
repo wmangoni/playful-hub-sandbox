@@ -1,5 +1,7 @@
 # Divulgação automatizada do PlayfulHub
 
+> **Falta fazer (só uma pessoa pode): contas, credenciais e decisões em aberto. Lista completa em [`PENDENCIAS.md`](PENDENCIAS.md).**
+
 Fase 2 do plano de divulgação. Uma fábrica de conteúdo que roda sozinha no GitHub Actions: os próprios jogos geram os vídeos, um calendário de posts define o que sai e quando, um Guardião barra o que não presta e o publicador envia pelas APIs oficiais, sem nenhum clique manual depois da configuração inicial.
 
 ```
