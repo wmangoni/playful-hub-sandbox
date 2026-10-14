@@ -23,7 +23,15 @@ import { createRng } from '../../js/rules/dice.js';
 import { montarPersonagem, CLASSES, RACAS } from './personagens.mjs';
 
 const cat = JSON.parse(readFileSync(new URL('../../data/catalogo-combate.json', import.meta.url), 'utf8'));
-const CATALOGO = [...cat.monstros, ...cat.holy_avenger];
+const ORDEM_MONSTROS_REFERENCIA = [
+  'carnical', 'ogro', 'cubo-gelatinoso', 'urso-coruja', 'troll',
+  'arbusto-errante', 'medusa', 'behir', 'gigante-do-gelo', 'naga-guardia',
+  'elemental-do-fogo-anciao', 'verme-purpura', 'golem-de-ferro',
+  'dragao-vermelho-adulto', 'glabrezu', 'lorde-das-profundezas',
+  'dragao-azul-antigo', 'balor', 'dragao-de-prata-antigo', 'tarrasque'
+];
+const porId = new Map(cat.monstros.map(m => [m.id, m]));
+const CATALOGO = [...ORDEM_MONSTROS_REFERENCIA.map(id => porId.get(id)).filter(Boolean), ...cat.holy_avenger];
 
 /** Personagens da referência: as 11 classes em 9 níveis, com a raça sorteada (semente fixa). */
 function personagensDaReferencia() {

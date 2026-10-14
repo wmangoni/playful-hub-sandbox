@@ -27,15 +27,15 @@ const SRD_NIVEL = {
   'curar-leves': 'Brd 1, Clr 1, Drd 1, Healing 1, Pal 1, Rgr 2',
   'esfera-flamejante': 'Drd 2, Sor/Wiz 2',
   'flecha-acida': 'Sor/Wiz 2',
-  'forca-do-touro': 'Brd 2, Clr 2, Sor/Wiz 2, Strength 2',
+  'forca-do-touro': 'Clr 2, Drd 2, Pal 2, Sor/Wiz 2, Strength 2',
   'pele-de-arvore': 'Drd 2, Plant 2',
-  'produzir-chamas': 'Drd 2, Fire 2',
+  'produzir-chamas': 'Drd 1, Fire 2',
   'curar-moderados': 'Brd 2, Clr 2, Drd 3, Healing 2, Pal 3, Rgr 3',
   'imobilizar-pessoa': 'Brd 2, Clr 2, Sor/Wiz 3',
   'bola-de-fogo': 'Sor/Wiz 3',
   relampago: 'Sor/Wiz 3',
   'curar-graves': 'Brd 3, Clr 3, Drd 4, Pal 4, Rgr 4, Healing 3',
-  'tempestade-glacial': 'Drd 5, Sor/Wiz 4, Water 5',
+  'tempestade-glacial': 'Drd 4, Sor/Wiz 4, Water 5',
   'curar-criticos': 'Brd 4, Clr 4, Drd 5, Healing 4',
   'coluna-de-chamas': 'Clr 5, Drd 4, Sun 5, War 5',
   'cone-de-frio': 'Sor/Wiz 5, Water 6',
@@ -151,7 +151,7 @@ async function run() {
     assert.strictEqual(mec('arma-magica', 3, { armaPrincipal: { ...espada, melhoria: 1 } }), null, 'não soma com a melhoria da arma');
     assert.strictEqual(mec('arma-magica', 3, { armaPrincipal: { id: 'desarmado', desarmado: true } }), null, 'não vale em golpe desarmado');
     assert.deepStrictEqual([mec('bencao', 3).alvo, mec('bencao', 3).tipo_bonus, mec('bencao', 3).bonus], ['aliados', 'moral', { ataque: 1, contra_medo: 1 }]);
-    assert.deepStrictEqual([mec('forca-do-touro', 1).bonus.for, mec('forca-do-touro', 1).duracao], ['1d4+1', '1 hora']);
+    assert.deepStrictEqual([mec('forca-do-touro', 1).bonus.for, mec('forca-do-touro', 1).duracao], [4, '1 minuto']);
   });
 
   test('nível de conjurador e espaços do dia (spellcasting): sem nível 0 nem domínio; paladino e ranger com metade do nível', () => {
@@ -294,7 +294,7 @@ async function run() {
     assert.ok(!SP.options(K, b, c, b.get('B1')).some(o => o.tipo === 'magia'), 'a Bênção preparada se perdeu com o espaço');
   });
 
-  test('motor: Força do Touro rola 1d4+1; Bênção não soma com inspirar coragem (moral); a mesma magia renova em vez de somar', () => {
+  test('motor: Força do Touro dá +4; Bênção não soma com inspirar coragem (moral); a mesma magia renova em vez de somar', () => {
     const ft = deLista('forca-do-touro', 3, { nivel: 2, espaco: ['n2'] });
     const escudo = deLista('escudo-arcano', 3, { quantidade: 2 });
     const b = luta(boneco({ nome: 'Mago', atributos: { ...entrada('ogro').atributos, for: 10 }, magias: lista(3, { n1: 2, n2: 1 }, [ft, escudo]) }), boneco(), [3]);
@@ -302,7 +302,7 @@ async function run() {
     SP.execute(K, b, c, { tipo: 'magia', s: { tipo: 'lista', idx: 0, nome: ft.nome, nivel: 2, m: ft.mecanica, natureza: 'magia', cl: 3, cd: 15, espaco: 'n2' }, alvo: c });
     assert.strictEqual(c.buffs[0].atributos.for, 4);
     assert.strictEqual(K.deltaMod(c, 'for'), 2, 'For 10 → 14');
-    assert.match(textos(b), /Força do Touro \(1d4\+1 = \+4 de Força; 1800 rodadas\)/);
+    assert.match(textos(b), /Força do Touro \(30 rodadas\)/);
     const s = { tipo: 'lista', idx: 1, nome: escudo.nome, nivel: 1, m: escudo.mecanica, natureza: 'magia', cl: 3, cd: 14, espaco: 'n1' };
     SP.execute(K, b, c, { tipo: 'magia', s, alvo: c });
     SP.execute(K, b, c, { tipo: 'magia', s, alvo: c });

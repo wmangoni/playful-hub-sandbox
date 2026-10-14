@@ -94,9 +94,9 @@ export const MAGIAS = [
     },
   },
   {
-    id: 'forca-do-touro', nome: 'Força do Touro', classes: { bad: 2, cle: 2, fei: 2, mag: 2 }, fonte: SRD('spellsb'),
-    resumo: '+1d4+1 de Força, por 1 hora por nível.',
-    mecanica: cl => ({ efeito: 'magia', bonus: { for: '1d4+1' }, duracao: dur(cl, 'hora') }),
+    id: 'forca-do-touro', nome: 'Força do Touro', classes: { cle: 2, dru: 2, pal: 2, fei: 2, mag: 2 }, fonte: SRD('spellsb'),
+    resumo: '+4 de Força, por 1 minuto por nível.',
+    mecanica: cl => ({ efeito: 'magia', bonus: { for: 4 }, duracao: dur(cl, 'minuto') }),
   },
   {
     id: 'pele-de-arvore', nome: 'Pele de Árvore', classes: { dru: 2 }, fonte: SRD('spellsb'),
@@ -104,7 +104,7 @@ export const MAGIAS = [
     mecanica: cl => ({ efeito: 'magia', bonus: { ca_natural: cl >= 12 ? 5 : cl >= 6 ? 4 : 3 }, duracao: dur(10 * cl, 'minuto') }),
   },
   {
-    id: 'produzir-chamas', nome: 'Produzir Chamas', classes: { dru: 2 }, fonte: SRD('spellsp'),
+    id: 'produzir-chamas', nome: 'Produzir Chamas', classes: { dru: 1 }, fonte: SRD('spellsp'),
     resumo: 'Chamas na mão por 1 rodada por nível, arremessadas (toque à distância) a cada rodada: 1d4 +1 a cada 2 níveis (máx. +10) de fogo.',
     mecanica: cl => {
       const b = Math.min(10, Math.floor(cl / 2));
@@ -137,7 +137,7 @@ export const MAGIAS = [
     mecanica: cl => ({ efeito: 'magia', cura: `3d8+${Math.min(15, cl)}` }),
   },
   {
-    id: 'tempestade-glacial', nome: 'Tempestade Glacial', classes: { dru: 5, fei: 4, mag: 4 }, fonte: SRD('spellsi'),
+    id: 'tempestade-glacial', nome: 'Tempestade Glacial', classes: { dru: 4, fei: 4, mag: 4 }, fonte: SRD('spellsi'),
     resumo: 'Granizo num cilindro de 6 m: 3d6 de impacto e 2d6 de frio, sem teste.',
     mecanica: () => ({ efeito: 'magia', dano: '3d6', dano_extra: [{ dano: '2d6', tipo: 'frio' }], area: 'cilindro de 6 m de raio', resistencia: null }),
   },

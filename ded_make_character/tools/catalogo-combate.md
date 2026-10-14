@@ -1,24 +1,43 @@
 # Formato do catálogo de combate (`data/catalogo-combate.json`)
 
-Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
-- `monstros`: 20 monstros do SRD 3.0, um por ND de 1 a 20, com o Tarrasque no 20;
-- `holy_avenger`: personagens da HQ, em regras 3.0.
+Catálogo somente leitura do simulador de combate (TASK_006 / TASK_012), com duas seções:
+- `monstros`: 20 monstros do Livro dos Monstros 3.5 (Devir / SRD 3.5), incluindo o Tarrasque no ND 20;
+- `holy_avenger`: personagens da HQ, adaptados para as regras de D&D 3.5.
 
 ```json
 {
-  "versao": 1,
+  "versao": 2,
   "descricao": "…",
   "monstros": [ /* Combatente */ ],
   "holy_avenger": [ /* Combatente */ ]
 }
 ```
 
-- O arquivo é **mantido à mão**. O `tools/sql-to-json.js` não o gera nem o apaga.
+- O arquivo é **mantido à mão** ou sincronizado pelas ferramentas de particionamento/montagem. O `tools/sql-to-json.js` não o gera nem o apaga.
 - Ao mudar o conteúdo, incremente `versao` e rode o validador:
   ```bash
   node ded_make_character/tools/validar-catalogo.js
   ```
-  Ele também valida um array com uma seção só: `validar-catalogo.js arquivo.json monstros`. O teste `tests/ded_make_character_catalogo.test.js` usa o mesmo validador. O que ele confere está marcado com ✔ neste documento.
+  Ele valida tanto `data/catalogo-combate.json` quanto o diretório particionado `data/monstros/` (arquivos por letra, `holy_avenger.json` e `indice.json`). Também pode validar um arquivo específico ou diretório:
+  - `node ded_make_character/tools/validar-catalogo.js ded_make_character/data/monstros`
+  - `node ded_make_character/tools/validar-catalogo.js ded_make_character/data/monstros/indice.json`
+  - `node ded_make_character/tools/validar-catalogo.js ded_make_character/data/monstros/a.json`
+  O teste `tests/ded_make_character_catalogo.test.js` usa o mesmo validador. O que ele confere está marcado com ✔ neste documento.
+
+## Estrutura particionada (`data/monstros/`)
+
+Para manter o carregamento inicial leve com o crescimento do catálogo (500+ monstros do Livro dos Monstros 3.5), o catálogo é particionado:
+
+- `data/monstros/indice.json`: lista ordenada e leve de todos os combatentes (monstros e Holy Avenger), contendo apenas os campos essenciais para galeria, filtros e busca:
+  `{ id, nome, nome_original, categoria, nd, nivel, tipo, subtipos, tamanho, pv, ca: { total, toque, surpresa }, letra, arquivo }`.
+- `data/monstros/[a-z].json`: combatentes monstros completos (`Combatente`), agrupados pela primeira letra normalizada do nome (minúscula, sem acento: "Água" em `a.json`, "Carniçal" em `c.json`).
+- `data/monstros/holy_avenger.json`: combatentes completos de Holy Avenger.
+
+### Ferramentas de sincronização
+
+- `node ded_make_character/tools/particionar-catalogo.js`: lê `data/catalogo-combate.json` e gera/atualiza `data/monstros/[a-z].json`, `holy_avenger.json` e `indice.json`.
+- `node ded_make_character/tools/montar-catalogo.js`: lê os arquivos particionados de `data/monstros/` e gera `data/catalogo-combate.json`.
+
 
 ## Regras gerais
 
@@ -26,14 +45,13 @@ Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
 - Unidades:
   - distâncias em **metros**, pela conversão da tradução brasileira: 5 pés = 1,5 m, 10 pés = 3 m, 30 pés = 9 m;
   - pesos não são necessários.
-- Tamanhos ✔: `Mínimo`, `Minúsculo`, `Pequeno`, `Médio`, `Grande`, `Enorme`, `Imenso`, `Colossal`.
-- Tendência ✔: sigla 3.0 em PT-BR, uma de `LB`, `NB`, `CB`, `LN`, `N`, `CN`, `LM`, `NM`, `CM`.
-- **Regras da 3.0, não da 3.5.** Alguns exemplos da diferença:
-  - RD no formato `15/+5`, e não `15/epic` ✔ (aviso);
-  - funda não soma For ao dano;
-  - valores e ND do *Monster Manual* 3.0.
-  - Na dúvida, prevalece o SRD 3.0: http://www.dragon.ee/30srd/
-- **Só o SRD.** Monstros que são *Product Identity* da Wizards (devorador de mentes, beholder, yuan-ti etc.) não entram ✔. Atenção: o dragon.ee também publica alguns desses, então ter a fonte no dragon.ee não prova que o monstro é do SRD.
+- Tamanhos ✔ (9 categorias oficiais Devir): `Minúsculo`, `Diminuto`, `Miúdo`, `Pequeno`, `Médio`, `Grande`, `Enorme`, `Imenso`, `Colossal` (com alias de compatibilidade `Mínimo`).
+- Tendência ✔: sigla em PT-BR, uma de `LB`, `NB`, `CB`, `LN`, `N`, `CN`, `LM`, `NM`, `CM`.
+- **Regras da 3.5 (Edição Revisada Devir / SRD 3.5).** Principais pontos:
+  - RD no formato 3.5: `{ "valor": 15, "exceto": ["ferro frio", "bem"], "modo": "e" }` ou `{ "valor": 10, "exceto": ["magia"], "modo": "ou" }`, `{ "valor": 5, "exceto": "—" }`;
+  - Espaço quadrado simétrico (Pequeno/Médio 1,5 m, Grande 3 m, Enorme 4,5 m, Imenso 6 m, Colossal 9 m+);
+  - Valores e ND do *Livro dos Monstros 3.5*.
+- **Só o SRD.** Monstros que são *Product Identity* da Wizards (devorador de mentes, beholder, yuan-ti etc.) não entram ✔.
 - **Textos próprios.** `resumo`, `descricao` e `tatica` são escritos com as suas palavras, em 1 ou 2 frases. Nada copiado de livro ou wiki. Números de estatística podem ser transcritos.
 
 ## Listas fechadas ✔
@@ -65,11 +83,11 @@ Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
 | `nome` | string | nome em PT-BR (tradução Devir quando houver) |
 | `nome_original` | string \| null | nome em inglês do monstro; `null` para Holy Avenger |
 | `categoria` | ✔ `"monstro"` \| `"holy_avenger"` | |
-| `nd` | número ✔ | Nível de Desafio. Monstros: inteiro 1–20, um por ND, sem repetir, com o Tarrasque no 20 ✔. Holy Avenger: inteiro 1–80 ou fração 1/2, 1/3, 1/4, 1/6, 1/8, gravada como número (`0.5`) ✔. No livro, o Paladino vai do ND 20 ao 55 e Tarso tem ND 50 |
-| `nivel` | inteiro ✔ | o que o seletor mostra: igual ao `nd` para monstro ✔ (1–20); nível de personagem para Holy Avenger (1–80 ✔), com os DV raciais (Tarso: 43 DV de dragão + Mago 20 = 63); criatura sem classe: os DV |
-| `classes` | array ✔ | `[{ "classe": "Guerreiro", "nivel": 8 }]`, com nomes PT das classes do Livro do Jogador 3.0, das classes de PdM do Livro do Mestre (Plebeu, Combatente, Aristocrata, Especialista) ou dos nomes do livro de Holy Avenger (Assassino, Gladiador Imperial, Samurai de Tamu-ra, ex-Druida, Xamã Aprendiz); `[]` para monstro e para criatura de Holy Avenger sem classe (Helena, Aspis); soma ≤ `nivel` ✔ (DV raciais não são classe) |
+| `nd` | número ✔ | Nível de Desafio. Monstros: inteiro 1–30 ou fração 1/2, 1/3, 1/4, 1/6, 1/8, 1/10. Holy Avenger: inteiro 1–80 ou fração 1/2, 1/3, 1/4, 1/6, 1/8, 1/10, gravada como número (`0.5`) ✔. No livro, o Paladino vai do ND 20 ao 55 e Tarso tem ND 50 |
+| `nivel` | inteiro ✔ | o que o seletor mostra: igual ao `nd` para monstro ✔ (1–30); nível de personagem para Holy Avenger (1–80 ✔), com os DV raciais (Tarso: 43 DV de dragão + Mago 20 = 63); criatura sem classe: os DV |
+| `classes` | array ✔ | `[{ "classe": "Guerreiro", "nivel": 8 }]`, com nomes PT das classes do Livro do Jogador 3.5, das classes de PdM do Livro do Mestre (Plebeu, Combatente, Aristocrata, Especialista) ou dos nomes do livro de Holy Avenger (Assassino, Gladiador Imperial, Samurai de Tamu-ra, ex-Druida, Xamã Aprendiz); `[]` para monstro e para criatura de Holy Avenger sem classe (Helena, Aspis); soma ≤ `nivel` ✔ (DV raciais não são classe) |
 | `raca` | string \| null | para Holy Avenger (ex.: `Humano`, `Elfo`) |
-| `tipo` | string ✔ | tipo 3.0 em PT-BR: Aberração, Animal, Besta, Besta Mágica, Constructo, Dragão, Elemental, Fada, Gigante, Humanoide, Humanoide Monstruoso, Limo, Extra-Planar, Planta, Morto-Vivo, Verme |
+| `tipo` | string ✔ | tipo 3.5 em PT-BR: Aberração, Animal, Besta Mágica, Constructo, Dragão, Elemental, Fada, Gigante, Humanoide, Humanoide Monstruoso, Limo, Extra-Planar, Planta, Morto-Vivo, Verme |
 | `subtipos` | string[] | ex.: `["Fogo"]`, `["Mau", "Leal"]` |
 | `tamanho`, `tendencia` | string ✔ | ver as listas acima |
 | `resumo` | string ✔ | ≤ 300 caracteres, texto próprio |
@@ -77,16 +95,16 @@ Catálogo somente leitura do simulador de combate (TASK_006), com duas seções:
 | `pv` | inteiro ✔ | monstros: a média dos dados do bloco oficial ✔ (aviso); Holy Avenger: o PV da ficha oficial do livro; personagem adaptado sem ficha: máximo no 1º nível, média arredondada para cima nos demais, + Con |
 | `iniciativa` | inteiro ✔ | bônus total |
 | `deslocamento` | objeto ✔ | `{ "terrestre": 9, "voo": null, "voo_manobrabilidade": null, "natacao": null, "escalada": null, "escavacao": null }`, em metros |
-| `espaco` | número ✔ | **maior** lado ocupado em metros (*Face* 3.0): 1,5 para Médio; 3 para "1,5 m × 3 m" |
+| `espaco` | número ✔ | espaço quadrado em metros (3.5): 1,5 para Médio; 3 para Grande; 4,5 para Enorme; 6 para Imenso; 9 para Colossal |
 | `alcance` | número ✔ | alcance natural em metros (*Reach*) |
 | `ca` | objeto ✔ | `{ "total": 16, "toque": 8, "surpresa": 16, "composicao": "−1 tamanho, −1 Des, +5 natural, +3 gibão" }`. **Não inclui Esquiva** ✔: o motor soma +1 contra o alvo escolhido. Toque ≤ total ✔ (aviso) |
 | `bba` | inteiro ✔ | bônus base de ataque |
-| `agarrar` | inteiro ✔ | BBA + modificador de agarrar do tamanho (Mínimo −16, Minúsculo −8, Pequeno −4, Médio 0, Grande +4, Enorme +8, Imenso +12, Colossal +16) + mod. de For. O 3.0 não imprime esse valor; ele é calculado ✔ |
+| `agarrar` | inteiro ✔ | BBA + modificador de agarrar do tamanho (Minúsculo/Mínimo −16, Diminuto −12, Miúdo −8, Pequeno −4, Médio 0, Grande +4, Enorme +8, Imenso +12, Colossal +16) + mod. de For ✔ |
 | `ataques` | Ataque[] ✔ | opções de **ataque único** (ação padrão); a primeira é a preferida |
 | `ataque_total` | Ataque[] ✔ | sequência completa do **ataque total**, um golpe por item (os iterativos aparecem repetidos, com bônus menores); é a sequência corpo a corpo quando existem as duas |
 | `ataque_total_distancia` | Ataque[] \| null ✔ | segunda sequência de ataque total, **à distância** (ex.: arco +8/+3); só golpes à distância ✔; `null` se não tiver |
 | `ataques_especiais`, `qualidades_especiais` | Especial[] ✔ | ids únicos no combatente ✔ |
-| `reducao_dano` | objeto \| null ✔ | `{ "valor": 15, "exceto": "+5" }` (3.0: arma com bônus de melhoria +5 ou mais), `"exceto": "prata"` ou `"—"` |
+| `reducao_dano` | objeto \| null ✔ | RD 3.5: `{ "valor": 15, "exceto": ["ferro frio", "bem"], "modo": "e" }`, `{ "valor": 10, "exceto": ["magia"], "modo": "ou" }`, `{ "valor": 5, "exceto": "—" }` |
 | `resistencia_magia` | inteiro \| null ✔ | |
 | `resistencias_energia` | objeto ✔ | ex.: `{ "fogo": 10 }`; `{}` se nenhuma |
 | `imunidades`, `vulnerabilidades` | string[] ✔ | ver as listas acima; `vulnerabilidades` só aceita energias (uma fraqueza de outro tipo, como a ferrugem do golem, vira especial) |

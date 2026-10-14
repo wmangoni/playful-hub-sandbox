@@ -14,7 +14,7 @@ import { normalize, signed } from '../core/format.js';
 import { TENDENCIAS } from '../entities/options.js';
 import { ndRotulo } from './encontro30.js';
 import { rotuloItem } from './equipamento30.js';
-import { IMUNIDADES_DE_TIPO } from './combat30.js';
+import { IMUNIDADES_DE_TIPO, rdTexto } from './combat30.js';
 import { MAGIAS, bonusLegivel, chavesDeBonus, danoLegivel, magiaPorId } from './magias30.js';
 
 const metros = n => `${String(n).replace('.', ',')} m`;
@@ -300,7 +300,7 @@ function deslocamentos(d) {
 function defesasDe(e) {
   const out = [];
   const poe = (rotulo, valor) => valor != null && valor !== '' && out.push({ rotulo, valor: String(valor) });
-  if (e.reducao_dano) poe('Redução de dano', `${e.reducao_dano.valor}/${e.reducao_dano.exceto}`);
+  if (e.reducao_dano) poe('Redução de dano', rdTexto(e.reducao_dano));
   if (e.resistencia_magia != null) poe('Resistência à magia', e.resistencia_magia);
   const energia = Object.entries(e.resistencias_energia || {});
   poe('Resistência a energia', energia.map(([k, v]) => `${k} ${v}`).join(', '));
