@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -159,7 +159,7 @@ async function runTests() {
   console.log('✅ Teste 2: Zero vazamentos em 300 passos de estresse com sub-stepping e contenção rígida.');
 
   // Capturar screenshot
-  const screenshotPath = path.join(__dirname, 'pinball_stress_qa_evidence.png');
+  const screenshotPath = shotPath('pinball_stress_qa_evidence.png');
   await page.screenshot({ path: screenshotPath });
   console.log(`\n📸 Screenshot salva em: ${screenshotPath}`);
 

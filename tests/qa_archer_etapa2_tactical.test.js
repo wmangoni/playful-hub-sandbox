@@ -12,6 +12,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { shotPath } = require('./shots');
 const puppeteer = require('puppeteer');
 
 const PORT = 3096;
@@ -393,7 +394,7 @@ async function runTests() {
   console.log('✅ Teste 6: 0 erros detectados no console.');
 
   // Screenshot de evidência
-  const evidencePath = path.join(ROOT_DIR, 'tests', 'archer_etapa2_tactical_evidence.png');
+  const evidencePath = shotPath('archer_etapa2_tactical_evidence.png');
   await page.screenshot({ path: evidencePath });
   console.log(`\n📸 Screenshot de evidência capturada em: ${evidencePath}`);
 

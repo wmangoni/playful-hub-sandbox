@@ -20,6 +20,8 @@ Portal de jogos web. Cada jogo vive na própria pasta (com um `CLAUDE.md` própr
 
 - **Cuidado com `scripts/generate-game-pages.js`: ele sobrescreve páginas editadas à mão.** O script regenera as 23 páginas de `jogos/` que estão no `gamesData` a partir do template, apagando qualquer edição feita direto no HTML (o `puzzle.html`, por exemplo, já divergiu do template). Nunca o rode "para atualizar" sem antes conferir `git status`/`git diff` e sem um motivo claro. Para uma mudança em uma página só, edite o `jogos/<jogo>.html` ou o `gamesData`/template e regenere *apenas depois* de confirmar que o diff mostra só o que você quer; se algo foi apagado sem querer, restaure com `git checkout -- jogos/`. As páginas `blood_and_silver`, `planning_poker`, `blender_game` e `tumbalacatumba` são escritas à mão e o gerador não as toca.
 
+- **Testes nunca gravam em arquivos versionados.** Capturas de evidência usam `shotPath('<nome>.png')` de `tests/shots.js`, que grava em `tests/out/` (ignorada pelo git) ou em `SHOTS_DIR=<pasta>`; imprima o caminho no log. Os PNGs versionados em `tests/` são evidência histórica de sprints antigas (alguns citados em `*/TASKS/*.md`) e nenhum teste os regrava. Depois de rodar testes, `git status` tem que continuar limpo.
+
 ## Regras de SEO
 
 O SEO e a descoberta do portal são **gerados**, não escritos à mão. A fonte da verdade são as páginas `jogos/*.html` e o `index.html`; `scripts/generate-seo.js` produz o resto.

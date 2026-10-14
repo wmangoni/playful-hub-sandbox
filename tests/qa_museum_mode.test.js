@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -240,28 +240,28 @@ async function runTests() {
   // 1. Lobby Central
   await page.evaluate(() => window.__museum.teleportPlayer(1200, 1050));
   await new Promise(r => setTimeout(r, 150));
-  const lobbyEvidence = path.join(__dirname, 'museum_evidence_lobby.png');
+  const lobbyEvidence = shotPath('museum_evidence_lobby.png');
   await page.screenshot({ path: lobbyEvidence });
   console.log('📸 Evidência 1 (Lobby Central):', lobbyEvidence);
 
   // 2. Ala Norte (3D)
   await page.evaluate(() => window.__museum.teleportPlayer(1200, 350));
   await new Promise(r => setTimeout(r, 150));
-  const northEvidence = path.join(__dirname, 'museum_evidence_3d_wing.png');
+  const northEvidence = shotPath('museum_evidence_3d_wing.png');
   await page.screenshot({ path: northEvidence });
   console.log('📸 Evidência 2 (Ala 3D & WebGL):', northEvidence);
 
   // 3. Ala Oeste (Arcade)
   await page.evaluate(() => window.__museum.teleportPlayer(370, 950));
   await new Promise(r => setTimeout(r, 150));
-  const westEvidence = path.join(__dirname, 'museum_evidence_arcade_wing.png');
+  const westEvidence = shotPath('museum_evidence_arcade_wing.png');
   await page.screenshot({ path: westEvidence });
   console.log('📸 Evidência 3 (Ala Ação & Arcade):', westEvidence);
 
   // 4. Ala Leste (Puzzles)
   await page.evaluate(() => window.__museum.teleportPlayer(1950, 950));
   await new Promise(r => setTimeout(r, 150));
-  const eastEvidence = path.join(__dirname, 'museum_evidence_puzzles_wing.png');
+  const eastEvidence = shotPath('museum_evidence_puzzles_wing.png');
   await page.screenshot({ path: eastEvidence });
   console.log('📸 Evidência 4 (Ala Puzzles & Estratégia):', eastEvidence);
 
@@ -274,7 +274,7 @@ async function runTests() {
     window.__museum.simulateInteract();
   });
   await new Promise(r => setTimeout(r, 200));
-  const modalEvidence = path.join(__dirname, 'museum_evidence_modal.png');
+  const modalEvidence = shotPath('museum_evidence_modal.png');
   await page.screenshot({ path: modalEvidence });
   console.log('📸 Evidência 5 (Modal de Detalhes Aberta):', modalEvidence);
 

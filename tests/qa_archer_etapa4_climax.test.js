@@ -26,6 +26,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { shotPath } = require('./shots');
 const puppeteer = require('puppeteer');
 
 const PORT = 3098;
@@ -409,12 +410,7 @@ async function runTests() {
 
   await new Promise(r => setTimeout(r, 400));
 
-  const screenshotDir = path.join(ROOT_DIR, 'test-artifacts');
-  if (!fs.existsSync(screenshotDir)) {
-    fs.mkdirSync(screenshotDir, { recursive: true });
-  }
-
-  const screenshotPath = path.join(screenshotDir, 'qa_archer_etapa4_climax.png');
+  const screenshotPath = shotPath('qa_archer_etapa4_climax.png');
   await page.screenshot({ path: screenshotPath, fullPage: false });
   console.log(`Screenshot salva em: ${screenshotPath}`);
 

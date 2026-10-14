@@ -8,7 +8,7 @@ if (process.env.CI) {
 }
 
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -205,7 +205,7 @@ async function runTests() {
   console.log('✅ Teste 4: Simulação executou com 0 erros.');
 
   // Tirar Screenshot de Evidência
-  const screenshotPath = path.join(__dirname, 'rpg_adventure_task003_qa_evidence.png');
+  const screenshotPath = shotPath('rpg_adventure_task003_qa_evidence.png');
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`\n📸 Screenshot de evidência capturada em: ${screenshotPath}`);
 
