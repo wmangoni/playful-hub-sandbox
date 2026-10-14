@@ -256,7 +256,7 @@ async function capturarJogo(browser, base, pasta, erros) {
         await esperaJanela('loja');
         await espera(JANELA);
         await tira('loja');
-        // A especialização (obrigatória: sai pela escolha)
+        // A especialização (sai pela escolha)
         await page.evaluate(() => { fecharJanela('loja'); gameState.player.level = 3; openSpecializationModal(); });
         await espera(JANELA);
         await tira('especializacao');

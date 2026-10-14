@@ -721,6 +721,12 @@ async function rodada(tamanho, w, h) {
     await espera(900);
     await A(page, 'especializacao');
     await anelDeFoco(page, 'especializacao', tamanho, '#especializacao .especializacao-opcao:nth-child(2)');
+    await anelDeFoco(page, 'especializacao', tamanho, '#especializacao .janela-fechar');
+    // fechada sem a escolha: o jogo em pausa, com o aviso fixo no lugar das escolhas
+    await page.evaluate(() => fecharJanela('especializacao'));
+    await espera(700);
+    await A(page, 'especializacao-adiada');
+    await anelDeFoco(page, 'especializacao-adiada', tamanho, '#choices .pausa-especializacao .escolha');
     await page.evaluate(() => chooseSpecialization(Object.keys(SPECIALIZATIONS[gameState.player.class])[0]));
     await espera(500);
 
