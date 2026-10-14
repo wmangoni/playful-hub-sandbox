@@ -139,16 +139,32 @@ async function runTests() {
     g.setCosmicIntensity(1.0); // 100% de mutação
     const gridBeforeRay = g.createEmptyGrid();
     g.setGrid(gridBeforeRay);
-    
-    g.triggerCosmicRay();
+
+    // Mesmo com 100% de mutação, cada célula atingida vira viva ou morta com 50% de chance,
+    // então as 9 poderiam ficar mortas (1/512). Fixa o Math.random só durante o disparo
+    // (0.75 passa no sorteio de mutação e no de "viva") e restaura logo depois.
+    const realRandom = Math.random;
+    Math.random = () => 0.75;
+    try {
+      g.triggerCosmicRay();
+    } finally {
+      Math.random = realRandom;
+    }
     const stateRay = g.getState();
     const gridAfterRay = g.getGrid();
     let mutatedCells = 0;
+    let minR = g.rows, maxR = -1, minC = g.cols, maxC = -1;
     for (let r = 0; r < g.rows; r++) {
       for (let c = 0; c < g.cols; c++) {
-        if (gridAfterRay[r][c] >= 1) mutatedCells++;
+        if (gridAfterRay[r][c] >= 1) {
+          mutatedCells++;
+          minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+          minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+        }
       }
     }
+    // Com 0.75 o impacto fica longe das bordas, sem a volta toroidal
+    const rayHit3x3 = mutatedCells === 9 && maxR - minR === 2 && maxC - minC === 2;
 
     // 2.2 Testar Buraco Negro
     g.setBlackHole(true);
@@ -178,6 +194,7 @@ async function runTests() {
     return {
       cosmicRayActive: stateRay.cosmicRayActive,
       mutatedCellsByRay: mutatedCells,
+      rayHit3x3,
       isBlackHoleActive: g.getState().isBlackHoleEnabled,
       cellsDestroyedByBH: countBeforeBH - countAfterBH,
       destroyedAtLeastCore: (countBeforeBH - countAfterBH) >= 9
@@ -185,7 +202,7 @@ async function runTests() {
   });
 
   console.log('Resultados dos Eventos de Caos:', JSON.stringify(chaosCheck, null, 2));
-  if (!chaosCheck.cosmicRayActive || chaosCheck.mutatedCellsByRay === 0 || !chaosCheck.destroyedAtLeastCore) {
+  if (!chaosCheck.cosmicRayActive || !chaosCheck.rayHit3x3 || !chaosCheck.destroyedAtLeastCore) {
     throw new Error('Falha nos Eventos de Caos (Raio Cósmico ou Buraco Negro).');
   }
   console.log('✅ Teste 2: Raio Cósmico e atração/destruição de Buraco Negro validados.');
