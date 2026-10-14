@@ -19,6 +19,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../i18n/config');
 
 const ROOT = path.join(__dirname, '..');
 const SITE = 'https://playfulhub.com.br';
@@ -119,13 +120,14 @@ function gameJsonLd(g) {
         description: g.description,
         url: g.url,
         image: g.image,
-        inLanguage: 'pt-BR',
+        inLanguage: g.inLanguage || 'pt-BR',
         isAccessibleForFree: true,
         operatingSystem: 'Any',
         applicationCategory: g.kind === 'game' ? 'GameApplication' : APP_CATEGORY[g.slug],
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL', availability: 'https://schema.org/InStock' },
+        offers: { '@type': 'Offer', price: '0', priceCurrency: g.currency || 'BRL', availability: 'https://schema.org/InStock' },
         publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE + '/' }
     };
+    if (g.noOffers) delete entity.offers; // páginas traduzidas: sem preço/moeda inventados (isAccessibleForFree já diz que é grátis)
     if (g.kind === 'game') entity.gamePlatform = 'Web browser';
     if (g.genre) entity.genre = g.genre;
     if (g.playUrl) entity.potentialAction = { '@type': 'PlayAction', target: g.playUrl };
@@ -136,7 +138,7 @@ function gameJsonLd(g) {
             entity,
             {
                 '@type': 'BreadcrumbList',
-                itemListElement: [
+                itemListElement: g.breadcrumb || [
                     { '@type': 'ListItem', position: 1, name: SITE_NAME, item: SITE + '/' },
                     { '@type': 'ListItem', position: 2, name: g.name, item: g.url }
                 ]
@@ -166,14 +168,16 @@ function homeJsonLd(catalog) {
 }
 
 // Monta o bloco, pulando o que a página já declara por conta própria.
-function buildBlock(html, { url, title, description, image, jsonLd }) {
+function buildBlock(html, { url, title, description, image, jsonLd, alternates = [], locale = 'pt_BR' }) {
     const has = (attr, key) => new RegExp(`<meta\\s+${attr}="${key}"`, 'i').test(html);
     const lines = [];
     if (!/<link\s+rel="canonical"/i.test(html)) lines.push(`<link rel="canonical" href="${url}">`);
+    // hreflang: cada versão aponta para todas as outras E para si mesma (o Google ignora alternates sem reciprocidade)
+    alternates.forEach((a) => lines.push(`<link rel="alternate" hreflang="${a.hreflang}" href="${a.href}">`));
     if (!has('property', 'og:url')) lines.push(`<meta property="og:url" content="${url}">`);
     if (!has('property', 'og:image')) lines.push(`<meta property="og:image" content="${image}">`);
     if (!has('property', 'og:site_name')) lines.push(`<meta property="og:site_name" content="${SITE_NAME}">`);
-    if (!has('property', 'og:locale')) lines.push('<meta property="og:locale" content="pt_BR">');
+    if (!has('property', 'og:locale')) lines.push(`<meta property="og:locale" content="${locale}">`);
     if (!has('name', 'twitter:card')) lines.push('<meta name="twitter:card" content="summary_large_image">');
     if (!has('name', 'twitter:title')) lines.push(`<meta name="twitter:title" content="${escAttr(title)}">`);
     if (!has('name', 'twitter:description')) lines.push(`<meta name="twitter:description" content="${escAttr(description)}">`);
@@ -196,7 +200,9 @@ function injectSeo(rawHtml, page) {
         title: ogTitle || page.title,
         description: ogDesc || page.description,
         image: page.image,
-        jsonLd: page.jsonLd
+        jsonLd: page.jsonLd,
+        alternates: page.alternates || [],
+        locale: page.locale || 'pt_BR'
     });
     if (!/<\/head>/i.test(html)) throw new Error(`${page.url}: sem </head>`);
     return html.replace(/([ \t]*)<\/head>/i, (m) => block + m);
@@ -206,14 +212,24 @@ function buildSitemap(catalog) {
     EXTRA_PAGES.forEach(p => {
         if (!fs.existsSync(path.join(ROOT, p.file))) throw new Error(`EXTRA_PAGES: ${p.file} não existe`);
     });
+    // páginas traduzidas: o arquivo precisa existir (rode npm run i18n)
+    const i18nFiles = [...i18n.langs.map(l => i18n.hubFile(l)), ...i18n.langs.flatMap(l => i18n.slugs.map(s => i18n.gameFile(l, s)))];
+    i18nFiles.forEach(f => {
+        if (!fs.existsSync(path.join(ROOT, f))) throw new Error(`i18n: ${f} não existe (rode: npm run i18n)`);
+    });
     const urls = [
-        { loc: SITE + '/', priority: '1.0' },
+        { loc: SITE + '/', priority: '1.0', alternates: i18n.homeAlternates() },
+        ...i18n.langs.map(l => ({ loc: i18n.hubUrl(l), priority: '0.9', alternates: i18n.homeAlternates() })),
         ...EXTRA_PAGES.map(p => ({ loc: SITE + p.path, priority: '0.9' })),
-        ...catalog.map(g => ({ loc: g.url, priority: '0.8' }))
+        ...catalog.flatMap(g => i18n.has(g.slug)
+            ? [{ loc: g.url, priority: '0.8', alternates: i18n.gameAlternates(g.slug) },
+                ...i18n.langs.map(l => ({ loc: i18n.gameUrl(l, g.slug), priority: '0.7', alternates: i18n.gameAlternates(g.slug) }))]
+            : [{ loc: g.url, priority: '0.8' }])
     ];
+    const alt = u => (u.alternates || []).map(a => `    <xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${escXml(a.href)}"/>\n`).join('');
     return '<?xml version="1.0" encoding="UTF-8"?>\n' +
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-        urls.map(u => `  <url>\n    <loc>${escXml(u.loc)}</loc>\n    <priority>${u.priority}</priority>\n  </url>\n`).join('') +
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' +
+        urls.map(u => `  <url>\n    <loc>${escXml(u.loc)}</loc>\n${alt(u)}    <priority>${u.priority}</priority>\n  </url>\n`).join('') +
         '</urlset>\n';
 }
 
@@ -240,6 +256,10 @@ function buildLlmsTxt(catalog) {
         '',
         ...EXTRA_PAGES.map(p => `- [${p.name}](${SITE}${p.path}): ${p.description}`),
         '',
+        '## English and Spanish / Inglés y español',
+        '',
+        ...i18n.langs.map(l => `- [PlayfulHub in ${i18n.LANGS[l].label}](${i18n.hubUrl(l)}): ${i18n.slugs.length} games with an info page in ${i18n.LANGS[l].englishName} (some games show a few labels in Portuguese; each page says so)`),
+        '',
         '## Dados',
         '',
         `- [Catálogo em JSON](${SITE}/games.json): todos os títulos com URL, URL de jogo, descrição, gênero e imagem`,
@@ -249,8 +269,11 @@ function buildLlmsTxt(catalog) {
 }
 
 function buildGamesJson(catalog) {
-    const games = catalog.map(({ slug, name, url, playUrl, description, genre, tags, image, kind }) =>
-        ({ slug, name, kind, url, playUrl, description, genre, tags, image }));
+    const games = catalog.map(({ slug, name, url, playUrl, description, genre, tags, image, kind }) => {
+        const g = { slug, name, kind, url, playUrl, description, genre, tags, image };
+        if (i18n.has(slug)) g.translations = Object.fromEntries(i18n.langs.map(l => [l, i18n.gameUrl(l, slug)]));
+        return g;
+    });
     return JSON.stringify({ site: SITE, name: SITE_NAME, language: 'pt-BR', count: games.length, games }, null, 2) + '\n';
 }
 
@@ -264,7 +287,8 @@ function computeOutputs() {
 
     catalog.forEach(g => {
         files[`jogos/${g.slug}.html`] = injectSeo(read(`jogos/${g.slug}.html`), {
-            url: g.url, title: g.pageTitle, description: g.description, image: g.image, jsonLd: gameJsonLd(g)
+            url: g.url, title: g.pageTitle, description: g.description, image: g.image, jsonLd: gameJsonLd(g),
+            alternates: i18n.has(g.slug) ? i18n.gameAlternates(g.slug) : []
         });
     });
 
@@ -274,7 +298,8 @@ function computeOutputs() {
         title: decode((home.match(/<title>([^<]*)<\/title>/i) || [, SITE_NAME])[1]).trim(),
         description: metaContent(home, 'name', 'description') || '',
         image: absolute(metaContent(home, 'property', 'og:image') || DEFAULT_IMAGE),
-        jsonLd: homeJsonLd(catalog)
+        jsonLd: homeJsonLd(catalog),
+        alternates: i18n.homeAlternates()
     });
     return files;
 }
@@ -302,4 +327,4 @@ if (require.main === module) {
     console.log(check ? `SEO em dia (${total} arquivos).` : `SEO gerado: ${changed.length} de ${total} arquivos atualizados.`);
 }
 
-module.exports = { run, computeOutputs, buildCatalog, SITE, EXTRA_PAGES };
+module.exports = { run, computeOutputs, buildCatalog, injectSeo, gameJsonLd, absolute, escAttr, SITE, SITE_NAME, LOGO, EXTRA_PAGES, APP_CATEGORY };
