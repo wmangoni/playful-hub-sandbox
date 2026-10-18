@@ -611,6 +611,22 @@
             font-size: 14px;
             font-weight: bold;
             text-shadow: 0 0 4px #f1c40f;
+            z-index: 15;
+        }
+        #vfx-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #player, .enemy, .bullet, .special-bullet, .plasma-orb, .enemy-bullet, .powerup, #boss, #dreadnought-boss, #goliath-transport {
+            z-index: 4;
+        }
+        #score, #player-hp-bar-container, #phase-display, #special-charges, #special-active, #special-bar {
+            z-index: 15;
         }
     </style>
 </head>
@@ -623,6 +639,7 @@
 <!-- End Google Tag Manager (noscript) -->
 
 <div id="game-container">
+    <canvas id="vfx-canvas"></canvas>
     <div id="hp-vignette" class="critical-hp-vignette"></div>
     <div id="score">Score: 0</div>
     <div id="player-hp-bar-container">
@@ -1102,6 +1119,28 @@
         const bhCenterX = blackHoleX;
         const bhCenterY = blackHoleY;
 
+        if (Math.random() < 0.65) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 38 + Math.random() * 55;
+            const px = bhCenterX + Math.cos(angle) * dist;
+            const py = bhCenterY + Math.sin(angle) * dist;
+            const tangAngle = angle + Math.PI * 0.68;
+            const spd = 2.2 + Math.random() * 1.8;
+            const bhColors = ['#8e2de2', '#00ffff', '#ff00ff', '#a29bfe'];
+            spawnVFXParticle(
+                1,
+                px,
+                py,
+                Math.cos(tangAngle) * spd,
+                Math.sin(tangAngle) * spd,
+                1.8 + Math.random() * 1.2,
+                0.035 + Math.random() * 0.02,
+                bhColors[Math.floor(Math.random() * bhColors.length)],
+                0.96,
+                0.9
+            );
+        }
+
         // Gravity pull on Player
         const pCenterX = playerX + playerWidth / 2;
         const pCenterY = playerY + playerHeight / 2;
@@ -1235,6 +1274,10 @@
         goliathY = containerHeight - 75;
         goliathElement.style.left = goliathX + 'px';
         goliathElement.style.top = goliathY + 'px';
+        if (Math.random() < 0.7) {
+            spawnEngineParticles(goliathX + 22, goliathY + 46, '#0088ff');
+            spawnEngineParticles(goliathX + 68, goliathY + 46, '#00ffff');
+        }
     }
 
     function checkEscortCompletion() {
@@ -1296,50 +1339,231 @@
         }, duration);
     }
 
-    // --- Engine Thruster Trails ---
+    // --- Modern Canvas 2D Particle Engine (Etapa 2: Object Pool + Additive Blending) ---
+    const vfxCanvas = document.getElementById('vfx-canvas');
+    const vfxCtx = vfxCanvas ? vfxCanvas.getContext('2d', { alpha: true }) : null;
+
+    function resizeVfxCanvas() {
+        if (!vfxCanvas) return;
+        if (vfxCanvas.width !== containerWidth || vfxCanvas.height !== containerHeight) {
+            vfxCanvas.width = containerWidth;
+            vfxCanvas.height = containerHeight;
+        }
+    }
+    resizeVfxCanvas();
+    window.addEventListener('resize', resizeVfxCanvas);
+
+    // Pre-rendered Radial Glow Sprite Cache (avoids per-frame gradient/shadowBlur cost)
+    const vfxSpriteCache = {};
+    function getGlowSprite(color) {
+        const key = color || '#ffffff';
+        if (vfxSpriteCache[key]) return vfxSpriteCache[key];
+        const off = document.createElement('canvas');
+        off.width = 32;
+        off.height = 32;
+        const octx = off.getContext('2d');
+        const grad = octx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.28, key);
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        octx.fillStyle = grad;
+        octx.fillRect(0, 0, 32, 32);
+        vfxSpriteCache[key] = off;
+        return off;
+    }
+    // Pre-warm common palette sprites
+    ['#ffdd57', '#ff6f91', '#42d9ff', '#ffd1ff', '#ffa07a', '#00ffff', '#2ecc71', '#ff0055', '#8e2de2', '#e74c3c', '#ffffff', '#ff9900', '#f1c40f', '#3498db', '#888', '#666', '#555', '#444'].forEach(getGlowSprite);
+
+    const MAX_VFX_PARTICLES = 650;
+    const vfxPool = new Array(MAX_VFX_PARTICLES);
+    const activeVfxParticles = [];
+    for (let i = 0; i < MAX_VFX_PARTICLES; i++) {
+        vfxPool[i] = {
+            type: 0, // 0: orb, 1: spark, 2: thruster, 3: core flash
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            drag: 0.96,
+            size: 6,
+            alpha: 1,
+            decay: 0.03,
+            color: '#ffffff',
+            sprite: null
+        };
+    }
+
+    const MAX_VFX_SHOCKWAVES = 32;
+    const shockwavePool = new Array(MAX_VFX_SHOCKWAVES);
+    const activeShockwaves = [];
+    for (let i = 0; i < MAX_VFX_SHOCKWAVES; i++) {
+        shockwavePool[i] = {
+            x: 0,
+            y: 0,
+            radius: 2,
+            maxRadius: 60,
+            speed: 3.5,
+            alpha: 1,
+            lineWidth: 3,
+            color: '#00ffff'
+        };
+    }
+
+    function spawnVFXParticle(type, x, y, vx, vy, size, decay, color, drag = 0.96, initialAlpha = 1.0) {
+        let p;
+        if (vfxPool.length > 0) {
+            p = vfxPool.pop();
+        } else if (activeVfxParticles.length > 0) {
+            // Recycle oldest particle if pool is saturated
+            p = activeVfxParticles[0];
+            activeVfxParticles[0] = activeVfxParticles[activeVfxParticles.length - 1];
+            activeVfxParticles.pop();
+        } else {
+            return;
+        }
+        p.type = type;
+        p.x = x;
+        p.y = y;
+        p.vx = vx;
+        p.vy = vy;
+        p.drag = drag;
+        p.size = size;
+        p.alpha = initialAlpha;
+        p.decay = decay;
+        p.color = color || '#ffffff';
+        p.sprite = getGlowSprite(p.color);
+        activeVfxParticles.push(p);
+    }
+
+    function spawnVFXShockwave(x, y, maxRadius, speed, color, lineWidth = 3) {
+        let sw;
+        if (shockwavePool.length > 0) {
+            sw = shockwavePool.pop();
+        } else if (activeShockwaves.length > 0) {
+            sw = activeShockwaves[0];
+            activeShockwaves[0] = activeShockwaves[activeShockwaves.length - 1];
+            activeShockwaves.pop();
+        } else {
+            return;
+        }
+        sw.x = x;
+        sw.y = y;
+        sw.radius = 4;
+        sw.maxRadius = maxRadius;
+        sw.speed = speed;
+        sw.alpha = 0.95;
+        sw.lineWidth = lineWidth;
+        sw.color = color || '#00ffff';
+        activeShockwaves.push(sw);
+    }
+
+    function clearAllVFX() {
+        while (activeVfxParticles.length > 0) {
+            vfxPool.push(activeVfxParticles.pop());
+        }
+        while (activeShockwaves.length > 0) {
+            shockwavePool.push(activeShockwaves.pop());
+        }
+    }
+
+    // --- Engine Thruster Trails (Pooled Canvas 2D) ---
     const activeTrails = [];
-    function spawnEngineParticles(x, y, shipColor) {
-        if (activeTrails.length > 60) return;
-        const part = document.createElement('div');
-        part.style.position = 'absolute';
-        const size = 3 + Math.random() * 4;
-        part.style.width = size + 'px';
-        part.style.height = size + 'px';
-        part.style.borderRadius = '50%';
-        part.style.left = x + 'px';
-        part.style.top = y + 'px';
-        part.style.backgroundColor = shipColor || '#e74c3c';
-        part.style.pointerEvents = 'none';
-        part.style.zIndex = '1';
-        
-        gameContainer.appendChild(part);
-        
-        activeTrails.push({
-            element: part,
-            _x: x,
-            _y: y,
-            opacity: 0.9,
-            vy: 2.5 + Math.random() * 1.5,
-            vx: Math.random() * 0.8 - 0.4
-        });
+    function spawnEngineParticles(x, y, shipColor, customVy) {
+        const col = shipColor || '#e74c3c';
+        const vy = customVy !== undefined ? customVy : (2.2 + Math.random() * 1.8);
+        const vx = (Math.random() - 0.5) * 0.9;
+        const size = 9 + Math.random() * 6;
+        spawnVFXParticle(2, x, y, vx, vy, size, 0.065 + Math.random() * 0.025, col, 0.98, 0.85);
     }
 
     function updateEngineTrails() {
+        // Legacy DOM trail cleanup if any external test pushed into activeTrails
         for (let i = activeTrails.length - 1; i >= 0; i--) {
             const t = activeTrails[i];
-            t.opacity -= 0.08;
-            t._x += t.vx;
-            t._y += t.vy;
-            
-            if (t.opacity <= 0) {
-                if (t.element.parentNode === gameContainer) gameContainer.removeChild(t.element);
-                activeTrails.splice(i, 1);
+            if (t && t.element && t.element.parentNode === gameContainer) {
+                gameContainer.removeChild(t.element);
+            }
+            activeTrails.splice(i, 1);
+        }
+    }
+
+    function updateAndRenderVFX() {
+        if (!vfxCtx) return;
+        resizeVfxCanvas();
+        vfxCtx.clearRect(0, 0, containerWidth, containerHeight);
+
+        // 1. Render Parallax Starfield (source-over)
+        vfxCtx.globalCompositeOperation = 'source-over';
+        const nowSec = performance.now() * 0.003;
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const twinkle = 0.75 + 0.25 * Math.sin(nowSec * s.twinkleSpeed + s.twinklePhase);
+            vfxCtx.globalAlpha = s.baseAlpha * twinkle;
+            vfxCtx.fillStyle = s.color;
+            // Subtle warp streak proportional to star speed
+            const h = s.size + s.speed * 1.6;
+            vfxCtx.fillRect(s._x, s._y, s.size, h);
+        }
+
+        // 2. Render Additive Particles & Shockwaves ('lighter')
+        vfxCtx.globalCompositeOperation = 'lighter';
+
+        for (let i = activeShockwaves.length - 1; i >= 0; i--) {
+            const sw = activeShockwaves[i];
+            sw.radius += sw.speed;
+            const progress = sw.radius / sw.maxRadius;
+            sw.alpha = Math.max(0, 1 - progress);
+
+            if (sw.alpha <= 0.02 || sw.radius >= sw.maxRadius) {
+                activeShockwaves[i] = activeShockwaves[activeShockwaves.length - 1];
+                activeShockwaves.pop();
+                shockwavePool.push(sw);
+                continue;
+            }
+
+            vfxCtx.globalAlpha = sw.alpha * 0.85;
+            vfxCtx.strokeStyle = sw.color;
+            vfxCtx.lineWidth = Math.max(0.8, sw.lineWidth * (1 - progress * 0.7));
+            vfxCtx.beginPath();
+            vfxCtx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+            vfxCtx.stroke();
+        }
+
+        for (let i = activeVfxParticles.length - 1; i >= 0; i--) {
+            const p = activeVfxParticles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= p.drag;
+            p.vy *= p.drag;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0.01) {
+                activeVfxParticles[i] = activeVfxParticles[activeVfxParticles.length - 1];
+                activeVfxParticles.pop();
+                vfxPool.push(p);
+                continue;
+            }
+
+            if (p.type === 1) {
+                // Directional velocity spark
+                vfxCtx.globalAlpha = p.alpha;
+                vfxCtx.strokeStyle = p.color;
+                vfxCtx.lineWidth = p.size;
+                vfxCtx.beginPath();
+                vfxCtx.moveTo(p.x, p.y);
+                vfxCtx.lineTo(p.x - p.vx * 2.6, p.y - p.vy * 2.6);
+                vfxCtx.stroke();
             } else {
-                t.element.style.left = t._x + 'px';
-                t.element.style.top = t._y + 'px';
-                t.element.style.opacity = t.opacity;
+                // Pre-rendered glowing radial orb / thruster / core flash
+                const drawSize = p.type === 2 ? p.size * (0.45 + 0.55 * p.alpha) : p.size;
+                const half = drawSize * 0.5;
+                vfxCtx.globalAlpha = p.alpha;
+                vfxCtx.drawImage(p.sprite, p.x - half, p.y - half, drawSize, drawSize);
             }
         }
+
+        vfxCtx.globalAlpha = 1.0;
+        vfxCtx.globalCompositeOperation = 'source-over';
     }
 
     // --- Low HP Vignette & Audio Alert ---
@@ -1406,6 +1630,8 @@
             const x = isFragment ? parentX : Math.random() * (containerWidth - this.width);
             const y = isFragment ? parentY : -40;
             
+            this._x = x;
+            this._y = y;
             this.element.style.left = x + 'px';
             this.element.style.top = y + 'px';
             
@@ -1415,6 +1641,10 @@
             gameContainer.appendChild(this.element);
             
             this.element.hp = this.hp;
+            this.element._x = x;
+            this.element._y = y;
+            this.element._w = this.width;
+            this.element._h = this.height;
             this.element.speedX = this.speedX;
             this.element.speedY = this.speedY;
             this.element.isMeteor = true;
@@ -1430,15 +1660,17 @@
     function updateMeteors() {
         for (let i = meteors.length - 1; i >= 0; i--) {
             const m = meteors[i];
-            let x = parseFloat(m.element.style.left) + m.speedX;
-            let y = parseFloat(m.element.style.top) + m.speedY;
+            m._x += m.speedX;
+            m._y += m.speedY;
+            m.element._x = m._x;
+            m.element._y = m._y;
 
-            if (y > containerHeight + 40 || x < -50 || x > containerWidth + 50) {
+            if (m._y > containerHeight + 40 || m._x < -50 || m._x > containerWidth + 50) {
                 if (m.element.parentNode === gameContainer) gameContainer.removeChild(m.element);
                 meteors.splice(i, 1);
             } else {
-                m.element.style.left = x + 'px';
-                m.element.style.top = y + 'px';
+                m.element.style.left = m._x + 'px';
+                m.element.style.top = m._y + 'px';
             }
         }
     }
@@ -1446,10 +1678,11 @@
     function handleMeteorDestruction(meteorObj) {
         if (!meteorObj || !meteorObj.element) return;
         const elem = meteorObj.element;
-        const mx = parseFloat(elem.style.left) + meteorObj.width / 2;
-        const my = parseFloat(elem.style.top) + meteorObj.height / 2;
+        const mx = meteorObj._x + meteorObj.width / 2;
+        const my = meteorObj._y + meteorObj.height / 2;
         
-        createParticleBurstCustomColor(mx, my, 12, ['#888', '#666', '#555', '#444']);
+        createParticleBurstCustomColor(mx, my, 14, ['#888', '#666', '#555', '#ff9900']);
+        spawnVFXShockwave(mx, my, 36, 2.8, '#ff9900', 2);
         playSound(sfxExplosion);
         
         if (!meteorObj.isFragment) {
@@ -1469,27 +1702,22 @@
 
     function createParticleBurstCustomColor(relativeX, relativeY, count = 12, colors = ['#ffffff']) {
         for (let i = 0; i < count; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'particle';
-            const size = 3 + Math.random() * 4;
             const angle = Math.random() * Math.PI * 2;
-            const distance = 15 + Math.random() * 30;
-            particle.style.width = size + 'px';
-            particle.style.height = size + 'px';
-            particle.style.left = (relativeX - size / 2) + 'px';
-            particle.style.top = (relativeY - size / 2) + 'px';
-            particle.style.setProperty('--moveX', `${Math.cos(angle) * distance}px`);
-            particle.style.setProperty('--moveY', `${Math.sin(angle) * distance}px`);
-            particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-            particle.style.animationDuration = `${0.3 + Math.random() * 0.3}s`;
-            particle.style.opacity = '0.8';
-            gameContainer.appendChild(particle);
-
-            setTimeout(() => {
-                if (particle.parentNode === gameContainer) {
-                    gameContainer.removeChild(particle);
-                }
-            }, 600);
+            const speed = 1.2 + Math.random() * 4.2;
+            const col = colors[Math.floor(Math.random() * colors.length)];
+            const isSpark = i % 3 === 0;
+            spawnVFXParticle(
+                isSpark ? 1 : 0,
+                relativeX,
+                relativeY,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                isSpark ? (1.8 + Math.random() * 1.2) : (10 + Math.random() * 10),
+                0.028 + Math.random() * 0.025,
+                col,
+                0.94,
+                0.95
+            );
         }
     }
 
@@ -1956,24 +2184,29 @@
 
     function createStars() {
         stars.forEach(star => {
-            if(star.parentNode === gameContainer) gameContainer.removeChild(star);
+            if (star && star.parentNode === gameContainer) gameContainer.removeChild(star);
         });
         stars = [];
 
-        const starCounts = { layer1: 30, layer2: 40, layer3: 50 };
-        const starSpeeds = { layer1: 0.8, layer2: 0.4, layer3: 0.2 };
+        const layers = [
+            { count: 35, speed: 1.05, size: 2.2, alpha: 0.9, color: '#ffffff' },
+            { count: 45, speed: 0.55, size: 1.5, alpha: 0.65, color: '#cceeff' },
+            { count: 60, speed: 0.25, size: 1.0, alpha: 0.42, color: '#99bbff' }
+        ];
 
-        for (const layer in starCounts) {
-            for (let i = 0; i < starCounts[layer]; i++) {
-                const star = document.createElement('div');
-                star.className = `star star-${layer}`;
-                star._x = Math.random() * containerWidth;
-                star._y = Math.random() * containerHeight;
-                star.style.left = star._x + 'px';
-                star.style.top = star._y + 'px';
-                star.speed = starSpeeds[layer] * (Math.random() * 0.5 + 0.75);
-                gameContainer.insertBefore(star, player);
-                stars.push(star);
+        for (let l = 0; l < layers.length; l++) {
+            const cfg = layers[l];
+            for (let i = 0; i < cfg.count; i++) {
+                stars.push({
+                    _x: Math.random() * containerWidth,
+                    _y: Math.random() * containerHeight,
+                    speed: cfg.speed * (Math.random() * 0.45 + 0.78),
+                    size: cfg.size * (0.85 + Math.random() * 0.3),
+                    baseAlpha: cfg.alpha,
+                    twinkleSpeed: 0.002 + Math.random() * 0.004,
+                    twinklePhase: Math.random() * Math.PI * 2,
+                    color: cfg.color
+                });
             }
         }
     }
@@ -1986,55 +2219,72 @@
             playerX += 7;
         }
         player.style.left = playerX + 'px';
+
+        if (!isGameOver && Math.random() < 0.85) {
+            const thrusterColor = isSpecialActive ? '#ff00ff' : (hasShield > 0 ? '#3498db' : '#00ffff');
+            spawnVFXParticle(
+                2,
+                playerX + 9 + (Math.random() * 2 - 1),
+                playerY + playerHeight - 4,
+                (isLeftPressed ? 0.6 : (isRightPressed ? -0.6 : 0)) + (Math.random() - 0.5) * 0.4,
+                2.2 + Math.random() * 1.4,
+                7 + Math.random() * 4,
+                0.08 + Math.random() * 0.03,
+                thrusterColor,
+                0.92,
+                0.75
+            );
+            spawnVFXParticle(
+                2,
+                playerX + playerWidth - 9 + (Math.random() * 2 - 1),
+                playerY + playerHeight - 4,
+                (isLeftPressed ? 0.6 : (isRightPressed ? -0.6 : 0)) + (Math.random() - 0.5) * 0.4,
+                2.2 + Math.random() * 1.4,
+                7 + Math.random() * 4,
+                0.08 + Math.random() * 0.03,
+                thrusterColor,
+                0.92,
+                0.75
+            );
+        }
     }
 
     function createExplosion(x, y) {
-        const explosion = document.createElement('div');
-        explosion.className = 'explosion';
-
         const relativeX = x;
         const relativeY = y;
 
-        explosion.style.left = (relativeX - 25) + 'px';
-        explosion.style.top = (relativeY - 25) + 'px';
-        gameContainer.appendChild(explosion);
-        createParticleBurst(relativeX, relativeY, 14 + Math.floor(Math.random() * 6));
+        // Core flash + Shockwave ring + High-velocity particle burst on Canvas 2D (0 DOM nodes)
+        spawnVFXParticle(3, relativeX, relativeY, 0, 0, 36, 0.085, '#ffaa22', 0.9, 1.0);
+        spawnVFXShockwave(relativeX, relativeY, 52, 3.4, '#ff9900', 2.8);
+        createParticleBurst(relativeX, relativeY, 22);
         playSound(sfxPop);
-
-        setTimeout(() => {
-            if (explosion.parentNode === gameContainer) {
-                gameContainer.removeChild(explosion);
-            }
-        }, 300);
     }
 
-    function createParticleBurst(relativeX, relativeY, count = 16) {
+    function createParticleBurst(relativeX, relativeY, count = 20) {
         for (let i = 0; i < count; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'particle';
-            const size = 3 + Math.random() * 3;
             const angle = Math.random() * Math.PI * 2;
-            const distance = 20 + Math.random() * 35;
-            particle.style.width = size + 'px';
-            particle.style.height = size + 'px';
-            particle.style.left = (relativeX - size / 2) + 'px';
-            particle.style.top = (relativeY - size / 2) + 'px';
-            particle.style.setProperty('--moveX', `${Math.cos(angle) * distance}px`);
-            particle.style.setProperty('--moveY', `${Math.sin(angle) * distance}px`);
-            particle.style.background = particleColors[Math.floor(Math.random() * particleColors.length)];
-            particle.style.animationDuration = `${0.45 + Math.random() * 0.35}s`;
-            particle.style.opacity = (0.6 + Math.random() * 0.3).toFixed(2);
-            gameContainer.appendChild(particle);
-
-            setTimeout(() => {
-                if (particle.parentNode === gameContainer) {
-                    gameContainer.removeChild(particle);
-                }
-            }, 900);
+            const isSpark = i % 2 === 0;
+            const speed = isSpark ? (2.6 + Math.random() * 5.2) : (1.0 + Math.random() * 3.8);
+            const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+            spawnVFXParticle(
+                isSpark ? 1 : 0,
+                relativeX,
+                relativeY,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                isSpark ? (1.8 + Math.random() * 1.4) : (11 + Math.random() * 11),
+                isSpark ? (0.026 + Math.random() * 0.022) : (0.022 + Math.random() * 0.02),
+                color,
+                isSpark ? 0.92 : 0.95,
+                0.95
+            );
         }
     }
 
     function triggerPlasmaExplosion(centerX, centerY) {
+        spawnVFXShockwave(centerX, centerY, 82, 4.2, '#2ecc71', 3.5);
+        spawnVFXShockwave(centerX, centerY, 54, 3.0, '#00ffff', 2.2);
+        createParticleBurstCustomColor(centerX, centerY, 26, ['#2ecc71', '#00ff88', '#00ffff', '#ffffff']);
         createExplosion(centerX, centerY);
         playPlasmaBurstSound();
         triggerScreenShake(6, 150);
@@ -2087,6 +2337,15 @@
                     }
                 }
             });
+        }
+    }
+
+    function spawnMuzzleFlash(mx, my, color) {
+        spawnVFXParticle(3, mx, my, 0, -0.5, 16, 0.14, color, 0.9, 0.95);
+        for (let i = 0; i < 3; i++) {
+            const ang = -Math.PI / 2 + (Math.random() - 0.5) * 0.9;
+            const spd = 2.0 + Math.random() * 2.5;
+            spawnVFXParticle(1, mx, my, Math.cos(ang) * spd, Math.sin(ang) * spd, 1.6, 0.09, color, 0.9, 0.85);
         }
     }
 
@@ -2143,6 +2402,7 @@
             bullet3.speedY = -9;
             gameContainer.appendChild(bullet3);
             bullets.push(bullet3);
+            spawnMuzzleFlash(playerX + playerWidth / 2, playerY - 6, '#00ffff');
         } else if (activeWeapon === 'plasma') {
             const ox = playerX + playerWidth / 2 - 12;
             const oy = playerY - 20;
@@ -2159,6 +2419,7 @@
             orb.isPlasma = true;
             gameContainer.appendChild(orb);
             bullets.push(orb);
+            spawnMuzzleFlash(playerX + playerWidth / 2, playerY - 6, '#2ecc71');
             playPlasmaBurstSound();
         } else if (activeWeapon === 'tesla') {
             fireTeslaArc();
@@ -2177,6 +2438,7 @@
             bullet.speedY = -10;
             gameContainer.appendChild(bullet);
             bullets.push(bullet);
+            spawnMuzzleFlash(playerX + playerWidth / 2, playerY - 5, isHomingActive ? '#ff6600' : '#ffdd57');
             playSound(sfxShoot);
         }
 
@@ -2187,6 +2449,7 @@
         playTeslaDischargeSound();
         const pX = playerX + playerWidth / 2;
         const pY = playerY;
+        spawnMuzzleFlash(pX, pY - 4, '#00ffff');
 
         const allTargets = enemies.concat(summonedEnemies);
         let targets = [];
@@ -2304,6 +2567,8 @@
 
         const baseDmg = [25, 17.5, 12];
         targets.forEach((t, idx) => {
+            spawnVFXShockwave(t.x, t.y, 32, 3.5, '#00ffff', 2.0);
+            createParticleBurstCustomColor(t.x, t.y, 10, ['#00ffff', '#ffffff', '#80ffff']);
             const dmg = baseDmg[idx] || 10;
             if (t.isBoss) {
                 bossTakeDamage(dmg / 3);
@@ -2416,6 +2681,34 @@
                 bullet._y = y;
                 bullet.style.left = x + 'px';
                 bullet.style.top = y + 'px';
+
+                if (bullet.isPlasma && Math.random() < 0.75) {
+                    spawnVFXParticle(
+                        0,
+                        x + 12 + (Math.random() - 0.5) * 6,
+                        y + 18,
+                        (Math.random() - 0.5) * 0.8,
+                        1.2 + Math.random() * 1.2,
+                        12 + Math.random() * 6,
+                        0.065,
+                        Math.random() < 0.5 ? '#2ecc71' : '#00ff88',
+                        0.92,
+                        0.75
+                    );
+                } else if (isHomingActive && Math.random() < 0.6) {
+                    spawnVFXParticle(
+                        2,
+                        x + 3,
+                        y + 12,
+                        (Math.random() - 0.5) * 0.5,
+                        0.8,
+                        8,
+                        0.08,
+                        '#ff6600',
+                        0.9,
+                        0.7
+                    );
+                }
             }
         }
     }
@@ -2543,16 +2836,14 @@
     function updateStars() {
         for (let i = 0; i < stars.length; i++) {
             const star = stars[i];
-            let y = (star._y !== undefined ? star._y : parseFloat(star.style.top)) + star.speed;
+            let y = star._y + star.speed;
 
             if (y > containerHeight) {
                 y = -5;
                 star._x = Math.random() * containerWidth;
-                star.style.left = star._x + 'px';
             }
 
             star._y = y;
-            star.style.top = y + 'px';
         }
     }
 
@@ -3020,13 +3311,13 @@
         summonedEnemies = [];
         bossGenerators.forEach(g => { if(g.element && g.element.parentNode === gameContainer) gameContainer.removeChild(g.element); });
         bossGenerators = [];
-        activeTrails.forEach(t => { if(t.element && t.element.parentNode === gameContainer) gameContainer.removeChild(t.element); });
-        activeTrails.length = 0;
+        clearAllVFX();
         meteors.forEach(m => { if(m.element && m.element.parentNode === gameContainer) gameContainer.removeChild(m.element); });
         meteors = [];
 
         containerWidth = window.innerWidth || (gameContainer && gameContainer.offsetWidth) || 1920;
         containerHeight = window.innerHeight || (gameContainer && gameContainer.offsetHeight) || 1080;
+        resizeVfxCanvas();
         playerX = containerWidth / 2 - playerWidth / 2;
         playerY = containerHeight - playerHeight - 20;
         playerCurrentHP = playerMaxHP;
@@ -3103,6 +3394,7 @@
             updateStars();
             checkCollisions();
             updatePowerups();
+            updateAndRenderVFX();
             checkCriticalHealthAlert();
             gameLoopId = requestAnimationFrame(gameLoop);
         }
@@ -3537,6 +3829,12 @@
             maxHp: goliathMaxHP,
             x: goliathX,
             y: goliathY
+        }),
+        getVfxState: () => ({
+            activeParticles: activeVfxParticles.length,
+            activeShockwaves: activeShockwaves.length,
+            poolAvailable: vfxPool.length,
+            starsCount: stars.length
         }),
         fireBullet: () => {
             lastFireTime = 0;
