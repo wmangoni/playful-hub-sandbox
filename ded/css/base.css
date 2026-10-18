@@ -1,0 +1,70 @@
+/* ==========================================================================
+   Base da Ficha Iluminada: escala da tela, reset mínimo e utilitários.
+   Tudo em rem: 1rem = 16px em 1920x1080 e a tela inteira escala com a janela.
+   Rótulos pequenos têm piso em px para continuarem legíveis em 1366x768.
+
+   O reset vale só dentro da .folha (e o fundo, no body.ficha), com
+   especificidade zero. Desde a Fase 4 não há mais telas legadas: tudo o que
+   aparece é uma .folha (as telas e, por dentro, as janelas) ou uma peça do kit
+   com fonte e cor próprias (avisos e efeitos de tela).
+   ========================================================================== */
+
+html {
+    font-size: clamp(10px, min(0.8333vw, 1.4815vh), 18px);
+}
+
+:where(.folha, .folha *) { box-sizing: border-box; }
+/* pseudo-elementos não valem dentro de :where(), daí a regra à parte */
+:where(.folha) *::before, :where(.folha) *::after { box-sizing: border-box; }
+
+/* Página que é só a folha (protótipo, catálogo e, da Fase 2 em diante, o jogo) */
+.ficha {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--fundo);
+}
+
+.folha {
+    color: var(--tinta);
+    font-family: var(--fonte-texto);
+    font-size: 1rem;
+    -webkit-font-smoothing: antialiased;
+}
+
+:where(.folha) button { font: inherit; color: inherit; }
+
+/* Esconde de vez. Os filhos de .acoes são a exceção: lá, .hidden só deixa
+   invisível, sem mudar a altura (componentes.css) */
+.hidden:where(:not(.acoes > *)) { display: none !important; }
+
+/* Texto só para leitores de tela */
+.so-leitor {
+    position: absolute;
+    margin: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+:where(.folha) :focus-visible {
+    outline: 0.15rem solid var(--rubro);
+    outline-offset: 0.12rem;
+}
+
+/* Telas estreitas ou em retrato (celular e tablet, Fase 5): a escala deixa de
+   seguir a janela e segue a fonte que o usuário escolheu no navegador (93,75% dá
+   15 px no padrão de 16 px; com 20 px, dá 18,75). Os rótulos menores sobem para
+   12 px, o mínimo legível no celular.
+
+   Os limites das telas estreitas ficam em em, que nas media queries é a fonte do
+   navegador: no padrão, 68,6875em são os mesmos 1099 px; com uma fonte maior, a
+   folha que rola (e respeita a fonte) vale também em telas mais largas. A grade
+   do desktop, acima disso, cabe na janela e escala com ela, e por isso não segue
+   a fonte do navegador: maior, ela passaria da altura da tela (o zoom do
+   navegador funciona, e logo leva à folha que rola). */
+@media (max-width: 68.6875em), (orientation: portrait) {
+    html { font-size: 93.75%; }
+    :root { --rotulo-menor: max(0.8rem, 12px); }
+}

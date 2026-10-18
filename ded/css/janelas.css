@@ -1,0 +1,602 @@
+/* ==========================================================================
+   Janelas da Ficha Iluminada (Fase 4): o arranjo do que vai dentro de cada
+   <dialog class="janela"> do jogo. A moldura, o título, o fechar, o rodapé e o
+   aviso são peças de componentes.css; aqui fica só o que é de uma janela só
+   (a largura em --largura-janela e o miolo), cada uma sob o próprio id.
+   ========================================================================== */
+
+/* ---------- Loja ---------- */
+
+/* O ouro e a mochila ficam fixos no alto, as mercadorias rolam no corpo, e a
+   linha de status (o que a última compra fez) fica fixa embaixo, à vista */
+#loja { --largura-janela: 42rem; }
+#loja .janela-folha { grid-template-rows: auto auto minmax(0, 1fr) auto auto; row-gap: 0.9rem; }
+#loja .janela-status { margin-top: -0.3rem; }
+
+.loja-bolsa {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem 2.6rem;
+    margin: 0;
+    padding: 0.55rem 0;
+    border-block: var(--linha-pontilhada);
+}
+.loja-bolsa-item { display: flex; align-items: center; gap: 0.7rem; }
+.loja-bolsa dt {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font: var(--rotulo) var(--fonte-rotulo);
+    letter-spacing: 0.12em;
+    color: var(--sepia);
+}
+.loja-bolsa dd {
+    margin: 0;
+    font: 1.15rem/1 var(--fonte-texto);
+    color: var(--sepia);
+}
+.loja-bolsa dd .num { font-size: 1.6rem; line-height: 1; color: var(--tinta); }
+/* o ouro na moeda da ficha; a mochila num medalhão */
+.loja-bolsa-icone {
+    display: grid;
+    place-items: center;
+    width: 2.7rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/moeda.svg) center / contain no-repeat;
+}
+.loja-bolsa-icone svg { width: 1.3rem; height: 1.3rem; color: var(--tinta-2); }
+.loja-bolsa-item + .loja-bolsa-item .loja-bolsa-icone { background-image: url(../ui/ornamentos/medalhao.svg); }
+.loja-bolsa-cheia dd, .loja-bolsa-cheia dd .num { color: var(--rubro); }
+
+/* As mercadorias: a peça das ações do combate, com o ícone do item num medalhão
+   maior, o nome, a descrição embaixo e o preço à direita */
+#loja .escolha { grid-template-columns: 2.6rem minmax(0, 1fr) auto; padding-block: 0.5rem; }
+#loja .escolha-num { width: 2.5rem; height: 2.5rem; }
+#loja .acao-combate .escolha-num svg { width: 1.45rem; height: 1.45rem; }
+.loja-desc {
+    display: block;
+    font: italic max(0.98rem, 12.5px)/1.3 var(--fonte-texto);
+    color: var(--sepia);
+}
+#loja .acao-detalhe .num { font-size: 1.3rem; color: var(--tinta); }
+#loja .indisponivel .acao-detalhe .num { color: var(--rubro); }
+/* mochila cheia: todas indisponíveis, mas o preço não é o motivo e fica neutro */
+#loja .sem-espaco .acao-detalhe, #loja .sem-espaco .acao-detalhe .num { color: var(--apagado); }
+/* folga para o contorno do foco, que o corpo (com rolagem) recortaria */
+#loja .janela-corpo { padding: 0.25rem 0.3rem; }
+
+@media (max-width: 68.6875em), (orientation: portrait) {
+    /* o preço desce para baixo do nome (o "faltam X de ouro" não cabe ao lado); o
+       ouro e a mochila numa linha só */
+    #loja .escolha { grid-template-columns: 2.6rem minmax(0, 1fr); row-gap: 0.15rem; }
+    #loja .acao-detalhe { grid-column: 2; justify-self: start; }
+    .loja-bolsa { gap: 0.5rem 1.3rem; }
+    .loja-bolsa-item { gap: 0.5rem; }
+    .loja-bolsa dt { gap: 0.45rem; letter-spacing: 0.08em; }
+    .loja-bolsa-icone { width: 2.3rem; }
+    .loja-bolsa-icone svg { width: 1.15rem; height: 1.15rem; }
+}
+
+
+/* ---------- Especialização ---------- */
+
+/* Sem rodapé; fecha como as outras janelas, e o jogo fica em pausa até a escolha
+   (o aviso fixo no lugar das escolhas, em componentes.css). Duas opções lado a lado,
+   cada uma um card com moldura, como os da seleção do herói. */
+#especializacao { --largura-janela: 54rem; }
+#especializacao .janela-folha { grid-template-rows: auto minmax(0, 1fr); }
+
+/* As quatro linhas de cada opção (medalhão, nome, descrição e habilidades) são
+   as mesmas nas duas (subgrid): um nome em duas linhas ("Dançarino das Sombras")
+   não desalinha a descrição ao lado */
+.especializacao-opcoes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto 1fr auto;
+    gap: 0 1.6rem;
+    padding: 0.5rem; /* folga para o contorno do foco e a subida no hover, que o corpo recortaria */
+}
+.especializacao-opcao {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+    justify-items: center;
+    row-gap: 0.6rem;
+    padding: 1.2rem 1.2rem 1.3rem;
+    border: 0.7rem solid transparent;
+    border-image: url(../ui/ornamentos/moldura.svg) 40 / 2.5rem / 0 stretch;
+    background: rgba(255, 250, 236, 0.3);
+    background-clip: padding-box;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.especializacao-opcao:hover { transform: translateY(-0.2rem); }
+.especializacao-opcao:focus-visible { outline: 0.15rem solid var(--rubro); outline-offset: 0.3rem; }
+.especializacao-medalhao {
+    display: grid;
+    place-items: center;
+    width: 5.6rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.especializacao-medalhao svg { width: 2.8rem; height: 2.8rem; color: var(--tinta-2); transition: color 0.15s ease; }
+.especializacao-nome {
+    align-self: center; /* no meio da linha, quando o nome ao lado ocupa duas */
+    font: 700 2.15rem/1 var(--fonte-titulo);
+    color: var(--tinta);
+    transition: color 0.15s ease;
+}
+.especializacao-opcao:hover .especializacao-medalhao svg, .especializacao-opcao:focus-visible .especializacao-medalhao svg,
+.especializacao-opcao:hover .especializacao-nome, .especializacao-opcao:focus-visible .especializacao-nome { color: var(--rubro); }
+.especializacao-desc {
+    font: italic 1.12rem/1.35 var(--fonte-texto);
+    color: var(--sepia);
+    text-wrap: balance;
+}
+/* em cima na linha delas (a outra opção pode ter as pílulas em duas linhas) */
+.especializacao-habilidades {
+    display: flex;
+    flex-wrap: wrap;
+    align-self: start;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .especializacao-opcao:hover { transform: none; }
+}
+/* Celular: as duas opções empilhadas e mais baixas (no tablet, lado a lado) */
+@media (max-width: 43.6875em) {
+    /* folga de 0.6rem dos lados: o anel de foco (0.45rem) fica no pergaminho, e não na moldura da janela */
+    .especializacao-opcoes { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; padding: 0.4rem 0.6rem; }
+    .especializacao-opcao { row-gap: 0.45rem; padding: 0.9rem 0.9rem 1rem; }
+    .especializacao-opcao + .especializacao-opcao { margin-top: 0.9rem; }
+    .especializacao-medalhao { width: 4.2rem; }
+    .especializacao-medalhao svg { width: 2.1rem; height: 2.1rem; }
+    .especializacao-nome { font-size: 1.9rem; }
+}
+
+
+/* ---------- Diário ---------- */
+
+/* Em andamento e concluídas; cada missão com o ícone num medalhão (rubro quando
+   concluída, como a bolha da ficha), o título, a descrição, o progresso e a
+   recompensa em pílulas. No rodapé, o crédito dos ícones. */
+#diario { --largura-janela: 46rem; }
+
+.diario-secao + .diario-secao { margin-top: 1.1rem; }
+.diario-lista { display: grid; margin: 0; padding: 0; list-style: none; }
+.diario-missao {
+    display: grid;
+    grid-template-columns: 3.6rem minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+    padding: 0.75rem 0.3rem 0.85rem;
+    border-bottom: var(--linha-pontilhada);
+}
+.diario-missao:last-child { border-bottom: 0; }
+.diario-medalhao {
+    display: grid;
+    place-items: center;
+    width: 3.6rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/medalhao.svg) center / contain no-repeat;
+}
+.diario-medalhao svg { width: 1.8rem; height: 1.8rem; color: var(--tinta-2); }
+.diario-concluida .diario-medalhao { background-image: url(../ui/ornamentos/medalhao-rubro.svg); }
+.diario-concluida .diario-medalhao svg { color: var(--creme); }
+.diario-titulo {
+    margin: 0.15rem 0 0;
+    font: 700 1.5rem/1.1 var(--fonte-titulo);
+    font-variant-numeric: lining-nums;
+    color: var(--tinta);
+}
+.diario-desc {
+    margin: 0.3rem 0 0.35rem;
+    font: 1.08rem/1.4 var(--fonte-texto);
+    color: var(--tinta);
+}
+/* rótulo numa coluna fixa e o valor ao lado: as pílulas quebram dentro da coluna */
+.diario-linha {
+    display: grid;
+    grid-template-columns: 6.6rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.3rem 0.6rem;
+    margin: 0.35rem 0 0;
+}
+.diario-rotulo {
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.1em;
+    color: var(--sepia);
+}
+.diario-valor {
+    font: italic max(1rem, 12.5px)/1.35 var(--fonte-texto);
+    color: var(--sepia);
+}
+.diario-valor .num { font-style: normal; color: var(--tinta); }
+.diario-pilulas { display: flex; flex-wrap: wrap; gap: 0.35rem 0.4rem; }
+.diario-vazio {
+    margin: 0.1rem 0 0.4rem;
+    font: italic 1.05rem/1.4 var(--fonte-texto);
+    color: var(--apagado);
+    text-align: center;
+}
+/* Crédito dos ícones (o mesmo da seleção) */
+#diario .creditos {
+    margin: 0;
+    font: italic max(0.85rem, 11.5px)/1.4 var(--fonte-texto);
+    color: var(--apagado);
+    text-align: center;
+    text-wrap: balance;
+}
+#diario .creditos a { color: var(--sepia); white-space: nowrap; }
+#diario .creditos a:hover { color: var(--rubro); }
+
+@media (max-width: 68.6875em), (orientation: portrait) {
+    /* os links dos créditos com toque de 44 px, num ::after: com padding, o anel de foco
+       envolvia a caixa toda e cortava a linha de cima */
+    #diario .creditos a { position: relative; }
+    #diario .creditos a::after { content: ""; position: absolute; inset: -0.9rem 0; }
+}
+/* Celular: medalhão menor, e o rótulo de cada linha em cima do valor */
+@media (max-width: 43.6875em) {
+    .diario-missao { grid-template-columns: 2.8rem minmax(0, 1fr); gap: 0.7rem; padding-inline: 0; }
+    .diario-medalhao { width: 2.8rem; }
+    .diario-medalhao svg { width: 1.4rem; height: 1.4rem; }
+    .diario-titulo { font-size: 1.4rem; }
+    .diario-linha { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
+}
+
+
+/* ---------- Mapa ---------- */
+
+/* A carta da masmorra (#mapa): os caminhos num SVG só de traços e, por cima, os
+   lugares como botões posicionados em porcentagem pelo JS (atualizarMapa), com o
+   nome embaixo. O estado de cada lugar vem em data-estado (atual, visitado,
+   pode-ir, selado ou desconhecido), e a legenda usa as mesmas peças. Nada anima
+   na carta (ver "Você está aqui", abaixo). */
+#mapa { --largura-janela: 78rem; }
+/* abaixo da largura mínima da carta (celular), o corpo rola de lado */
+#mapa .janela-corpo { overflow-x: auto; padding: 0.35rem 0.25rem 0.5rem; }
+#mapa .janela-status { margin-top: -0.3rem; }
+
+.mapa-carta {
+    position: relative;
+    min-width: 50rem;
+    border: 0.1rem solid var(--sepia-claro);
+    border-radius: 0.3rem;
+    /* o pergaminho da carta, um tom abaixo do da janela, com a borda mais escura. Sem
+       gradiente radial: o primeiro desenho de um compila um pipeline da GPU (~40 ms) na
+       primeira vez que o mapa abre numa sessão do Chrome (TASK_001 §6) */
+    background: color-mix(in srgb, var(--pergaminho-2) 34%, transparent);
+    box-shadow: inset 0 0 0 0.28rem color-mix(in srgb, var(--pergaminho) 55%, transparent),
+        inset 0 0 0 0.36rem color-mix(in srgb, var(--sepia-claro) 45%, transparent);
+}
+
+/* Caminhos: o traço não escala com a carta (vector-effect) */
+.mapa-caminhos {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+.mapa-caminhos line {
+    fill: none;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+.mapa-caminhos .caminho-percorrido { stroke: var(--sepia); stroke-width: 0.2rem; }
+.mapa-caminhos .caminho-aberto { stroke: var(--sepia); stroke-width: 0.15rem; stroke-dasharray: 0.55rem 0.4rem; }
+.mapa-caminhos .caminho-desconhecido { stroke: var(--sepia-claro); stroke-width: 0.12rem; stroke-dasharray: 0.25rem 0.45rem; opacity: 0.6; }
+
+/* Lugares: o medalhão fica sobre o ponto (x, y) e o nome, embaixo dele */
+.mapa-nos { position: absolute; inset: 0; }
+.mapa-no {
+    position: absolute;
+    display: grid;
+    justify-items: center;
+    gap: 0.18rem;
+    width: max-content;
+    padding: 0;
+    border: 0;
+    background: none;
+    transform: translate(-50%, -1.25rem);
+    text-align: center;
+    cursor: default;
+}
+/* nome em cima do medalhão (onde embaixo ele bateria no do vizinho) */
+.mapa-no-acima { transform: translate(-50%, calc(-100% + 1.25rem)); }
+.mapa-no-acima .mapa-no-nome { order: -1; }
+.mapa-no-nome {
+    max-width: max(5.2rem, 66px);
+    padding: 0 0.28rem 0.06rem;
+    border-radius: 0.3rem;
+    background: color-mix(in srgb, var(--pergaminho) 78%, transparent);
+    font: 500 max(0.92rem, 12px) / 1.08 var(--fonte-texto);
+    color: var(--tinta-2);
+    text-wrap: balance;
+}
+
+/* O medalhão de cada estado (também na legenda) */
+.mapa-medalhao {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--medalhao-mapa, 2.5rem);
+    aspect-ratio: 1;
+    border: 0.14rem solid var(--sepia-claro);
+    border-radius: 50%;
+    background: var(--pergaminho);
+    color: var(--sepia);
+}
+.mapa-medalhao svg { width: 56%; height: 56%; }
+.mapa-medalhao[data-icone=""] svg { display: none; }
+[data-estado="atual"] > .mapa-medalhao {
+    border: 0;
+    background: url(../ui/ornamentos/medalhao-rubro.svg) center / contain no-repeat;
+    box-shadow: 0 0 0 0.1rem var(--tinta); /* o aro escuro da arte tem menos de 1 px */
+    color: var(--creme);
+}
+/* Cada estado se distingue por uma peça de 3:1 ou mais (Fase 5, contraste AA; medido em
+   todos os medalhões, contra o fundo em volta, por ded/tools/contraste.mjs): o visitado pela
+   borda de tinta e pelo miolo em bronze, que tem 3:1 contra o miolo claro do "não visitado"
+   e do "pode ir"; o "pode ir" pelo anel escuro de fora (depois da faixa de ouro); o não
+   visitado pela borda em sépia médio; o selado pela borda sépia e o cadeado; e o atual pelo
+   anel de tinta em volta da arte rubra */
+[data-estado="visitado"] > .mapa-medalhao {
+    border-color: var(--tinta-2);
+    background: var(--bronze);
+    color: var(--tinta);
+}
+[data-estado="pode-ir"] > .mapa-medalhao {
+    border: 0.2rem solid var(--ouro);
+    box-shadow: 0 0 0 0.1rem var(--anel-mapa, var(--tinta-2));
+    color: var(--tinta-2);
+}
+[data-estado="selado"] > .mapa-medalhao {
+    border-color: var(--sepia);
+    background: var(--pergaminho-2);
+    color: var(--rubro);
+}
+/* borda contínua, não tracejada (um círculo tracejado é rasterizado à parte e compilava
+   um pipeline da GPU na primeira vez que o mapa abria numa sessão), em sépia médio: o
+   sépia claro ficava abaixo de 3:1 nas manchas escuras da carta e no rodapé da legenda */
+[data-estado="desconhecido"] > .mapa-medalhao {
+    border-color: var(--sepia-medio);
+    background: color-mix(in srgb, var(--pergaminho) 70%, var(--pergaminho-2));
+    color: var(--sepia-claro);
+}
+.mapa-no[data-estado="atual"] .mapa-no-nome { font-weight: 700; color: var(--rubro); }
+.mapa-no[data-estado="visitado"] .mapa-no-nome,
+.mapa-no[data-estado="pode-ir"] .mapa-no-nome { color: var(--tinta); }
+.mapa-no[data-estado="selado"] .mapa-no-nome { color: var(--sepia); }
+.mapa-no[data-estado="desconhecido"] .mapa-no-nome { font-style: italic; color: var(--apagado); }
+
+/* Aonde dá para ir: cursor de clique e rubro no hover e no foco */
+.mapa-no:not([aria-disabled="true"]) { cursor: pointer; }
+.mapa-no:not([aria-disabled="true"]) > .mapa-medalhao,
+.mapa-no:not([aria-disabled="true"]) .mapa-no-nome { transition: border-color 0.15s ease, color 0.15s ease; }
+.mapa-no:not([aria-disabled="true"]):hover > .mapa-medalhao,
+.mapa-no:not([aria-disabled="true"]):focus-visible > .mapa-medalhao { border-color: var(--rubro); color: var(--rubro); }
+.mapa-no:not([aria-disabled="true"]):hover .mapa-no-nome,
+.mapa-no:not([aria-disabled="true"]):focus-visible .mapa-no-nome { color: var(--rubro); }
+.mapa-no:focus-visible { outline: 0.15rem solid transparent; } /* o anel de alto contraste (forced-colors) */
+.mapa-no:focus-visible > .mapa-medalhao { box-shadow: 0 0 0 0.15rem var(--rubro), 0 0 0 0.32rem var(--ouro), 0 0 0 0.44rem var(--tinta); }
+/* No meio da luta, do d20 ou da especialização, nada leva a lugar nenhum */
+.mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] > .mapa-medalhao { --anel-mapa: var(--sepia-claro); border-color: var(--pergaminho-3); }
+.mapa-carta[data-parado="true"] .mapa-no[data-estado="pode-ir"] .mapa-no-nome { color: var(--sepia); }
+
+/* Você está aqui: o medalhão rubro e o nome em rubro, sem animação. Um anel que
+   saía do medalhão na abertura (uma camada animada dentro da janela) fazia a GPU
+   desenhar a textura da folha por outro caminho, e a primeira abertura do mapa
+   numa sessão do Chrome compilava um pipeline (40 a 50 ms, TASK_001 §6) */
+
+/* Alavanca: uma insígnia no alto do medalhão, cheia quando puxada */
+.mapa-alavanca {
+    position: absolute;
+    top: -0.5rem;
+    left: calc(50% + 0.55rem);
+    display: grid;
+    place-items: center;
+    width: 1.45rem;
+    aspect-ratio: 1;
+    border: 0.1rem solid var(--sepia-claro); /* contínua: o tracejado compilava um pipeline */
+    border-radius: 50%;
+    background: var(--pergaminho);
+    color: var(--sepia);
+}
+.mapa-alavanca svg { width: 74%; height: 74%; }
+.mapa-alavanca[data-puxada="true"] {
+    border: 0.1rem solid var(--tinta-2);
+    background: var(--ouro);
+    color: var(--tinta);
+}
+
+/* Legenda */
+.mapa-legenda {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.06em;
+    color: var(--sepia);
+}
+.mapa-legenda li { display: flex; align-items: center; gap: 0.5rem; }
+.mapa-legenda .mapa-medalhao { --medalhao-mapa: 1.75rem; }
+.mapa-legenda .mapa-alavanca { position: static; }
+
+/* Tela estreita deitada (o celular deitado): a moldura fica mais justa, e a carta,
+   que precisa de 60rem para os nomes não baterem, rola de lado dentro da janela */
+@media (max-width: 68.6875em) and (orientation: landscape) {
+    #mapa .janela-folha { padding-inline: 1.3rem; }
+    .mapa-carta { min-width: 60rem; }
+    .mapa-no { min-width: 44px; } /* o toque: o lugar de nome curto ("Loja") tinha 37 px */
+}
+/* Em pé (celular e tablet): a carta deita, com a entrada no alto e a vitória
+   embaixo, na largura da janela; o corpo rola para baixo, e nada rola de lado.
+   Os lugares continuam onde o JS os põe (left e top em porcentagem da carta
+   deitada, e os caminhos no viewBox dela): a camada dos caminhos e a dos lugares
+   têm o tamanho da carta deitada (100cqh por 100cqw) e são transpostas
+   (matrix(0, 1, 1, 0, 0, 0) troca x por y), e cada lugar é transposto de volta,
+   em pé, com o medalhão no ponto e o nome embaixo. A altura é fixa em rem, e não
+   proporcional à largura: dois lugares seguidos na mesma linha (70 unidades da
+   carta) ficam sempre a ~73 px, mais que um lugar com o nome em duas linhas,
+   qualquer que seja a largura da tela. Nada disso anima. */
+@media (orientation: portrait) {
+    #mapa .janela-folha { padding-inline: 1rem; }
+    #mapa .janela-corpo { overflow-x: hidden; }
+    #mapa .mapa-carta {
+        container-type: size;
+        min-width: 0;
+        width: min(100%, 27rem);
+        height: 80rem; /* o aspect-ratio que o JS grava não vale com as duas medidas */
+        margin-inline: auto;
+    }
+    #mapa .mapa-caminhos,
+    #mapa .mapa-nos {
+        inset: 0 auto auto 0;
+        width: 100cqh;
+        height: 100cqw;
+        transform-origin: 0 0;
+        transform: matrix(0, 1, 1, 0, 0, 0);
+    }
+    #mapa .mapa-no {
+        min-width: 44px; /* o toque: o lugar de nome curto ("Loja") tinha 37 px */
+        transform-origin: 0 0;
+        transform: matrix(0, 1, 1, 0, 0, 0) translate(-50%, -1.25rem);
+    }
+    /* o nome sempre embaixo e um pouco mais estreito ("Porta Selada" em duas
+       linhas não bate no Mercador da Cripta, ao lado) */
+    #mapa .mapa-no-acima .mapa-no-nome { order: 0; }
+    #mapa .mapa-no-nome { max-width: 4.6rem; }
+}
+
+
+/* ---------- Fim da aventura ---------- */
+
+/* Abre sozinha num final (agendarFim no jogo). Em cima, o selo de cera com o
+   ícone do desfecho (louros na cera de ouro, lápide na cera escura), o título e a
+   mensagem; no corpo, o resumo da partida em quatro números; no rodapé, recomeçar
+   (a ação principal, com o foco) e rever a cena. data-desfecho="vitoria|derrota"
+   no <dialog> escolhe a cera e a cor do título. As peças levam o prefixo fim- e
+   valem também na amostra do catálogo. */
+#fim { --largura-janela: 44rem; }
+/* uma peça larga demais (a fita do recomeçar numa tela estreita) não alarga a janela */
+.fim-folha { grid-template-columns: minmax(0, 1fr); }
+.fim-cabeca {
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+    padding-top: 0.5rem;
+}
+.fim-selo {
+    display: grid;
+    place-items: center;
+    width: 7.2rem;
+    aspect-ratio: 1;
+    background: url(../ui/ornamentos/selo-cera-critico.svg) center / contain no-repeat;
+    color: #fbe7c4;
+    transform: rotate(-10deg); /* o mesmo ângulo dos selos carimbados */
+}
+.fim-selo svg {
+    width: 3.3rem;
+    height: 3.3rem;
+    transform: rotate(10deg); /* o ícone fica de pé */
+}
+[data-desfecho="derrota"] .fim-selo { background-image: url(../ui/ornamentos/selo-cera-escuro.svg); color: #e8d2c4; }
+/* carimbado ao abrir: só opacidade e transform, e nada fica preso numa camada
+   depois (backwards, e não both: o fim da animação é o próprio repouso) */
+dialog.janela[open] .fim-selo { animation: carimbar 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.12s backwards; }
+.fim-titulo {
+    margin: 0.35rem 0 0;
+    font: 700 2.75rem/1.05 var(--fonte-titulo);
+    font-variant-numeric: lining-nums;
+    color: var(--rubro);
+    text-align: center;
+    text-shadow: 0 0.07rem 0 rgba(255, 244, 220, 0.75);
+}
+[data-desfecho="derrota"] .fim-titulo { color: var(--tinta-2); }
+.fim-mensagem { max-width: 30rem; text-wrap: balance; }
+/* Resumo: quatro números lado a lado, separados por filetes pontilhados */
+.fim-resumo {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    padding: 0.2rem 0 0.1rem;
+}
+.fim-dado {
+    display: grid;
+    align-content: start;
+    justify-items: center;
+    gap: 0.15rem;
+    padding: 0.2rem 0.5rem;
+    border-left: var(--linha-pontilhada);
+    text-align: center;
+}
+.fim-dado:first-child { border-left: 0; }
+.fim-dado dt {
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    font: var(--rotulo-menor) var(--fonte-rotulo);
+    letter-spacing: 0.1em;
+    color: var(--sepia);
+}
+.fim-dado dt svg { width: 1.7rem; height: 1.7rem; color: var(--sepia); }
+.fim-dado dd { margin: 0; }
+.fim-valor {
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--tinta);
+    white-space: nowrap;
+}
+.fim-valor small { font: italic 0.5em var(--fonte-texto); color: var(--sepia); }
+.fim-valor small .num { font-style: normal; }
+.fim-detalhe {
+    font: italic max(0.95rem, 12.5px)/1.25 var(--fonte-texto);
+    color: var(--sepia);
+}
+.fim-detalhe .num { font-style: normal; color: var(--tinta-2); }
+
+@media (prefers-reduced-motion: reduce) {
+    dialog.janela[open] .fim-selo { animation: none; }
+}
+
+@media (max-width: 68.6875em), (orientation: portrait) {
+    /* o selo e o título menores, e a fita do recomeçar mais curta (rabos menores),
+       numa linha só e dentro da folha a 360 px */
+    .fim-folha { padding-inline: 1rem; }
+    .fim-cabeca { padding-top: 0.2rem; }
+    .fim-selo { width: 5.2rem; }
+    .fim-selo svg { width: 2.4rem; height: 2.4rem; }
+    .fim-titulo { font-size: 2.2rem; }
+    .fim-folha .janela-rodape { gap: 0.7rem 1rem; }
+    .fim-folha .janela-rodape .botao-fita {
+        height: 3.1rem;
+        border-width: 0 2.4rem;
+        border-image-width: 0 2.4rem;
+        padding: 0 0.4rem;
+        font-size: 1.1rem;
+        line-height: 2.7rem;
+    }
+}
+/* Celular: o resumo em duas colunas, com o ícone ao lado do rótulo, para caber sem
+   rolar a 360 px */
+@media (max-width: 37.4375em) {
+    .fim-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 0.7rem; }
+    .fim-dado:nth-child(odd) { border-left: 0; }
+    .fim-dado dt { grid-auto-flow: column; align-items: center; gap: 0.4rem; }
+    .fim-dado dt svg { width: 1.3rem; height: 1.3rem; }
+    .fim-valor { font-size: 2rem; }
+}
+
+
+/* ---------- Telas estreitas ou em retrato (refinado na Fase 5) ---------- */

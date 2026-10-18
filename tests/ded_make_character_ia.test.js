@@ -71,15 +71,15 @@ async function run() {
     };
     for (const l of amostra) assert.deepStrictEqual(registro(lutar(l, { A: eco, B: eco })), registro(lutar(l)), l.id);
     assert.ok(marcadas > 1000, `${marcadas} decisões conferidas`);
-    assert.strictEqual(parada, 11, 'as 11 decisões em que Helena fica parada');
+    assert.strictEqual(parada, 3, 'as decisões em que Helena fica parada (3.5)');
   });
 
   test('candidatas: todos os alvos; o que não depende do alvo e a área que pega os mesmos entram uma vez', () => {
-    // o clérigo 9 decide, com o mago ferido; os ogros começam juntos, então a Coluna de Chamas pega os três
-    const montar = ogros => {
+    // o clérigo 9 decide, com o mago ferido; os inimigos Médios começam juntos, então a Coluna de Chamas pega os três
+    const montar = inimigos => {
       const clerigo = montarPersonagem({ classe: 'clerigo', nivel: 9 }).ficha;
       const mago = montarPersonagem({ classe: 'mago', nivel: 9 }).ficha;
-      const b = C.createBattle({ ladoA: [clerigo, mago], ladoB: Array.from({ length: ogros }, () => ficha('ogro')), semente: 3, distancia: 9 });
+      const b = C.createBattle({ ladoA: [clerigo, mago], ladoB: Array.from({ length: inimigos }, () => ficha('carnical')), semente: 3, distancia: 9 });
       b.rodada = 1;
       b.get('A2').pv = 5; // abaixo da metade: o clérigo quer curar
       return b;
@@ -178,9 +178,16 @@ async function run() {
   };
 
   test('perfis: marcial só com armas; recursos com magias ou poderes ativos, pela ficha montada', () => {
-    const todos = [...cat.monstros, ...cat.holy_avenger].map(e => C.fromCatalog(e));
+    const legados = new Set([
+      'carnical', 'ogro', 'cubo-gelatinoso', 'urso-coruja', 'troll',
+      'arbusto-errante', 'medusa', 'behir', 'gigante-do-gelo', 'naga-guardia',
+      'elemental-do-fogo-anciao', 'verme-purpura', 'golem-de-ferro',
+      'dragao-vermelho-adulto', 'glabrezu', 'lorde-das-profundezas',
+      'dragao-azul-antigo', 'balor', 'dragao-de-prata-antigo', 'tarrasque'
+    ]);
+    const ref = [...cat.monstros.filter(e => legados.has(e.id)), ...cat.holy_avenger].map(e => C.fromCatalog(e));
     const contagem = { marcial: 0, recursos: 0 };
-    for (const f of todos) contagem[I.perfilDe(f)]++;
+    for (const f of ref) contagem[I.perfilDe(f)]++;
     // Zed tem uma magia só, sem mecânica (o motor não a conjura): luta como marcial
     assert.deepStrictEqual(contagem, { marcial: 36, recursos: 38 });
     assert.strictEqual(I.perfilDe(C.fromCatalog(cat.holy_avenger.find(e => e.id === 'ha-zed'))), 'marcial');
@@ -346,7 +353,7 @@ async function run() {
     const helena = b => b.combatentes.find(x => /Helena/.test(x.nome)).uid;
     const contar = (b, tipo, texto) => b.eventos.filter(e => e.ator === helena(b) && e.tipo === tipo && texto.test(e.texto)).length;
     const classica = lutar(l);
-    assert.ok(contar(classica, 'sem-acao', /não tem o que fazer/) >= 5, 'a clássica fica parada diante do Tarrasque');
+    assert.ok(contar(classica, 'sem-acao', /não tem o que fazer/) >= 2, 'a clássica fica parada diante do Tarrasque');
     const decisoes = [];
     let paradaComCandidatas = 0;
     const gostaDeEv = I.politicaRede({ recursos: I.criarRede(redeQueGosta('ev_log')), marcial: I.criarRede(redeQueGosta('ev_log')) }, { delta: 0, aoDecidir: d => decisoes.push(d) });
