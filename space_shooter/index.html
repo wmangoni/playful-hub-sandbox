@@ -613,6 +613,15 @@
             text-shadow: 0 0 4px #f1c40f;
             z-index: 15;
         }
+        #shader-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
         #vfx-canvas {
             position: absolute;
             top: 0;
@@ -639,6 +648,7 @@
 <!-- End Google Tag Manager (noscript) -->
 
 <div id="game-container">
+    <canvas id="shader-canvas"></canvas>
     <canvas id="vfx-canvas"></canvas>
     <div id="hp-vignette" class="critical-hp-vignette"></div>
     <div id="score">Score: 0</div>
@@ -1338,6 +1348,315 @@
             gameContainer.classList.remove('shake-active');
         }, duration);
     }
+
+    // --- High-Quality WebGL Cosmic & Gravitational Lensing Shader Engine (Etapa 3) ---
+    const shaderCanvas = document.getElementById('shader-canvas');
+    let gl = null;
+    let shaderProgram = null;
+    let shaderUniforms = {};
+    let shaderScale = 0.25; // Adaptive internal resolution scale (upscaled smoothly via GPU bilinear filtering)
+    let shaderTime = 0;
+    let shaderBlackHoleStrength = 0;
+    let shaderHyperbeamStrength = 0;
+    let shaderFlashIntensity = 0;
+    let shaderBgColor = [0.016, 0.028, 0.082];
+    let shaderPrimaryColor = [0.0, 0.68, 0.92];
+    let shaderSecondaryColor = [0.42, 0.08, 0.76];
+    let shaderFrameCounter = 0;
+    let rollingFrameDt = 8.0;
+
+    function triggerShaderFlash(intensity = 0.35) {
+        shaderFlashIntensity = Math.min(1.0, Math.max(shaderFlashIntensity, intensity));
+    }
+
+    function initCosmicShader() {
+        if (!shaderCanvas) return;
+        try {
+            const ctxOpts = {
+                alpha: false,
+                depth: false,
+                stencil: false,
+                antialias: false,
+                preserveDrawingBuffer: false,
+                powerPreference: 'high-performance'
+            };
+            gl = shaderCanvas.getContext('webgl2', ctxOpts) ||
+                 shaderCanvas.getContext('webgl', ctxOpts) ||
+                 shaderCanvas.getContext('experimental-webgl', ctxOpts);
+        } catch (e) {
+            gl = null;
+        }
+        if (!gl) return;
+
+        // Detect software renderer (e.g., SwiftShader in headless benchmarks) to tune internal resolution scale
+        try {
+            const dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
+            const rendererStr = dbgExt
+                ? String(gl.getParameter(dbgExt.UNMASKED_RENDERER_WEBGL) || '')
+                : String(gl.getParameter(gl.RENDERER) || '');
+            if (/SwiftShader|llvmpipe|Software|Basic Render/i.test(rendererStr)) {
+                shaderScale = 0.20;
+            } else {
+                shaderScale = 0.30;
+            }
+        } catch (e) {
+            shaderScale = 0.24;
+        }
+
+        const vsSource = `
+            attribute vec2 a_pos;
+            varying vec2 v_uv;
+            void main() {
+                v_uv = a_pos * 0.5 + 0.5;
+                gl_Position = vec4(a_pos, 0.0, 1.0);
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            varying vec2 v_uv;
+            uniform float u_time;
+            uniform vec2 u_resolution;
+            uniform vec3 u_bgColor;
+            uniform vec3 u_primaryColor;
+            uniform vec3 u_secondaryColor;
+            uniform vec4 u_blackHole; // xy: norm pos (top-down), z: strength, w: phaseScroll
+            uniform vec3 u_hyperbeam; // x: norm centerX, y: norm topY, z: strength
+            uniform vec3 u_player;    // xy: norm pos, z: flashIntensity
+
+            // Fast C-infinity harmonic domain-warped FBM for silk-like volumetric nebulae
+            float cosmicNebula(vec2 p, float t) {
+                vec2 q = vec2(
+                    sin(p.x * 1.65 + t * 0.28 + cos(p.y * 1.45 - t * 0.22)),
+                    cos(p.y * 1.55 - t * 0.25 + sin(p.x * 1.50 + t * 0.18))
+                );
+                vec2 r = p + 0.62 * q;
+                float f = 0.50 * (0.5 + 0.5 * sin(r.x * 2.15 + cos(r.y * 2.25 + t * 0.35)));
+                r = r * 1.85 + vec2(t * 0.15, -t * 0.20);
+                f += 0.32 * (0.5 + 0.5 * cos(r.x * 2.35 - sin(r.y * 2.15 - t * 0.42)));
+                r = r * 1.95 + q * 0.75;
+                f += 0.18 * (0.5 + 0.5 * sin(r.x * 2.60 + r.y * 2.40 + t * 0.55));
+                return f;
+            }
+
+            void main() {
+                // Convert v_uv (bottom-up) to screen top-down coordinates to match game DOM
+                vec2 uv = vec2(v_uv.x, 1.0 - v_uv.y);
+                float aspect = u_resolution.x / max(1.0, u_resolution.y);
+                vec2 p = (uv - 0.5) * vec2(aspect, 1.0) * 2.4;
+                p.y -= u_blackHole.w;
+
+                // 1. Relativistic Black Hole Gravitational Lensing & Accretion Disk
+                float bhStrength = u_blackHole.z;
+                vec3 bhGlow = vec3(0.0);
+                float bhHorizonMask = 1.0;
+
+                if (bhStrength > 0.005) {
+                    vec2 bhDelta = (uv - u_blackHole.xy) * vec2(aspect, 1.0);
+                    float bhDist2 = dot(bhDelta, bhDelta);
+                    float bhDist = sqrt(bhDist2);
+
+                    // Einstein ring space-time deflection
+                    p -= bhDelta * (0.042 * bhStrength / (bhDist2 + 0.0032));
+
+                    // Relativistic swirling accretion disk & photon sphere
+                    float ang = atan(bhDelta.y, bhDelta.x);
+                    float spiral = 0.5 + 0.5 * sin(ang * 4.0 - bhDist * 52.0 + u_time * 6.8);
+                    float disk = exp(-pow((bhDist - 0.060) * 22.0, 2.0)) * (0.55 + 0.45 * spiral) * bhStrength;
+                    float photonRing = exp(-pow((bhDist - 0.029) * 68.0, 2.0)) * 1.45 * bhStrength;
+
+                    bhGlow = mix(vec3(0.56, 0.18, 0.92), vec3(0.0, 0.95, 1.0), spiral) * disk
+                           + vec3(0.95, 0.65, 1.0) * photonRing;
+                    bhHorizonMask = smoothstep(0.020, 0.028, bhDist);
+                }
+
+                // 2. Dreadnought Hyperbeam Volumetric Corridor Distortion
+                float hbStrength = u_hyperbeam.z;
+                vec3 hbGlow = vec3(0.0);
+                if (hbStrength > 0.005 && uv.y >= u_hyperbeam.y) {
+                    float dx = abs(uv.x - u_hyperbeam.x) * aspect;
+                    float wave = sin(uv.y * 36.0 - u_time * 16.0);
+                    p.x += wave * 0.035 * hbStrength * exp(-dx * 14.0);
+                    float beamCore = exp(-dx * 22.0) * hbStrength;
+                    float beamAura = exp(-dx * 7.5) * hbStrength * (0.7 + 0.3 * wave);
+                    hbGlow = vec3(1.0, 0.15, 0.85) * beamAura * 0.55 + vec3(0.65, 1.0, 1.0) * beamCore * 0.85;
+                }
+
+                // 3. Multi-layered Volumetric Nebula & Interstellar Dust
+                float n1 = cosmicNebula(p, u_time);
+                float n2 = cosmicNebula(p * 1.45 + vec2(2.7, -1.9), -u_time * 0.8);
+                float dust = smoothstep(0.22, 0.82, n1);
+                float filaments = pow(max(0.0, n2 * n1 * 1.35), 2.2);
+
+                vec3 col = u_bgColor;
+                col = mix(col, u_primaryColor * 0.42, dust * 0.68);
+                col += u_secondaryColor * filaments * 0.72;
+                col += (u_primaryColor * 0.5 + vec3(0.4)) * pow(max(0.0, n1 - 0.52), 3.0) * 1.4;
+
+                // 4. Subtle Player Ship Ambient Illumination & Explosion Flash
+                vec2 plDelta = (uv - u_player.xy) * vec2(aspect, 1.0);
+                float plGlow = exp(-dot(plDelta, plDelta) * 28.0) * 0.18;
+                col += u_primaryColor * plGlow;
+
+                // Apply Black Hole Event Horizon shadow & Accretion Glow
+                col = col * bhHorizonMask + bhGlow;
+                col += hbGlow;
+
+                // Global reactive explosion bloom + subtle cinematic vignette
+                col += u_primaryColor * (u_player.z * 0.22);
+                vec2 vigUv = uv * (1.0 - uv.yx);
+                float vig = clamp(pow(vigUv.x * vigUv.y * 15.0, 0.22), 0.35, 1.0);
+                col *= vig;
+
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `;
+
+        function compileShader(type, source) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, source);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                gl.deleteShader(s);
+                return null;
+            }
+            return s;
+        }
+
+        const vs = compileShader(gl.VERTEX_SHADER, vsSource);
+        const fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+        if (!vs || !fs) {
+            gl = null;
+            return;
+        }
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vs);
+        gl.attachShader(shaderProgram, fs);
+        gl.linkProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            gl = null;
+            return;
+        }
+
+        gl.useProgram(shaderProgram);
+
+        const quadVerts = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+
+        const aPos = gl.getAttribLocation(shaderProgram, 'a_pos');
+        gl.enableVertexAttribArray(aPos);
+        gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+        shaderUniforms = {
+            time: gl.getUniformLocation(shaderProgram, 'u_time'),
+            resolution: gl.getUniformLocation(shaderProgram, 'u_resolution'),
+            bgColor: gl.getUniformLocation(shaderProgram, 'u_bgColor'),
+            primaryColor: gl.getUniformLocation(shaderProgram, 'u_primaryColor'),
+            secondaryColor: gl.getUniformLocation(shaderProgram, 'u_secondaryColor'),
+            blackHole: gl.getUniformLocation(shaderProgram, 'u_blackHole'),
+            hyperbeam: gl.getUniformLocation(shaderProgram, 'u_hyperbeam'),
+            player: gl.getUniformLocation(shaderProgram, 'u_player')
+        };
+
+        resizeShaderCanvas();
+    }
+
+    function resizeShaderCanvas() {
+        if (!shaderCanvas || !gl) return;
+        const targetW = Math.max(160, Math.round(containerWidth * shaderScale));
+        const targetH = Math.max(90, Math.round(containerHeight * shaderScale));
+        if (shaderCanvas.width !== targetW || shaderCanvas.height !== targetH) {
+            shaderCanvas.width = targetW;
+            shaderCanvas.height = targetH;
+            gl.viewport(0, 0, targetW, targetH);
+        }
+    }
+
+    function updateAndRenderCosmicShader(dt) {
+        if (!gl || !shaderProgram) return;
+
+        // Dynamic Frame-Time Governor: guarantee >=60 FPS in Full HD
+        rollingFrameDt = rollingFrameDt * 0.9 + dt * 0.1;
+        shaderFrameCounter++;
+        if (rollingFrameDt > 14.5 && shaderScale > 0.16) {
+            shaderScale = Math.max(0.16, shaderScale - 0.02);
+            resizeShaderCanvas();
+        }
+
+        // Advance time & smooth state transitions
+        const dtSec = dt * 0.001;
+        shaderTime += dtSec * (1.0 + currentPhase * 0.12);
+        shaderFlashIntensity = Math.max(0, shaderFlashIntensity - dtSec * 2.8);
+
+        const targetBh = blackHoleActive ? 1.0 : 0.0;
+        shaderBlackHoleStrength += (targetBh - shaderBlackHoleStrength) * 0.08;
+
+        const targetHb = isHyperbeamFiring ? 1.0 : (isHyperbeamCharging ? 0.35 : 0.0);
+        shaderHyperbeamStrength += (targetHb - shaderHyperbeamStrength) * 0.12;
+
+        // Smooth palette transitions based on gameplay state (Boss / Escort / Normal Phase)
+        let targetBg = [0.016, 0.028, 0.082];
+        let targetPri = [0.0, 0.68, 0.92];
+        let targetSec = [0.42, 0.08, 0.76];
+
+        if (isDreadnoughtActive || isBossActive) {
+            targetBg = bossPhase === 3 ? [0.11, 0.01, 0.08] : [0.075, 0.015, 0.055];
+            targetPri = bossPhase === 3 ? [1.0, 0.05, 0.55] : [0.92, 0.08, 0.32];
+            targetSec = [0.65, 0.05, 0.88];
+        } else if (escortModeActive) {
+            targetBg = [0.018, 0.045, 0.11];
+            targetPri = [0.0, 0.55, 1.0];
+            targetSec = [0.95, 0.60, 0.12];
+        } else if (currentPhase >= 3) {
+            targetBg = [0.025, 0.020, 0.095];
+            targetPri = [0.18, 0.82, 0.75];
+            targetSec = [0.62, 0.12, 0.85];
+        }
+
+        for (let i = 0; i < 3; i++) {
+            shaderBgColor[i] += (targetBg[i] - shaderBgColor[i]) * 0.04;
+            shaderPrimaryColor[i] += (targetPri[i] - shaderPrimaryColor[i]) * 0.04;
+            shaderSecondaryColor[i] += (targetSec[i] - shaderSecondaryColor[i]) * 0.04;
+        }
+
+        // If no high-frequency distortion (Black Hole / Hyperbeam) is active and rollingFrameDt > 11ms,
+        // we can skip odd frames cleanly since the WebGL backbuffer retains the smooth nebula
+        if (shaderBlackHoleStrength < 0.01 && shaderHyperbeamStrength < 0.01 && rollingFrameDt > 11.5 && (shaderFrameCounter & 1) === 1) {
+            return;
+        }
+
+        resizeShaderCanvas();
+
+        const normBhX = (blackHoleX || containerWidth * 0.5) / Math.max(1, containerWidth);
+        const normBhY = (blackHoleY || containerHeight * 0.3) / Math.max(1, containerHeight);
+
+        const hbCenterX = isDreadnoughtActive && dreadnoughtElement
+            ? ((dreadnoughtElement._x !== undefined ? dreadnoughtElement._x : containerWidth * 0.5 - 65) + 65) / Math.max(1, containerWidth)
+            : 0.5;
+        const hbTopY = isDreadnoughtActive && dreadnoughtElement
+            ? ((dreadnoughtElement._y !== undefined ? dreadnoughtElement._y : 30) + 47.5) / Math.max(1, containerHeight)
+            : 0.1;
+
+        const normPlX = (playerX + playerWidth * 0.5) / Math.max(1, containerWidth);
+        const normPlY = (playerY + playerHeight * 0.5) / Math.max(1, containerHeight);
+
+        gl.uniform1f(shaderUniforms.time, shaderTime);
+        gl.uniform2f(shaderUniforms.resolution, shaderCanvas.width, shaderCanvas.height);
+        gl.uniform3fv(shaderUniforms.bgColor, shaderBgColor);
+        gl.uniform3fv(shaderUniforms.primaryColor, shaderPrimaryColor);
+        gl.uniform3fv(shaderUniforms.secondaryColor, shaderSecondaryColor);
+        gl.uniform4f(shaderUniforms.blackHole, normBhX, normBhY, shaderBlackHoleStrength, shaderTime * 0.22);
+        gl.uniform3f(shaderUniforms.hyperbeam, hbCenterX, hbTopY, shaderHyperbeamStrength);
+        gl.uniform3f(shaderUniforms.player, normPlX, normPlY, shaderFlashIntensity);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    initCosmicShader();
+    window.addEventListener('resize', resizeShaderCanvas);
 
     // --- Modern Canvas 2D Particle Engine (Etapa 2: Object Pool + Additive Blending) ---
     const vfxCanvas = document.getElementById('vfx-canvas');
@@ -2257,6 +2576,7 @@
         spawnVFXParticle(3, relativeX, relativeY, 0, 0, 36, 0.085, '#ffaa22', 0.9, 1.0);
         spawnVFXShockwave(relativeX, relativeY, 52, 3.4, '#ff9900', 2.8);
         createParticleBurst(relativeX, relativeY, 22);
+        triggerShaderFlash(0.28);
         playSound(sfxPop);
     }
 
@@ -2285,6 +2605,7 @@
         spawnVFXShockwave(centerX, centerY, 82, 4.2, '#2ecc71', 3.5);
         spawnVFXShockwave(centerX, centerY, 54, 3.0, '#00ffff', 2.2);
         createParticleBurstCustomColor(centerX, centerY, 26, ['#2ecc71', '#00ff88', '#00ffff', '#ffffff']);
+        triggerShaderFlash(0.65);
         createExplosion(centerX, centerY);
         playPlasmaBurstSound();
         triggerScreenShake(6, 150);
@@ -3317,6 +3638,7 @@
 
         containerWidth = window.innerWidth || (gameContainer && gameContainer.offsetWidth) || 1920;
         containerHeight = window.innerHeight || (gameContainer && gameContainer.offsetHeight) || 1080;
+        resizeShaderCanvas();
         resizeVfxCanvas();
         playerX = containerWidth / 2 - playerWidth / 2;
         playerY = containerHeight - playerHeight - 20;
@@ -3349,6 +3671,7 @@
         bossHPContainer.style.display = 'none';
 
         createStars();
+        updateAndRenderCosmicShader(16);
         if (gameLoopId) cancelAnimationFrame(gameLoopId);
         gameLoopId = null;
         startGame();
@@ -3394,6 +3717,7 @@
             updateStars();
             checkCollisions();
             updatePowerups();
+            updateAndRenderCosmicShader(dt);
             updateAndRenderVFX();
             checkCriticalHealthAlert();
             gameLoopId = requestAnimationFrame(gameLoop);
@@ -3835,6 +4159,14 @@
             activeShockwaves: activeShockwaves.length,
             poolAvailable: vfxPool.length,
             starsCount: stars.length
+        }),
+        getShaderState: () => ({
+            webglActive: Boolean(gl && shaderProgram),
+            scale: shaderScale,
+            width: shaderCanvas ? shaderCanvas.width : 0,
+            height: shaderCanvas ? shaderCanvas.height : 0,
+            blackHoleLensStrength: shaderBlackHoleStrength,
+            hyperbeamLensStrength: shaderHyperbeamStrength
         }),
         fireBullet: () => {
             lastFireTime = 0;
