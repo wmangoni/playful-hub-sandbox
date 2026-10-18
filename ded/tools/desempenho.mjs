@@ -1,0 +1,1130 @@
+// Medição do tempo de quadro do ded (TASK_001 §6): nenhum quadro acima de
+// 20,8 ms (48 FPS) em Full HD com CPU 1x. A CPU 4x sai junto, só para informar.
+//
+//   node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]
+//                                 [--json saida.json] [--raiz <repo>] [--perfil <pasta>]
+//                                 [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]
+//                                 [--aquecimento janelas|d20|combate|nenhum]
+//
+// A aba de aquecimento joga o teste de d20 com o 20 natural (d20, o padrão). Com janelas, também passa
+// uma vez por cada janela e efeito da Fase 4 (o mapa, uma compra na loja, o diário, a especialização,
+// a barreira, a janela do fim e um aviso): serve para isolar o custo de toda vez. Com combate, o d20 e
+// uma luta vencida; com nenhum, só mede o intervalo de atualização, com a sessão fria.
+// O primeiro desenho de cada coisa nova numa sessão do Chrome compila pipelines da GPU (30 a 50 ms
+// cada, TASK_001 §6 e §7), e o jogador paga isso em toda sessão. Com o d20, a primeira execução de cada
+// cenário mede justamente essa primeira vez, e conta: um quadro com compilação no rastreio sai marcado
+// "compilação da GPU" e fica no veredito.
+// O rastreio de cada execução com um quadro acima do limite fica guardado em --rastreios (o padrão
+// é ded-desempenho-rastreios na pasta temporária do sistema), e o relatório diz o arquivo.
+//
+// Em CPU 1x, cada cenário roda --repeticoes vezes (10), cada vez numa aba nova; o primeiro clique
+// roda --execucoes vezes (30) e a abertura, uma. Em CPU 4x, que só informa, cada um roda uma vez.
+// Depois de carregar cada aba, a ferramenta espera 1,5 s antes de jogar (ASSENTAR_MS).
+//
+// Cenários (todos em CPU 1x; os marcados com * repetem em 4x):
+//   abertura          da carga da página até a seleção parada (2 s depois das fontes). Só informa:
+//                     é a pintura a frio e fica fora do veredito.
+//   abertura-save     a carga com um save (o guerreiro no corredor): o jogo abre direto na exploração e
+//                     digita a cena salva, sem a espera de assentar; até 3,5 s depois das fontes. Só
+//                     informa, como a abertura: é o único caminho em que a página joga logo na carga.
+//   exploracao *      selectCharacter + startGame e 3 s da cena inicial com a máquina de escrever
+//                     rodando (inclui a troca da seleção para a exploração e a chama do vitral).
+//   texto-longo *     loadScene da cena de texto mais longo do scenes.json e 4 s de máquina de escrever.
+//   teste-d20 *       na crypt, o clique no teste de Força (abre a bandeja), "Rolar" 300 ms depois e
+//                     3,4 s de giro, resultado, selo de cera e avanço automático para a próxima cena.
+//   critico-20 *      o mesmo, com o 20 natural forçado (Math.random = () => 0.96 durante a rolagem).
+//   critico-1 *       o mesmo, com o 1 natural forçado (Math.random = () => 0).
+//   combate-entrada * o caminho real até a luta: na sala do Goblin, a escolha de lutar abre a bandeja, o d20
+//                     rola e o botão vira "Enfrentar". Do clique nele até 2 s depois: a narrativa e a crônica
+//                     dão lugar ao painel de combate e ao relato, e as ações são montadas.
+//   combate *         guerreiro contra o Goblin, aberto com startInteractiveCombat 800 ms antes. Do clique
+//                     em "Ataque" até 6 s depois, a rodada inteira: o d20 (~1,3 s), o acerto (clarão e
+//                     barra do inimigo), o turno do inimigo (~2,8 s), o golpe dele (~4 s: tremor, clarão
+//                     vermelho e barra do jogador) e a volta da vez para o jogador (~5,5 s). O Math.random
+//                     depende só do turno: 0,8 no do jogador (17, acerto sem crítico; o Goblin fica com 2
+//                     de 12) e 0,96 no do inimigo (o 20 natural, que sempre acerta).
+//   combate-vitoria * o mesmo começo, com o Goblin em 1 de vida e o 20 natural forçado: 7,5 s do clique, com a
+//                     vitória (~2,8 s: selo, XP, ouro e o nível novo), a volta para uma cena (~5 s) e o
+//                     segundo seguinte, quando a GPU limpa o que o painel deixou.
+//   combate-derrota * o mesmo começo, com o jogador em 1 de vida: o ataque (0,2) não derruba o Goblin, ele
+//                     acerta o 20 natural (~4 s), vem a derrota (~5,5 s) e a cena da morte (~7,5 s); 9 s do clique.
+//   combate-fuga *    o mesmo começo, com "Fugir" e o 20 natural: a fuga dá certo (~1,3 s) e a cena anterior
+//                     volta (~3,1 s); 5,5 s do clique.
+//   mapa *            as janelas da Fase 4, cada uma num jogo novo de guerreiro na entrada. Do clique no selo
+//                     "Mapa" até 2 s depois: a janela entra (0,22 s), o anel de "você está aqui" sai (até ~1,1 s)
+//                     e, aos 1,2 s, o medalhão de fechar a tira (0,16 s).
+//   mapa-viajar *     com o mapa já aberto, o clique no Corredor Escuro: a janela fecha e a cena nova entra;
+//                     2,5 s do clique.
+//   loja *            a escolha "comprar suprimentos" da entrada: a cena nova e, um quadro depois, a janela da
+//                     loja; 2 s do clique.
+//   loja-comprar *    com a loja já aberta, o clique na tocha (2 de ouro): o ouro, a mochila e a linha de status
+//                     mudam; aos 0,6 s, o medalhão fecha a janela. 1,5 s do clique.
+//   diario *          o selo "Diário" e, aos 1,2 s, o medalhão; 2 s do clique.
+//   especializacao *  com 140 de XP, changeXP(20) leva ao nível 3: o número que sobe, o som e, dois quadros
+//                     depois, a janela; aos 1,5 s, o clique na primeira opção a fecha. 2,6 s.
+//   fim *             loadScene('death') com o texto pulado: a cena da morte e, ~1,25 s depois, a janela do fim
+//                     com o carimbo do selo (0,45 s); 3 s.
+//   aviso *           avisar() sem janela aberta: o aviso desce, fica ~5,1 s e some (0,3 s); 6,5 s.
+//   barreira *        loadScene('final_chamber_entrance') com as alavancas abaixadas: a barreira recusa a
+//                     passagem, com o clarão da barreira (0,7 s) e o aviso; 2 s.
+//   primeiro-clique   o aceite: --execucoes (30) rodadas, cada uma numa aba nova, com o save apagado e
+//                     jogo novo, do primeiro clique no teste até 1,8 s depois de rolar (a primeira vez
+//                     que a bandeja e a arte do dado aparecem naquela página).
+//
+// Cada cenário informa quadros, mediana, p95, p99, máximo, quantos passaram do limite, quantos
+// desses foram a limpeza ociosa da GPU (ver as armadilhas), o pior bloqueio do LoAF
+// (long-animation-frame; o Chrome só registra quadros acima de 50 ms) e em que momento começou o
+// pior quadro, contado da ação; com mais de uma execução, também o máximo de cada uma. A última
+// linha é APROVADO ou REPROVADO, só com os cenários de CPU 1x (fora a abertura), e diz quantos
+// quadros ficaram fora do veredito na limpeza da GPU; reprovado ou erro de medição saem com código 1.
+//
+// Do jogo, o script usa só a API estável: selectCharacter, startGame, loadScene, gameState, scenes,
+// skipTyping, ttsEnabled, .character-card[data-class], o primeiro <button> de #character-select (o
+// de começar), os <button> de #choices, #dice-container e #dice-button. O #dice e a
+// classe .rolling-animation entram apenas em conferências que viram aviso. No combate:
+// startInteractiveCombat, gameState.combat (active, turn, enemy.hp), gameState.player (health, xp) e
+// #btn-combat-attack e #btn-combat-flee; na entrada, scenes.goblin_encounter (a escolha com checkType
+// "combat") e o rótulo "Enfrentar" do #dice-button. As conferências do combate leem o gameState
+// depois da janela medida. Nas janelas: #btn-toggle-map, #quest-journal-button, os ids das janelas
+// (mapa, loja, diario, especializacao, fim) com o atributo open, o .janela-fechar de cada uma,
+// .mapa-no[data-estado="pode-ir"], os <button> de #loja-mercadorias, [data-especializacao], abrirLoja,
+// changeXP, avisar e gameState.player (gold, xp, specialization).
+//
+// Armadilhas da medição (aprendidas neste projeto):
+// - GPU de verdade, sem --disable-gpu. O Puppeteer abre o Chrome com o processo de GPU frio, que gera
+//   picos de 300 a 800 ms nos primeiros ~500 ms sem culpa da página. Por isso: perfil persistente
+//   (--perfil; o padrão fica na pasta temporária do sistema) e uma aba de aquecimento que joga uma
+//   vez e fecha. Cada medição é feita depois, numa aba nova do mesmo navegador.
+// - Chrome com janela (headless: false), para os quadros seguirem o vsync de uma tela de verdade, e
+//   viewport de 1920x1080. Num monitor de 144 Hz os quadros vêm em múltiplos de ~6,94 ms e 3 vsyncs
+//   (20,83 ms) é o máximo aceito. O timestamp do rAF oscila ~±0,5 ms em volta do vsync (aqui, quadros
+//   de 6,5 a 7,4 ms a 144 Hz): 3 vsyncs aparecem como até ~21,7 ms e 4 começam em ~26,9. A folga de
+//   1,5 ms (FOLGA_MS) separa os dois sem aceitar um vsync a mais em 60, 75, 100, 120, 144, 165 ou 240 Hz.
+//   O intervalo de atualização medido sai no relatório.
+// - A janela não pode ser minimizada: sem quadros, não há rAF. Coberta por outras janelas ela continua
+//   pintando (CalculateNativeWinOcclusion desligado), mas o ideal é deixá-la à vista e o PC quieto.
+//   Com alguém usando o PC, o Chrome chegou a passar baterias inteiras em meia taxa: a mediana dos
+//   quadros em 2 vsyncs (13,9 ms a 144 Hz), com a GPU parada fora delas, alternando entre uma bateria
+//   e a seguinte com o mesmo código e a mesma ferramenta. Os cenários do jogo têm mediana de 1 vsync.
+//   Uma execução em meia taxa (mediana de 1,8 intervalo de atualização ou mais) é refeita uma vez;
+//   se a segunda também sair assim, o veredito sai INVÁLIDO: o ambiente estava degradado.
+// - O ambiente tem ruído próprio. Na máquina do projeto (GTX 1660 SUPER, 144 Hz), uma página vazia
+//   só com um translateX teve uma parada de ~500 ms uns 120 s depois de o Chrome abrir, além de
+//   quadros soltos de 28 a 42 ms a cada ~30 s. Para separar página de ambiente, o relatório lista
+//   cada quadro acima do limite com o início contado da ação: os da página se repetem no mesmo
+//   momento do fluxo (no clique, na revelação); os do ambiente caem em qualquer lugar, com o LoAF
+//   sem script nem render. O JSON traz aposLancamentoMs de cada medição. Uma execução com um quadro
+//   acima de 100 ms em que o LoAF não tem script nem render (até 2 ms de script e 5 de render, o do
+//   próprio quadro) é refeita uma vez, com aviso no relatório.
+// - A limpeza ociosa da GPU. Cerca de 1 s depois de a página parar de rasterizar, o processo de GPU
+//   do Chrome (Graphite sobre Dawn/D3D11) roda GraphiteCacheController::ScheduleCleanUpAllResources
+//   e devolve ao driver as texturas que o compositor descartou. Nesta máquina essa tarefa leva de 30
+//   a 70 ms na thread principal da GPU, e o quadro que cai nela atrasa junto, sem nenhum trabalho da
+//   página naquele quadro. Ela só aparece quando a página fica parada mais de 1 s dentro da janela
+//   (a vitória do combate, entre o selo e a volta para a cena); o combate antigo não a mostrava porque
+//   repintava a tela em todo quadro. Por isso cada medição grava um rastreio leve (só as tarefas de
+//   cada thread e a marca da ação). Um quadro acima do limite sai da conta do veredito só quando as
+//   três coisas valem: a tarefa roda na thread principal da GPU (CrGpuMain) durante o quadro; o
+//   quadro, sem o trecho da tarefa que cai dentro dele, caberia no limite; e a thread principal da
+//   página trabalhou menos de 3 ms nesse intervalo. O relatório lista esses quadros à parte, com o
+//   trecho da tarefa e o trabalho da página, e o veredito diz quantos foram. A página influencia esse
+//   custo (ele cresce com as texturas descartadas), então uma aprovação que dependa dessa exclusão é
+//   decisão do dono do projeto. Se o Chrome mudar o nome da tarefa, os quadros voltam a contar contra
+//   a página. --sem-rastreio desliga o rastreio (para medir o custo dele): aí tudo conta.
+// - Tarefas do próprio Chrome na thread principal da página, reconhecidas pelo nome. Hoje, uma: o
+//   temporizador do "tempo até interativo" (InteractiveDetector, a tarefa postada por
+//   StartOrPostponeCITimer em interactive_detector.cc). Ele roda uma vez por carga, uns 5 s depois
+//   dela, sem script da página, e costuma levar 0,1 ms; em ~1% das cargas levou ~61 ms, e a ferramenta
+//   joga poucos segundos depois de abrir a aba (num jogo de verdade, a luta vem minutos depois). Um
+//   quadro acima do limite em que ela roda sai do veredito pela mesma regra da limpeza da GPU: sem o
+//   trecho dela, o quadro caberia no limite, e o resto do trabalho da página no quadro fica abaixo de
+//   3 ms. O relatório lista esses quadros à parte (coluna "Chr"), como numa captura de desempenho de
+//   um jogo, que separa o soluço da plataforma do custo do jogo sem escondê-lo. Decisão do dono do
+//   projeto (TASK_001 §7). Uma tarefa nova só entra em TAREFAS_DO_CHROME com o rastreio que a prove.
+// - Movimento padrão emulado (prefers-reduced-motion: no-preference). Com as animações do Windows
+//   desligadas, o Chrome pede movimento reduzido e o jogo pularia a máquina de escrever, o giro do
+//   d20 e a chama do vitral, que são justamente o que se quer medir. --movimento reduzido mede o outro caminho.
+// - O save (localStorage 'ded_save_v1') é apagado antes de cada página; com ele o jogo pularia a seleção.
+// - GTM, Google Analytics e os .mp3 bloqueados; os alert() dispensados; o áudio sintetizado toca, mudo.
+// - O tempo do quadro é a diferença entre os timestamps do rAF (mesma base do performance.now()), que
+//   caem no vsync. O performance.now() lido dentro do callback oscila alguns ms e daria falsos 21 ms.
+import { execFileSync } from 'node:child_process';
+import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import puppeteer from 'puppeteer';
+
+const RAIZ_PADRAO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+let MOVIMENTO = 'no-preference'; // prefers-reduced-motion emulado (--movimento reduzido troca para 'reduce')
+const PERFIL_PADRAO = path.join(os.tmpdir(), 'ded-desempenho-perfil');
+const LIMITE_MS = 1000 / 48;
+const FOLGA_MS = 1.5; // ruído do timestamp do rAF; ver o cabeçalho
+const CENARIOS = ['abertura', 'abertura-save', 'exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
+    'combate-vitoria', 'combate-derrota', 'combate-fuga', 'mapa', 'mapa-viajar', 'loja', 'loja-comprar', 'diario',
+    'especializacao', 'fim', 'aviso', 'barreira', 'primeiro-clique'];
+const EM_4X = new Set(['exploracao', 'texto-longo', 'teste-d20', 'critico-20', 'critico-1', 'combate-entrada', 'combate',
+    'combate-vitoria', 'combate-derrota', 'combate-fuga', 'mapa', 'mapa-viajar', 'loja', 'loja-comprar', 'diario',
+    'especializacao', 'fim', 'aviso', 'barreira']);
+// Janelas e avisos (Fase 4): o preparo fora da janela medida, a ação e, com depois, o fechamento
+// (pelo medalhão, ou pela escolha na especialização) depois ms depois da ação
+const JANELAS = {
+    mapa: { preparo: 'jogo', janela: 2000, depois: 1200 },
+    'mapa-viajar': { preparo: 'mapa', janela: 2500 },
+    loja: { preparo: 'jogo', janela: 2000 },
+    'loja-comprar': { preparo: 'loja', janela: 1500, depois: 600 },
+    diario: { preparo: 'jogo', janela: 2000, depois: 1200 },
+    especializacao: { preparo: 'jogo', janela: 2600, depois: 1500 },
+    fim: { preparo: 'jogo', janela: 3000 },
+    aviso: { preparo: 'jogo', janela: 6500 },
+    barreira: { preparo: 'jogo', janela: 2000 }
+};
+const SO_INFORMA = new Set(['abertura', 'abertura-save']);
+const FORCAR = { 'teste-d20': null, 'critico-20': 0.96, 'critico-1': 0 }; // floor(0,96 * 20) + 1 = 20
+// Combate: o desfecho esperado, a ação clicada, o Math.random no turno do jogador e no do
+// inimigo, as vidas antes do clique (null mantém a cheia) e a janela medida, contada do clique
+const COMBATE = {
+    combate: { tipo: 'rodada', acao: 'btn-combat-attack', jogador: 0.8, inimigo: 0.96, vidaInimigo: null, vidaJogador: null, janela: 6000 },
+    'combate-vitoria': { tipo: 'vitoria', acao: 'btn-combat-attack', jogador: 0.96, inimigo: 0.96, vidaInimigo: 1, vidaJogador: null, janela: 7500 },
+    'combate-derrota': { tipo: 'derrota', acao: 'btn-combat-attack', jogador: 0.2, inimigo: 0.96, vidaInimigo: null, vidaJogador: 1, janela: 9000 },
+    'combate-fuga': { tipo: 'fuga', acao: 'btn-combat-flee', jogador: 0.96, inimigo: 0.96, vidaInimigo: null, vidaJogador: null, janela: 5500 }
+};
+const GOBLIN = { name: 'Goblin', ac: 10, hp: 12, max_hp: 12, str: 10, dex: 10, con: 10, bba: 1 }; // o do scenes.json
+const BLOQUEIO = /googletagmanager|google-analytics|\.mp3(\?|$)/;
+const MIME = {
+    '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript',
+    '.svg': 'image/svg+xml', '.png': 'image/png', '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.webp': 'image/webp',
+    '.json': 'application/json', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg'
+};
+const espera = ms => new Promise(r => setTimeout(r, ms));
+// A aba nova assenta antes da ação. Cerca de 1 s depois da carga, o Chrome roda na thread principal
+// um desmonte (WidgetBase::Shutdown e ProxyMain::Stop, de 4 a 28 ms, mais uma tarefa na GPU),
+// provavelmente o do documento inicial da aba, trocado pela navegação. Sem a espera, ele caía no
+// meio da medição do d20 e do primeiro clique, por volta de +340 ms, em 24 de 25 execuções; com
+// ela, em 0 de 25. Um jogador leva mais que isso para escolher a classe (TASK_001 §6).
+const ASSENTAR_MS = 1500;
+const passou = d => d > LIMITE_MS + FOLGA_MS;
+const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU ou ao Chrome
+// Tarefas do Chrome na thread principal da página (ver as armadilhas): o arquivo e a função que as postam
+const TAREFAS_DO_CHROME = [
+    { arquivo: 'third_party/blink/renderer/core/loader/interactive_detector.cc', funcao: 'StartOrPostponeCITimer', nome: 'InteractiveDetector' }
+];
+let RASTREAR = true; // --sem-rastreio desliga
+let AQUECIMENTO = 'd20'; // --aquecimento
+let INTERVALO_MS = null; // o intervalo de atualização medido no aquecimento (para achar a meia taxa)
+let PASTA_RASTREIOS = path.join(os.tmpdir(), 'ded-desempenho-rastreios'); // --rastreios
+
+function servidor(raiz) {
+    return new Promise(resolve => {
+        const srv = http.createServer((req, res) => {
+            let p = decodeURIComponent(req.url.split('?')[0]);
+            if (p.endsWith('/')) p += 'index.html';
+            const arquivo = path.join(raiz, p);
+            if (!arquivo.startsWith(raiz)) { res.writeHead(403); return res.end(); }
+            fs.readFile(arquivo, (e, d) => {
+                if (e) { res.writeHead(404); return res.end(); }
+                res.writeHead(200, { 'Content-Type': MIME[path.extname(arquivo)] || 'application/octet-stream' });
+                res.end(d);
+            });
+        });
+        srv.listen(0, '127.0.0.1', () => resolve(srv));
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Dentro da página. Instalado antes dos scripts do jogo (evaluateOnNewDocument):
+// apaga o save e deixa window.__desempenho com iniciar/marcar/parar.
+function instalarMedidor(autoIniciar, save) {
+    if (window !== window.top) return;
+    try {
+        localStorage.clear();
+        if (save) localStorage.setItem('ded_save_v1', save); // a abertura com save
+    } catch { /* sem armazenamento */ }
+    const tipos = (window.PerformanceObserver && PerformanceObserver.supportedEntryTypes) || [];
+    const m = window.__desempenho = { loafSuportado: tipos.includes('long-animation-frame'), ativo: false };
+    let ultimo = null, observador = null, pronto = null;
+    const guardaLoaf = lista => { for (const e of lista) m.loaf.push(e); };
+    const passo = ts => {
+        if (!m.ativo) return;
+        if (ultimo !== null) { m.quadros.push(ts - ultimo); m.fins.push(ts); }
+        ultimo = ts;
+        if (pronto && m.quadros.length >= 2) { setTimeout(pronto, 0); pronto = null; }
+        requestAnimationFrame(passo);
+    };
+    // Resolve depois de dois quadros medidos: a ação só começa com o laço já rodando. A ação roda
+    // numa tarefa própria (setTimeout), como um clique de verdade; resolvida dentro do rAF, ela
+    // cairia no começo do quadro e o LoAF atribuiria o trabalho do jogo ao FrameRequestCallback.
+    m.iniciar = () => new Promise(ok => {
+        Object.assign(m, { quadros: [], fins: [], loaf: [], ativo: true, t0: performance.now(), tFim: Infinity });
+        m.tAcao = m.t0;
+        ultimo = null;
+        pronto = ok;
+        if (m.loafSuportado) {
+            observador?.disconnect();
+            observador = new PerformanceObserver(l => guardaLoaf(l.getEntries()));
+            observador.observe({ type: 'long-animation-frame', buffered: true });
+        }
+        requestAnimationFrame(passo);
+    });
+    m.marcar = () => { m.tAcao = performance.now(); performance.mark('desempenho:acao'); };
+    m.parar = async () => {
+        m.ativo = false;
+        m.tFim = performance.now();
+        await new Promise(r => setTimeout(r, 150)); // o LoAF chega depois do fim do quadro
+        if (observador) { guardaLoaf(observador.takeRecords()); observador.disconnect(); observador = null; }
+        const loaf = m.loaf.filter(e => e.startTime + e.duration >= m.t0 && e.startTime <= m.tFim).map(e => {
+            const fim = e.startTime + e.duration;
+            const scripts = e.scripts || [];
+            const maior = scripts.reduce((a, s) => (!a || s.duration > a.duration ? s : a), null);
+            return {
+                inicio: e.startTime - m.tAcao, duracao: e.duration, bloqueio: e.blockingDuration,
+                scripts: scripts.reduce((t, s) => t + s.duration, 0),
+                render: e.renderStart ? fim - e.renderStart : 0,
+                estiloLayout: e.styleAndLayoutStart ? fim - e.styleAndLayoutStart : 0,
+                fonte: maior ? `${[maior.invoker, maior.sourceFunctionName].filter(Boolean).join(' ')} (${Math.round(maior.duration)} ms)` : ''
+            };
+        });
+        return { quadros: m.quadros, fins: m.fins.map(f => f - m.tAcao), loaf, loafSuportado: m.loafSuportado, epoca: performance.timeOrigin + m.tAcao };
+    };
+    if (autoIniciar) m.iniciar();
+}
+
+// Dentro da página: o teste de Força da crypt. Clica na 2ª escolha (abre a bandeja),
+// rola rolarApos ms depois e mede até janela ms depois da rolagem.
+async function fluxoDado({ forcar, rolarApos, janela }) {
+    const m = window.__desempenho;
+    const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+    // Conferências só por classe e atributo: getClientRects() e getComputedStyle()
+    // forçariam estilo e layout dentro da janela medida, no quadro do clique.
+    const visivel = el => !!el && !el.hidden && !el.classList.contains('hidden');
+    const cenaAntes = gameState.currentScene;
+    const escolha = [...document.querySelectorAll('#choices button')][1];
+    if (!escolha) throw new Error(`#choices não tem o 2º botão (o teste de Força da ${cenaAntes})`);
+    await m.iniciar();
+    m.marcar();
+    escolha.click();
+    await dorme(rolarApos);
+    const rolar = document.getElementById('dice-button');
+    if (!visivel(document.getElementById('dice-container'))) throw new Error('a bandeja (#dice-container) não abriu com o clique no teste');
+    if (!rolar || rolar.disabled || rolar.getAttribute('aria-disabled') === 'true') throw new Error('#dice-button ausente ou desabilitado com a bandeja aberta');
+    const original = Math.random;
+    let comecou = false, resultado = null;
+    if (forcar !== null) Math.random = () => forcar;
+    try {
+        rolar.click();
+        await dorme(150);
+        comecou = rolar.disabled || rolar.getAttribute('aria-disabled') === 'true'
+            || !!document.getElementById('dice')?.classList.contains('rolling-animation');
+        await dorme(1350); // o giro dura 1,3 s: aqui o resultado já está no dado
+        resultado = document.getElementById('dice')?.textContent.trim() ?? null;
+        await dorme(janela - 1500);
+    } finally {
+        Math.random = original;
+    }
+    const r = await m.parar();
+    return { ...r, comecou, resultado, cenaAntes, cena: gameState.currentScene };
+}
+
+// Dentro da página: uma ação (ataque ou fuga) no combate já aberto, medida do clique até
+// janela ms depois. O Math.random forçado sai do turno (gameState.combat.turn), e não da ordem
+// das chamadas nem do tempo: o áudio também sorteia, e a animação do dado pode passar a sortear.
+// A ferramenta não confere nada dentro da janela: o estado do combate sai antes e depois dela.
+async function fluxoCombate({ acao, jogador, inimigo, vidaInimigo, vidaJogador, janela }) {
+    const m = window.__desempenho;
+    const c = gameState.combat;
+    if (!c || !c.active) throw new Error('startInteractiveCombat não abriu o combate (gameState.combat.active)');
+    if (c.turn !== 'player') throw new Error(`o combate abriu no turno "${c.turn}", e não no do jogador`);
+    const atacar = document.getElementById(acao);
+    if (!atacar || atacar.disabled || atacar.getAttribute('aria-disabled') === 'true') {
+        throw new Error(`#${acao} ausente ou desabilitado no turno do jogador`);
+    }
+    if (vidaInimigo !== null) c.enemy.hp = vidaInimigo;
+    if (vidaJogador !== null) { gameState.player.health = vidaJogador; updateStatsDisplay(); }
+    const retrato = () => ({
+        inimigo: gameState.combat.enemy.hp, jogador: gameState.player.health, xp: gameState.player.xp,
+        turno: gameState.combat.turn, ativo: gameState.combat.active
+    });
+    const antes = retrato();
+    const cenaAntes = gameState.currentScene;
+    const original = Math.random;
+    await m.iniciar();
+    m.marcar();
+    Math.random = () => (gameState.combat?.turn === 'enemy' ? inimigo : jogador);
+    try {
+        atacar.click();
+        await new Promise(ok => setTimeout(ok, janela));
+    } finally {
+        Math.random = original;
+    }
+    const r = await m.parar();
+    return { ...r, combate: { antes, depois: retrato() }, cenaAntes, cena: gameState.currentScene };
+}
+
+// ---------------------------------------------------------------------------
+// Uma aba nova do navegador aquecido, com o save apagado e o jogo pronto na seleção.
+async function abrirJogo(browser, base, cpu, reg, autoIniciar = false, save = null) {
+    const page = await browser.newPage();
+    await page.bringToFront();
+    page.on('dialog', d => d.dismiss().catch(() => {}));
+    page.on('pageerror', e => reg.avisos.push(`erro na página: ${e.message}`));
+    page.on('response', r => { if (r.status() >= 400 && !r.url().endsWith('favicon.ico')) reg.avisos.push(`${r.status()} ${r.url()}`); });
+    await page.setRequestInterception(true);
+    page.on('request', r => (BLOQUEIO.test(r.url()) ? r.abort() : r.continue()));
+    await page.evaluateOnNewDocument(instalarMedidor, autoIniciar, save);
+    // O padrão é medir o movimento completo: com as animações do Windows desligadas,
+    // o Chrome informa prefers-reduced-motion e o jogo pularia a máquina de escrever,
+    // o giro do d20 e a chama do vitral. --movimento reduzido mede o outro caminho.
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: MOVIMENTO }]);
+    await page.emulateCPUThrottling(cpu === 1 ? null : cpu); // Emulation.setCPUThrottlingRate
+    await page.goto(base + '/ded/', { waitUntil: 'domcontentloaded' });
+    try {
+        await page.waitForFunction(() => typeof scenes === 'object' && scenes && Object.keys(scenes).length > 50, { timeout: 30000 });
+    } catch {
+        throw new Error('as cenas (scenes) não carregaram em 30 s');
+    }
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => { ttsEnabled = false; });
+    if (!autoIniciar) await espera(ASSENTAR_MS); // a abertura mede justamente a carga
+    return page;
+}
+
+// Pula a máquina de escrever até as escolhas aparecerem; depois espera as imagens.
+async function prontoParaEscolher(page) {
+    try {
+        await page.waitForFunction(() => {
+            const b = [...document.querySelectorAll('#choices button')];
+            const prontas = b.length >= 2 && b.every(x => !x.disabled);
+            if (!prontas) skipTyping = true;
+            return prontas;
+        }, { timeout: 15000, polling: 50 });
+    } catch {
+        throw new Error('as escolhas (#choices button) não apareceram em 15 s');
+    }
+    await page.waitForFunction(() => [...document.images].every(i => i.complete), { timeout: 5000 }).catch(() => {});
+}
+
+// Começa como um jogador, com cliques de verdade no card e no botão de começar (o
+// primeiro <button> da seleção). A primeira interação da página liga o Web Audio e
+// a voz (~10 ms de script); no jogo isso acontece na seleção, não no teste de dado.
+async function novoJogo(page) {
+    await page.click('.character-card[data-class="warrior"]');
+    await page.click('#character-select button');
+    await prontoParaEscolher(page);
+}
+
+async function naCripta(page) {
+    await novoJogo(page);
+    await page.evaluate(() => loadScene('crypt'));
+    await prontoParaEscolher(page);
+    await espera(400);
+}
+
+// Dentro da página: o "Enfrentar" da bandeja (o teste de combate já rolado) abre o combate.
+// Mede do clique até janela ms depois.
+async function fluxoEntrada({ janela }) {
+    const m = window.__desempenho;
+    const botao = document.getElementById('dice-button');
+    if (!botao || !/Enfrentar/.test(botao.textContent)) throw new Error(`o #dice-button não ofereceu "Enfrentar" (diz "${botao && botao.textContent}")`);
+    await m.iniciar();
+    m.marcar();
+    botao.click();
+    await new Promise(ok => setTimeout(ok, janela));
+    const r = await m.parar();
+    return { ...r, combate: { ativo: !!(gameState.combat && gameState.combat.active) } };
+}
+
+// Dentro da página: as janelas da Fase 4 e os avisos (ver JANELAS e o cabeçalho). A ação é um clique
+// (como o de um jogador) ou a função que o jogo chama; as conferências só leem atributos e o gameState.
+async function fluxoJanela({ tipo, janela, depois }) {
+    const m = window.__desempenho;
+    const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+    const antes = { cena: gameState.currentScene, ouro: gameState.player.gold };
+    const ids = { mapa: 'mapa', loja: 'loja', 'loja-comprar': 'loja', diario: 'diario', especializacao: 'especializacao', fim: 'fim' };
+    let alvo = null;
+    if (tipo === 'mapa-viajar') {
+        alvo = document.querySelector('#mapa .mapa-no[data-no="corridor"][data-estado="pode-ir"]:not([aria-disabled="true"])');
+        if (!alvo) throw new Error('o mapa aberto na entrada não ofereceu o Corredor Escuro');
+    } else if (tipo === 'loja') {
+        const i = scenes[gameState.currentScene].choices.findIndex(c => c.nextScene === 'buy_supplies');
+        alvo = [...document.querySelectorAll('#choices button')][i];
+        if (!alvo) throw new Error(`a cena "${gameState.currentScene}" não tem a escolha que leva à loja`);
+    } else if (tipo === 'loja-comprar') {
+        alvo = [...document.querySelectorAll('#loja-mercadorias button')].pop();
+        if (!alvo) throw new Error('a loja não tem mercadorias');
+    }
+    if (tipo === 'especializacao') { gameState.player.xp = 140; gameState.player.level = 2; }
+    await m.iniciar();
+    m.marcar();
+    if (tipo === 'mapa') document.getElementById('btn-toggle-map').click();
+    else if (tipo === 'diario') document.getElementById('quest-journal-button').click();
+    else if (tipo === 'especializacao') changeXP(20);
+    else if (tipo === 'fim') { loadScene('death'); skipTyping = true; }
+    else if (tipo === 'aviso') avisar('Mochila cheia! Consuma uma poção para liberar espaço.', { tom: 'falha', icone: 'i-mochila' });
+    else if (tipo === 'barreira') loadScene('final_chamber_entrance');
+    else alvo.click();
+    let aberta = null;
+    if (depois) {
+        await dorme(depois);
+        const id = ids[tipo];
+        aberta = !!document.getElementById(id)?.open;
+        if (tipo === 'especializacao') document.querySelector('#especializacao [data-especializacao]')?.click();
+        else document.querySelector(`#${id} .janela-fechar`)?.click();
+        await dorme(janela - depois);
+    } else {
+        await dorme(janela);
+    }
+    const r = await m.parar();
+    const abertas = [...document.querySelectorAll('dialog.janela[open]')].map(d => d.id);
+    return {
+        ...r, cenaAntes: antes.cena, cena: gameState.currentScene,
+        resultado: JSON.stringify({ aberta, abertas, ouro: [antes.ouro, gameState.player.gold], especializacao: gameState.player.specialization || null })
+    };
+}
+
+// Rastreio leve da janela medida: as tarefas de cada thread ('toplevel') e a marca da ação, de onde
+// saem as limpezas ociosas da GPU e o trabalho da thread principal da página (ver as armadilhas),
+// em ms contados da ação.
+async function comRastreio(page, executar) {
+    if (!RASTREAR) return Object.assign(await executar(), { limpezas: null, trabalho: null, compilacoes: null, paradas: null, chrome: null });
+    const arq = path.join(os.tmpdir(), `ded-desempenho-${process.pid}-${Date.now()}.json`);
+    await page.tracing.start({ path: arq, categories: ['toplevel', 'blink.user_timing'] });
+    let r;
+    try {
+        r = await executar();
+    } finally {
+        await page.tracing.stop().catch(() => {});
+    }
+    Object.assign(r, lerRastreio(arq));
+    // o rastreio de uma execução que passou do limite fica guardado, para achar a causa
+    if (r.quadros.some(passou)) {
+        fs.mkdirSync(PASTA_RASTREIOS, { recursive: true });
+        r.rastreioGuardado = path.join(PASTA_RASTREIOS, path.basename(arq));
+        fs.copyFileSync(arq, r.rastreioGuardado);
+    }
+    fs.rmSync(arq, { force: true });
+    return r;
+}
+
+function lerRastreio(arq) {
+    let eventos;
+    const vazio = { limpezas: null, trabalho: null, compilacoes: null, paradas: null, chrome: null };
+    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return vazio; }
+    const marca = eventos.find(e => e.name === 'desempenho:acao');
+    if (!marca) return vazio;
+    const threads = new Map();
+    for (const e of eventos) if (e.name === 'thread_name') threads.set(`${e.pid}:${e.tid}`, e.args && e.args.name);
+    const ms = ts => (ts - marca.ts) / 1000;
+    const tarefas = eventos.filter(e => e.ph === 'X' && e.name === 'ThreadControllerImpl::RunTask');
+    const naGpu = e => threads.get(`${e.pid}:${e.tid}`) === 'CrGpuMain';
+    return {
+        limpezas: tarefas.filter(e => e.dur >= 5000 && e.args?.src_func === 'ScheduleCleanUpAllResources' && naGpu(e))
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        // A compilação de um pipeline da GPU (o Dawn compila num worker, e a thread da GPU espera)
+        compilacoes: eventos.filter(e => e.ph === 'X' && e.name === 'DawnPlatformImpl::RunWorkerTask' && e.dur >= 5000)
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        // A parada do ambiente, pelo nome: GpuServiceImpl::GetDawnInfo na thread principal da GPU
+        paradas: tarefas.filter(e => e.dur >= 50000 && e.args?.src_func === 'GetDawnInfo' && naGpu(e))
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
+        // a thread principal da página é a da marca
+        trabalho: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100).map(e => [ms(e.ts), ms(e.ts + e.dur)]),
+        // as tarefas do Chrome nela, pelo nome
+        chrome: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100 &&
+            TAREFAS_DO_CHROME.some(t => e.args?.src_file === t.arquivo && e.args?.src_func === t.funcao))
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000, nome: TAREFAS_DO_CHROME.find(t => e.args.src_func === t.funcao).nome }))
+    };
+}
+
+// Um quadro acima do limite é da limpeza ociosa da GPU quando a tarefa roda durante ele, quando
+// ele caberia no limite sem o trecho dela que cai dentro do quadro e quando a página quase não
+// trabalhou nesse intervalo (menos de TRABALHO_MAX_MS na thread principal).
+const sobreposicao = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+const intervalo = (e, i) => [e.fins[i] - e.quadros[i], e.fins[i]];
+function trechoDaLimpeza(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return Math.max(0, ...(e.limpezas || []).map(l => sobreposicao(inicio, fim, l.inicio, l.inicio + l.duracao)));
+}
+function trabalhoDaPagina(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return (e.trabalho || []).reduce((t, [a, b]) => t + sobreposicao(inicio, fim, a, b), 0);
+}
+function daLimpeza(e, i) {
+    if (!passou(e.quadros[i]) || !e.limpezas || !e.trabalho) return false;
+    const trecho = trechoDaLimpeza(e, i);
+    return trecho > 0 && e.quadros[i] - trecho <= LIMITE_MS + FOLGA_MS && trabalhoDaPagina(e, i) < TRABALHO_MAX_MS;
+}
+// Um quadro acima do limite é de uma tarefa do Chrome (TAREFAS_DO_CHROME) pela mesma regra: ela roda
+// durante ele, ele caberia no limite sem o trecho dela, e o resto do trabalho da página no quadro
+// (o trabalho menos o trecho da tarefa, que roda na mesma thread) fica abaixo de TRABALHO_MAX_MS.
+function trechoDoChrome(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return (e.chrome || []).reduce((t, c) => t + sobreposicao(inicio, fim, c.inicio, c.inicio + c.duracao), 0);
+}
+function doChrome(e, i) {
+    if (!passou(e.quadros[i]) || !e.chrome || !e.trabalho || daLimpeza(e, i)) return false;
+    const trecho = trechoDoChrome(e, i);
+    return trecho > 0 && e.quadros[i] - trecho <= LIMITE_MS + FOLGA_MS && trabalhoDaPagina(e, i) - trecho < TRABALHO_MAX_MS;
+}
+const daPagina = (e, i) => passou(e.quadros[i]) && !daLimpeza(e, i) && !doChrome(e, i);
+// Um quadro em que o Dawn compilava um pipeline (é custo de primeira vez, e conta contra a página)
+function comCompilacao(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return (e.compilacoes || []).some(c => sobreposicao(inicio - 30, fim, c.inicio, c.inicio + c.duracao) > 0);
+}
+
+async function cenarioAbertura(browser, base, cpu, reg) {
+    const page = await abrirJogo(browser, base, cpu, reg, true);
+    try {
+        await espera(2000);
+        reg.execucoes.push(await page.evaluate(() => window.__desempenho.parar()));
+    } finally { await page.close().catch(() => {}); }
+}
+
+// O save de um guerreiro no corredor, feito por uma partida de verdade numa aba à parte
+async function fazerSave(browser, base, reg) {
+    const page = await abrirJogo(browser, base, 1, reg);
+    try {
+        await novoJogo(page);
+        await page.evaluate(() => loadScene('corridor'));
+        await prontoParaEscolher(page);
+        return await page.evaluate(() => { saveGame(); return localStorage.getItem('ded_save_v1'); });
+    } finally { await page.close().catch(() => {}); }
+}
+
+async function cenarioAberturaSave(browser, base, cpu, reg) {
+    const save = await fazerSave(browser, base, reg);
+    if (!save) throw new Error('o jogo não gravou o save (ded_save_v1)');
+    const page = await abrirJogo(browser, base, cpu, reg, true, save);
+    try {
+        await espera(3500);
+        const r = await page.evaluate(async () => ({ ...(await window.__desempenho.parar()), cena: gameState.currentScene }));
+        if (r.cena !== 'corridor') reg.avisos.push(`a abertura com save parou na cena "${r.cena}", e não no corredor`);
+        reg.execucoes.push(r);
+    } finally { await page.close().catch(() => {}); }
+}
+
+async function cenarioExploracao(browser, base, cpu, reg) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await espera(1000); // seleção parada
+        const r = await comRastreio(page, () => page.evaluate(async janela => {
+            const m = window.__desempenho;
+            await m.iniciar();
+            m.marcar();
+            selectCharacter('warrior');
+            startGame();
+            await new Promise(ok => setTimeout(ok, janela));
+            return { ...(await m.parar()), cena: gameState.currentScene };
+        }, 3000));
+        if (r.cena !== 'start') reg.avisos.push(`startGame() deixou o jogo em "${r.cena}", não em "start"`);
+        reg.execucoes.push(r);
+    } finally { await page.close().catch(() => {}); }
+}
+
+async function cenarioTextoLongo(browser, base, cpu, reg) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await novoJogo(page);
+        await espera(400);
+        const alvo = await page.evaluate(() => {
+            const [id, s] = Object.entries(scenes).filter(([, c]) => c && typeof c.text === 'string')
+                .reduce((a, b) => (b[1].text.length > a[1].text.length ? b : a));
+            return { id, tamanho: s.text.length };
+        });
+        reg.nota = `cena ${alvo.id} (${alvo.tamanho} caracteres)`;
+        const r = await comRastreio(page, () => page.evaluate(async ({ id, janela }) => {
+            const m = window.__desempenho;
+            await m.iniciar();
+            m.marcar();
+            loadScene(id);
+            await new Promise(ok => setTimeout(ok, janela));
+            return { ...(await m.parar()), cena: gameState.currentScene };
+        }, { id: alvo.id, janela: 4000 }));
+        if (r.cena !== alvo.id) throw new Error(`loadScene('${alvo.id}') não entrou na cena (ficou em "${r.cena}")`);
+        reg.execucoes.push(r);
+    } finally { await page.close().catch(() => {}); }
+}
+
+// teste-d20, critico-20, critico-1 e cada rodada do primeiro-clique.
+async function cenarioDado(browser, base, cpu, reg, forcar, janela) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await naCripta(page);
+        const r = await comRastreio(page, () => page.evaluate(fluxoDado, { forcar, rolarApos: 300, janela }));
+        if (!r.comecou && r.cena === r.cenaAntes) throw new Error('o clique em #dice-button não rolou o dado');
+        if (forcar !== null) {
+            const n = forcar === 0 ? 1 : 20;
+            if (r.resultado === null) reg.avisos.push('não deu para ler o resultado no #dice');
+            else if (!new RegExp(`(^|\\D)${n}(\\D|$)`).test(r.resultado)) reg.avisos.push(`o #dice mostrou "${r.resultado}", e o forçado era ${n}`);
+        }
+        if (janela >= 3400 && r.cena === r.cenaAntes) reg.avisos.push(`a cena não saiu de "${r.cenaAntes}" sozinha depois do dado (há um "Continuar"?)`);
+        reg.execucoes.push(r);
+        return r;
+    } finally { await page.close().catch(() => {}); }
+}
+
+// combate-entrada: na sala do Goblin, a escolha de lutar, o d20 e o "Enfrentar", que é clicado
+// depois da pausa de ativação (o avanço sozinho viria em 1,8 s).
+async function cenarioEntrada(browser, base, cpu, reg) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await novoJogo(page);
+        await page.evaluate(() => loadScene('goblin_encounter'));
+        await prontoParaEscolher(page);
+        await espera(400);
+        await page.evaluate(() => {
+            const i = scenes.goblin_encounter.choices.findIndex(c => c.checkType === 'combat');
+            if (i < 0) throw new Error('goblin_encounter não tem a escolha de combate (checkType "combat")');
+            [...document.querySelectorAll('#choices button')][i].click();
+        });
+        await espera(400);
+        await page.evaluate(() => document.getElementById('dice-button').click());
+        await page.waitForFunction(() => /Enfrentar/.test(document.getElementById('dice-button').textContent), { timeout: 5000 })
+            .catch(() => { throw new Error('o d20 do teste de combate não ofereceu "Enfrentar" em 5 s'); });
+        await espera(400);
+        const r = await comRastreio(page, () => page.evaluate(fluxoEntrada, { janela: 2000 }));
+        if (!r.combate.ativo) reg.avisos.push('o "Enfrentar" não abriu o combate');
+        reg.execucoes.push(r);
+        return r;
+    } finally { await page.close().catch(() => {}); }
+}
+
+// As janelas e os avisos: jogo novo de guerreiro na entrada; o mapa ou a loja já abertos, quando o
+// cenário começa com eles. As conferências viram aviso.
+async function cenarioJanela(browser, base, cpu, reg, cenario, { preparo, janela, depois }) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await novoJogo(page);
+        await espera(400);
+        if (preparo === 'mapa') {
+            await page.evaluate(() => document.getElementById('btn-toggle-map').click());
+            await page.waitForFunction(() => document.getElementById('mapa')?.open, { timeout: 5000 })
+                .catch(() => { throw new Error('o selo "Mapa" não abriu a janela #mapa em 5 s'); });
+            await espera(1200);
+        } else if (preparo === 'loja') {
+            await page.evaluate(() => loadScene('buy_supplies'));
+            await page.waitForFunction(() => document.getElementById('loja')?.open, { timeout: 5000 })
+                .catch(() => { throw new Error('a cena buy_supplies não abriu a janela #loja em 5 s'); });
+            await espera(1000);
+        }
+        const r = await comRastreio(page, () => page.evaluate(fluxoJanela, { tipo: cenario, janela, depois }));
+        const x = JSON.parse(r.resultado);
+        const confere = {
+            mapa: () => x.aberta && !x.abertas.length,
+            'mapa-viajar': () => r.cena !== r.cenaAntes && !x.abertas.length,
+            loja: () => r.cena === 'buy_supplies' && x.abertas.includes('loja'),
+            'loja-comprar': () => x.ouro[1] === x.ouro[0] - 2 && !x.abertas.length,
+            diario: () => x.aberta && !x.abertas.length,
+            especializacao: () => x.aberta && x.especializacao && !x.abertas.length,
+            fim: () => r.cena === 'death' && x.abertas.includes('fim'),
+            aviso: () => true,
+            barreira: () => r.cena === r.cenaAntes
+        }[cenario];
+        if (confere && !confere()) reg.avisos.push(`${cenario}: o estado depois não é o esperado (${r.cenaAntes} → ${r.cena}, ${r.resultado})`);
+        reg.execucoes.push(r);
+        return r;
+    } finally { await page.close().catch(() => {}); }
+}
+
+// combate, vitória, derrota e fuga: jogo novo de guerreiro, o Goblin, 800 ms com o combate
+// parado (depois das imagens) e uma ação. As conferências viram aviso; só um clique que não
+// mexe em nada é erro.
+async function cenarioCombate(browser, base, cpu, reg, { tipo, acao, jogador, inimigo, vidaInimigo, vidaJogador, janela }) {
+    const page = await abrirJogo(browser, base, cpu, reg);
+    try {
+        await novoJogo(page);
+        await page.evaluate(g => startInteractiveCombat(g), GOBLIN);
+        await page.waitForFunction(() => [...document.images].every(i => i.complete), { timeout: 5000 }).catch(() => {});
+        await espera(800);
+        const r = await comRastreio(page, () => page.evaluate(fluxoCombate, { acao, jogador, inimigo, vidaInimigo, vidaJogador, janela }));
+        const { antes, depois } = r.combate;
+        if (depois.ativo && depois.inimigo === antes.inimigo && depois.jogador === antes.jogador && tipo !== 'fuga') {
+            throw new Error(`o clique em #${acao} não fez nada (nenhuma vida mudou)`);
+        }
+        if (tipo === 'derrota') {
+            reg.nota = `vida do jogador ${antes.jogador} → ${depois.jogador}, cena "${r.cenaAntes}" → "${r.cena}"`;
+            if (depois.ativo) reg.avisos.push(`em ${janela} ms o combate não fechou`);
+            else if (r.cena !== 'death') reg.avisos.push(`a derrota levou à cena "${r.cena}", e não à "death"`);
+        } else if (tipo === 'fuga') {
+            reg.nota = `cena "${r.cenaAntes}" → "${r.cena}"`;
+            if (depois.ativo) reg.avisos.push(`em ${janela} ms a fuga não fechou o combate`);
+        } else if (tipo === 'rodada') {
+            reg.nota = `vida do Goblin ${antes.inimigo} → ${depois.inimigo}, do jogador ${antes.jogador} → ${depois.jogador}`;
+            if (depois.inimigo <= 0) reg.avisos.push('o ataque forçado matou o Goblin: a rodada ficou sem o turno do inimigo');
+            else if (depois.inimigo >= antes.inimigo) reg.avisos.push('o ataque forçado não tirou vida do Goblin');
+            if (depois.jogador >= antes.jogador) reg.avisos.push('o Goblin não acertou o jogador (sem tremor nem clarão vermelho)');
+            if (depois.ativo && depois.turno !== 'player') reg.avisos.push(`em ${janela} ms a vez não voltou para o jogador (turno "${depois.turno}")`);
+        } else {
+            reg.nota = `XP ${antes.xp} → ${depois.xp}, cena "${r.cenaAntes}" → "${r.cena}"`;
+            if (depois.xp <= antes.xp) reg.avisos.push('a vitória não deu XP');
+            if (depois.ativo) reg.avisos.push(`em ${janela} ms o combate não fechou (sem a volta para uma cena)`);
+            else if (r.cena === r.cenaAntes) reg.avisos.push(`o combate fechou, mas a cena continuou "${r.cena}"`);
+        }
+        reg.execucoes.push(r);
+        return r;
+    } finally { await page.close().catch(() => {}); }
+}
+
+// Joga uma vez (o 20 natural, o caminho com mais arte) para aquecer a GPU, os
+// caches e o perfil, e mede o intervalo de atualização com a página parada.
+async function aquecer(browser, base, modo) {
+    const reg = { avisos: [] };
+    const page = await abrirJogo(browser, base, 1, reg);
+    try {
+        try {
+            if (modo !== 'nenhum') {
+                await naCripta(page);
+                await page.evaluate(fluxoDado, { forcar: 0.96, rolarApos: 300, janela: 3400 });
+            }
+            if (modo === 'combate') {
+                // uma luta aberta e vencida (o 20 natural no Goblin com 1 de vida)
+                await page.evaluate(g => startInteractiveCombat(g), GOBLIN);
+                await espera(800);
+                await page.evaluate(() => {
+                    gameState.combat.enemy.hp = 1;
+                    Math.random = () => 0.96;
+                    document.getElementById('btn-combat-attack').click();
+                });
+                await espera(5500);
+            }
+            if (modo === 'janelas') {
+                // cada janela e efeito da Fase 4 uma vez, na ordem em que um jogador os veria
+                const passo = async (acao, ms) => { await page.evaluate(acao); await espera(ms); };
+                await passo(() => loadScene('start'), 600);
+                await passo(() => document.getElementById('btn-toggle-map').click(), 1400);
+                await passo(() => document.querySelector('#mapa .janela-fechar').click(), 500);
+                await passo(() => loadScene('buy_supplies'), 1200);
+                await passo(() => [...document.querySelectorAll('#loja-mercadorias button')].pop().click(), 700);
+                await passo(() => document.querySelector('#loja .janela-fechar').click(), 500);
+                await passo(() => document.getElementById('quest-journal-button').click(), 1000);
+                await passo(() => document.querySelector('#diario .janela-fechar').click(), 500);
+                await passo(() => { gameState.player.xp = 140; gameState.player.level = 2; changeXP(20); }, 1500);
+                await passo(() => document.querySelector('#especializacao [data-especializacao]').click(), 600);
+                await passo(() => loadScene('final_chamber_entrance'), 1200);
+                await passo(() => avisar('Aquecendo os avisos.'), 600);
+                await passo(() => { loadScene('death'); skipTyping = true; }, 2600);
+                await passo(() => document.querySelector('#fim .janela-fechar').click(), 600);
+            }
+        } catch (e) { reg.avisos.push(`aquecimento incompleto: ${e.message}`); }
+        await espera(500);
+        const r = await page.evaluate(async () => {
+            const m = window.__desempenho;
+            await m.iniciar();
+            await new Promise(ok => setTimeout(ok, 1000));
+            return m.parar();
+        });
+        // A mediana oscila com o ruído; a média dos quadros normais dá a taxa da tela.
+        const mediana = estatistica([r]).mediana;
+        const normais = r.quadros.filter(d => d > mediana / 2 && d < mediana * 1.5);
+        const intervalo = normais.reduce((a, b) => a + b, 0) / normais.length;
+        return { intervalo, mediana, loafSuportado: r.loafSuportado, avisos: reg.avisos };
+    } finally { await page.close().catch(() => {}); }
+}
+
+// ---------------------------------------------------------------------------
+function estatistica(execucoes) {
+    const quadros = execucoes.flatMap(e => e.quadros);
+    const ord = [...quadros].sort((a, b) => a - b);
+    const q = p => (ord.length ? ord[Math.max(0, Math.ceil(p * ord.length) - 1)] : NaN);
+    let pior = null;
+    for (const e of execucoes) e.quadros.forEach((d, i) => { if (!pior || d > pior.d) pior = { d, inicio: e.fins[i] - d }; });
+    const loafs = execucoes.flatMap(e => e.loaf);
+    const conta = f => execucoes.reduce((t, e) => t + e.quadros.filter((_, i) => f(e, i)).length, 0);
+    return {
+        quadros: quadros.length, mediana: q(0.5), p95: q(0.95), p99: q(0.99), max: pior ? pior.d : NaN,
+        acima: conta(daPagina), limpeza: conta(daLimpeza), chrome: conta(doChrome), piorEm: pior ? pior.inicio : NaN,
+        loafBloqueio: execucoes.some(e => e.loafSuportado) ? Math.max(0, ...loafs.map(l => l.bloqueio)) : null,
+        loafDuracao: execucoes.some(e => e.loafSuportado) ? Math.max(0, ...loafs.map(l => l.duracao)) : null
+    };
+}
+
+const num = (v, casas = 1) => (Number.isFinite(v) ? v.toFixed(casas).replace('.', ',') : '—');
+const LARGURAS = [22, 4, 8, 8, 7, 7, 7, 6, 4, 4, 6, 10];
+const linha = cols => cols.map((c, i) => String(c)[i === 0 ? 'padEnd' : 'padStart'](LARGURAS[i])).join(' ');
+
+function imprimir(resultados, meta) {
+    console.log('\n' + linha(['cenário', 'CPU', 'quadros', 'mediana', 'p95', 'p99', 'máx', '>20,8', 'GPU', 'Chr', 'LoAF', 'pior em']));
+    console.log('-'.repeat(LARGURAS.reduce((a, b) => a + b + 1, -1)));
+    for (const r of resultados) {
+        const nome = r.cenario + (SO_INFORMA.has(r.cenario) ? ' (info)' : r.tentativas > 1 ? ` ×${r.tentativas}` : '');
+        if (!r.execucoes.length) { console.log(linha([nome, `${r.cpu}x`, 'ERRO', '', '', '', '', '', '', '', '', ''])); continue; }
+        const s = r.resumo;
+        console.log(linha([nome, `${r.cpu}x`, s.quadros, num(s.mediana), num(s.p95), num(s.p99), num(s.max), s.acima, s.limpeza, s.chrome,
+            s.loafBloqueio === null ? '—' : Math.round(s.loafBloqueio), `${s.piorEm >= 0 ? '+' : ''}${Math.round(s.piorEm)} ms`]));
+    }
+    console.log('\nTempos em ms. ">20,8": quadros acima do limite que contam contra a página. "GPU": os acima do limite');
+    console.log('que caíram na limpeza ociosa da GPU e ficam fora do veredito (ver o cabeçalho do script). "Chr": os que');
+    console.log('caíram numa tarefa do próprio Chrome, pelo nome (TAREFAS_DO_CHROME), também fora do veredito. "pior em":');
+    console.log('início do quadro mais lento, contado da ação (na abertura, do início do documento).');
+    console.log('LoAF: pior bloqueio (ms) entre os quadros acima de 50 ms. Um LoAF longo com pouco script e pouco');
+    console.log('render quer dizer que a thread principal esperou a GPU, a rasterização ou a decodificação de imagem.');
+    for (const r of resultados) {
+        const rotulo = `${r.cenario} ${r.cpu}x`;
+        if (r.nota) console.log(`${rotulo}: ${r.nota}`);
+        const pior = r.execucoes.flatMap(e => e.loaf).reduce((a, l) => (!a || l.duracao > a.duracao ? l : a), null);
+        if (pior) {
+            console.log(`${rotulo}: pior LoAF ${num(pior.duracao, 0)} ms em ${pior.inicio >= 0 ? '+' : ''}${Math.round(pior.inicio)} ms ` +
+                `(bloqueio ${num(pior.bloqueio, 0)}, scripts ${num(pior.scripts, 0)}, render ${num(pior.render, 0)}, ` +
+                `estilo e layout ${num(pior.estiloLayout, 0)})${pior.fonte ? `; maior script: ${pior.fonte}` : ''}`);
+        }
+        const quadrosDe = f => r.execucoes.flatMap((e, k) => e.quadros.map((d, i) => ({ d, inicio: e.fins[i] - d, k, e, i })).filter(x => f(x.e, x.i)));
+        const fmt = x => `${num(x.d)}@${x.inicio >= 0 ? '+' : ''}${Math.round(x.inicio)}` +
+            `${r.execucoes.length > 1 || comCompilacao(x.e, x.i) ? ` (${[r.execucoes.length > 1 ? `exec ${x.k + 1}` : '', comCompilacao(x.e, x.i) ? 'compilação da GPU' : ''].filter(Boolean).join(', ')})` : ''}`;
+        const acima = quadrosDe(daPagina);
+        if (acima.length) console.log(`${rotulo}: acima do limite (ms@início): ${acima.slice(0, 40).map(fmt).join(', ')}${acima.length > 40 ? ', …' : ''}`);
+        const guardados = [...new Set(acima.map(x => x.e.rastreioGuardado).filter(Boolean))];
+        if (guardados.length) console.log(`${rotulo}: rastreio guardado: ${guardados.join(', ')}`);
+        const naLimpeza = quadrosDe(daLimpeza);
+        if (naLimpeza.length) {
+            console.log(`${rotulo}: na limpeza ociosa da GPU, fora do veredito (ms@início, trecho da tarefa no quadro, trabalho da página): ` +
+                naLimpeza.map(x => `${fmt(x)} ${num(trechoDaLimpeza(x.e, x.i))} ${num(trabalhoDaPagina(x.e, x.i))}`).join(', '));
+        }
+        const noChrome = quadrosDe(doChrome);
+        if (noChrome.length) {
+            console.log(`${rotulo}: numa tarefa do Chrome, fora do veredito (ms@início, tarefa, trecho dela no quadro, resto do trabalho da página): ` +
+                noChrome.map(x => `${fmt(x)} ${[...new Set(x.e.chrome.map(c => c.nome))].join('+')} ${num(trechoDoChrome(x.e, x.i))} ${num(trabalhoDaPagina(x.e, x.i) - trechoDoChrome(x.e, x.i))}`).join(', '));
+        }
+        if (RASTREAR && r.execucoes.some(e => e.limpezas === null)) r.avisos.push('sem o rastreio da GPU em alguma execução: os quadros dela contam todos contra a página');
+        if (r.execucoes.length > 1) {
+            const maximos = r.execucoes.map(e => Math.max(...e.quadros));
+            const comPagina = r.execucoes.filter(e => e.quadros.some((_, i) => daPagina(e, i))).length;
+            console.log(`${rotulo}: máximo por execução: ${maximos.map(v => num(v)).join(' ')}`);
+            console.log(`${rotulo}: execuções com quadro da página acima de 20,8 ms: ${comPagina}/${maximos.length}; pior ${num(Math.max(...maximos))} ms`);
+        }
+        const erros = new Map();
+        for (const e of r.erros) { const msg = e.replace(/^execução \d+: /, ''); erros.set(msg, (erros.get(msg) || 0) + 1); }
+        for (const [msg, n] of erros) console.log(`${rotulo}: ERRO${n > 1 ? ` (${n} execuções)` : ''} ${msg}`);
+        for (const a of new Set(r.avisos)) console.log(`${rotulo}: aviso: ${a}`);
+    }
+    for (const a of new Set(meta.avisosAquecimento)) console.log(`aquecimento: aviso: ${a}`);
+    const hz = meta.intervaloMs ? Math.round(1000 / meta.intervaloMs) : NaN;
+    const codigo = meta.commit ? `${meta.commit}${meta.sujo ? ` + ${meta.alterados.length} alterado(s)` : ''}` : 'fora do git';
+    console.log(`\ncódigo ${codigo} | movimento ${MOVIMENTO === 'reduce' ? 'reduzido' : 'padrão'} | aquecimento ${AQUECIMENTO} | ${meta.chrome} | intervalo de atualização medido ${num(meta.intervaloMs, 2)} ms (~${hz} Hz; ` +
+        `mediana ${num(meta.intervaloMedianaMs, 2)}) | LoAF ${meta.loafSuportado ? 'disponível' : 'indisponível'} | ` +
+        `limite ${num(LIMITE_MS, 2)} ms + folga ${num(FOLGA_MS)} ms`);
+}
+
+// Quantas execuções de aceite têm o pior quadro em 3 vsyncs. Numa bateria sã nesta máquina, de
+// 13 a 18%; com o ambiente degradado, de 36 a 72% (TASK_001 §6)
+function emTresVsyncs(resultados, intervaloMs) {
+    const iv = intervaloMs || 1000 / 144;
+    const execs = resultados.filter(r => r.cpu === 1 && !SO_INFORMA.has(r.cenario)).flatMap(r => r.execucoes);
+    const n = execs.filter(e => { const m = Math.max(...e.quadros); return m >= 2.5 * iv && m < 3.5 * iv; }).length;
+    return { n, total: execs.length, parte: execs.length ? n / execs.length : 0 };
+}
+
+function veredito(resultados) {
+    const contam = resultados.filter(r => r.cpu === 1 && !SO_INFORMA.has(r.cenario));
+    if (!contam.length) return { texto: 'SEM VEREDITO (nenhum cenário de aceite em CPU 1x)', aprovado: true };
+    const acima = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.acima : 0), 0);
+    const naLimpeza = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.limpeza : 0), 0);
+    const noChrome = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.chrome : 0), 0);
+    const erros = contam.reduce((t, r) => t + r.erros.length, 0);
+    const fora = [naLimpeza ? `${naLimpeza} ${naLimpeza === 1 ? 'quadro' : 'quadros'} na limpeza da GPU` : '',
+        noChrome ? `${noChrome} ${noChrome === 1 ? 'quadro' : 'quadros'} numa tarefa do Chrome` : '']
+        .filter(Boolean).join(' e ') + (naLimpeza || noChrome ? ', fora do veredito' : '');
+    const meia = contam.reduce((t, r) => t + (r.meiaTaxa || 0), 0);
+    const refeitas = contam.reduce((t, r) => t + (r.refeitasMeiaTaxa || 0), 0);
+    const nota = refeitas ? ` [${refeitas} ${refeitas === 1 ? 'execução refeita' : 'execuções refeitas'} em meia taxa]` : '';
+    const invalido = meia ? `INVÁLIDO: ${meia} ${meia === 1 ? 'execução ficou' : 'execuções ficaram'} em meia taxa mesmo refeitas ` +
+        '(o ambiente degradado; refaça com a janela do Chrome à vista e o PC quieto). Sem isso: ' : '';
+    if (!acima && !erros) return { texto: `${invalido}APROVADO${fora ? ` (${fora})` : ''}${nota}`, aprovado: !meia };
+    const partes = [`${acima} ${acima === 1 ? 'quadro' : 'quadros'} acima de 20,8 ms em CPU 1x`];
+    if (erros) partes.push(`${erros} erro(s) de medição`);
+    if (fora) partes.push(fora);
+    return { texto: `${invalido}REPROVADO (${partes.join('; ')})${nota}`, aprovado: false };
+}
+
+// Parada do ambiente: a tarefa GpuServiceImpl::GetDawnInfo, de ~500 ms na thread principal
+// da GPU, que aparece até numa página vazia, uns 120 s depois de o Chrome abrir. Um quadro de
+// mais de 100 ms em que ela roda é refeito uma vez, e o relatório avisa; um quadro com
+// compilação do Dawn nunca é refeito (é custo da página, de primeira vez). Sem rastreio
+// (--sem-rastreio), vale o sinal antigo: todo LoAF longo sem script nem render.
+function paradaDoAmbiente(e) {
+    const quadros = e.quadros.map((d, i) => i).filter(i => e.quadros[i] > 100);
+    if (!quadros.length) return false;
+    if (e.paradas) {
+        return quadros.every(i => {
+            const [inicio, fim] = intervalo(e, i);
+            return e.paradas.some(p => sobreposicao(inicio, fim, p.inicio, p.inicio + p.duracao) > 0) && !comCompilacao(e, i);
+        });
+    }
+    const longos = (e.loaf || []).filter(l => l.duracao > 100);
+    // render até 5 ms: é o do próprio quadro (uma parada de 503 ms teve 3,2)
+    return longos.length > 0 && longos.every(l => l.scripts <= 2 && l.render <= 5);
+}
+
+// Meia taxa: a execução inteira a 2 vsyncs por quadro, o ambiente degradado (ver o cabeçalho)
+function emMeiaTaxa(e) {
+    if (!INTERVALO_MS || !e.quadros.length) return false;
+    const ord = [...e.quadros].sort((a, b) => a - b);
+    return ord[Math.floor(ord.length / 2)] >= 1.8 * INTERVALO_MS;
+}
+
+async function comRefacao(reg, executar) {
+    const antes = reg.execucoes.length;
+    const r = await executar();
+    const e = reg.execucoes[reg.execucoes.length - 1];
+    if (reg.execucoes.length > antes && emMeiaTaxa(e)) {
+        reg.execucoes.pop();
+        reg.avisos.push('execução refeita: em meia taxa (a mediana dos quadros em 2 vsyncs)');
+        reg.refeitasMeiaTaxa = (reg.refeitasMeiaTaxa || 0) + 1;
+        const r2 = await executar();
+        if (reg.execucoes.length > antes && emMeiaTaxa(reg.execucoes[reg.execucoes.length - 1])) reg.meiaTaxa = (reg.meiaTaxa || 0) + 1;
+        return r2;
+    }
+    if (reg.execucoes.length > antes && paradaDoAmbiente(e)) {
+        reg.execucoes.pop();
+        reg.avisos.push(`execução refeita: parada do ambiente de ${Math.round(Math.max(...e.quadros))} ms ` +
+            (e.paradas ? '(GetDawnInfo na GPU)' : '(LoAF sem script nem render)'));
+        return executar();
+    }
+    return r;
+}
+
+// Qual código foi medido: o commit da raiz servida e os arquivos alterados fora dele
+function versaoDoCodigo(raiz) {
+    const git = (...args) => execFileSync('git', args, { cwd: raiz, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    try {
+        const alterados = git('status', '--porcelain').split('\n').filter(Boolean).map(l => l.slice(3));
+        return { commit: git('rev-parse', '--short', 'HEAD').trim(), sujo: alterados.length > 0, alterados };
+    } catch {
+        return { commit: null, sujo: null, alterados: [] }; // raiz fora de um repositório (cópia solta)
+    }
+}
+
+async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil }) {
+    const srv = await servidor(path.resolve(raiz));
+    const base = `http://127.0.0.1:${srv.address().port}`;
+    fs.mkdirSync(perfil, { recursive: true });
+    const lancamento = Date.now(); // o JSON guarda quando cada medição começou, contado daqui
+    const browser = await puppeteer.launch({
+        headless: false,
+        userDataDir: perfil,
+        defaultViewport: { width: 1920, height: 1080 },
+        args: ['--window-size=1920,1160', '--window-position=0,0', '--autoplay-policy=no-user-gesture-required',
+            '--mute-audio', '--disable-features=CalculateNativeWinOcclusion']
+    });
+    const resultados = [];
+    let meta;
+    try {
+        console.log('aquecendo...');
+        const aq = await aquecer(browser, base, AQUECIMENTO);
+        INTERVALO_MS = aq.intervalo;
+        meta = {
+            ...versaoDoCodigo(path.resolve(raiz)),
+            chrome: await browser.version(), intervaloMs: aq.intervalo, intervaloMedianaMs: aq.mediana,
+            loafSuportado: aq.loafSuportado, avisosAquecimento: aq.avisos
+        };
+        for (const cpu of cpus) {
+            for (const cenario of cenarios) {
+                if (cpu !== 1 && !EM_4X.has(cenario)) continue;
+                const vezes = cenario === 'primeiro-clique' ? execucoes : SO_INFORMA.has(cenario) || cpu !== 1 ? 1 : repeticoes;
+                const reg = { cenario, cpu, tentativas: vezes, execucoes: [], erros: [], avisos: [], nota: '' };
+                resultados.push(reg);
+                process.stdout.write(`${cenario} ${cpu}x... `);
+                const executar = {
+                    exploracao: () => cenarioExploracao(browser, base, cpu, reg),
+                    'texto-longo': () => cenarioTextoLongo(browser, base, cpu, reg),
+                    'combate-entrada': () => cenarioEntrada(browser, base, cpu, reg),
+                    'primeiro-clique': () => cenarioDado(browser, base, cpu, reg, null, 1800)
+                }[cenario] || (cenario in FORCAR ? () => cenarioDado(browser, base, cpu, reg, FORCAR[cenario], 3400)
+                    : cenario in COMBATE ? () => cenarioCombate(browser, base, cpu, reg, COMBATE[cenario])
+                    : cenario in JANELAS ? () => cenarioJanela(browser, base, cpu, reg, cenario, JANELAS[cenario]) : null);
+                if (SO_INFORMA.has(cenario)) {
+                    const so = cenario === 'abertura' ? cenarioAbertura : cenarioAberturaSave;
+                    try { await so(browser, base, cpu, reg); } catch (e) { reg.erros.push(e.message.split('\n')[0]); }
+                } else {
+                    for (let i = 0; i < vezes; i++) {
+                        try {
+                            await comRefacao(reg, executar);
+                            if (vezes > 1) process.stdout.write(`${num(Math.max(...reg.execucoes[reg.execucoes.length - 1].quadros))} `);
+                        } catch (e) {
+                            reg.erros.push(`${vezes > 1 ? `execução ${i + 1}: ` : ''}${e.message.split('\n')[0]}`);
+                            if (vezes > 1) process.stdout.write('x ');
+                        }
+                        await espera(300);
+                    }
+                }
+                if (reg.execucoes.length) reg.resumo = estatistica(reg.execucoes);
+                console.log(reg.erros.length ? `→ ${reg.erros.length} erro(s)` : `→ máx ${num(reg.resumo.max)} ms`);
+                await espera(300);
+            }
+        }
+    } finally {
+        await browser.close();
+        srv.close();
+    }
+    imprimir(resultados, meta);
+    const tres = emTresVsyncs(resultados, meta.intervaloMs);
+    if (tres.parte >= 0.3) {
+        console.log(`aviso: ${tres.n} de ${tres.total} execuções têm o pior quadro em 3 vsyncs (${Math.round(tres.parte * 100)}%; ` +
+            'numa bateria sã, 13 a 18%). O ambiente pode estar degradado: compare com um controle intercalado ' +
+            '(a mesma bateria com --raiz numa cópia de referência, alternando com esta).');
+    }
+    const v = veredito(resultados);
+    console.log(v.texto);
+    if (json) {
+        const r2 = v => Math.round(v * 100) / 100;
+        const saida = {
+            data: new Date().toISOString(), ...meta, limiteMs: LIMITE_MS, folgaMs: FOLGA_MS, viewport: '1920x1080', veredito: v.texto,
+            resultados: resultados.map(r => ({
+                cenario: r.cenario, cpu: r.cpu, nota: r.nota, resumo: r.resumo ?? null, erros: r.erros, avisos: [...new Set(r.avisos)],
+                emMeiaTaxa: r.meiaTaxa || 0, refeitasEmMeiaTaxa: r.refeitasMeiaTaxa || 0,
+                execucoes: r.execucoes.map(e => ({
+                    aposLancamentoMs: Math.round(e.epoca - lancamento), quadros: e.quadros.map(r2), fins: e.fins.map(r2), loaf: e.loaf,
+                    limpezasGpu: e.limpezas && e.limpezas.map(l => ({ inicio: r2(l.inicio), duracao: r2(l.duracao) })),
+                    compilacoesGpu: e.compilacoes && e.compilacoes.map(c => ({ inicio: r2(c.inicio), duracao: r2(c.duracao) })),
+                    quadrosComCompilacao: e.quadros.map((_, i) => i).filter(i => passou(e.quadros[i]) && comCompilacao(e, i)),
+                    quadrosNaLimpeza: e.quadros.map((_, i) => i).filter(i => daLimpeza(e, i)),
+                    tarefasChrome: e.chrome && e.chrome.map(c => ({ nome: c.nome, inicio: r2(c.inicio), duracao: r2(c.duracao) })),
+                    quadrosNoChrome: e.quadros.map((_, i) => i).filter(i => doChrome(e, i)),
+                    rastreio: !!(e.limpezas && e.trabalho), rastreioGuardado: e.rastreioGuardado || null,
+                    comecou: e.comecou, resultado: e.resultado, cenaAntes: e.cenaAntes, cena: e.cena, combate: e.combate
+                }))
+            }))
+        };
+        fs.writeFileSync(path.resolve(json), JSON.stringify(saida, null, 1));
+        console.log(`JSON em ${path.resolve(json)}`);
+    }
+    if (!v.aprovado) process.exitCode = 1;
+}
+
+// ---------------------------------------------------------------------------
+const args = process.argv.slice(2);
+let invalido = args.includes('--ajuda') || args.includes('-h');
+const opcao = nome => {
+    const i = args.indexOf(nome);
+    if (i < 0) return null;
+    const v = args.splice(i, 2)[1];
+    if (v === undefined) invalido = true;
+    return v ?? null;
+};
+const cenarios = (opcao('--cenarios') || CENARIOS.join(',')).split(',').map(s => s.trim()).filter(Boolean);
+const execucoes = Number(opcao('--execucoes') ?? 30);
+const repeticoes = Number(opcao('--repeticoes') ?? 10);
+if (args.includes('--sem-rastreio')) { args.splice(args.indexOf('--sem-rastreio'), 1); RASTREAR = false; }
+const pastaRastreios = opcao('--rastreios');
+if (pastaRastreios) PASTA_RASTREIOS = path.resolve(pastaRastreios);
+AQUECIMENTO = opcao('--aquecimento') ?? 'd20';
+const cpu = opcao('--cpu') ?? 'ambos';
+const json = opcao('--json');
+const raiz = opcao('--raiz') || RAIZ_PADRAO;
+const perfil = path.resolve(opcao('--perfil') || PERFIL_PADRAO);
+const movimento = opcao('--movimento') ?? 'padrao';
+MOVIMENTO = movimento === 'reduzido' ? 'reduce' : 'no-preference';
+const desconhecidos = cenarios.filter(c => !CENARIOS.includes(c));
+if (invalido || args.length || desconhecidos.length || !Number.isInteger(execucoes) || execucoes < 1
+    || !Number.isInteger(repeticoes) || repeticoes < 1 || !['1', '4', 'ambos'].includes(cpu)
+    || !['janelas', 'd20', 'combate', 'nenhum'].includes(AQUECIMENTO)
+    || !['padrao', 'reduzido'].includes(movimento)) {
+    if (desconhecidos.length) console.log(`Cenário(s) desconhecido(s): ${desconhecidos.join(', ')}`);
+    console.log('Uso:\n  node ded/tools/desempenho.mjs [--cenarios a,b,c] [--execucoes 30] [--repeticoes 10] [--cpu 1|4|ambos]\n' +
+        '                                [--json saida.json] [--raiz <repo>] [--perfil <pasta>]\n' +
+        '                                [--movimento padrao|reduzido] [--sem-rastreio] [--rastreios <pasta>]\n' +
+        '                                [--aquecimento janelas|d20|combate|nenhum]\n' +
+        `Cenários (* repete em CPU 4x): ${CENARIOS.map(c => c + (EM_4X.has(c) ? ' *' : '')).join(', ')}`);
+    process.exitCode = 2;
+} else {
+    await medir({ cenarios, execucoes, repeticoes, cpus: cpu === 'ambos' ? [1, 4] : [Number(cpu)], json, raiz, perfil });
+}

@@ -1,6 +1,7 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
 const path = require('path');
+const { shotPath } = require('./shots');
 const fs = require('fs');
 const app = require('../server');
 
@@ -118,7 +119,7 @@ async function runTests() {
   console.log('✅ Teste 3: Página Three.js Earth possui layout canônico e link correto para a simulação 3D.');
 
   // Tirar Screenshot de Evidência
-  const screenshotPath = path.join(__dirname, 'catalog_and_menu_qa_evidence.png');
+  const screenshotPath = shotPath('catalog_and_menu_qa_evidence.png');
   await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await page.setViewport({ width: 1280, height: 800 });
   await new Promise(r => setTimeout(r, 300));

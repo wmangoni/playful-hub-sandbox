@@ -391,7 +391,7 @@ export function danoDeAtributo(K, b, alvo, attr, valor, fonte = null, origem = '
 
 const tamanhoMaxPadrao = (K, c) => {
   const i = Math.max(0, K.sizeIdx(c.tamanho) - 1);
-  return ['Mínimo', 'Minúsculo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal'][i];
+  return ['Minúsculo', 'Diminuto', 'Miúdo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal'][i];
 };
 
 /** Agarrar aprimorado (3.0): acertou o ataque → teste resistido de agarrar, sem ação. */
@@ -503,7 +503,7 @@ function turnoEngolido(K, b, c) {
     const rd = engolir.m.rd_se_aplica && quem.rd && !K.venceRD(c, golpe, quem.rd) ? quem.rd.valor : 0;
     const dano = rd ? Math.max(0, r.total - rd) : Math.max(1, r.total);
     c.danoInterno += dano;
-    texto += ` — acerta, ${dano} de dano${rd ? ` (RD ${quem.rd.valor}/${quem.rd.exceto} absorve ${r.total - dano})` : ''} (${c.danoInterno} de ${engolir.m.pv_para_sair} para sair).`;
+    texto += ` — acerta, ${dano} de dano${rd ? ` (RD ${K.rdTexto(quem.rd)} absorve ${r.total - dano})` : ''} (${c.danoInterno} de ${engolir.m.pv_para_sair} para sair).`;
   } else texto += ' — erra.';
   K.log(b, c, 'ataque', texto);
   if (c.danoInterno >= engolir.m.pv_para_sair) {

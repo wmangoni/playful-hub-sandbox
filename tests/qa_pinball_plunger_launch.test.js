@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -100,7 +100,7 @@ async function runTests() {
   console.log('\n✅ Teste 1: Plunger lançou a bola com força total até o topo e a conduziu perfeitamente para o campo principal de jogo.');
 
   // Capturar screenshot da bola no campo de jogo
-  const screenshotPath = path.join(__dirname, 'pinball_launch_qa_evidence.png');
+  const screenshotPath = shotPath('pinball_launch_qa_evidence.png');
   await page.screenshot({ path: screenshotPath });
   console.log(`📸 Screenshot de evidência salva em: ${screenshotPath}`);
 

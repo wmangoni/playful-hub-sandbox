@@ -24,7 +24,9 @@ import { emptyState, loadingState, pageHead } from '../ui/page.js';
 import { toast } from '../ui/toast.js';
 import { abrirEquipamento } from './arena-equipamento.js';
 import { carregarRedes, politicasDaArena } from './arena-ia.js';
-import { AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND as FAIXAS, carregarCatalogo, contextoDoCard, rotuloFaixa } from './card-dados.js';
+import {
+  AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND as FAIXAS, carregarCatalogo, carregarCombatente, carregarIndiceCatalogo, contextoDoCard, rotuloFaixa,
+} from './card-dados.js';
 import { abrirCard } from './ficha-card.js';
 import { perfilDe } from '../rules/ia30.js';
 import { abrirMagias } from './arena-magias.js';
@@ -75,19 +77,24 @@ function cabecalho() {
 
 export async function renderArena({ root, router, query, store }) {
   render(root, html`${cabecalho()}${loadingState(4)}`);
-  let cat;
+  let indice;
   try {
-    cat = await carregarCatalogo();
+    indice = await carregarIndiceCatalogo();
   } catch {
-    if (!root.isConnected) return undefined;
-    render(root, html`${cabecalho()}<section class="card">${emptyState({
-      glyph: 'alert',
-      title: 'Não foi possível carregar o catálogo',
-      text: 'Os monstros e os heróis da arena não chegaram. Verifique a conexão e tente de novo.',
-      action: html`<button type="button" class="btn btn--primary" data-action="recarregar">${icon('restore')}Tentar de novo</button>`,
-    })}</section>`);
-    root.querySelector('[data-action="recarregar"]').addEventListener('click', () => router.reload());
-    return undefined;
+    try {
+      const cat = await carregarCatalogo();
+      indice = [...(cat.monstros || []), ...(cat.holy_avenger || [])];
+    } catch {
+      if (!root.isConnected) return undefined;
+      render(root, html`${cabecalho()}<section class="card">${emptyState({
+        glyph: 'alert',
+        title: 'Não foi possível carregar o catálogo',
+        text: 'Os monstros e os heróis da arena não chegaram. Verifique a conexão e tente de novo.',
+        action: html`<button type="button" class="btn btn--primary" data-action="recarregar">${icon('restore')}Tentar de novo</button>`,
+      })}</section>`);
+      root.querySelector('[data-action="recarregar"]').addEventListener('click', () => router.reload());
+      return undefined;
+    }
   }
   // seus personagens, calculados como na ficha (sem eles, a arena segue só com o catálogo)
   let dados = null;
@@ -100,7 +107,9 @@ export async function renderArena({ root, router, query, store }) {
   }
   if (!root.isConnected) return undefined;
 
-  const entradas = [...cat.monstros, ...cat.holy_avenger];
+  const entradas = Array.isArray(indice) ? indice : [];
+  const monstros = entradas.filter(e => e.categoria === 'monstro');
+  const holy_avenger = entradas.filter(e => e.categoria === 'holy_avenger');
   const porId = new Map(entradas.map(e => [e.id, e]));
   const talentoPorId = new Map((dados?.talentos || []).map(t => [String(t.id), t]));
   function entradaDePersonagem(p) {
@@ -190,10 +199,29 @@ export async function renderArena({ root, router, query, store }) {
   const ladoAge = l => state[l].some(x => perfilDe(fichaDe(x.ref)) === 'recursos');
   const textoDaIa = ia => LADOS.map(l => `${l}: ${ia[l] === 'rede' ? (ladoAge(l) ? 'treinada' : 'treinada (sem efeito)') : 'clássica'}`).join(' · ');
 
+  const combatentesCompletos = new Map();
+  async function garantirCombatentesCompletos() {
+    const refs = [...new Set([...state.A, ...state.B].map(x => x.ref))].filter(r => !ehPersonagem(r));
+    const pendentes = refs.filter(r => !combatentesCompletos.has(r));
+    if (pendentes.length) {
+      const carregados = await Promise.all(pendentes.map(r => carregarCombatente(r)));
+      pendentes.forEach((r, i) => {
+        if (carregados[i]) {
+          combatentesCompletos.set(r, carregados[i]);
+          const atual = porId.get(r);
+          if (atual) Object.assign(atual, carregados[i]);
+        }
+      });
+    }
+  }
+
   const fichas = new Map();
   const fichaDe = ref => {
     if (ehPersonagem(ref)) return porId.get(ref).ficha; // sempre com o equipamento atual
-    if (!fichas.has(ref)) fichas.set(ref, fromCatalog(porId.get(ref)));
+    if (!fichas.has(ref)) {
+      const completo = combatentesCompletos.get(ref) || porId.get(ref);
+      fichas.set(ref, fromCatalog(completo));
+    }
     return fichas.get(ref);
   };
   // quem não pode lutar (personagem sem classe, equipamento com erro) não conta para a dica
@@ -594,7 +622,7 @@ export async function renderArena({ root, router, query, store }) {
     const podeAdicionar = e => !cheio() && qtdNoLado(e.id) < maximoDe(e.id) && !e.erros?.length;
 
     function filtrados() {
-      const base = s.aba === 'monstros' ? cat.monstros : s.aba === 'holy' ? cat.holy_avenger : personagens;
+      const base = s.aba === 'monstros' ? monstros : s.aba === 'holy' ? holy_avenger : personagens;
       const termo = normalize(s.busca);
       const [min, max] = FAIXAS[s.nd];
       return base
@@ -971,11 +999,22 @@ export async function renderArena({ root, router, query, store }) {
     const e = porId.get(ref);
     if (!e || cardAberto) return;
     const origem = document.activeElement;
+    let combatente = e;
+    if (!ehPersonagem(ref)) {
+      if (!combatentesCompletos.has(ref)) {
+        const carregado = await carregarCombatente(ref);
+        if (carregado) {
+          combatentesCompletos.set(ref, carregado);
+          Object.assign(e, carregado);
+        }
+      }
+      combatente = combatentesCompletos.get(ref) || e;
+    }
     const ctx = await contextoDoCard(store);
     if (saindo || cardAberto) return;
     const modelo = ehPersonagem(ref)
       ? montarCardPersonagem(e, { ...ctx, concedidos: grantedFeats(e.sheet.nivel, e.sheet.classKey, e.sheet.raceKey) })
-      : montarCardCatalogo(e, ctx);
+      : montarCardCatalogo(combatente, ctx);
     cardAberto = abrirCard({
       modelo,
       aviso: ctx.semGlossario ? AVISO_SEM_GLOSSARIO : '',
@@ -1083,6 +1122,7 @@ export async function renderArena({ root, router, query, store }) {
       confirmarCampos();
       const vezes = Number(t.closest('[data-vezes]').dataset.vezes);
       if (state.lote?.rodando || !state.A.length || !state.B.length) return;
+      await garantirCombatentesCompletos();
       await garantirRedes({ lote: true });
       if (state.lote?.rodando || state.fase !== 'montagem' || !situacao().pronto) return;
       iniciarLote(vezes);
@@ -1120,6 +1160,7 @@ export async function renderArena({ root, router, query, store }) {
     } else if (acao === 'comecar') {
       confirmarCampos();
       if (!state.A.length || !state.B.length || state.lote?.rodando) return;
+      await garantirCombatentesCompletos();
       await garantirRedes();
       if (state.fase !== 'montagem' || !situacao().pronto) return;
       iniciarLuta();

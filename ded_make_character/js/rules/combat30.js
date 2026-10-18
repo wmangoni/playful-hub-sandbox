@@ -18,8 +18,8 @@ import { normalize as loose } from '../core/format.js';
 import { createRng, roll, average, parseDice, isZero } from './dice.js';
 import * as SP from './combat30-specials.js';
 
-export const TAMANHOS = ['Mínimo', 'Minúsculo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal'];
-const sizeIdx = t => Math.max(0, TAMANHOS.indexOf(t));
+export const TAMANHOS = ['Minúsculo', 'Diminuto', 'Miúdo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal'];
+const sizeIdx = t => (t === 'Mínimo' ? 0 : Math.max(0, TAMANHOS.indexOf(t)));
 /** Tipos imunes a crítico e a ataque furtivo (e a dano maciço, quando não têm Constituição). */
 const TIPOS_SEM_CRITICO = ['Morto-Vivo', 'Constructo', 'Limo', 'Planta', 'Elemental'];
 /** Tipos destruídos com 0 PV (3.0). */
@@ -668,24 +668,119 @@ function modsDeDano(b, c, alvo, a, { poderoso = 0 } = {}) {
 // ---------------------------------------------------------------------------------------------
 // defesas: RD, energia, regeneração
 
-/** A arma vence a RD do alvo? (3.0: bônus de melhoria, material, arma natural com a RD do dono) */
-function venceRD(atacante, a, rd) {
-  if (!rd) return true;
-  const exceto = String(rd.exceto).trim();
-  if (exceto === '—' || exceto === '-') return false;
-  let melhoria = a?.magico ? Number(String(a.magico).replace('+', '')) : 0;
-  // Arma Mágica: +1 de melhoria na arma encantada (3.0: vence RD x/+1)
-  for (const bf of atacante?.buffs || []) if (bf.melhoria_arma && valeParaArma(bf, a)) melhoria = Math.max(melhoria, bf.melhoria_arma);
-  // armas naturais contam como do tipo que vence a RD da própria criatura
-  if (a?.natural && atacante?.rd) {
-    const proprio = /^\+(\d+)$/.exec(String(atacante.rd.exceto).trim());
-    if (proprio) melhoria = Math.max(melhoria, Number(proprio[1]));
+export function rdTexto(rd) {
+  if (!rd) return '';
+  const { valor, exceto, modo } = rd;
+  if (Array.isArray(exceto)) {
+    const separador = modo === 'e' ? ' e ' : ' ou ';
+    return `${valor}/${exceto.join(separador)}`;
   }
-  const n = /^\+(\d+)$/.exec(exceto);
-  if (n) return melhoria >= Number(n[1]);
-  // material (prata…): vence com o material ou com qualquer arma mágica ("mais poderosa")
-  if (a?.material && loose(a.material) === loose(exceto)) return true;
-  return melhoria >= 1;
+  return `${valor}/${exceto}`;
+}
+
+/** Propriedades do ataque (material, tipo físico, magia, alinhamento, etc.) para superar RD 3.5. */
+function propriedadesDoAtaque(atacante, a) {
+  const p = new Set();
+  if (!a) return p;
+
+  let melhoria = a.magico ? Number(String(a.magico).replace('+', '')) : 0;
+  for (const bf of atacante?.buffs || []) {
+    if (bf.melhoria_arma && valeParaArma(bf, a)) melhoria = Math.max(melhoria, bf.melhoria_arma);
+  }
+  if (melhoria > 0) {
+    p.add('magia');
+    p.add('magico');
+    p.add('magica');
+  }
+  if (melhoria >= 6) {
+    p.add('épico');
+    p.add('épica');
+    p.add('epico');
+    p.add('epica');
+  }
+
+  if (a.material) {
+    const mat = loose(a.material);
+    p.add(mat);
+    if (mat.includes('ferro') && mat.includes('frio')) p.add('ferro frio');
+  }
+
+  for (const t of a.tipo_dano || []) {
+    p.add(loose(t));
+  }
+
+  const q = qualidadesDaArma(a);
+  if (q.includes('sagrada')) {
+    p.add('bem');
+    p.add('bom');
+  }
+  if ((a.dano_extra || []).some(d => d.tipo === 'sagrado' || d.tipo === 'divino')) {
+    p.add('bem');
+    p.add('bom');
+  }
+  if ((a.dano_extra || []).some(d => d.tipo === 'profano')) {
+    p.add('mal');
+    p.add('maligno');
+  }
+
+  const subtipos = (atacante?.subtipos || []).map(loose);
+  if (subtipos.includes('bem') || subtipos.includes('bom')) p.add('bem');
+  if (subtipos.includes('mal') || subtipos.includes('maligno')) p.add('mal');
+  if (subtipos.includes('leal') || subtipos.includes('ordem')) p.add('leal');
+  if (subtipos.includes('caotico') || subtipos.includes('caos')) p.add('caótico');
+
+  if (a.natural && atacante?.rd) {
+    const rdExc = Array.isArray(atacante.rd.exceto) ? atacante.rd.exceto : [atacante.rd.exceto];
+    for (const x of rdExc) {
+      if (x && x !== '—' && x !== '-') p.add(loose(String(x)));
+    }
+  }
+
+  if (atacante?.origem === 'personagem' && atacante?.classe === 'mon') {
+    if (a.arma_id === 'desarmado' || a.natural) {
+      const niv = atacante.nivel || 1;
+      if (niv >= 4) p.add('magia');
+      if (niv >= 10) p.add('leal');
+      if (niv >= 16) p.add('adamante');
+    }
+  }
+
+  return p;
+}
+
+/** A arma vence a RD do alvo? (D&D 3.5: material, tendência, magia, épico, tipo de dano, modo 'e' ou 'ou') */
+export function venceRD(atacante, a, rd) {
+  if (!rd) return true;
+  const listaExceto = Array.isArray(rd.exceto) ? rd.exceto : [rd.exceto];
+  if (listaExceto.length === 1 && (listaExceto[0] === '—' || listaExceto[0] === '-' || !listaExceto[0])) {
+    return false;
+  }
+  const modo = rd.modo === 'e' ? 'e' : 'ou';
+  const props = propriedadesDoAtaque(atacante, a);
+
+  const atendeUma = exc => {
+    const s = String(exc).trim();
+    if (s === '—' || s === '-') return false;
+    const n = /^\+(\d+)$/.exec(s);
+    if (n) {
+      let melhoria = a?.magico ? Number(String(a.magico).replace('+', '')) : 0;
+      for (const bf of atacante?.buffs || []) {
+        if (bf.melhoria_arma && valeParaArma(bf, a)) melhoria = Math.max(melhoria, bf.melhoria_arma);
+      }
+      return melhoria >= Number(n[1]);
+    }
+    const chave = loose(s);
+    if (chave === 'epico' || chave === 'epica') return props.has('épico') || props.has('épica') || props.has('epico') || props.has('epica');
+    if (chave === 'magico' || chave === 'magica') return props.has('magia') || props.has('magico') || props.has('magica');
+    if (chave === 'caotico' || chave === 'caotica') return props.has('caótico') || props.has('caotico');
+    return props.has(chave);
+  };
+
+  if (modo === 'e') {
+    return listaExceto.every(atendeUma);
+  } else {
+    return listaExceto.some(atendeUma);
+  }
 }
 
 /** Qualidades de uma arma, para a regeneração do Lorde das Profundezas (sagrada, abençoada). */
@@ -771,7 +866,7 @@ function causarDano(b, alvo, partes, { fonte = null, ataque = null, ignoraRD = f
       const absorve = Math.min(fisico, alvo.rd.valor);
       fisico -= absorve;
       absorvidoRD = absorve;
-      if (absorve) notas.push(`RD ${alvo.rd.valor}/${alvo.rd.exceto} absorve ${absorve}`);
+      if (absorve) notas.push(`RD ${rdTexto(alvo.rd)} absorve ${absorve}`);
     }
     if (fisico > 0) {
       if (furaRegeneracao(alvo, { tipo: 'fisico', ataque })) letal += fisico;
@@ -1574,7 +1669,7 @@ export function simulate(luta, opcoes = {}) {
 const K = {
   log, anunciarCondicao, roll: (b, expr, o) => roll(b.rng, expr, o), average, parseDice, isZero, parseDuracao, parseArea,
   gap, mover, velocidade, inimigos, aliados, alvosNaArea, alvoValido, podeLutar, atende, eixos,
-  inicioDoTurno, venceRD, furaRegeneracao, teste, resistido, agarrarDe, aplicarCondicao, imuneACondicao, efeitoNaoAfeta, categoriaDaCondicao, removerCondicao, causarDano, curar, morrer, atualizarEstado,
+  inicioDoTurno, venceRD, rdTexto, furaRegeneracao, teste, resistido, agarrarDe, aplicarCondicao, imuneACondicao, efeitoNaoAfeta, categoriaDaCondicao, removerCondicao, causarDano, curar, morrer, atualizarEstado,
   efeitoComTeste, venceRM, golpe, sequencia, caContra, modsDeAtaque, modsDeDano, deltaMod, somaBuff, expiraEm, tick,
   soltarAgarrao, imuneCritico, semDestreza, esperado, pAcerto, isMelee, isRanged, isTouch, ataqueAlcanca, alcanceDe,
   hasCond, talento, sizeIdx, mod, sinal, num, MEDO, TIPOS_SEM_CRITICO,

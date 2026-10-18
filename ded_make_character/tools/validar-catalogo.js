@@ -7,13 +7,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const TAMANHOS = ['Mínimo', 'Minúsculo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal'];
-const AGARRAR_TAMANHO = { Mínimo: -16, Minúsculo: -8, Pequeno: -4, Médio: 0, Grande: 4, Enorme: 8, Imenso: 12, Colossal: 16 };
+const TAMANHOS = ['Minúsculo', 'Diminuto', 'Miúdo', 'Pequeno', 'Médio', 'Grande', 'Enorme', 'Imenso', 'Colossal', 'Mínimo'];
+const AGARRAR_TAMANHO = { Minúsculo: -16, Mínimo: -16, Diminuto: -12, Miúdo: -8, Pequeno: -4, Médio: 0, Grande: 4, Enorme: 8, Imenso: 12, Colossal: 16 };
 const TENDENCIAS = ['LB', 'NB', 'CB', 'LN', 'N', 'CN', 'LM', 'NM', 'CM'];
-const TIPOS = ['Aberração', 'Animal', 'Besta', 'Besta Mágica', 'Constructo', 'Dragão', 'Elemental', 'Fada', 'Gigante', 'Humanoide', 'Humanoide Monstruoso', 'Limo', 'Extra-Planar', 'Planta', 'Morto-Vivo', 'Verme'];
+const TIPOS = ['Aberração', 'Animal', 'Besta Mágica', 'Constructo', 'Dragão', 'Elemental', 'Fada', 'Gigante', 'Humanoide', 'Humanoide Monstruoso', 'Limo', 'Extra-Planar', 'Planta', 'Morto-Vivo', 'Verme'];
 const TIPOS_ATAQUE = ['corpo a corpo', 'distancia', 'toque', 'toque a distancia'];
 const TIPOS_DANO = ['cortante', 'perfurante', 'concussão'];
-const MATERIAIS = ['prata', 'adamante', 'mitral'];
+const MATERIAIS = ['prata', 'adamante', 'mitral', 'ferro frio'];
 const NATUREZAS = ['Ext', 'Sob', 'SM'];
 const RESISTENCIAS = ['fort', 'ref', 'von'];
 const ENERGIAS = ['fogo', 'frio', 'eletricidade', 'ácido', 'sônico', 'energia', 'energia negativa', 'energia positiva', 'divino', 'sagrado', 'profano', 'caótico', 'leal'];
@@ -38,7 +38,7 @@ const MARGENS = [15, 17, 18, 19, 20];
 /** Monstros que são Product Identity da Wizards e ficaram fora do SRD 3.0 (nome em inglês). */
 const PRODUCT_IDENTITY = ['beholder', 'mind flayer', 'illithid', 'githyanki', 'githzerai', 'displacer beast', 'carrion crawler', 'yuan-ti', 'kuo-toa', 'slaad', 'umber hulk', 'gauth', 'beholder mage'];
 /**
- * Talentos fora do compêndio aceitos: de monstro (Monster Manual 3.0) e de Tormenta usados por fichas oficiais
+ * Talentos fora do compêndio aceitos: de monstro (Monster Manual 3.0/3.5) e de Tormenta usados por fichas oficiais
  * (as do livro Tormenta D20 – Holy Avenger entraram na TASK_008, com o nome que o livro usa).
  */
 const TALENTOS_EXTRAS = [
@@ -46,9 +46,18 @@ const TALENTOS_EXTRAS = [
   'APARÊNCIA INOFENSIVA', 'ARREBATAR', 'AVENTUREIRO NATO', 'DESLOCAMENTO', 'FOCO EM HABILIDADE', 'FORMA DO MAR', 'FORMA FEROZ DO MAR',
   'FORMA MONSTRUOSA DO MAR', 'IMPOSTOR', 'INTOLERÂNCIA', 'INVOCAR FAMILIAR', 'MEMÓRIA RACIAL', 'PROSPERIDADE', 'RELIGIOSO',
   'TERRENO FAMILIAR', 'TORCIDA', 'VOZ DE ALLIHANNA',
+  'ATAQUE NATURAL APRIMORADO', 'PAIRAR', 'INVESTIDA PODEROSA', 'GOLPE ARRASADOR', 'CAPACIDADE DE CARGA ADICIONAL',
+  'COMBATER COM DUAS ARMAS MAIOR', 'VOAR ALTO', 'DURO DE FERIR', 'PERSUASIVO', 'SEPARAR APRIMORADO',
+  'SORRATEIRO', 'IGNORAR COMPONENTES MATERIAIS', 'AUTO-SUFICIENTE', 'ENGANADOR', 'ACROBÁTICO', 'ATLÉTICO',
+  'DILACERAR', 'INVESTIDA AÉREA', 'ESPECIALIZAÇÃO EM COMBATE APRIMORADA', 'ASSUSTAR APRIMORADO',
+  'AGARRAR APRIMORADO', 'INVERSÃO', 'SUCESSO DECISIVO APRIMORADO', 'CORRIDA',
+  'ATROPELAR APRIMORADO', 'POTENCIALIZAR HABILIDADE SIMILAR À MAGIA', 'POTENCIALIZAR HABILIDADE SIMILAR A MAGIA',
+  'ACELERAR HABILIDADE SIMILAR À MAGIA', 'ACELERAR HABILIDADE SIMILAR A MAGIA',
+  'GOLPE AVASSALADOR', 'TIRO MÚLTIPLO', 'DURO DE MATAR', 'MAGIAS SEM GESTOS', 'CONTRAMÁGICA APRIMORADA',
+  'ARMADURA NATURAL APRIMORADA', 'EXPULSÃO APRIMORADA',
 ];
-/** ND fracionário (criaturas e personagens muito fracos): 1/2, 1/3, 1/4, 1/6, 1/8, gravados como número. */
-const ND_FRACOES = [1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8];
+/** ND fracionário (criaturas e personagens muito fracos): 1/2, 1/3, 1/4, 1/6, 1/8, 1/10, gravados como número. */
+const ND_FRACOES = [1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8, 1 / 10];
 const ndFracionario = v => typeof v === 'number' && ND_FRACOES.some(f => Math.abs(v - f) < 1e-3);
 
 /**
@@ -125,7 +134,7 @@ function compendio() {
 }
 
 /** Valida uma seção ("monstros" ou "holy_avenger"). Devolve { erros, avisos }. */
-function validarSecao(lista, secao) {
+function validarSecao(lista, secao, { particionado = false } = {}) {
   const erros = [];
   const avisos = [];
   if (!['monstros', 'holy_avenger'].includes(secao)) return { erros: [`seção desconhecida "${secao}"`], avisos };
@@ -321,14 +330,14 @@ function validarSecao(lista, secao) {
     for (const k of ['nome', 'tipo', 'tamanho', 'tendencia', 'resumo', 'dados_vida', 'tatica']) if (!isStr(c[k])) erros.push(`${onde}: ${k}`);
     const cat = secao === 'monstros' ? 'monstro' : 'holy_avenger';
     if (c.categoria !== cat) erros.push(`${onde}: categoria deve ser "${cat}"`);
-    // monstros: ND 1–20; Holy Avenger pode passar do 20 (no livro, o Paladino vai até o ND 55 e Tarso, nível 63,
-    // tem ND 50; TASK_007 e TASK_008) e pode ter ND fracionário (Petra e Hipólita, ND 1/2)
-    const teto = secao === 'monstros' ? 20 : 80;
-    const ndOk = (isInt(c.nd) && c.nd >= 1 && c.nd <= teto) || (secao === 'holy_avenger' && ndFracionario(c.nd));
-    if (!ndOk) erros.push(`${onde}: nd 1–${teto}${secao === 'holy_avenger' ? ' ou fração (1/2, 1/3, 1/4, 1/6, 1/8)' : ''}`);
+    // monstros: ND 1–30; Holy Avenger pode passar do 20 (no livro, o Paladino vai até o ND 55 e Tarso, nível 63,
+    // tem ND 50; TASK_007 e TASK_008) e pode ter ND fracionário (1/2, 1/3, 1/4, 1/6, 1/8, 1/10)
+    const teto = secao === 'monstros' ? 30 : 80;
+    const ndOk = (isInt(c.nd) && c.nd >= 1 && c.nd <= teto) || ndFracionario(c.nd);
+    if (!ndOk) erros.push(`${onde}: nd 1–${teto} ou fração (1/2, 1/3, 1/4, 1/6, 1/8, 1/10)`);
     if (!isInt(c.nivel) || c.nivel < 1 || c.nivel > teto) erros.push(`${onde}: nivel 1–${teto}`);
     if (secao === 'monstros') {
-      if (c.nivel !== c.nd) erros.push(`${onde}: nivel deve ser igual ao nd`);
+      if (isInt(c.nd) && c.nivel !== c.nd) erros.push(`${onde}: nivel deve ser igual ao nd`);
       if (PRODUCT_IDENTITY.some(p => String(c.nome_original || '').toLowerCase().includes(p))) erros.push(`${onde}: "${c.nome_original}" é Product Identity, fora do SRD`);
     }
     if (!TAMANHOS.includes(c.tamanho)) erros.push(`${onde}: tamanho "${c.tamanho}"`);
@@ -392,8 +401,23 @@ function validarSecao(lista, secao) {
     especiais.forEach((e, j) => especial(e, `${onde} especial[${j}] ${e?.id}`, nomesAtaques, setEsp));
     for (const a of golpes) for (const ef of (isObj(a) && Array.isArray(a.efeitos) ? a.efeitos : [])) if (!setEsp.has(ef)) erros.push(`${onde}: ataque "${a.nome}" dispara "${ef}", que não está nos especiais`);
 
-    if (c.reducao_dano !== null && !(isObj(c.reducao_dano) && isInt(c.reducao_dano.valor) && isStr(c.reducao_dano.exceto))) erros.push(`${onde}: reducao_dano`);
-    if (isObj(c.reducao_dano) && /epic|épic|magic$|mágic[ao]$|ferro frio/i.test(c.reducao_dano.exceto)) avisos.push(`${onde}: RD "${c.reducao_dano.exceto}" parece da 3.5 (na 3.0 é "+N")`);
+    if (c.reducao_dano !== null) {
+      const rd = c.reducao_dano;
+      if (!isObj(rd) || !isInt(rd.valor) || rd.valor < 1) {
+        erros.push(`${onde}: reducao_dano.valor deve ser inteiro >= 1`);
+      } else {
+        const excetos = Array.isArray(rd.exceto) ? rd.exceto : [rd.exceto];
+        if (!excetos.length || excetos.some(e => !isStr(e))) {
+          erros.push(`${onde}: reducao_dano.exceto deve ser string ou array de strings não vazias`);
+        }
+        if (rd.modo !== undefined && !['e', 'ou'].includes(rd.modo)) {
+          erros.push(`${onde}: reducao_dano.modo deve ser "e" ou "ou"`);
+        }
+        for (const k of Object.keys(rd)) {
+          if (!['valor', 'exceto', 'modo'].includes(k)) erros.push(`${onde}: reducao_dano com campo "${k}" fora do formato`);
+        }
+      }
+    }
     if (c.resistencia_magia !== null && !isInt(c.resistencia_magia)) erros.push(`${onde}: resistencia_magia`);
     if (!isObj(c.resistencias_energia) || Object.values(c.resistencias_energia).some(v => !isInt(v))) erros.push(`${onde}: resistencias_energia`);
     else for (const k of Object.keys(c.resistencias_energia)) energia(k, `${onde} resistencias_energia`);
@@ -441,14 +465,11 @@ function validarSecao(lista, secao) {
     if (c.condicoes_iniciais !== undefined && (!Array.isArray(c.condicoes_iniciais) || c.condicoes_iniciais.some(x => !CONDICOES.includes(x)))) erros.push(`${onde}: condicoes_iniciais (lista de condições)`);
   });
 
-  if (secao === 'monstros') {
-    const nds = lista.filter(isObj).map(c => c.nd).sort((a, b) => a - b);
-    const faltam = Array.from({ length: 20 }, (_, i) => i + 1).filter(n => !nds.includes(n));
-    if (faltam.length) erros.push(`faltam monstros de ND ${faltam.join(', ')}`);
-    const repetidos = nds.filter((n, i) => nds.indexOf(n) !== i);
-    if (repetidos.length) erros.push(`ND repetido: ${[...new Set(repetidos)].join(', ')}`);
-    const t = lista.find(c => isObj(c) && c.nd === 20);
-    if (t && t.id !== 'tarrasque') erros.push('o monstro de ND 20 deve ser o Tarrasque (id "tarrasque")');
+  if (secao === 'monstros' && !particionado) {
+    if (lista.length < 20) erros.push(`seção monstros deve ter pelo menos 20 monstros (tem ${lista.length})`);
+    const t = lista.find(c => isObj(c) && c.id === 'tarrasque');
+    if (!t) erros.push('deve conter o Tarrasque (id "tarrasque")');
+    else if (t.nd !== 20) erros.push('o Tarrasque deve ser de ND 20');
   }
   return { erros, avisos };
 }
@@ -472,12 +493,209 @@ function validarCatalogo(catalogo) {
   return { erros, avisos };
 }
 
-module.exports = { validarSecao, validarCatalogo, EFEITOS, ENERGIAS, CONDICOES, IMUNIDADES, TALENTOS_EXTRAS };
+const CAMPOS_INDICE = ['id', 'nome', 'nome_original', 'categoria', 'nd', 'nivel', 'tipo', 'subtipos', 'tamanho', 'pv', 'ca', 'letra', 'arquivo'];
+const CAMPOS_INDICE_CA = ['total', 'toque', 'surpresa'];
+
+/** Valida o formato leve de data/monstros/indice.json */
+function validarIndice(indice) {
+  if (!Array.isArray(indice)) return { erros: ['o índice deve ser um array'], avisos: [] };
+  const erros = [];
+  const avisos = [];
+  const ids = new Set();
+
+  indice.forEach((item, i) => {
+    const onde = `indice[${i}] (${item?.id || 'sem id'})`;
+    if (!isObj(item)) return erros.push(`${onde}: item deve ser um objeto`);
+
+    for (const k of Object.keys(item)) {
+      if (!CAMPOS_INDICE.includes(k)) erros.push(`${onde}: campo "${k}" fora do formato`);
+    }
+
+    if (!isStr(item.id)) erros.push(`${onde}: id deve ser string`);
+    else if (ids.has(item.id)) erros.push(`${onde}: id duplicado "${item.id}"`);
+    else ids.add(item.id);
+
+    if (!isStr(item.nome)) erros.push(`${onde}: nome deve ser string`);
+    if (item.nome_original !== null && !isStr(item.nome_original)) erros.push(`${onde}: nome_original deve ser string ou null`);
+    if (!['monstro', 'holy_avenger'].includes(item.categoria)) erros.push(`${onde}: categoria deve ser "monstro" ou "holy_avenger"`);
+
+    if (item.categoria === 'monstro') {
+      if (!((isInt(item.nd) && item.nd >= 1 && item.nd <= 30) || ndFracionario(item.nd))) erros.push(`${onde}: nd deve ser 1–30 ou fração`);
+    } else {
+      if (!((isInt(item.nd) && item.nd >= 1 && item.nd <= 80) || ndFracionario(item.nd))) erros.push(`${onde}: nd deve ser 1–80 ou fração`);
+    }
+
+    if (!isInt(item.nivel) || item.nivel < 1) erros.push(`${onde}: nivel deve ser inteiro >= 1`);
+    if (!TIPOS.includes(item.tipo)) erros.push(`${onde}: tipo "${item.tipo}" fora da lista`);
+    if (!Array.isArray(item.subtipos) || item.subtipos.some(s => !isStr(s))) erros.push(`${onde}: subtipos deve ser array de strings`);
+    if (!TAMANHOS.includes(item.tamanho)) erros.push(`${onde}: tamanho "${item.tamanho}" fora da lista`);
+    if (!isInt(item.pv) || item.pv < 1) erros.push(`${onde}: pv deve ser inteiro >= 1`);
+
+    if (!isObj(item.ca)) {
+      erros.push(`${onde}: ca deve ser objeto`);
+    } else {
+      for (const k of Object.keys(item.ca)) {
+        if (!CAMPOS_INDICE_CA.includes(k)) erros.push(`${onde}: ca com campo "${k}" fora do formato`);
+      }
+      for (const k of CAMPOS_INDICE_CA) {
+        if (!isInt(item.ca[k])) erros.push(`${onde}: ca.${k} deve ser inteiro`);
+      }
+    }
+
+    if (!isStr(item.letra) || !/^[a-z]$/.test(item.letra)) erros.push(`${onde}: letra deve ser uma letra minúscula [a-z]`);
+    if (!isStr(item.arquivo) || (!/^[a-z]\.json$/.test(item.arquivo) && item.arquivo !== 'holy_avenger.json')) {
+      erros.push(`${onde}: arquivo "${item.arquivo}" inválido`);
+    }
+  });
+
+  return { erros, avisos };
+}
+
+/** Valida o diretório particionado data/monstros/ e sua consistência com o índice */
+function validarDiretorioMonstros(dirPath) {
+  const erros = [];
+  const avisos = [];
+
+  const indicePath = path.join(dirPath, 'indice.json');
+  if (!fs.existsSync(indicePath)) {
+    erros.push(`arquivo indice.json não encontrado em ${dirPath}`);
+    return { erros, avisos };
+  }
+
+  let indice;
+  try {
+    indice = JSON.parse(fs.readFileSync(indicePath, 'utf8'));
+  } catch (err) {
+    return { erros: [`falha ao carregar indice.json: ${err.message}`], avisos };
+  }
+
+  const rIndice = validarIndice(indice);
+  erros.push(...rIndice.erros);
+  avisos.push(...rIndice.avisos);
+
+  const haPath = path.join(dirPath, 'holy_avenger.json');
+  let holyAvenger = [];
+  if (fs.existsSync(haPath)) {
+    try {
+      holyAvenger = JSON.parse(fs.readFileSync(haPath, 'utf8'));
+      const rHa = validarSecao(holyAvenger, 'holy_avenger');
+      erros.push(...rHa.erros);
+      avisos.push(...rHa.avisos);
+    } catch (err) {
+      erros.push(`falha ao ler holy_avenger.json: ${err.message}`);
+    }
+  }
+
+  const monstros = [];
+  const LETRAS = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  for (const l of LETRAS) {
+    const fPath = path.join(dirPath, `${l}.json`);
+    if (!fs.existsSync(fPath)) continue;
+    try {
+      const listaLetra = JSON.parse(fs.readFileSync(fPath, 'utf8'));
+      if (!Array.isArray(listaLetra)) {
+        erros.push(`${l}.json deve conter um array`);
+        continue;
+      }
+      for (const m of listaLetra) {
+        if (isObj(m)) {
+          const norm = String(m.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          const primLetra = (norm.match(/[a-z]/) || [''])[0];
+          if (primLetra !== l) {
+            erros.push(`${l}.json: monstro "${m.nome}" (letra inicial "${primLetra}") em arquivo incorreto`);
+          }
+        }
+      }
+      const rLetra = validarSecao(listaLetra, 'monstros', { particionado: true });
+      erros.push(...rLetra.erros);
+      avisos.push(...rLetra.avisos);
+      monstros.push(...listaLetra);
+    } catch (err) {
+      erros.push(`falha ao ler ${l}.json: ${err.message}`);
+    }
+  }
+
+  if (monstros.length < 20) erros.push(`total de monstros particionados deve ser pelo menos 20 (tem ${monstros.length})`);
+  const t = monstros.find(c => isObj(c) && c.id === 'tarrasque');
+  if (!t) erros.push('particionados devem conter o Tarrasque (id "tarrasque")');
+  else if (t.nd !== 20) erros.push('o Tarrasque deve ser de ND 20');
+
+  const todosParticionados = [...monstros, ...holyAvenger].filter(isObj);
+  const mapaArquivos = new Map(todosParticionados.map(c => [c.id, c]));
+  const mapaIndice = new Map((Array.isArray(indice) ? indice : []).filter(isObj).map(c => [c.id, c]));
+
+  if (mapaArquivos.size !== mapaIndice.size) {
+    erros.push(`contagem divergente entre arquivos particionados (${mapaArquivos.size}) e indice.json (${mapaIndice.size})`);
+  }
+
+  for (const [id, c] of mapaArquivos) {
+    const idx = mapaIndice.get(id);
+    if (!idx) {
+      erros.push(`combatente "${id}" presente nos arquivos mas ausente no indice.json`);
+      continue;
+    }
+    if (idx.nome !== c.nome) erros.push(`combatente "${id}": nome diverge no índice ("${idx.nome}" ≠ "${c.nome}")`);
+    if (idx.categoria !== c.categoria) erros.push(`combatente "${id}": categoria diverge no índice`);
+    if (idx.nd !== c.nd) erros.push(`combatente "${id}": nd diverge no índice`);
+    if (idx.pv !== c.pv) erros.push(`combatente "${id}": pv diverge no índice`);
+    if (idx.ca?.total !== c.ca?.total) erros.push(`combatente "${id}": ca.total diverge no índice`);
+  }
+
+  for (const id of mapaIndice.keys()) {
+    if (!mapaArquivos.has(id)) {
+      erros.push(`combatente "${id}" presente no indice.json mas ausente nos arquivos particionados`);
+    }
+  }
+
+  return { erros, avisos };
+}
+
+module.exports = { validarSecao, validarCatalogo, validarIndice, validarDiretorioMonstros, EFEITOS, ENERGIAS, CONDICOES, IMUNIDADES, TALENTOS_EXTRAS };
 
 if (require.main === module) {
-  const [arquivo = path.join(__dirname, '..', 'data', 'catalogo-combate.json'), secaoArg] = process.argv.slice(2);
-  const raw = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
-  const { erros, avisos } = Array.isArray(raw) ? validarSecao(raw, secaoArg) : validarCatalogo(raw);
+  const [alvoArg, secaoArg] = process.argv.slice(2);
+  const root = path.join(__dirname, '..');
+  const dirMonstrosPadrao = path.join(root, 'data', 'monstros');
+  const catPadrao = path.join(root, 'data', 'catalogo-combate.json');
+
+  let erros = [];
+  let avisos = [];
+
+  if (!alvoArg) {
+    if (fs.existsSync(catPadrao)) {
+      const raw = JSON.parse(fs.readFileSync(catPadrao, 'utf8'));
+      const r = validarCatalogo(raw);
+      erros.push(...r.erros);
+      avisos.push(...r.avisos);
+    }
+    if (fs.existsSync(dirMonstrosPadrao)) {
+      const rDir = validarDiretorioMonstros(dirMonstrosPadrao);
+      erros.push(...rDir.erros);
+      avisos.push(...rDir.avisos);
+    }
+  } else if (fs.existsSync(alvoArg) && fs.statSync(alvoArg).isDirectory()) {
+    const rDir = validarDiretorioMonstros(alvoArg);
+    erros.push(...rDir.erros);
+    avisos.push(...rDir.avisos);
+  } else {
+    const raw = JSON.parse(fs.readFileSync(alvoArg, 'utf8'));
+    const nomeBase = path.basename(alvoArg);
+    if (nomeBase === 'indice.json') {
+      const r = validarIndice(raw);
+      erros.push(...r.erros);
+      avisos.push(...r.avisos);
+    } else if (Array.isArray(raw)) {
+      const particionado = /^[a-z]\.json$/.test(nomeBase);
+      const r = validarSecao(raw, secaoArg || (raw.some(c => c?.categoria === 'holy_avenger') ? 'holy_avenger' : 'monstros'), { particionado });
+      erros.push(...r.erros);
+      avisos.push(...r.avisos);
+    } else {
+      const r = validarCatalogo(raw);
+      erros.push(...r.erros);
+      avisos.push(...r.avisos);
+    }
+  }
+
   for (const a of avisos) console.log('AVISO ', a);
   for (const e of erros) console.log('ERRO  ', e);
   console.log(`${erros.length} erro(s), ${avisos.length} aviso(s).`);

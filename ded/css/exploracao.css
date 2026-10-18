@@ -1,0 +1,244 @@
+/* ==========================================================================
+   Tela de exploração da Ficha Iluminada: só o arranjo da folha em três
+   colunas (ficha, vitral com a cena, narrativa e crônica). As peças e o
+   comportamento responsivo delas vêm de componentes.css. Tudo aqui fica sob
+   .tela-exploracao, a classe que a .folha recebe enquanto esta tela está
+   ativa. O cabeçalho usa as mesmas colunas da mesa (subgrid), então o título
+   fica centrado sobre o vitral.
+   ========================================================================== */
+
+.tela-exploracao {
+    /* moldura 1,4rem + cabeçalho 6,5rem + respiro da mesa 2,3rem */
+    --coluna-ficha: 23rem;
+    --vao: 1.6rem;
+    --cabecalho: 6.5rem;
+    --altura-mesa: calc(100dvh - 2.8rem - var(--cabecalho) - 2.3rem);
+}
+
+.folha.tela-exploracao {
+    display: grid;
+    grid-template-columns: var(--coluna-ficha) auto minmax(0, 1fr);
+    grid-template-rows: var(--cabecalho) minmax(0, 1fr);
+    column-gap: var(--vao);
+    height: 100dvh;
+    padding: 0 1.4rem;
+}
+
+/* Exploração montada e invisível enquanto a seleção está na tela (mostrarTela):
+   o estilo e o layout já ficam prontos para o "Começar". A chama para. */
+.tela-exploracao.tela-em-espera {
+    position: fixed;
+    inset: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+.tela-em-espera .vitral-chama { animation-play-state: paused; }
+/* com uma janela aberta (body.com-janela, de abrirJanela), a chama também para:
+   ela fica atrás do fundo escuro, e a animação contínua faria o compositor
+   redesenhar a tela inteira a cada quadro */
+.com-janela .vitral-chama { animation-play-state: paused; }
+
+/* ---------- Cabeçalho (mesmas colunas da mesa) ---------- */
+
+.tela-exploracao .cabecalho {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+}
+/* folga para os dragões dos cantos; e os campos um pouco abaixo da borda queimada do alto
+   da folha, onde o rótulo "Classe" ficava em 4,47:1 (Fase 5, contraste AA) */
+.tela-exploracao .campos { padding: 0.4rem 0 0 7rem; }
+.tela-exploracao .selos { padding-right: 7rem; }
+
+/* ---------- Mesa (três colunas) ---------- */
+
+.tela-exploracao .mesa {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    min-height: 0;
+    padding: 1.2rem 0 1.1rem;
+}
+
+.tela-exploracao .coluna {
+    display: flex;
+    flex-direction: column;
+    gap: 2.15rem;
+    min-height: 0;
+}
+
+/* Ficha: o último painel estica para as três colunas terminarem juntas */
+.tela-exploracao .coluna-ficha > .painel:last-child { flex: 1 1 auto; }
+
+/* Vitral: a altura da mesa define a largura da coluna do meio, e o medalhão
+   do nível coroa o arco */
+.tela-exploracao .coluna-vitral {
+    position: relative;
+    align-items: center;
+    gap: 0;
+}
+.tela-exploracao .vitral { height: var(--altura-mesa); }
+.tela-exploracao .nivel {
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    z-index: var(--z-medalhao);
+    transform: translateX(-50%);
+}
+
+/* Arte da cena em duas camadas fixas, uma sobre a outra, na caixa do recorte
+   (changeImage). .vitral-artes isola a ordem das duas, abaixo da sombra e da
+   chama. A arte nova vai para a camada escondida, que passa para cima ainda em
+   opacity 0 e esmaece sobre a antiga; depois, a antiga se esconde. Só a
+   opacidade anima, e as duas camadas ficam na GPU a sessão inteira: criar uma
+   camada por troca obrigaria a GPU a limpar as texturas dela depois. Nada de
+   gradiente, máscara ou recorte nelas: o recorte em arco é o da .vitral-cena. */
+.tela-exploracao .vitral-artes {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+.tela-exploracao .vitral-arte {
+    position: absolute;
+    inset: 0;
+}
+.tela-exploracao .vitral-arte-cima { z-index: 1; }
+.tela-exploracao .vitral-arte-oculta { opacity: 0; }
+/* Sem o esmaecer (movimento reduzido), nenhuma das duas precisa de camada
+   própria, e o vitral fica como antes: a troca é na hora */
+@media (prefers-reduced-motion: no-preference) {
+    .tela-exploracao .vitral-arte { will-change: opacity; }
+}
+
+/* Narrativa logo depois do texto; a crônica absorve a sobra */
+.tela-exploracao .coluna-narrativa { padding-top: 0.2rem; }
+
+.tela-exploracao .painel-narrativa {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 2.2rem 2.2rem 1.2rem;
+    contain: layout style; /* trocar escolhas por dado não reflui o resto da folha */
+}
+.tela-exploracao .cena-texto { flex: 0 1 auto; min-height: 0; }
+
+.tela-exploracao .painel-cronica {
+    flex: 1 1 9rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 1.8rem 1.3rem 0.7rem;
+}
+.tela-exploracao .cronica { flex: 1 1 auto; min-height: 0; }
+
+/* Combate: o painel toma o lugar da narrativa e o relato, o da crônica (que
+   já dá o arranjo dele, .painel-cronica). O arranjo de dentro do painel fica
+   em componentes.css; aqui, só o lugar dele na coluna. */
+.tela-exploracao .painel-combate {
+    flex: 0 1 auto;
+    min-height: 0;
+    contain: layout style;
+}
+
+/* ---------- Telas estreitas ou em retrato: celular e tablet (Fase 5) ---------- */
+
+/* A folha cresce com o conteúdo e a página rola. As colunas da ficha e da
+   narrativa somem do layout (display: contents): cada peça entra na grade da mesa
+   e toma o lugar que serve ao jogo. A coluna do vitral fica, porque o medalhão do
+   nível se posiciona nela.
+
+   Celular: uma coluna, na ordem de jogar. O vitral com a cena, a narrativa (ou o
+   combate) com as escolhas, a vida logo abaixo das ações, a crônica (ou o relato)
+   e, por fim, a ficha. */
+@media (max-width: 68.6875em), (orientation: portrait) {
+    .folha.tela-exploracao {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        height: auto;
+        min-height: 100dvh;
+        padding: 0 0.35rem;
+    }
+    .tela-exploracao .cabecalho { grid-template-columns: minmax(0, 1fr); row-gap: 0.7rem; padding: 0.7rem 0 0; }
+    .tela-exploracao .titulo { order: -1; }
+    .tela-exploracao .campos { grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0 0.3rem; }
+    .tela-exploracao .selos { justify-content: center; padding: 0; }
+
+    .tela-exploracao .mesa { grid-template-columns: minmax(0, 1fr); row-gap: 2.5rem; padding: 1.2rem 0 1rem; }
+    .tela-exploracao .coluna-ficha,
+    .tela-exploracao .coluna-narrativa { display: contents; }
+    .tela-exploracao .coluna-vitral { order: 1; padding-top: 4.2rem; }
+    .tela-exploracao .painel-narrativa,
+    .tela-exploracao .painel-combate { order: 2; }
+    .tela-exploracao .vitais { order: 3; padding: 0.4rem 0.6rem 0; }
+    .tela-exploracao .painel-cronica { order: 4; }
+    .tela-exploracao .coluna-ficha > .painel { order: 5; }
+
+    /* O vitral não passa de ~53% da altura da tela: a arte e o começo do texto
+       cabem juntos quando a cena nova entra */
+    .tela-exploracao .vitral { height: auto; width: min(100%, 30rem, 40svh); }
+    .tela-exploracao .painel-narrativa { padding: 2.2rem 0.9rem 1rem; }
+    /* o texto cresce com a página e não rola por dentro (com a capitular mais alta
+       que um texto curto, sobravam uns pixels de rolagem que prendiam o dedo) */
+    .tela-exploracao .cena-texto { overflow-y: visible; }
+    /* a crônica e o relato não empurram a ficha para longe: rolam por dentro, com o
+       mais recente à vista */
+    .tela-exploracao .painel-cronica { padding: 1.8rem 0.9rem 0.6rem; }
+    .tela-exploracao .cronica { max-height: 19rem; }
+
+    /* A página rola: os números que sobem flutuam no meio da tela, onde ela estiver,
+       e não só sobre o vitral */
+    .tela-exploracao #floater-layer { position: fixed; }
+
+    /* Onde a página para quando a cena nova ou a luta vem à vista (trazerAVista, no
+       jogo): com a fita do painel e o medalhão do nível inteiros */
+    .tela-exploracao .nivel { scroll-margin-top: 0.6rem; }
+    .tela-exploracao .painel-narrativa,
+    .tela-exploracao .painel-combate { scroll-margin-top: 2.6rem; }
+}
+
+/* Tablet e celular deitado (de 43,75em, 700 px na fonte padrão): duas colunas.
+   O vitral e a vida à esquerda, a narrativa (ou o combate) à direita; embaixo, a
+   crônica na largura toda e a ficha em duas colunas. O cabeçalho ganha duas
+   linhas: o título, e os campos com os selos. A ordem dos painéis da ficha
+   (atributos, equipamento e missões) é a do HTML. */
+@media (min-width: 43.75em) and (max-width: 68.6875em), (min-width: 43.75em) and (orientation: portrait) {
+    .folha.tela-exploracao { padding: 0 0.8rem; }
+    .tela-exploracao .cabecalho {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "titulo titulo" "campos selos";
+        column-gap: 2rem;
+        padding: 0.8rem 3rem 0;
+    }
+    .tela-exploracao .titulo { grid-area: titulo; }
+    .tela-exploracao .campos { grid-area: campos; align-self: center; max-width: 30rem; }
+    .tela-exploracao .selos { grid-area: selos; }
+
+    .tela-exploracao .mesa {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        grid-template-rows: auto 1fr;
+        grid-template-areas:
+            "vitral narrativa"
+            "vitais narrativa"
+            "cronica cronica"
+            "atributos equipamento"
+            "missoes missoes";
+        column-gap: 1.6rem;
+        row-gap: 2.3rem;
+    }
+    .tela-exploracao .coluna-vitral { grid-area: vitral; }
+    .tela-exploracao .painel-narrativa,
+    .tela-exploracao .painel-combate { grid-area: narrativa; align-self: start; }
+    .tela-exploracao .vitais { grid-area: vitais; align-self: start; }
+    .tela-exploracao .painel-cronica { grid-area: cronica; }
+    .tela-exploracao .coluna-ficha > .painel:nth-child(2) { grid-area: atributos; }
+    .tela-exploracao .coluna-ficha > .painel:nth-child(3) { grid-area: equipamento; }
+    .tela-exploracao .coluna-ficha > .painel:nth-child(4) { grid-area: missoes; }
+    /* o vitral (e o medalhão em cima dele) cabem na altura da tela */
+    .tela-exploracao .vitral { width: min(100%, 30rem, calc((100svh - 6rem) * 0.75)); }
+    .tela-exploracao .painel-narrativa { padding: 2.2rem 1.4rem 1rem; }
+    .tela-exploracao .cronica { max-height: 14rem; }
+    /* com o vitral à vista, ao lado do texto, os números voltam a subir sobre ele */
+    .tela-exploracao #floater-layer { position: absolute; }
+}
