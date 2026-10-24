@@ -5,6 +5,7 @@ const path = require('path');
 const cfg = require('../config');
 const { countedLength } = require('./compose');
 const { resolveMedia, missingFiles, insideAssets } = require('./media');
+const lang = require('./lang');
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{2,60}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
@@ -26,8 +27,17 @@ function validAt(at) {
 const HASHTAG_RE = /^[A-Za-zÀ-ÿ0-9_]{2,30}$/;
 // isca de engajamento e spam: o plano é conteúdo que vale por si, nunca pedir curtida/compartilhamento
 const BAIT = ['clique aqui', 'link na bio', 'ganhe dinheiro', 'compre agora', 'sorteio', 'siga e ', 'segue de volta',
-    'follow back', 'curta e compartilhe', 'marque um amigo', 'marque alguém', 'compartilhe com', 'retweet', 'rt se'];
-const CLAIMS = [/melhor jogo do mundo/, /\bn(úmero|º) ?1\b/, /o maior do brasil/, /\bgarantid[oa]s?\b/, /viciante demais/];
+    'follow back', 'curta e compartilhe', 'marque um amigo', 'marque alguém', 'compartilhe com', 'retweet',
+    // inglês e espanhol (posts com `lang`)
+    'click here', 'tag a friend', 'giveaway', 'like and share', 'like & share', 'follow for follow', 'buy now', 'make money',
+    'share this', 'share with', 'follow us', 'like this', 'like and follow', 'tag someone',
+    'haz clic aquí', 'etiqueta a un amigo', 'etiqueta a alguien', 'sorteo', 'comparte con', 'comparte esto', 'comparte este', 'sígueme y',
+    'síguenos', 'dale like', 'compra ahora', 'gana dinero'];
+// "rt se" por substring pegaria em "start settings": só vale como palavra
+const BAIT_WORDS = [/(^|\s)rt se(\s|$)/];
+const CLAIMS = [/melhor jogo do mundo/, /\bn(úmero|º) ?1\b/, /o maior do brasil/, /\bgarantid[oa]s?\b/, /viciante demais/,
+    /best (game|games) (in the world|ever)/, /\bguaranteed\b/, /\bthe #1\b/, /mejor juego del mundo/, /\bgarantizad[oa]s?\b/,
+    /\bnumber one\b/, /world'?s best/, /el mejor del mundo/, /\bnúmero uno\b/];
 
 const emojiCount = (s) => (s.match(/\p{Extended_Pictographic}/gu) || []).length + (s.match(/\p{Regional_Indicator}{2}/gu) || []).length;
 
@@ -43,6 +53,7 @@ function lintText(text, { min = cfg.MIN_TEXT_LENGTH } = {}) {
     const letters = text.replace(/[^A-Za-zÀ-ÿ]/g, '');
     if (letters.length > 20 && text.replace(/[^A-ZÀ-Ý]/g, '').length / letters.length > 0.4) p.push('texto em CAIXA ALTA');
     BAIT.filter((b) => low.includes(b)).forEach((b) => p.push(`isca de engajamento/spam: "${b.trim()}"`));
+    BAIT_WORDS.filter((re) => re.test(low)).forEach((re) => p.push(`isca de engajamento/spam: "${low.match(re)[0].trim()}"`));
     CLAIMS.filter((re) => re.test(low)).forEach((re) => p.push(`afirmação não comprovável: "${low.match(re)[0]}"`));
     return p;
 }
@@ -72,6 +83,19 @@ function validatePost(post, { games, mode = 'plan' }) {
     if (!Array.isArray(post.channels) || !post.channels.length || post.channels.some((c) => !cfg.CHANNELS.includes(c))) add(`"channels" deve ser subconjunto de ${cfg.CHANNELS.join(', ')}`);
     if (typeof post.text !== 'string') { add('texto ausente'); return p; }
     lintText(post.text).forEach(add);
+
+    // idioma: pt (padrão), en ou es. en/es só para jogos com página traduzida, só em canais que aceitam e sem `link` alternativo
+    // (o Desafio do Dia só existe em português).
+    if (post.lang !== undefined && !cfg.POST_LANGS.includes(post.lang)) add(`lang deve ser um de: ${cfg.POST_LANGS.join(', ')}`);
+    else if (lang.langOf(post) !== lang.DEFAULT_LANG) {
+        const lg = lang.langOf(post);
+        if (!lang.hasTranslation(post.game, lg)) add(`jogo "${post.game}" não tem página em ${lg} (i18n/config.js e i18n/${lg}.json): só jogos traduzidos podem ter post em ${lg}`);
+        // como a página: se parte do jogo está em português, o post diz (quem chega pelo post não deve ser surpreendido)
+        else if (lang.needsLanguageNote(post.game) && !lang.MENTIONS_PORTUGUESE.test(post.text)) add(`o jogo "${post.game}" tem partes em português: o texto do post precisa avisar (cite "Portuguese"/"portugués", como a uiNote da página)`);
+        if (Array.isArray(post.channels) && post.channels.some((c) => !cfg.NON_PT_CHANNELS.includes(c))) add(`posts em ${lg} só podem ir para: ${cfg.NON_PT_CHANNELS.join(', ')}`);
+        if (post.link !== undefined) add(`posts em ${lg} não podem ter "link" alternativo (o Desafio do Dia só existe em português)`);
+        lang.langProblems(post.text, lg).forEach(add);
+    }
 
     if (post.link !== undefined) {
         const l = post.link;
@@ -133,7 +157,7 @@ function validatePost(post, { games, mode = 'plan' }) {
     }
 
     // tamanho final em cada canal
-    if (games.has(post.game) && Array.isArray(post.channels)) {
+    if (games.has(post.game) && Array.isArray(post.channels) && cfg.POST_LANGS.includes(lang.langOf(post))) {
         for (const ch of post.channels.filter((c) => cfg.CHANNELS.includes(c))) {
             const n = countedLength(post, ch, post.campaign || 'x');
             if (n > cfg.TEXT_LIMITS[ch]) add(`${ch}: ${n} caracteres, o limite é ${cfg.TEXT_LIMITS[ch]}`);
