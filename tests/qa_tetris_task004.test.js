@@ -135,13 +135,12 @@ async function runTests() {
     throw new Error('Garbage line attack calculation failed');
   }
 
-  // Prepopulate pending incoming garbage on player and check garbage fill bar
-  await page.evaluate(() => {
-    window.__tetris.setIncomingGarbage(5);
-  });
-  await new Promise(r => setTimeout(r, 200));
-
+  // Prepopulate pending incoming garbage on player and check garbage fill bar.
+  // The duel keeps running: a CPU line clear sends more garbage (+10% per line) and a
+  // player piece locking applies the pending garbage (0%). Read the bar in the same
+  // evaluate, right after setIncomingGarbage, which updates the HUD synchronously.
   const fillHeight = await page.evaluate(() => {
+    window.__tetris.setIncomingGarbage(5);
     const fill = document.getElementById('playerGarbageFill');
     return fill ? fill.style.height : '0%';
   });
