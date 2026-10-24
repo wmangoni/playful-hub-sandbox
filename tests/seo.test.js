@@ -20,7 +20,9 @@ pages.forEach(p => assert.ok(locs.includes(`${SITE}/jogos/${p}`), `sitemap sem /
 assert.ok(locs.includes(SITE + '/desafio/'), 'sitemap sem a página do Desafio do Dia');
 const extras = require('../scripts/generate-seo').EXTRA_PAGES;
 extras.forEach((e) => assert.ok(locs.includes(SITE + e.path), `sitemap sem ${e.path}`));
-assert.strictEqual(locs.length, pages.length + 1 + extras.length, 'sitemap com URLs além da home, das páginas extras e dos jogos');
+const i18n = require('../i18n/config');
+const translated = i18n.langs.length * (i18n.slugs.length + 1); // hubs + páginas traduzidas
+assert.strictEqual(locs.length, pages.length + 1 + extras.length + translated, 'sitemap com URLs além da home, das páginas extras, dos jogos e das versões em outros idiomas');
 locs.forEach(u => assert.ok(u.startsWith(SITE), `URL fora do domínio: ${u}`));
 
 // robots.txt aponta para o sitemap
