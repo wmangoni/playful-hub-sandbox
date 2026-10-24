@@ -61,7 +61,7 @@
 //                     mudam; aos 0,6 s, o medalhão fecha a janela. 1,5 s do clique.
 //   diario *          o selo "Diário" e, aos 1,2 s, o medalhão; 2 s do clique.
 //   especializacao *  com 140 de XP, changeXP(20) leva ao nível 3: o número que sobe, o som e, dois quadros
-//                     depois, a janela obrigatória; aos 1,5 s, o clique na primeira opção a fecha. 2,6 s.
+//                     depois, a janela; aos 1,5 s, o clique na primeira opção a fecha. 2,6 s.
 //   fim *             loadScene('death') com o texto pulado: a cena da morte e, ~1,25 s depois, a janela do fim
 //                     com o carimbo do selo (0,45 s); 3 s.
 //   aviso *           avisar() sem janela aberta: o aviso desce, fica ~5,1 s e some (0,3 s); 6,5 s.
@@ -131,6 +131,16 @@
 //   custo (ele cresce com as texturas descartadas), então uma aprovação que dependa dessa exclusão é
 //   decisão do dono do projeto. Se o Chrome mudar o nome da tarefa, os quadros voltam a contar contra
 //   a página. --sem-rastreio desliga o rastreio (para medir o custo dele): aí tudo conta.
+// - Tarefas do próprio Chrome na thread principal da página, reconhecidas pelo nome. Hoje, uma: o
+//   temporizador do "tempo até interativo" (InteractiveDetector, a tarefa postada por
+//   StartOrPostponeCITimer em interactive_detector.cc). Ele roda uma vez por carga, uns 5 s depois
+//   dela, sem script da página, e costuma levar 0,1 ms; em ~1% das cargas levou ~61 ms, e a ferramenta
+//   joga poucos segundos depois de abrir a aba (num jogo de verdade, a luta vem minutos depois). Um
+//   quadro acima do limite em que ela roda sai do veredito pela mesma regra da limpeza da GPU: sem o
+//   trecho dela, o quadro caberia no limite, e o resto do trabalho da página no quadro fica abaixo de
+//   3 ms. O relatório lista esses quadros à parte (coluna "Chr"), como numa captura de desempenho de
+//   um jogo, que separa o soluço da plataforma do custo do jogo sem escondê-lo. Decisão do dono do
+//   projeto (TASK_001 §7). Uma tarefa nova só entra em TAREFAS_DO_CHROME com o rastreio que a prove.
 // - Movimento padrão emulado (prefers-reduced-motion: no-preference). Com as animações do Windows
 //   desligadas, o Chrome pede movimento reduzido e o jogo pularia a máquina de escrever, o giro do
 //   d20 e a chama do vitral, que são justamente o que se quer medir. --movimento reduzido mede o outro caminho.
@@ -195,7 +205,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 // ela, em 0 de 25. Um jogador leva mais que isso para escolher a classe (TASK_001 §6).
 const ASSENTAR_MS = 1500;
 const passou = d => d > LIMITE_MS + FOLGA_MS;
-const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU
+const TRABALHO_MAX_MS = 3; // trabalho da página tolerado num quadro atribuído à limpeza da GPU ou ao Chrome
+// Tarefas do Chrome na thread principal da página (ver as armadilhas): o arquivo e a função que as postam
+const TAREFAS_DO_CHROME = [
+    { arquivo: 'third_party/blink/renderer/core/loader/interactive_detector.cc', funcao: 'StartOrPostponeCITimer', nome: 'InteractiveDetector' }
+];
 let RASTREAR = true; // --sem-rastreio desliga
 let AQUECIMENTO = 'd20'; // --aquecimento
 let INTERVALO_MS = null; // o intervalo de atualização medido no aquecimento (para achar a meia taxa)
@@ -472,7 +486,7 @@ async function fluxoJanela({ tipo, janela, depois }) {
 // saem as limpezas ociosas da GPU e o trabalho da thread principal da página (ver as armadilhas),
 // em ms contados da ação.
 async function comRastreio(page, executar) {
-    if (!RASTREAR) return Object.assign(await executar(), { limpezas: null, trabalho: null, compilacoes: null, paradas: null });
+    if (!RASTREAR) return Object.assign(await executar(), { limpezas: null, trabalho: null, compilacoes: null, paradas: null, chrome: null });
     const arq = path.join(os.tmpdir(), `ded-desempenho-${process.pid}-${Date.now()}.json`);
     await page.tracing.start({ path: arq, categories: ['toplevel', 'blink.user_timing'] });
     let r;
@@ -494,9 +508,10 @@ async function comRastreio(page, executar) {
 
 function lerRastreio(arq) {
     let eventos;
-    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return { limpezas: null, trabalho: null, compilacoes: null, paradas: null }; }
+    const vazio = { limpezas: null, trabalho: null, compilacoes: null, paradas: null, chrome: null };
+    try { eventos = JSON.parse(fs.readFileSync(arq, 'utf8')).traceEvents; } catch { return vazio; }
     const marca = eventos.find(e => e.name === 'desempenho:acao');
-    if (!marca) return { limpezas: null, trabalho: null, compilacoes: null, paradas: null };
+    if (!marca) return vazio;
     const threads = new Map();
     for (const e of eventos) if (e.name === 'thread_name') threads.set(`${e.pid}:${e.tid}`, e.args && e.args.name);
     const ms = ts => (ts - marca.ts) / 1000;
@@ -512,7 +527,11 @@ function lerRastreio(arq) {
         paradas: tarefas.filter(e => e.dur >= 50000 && e.args?.src_func === 'GetDawnInfo' && naGpu(e))
             .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000 })),
         // a thread principal da página é a da marca
-        trabalho: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100).map(e => [ms(e.ts), ms(e.ts + e.dur)])
+        trabalho: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100).map(e => [ms(e.ts), ms(e.ts + e.dur)]),
+        // as tarefas do Chrome nela, pelo nome
+        chrome: tarefas.filter(e => e.pid === marca.pid && e.tid === marca.tid && e.dur >= 100 &&
+            TAREFAS_DO_CHROME.some(t => e.args?.src_file === t.arquivo && e.args?.src_func === t.funcao))
+            .map(e => ({ inicio: ms(e.ts), duracao: e.dur / 1000, nome: TAREFAS_DO_CHROME.find(t => e.args.src_func === t.funcao).nome }))
     };
 }
 
@@ -534,7 +553,19 @@ function daLimpeza(e, i) {
     const trecho = trechoDaLimpeza(e, i);
     return trecho > 0 && e.quadros[i] - trecho <= LIMITE_MS + FOLGA_MS && trabalhoDaPagina(e, i) < TRABALHO_MAX_MS;
 }
-const daPagina = (e, i) => passou(e.quadros[i]) && !daLimpeza(e, i);
+// Um quadro acima do limite é de uma tarefa do Chrome (TAREFAS_DO_CHROME) pela mesma regra: ela roda
+// durante ele, ele caberia no limite sem o trecho dela, e o resto do trabalho da página no quadro
+// (o trabalho menos o trecho da tarefa, que roda na mesma thread) fica abaixo de TRABALHO_MAX_MS.
+function trechoDoChrome(e, i) {
+    const [inicio, fim] = intervalo(e, i);
+    return (e.chrome || []).reduce((t, c) => t + sobreposicao(inicio, fim, c.inicio, c.inicio + c.duracao), 0);
+}
+function doChrome(e, i) {
+    if (!passou(e.quadros[i]) || !e.chrome || !e.trabalho || daLimpeza(e, i)) return false;
+    const trecho = trechoDoChrome(e, i);
+    return trecho > 0 && e.quadros[i] - trecho <= LIMITE_MS + FOLGA_MS && trabalhoDaPagina(e, i) - trecho < TRABALHO_MAX_MS;
+}
+const daPagina = (e, i) => passou(e.quadros[i]) && !daLimpeza(e, i) && !doChrome(e, i);
 // Um quadro em que o Dawn compilava um pipeline (é custo de primeira vez, e conta contra a página)
 function comCompilacao(e, i) {
     const [inicio, fim] = intervalo(e, i);
@@ -801,28 +832,29 @@ function estatistica(execucoes) {
     const conta = f => execucoes.reduce((t, e) => t + e.quadros.filter((_, i) => f(e, i)).length, 0);
     return {
         quadros: quadros.length, mediana: q(0.5), p95: q(0.95), p99: q(0.99), max: pior ? pior.d : NaN,
-        acima: conta(daPagina), limpeza: conta(daLimpeza), piorEm: pior ? pior.inicio : NaN,
+        acima: conta(daPagina), limpeza: conta(daLimpeza), chrome: conta(doChrome), piorEm: pior ? pior.inicio : NaN,
         loafBloqueio: execucoes.some(e => e.loafSuportado) ? Math.max(0, ...loafs.map(l => l.bloqueio)) : null,
         loafDuracao: execucoes.some(e => e.loafSuportado) ? Math.max(0, ...loafs.map(l => l.duracao)) : null
     };
 }
 
 const num = (v, casas = 1) => (Number.isFinite(v) ? v.toFixed(casas).replace('.', ',') : '—');
-const LARGURAS = [22, 4, 8, 8, 7, 7, 7, 6, 4, 6, 10];
+const LARGURAS = [22, 4, 8, 8, 7, 7, 7, 6, 4, 4, 6, 10];
 const linha = cols => cols.map((c, i) => String(c)[i === 0 ? 'padEnd' : 'padStart'](LARGURAS[i])).join(' ');
 
 function imprimir(resultados, meta) {
-    console.log('\n' + linha(['cenário', 'CPU', 'quadros', 'mediana', 'p95', 'p99', 'máx', '>20,8', 'GPU', 'LoAF', 'pior em']));
+    console.log('\n' + linha(['cenário', 'CPU', 'quadros', 'mediana', 'p95', 'p99', 'máx', '>20,8', 'GPU', 'Chr', 'LoAF', 'pior em']));
     console.log('-'.repeat(LARGURAS.reduce((a, b) => a + b + 1, -1)));
     for (const r of resultados) {
         const nome = r.cenario + (SO_INFORMA.has(r.cenario) ? ' (info)' : r.tentativas > 1 ? ` ×${r.tentativas}` : '');
-        if (!r.execucoes.length) { console.log(linha([nome, `${r.cpu}x`, 'ERRO', '', '', '', '', '', '', '', ''])); continue; }
+        if (!r.execucoes.length) { console.log(linha([nome, `${r.cpu}x`, 'ERRO', '', '', '', '', '', '', '', '', ''])); continue; }
         const s = r.resumo;
-        console.log(linha([nome, `${r.cpu}x`, s.quadros, num(s.mediana), num(s.p95), num(s.p99), num(s.max), s.acima, s.limpeza,
+        console.log(linha([nome, `${r.cpu}x`, s.quadros, num(s.mediana), num(s.p95), num(s.p99), num(s.max), s.acima, s.limpeza, s.chrome,
             s.loafBloqueio === null ? '—' : Math.round(s.loafBloqueio), `${s.piorEm >= 0 ? '+' : ''}${Math.round(s.piorEm)} ms`]));
     }
     console.log('\nTempos em ms. ">20,8": quadros acima do limite que contam contra a página. "GPU": os acima do limite');
-    console.log('que caíram na limpeza ociosa da GPU e ficam fora do veredito (ver o cabeçalho do script). "pior em":');
+    console.log('que caíram na limpeza ociosa da GPU e ficam fora do veredito (ver o cabeçalho do script). "Chr": os que');
+    console.log('caíram numa tarefa do próprio Chrome, pelo nome (TAREFAS_DO_CHROME), também fora do veredito. "pior em":');
     console.log('início do quadro mais lento, contado da ação (na abertura, do início do documento).');
     console.log('LoAF: pior bloqueio (ms) entre os quadros acima de 50 ms. Um LoAF longo com pouco script e pouco');
     console.log('render quer dizer que a thread principal esperou a GPU, a rasterização ou a decodificação de imagem.');
@@ -846,6 +878,11 @@ function imprimir(resultados, meta) {
         if (naLimpeza.length) {
             console.log(`${rotulo}: na limpeza ociosa da GPU, fora do veredito (ms@início, trecho da tarefa no quadro, trabalho da página): ` +
                 naLimpeza.map(x => `${fmt(x)} ${num(trechoDaLimpeza(x.e, x.i))} ${num(trabalhoDaPagina(x.e, x.i))}`).join(', '));
+        }
+        const noChrome = quadrosDe(doChrome);
+        if (noChrome.length) {
+            console.log(`${rotulo}: numa tarefa do Chrome, fora do veredito (ms@início, tarefa, trecho dela no quadro, resto do trabalho da página): ` +
+                noChrome.map(x => `${fmt(x)} ${[...new Set(x.e.chrome.map(c => c.nome))].join('+')} ${num(trechoDoChrome(x.e, x.i))} ${num(trabalhoDaPagina(x.e, x.i) - trechoDoChrome(x.e, x.i))}`).join(', '));
         }
         if (RASTREAR && r.execucoes.some(e => e.limpezas === null)) r.avisos.push('sem o rastreio da GPU em alguma execução: os quadros dela contam todos contra a página');
         if (r.execucoes.length > 1) {
@@ -881,8 +918,11 @@ function veredito(resultados) {
     if (!contam.length) return { texto: 'SEM VEREDITO (nenhum cenário de aceite em CPU 1x)', aprovado: true };
     const acima = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.acima : 0), 0);
     const naLimpeza = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.limpeza : 0), 0);
+    const noChrome = contam.reduce((t, r) => t + (r.execucoes.length ? r.resumo.chrome : 0), 0);
     const erros = contam.reduce((t, r) => t + r.erros.length, 0);
-    const fora = naLimpeza ? `${naLimpeza} ${naLimpeza === 1 ? 'quadro' : 'quadros'} na limpeza da GPU, fora do veredito` : '';
+    const fora = [naLimpeza ? `${naLimpeza} ${naLimpeza === 1 ? 'quadro' : 'quadros'} na limpeza da GPU` : '',
+        noChrome ? `${noChrome} ${noChrome === 1 ? 'quadro' : 'quadros'} numa tarefa do Chrome` : '']
+        .filter(Boolean).join(' e ') + (naLimpeza || noChrome ? ', fora do veredito' : '');
     const meia = contam.reduce((t, r) => t + (r.meiaTaxa || 0), 0);
     const refeitas = contam.reduce((t, r) => t + (r.refeitasMeiaTaxa || 0), 0);
     const nota = refeitas ? ` [${refeitas} ${refeitas === 1 ? 'execução refeita' : 'execuções refeitas'} em meia taxa]` : '';
@@ -1037,6 +1077,8 @@ async function medir({ cenarios, execucoes, repeticoes, cpus, json, raiz, perfil
                     compilacoesGpu: e.compilacoes && e.compilacoes.map(c => ({ inicio: r2(c.inicio), duracao: r2(c.duracao) })),
                     quadrosComCompilacao: e.quadros.map((_, i) => i).filter(i => passou(e.quadros[i]) && comCompilacao(e, i)),
                     quadrosNaLimpeza: e.quadros.map((_, i) => i).filter(i => daLimpeza(e, i)),
+                    tarefasChrome: e.chrome && e.chrome.map(c => ({ nome: c.nome, inicio: r2(c.inicio), duracao: r2(c.duracao) })),
+                    quadrosNoChrome: e.quadros.map((_, i) => i).filter(i => doChrome(e, i)),
                     rastreio: !!(e.limpezas && e.trabalho), rastreioGuardado: e.rastreioGuardado || null,
                     comecou: e.comecou, resultado: e.resultado, cenaAntes: e.cenaAntes, cena: e.cena, combate: e.combate
                 }))

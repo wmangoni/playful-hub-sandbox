@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -294,21 +294,21 @@ async function runTests() {
     window.__museum.teleportPlayer(1200, 1050);
   });
   await new Promise(r => setTimeout(r, 200));
-  const deskEvidence = path.join(__dirname, 'crt_pc_desk_view.png');
+  const deskEvidence = shotPath('crt_pc_desk_view.png');
   await page.screenshot({ path: deskEvidence });
   console.log('📸 Evidência 1 (Mesa e PC Anos 90 Completo):', deskEvidence);
 
   // 2. Visão Focada no Monitor CRT 4:3 (Focus View)
   await page.evaluate(() => window.__museum.toggleViewMode());
   await new Promise(r => setTimeout(r, 350));
-  const focusEvidence = path.join(__dirname, 'crt_pc_focus_view.png');
+  const focusEvidence = shotPath('crt_pc_focus_view.png');
   await page.screenshot({ path: focusEvidence });
   console.log('📸 Evidência 2 (Foco no Monitor CRT 4:3):', focusEvidence);
 
   // 3. Efeito Degauss em Ação
   await page.evaluate(() => window.__museum.triggerDegauss());
   await new Promise(r => setTimeout(r, 70)); // Pegar o ápice da distorção
-  const degaussEvidence = path.join(__dirname, 'crt_pc_degauss_action.png');
+  const degaussEvidence = shotPath('crt_pc_degauss_action.png');
   await page.screenshot({ path: degaussEvidence });
   console.log('📸 Evidência 3 (Degauss Eletromagnético):', degaussEvidence);
 
@@ -320,7 +320,7 @@ async function runTests() {
   await new Promise(r => setTimeout(r, 100));
   await page.evaluate(() => window.__museum.simulateInteract());
   await new Promise(r => setTimeout(r, 200));
-  const modalEvidence = path.join(__dirname, 'crt_pc_modal_game.png');
+  const modalEvidence = shotPath('crt_pc_modal_game.png');
   await page.screenshot({ path: modalEvidence });
   console.log('📸 Evidência 4 (Modal de Jogo Aberta no CRT):', modalEvidence);
 

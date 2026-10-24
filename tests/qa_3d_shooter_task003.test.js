@@ -1,5 +1,6 @@
 const http = require('http');
 const app = require('../server');
+const { shotPath } = require('./shots');
 
 let server;
 let browser;
@@ -8,8 +9,8 @@ let puppeteer;
 
 const PORT = 3057;
 const BASE_URL = `http://127.0.0.1:${PORT}/3d_shooter`;
-const SCREENSHOT = `${__dirname}/3d_shooter_task003_qa_evidence.png`;
-const SCREENSHOT2 = `${__dirname}/3d_shooter_task003_qa_evidence_rocket.png`;
+const SCREENSHOT = shotPath('3d_shooter_task003_qa_evidence.png');
+const SCREENSHOT2 = shotPath('3d_shooter_task003_qa_evidence_rocket.png');
 
 let totalPassed = 0;
 let totalFailed = 0;

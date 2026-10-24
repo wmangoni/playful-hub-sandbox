@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const fs = require('fs');
 const app = require('../server');
 
@@ -330,7 +330,7 @@ async function runTests() {
   console.log('✅ Teste 7: Game loop executou sem nenhum erro de runtime.');
 
   // Tirar Screenshot de Evidência
-  const screenshotPath = path.join(__dirname, 'rede_neural_qa_evidence.png');
+  const screenshotPath = shotPath('rede_neural_qa_evidence.png');
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`\n📸 Screenshot de evidência capturada em: ${screenshotPath}`);
 

@@ -1,6 +1,6 @@
 process.env.NODE_ENV = 'test';
 const http = require('http');
-const path = require('path');
+const { shotPath } = require('./shots');
 const app = require('../server');
 
 let server;
@@ -214,7 +214,7 @@ async function runTests() {
   console.log('✅ Teste 5: WebGL e Three.js executaram com 0 erros.');
 
   // Tirar Screenshot de Evidência
-  const screenshotPath = path.join(__dirname, 'voxel_arena_task001_qa_evidence.png');
+  const screenshotPath = shotPath('voxel_arena_task001_qa_evidence.png');
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`\n📸 Screenshot de evidência capturada em: ${screenshotPath}`);
 

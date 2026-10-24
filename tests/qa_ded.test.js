@@ -920,7 +920,7 @@ async function runTests() {
   // TEST CASES 9 a 12: as janelas e os avisos (Fase 4), com o teclado
   // ----------------------------------------------------
   // As janelas são <dialog> abertos com showModal(): o foco entra nelas, Escape fecha
-  // (menos a especialização, obrigatória) e o foco volta para quem abriu. Nenhum
+  // (a especialização deixa o jogo em pausa) e o foco volta para quem abriu. Nenhum
   // diálogo nativo pode abrir. As esperas de 400 ms cobrem a pausa de 300 ms dos
   // botões recém-montados e a entrada das janelas (0,22 s).
   const pausa = ms => new Promise(r => setTimeout(r, ms));
@@ -1028,23 +1028,65 @@ async function runTests() {
     await pausa(300);
     const focoForaDaLoja = await focado();
     if (!focoForaDaLoja.escolha) throw new Error(`Closing the shop must leave the focus on the scene choices, got ${JSON.stringify(focoForaDaLoja)}`);
-    // Especialização: o nível 3 abre a janela obrigatória
+    // Especialização: o nível 3 abre a janela e pausa o jogo
     await page.evaluate(() => { gameState.player.specialization = null; gameState.player.xp = 140; gameState.player.level = 2; changeXP(20); });
     await esperarJanela('especializacao');
     await pausa(400);
-    const espec = await page.evaluate(() => ({ obrigatoria: document.getElementById('especializacao').hasAttribute('data-obrigatoria'), pausado: gameState.isPaused }));
+    const espec = await page.evaluate(() => ({ fixa: document.getElementById('especializacao').hasAttribute('data-fixa'), pausado: gameState.isPaused }));
     const focoNaEspec = await focado();
-    if (!espec.obrigatoria || !espec.pausado || focoNaEspec.especializacao !== 'Paladino') {
-      throw new Error(`The specialization window must be mandatory, pause the game and focus the first option, got ${JSON.stringify({ espec, focoNaEspec })}`);
+    if (!espec.fixa || !espec.pausado || focoNaEspec.especializacao !== 'Paladino') {
+      throw new Error(`The specialization window must open fixed, pause the game and focus the first option, got ${JSON.stringify({ espec, focoNaEspec })}`);
     }
-    for (let i = 0; i < 4; i++) { await page.keyboard.press('Escape'); await pausa(250); }
-    if (!(await page.evaluate(() => document.getElementById('especializacao').open))) throw new Error('Escape must not close the mandatory specialization window');
+    // Escape fecha; o jogo segue em pausa, com o aviso fixo no lugar das escolhas da cena
+    await page.keyboard.press('Escape');
+    await esperarJanela('especializacao', false);
+    await pausa(400);
+    const pausa1 = await page.evaluate(() => {
+      const escolhas = document.getElementById('choices');
+      const visiveis = [...escolhas.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim());
+      const cena = gameState.currentScene;
+      teleportToNode('corridor');
+      return { pausado: gameState.isPaused, visiveis, rotulo: escolhas.getAttribute('aria-labelledby'), mapaParado: motivoMapaParado(), ficouNaCena: gameState.currentScene === cena,
+        caminho: document.getElementById('specialization-badge').textContent.trim() };
+    });
+    const focoNaPausa = await focado();
+    if (!pausa1.pausado || pausa1.visiveis.length !== 1 || !/Escolher a especialização/.test(pausa1.visiveis[0]) || !/especialização/.test(pausa1.mapaParado) || !pausa1.ficouNaCena
+      || pausa1.rotulo !== 'pausa-titulo pausa-texto' || !/Escolher a especialização/.test(focoNaPausa.texto) || pausa1.caminho !== 'a escolher') {
+      throw new Error(`Closing the specialization window must keep the game paused, with the notice instead of the scene choices, the focus on it and the map stopped, got ${JSON.stringify({ pausa1, focoNaPausa })}`);
+    }
+    // o aviso reabre a janela, e a escolha pelo teclado tira a pausa
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao');
+    await pausa(400);
+    const focoReaberta = await focado();
+    if (focoReaberta.especializacao !== 'Paladino') throw new Error(`The notice must reopen the window on the first option, got ${JSON.stringify(focoReaberta)}`);
+    // um Enter repetido logo depois de fechar pelo medalhão (a tecla segurada) não reabre pelo aviso
+    await page.focus('#especializacao .janela-fechar');
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao', false);
+    await page.waitForFunction(() => document.activeElement && !!document.activeElement.closest('.pausa-especializacao'), { timeout: 3000 })
+      .catch(() => { throw new Error('Closing by the medallion must put the focus on the pause notice'); });
+    await page.keyboard.press('Enter');
+    await pausa(150);
+    if (await page.evaluate(() => document.getElementById('especializacao').open)) throw new Error('An Enter right after closing (a held key) must not reopen the window through the notice');
+    await pausa(300);
+    await page.keyboard.press('Enter');
+    await esperarJanela('especializacao');
+    await pausa(400);
     await page.keyboard.press('Tab');
     await page.keyboard.press('Enter');
     await esperarJanela('especializacao', false);
-    const escolheu = await page.evaluate(() => ({ espec: gameState.player.specialization, pausado: gameState.isPaused, selo: document.getElementById('specialization-badge').textContent.trim() }));
-    if (escolheu.espec !== 'Berserker' || escolheu.pausado || escolheu.selo !== 'Berserker') throw new Error(`Tab + Enter must choose Berserker and resume the game, got ${JSON.stringify(escolheu)}`);
-    console.log('✅ PASS: The shop explains, buys and saves by keyboard, and the mandatory specialization survives Escape and is chosen by keyboard.');
+    await pausa(300);
+    const escolheu = await page.evaluate(() => ({
+      espec: gameState.player.specialization, pausado: gameState.isPaused, selo: document.getElementById('specialization-badge').textContent.trim(),
+      pausa: document.getElementById('choices').hasAttribute('data-pausa') || !!document.querySelector('.pausa-especializacao'),
+      escolhas: [...document.querySelectorAll('#choices .escolha')].filter(b => b.getClientRects().length).length
+    }));
+    const focoDepois = await focado();
+    if (escolheu.espec !== 'Berserker' || escolheu.pausado || escolheu.selo !== 'Berserker' || escolheu.pausa || !escolheu.escolhas || !focoDepois.escolha) {
+      throw new Error(`Tab + Enter must choose Berserker, resume the game and bring back the scene choices with the focus, got ${JSON.stringify({ escolheu, focoDepois })}`);
+    }
+    console.log('✅ PASS: The shop explains, buys and saves by keyboard; the specialization closes with the game paused behind a notice that reopens it, and is chosen by keyboard.');
 
     // --- 11. O diário ---
     console.log('\n--- 11. Testing the journal window ---');
@@ -1202,7 +1244,7 @@ async function runTests() {
   await movimento('no-preference');
   console.log('✅ PASS: The arts are WebP, the vitral fades from one art to the next and settles on the last one, and swaps at once with reduced motion.');
 
-  // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas ---
+  // --- 14. O leitor de tela: um main, a rolagem uma vez, a cena antes das escolhas, o narrador desligado ---
   console.log('\n--- 14. Testing the screen-reader structure ---');
   const leitor = await page.evaluate(() => ({
     mains: document.querySelectorAll('main:not([hidden])').length,
@@ -1211,9 +1253,12 @@ async function runTests() {
     descricaoDoDado: document.getElementById('dice-button').getAttribute('aria-describedby'),
     mapa: document.getElementById('mapa').getAttribute('aria-describedby'),
     diario: document.getElementById('diario').getAttribute('aria-describedby'),
-    lang: document.documentElement.lang
+    lang: document.documentElement.lang,
+    // ninguém clicou no selo "Narrador" nesta página: ele segue como começou
+    narrador: ttsEnabled, seloNarrador: document.getElementById('tts-toggle-button').getAttribute('aria-pressed')
   }));
   console.log('Screen-reader structure:', leitor);
+  if (leitor.narrador !== false || leitor.seloNarrador !== 'false') throw new Error(`The narrator must start off (it would read over a screen reader), got ${JSON.stringify({ narrador: leitor.narrador, selo: leitor.seloNarrador })}`);
   if (leitor.mains !== 1) throw new Error(`Only one <main> may be exposed, got ${leitor.mains}`);
   if (leitor.papelDoResultado || leitor.resultadoEmRegiaoViva) throw new Error('#result-message must not be a live region (the chronicle line announces the roll)');
   if (leitor.descricaoDoDado !== 'bandeja-titulo result-message') throw new Error(`#dice-button must be described by the tray title and the result, got ${leitor.descricaoDoDado}`);

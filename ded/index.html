@@ -152,7 +152,7 @@
                 <nav class="selos" aria-label="Menu da aventura">
                     <button class="selo" id="btn-toggle-map" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mapa"><svg aria-hidden="true"><use href="ui/icones.svg#i-mapa"/></svg><span>Mapa</span></button>
                     <button class="selo" id="quest-journal-button" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="ui/icones.svg#i-diario"/></svg><span>Diário</span></button>
-                    <button class="selo" id="tts-toggle-button" type="button" aria-pressed="true"><svg aria-hidden="true"><use href="ui/icones.svg#i-narrador"/></svg><span>Narrador</span></button>
+                    <button class="selo" id="tts-toggle-button" type="button" aria-pressed="false"><svg aria-hidden="true"><use href="ui/icones.svg#i-narrador"/></svg><span>Narrador</span></button>
                     <button class="selo" type="button" data-musica aria-pressed="false"><svg aria-hidden="true"><use href="ui/icones.svg#i-musica"/></svg><span>Música</span></button>
                 </nav>
             </header>
@@ -400,11 +400,13 @@
             </div>
         </dialog>
 
-        <!-- Especialização: obrigatória no nível 3 (openSpecializationModal). Só fecha
-             pela escolha: sem medalhão de fechar, e Escape não fecha. -->
+        <!-- Especialização: pedida no nível 3 (openSpecializationModal). Fecha como as
+             outras janelas, mas o jogo fica em pausa até a escolha: no lugar das escolhas
+             da cena, um aviso fixo reabre a janela (montarPausaDaEspecializacao). -->
         <dialog class="janela" id="especializacao" aria-labelledby="especializacao-titulo" aria-describedby="especializacao-subtitulo">
             <div class="folha janela-folha">
                 <h2 class="fita fita-rubra" id="especializacao-titulo">Escolha sua especialização</h2>
+                <button class="janela-fechar" type="button" aria-label="Fechar"><svg aria-hidden="true"><use href="ui/icones.svg#i-fechar"/></svg></button>
                 <p class="janela-subtitulo" id="especializacao-subtitulo">Você provou seu valor e chegou ao ápice da sua classe. Escolha o seu caminho de prestígio.</p>
                 <div class="janela-corpo">
                     <div class="especializacao-opcoes" id="especializacao-opcoes"></div>
@@ -1098,7 +1100,9 @@
             var choicesElement = document.getElementById('choices');
 
             // --- Fase 2: TTS Variables ---
-            let ttsEnabled = true; // Controle global para ativar/desativar TTS
+            // O narrador começa desligado (decisão do dono): ligado, ele lia a cena por cima
+            // do leitor de tela de quem usa um. O selo "Narrador" liga.
+            let ttsEnabled = false;
             let synth = window.speechSynthesis; // Acesso à API de fala
             let voices = []; // Array para guardar as vozes disponíveis
             let selectedVoice = null; // Para guardar a voz pt-BR preferida
@@ -1428,7 +1432,8 @@
             // o grupo (quem lê a página em sequência não ouve a cena duas vezes).
             function focarPrimeiraEscolha() {
                 const escolhas = document.getElementById('choices');
-                if (escolhas && escolhas.querySelector('button')) escolhas.setAttribute('aria-labelledby', 'local scene-text escolhas-titulo');
+                // em pausa, o grupo leva o nome do aviso (as escolhas da cena estão escondidas)
+                if (escolhas && escolhas.querySelector('button')) escolhas.setAttribute('aria-labelledby', escolhas.dataset.pausa ? 'pausa-titulo pausa-texto' : 'local scene-text escolhas-titulo');
                 focarNoQuadro(() => document.querySelector('#choices button'));
             }
 
@@ -1502,12 +1507,12 @@
             // Loja, especialização, diário, mapa e fim são <dialog class="janela">,
             // abertos com showModal(): o foco fica preso dentro, o resto da página fica
             // inerte, e ao fechar o foco volta sozinho para quem abriu. Só uma janela
-            // fica aberta por vez. Uma janela obrigatória (a especialização) não fecha
-            // por Escape nem por um clique no fundo.
-            function abrirJanela(id, { obrigatoria = false } = {}) {
+            // fica aberta por vez. Uma janela fixa (a especialização) não fecha sozinha
+            // quando a cena muda; quem joga fecha pelo medalhão, por Escape ou pelo fundo.
+            function abrirJanela(id, { fixa = false } = {}) {
                 const janela = document.getElementById(id);
                 if (!janela || typeof janela.showModal !== 'function') return janela;
-                janela.toggleAttribute('data-obrigatoria', obrigatoria);
+                janela.toggleAttribute('data-fixa', fixa);
                 // reaberta no meio da saída: a saída para, e a janela fica
                 if (janela.open && janela.encerrarSaida) janela.encerrarSaida(false);
                 if (janela.open) return janela;
@@ -1546,10 +1551,10 @@
                 reserva = setTimeout(encerrar, 400); // se a animação não terminar (aba em segundo plano)
             }
 
-            // Fecha as janelas abertas que não são obrigatórias (menos a de id `exceto`)
+            // Fecha as janelas abertas que não são fixas (menos a de id `exceto`)
             function fecharJanelas(exceto) {
                 document.querySelectorAll('dialog.janela[open]').forEach(janela => {
-                    if (janela.id !== exceto && !janela.hasAttribute('data-obrigatoria')) fecharJanela(janela);
+                    if (janela.id !== exceto && !janela.hasAttribute('data-fixa')) fecharJanela(janela);
                 });
             }
 
@@ -1563,12 +1568,12 @@
                 const fechar = e.target.closest && e.target.closest('.janela-fechar, [data-fechar-janela]');
                 const noFundo = e.target.matches && e.target.matches('dialog.janela') && tocouEm === e.target;
                 const janela = fechar ? fechar.closest('dialog.janela') : (noFundo ? e.target : null);
-                if (janela && !janela.hasAttribute('data-obrigatoria')) fecharJanela(janela);
+                if (janela) fecharJanela(janela);
             });
             document.addEventListener('cancel', e => {
                 if (!e.target.matches || !e.target.matches('dialog.janela')) return;
                 e.preventDefault();
-                if (!e.target.hasAttribute('data-obrigatoria')) fecharJanela(e.target);
+                fecharJanela(e.target);
             }, true);
 
             // ---------- Avisos (Fase 4) ----------
@@ -1659,6 +1664,26 @@
                 document.querySelectorAll('.aquecer-gpu').forEach(peca => { if (peca.remove) peca.remove(); });
             }
             depoisDoProximoQuadro(encerrarAquecimento);
+
+            // Aquecer de novo antes da luta: o Chrome não guarda os pipelines para sempre (numa
+            // sessão longa, o do preenchimento da barra voltou a compilar no "Enfrentar", TASK_001
+            // §6). Como o pré-aquecimento de shaders de um jogo antes de um encontro, a cena que
+            // oferece uma luta põe a peça da barra de volta por dois quadros, num momento ocioso
+            // depois do esmaecer da arte (o trecho mais pesado da troca de cena): com o pipeline
+            // guardado, é um retângulo a 1%; sem ele, a compilação cai aqui, com o jogador lendo,
+            // e não no clique da luta. Uma vez por cena.
+            function aquecerAntesDaLuta() {
+                const cena = gameState.currentScene;
+                const ocioso = typeof requestIdleCallback === 'function' ? f => requestIdleCallback(f, { timeout: 1000 }) : f => f();
+                setTimeout(() => ocioso(() => {
+                    if (!document.body || gameState.currentScene !== cena || (gameState.combat && gameState.combat.active)) return;
+                    const peca = document.createElement('div');
+                    peca.className = 'aquecer-gpu';
+                    peca.setAttribute('aria-hidden', 'true');
+                    document.body.appendChild(peca);
+                    depoisDoProximoQuadro(() => peca.remove());
+                }), ESMAECER_ARTE + 200);
+            }
 
             function noProximoQuadro(chave, funcao) {
                 if (typeof requestAnimationFrame !== 'function') return funcao();
@@ -1800,7 +1825,7 @@
                 if (gameState.combat && gameState.combat.active) closeCombatScreen();
                 mostrarCombate(false);
                 // e nunca começa com uma janela aberta por cima (a loja da cena anterior, o
-                // mapa de onde se viajou); a especialização, obrigatória, fica
+                // mapa de onde se viajou); a especialização, fixa, fica
                 fecharJanelas();
 
                 // Quem escolheu pelo teclado continua nas escolhas da cena nova
@@ -1937,6 +1962,9 @@
                 }
 
                 escolhasMontadasEm = performance.now();
+                // com a especialização adiada, o aviso fixo fica no lugar das escolhas
+                montarPausaDaEspecializacao();
+                if (scene.choices.some(c => c.requiresCheck && c.checkType === 'combat')) aquecerAntesDaLuta();
 
                 // Escolhas à vista e bandeja recolhida. Dentro de .acoes a classe
                 // .hidden só deixa invisível: as duas ocupam a mesma célula.
@@ -1989,7 +2017,7 @@
                     fimAgendado = null;
                     if (geracao !== fimGeracao || gameState.currentScene !== cena) return;
                     // nunca no meio de uma luta, nem por cima de outra janela (a
-                    // especialização, obrigatória, ou o diário que o jogador abriu):
+                    // especialização ou o diário que o jogador abriu):
                     // espera a luta acabar ou a janela fechar
                     if (gameState.combat && gameState.combat.active) {
                         if (tentativas > 0) agendarFim(cena, 500, tentativas - 1);
@@ -3192,7 +3220,7 @@
                 // Classe e caminho de prestígio, no cabeçalho
                 escreverTexto(porId('campo-classe'), getPlayerClassNamePt());
                 const caminho = porId('specialization-badge');
-                escreverTexto(caminho, p.specialization || 'escolhido no nível 3');
+                escreverTexto(caminho, p.specialization || (precisaDeEspecializacao() ? 'a escolher' : 'escolhido no nível 3'));
                 caminho.classList.toggle('campo-vazio', !p.specialization);
 
                 // Atributos: o modificador em destaque no medalhão, o valor na pílula
@@ -3522,7 +3550,7 @@
                 if (!janela || typeof janela.addEventListener !== 'function') return;
                 janela.addEventListener('close', () => {
                     const ativo = document.activeElement;
-                    if (janela.open) return; // reaberta (a especialização obrigatória)
+                    if (janela.open) return; // reaberta no meio da saída
                     if (!ativo || ativo === document.body || janela.contains(ativo)) focarPrimeiraEscolha();
                 });
             }
@@ -3836,7 +3864,12 @@
                     atualizarSeloNarrador();
                     if (!ttsEnabled) {
                         stopSpeech(); // Para a fala imediatamente se for desabilitado
+                        return;
                     }
+                    // ligado no meio de uma cena, ele lê a cena à vista (fora da luta), ou o aviso da pausa
+                    const cena = gameState.currentScene && scenes[gameState.currentScene];
+                    if (document.querySelector('#choices[data-pausa]')) speakText(TEXTO_DA_PAUSA);
+                    else if (cena && !(gameState.combat && gameState.combat.active)) speakText(cena.text);
                 });
                 atualizarSeloNarrador(); // Define o estado inicial do selo
             }
@@ -4054,8 +4087,10 @@
 
 
             // ---------- Especialização (Fase 4) ----------
-            // No nível 3, escolher o caminho de prestígio é obrigatório: a janela só fecha
-            // pela escolha, e o jogo fica em pausa (gameState.isPaused) até lá. O changeXP
+            // No nível 3, escolher o caminho de prestígio é obrigatório: o jogo fica em pausa
+            // (gameState.isPaused) até lá. A janela fecha como as outras (o medalhão, Escape,
+            // o fundo); fechada sem a escolha, um aviso fixo fica no lugar das escolhas da
+            // cena e reabre a janela, e o mapa não leva a lugar nenhum. O changeXP
             // a pede a cada ganho de XP enquanto falta a escolha; aberta (ou já marcada para
             // abrir), ela não remonta nem toca de novo. comSom: falso quando o som do nível
             // novo acabou de tocar (no changeXP), para ele não tocar duas vezes.
@@ -4066,6 +4101,9 @@
             // fechar: o closeCombatScreen chama abrirEspecializacaoPendente.
             let especializacaoPendente = null; // { comSom, agendada } até a janela abrir
             let especializacaoAbertaEm = -Infinity;
+            let especializacaoAdiada = false; // a janela fechou sem a escolha
+            let pausaMontadaEm = -Infinity; // o aviso recebeu o foco (a mesma pausa de ativação das escolhas)
+            const TEXTO_DA_PAUSA = 'Você chegou ao nível 3. A aventura fica em pausa até você escolher a sua especialização.';
 
             function precisaDeEspecializacao() {
                 const p = gameState.player;
@@ -4098,12 +4136,13 @@
                 }));
             }
 
-            function mostrarEspecializacao(comSom) {
+            // reaberta: pelo aviso fixo da pausa (a crônica já disse que ela está disponível)
+            function mostrarEspecializacao(comSom, { reaberta = false } = {}) {
                 montarEspecializacao();
                 especializacaoAbertaEm = performance.now();
-                abrirJanela('especializacao', { obrigatoria: true });
+                abrirJanela('especializacao', { fixa: true });
                 if (comSom) AudioEngine.playLevelUp();
-                addToLog('✨ Especialização disponível! Escolha seu caminho de prestígio.');
+                if (!reaberta) addToLog('✨ Especialização disponível! Escolha seu caminho de prestígio.');
             }
 
             // As habilidades fora da luta, sem recarga nem efeito em curso (abilityInfo)
@@ -4137,16 +4176,62 @@
                     const opcao = e.target.closest && e.target.closest('[data-especializacao]');
                     if (opcao && !cedoDemais(especializacaoAbertaEm)) chooseSpecialization(opcao.dataset.especializacao);
                 });
-                // O Chrome fecha à força um <dialog> modal no terceiro Escape seguido, mesmo
-                // com o cancel cancelado (proteção contra páginas que prendem quem joga). A
-                // escolha é obrigatória: sem ela, a janela volta na hora, sem a entrada.
+                // Fechada sem a escolha: o jogo segue em pausa, com o aviso fixo no lugar das
+                // escolhas e o foco nele (o foco que o <dialog> devolveu pode ter ido para uma
+                // escolha da cena, agora escondida). Um Enter segurado no medalhão de fechar não
+                // reabre a janela pelo aviso (pausaMontadaEm). No estreito, o aviso entra à vista;
+                // com o narrador ligado, ele é lido.
                 janela.addEventListener('close', () => {
                     if (!precisaDeEspecializacao()) return; // fechou pela escolha
-                    janela.classList.add('sem-entrada');
-                    abrirJanela('especializacao', { obrigatoria: true });
+                    especializacaoAdiada = true;
+                    montarPausaDaEspecializacao();
+                    pausaMontadaEm = performance.now();
+                    focarPrimeiraEscolha();
+                    if (telaEstreita) noProximoQuadro('pausa-a-vista', () => {
+                        const aviso = document.querySelector('#choices .pausa-especializacao');
+                        if (aviso && typeof aviso.scrollIntoView === 'function') aviso.scrollIntoView({ block: 'nearest', behavior: movimentoReduzido() ? 'auto' : 'smooth' });
+                    });
+                    speakText(TEXTO_DA_PAUSA);
                 });
             })();
             devolverFocoAsEscolhas('especializacao');
+
+            // O aviso fixo da pausa: o primeiro filho de #choices (o foco das escolhas vai a
+            // ele), com as escolhas da cena montadas e escondidas pelo CSS ([data-pausa]).
+            // Uma cena nova remonta as escolhas e chama de novo (addChoiceInCurrentScene). Num
+            // final a aventura acabou, e o "Começar uma nova aventura" fica à vista.
+            function montarPausaDaEspecializacao() {
+                const escolhas = document.getElementById('choices');
+                if (!escolhas) return;
+                if (!especializacaoAdiada || !precisaDeEspecializacao() || CENAS_FINAIS.has(gameState.currentScene)) {
+                    delete escolhas.dataset.pausa;
+                    const aviso = escolhas.querySelector('.pausa-especializacao');
+                    if (aviso) aviso.remove();
+                    return;
+                }
+                escolhas.dataset.pausa = 'especializacao';
+                if (escolhas.querySelector('.pausa-especializacao')) return;
+                const aviso = document.createElement('div');
+                aviso.className = 'pausa-especializacao';
+                aviso.innerHTML = '<p class="escolhas-titulo" id="pausa-titulo">Antes de seguir</p>' +
+                    `<p class="pausa-texto" id="pausa-texto">${TEXTO_DA_PAUSA}</p>` +
+                    `<button class="escolha" type="button"><span class="escolha-num"><svg aria-hidden="true"><use href="${hrefIcone('i-magia')}"/></svg></span><span class="escolha-texto">Escolher a especialização</span></button>`;
+                const botao = aviso.querySelector('button');
+                botao.onclick = () => { if (!cedoDemais(pausaMontadaEm)) mostrarEspecializacao(false, { reaberta: true }); };
+                // o foco que a janela devolve ao fechar chega antes do evento close: a pausa de
+                // ativação conta dele (um Tab de outro lugar até o aviso não trava)
+                botao.addEventListener('focus', e => {
+                    const de = e.relatedTarget;
+                    if (!de || (de.closest && de.closest('#especializacao'))) pausaMontadaEm = performance.now();
+                });
+                escolhas.prepend(aviso);
+                pausaMontadaEm = performance.now();
+            }
+
+            function tirarPausaDaEspecializacao() {
+                especializacaoAdiada = false;
+                montarPausaDaEspecializacao();
+            }
 
             function chooseSpecialization(name) {
                 const opts = SPECIALIZATIONS[gameState.player.class];
@@ -4155,6 +4240,7 @@
                 gameState.player.specialization = name;
                 gameState.isPaused = false;
                 especializacaoPendente = null;
+                tirarPausaDaEspecializacao();
                 fecharJanela('especializacao');
                 addToLog(`✨ Você se tornou <strong>${name}</strong> (${getPlayerClassNamePt()})!`);
                 AudioEngine.playQuestComplete();
