@@ -179,6 +179,10 @@ app.get('/api/hello', (req, res) => {
 // Criar rotas para as páginas HTML
 createHtmlRoute('/', 'index.html');
 
+// Versões em inglês e espanhol (geradas por scripts/generate-i18n.js): URLs limpas /en/games/<jogo> e
+// /es/juegos/<jogo>. A lista vem de i18n/config.js (única fonte): só existem as rotas dos jogos traduzidos.
+require('./i18n/config').routes().forEach(({ url, file, redirect }) => (redirect ? app.get(url, (req, res) => res.redirect(301, redirect)) : createHtmlRoute(url, file)));
+
 // Rotas para páginas de jogos otimizadas (SEO-friendly)
 createHtmlRoute('/jogos/puzzle', 'jogos/puzzle.html');
 createHtmlRoute('/jogos/space_shooter', 'jogos/space_shooter.html');
