@@ -800,6 +800,87 @@ const goodPost = (over = {}) => ({
         console.log('✓ review do PR #81 (validade do diário, workflow, link, malformados, id reservado)');
     }
 
+    // ---- posts em inglês e espanhol: página traduzida, Guardião, cartão e idioma nos canais
+    {
+        const i18n = require(path.resolve(__dirname, '../i18n/config'));
+        const en = goodPost({ id: 'en-snake-t', lang: 'en', text: 'A snake game with modern visuals and classic rules, free in your browser. The menus are in Portuguese.', channels: ['bluesky', 'mastodon'], hashtags: ['BrowserGames'] });
+        const es = goodPost({ id: 'es-snake-t', lang: 'es', text: 'Un juego de la serpiente con visuales modernos y reglas clásicas, gratis en el navegador. Los menús están en portugués.', channels: ['bluesky', 'mastodon'], hashtags: ['JuegosGratis'] });
+        assert.deepStrictEqual(validatePost(en, { games }), [], 'post em inglês válido');
+        assert.deepStrictEqual(validatePost(es, { games }), [], 'post em espanhol válido');
+        assert.deepStrictEqual(validatePost(goodPost(), { games }), [], 'o padrão (pt) continua igual');
+
+        // link: a página traduzida do jogo, com UTM; português continua em /jogos/
+        const cEn = compose(en, 'bluesky', 'teste'), cEs = compose(es, 'mastodon', 'teste');
+        assert.strictEqual(cEn.shown, 'playfulhub.com.br' + i18n.gamePath('en', 'snake'));
+        assert.ok(cEn.link.startsWith('https://playfulhub.com.br/en/games/snake?utm_source=bluesky'));
+        assert.ok(cEs.link.startsWith('https://playfulhub.com.br/es/juegos/snake?utm_source=mastodon'));
+        assert.ok(compose(goodPost(), 'bluesky', 'teste').link.startsWith('https://playfulhub.com.br/jogos/snake?'), 'português: /jogos/');
+        assert.strictEqual(compose(en, 'telegram', 'teste').cta, 'Play free in your browser');
+        assert.strictEqual(compose(es, 'telegram', 'teste').cta, 'Jugar gratis en el navegador');
+        assert.strictEqual(compose(goodPost(), 'telegram', 'teste').cta, 'Jogar grátis no navegador');
+
+        // o Guardião barra o que não vale
+        const bad = (over) => validatePost({ ...en, ...over }, { games });
+        assert.ok(bad({ lang: 'fr' }).some((m) => m.includes('lang deve ser')), 'idioma desconhecido');
+        assert.ok(bad({ game: 'tumbalacatumba' }).some((m) => m.includes('não tem página em en')), 'jogo sem página traduzida');
+        assert.ok(bad({ channels: ['bluesky', 'telegram'] }).some((m) => m.includes('só podem ir para')), 'Telegram é só em português');
+        assert.ok(bad({ link: { path: '/desafio/', title: 'Desafio do Dia', description: 'Jogo do dia' } }).some((m) => m.includes('link')), 'Desafio só em português');
+        assert.ok(bad({ text: 'Um jogo da cobrinha com visual moderno, de graça no navegador, sem precisar instalar.' }).some((m) => m.includes('não parece estar em inglês')), 'texto em português marcado como en');
+        assert.ok(validatePost({ ...es, text: 'A snake game with modern visuals, free with your browser and no install needed.' }, { games }).some((m) => m.includes('não parece estar em espanhol')), 'texto em inglês marcado como es');
+        assert.ok(validatePost({ ...es, text: 'Para jogar você só precisa do navegador, tudo de graça e sem cadastro nenhum.' }, { games }).some((m) => m.includes('não parece estar em espanhol')), '"você" (acentuada) é detectada');
+        // "hack and slash" e nomes em inglês são válidos em espanhol
+        assert.deepStrictEqual(validatePost({ ...es, game: 'voxel_arena', text: 'Un hack and slash de vóxeles con oleadas de enemigos y un jefe, gratis en el navegador.' }, { games }), []);
+        // isca e afirmações também nos outros idiomas
+        assert.ok(bad({ text: 'Click here to play the best game in the world, free in your browser today.' }).length >= 2, 'isca/superlativo em inglês');
+        assert.ok(validatePost({ ...es, text: 'Etiqueta a un amigo y juega gratis en el navegador, el mejor juego del mundo.' }, { games }).length >= 2, 'isca/superlativo em espanhol');
+
+        // o cartão do link usa o título e a descrição traduzidos; português fica como está em games.json
+        const { cardFor } = require(`${M}/lib/lang`);
+        assert.strictEqual(cardFor(games.get('snake'), 'en').name, 'Snake Game');
+        assert.ok(cardFor(games.get('snake'), 'en').description.startsWith('A snake game'));
+        assert.ok(cardFor(games.get('gameoflife'), 'es').name.startsWith('Juego de la Vida'));
+        assert.strictEqual(cardFor(games.get('snake'), 'pt'), games.get('snake'));
+
+        // idioma declarado nas plataformas (filtros de idioma do Bluesky e do Mastodon)
+        const calls = [];
+        const bsky = async (url, init) => {
+            calls.push({ url, init });
+            if (url.endsWith('createSession')) return jsonRes({ accessJwt: 'jwt', did: 'did:plc:abc', handle: 'p.bsky.social' });
+            return jsonRes({ uri: 'at://did:plc:abc/app.bsky.feed.post/3k', cid: 'c' });
+        };
+        await bluesky.publish({ post: en, composed: cEn, game: cardFor(games.get('snake'), 'en'), media: null }, { BLUESKY_HANDLE: 'p', BLUESKY_APP_PASSWORD: 'x' }, bsky);
+        const rec = JSON.parse(calls[calls.length - 1].init.body).record;
+        assert.deepStrictEqual(rec.langs, ['en']);
+        assert.strictEqual(rec.embed.external.title, 'Snake Game');
+        assert.ok(rec.embed.external.uri.includes('/en/games/snake'));
+        let mastoBody;
+        await mastodon.publish({ post: es, composed: cEs, media: null }, { MASTODON_INSTANCE: 'https://m.example', MASTODON_ACCESS_TOKEN: 't' },
+            async (url, init) => { mastoBody = JSON.parse(init.body); return jsonRes({ id: '1', url: 'https://m.example/1' }); });
+        assert.strictEqual(mastoBody.language, 'es');
+        assert.ok(mastoBody.status.includes('/es/juegos/snake'));
+
+        // calendário real: todos os posts en/es válidos, jogos com página traduzida e imagem de preview
+        const { posts } = loadCalendars();
+        const translated = posts.filter((p) => p.lang && p.lang !== 'pt');
+        assert.ok(translated.length >= 18, 'o calendário en/es existe');
+        assert.deepStrictEqual(validateCalendar(posts, { games }), []);
+        for (const lg of ['en', 'es']) {
+            const mine = translated.filter((p) => p.lang === lg);
+            assert.deepStrictEqual([...new Set(mine.map((p) => p.game))].sort(), [...i18n.slugs].sort(), `${lg}: um post por jogo traduzido`);
+        }
+        // em Brasília, às 15:00 (longe do post diário das 09:00)
+        translated.forEach((p) => assert.ok(p.at.endsWith('T15:00:00-03:00'), `${p.id}: 15:00 BRT`));
+
+        // fluxo completo: um post em espanhol sai só em Bluesky e Mastodon, nunca no Telegram
+        const st = { sent: [], down: null };
+        const mk = Object.fromEntries(['bluesky', 'mastodon', 'telegram'].map((n) => [n, { name: n, isConfigured: () => true, publish: async ({ post: p, composed, game }) => { st.sent.push(`${p.id}:${n}:${game.name}:${composed.link.split('?')[0].split('.br')[1]}`); return { id: p.id }; } }]));
+        const dir = path.join(tmp, 'lang-run'); fs.mkdirSync(dir);
+        fs.writeFileSync(path.join(dir, 'c.json'), JSON.stringify({ campaign: 'teste', posts: [{ ...es, at: '2027-03-02T15:00:00-03:00' }] }));
+        await run({ calendarDir: dir, ledgerFile: path.join(tmp, 'lang-l.json'), channels: mk, games, log: quiet, env: NO_DAILY, now: new Date('2027-03-02T15:10:00-03:00') });
+        assert.deepStrictEqual(st.sent.sort(), ['es-snake-t:bluesky:Snake: juego de la serpiente:/es/juegos/snake', 'es-snake-t:mastodon:Snake: juego de la serpiente:/es/juegos/snake']);
+        console.log('✓ posts em inglês e espanhol');
+    }
+
     fs.rmSync(tmp, { recursive: true, force: true });
     console.log('\nMarketing: todos os testes passaram');
 })().catch((e) => {

@@ -12,7 +12,7 @@ const blobOf = (file, type) => new Blob([fs.readFileSync(file)], { type });
 
 /** legenda em HTML do Telegram: texto escapado + link com UTM + hashtags */
 function buildCaption(post, composed) {
-    return [esc(post.text), `<a href="${esc(composed.link)}">▶ ${esc(composed.cta || 'Jogar grátis no navegador')}</a>`, esc(composed.tags)].filter(Boolean).join('\n\n');
+    return [esc(post.text), `<a href="${esc(composed.link)}">▶ ${esc(composed.cta)}</a>`, esc(composed.tags)].filter(Boolean).join('\n\n');
 }
 
 async function publish({ post, composed, media }, env, fetchImpl = fetch) {

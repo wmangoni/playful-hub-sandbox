@@ -45,7 +45,7 @@ async function publish({ post, composed, media }, env, fetchImpl = fetch, { poll
             // reenvio do mesmo post (ex.: queda depois de publicar) não duplica
             'idempotency-key': `${post.id}:mastodon`
         },
-        body: JSON.stringify({ status: composed.text, media_ids: mediaIds, language: 'pt', visibility: 'public' })
+        body: JSON.stringify({ status: composed.text, media_ids: mediaIds, language: post.lang || 'pt', visibility: 'public' })
     });
     const status = await json(res);
     return { id: status.id, url: status.url };

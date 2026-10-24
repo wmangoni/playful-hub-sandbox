@@ -82,6 +82,16 @@ Arquivo `calendar/<campanha>.json`:
 
 O Guardião (`npm run marketing:check`, também na CI) reprova: jogo fora do `games.json`; data sem fuso; texto com URL, @menção, hashtag solta, CAIXA ALTA, mais de 3 emojis ou isca de engajamento ("clique aqui", "marque um amigo", "sorteio"…); afirmações não comprováveis ("o melhor do mundo"); mais de 3 hashtags; mídia sem `alt`; texto acima do limite de cada rede; mais de 2 posts por dia ou menos de 4 h entre posts no mesmo canal; ids ou textos repetidos.
 
+## Posts em inglês e espanhol
+
+Um post pode ter `"lang": "en"` ou `"lang": "es"` (o padrão é português). O publicador então:
+
+- leva o link para a **página traduzida do jogo** (`/en/games/<jogo>`, `/es/juegos/<jogo>`), com UTM, e usa o título e a descrição traduzidos no cartão do Bluesky;
+- declara o idioma na plataforma (`langs` no Bluesky, `language` no Mastodon), que é o que os filtros de idioma delas usam;
+- usa o CTA no idioma do post.
+
+Regras do Guardião para posts `en`/`es`: só jogos com página traduzida (`i18n/config.js`), só nos canais `bluesky` e `mastodon` (o Telegram é um canal único em português), sem `link` alternativo (o Desafio do Dia só existe em português) e o texto precisa estar no idioma declarado (a checagem pega engano de copiar e colar, não traduz nada). Se o jogo tem partes em português dentro do jogo (`ui` `partial` ou `toggle` em `i18n/config.js`), **o texto do post avisa**, como a página faz. O calendário `calendar/en-es-2026-11.json` tem um post por jogo traduzido em cada idioma, um a cada dois dias às 15:00 de Brasília.
+
 ## Cineasta: novas tomadas
 
 Cada jogo tem um arquivo em `cineasta/shots/<jogo>.js` com `file`, `query`, `cta` e as `shots`. Uma tomada define `duration`, `hour` (a hora do jogo anima ao longo dela), a `camera` (chaves com `t`, `pos` e `look` em `[x, z, altura]`) e as `captions`. Para ensaiar o enquadramento sem gerar vídeo:
