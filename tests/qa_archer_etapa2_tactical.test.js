@@ -76,6 +76,15 @@ async function runTests() {
   await page.goto(`http://127.0.0.1:${PORT}/archer/index.html`, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await page.waitForFunction(() => !!window.__archer, { timeout: 15000 });
 
+  // O balão nasce em posição aleatória (x 400-720, y 140-400), então a nuvem de tempestade (destrói a flecha) e o
+  // escudo giratório (desvia a flecha) podem ficar no caminho do tiro e fazer o teste falhar de vez em quando.
+  // Os testes de balão mirando direto no alvo estacionam os dois fora do campo; mover (cloud.x / shield.angle)
+  // continua igual, só que sem colisão.
+  await page.evaluate(() => {
+    window.__archer.stormCloud.y = 5000;
+    window.__archer.woodenShield.x = -1000;
+  });
+
   // -------------------------------------------------------------
   // Teste 1: Balão TNT (Explosão em Área e Contagem Bônus de Alvos)
   // -------------------------------------------------------------
@@ -332,22 +341,17 @@ async function runTests() {
     window.__archer.spawnArrowAt(targetX - 20, targetY, 15, 0, 'normal');
     window.__archer.step(2);
 
+    // step() é síncrono: o acerto já foi processado, então lê o estado aqui mesmo (sem espera fixa)
+    const state2 = window.__archer.getState();
     return {
       hasSkullClass,
       hasSkullIcon,
-      initialArrows
+      initialArrows,
+      arrowsLeft: state2.arrowsLeft,
+      comboStreak: state2.comboStreak
     };
   });
-
-  await new Promise(r => setTimeout(r, 120));
-
-  const skullAfter = await page.evaluate(() => {
-    const state = window.__archer.getState();
-    return {
-      arrowsLeft: state.arrowsLeft,
-      comboStreak: state.comboStreak
-    };
-  });
+  const skullAfter = { arrowsLeft: skullResults.arrowsLeft, comboStreak: skullResults.comboStreak };
 
   console.log('Resultados do Balão Caveira:', JSON.stringify({ ...skullResults, ...skullAfter }, null, 2));
 
