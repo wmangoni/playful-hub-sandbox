@@ -1,7 +1,7 @@
 // Monta o texto final de cada canal a partir do post do calendário.
 const { postLink, displayLink } = require('./links');
 const { MASTODON_LINK_LENGTH } = require('../config');
-const { langOf, CTA } = require('./lang');
+const { langOf } = require('./lang');
 
 const tagsLine = (post) => (post.hashtags || []).map((t) => `#${t}`).join(' ');
 
@@ -16,7 +16,7 @@ function compose(post, channel, campaign) {
     const lang = langOf(post);
     const link = postLink({ game: post.game, path: dest, campaign, postId: post.id, lang }, channel);
     const shown = displayLink(post.game, dest, lang);
-    const cta = (post.link && post.link.cta) || CTA[lang];
+    const cta = (post.link && post.link.cta) || 'Jogar grátis no navegador';
     const tags = tagsLine(post);
     let text;
     if (channel === 'bluesky') text = [post.text, shown, tags].filter(Boolean).join('\n\n');

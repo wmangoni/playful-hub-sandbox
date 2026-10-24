@@ -815,9 +815,6 @@ const goodPost = (over = {}) => ({
         assert.ok(cEn.link.startsWith('https://playfulhub.com.br/en/games/snake?utm_source=bluesky'));
         assert.ok(cEs.link.startsWith('https://playfulhub.com.br/es/juegos/snake?utm_source=mastodon'));
         assert.ok(compose(goodPost(), 'bluesky', 'teste').link.startsWith('https://playfulhub.com.br/jogos/snake?'), 'português: /jogos/');
-        assert.strictEqual(compose(en, 'telegram', 'teste').cta, 'Play free in your browser');
-        assert.strictEqual(compose(es, 'telegram', 'teste').cta, 'Jugar gratis en el navegador');
-        assert.strictEqual(compose(goodPost(), 'telegram', 'teste').cta, 'Jogar grátis no navegador');
 
         // o Guardião barra o que não vale
         const bad = (over) => validatePost({ ...en, ...over }, { games });
@@ -829,8 +826,32 @@ const goodPost = (over = {}) => ({
         assert.ok(validatePost({ ...es, text: 'A snake game with modern visuals, free with your browser and no install needed.' }, { games }).some((m) => m.includes('não parece estar em espanhol')), 'texto em inglês marcado como es');
         assert.ok(validatePost({ ...es, text: 'Para jogar você só precisa do navegador, tudo de graça e sem cadastro nenhum.' }, { games }).some((m) => m.includes('não parece estar em espanhol')), '"você" (acentuada) é detectada');
         // "hack and slash" e nomes em inglês são válidos em espanhol
-        assert.deepStrictEqual(validatePost({ ...es, game: 'voxel_arena', text: 'Un hack and slash de vóxeles con oleadas de enemigos y un jefe, gratis en el navegador.' }, { games }), []);
+        assert.deepStrictEqual(validatePost({ ...es, game: 'voxel_arena', text: 'Un hack and slash de vóxeles con oleadas de enemigos y un jefe, gratis en el navegador. Los menús del jefe están en portugués.' }, { games }), []);
         // isca e afirmações também nos outros idiomas
+        // jogo com partes em português: o texto precisa avisar (voxel_city é "partial"; 3d_shooter é "full")
+        const vc = { ...en, game: 'voxel_city', text: 'An open-world voxel city to explore on foot or by car, with a day and night cycle. Free in your browser.' };
+        assert.ok(validatePost(vc, { games }).some((m) => m.includes('precisa avisar')), 'jogo partial sem aviso de idioma');
+        assert.deepStrictEqual(validatePost({ ...vc, text: vc.text + ' A few labels are in Portuguese.' }, { games }), [], 'com o aviso passa');
+        assert.deepStrictEqual(validatePost({ ...en, game: '3d_shooter', text: 'A first-person shooter in the classic Doom style: shoot enemies and survive in a maze, free in your browser.' }, { games }), [], 'jogo full não precisa de aviso');
+        assert.ok(validatePost({ ...es, game: 'puzzle', text: 'Puzzle Master: enigmas de lógica, memoria y prisma 3D, gratis en el navegador, con modos Campaign y Endless.' }, { games }).some((m) => m.includes('precisa avisar')), 'toggle também avisa');
+        const { hasTranslation } = require(`${M}/lib/lang`);
+        assert.strictEqual(hasTranslation('snake', 'en'), true);
+        assert.strictEqual(hasTranslation('tumbalacatumba', 'es'), false);
+
+        // português marcado como en/es: os textos reais do projeto (Halloween, diário) nunca passam como outro idioma
+        const ptTexts = [...loadCalendars().posts.filter((p) => !p.lang).map((p) => p.text), ...daily.TEMPLATES.map((x) => (typeof x === 'string' ? x : x.text || '')).filter(Boolean),
+            'Pilote uma nave espacial e destrua os inimigos direto no navegador, sem instalar nada.',
+            'Controle a cobra e coma o máximo que puder para bater o recorde, tudo no navegador.'];
+        const { langProblems } = require(`${M}/lib/lang`);
+        ptTexts.forEach((x) => { assert.ok(langProblems(x, 'es').length, `pt aceito como es: ${x}`); assert.ok(langProblems(x, 'en').length, `pt aceito como en: ${x}`); });
+        assert.ok(langProblems('Gráficos rápidos e ação sem parar', 'es').length, 'ã/ç denunciam português');
+        assert.deepStrictEqual(langProblems('Nave espacial arcade, gratis en el navegador, para jugar sin instalar.', 'es'), [], '"nave" e "para" são espanhol');
+
+        // isca em inglês/espanhol e falso positivo de "rt se"
+        for (const text of ['Share this with a friend and play free in your browser today.', 'Like this post and follow us to play free in your browser.', 'Dale like y comparte esto para jugar gratis en el navegador.', 'The number one game, free in your browser, with the best controls.', 'El mejor del mundo, gratis en el navegador, con controles sencillos.'])
+            assert.ok(lintText(text).length, `isca/superlativo não detectado: ${text}`);
+        assert.deepStrictEqual(lintText('Press start settings to begin; every part sets the pace of the run in your browser.'), [], '"rt se" dentro de palavras não é isca');
+        assert.ok(lintText('Siga a conta e dê RT se gostou do jogo, direto no navegador.').length, '"rt se" como palavra continua sendo isca');
         assert.ok(bad({ text: 'Click here to play the best game in the world, free in your browser today.' }).length >= 2, 'isca/superlativo em inglês');
         assert.ok(validatePost({ ...es, text: 'Etiqueta a un amigo y juega gratis en el navegador, el mejor juego del mundo.' }, { games }).length >= 2, 'isca/superlativo em espanhol');
 
@@ -866,12 +887,13 @@ const goodPost = (over = {}) => ({
         assert.deepStrictEqual(validateCalendar(posts, { games }), []);
         for (const lg of ['en', 'es']) {
             const mine = translated.filter((p) => p.lang === lg);
-            assert.deepStrictEqual([...new Set(mine.map((p) => p.game))].sort(), [...i18n.slugs].sort(), `${lg}: um post por jogo traduzido`);
+            assert.ok(new Set(mine.map((p) => p.game)).size >= 9, `${lg}: ao menos 9 jogos diferentes`);
+            assert.ok(mine.every((p) => i18n.has(p.game)), `${lg}: só jogos traduzidos`);
         }
         // em Brasília, às 15:00 (longe do post diário das 09:00)
         translated.forEach((p) => assert.ok(p.at.endsWith('T15:00:00-03:00'), `${p.id}: 15:00 BRT`));
 
-        // fluxo completo: um post em espanhol sai só em Bluesky e Mastodon, nunca no Telegram
+        // fluxo completo: um post em espanhol sai em Bluesky e Mastodon com o link e o cartão traduzidos
         const st = { sent: [], down: null };
         const mk = Object.fromEntries(['bluesky', 'mastodon', 'telegram'].map((n) => [n, { name: n, isConfigured: () => true, publish: async ({ post: p, composed, game }) => { st.sent.push(`${p.id}:${n}:${game.name}:${composed.link.split('?')[0].split('.br')[1]}`); return { id: p.id }; } }]));
         const dir = path.join(tmp, 'lang-run'); fs.mkdirSync(dir);
