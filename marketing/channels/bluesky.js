@@ -70,7 +70,7 @@ async function publish({ post, composed, game, media }, env, fetchImpl = fetch) 
         $type: 'app.bsky.feed.post',
         text: composed.text,
         createdAt: new Date().toISOString(),
-        langs: ['pt'],
+        langs: [post.lang || 'pt'],
         facets: buildFacets(composed.text, composed),
         embed: { $type: 'app.bsky.embed.external', external }
     };
