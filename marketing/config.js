@@ -7,6 +7,10 @@ module.exports = {
     SITE_HOST: 'playfulhub.com.br',
     TZ: 'America/Sao_Paulo',
     CHANNELS: ['bluesky', 'mastodon', 'telegram'],
+    // Idiomas de post. O padrão é pt. en/es só para jogos que têm página traduzida (i18n/config.js) e só nos canais
+    // abaixo: o canal do Telegram é um só e em português (misturar idiomas num canal afasta quem entrou por um deles).
+    POST_LANGS: ['pt', 'en', 'es'],
+    NON_PT_CHANNELS: ['bluesky', 'mastodon'],
 
     // Limites de cada canal (caracteres/graphemas do texto final que o canal publica)
     TEXT_LIMITS: { bluesky: 300, mastodon: 500, telegram: 1024 },

@@ -2,7 +2,7 @@
 
 Tudo que o código já faz sozinho está pronto e testado. O que está aqui **só uma pessoa pode fazer** (as plataformas não deixam um robô criar conta, e algumas decisões são do dono do projeto). Marque conforme for concluindo.
 
-> **Atenção ao prazo:** o calendário de Halloween vai de **14 a 31/10/2026** e o post diário do Desafio do Dia começa em **12/10**. Post que passa da janela (36 h; o diário, só o próprio dia) **não é publicado depois**. Se as contas ficarem prontas depois de 14/10, os posts de Halloween já vencidos se perdem: ajuste o `at` deles em `marketing/calendar/halloween-2026.json` (o `npm run marketing:check` valida).
+> **Atenção ao prazo:** o calendário de Halloween vai de **14 a 31/10/2026**, o post diário do Desafio do Dia começa em **12/10** e os posts em inglês e espanhol vão de **3/11 a 7/12/2026** (`marketing/calendar/en-es-2026-11.json`). Post que passa da janela (36 h; o diário, só o próprio dia) **não é publicado depois**. Se as contas ficarem prontas depois dessas datas, os posts já vencidos se perdem: ajuste o `at` deles no calendário correspondente (o `npm run marketing:check` valida).
 
 ## 1. Contas e credenciais (obrigatório para qualquer divulgação)
 
@@ -29,11 +29,12 @@ Passo a passo detalhado em [`README.md`](README.md#configuração-inicial-única
 - [ ] **Vídeos em 30 fps nítido:** na CI (sem GPU) os clipes saem em 540×960/24 fps ampliados. Para qualidade máxima, gravar com GPU (`npm run marketing:render -- --all`) e versionar em `assets/videos/`.
 
 - [ ] **Revisão das traduções em inglês e espanhol por um falante nativo** (foram escritas por IA a partir do conteúdo real das páginas; PR das versões em outros idiomas). Enquanto isso **as páginas traduzidas não têm anúncios**; depois da revisão, decida se liga (`ADS_ON_TRANSLATED_PAGES` em `i18n/config.js`).
-- [ ] Posts de divulgação em inglês e espanhol (hoje saem só em português) e tradução da home e do Desafio do Dia.
+- [ ] Tradução da home e do Desafio do Dia (hoje só existem em português; os posts em inglês e espanhol já estão no calendário e levam às páginas dos jogos traduzidos).
+- [ ] **Posts em inglês e espanhol saem nas mesmas contas do Bluesky e do Mastodon** (marcados com o idioma, que os filtros das plataformas usam) e **nunca no Telegram**, que tem um canal só, em português. Se preferir contas separadas por idioma, é decisão sua (exigiria credenciais por idioma no publicador).
 
 ## 4. Segurança e manutenção
 
-- [ ] **`express.static('./')` expõe `server.js`, `package.json` e `games_control.json`** publicamente (achado durante a Fase 1; existe uma tarefa separada para restringir, ainda não executada). Nada de segredo está exposto, mas o código-fonte do servidor está.
+- [x] ~~`express.static('./')` expondo `server.js`, `package.json` e `games_control.json`~~ — resolvido: o `server.js` responde 404 para `marketing/`, `config/`, `scripts/`, `tests/`, arquivos ocultos, `.md` e os arquivos de configuração da raiz (`ocultarArquivosDoProjeto`).
 - [ ] Conferir **num aparelho real** o layout do overlay do Desafio em celular (Snake, Block Stacker e Pinball já têm layout mais largo que a tela em 360 px, independente do desafio).
 - [ ] (menor) `persist-credentials: false` no workflow de divulgação; fallback `execCommand` e foco por teclado no botão de compartilhar do Desafio.
 

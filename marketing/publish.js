@@ -21,6 +21,7 @@ const { classify, onePerChannel } = require('./lib/schedule');
 const ledgerLib = require('./lib/ledger');
 const { resolveMedia, missingFiles } = require('./lib/media');
 const { compose } = require('./lib/compose');
+const { langOf, cardFor } = require('./lib/lang');
 const { dailyPosts, dailyWindow, dailyEnabled } = require('./lib/daily');
 const desafio = require(path.join(cfg.ROOT, 'assets/js/desafio-core.js'));
 
@@ -104,7 +105,7 @@ async function run({
     superseded.forEach((x) => log(`⏩ ${x.id} → ${x.channel}: há um post mais recente devido neste canal; só o mais recente sai por execução`));
 
     for (const { post, channels: pending } of due) {
-        const game = games.get(post.game);
+        const game = cardFor(games.get(post.game), langOf(post));
         const media = resolveMedia(post);
         // revalida na hora de publicar, agora exigindo os arquivos de mídia
         const lastCheck = validatePost(post, { games, mode: 'publish' });
