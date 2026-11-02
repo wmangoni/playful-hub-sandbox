@@ -25,7 +25,7 @@ import { toast } from '../ui/toast.js';
 import { abrirEquipamento } from './arena-equipamento.js';
 import { carregarRedes, politicasDaArena } from './arena-ia.js';
 import {
-  AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND as FAIXAS, carregarCatalogo, carregarCombatente, carregarIndiceCatalogo, contextoDoCard, rotuloFaixa,
+  AVISO_SEM_GLOSSARIO, FAIXAS_DE_ND as FAIXAS, carregarCatalogo, carregarCombatente, carregarIndiceCatalogo, carregarLetra, contextoDoCard, rotuloFaixa,
 } from './card-dados.js';
 import { abrirCard } from './ficha-card.js';
 import { perfilDe } from '../rules/ia30.js';
@@ -56,7 +56,7 @@ function textoDasMagias(e) {
 function descricao(e) {
   if (e.categoria === 'monstro') return `${e.tipo} ${e.tamanho.toLowerCase()}`;
   if (e.categoria === 'personagem') return [e.sheet.identidade.classe ? `${e.sheet.identidade.classe} ${e.nd}` : `${e.nd}º nível, sem classe`, e.sheet.identidade.raca || 'sem raça'].join(' · ');
-  const partes = [e.classes.map(c => `${c.classe} ${c.nivel}`).join(' / '), e.raca].filter(Boolean);
+  const partes = [(e.classes || []).map(c => `${c.classe} ${c.nivel}`).join(' / '), e.raca].filter(Boolean);
   // criatura de Holy Avenger sem classe nem raça (Helena): tipo e tamanho, como os monstros
   return partes.length ? partes.join(' · ') : `${e.tipo} ${e.tamanho.toLowerCase()}`;
 }
@@ -79,7 +79,16 @@ export async function renderArena({ root, router, query, store }) {
   render(root, html`${cabecalho()}${loadingState(4)}`);
   let indice;
   try {
-    indice = await carregarIndiceCatalogo();
+    const [ind, holy] = await Promise.all([
+      carregarIndiceCatalogo(),
+      carregarLetra('holy_avenger').catch(() => null),
+    ]);
+    if (Array.isArray(ind) && Array.isArray(holy)) {
+      const porIdHoly = new Map(holy.map(c => [c.id, c]));
+      indice = ind.map(e => (porIdHoly.has(e.id) ? { ...e, ...porIdHoly.get(e.id) } : e));
+    } else {
+      indice = ind;
+    }
   } catch {
     try {
       const cat = await carregarCatalogo();
