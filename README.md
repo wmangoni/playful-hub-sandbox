@@ -97,7 +97,7 @@ Certifique-se de ter instalado em sua máquina:
     http://localhost:3000
     ```
 
-### Rodando os Testes de Fumaça
+### Rodando os Smoke Tests
 
 Para validar rapidamente se o servidor inicializa e as principais rotas estão saudáveis, você pode rodar os testes utilizando:
 ```bash
