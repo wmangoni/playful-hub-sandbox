@@ -10,6 +10,7 @@ export interface CardSlotProps {
   declaredAs?: CardType;
   requiredResponse: RequiredResponse | null;
   lastPlayer: PlayerId | null;
+  opponentLabel?: string;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export const CardSlot: React.FC<CardSlotProps> = ({
   declaredAs,
   requiredResponse,
   lastPlayer,
+  opponentLabel = 'Máquina (IA)',
   className = '',
 }) => {
   return (
@@ -57,7 +59,7 @@ export const CardSlot: React.FC<CardSlotProps> = ({
               className="hidden md:flex absolute -left-32 top-1/2 -translate-y-1/2 flex-col items-center bg-slate-950/85 border border-slate-700 rounded-2xl p-1.5 shadow-2xl backdrop-blur-md z-10"
             >
               <span className="text-[9px] font-black uppercase tracking-wider text-slate-300 mb-1 px-2 py-0.5 rounded-full bg-slate-800">
-                Anterior ({previousCard.owner === 'PLAYER' ? 'Você' : 'IA'})
+                Anterior ({previousCard.owner === 'PLAYER' ? 'Você' : opponentLabel})
               </span>
               <CardComponent
                 card={previousCard}
@@ -106,7 +108,7 @@ export const CardSlot: React.FC<CardSlotProps> = ({
                   }`}
                 >
                   <span className="inline-block skew-x-6">
-                    {lastPlayer === 'PLAYER' ? '⚡ Jogada por: Você' : '🤖 Jogada por: Máquina (IA)'}
+                    {lastPlayer === 'PLAYER' ? '⚡ Jogada por: Você' : `🎾 Jogada por: ${opponentLabel}`}
                   </span>
                 </div>
 

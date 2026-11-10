@@ -13,6 +13,8 @@ export interface ServeModalProps {
   selectedReceiveZones: ServeNumber[];
   duelResult?: ServeResult | null;
   isRevealing?: boolean;
+  waitingOpponent?: boolean;
+  opponentReady?: boolean;
 }
 
 export const ServeModal: React.FC<ServeModalProps> = ({
@@ -25,6 +27,8 @@ export const ServeModal: React.FC<ServeModalProps> = ({
   selectedReceiveZones,
   duelResult,
   isRevealing = false,
+  waitingOpponent = false,
+  opponentReady = false,
 }) => {
   if (!isOpen) return null;
 
@@ -124,18 +128,29 @@ export const ServeModal: React.FC<ServeModalProps> = ({
           </div>
         )}
 
+        {/* Opponent Ready Status */}
+        {!duelResult && opponentReady && !waitingOpponent && (
+          <div className="mb-3 py-1.5 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-xs font-bold text-emerald-300">
+            ✓ O adversário já confirmou a escolha dele!
+          </div>
+        )}
+
         {/* Confirm Duel Button */}
         {!duelResult && (
           <button
-            disabled={!isConfirmedReady || isRevealing}
+            disabled={!isConfirmedReady || isRevealing || waitingOpponent}
             onClick={onConfirmDuel}
             className={`w-full py-3 rounded-xl font-black text-sm uppercase tracking-wider transition ${
-              isConfirmedReady && !isRevealing
+              isConfirmedReady && !isRevealing && !waitingOpponent
                 ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 shadow-lg cursor-pointer'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-800 text-slate-400 cursor-not-allowed'
             }`}
           >
-            {isRevealing ? 'Revelando Saque...' : 'Confirmar Escolha'}
+            {isRevealing
+              ? 'Revelando Saque...'
+              : waitingOpponent
+              ? 'Escolha enviada! Aguardando adversário...'
+              : 'Confirmar Escolha'}
           </button>
         )}
       </motion.div>

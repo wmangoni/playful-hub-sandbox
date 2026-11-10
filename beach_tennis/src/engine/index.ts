@@ -14,4 +14,7 @@ export {
 } from './rallyValidator';
 export * from './scoreEngine';
 export * from './aiController';
+export * from './match';
+export * from './viewProjection';
+
 
