@@ -18,6 +18,8 @@ export interface ScoreboardHUDProps {
   onOpenRules: () => void;
   onRestartMatch?: () => void;
   rallyLength?: number;
+  playerLabel?: string;
+  opponentLabel?: string;
   className?: string;
 }
 
@@ -37,6 +39,8 @@ export const ScoreboardHUD: React.FC<ScoreboardHUDProps> = ({
   onOpenRules,
   onRestartMatch,
   rallyLength = 0,
+  playerLabel = 'VOCÊ',
+  opponentLabel = 'MÁQUINA',
   className = '',
 }) => {
   return (
@@ -48,7 +52,9 @@ export const ScoreboardHUD: React.FC<ScoreboardHUDProps> = ({
           {/* Player Score */}
           <div className="flex items-center gap-1.5 sm:gap-3">
             <div className="relative">
-              <span className="font-bold text-xs sm:text-base text-slate-100">VOCÊ</span>
+              <span className="font-bold text-xs sm:text-base text-slate-100 uppercase truncate max-w-[110px] inline-block align-bottom">
+                {playerLabel}
+              </span>
               {currentServer === 'PLAYER' && (
                 <span className="absolute -top-1 -right-3 text-xs" title="Sacador Atual">
                   🎾
@@ -71,7 +77,9 @@ export const ScoreboardHUD: React.FC<ScoreboardHUDProps> = ({
           {/* AI Score */}
           <div className="flex items-center gap-1.5 sm:gap-3">
             <div className="relative">
-              <span className="font-bold text-xs sm:text-base text-slate-100">MÁQUINA</span>
+              <span className="font-bold text-xs sm:text-base text-slate-100 uppercase truncate max-w-[110px] inline-block align-bottom">
+                {opponentLabel}
+              </span>
               {currentServer === 'AI' && (
                 <span className="absolute -top-1 -right-3 text-xs" title="Sacador Atual">
                   🎾

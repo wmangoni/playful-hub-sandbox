@@ -75,6 +75,12 @@ import {
   setVolume as setAudioVolume,
   toggleMute,
 } from '../utils/soundEffects';
+import {
+  OnlineMatchClient,
+  getSavedPlayerName,
+  savePlayerName,
+  type RoomPlayerSummary,
+} from '../net/onlineClient';
 
 export interface MatchStatistics {
   acesPlayer: number;
@@ -116,6 +122,28 @@ export interface MatchStoreState {
   actionLog: string[];
   stats: MatchStatistics;
 
+  // Estado Multiplayer Online 1v1
+  isOnline: boolean;
+  roomId: string | null;
+  roomPhase: 'lobby' | 'playing' | 'finished' | null;
+  onlineSeat: 'A' | 'B' | null;
+  isHost: boolean;
+  onlineConnected: boolean;
+  playerName: string;
+  opponentName: string;
+  opponentConnected: boolean;
+  opponentGraceUntil: number | null;
+  turnDeadline: number | null;
+  onlinePlayers: RoomPlayerSummary[];
+  onlineError: string | null;
+  onlineVersion: number;
+  selfServeReady: boolean;
+  opponentServeReady: boolean;
+  selfNextPointReady: boolean;
+  opponentNextPointReady: boolean;
+  selfRematchReady: boolean;
+  opponentRematchReady: boolean;
+
   // Actions
   startMatch: (difficulty?: AIDifficulty, format?: MatchFormat, rng?: RNG) => void;
   startNextPoint: (rng?: RNG) => void;
@@ -136,10 +164,18 @@ export interface MatchStoreState {
   toggleSound: () => void;
   setVolume: (vol: number) => void;
   setRulesOpen: (open: boolean) => void;
+
+  // Online Actions
+  joinOnlineRoom: (roomId: string, customName?: string) => void;
+  updateOnlinePlayerName: (name: string) => void;
+  setOnlineFormat: (format: MatchFormat) => void;
+  startOnlineMatch: () => void;
+  leaveOnlineRoom: () => void;
 }
 
 let aiTimerId: ReturnType<typeof setTimeout> | null = null;
 let revealTimerId: ReturnType<typeof setTimeout> | null = null;
+let onlineClient: OnlineMatchClient | null = null;
 
 function clearTimers(): void {
   if (aiTimerId) {
@@ -508,15 +544,45 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
     actionLog: [],
     stats: createInitialStats(),
 
+    isOnline: false,
+    roomId: null,
+    roomPhase: null,
+    onlineSeat: null,
+    isHost: false,
+    onlineConnected: false,
+    playerName: getSavedPlayerName() || 'Jogador',
+    opponentName: 'MÁQUINA (IA)',
+    opponentConnected: true,
+    opponentGraceUntil: null,
+    turnDeadline: null,
+    onlinePlayers: [],
+    onlineError: null,
+    onlineVersion: 0,
+    selfServeReady: false,
+    opponentServeReady: false,
+    selfNextPointReady: false,
+    opponentNextPointReady: false,
+    selfRematchReady: false,
+    opponentRematchReady: false,
+
     startMatch: (difficulty = 'MEDIUM', format = 'SHORT_SET_4', rng = Math.random) => {
       clearTimers();
       initAudio();
+      if (onlineClient) {
+        onlineClient.leaveAndClose();
+        onlineClient = null;
+      }
 
       const initialScore = createInitialScore(format, 'PLAYER');
       const playerState = buildFreshPlayerState('PLAYER', rng);
       const aiState = buildFreshPlayerState('AI', rng);
 
       set({
+        isOnline: false,
+        roomId: null,
+        roomPhase: null,
+        onlineSeat: null,
+        opponentName: 'MÁQUINA (IA)',
         phase: 'SERVE_SELECTION',
         difficulty,
         matchFormat: format,
@@ -539,8 +605,13 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
     },
 
     startNextPoint: (rng = Math.random) => {
-      clearTimers();
       const state = get();
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction({ type: 'NEXT_POINT' }, state.onlineVersion);
+        set({ selfNextPointReady: true });
+        return;
+      }
+      clearTimers();
       if (state.score.matchWinner !== null) {
         set({ phase: 'MATCH_OVER' });
         return;
@@ -573,6 +644,7 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
     selectServeZone: (zone) => {
       const state = get();
       if (state.serveDuel.server !== 'PLAYER') return;
+      if (state.isOnline && state.selfServeReady) return;
       set({
         serveDuel: {
           ...state.serveDuel,
@@ -584,6 +656,7 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
     selectReceiveZones: (zones) => {
       const state = get();
       if (state.serveDuel.receiver !== 'PLAYER') return;
+      if (state.isOnline && state.selfServeReady) return;
       set({
         serveDuel: {
           ...state.serveDuel,
@@ -594,6 +667,33 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
 
     confirmServeDuel: (rng = Math.random) => {
       const state = get();
+      if (state.isOnline && onlineClient) {
+        if (state.serveDuel.server === 'PLAYER') {
+          if (!state.serveDuel.serverPick) return;
+          playRacketHit('normal');
+          set({ selfServeReady: true });
+          onlineClient.sendAction(
+            { type: 'SERVE_PICK', zone: state.serveDuel.serverPick },
+            state.onlineVersion
+          );
+        } else {
+          if (state.serveDuel.receiverPicks.length !== 2) return;
+          playRacketHit('normal');
+          set({ selfServeReady: true });
+          onlineClient.sendAction(
+            {
+              type: 'RECEIVE_PICK',
+              zones: [
+                state.serveDuel.receiverPicks[0]!,
+                state.serveDuel.receiverPicks[1]!,
+              ],
+            },
+            state.onlineVersion
+          );
+        }
+        return;
+      }
+
       const { server, receiver } = state.serveDuel;
 
       let serverPick = state.serveDuel.serverPick;
@@ -727,10 +827,14 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
       const card = state.player.hand.find((c) => c.instanceId === instanceId);
       if (!card) return;
 
-      // Se for Coringa Verde sem declaração, abrir o CoringaModal
+      // Se for Coringa Verde sem declaração, abrir o CoringaModal localmente ou enviar ao servidor
       if (card.definition.type === 'GOLPE_UBT_CORINGA' && !declaredAs) {
         if (!state.rally.requiredResponse || state.rally.requiredResponse === 'DEFESAS') {
           playFault();
+          return;
+        }
+        if (state.isOnline && onlineClient) {
+          onlineClient.sendAction({ type: 'PLAY_CARD', instanceId }, state.onlineVersion);
           return;
         }
         const allowed = getValidDeclarationsForResponse(state.rally.requiredResponse);
@@ -760,6 +864,14 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
         return;
       }
 
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction(
+          { type: 'PLAY_CARD', instanceId, declaredAs },
+          state.onlineVersion
+        );
+        return;
+      }
+
       const updatedHand = state.player.hand.filter((c) => c.instanceId !== instanceId);
       applyGreenCardToCourt(
         card,
@@ -773,6 +885,13 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
 
     confirmWildcardDeclaration: (declaredType, rng = Math.random) => {
       const state = get();
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction(
+          { type: 'DECLARE_WILDCARD', declaredType },
+          state.onlineVersion
+        );
+        return;
+      }
       const pending = state.rally.pendingWildcard;
       if (!pending) return;
 
@@ -811,6 +930,10 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
 
     cancelWildcardDeclaration: () => {
       const state = get();
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction({ type: 'CANCEL_WILDCARD' }, state.onlineVersion);
+        return;
+      }
       const pending = state.rally.pendingWildcard;
       if (!pending) return;
       // Só permite cancelar se for Coringa Verde da mão (Coringa Azul já foi puxado do monte)
@@ -831,6 +954,10 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
         state.rally.currentTurnPlayer !== 'PLAYER' ||
         state.rally.requiredResponse !== 'DEFESAS'
       ) {
+        return;
+      }
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction({ type: 'DEFEND_BLUE' }, state.onlineVersion);
         return;
       }
 
@@ -880,6 +1007,10 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
       if (!state.rally.requiredResponse || state.rally.requiredResponse === 'DEFESAS') {
         return;
       }
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction({ type: 'DIG_CARD' }, state.onlineVersion);
+        return;
+      }
 
       const nextAttempt: 1 | 2 = state.player.digAttemptsThisTurn === 0 ? 1 : 2;
 
@@ -914,6 +1045,13 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
     playDrawnDigCard: (card) => {
       const state = get();
       if (!state.rally.requiredResponse) return;
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction(
+          { type: 'PLAY_DRAWN_DIG_CARD', instanceId: card.instanceId },
+          state.onlineVersion
+        );
+        return;
+      }
 
       if (card.definition.type === 'GOLPE_UBT_CORINGA') {
         const allowed = getValidDeclarationsForResponse(state.rally.requiredResponse);
@@ -943,6 +1081,10 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
 
     closeDigFailedModal: () => {
       const state = get();
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendAction({ type: 'CONCEDE_DIG_FAILURE' }, state.onlineVersion);
+        return;
+      }
       const digRes = state.activeDigResult;
       const reason: PointEndReason =
         digRes?.reason === 'GREEN_DECK_EMPTY'
@@ -1068,12 +1210,31 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
 
     restartMatch: (rng = Math.random) => {
       const state = get();
+      if (state.isOnline && onlineClient) {
+        onlineClient.sendRematch();
+        set({ selfRematchReady: true });
+        return;
+      }
       get().startMatch(state.difficulty, state.matchFormat, rng);
     },
 
     exitToMenu: () => {
       clearTimers();
+      if (onlineClient) {
+        onlineClient.leaveAndClose();
+        onlineClient = null;
+      }
+      if (typeof window !== 'undefined' && window.location.pathname.includes('/sala/')) {
+        window.history.pushState({}, '', '/beach_tennis');
+      }
       set({
+        isOnline: false,
+        roomId: null,
+        roomPhase: null,
+        onlineSeat: null,
+        onlinePlayers: [],
+        onlineError: null,
+        opponentName: 'MÁQUINA (IA)',
         phase: 'MENU',
         isAIThinking: false,
         activeDigResult: null,
@@ -1093,6 +1254,187 @@ export const useMatchStore = create<MatchStoreState>((set, get) => {
 
     setRulesOpen: (open) => {
       set({ isRulesOpen: open });
+    },
+
+    joinOnlineRoom: (roomId, customName) => {
+      clearTimers();
+      initAudio();
+
+      if (onlineClient) {
+        onlineClient.disconnectWithoutLeaving();
+        onlineClient = null;
+      }
+
+      const initialName =
+        (customName && customName.trim()) ||
+        getSavedPlayerName() ||
+        `Atleta ${Math.floor(100 + Math.random() * 900)}`;
+      savePlayerName(initialName);
+
+      set({
+        isOnline: true,
+        roomId,
+        roomPhase: 'lobby',
+        playerName: initialName,
+        onlineError: null,
+        onlineConnected: false,
+      });
+
+      const client = new OnlineMatchClient(roomId, initialName, {
+        onJoined: (payload) => {
+          set({
+            onlineSeat: payload.seat,
+            playerName: payload.name,
+            onlineError: null,
+          });
+        },
+        onRoomState: (payload) => {
+          const cur = get();
+          const mySeat = cur.onlineSeat;
+          const opp = payload.players.find((p) => p.seat !== mySeat);
+          set({
+            roomPhase: payload.phase,
+            matchFormat: payload.format,
+            isHost: mySeat !== null && payload.hostSeat === mySeat,
+            onlinePlayers: payload.players,
+            turnDeadline: payload.turnDeadline,
+            opponentName: opp ? opp.name : cur.opponentName,
+            opponentConnected: opp ? opp.connected : false,
+            opponentGraceUntil: opp ? opp.graceUntil : null,
+          });
+        },
+        onMatchState: (payload) => {
+          const cur = get();
+          const view = payload.view;
+
+          // Dispara efeitos sonoros para eventos recebidos da rede
+          for (const ev of payload.events || []) {
+            if (ev.type === 'EVENT_BALL_HIT') {
+              playRacketHit(ev.payload.isAttack ? 'power' : 'normal');
+            } else if (ev.type === 'EVENT_ACE') {
+              playAce();
+            } else if (ev.type === 'EVENT_DEFENSE_DRAWN' || ev.type === 'EVENT_DIG_SUCCESS') {
+              playCardDraw();
+            } else if (ev.type === 'EVENT_DIG_FAILED') {
+              playFault();
+            } else if (ev.type === 'EVENT_POINT_SCORED') {
+              playPointWon();
+            } else if (ev.type === 'EVENT_MATCH_WON') {
+              playApplause();
+            }
+          }
+
+          // Preserva escolha local de saque/recepção enquanto o duelo ainda não foi resolvido no servidor
+          const localServeDuel = cur.serveDuel;
+          const serverReady =
+            view.serveDuel.server === 'PLAYER'
+              ? view.serveDuel.serverReady
+              : view.serveDuel.receiverReady;
+          const oppReady =
+            view.serveDuel.server === 'PLAYER'
+              ? view.serveDuel.receiverReady
+              : view.serveDuel.serverReady;
+
+          const mergedServeDuel: ServeDuelState =
+            view.phase === 'SERVE_SELECTION' && !view.serveDuel.isResolved
+              ? {
+                  server: view.serveDuel.server,
+                  receiver: view.serveDuel.receiver,
+                  serverPick:
+                    view.serveDuel.server === 'PLAYER'
+                      ? view.serveDuel.serverPick ?? localServeDuel.serverPick
+                      : null,
+                  receiverPicks:
+                    view.serveDuel.receiver === 'PLAYER'
+                      ? view.serveDuel.receiverPicks.length > 0
+                        ? view.serveDuel.receiverPicks
+                        : localServeDuel.receiverPicks
+                      : [],
+                  isResolved: false,
+                }
+              : {
+                  server: view.serveDuel.server,
+                  receiver: view.serveDuel.receiver,
+                  serverPick: view.serveDuel.serverPick,
+                  receiverPicks: view.serveDuel.receiverPicks,
+                  isResolved: view.serveDuel.isResolved,
+                };
+
+          set({
+            onlineVersion: payload.version,
+            roomPhase: payload.phase,
+            phase: view.phase,
+            matchFormat: view.matchFormat,
+            score: view.score,
+            player: view.player,
+            ai: view.ai,
+            rally: view.rally,
+            serveDuel: mergedServeDuel,
+            lastServeResult: view.lastServeResult,
+            activeDigResult: view.activeDigResult,
+            pointWinner: view.pointWinner,
+            pointEndReason: view.pointEndReason,
+            pointBannerMessage: view.pointBannerMessage,
+            actionLog: view.actionLog,
+            stats: view.stats,
+            playerName: payload.playerName || cur.playerName,
+            opponentName: payload.opponentName || cur.opponentName,
+            opponentConnected: payload.opponentConnected,
+            opponentGraceUntil: payload.opponentGraceUntil,
+            turnDeadline: payload.turnDeadline,
+            selfServeReady: view.phase === 'SERVE_SELECTION' ? serverReady : false,
+            opponentServeReady: view.phase === 'SERVE_SELECTION' ? oppReady : false,
+            selfNextPointReady: view.selfNextPointReady,
+            opponentNextPointReady: view.opponentNextPointReady,
+            selfRematchReady: view.selfRematchReady,
+            opponentRematchReady: view.opponentRematchReady,
+            isAIThinking: false,
+          });
+        },
+        onOpponentStatus: (payload) => {
+          set({
+            opponentConnected: payload.connected,
+            opponentGraceUntil: payload.graceUntil,
+            opponentName: payload.name || get().opponentName,
+          });
+        },
+        onError: (payload) => {
+          playFault();
+          set({ onlineError: payload.message || 'Erro na sala online.' });
+        },
+        onConnectionChange: (connected) => {
+          set({ onlineConnected: connected });
+        },
+      });
+
+      onlineClient = client;
+      client.connect();
+    },
+
+    updateOnlinePlayerName: (name) => {
+      const cleaned = name.trim().slice(0, 24);
+      if (!cleaned) return;
+      savePlayerName(cleaned);
+      set({ playerName: cleaned });
+      if (onlineClient) {
+        onlineClient.updateNameAndRejoin(cleaned);
+      }
+    },
+
+    setOnlineFormat: (format) => {
+      if (onlineClient) {
+        onlineClient.sendConfig(format);
+      }
+    },
+
+    startOnlineMatch: () => {
+      if (onlineClient) {
+        onlineClient.sendStart();
+      }
+    },
+
+    leaveOnlineRoom: () => {
+      get().exitToMenu();
     },
   };
 });

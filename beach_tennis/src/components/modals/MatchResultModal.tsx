@@ -18,6 +18,9 @@ export interface MatchResultModalProps {
   };
   onPlayAgain: () => void;
   onExitToMenu?: () => void;
+  opponentLabel?: string;
+  rematchPending?: boolean;
+  opponentRematchReady?: boolean;
 }
 
 export const MatchResultModal: React.FC<MatchResultModalProps> = ({
@@ -27,6 +30,9 @@ export const MatchResultModal: React.FC<MatchResultModalProps> = ({
   stats,
   onPlayAgain,
   onExitToMenu,
+  opponentLabel = 'Máquina (IA)',
+  rematchPending = false,
+  opponentRematchReady = false,
 }) => {
   const isPlayerWinner = winner === 'PLAYER';
 
@@ -74,8 +80,12 @@ export const MatchResultModal: React.FC<MatchResultModalProps> = ({
         </h2>
         <p className="text-sm text-slate-300 mt-1 mb-6">
           {isPlayerWinner
-            ? 'Você dominou as areias e venceu a partida contra a IA!'
-            : 'A máquina levou a melhor desta vez. Ajuste sua estratégia e tente novamente!'}
+            ? opponentLabel === 'Máquina (IA)'
+              ? 'Você dominou as areias e venceu a partida contra a IA!'
+              : `Você dominou as areias e venceu a partida contra ${opponentLabel}!`
+            : opponentLabel === 'Máquina (IA)'
+            ? 'A máquina levou a melhor desta vez. Ajuste sua estratégia e tente novamente!'
+            : `${opponentLabel} levou a melhor desta vez. Ajuste sua estratégia e tente novamente!`}
         </p>
 
         {/* Final Score Snapshot */}
@@ -86,7 +96,7 @@ export const MatchResultModal: React.FC<MatchResultModalProps> = ({
           </div>
           <span className="text-slate-600 font-black text-xl">X</span>
           <div className="text-center">
-            <span className="text-xs text-slate-400 font-bold uppercase">Máquina (IA)</span>
+            <span className="text-xs text-slate-400 font-bold uppercase">{opponentLabel}</span>
             <div className="text-3xl font-black text-sky-400">{finalScore.aiGames}</div>
           </div>
         </div>
@@ -95,13 +105,13 @@ export const MatchResultModal: React.FC<MatchResultModalProps> = ({
         {stats && (
           <div className="grid grid-cols-2 gap-2 text-left mb-6 text-xs bg-slate-950 p-4 rounded-xl border border-slate-800">
             <div className="text-slate-400">
-              Aces (Você / IA):{' '}
+              {opponentLabel === 'Máquina (IA)' ? 'Aces (Você / IA):' : 'Aces (Você / Adv.):'}{' '}
               <strong className="text-slate-200">
                 {stats.acesPlayer} / {stats.acesAI}
               </strong>
             </div>
             <div className="text-slate-400">
-              Winners (Você / IA):{' '}
+              {opponentLabel === 'Máquina (IA)' ? 'Winners (Você / IA):' : 'Winners (Você / Adv.):'}{' '}
               <strong className="text-slate-200">
                 {stats.winnersPlayer} / {stats.winnersAI}
               </strong>
@@ -117,14 +127,27 @@ export const MatchResultModal: React.FC<MatchResultModalProps> = ({
           </div>
         )}
 
+        {opponentRematchReady && !rematchPending && (
+          <div className="mb-3 py-1.5 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-xs font-bold text-emerald-300">
+            🎾 {opponentLabel} pediu revanche! Clique abaixo para aceitar.
+          </div>
+        )}
+
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <button
+            disabled={rematchPending}
             onClick={onPlayAgain}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+            className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition ${
+              rematchPending
+                ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 cursor-pointer'
+            }`}
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Jogar Novamente</span>
+            <span>
+              {rematchPending ? 'Aguardando adversário aceitar...' : 'Jogar Novamente'}
+            </span>
           </button>
           {onExitToMenu && (
             <button

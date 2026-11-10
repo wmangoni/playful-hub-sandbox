@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMatchStore } from './store/useMatchStore';
 import { getLegalMoves } from './engine/rallyValidator';
@@ -13,6 +13,8 @@ import { CoringaModal } from './components/modals/CoringaModal';
 import { DigResultModal } from './components/modals/DigResultModal';
 import { MatchResultModal } from './components/modals/MatchResultModal';
 import { RulesModal } from './components/modals/RulesModal';
+import { OnlineLobby } from './components/modals/OnlineLobby';
+import { detectRoomIdFromLocation } from './net/onlineClient';
 import {
   Play,
   HelpCircle,
@@ -22,6 +24,10 @@ import {
   VolumeX,
   ArrowRightCircle,
   Sparkles,
+  Users,
+  Wifi,
+  WifiOff,
+  Clock,
 } from 'lucide-react';
 
 export function App() {
@@ -47,6 +53,25 @@ export function App() {
     soundEnabled,
     actionLog,
     stats,
+    isOnline,
+    roomId,
+    roomPhase,
+    onlineSeat,
+    isHost,
+    onlineConnected,
+    playerName,
+    opponentName,
+    opponentConnected,
+    opponentGraceUntil,
+    turnDeadline,
+    onlinePlayers,
+    onlineError,
+    selfServeReady,
+    opponentServeReady,
+    selfNextPointReady,
+    opponentNextPointReady,
+    selfRematchReady,
+    opponentRematchReady,
     startMatch,
     startNextPoint,
     selectServeZone,
@@ -63,10 +88,33 @@ export function App() {
     exitToMenu,
     toggleSound,
     setRulesOpen,
+    joinOnlineRoom,
+    updateOnlinePlayerName,
+    setOnlineFormat,
+    startOnlineMatch,
+    leaveOnlineRoom,
   } = useMatchStore();
 
   const [menuDifficulty, setMenuDifficulty] = useState<AIDifficulty>(difficulty);
   const [menuFormat, setMenuFormat] = useState<MatchFormat>(matchFormat);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  // Detecta automaticamente na montagem se a URL é uma sala online (/beach_tennis/sala/:roomId)
+  useEffect(() => {
+    const detectedRoom = detectRoomIdFromLocation();
+    if (detectedRoom) {
+      joinOnlineRoom(detectedRoom);
+    }
+  }, [joinOnlineRoom]);
+
+  // Atualiza contador visual de tempo de turno / reconexão a cada 1s quando em modo online
+  useEffect(() => {
+    if (!isOnline) return;
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOnline]);
 
   // Calcula jogadas legais para o jogador humano quando há uma carta na quadra
   const legalMoves = useMemo(() => {
@@ -113,6 +161,42 @@ export function App() {
     return rally.steps[rally.steps.length - 2]?.card || null;
   }, [rally.steps]);
 
+  const turnRemainingSec = useMemo(() => {
+    if (!isOnline || !turnDeadline) return null;
+    return Math.max(0, Math.ceil((turnDeadline - nowTick) / 1000));
+  }, [isOnline, turnDeadline, nowTick]);
+
+  const graceRemainingSec = useMemo(() => {
+    if (!isOnline || opponentConnected || !opponentGraceUntil) return null;
+    return Math.max(0, Math.ceil((opponentGraceUntil - nowTick) / 1000));
+  }, [isOnline, opponentConnected, opponentGraceUntil, nowTick]);
+
+  // ==========================================================================
+  // TELA DE LOBBY ONLINE 1v1 (/beach_tennis/sala/:roomId)
+  // ==========================================================================
+  if (isOnline && roomId && roomPhase === 'lobby') {
+    return (
+      <>
+        <OnlineLobby
+          roomId={roomId}
+          seat={onlineSeat}
+          isHost={isHost}
+          isConnected={onlineConnected}
+          format={matchFormat}
+          players={onlinePlayers}
+          playerName={playerName}
+          onlineError={onlineError}
+          onUpdatePlayerName={updateOnlinePlayerName}
+          onChangeFormat={setOnlineFormat}
+          onStartMatch={startOnlineMatch}
+          onLeaveLobby={leaveOnlineRoom}
+          onOpenRules={() => setRulesOpen(true)}
+        />
+        <RulesModal isOpen={isRulesOpen} onClose={() => setRulesOpen(false)} />
+      </>
+    );
+  }
+
   // ==========================================================================
   // TELA DE MENU PRINCIPAL / CONFIGURAÇÃO
   // ==========================================================================
@@ -127,7 +211,7 @@ export function App() {
           {/* Top Bar */}
           <div className="flex items-center justify-between mb-4">
             <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black uppercase tracking-wider">
-              UBT • Modo 1 vs 1 vs IA
+              UBT • 1v1 vs IA & Online
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -224,13 +308,26 @@ export function App() {
             </div>
           </div>
 
-          {/* Start Match CTA */}
+          {/* Start Match CTA (vs IA) */}
           <button
             onClick={() => startMatch(menuDifficulty, menuFormat)}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition cursor-pointer"
           >
             <Play className="w-5 h-5 fill-slate-950" />
-            <span>Entrar em Quadra</span>
+            <span>Entrar em Quadra (vs IA)</span>
+          </button>
+
+          {/* Create Online Room CTA (1v1 Multiplayer) */}
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = '/beach_tennis/online';
+            }}
+            data-testid="create-online-room-btn"
+            className="w-full mt-3 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 via-cyan-500 to-teal-400 hover:from-sky-400 hover:to-teal-300 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+          >
+            <Users className="w-5 h-5" />
+            <span>Jogar Online com Amigo (Criar Sala)</span>
           </button>
         </motion.div>
 
@@ -261,20 +358,55 @@ export function App() {
         onOpenRules={() => setRulesOpen(true)}
         onRestartMatch={exitToMenu}
         rallyLength={rally.rallyLength}
+        playerLabel={isOnline ? playerName : 'VOCÊ'}
+        opponentLabel={isOnline ? opponentName : 'MÁQUINA'}
       />
 
-      {/* 2. Área Superior: Mão da IA e Montes da IA */}
+      {/* Banner de Desconexão do Oponente em Modo Online */}
+      {isOnline && !opponentConnected && phase !== 'MATCH_OVER' && (
+        <div className="w-full max-w-4xl mx-auto px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-400/60 text-rose-200 text-xs font-black uppercase tracking-wide flex items-center justify-center gap-2 animate-pulse">
+          <WifiOff className="w-4 h-4 text-rose-400" />
+          <span>
+            {opponentName} desconectou — aguardando reconexão
+            {graceRemainingSec !== null ? ` (${graceRemainingSec}s para W.O.)` : '...'}
+          </span>
+        </div>
+      )}
+
+      {/* 2. Área Superior: Mão do Adversário e Montes do Adversário */}
       <div className="w-full max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2 px-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="px-3 py-1 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-sky-300 flex items-center gap-2">
-            <Cpu className="w-3.5 h-3.5" />
-            <span>IA ({difficulty})</span>
+            {isOnline ? (
+              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <Cpu className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {isOnline ? `${opponentName} (Sala #${roomId})` : `IA (${difficulty})`}
+            </span>
             <span className="text-slate-400">• Mão: {ai.hand.length}</span>
           </div>
-          {isAIThinking && (
+
+          {!isOnline && isAIThinking && (
             <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-xs font-bold animate-pulse flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 animate-spin" />
               <span>Carta em destaque (3s) • IA preparando resposta...</span>
+            </span>
+          )}
+
+          {isOnline && turnRemainingSec !== null && phase !== 'POINT_ENDED' && phase !== 'MATCH_OVER' && (
+            <span
+              className={`px-3 py-1 rounded-full border text-xs font-bold flex items-center gap-1.5 ${
+                turnRemainingSec <= 10
+                  ? 'bg-rose-500/20 border-rose-400 text-rose-300 animate-pulse'
+                  : 'bg-slate-900/80 border-amber-400/40 text-amber-300'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>
+                {rally.currentTurnPlayer === 'PLAYER' ? 'Sua vez' : `Vez de ${opponentName}`}: {turnRemainingSec}s
+              </span>
             </span>
           )}
         </div>
@@ -301,6 +433,7 @@ export function App() {
               declaredAs={rally.lastPlayedCard?.declaredAs}
               requiredResponse={phase === 'POINT_ENDED' ? null : rally.requiredResponse}
               lastPlayer={rally.lastPlayedCard?.owner || null}
+              opponentLabel={isOnline ? opponentName : 'Máquina (IA)'}
               className={
                 phase === 'POINT_ENDED' && rally.lastPlayedCard
                   ? 'scale-[0.80] -translate-y-8 sm:-translate-y-9 transition-transform duration-200'
@@ -325,11 +458,25 @@ export function App() {
                     >
                       {pointBannerMessage}
                     </p>
+                    {isOnline && opponentNextPointReady && !selfNextPointReady && (
+                      <p className="text-[11px] font-bold text-sky-300 mb-1">
+                        ✓ {opponentName} já está pronto para o próximo ponto!
+                      </p>
+                    )}
                     <button
+                      disabled={isOnline && selfNextPointReady}
                       onClick={() => startNextPoint()}
-                      className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 mx-auto transition cursor-pointer"
+                      className={`px-5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 mx-auto transition ${
+                        isOnline && selfNextPointReady
+                          ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 cursor-pointer'
+                      }`}
                     >
-                      <span>Próximo Ponto</span>
+                      <span>
+                        {isOnline && selfNextPointReady
+                          ? `Aguardando ${opponentName}...`
+                          : 'Próximo Ponto'}
+                      </span>
                       <ArrowRightCircle className="w-4 h-4" />
                     </button>
                   </motion.div>
@@ -379,6 +526,8 @@ export function App() {
         onConfirmDuel={() => confirmServeDuel()}
         duelResult={phase === 'SERVE_REVEAL' ? lastServeResult : null}
         isRevealing={phase === 'SERVE_REVEAL'}
+        waitingOpponent={isOnline && selfServeReady && phase === 'SERVE_SELECTION'}
+        opponentReady={isOnline && opponentServeReady && phase === 'SERVE_SELECTION'}
       />
 
       <CoringaModal
@@ -413,6 +562,9 @@ export function App() {
         stats={stats}
         onPlayAgain={() => restartMatch()}
         onExitToMenu={exitToMenu}
+        opponentLabel={isOnline ? opponentName : 'Máquina (IA)'}
+        rematchPending={isOnline && selfRematchReady}
+        opponentRematchReady={isOnline && opponentRematchReady}
       />
 
       <RulesModal isOpen={isRulesOpen} onClose={() => setRulesOpen(false)} />
