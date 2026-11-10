@@ -526,6 +526,31 @@ const gamesData = {
         ],
         tags: ['RPG', 'D&D 3ª edição', 'Ficha de personagem', 'Compêndio', 'Fantasia medieval'],
         relatedGames: ['ded', 'strategy_game', 'chess']
+    },
+    'beach_tennis': {
+        title: 'Beach Tennis Card Game',
+        description: 'Dispute partidas táticas de Beach Tennis em cartas 1v1 contra a IA com regras oficiais da ITF (No-Ad e Tie-break), duelos de saque por zonas, ataques explosivos, cavação no Monte Verde e arte estilo mangá.',
+        keywords: 'beach tennis, card game, jogo de cartas, estratégia, esporte, ITF, tie-break, anime, mangá, TCG, PlayfulHub',
+        genre: 'Esporte / Card Game Tático',
+        developer: 'PlayfulHub',
+        features: 'Regras oficiais da ITF (ponto decisivo No-Ad em 40-40 e Tie-break em 6-6), 19 cartas táticas divididas em Saque Laranja, Golpes Verdes e Defesas Azuis, mecânica de Cavação, cartas Coringa UBT e 3 níveis de IA adaptativa',
+        objective: 'Vença o set de 6 games superando a IA em duelos táticos de saque, ralis de rede e fundo de quadra, ataques Smash/Verônica/Gancho e defesas no limite!',
+        controls: [
+            { key: 'Saque (1–3)', action: 'Escolha 1 zona laranja para sacar ou selecione 2 zonas na quadra para defender o saque adversário' },
+            { key: 'Clique na Carta', action: 'Jogue uma carta verde compatível com a exigência do golpe na quadra (Bandejas, Voleios ou Fundo)' },
+            { key: 'Monte Azul', action: 'Ao sofrer uma carta de Ataque (Smash, Gancho ou Verônica), compre do Monte Azul para tentar defender' },
+            { key: 'Cavação', action: 'Sem carta compatível na mão? Cave até 2 cartas do Monte Verde para tentar salvar o ponto' },
+            { key: 'Coringa UBT', action: 'Declare qualquer golpe ou defesa válida ao jogar uma carta Coringa dourada' }
+        ],
+        tips: [
+            'Observe as zonas preferidas da IA no saque: cobrir 2 das 3 zonas garante 66,7% de chance de evitar o Ace e iniciar o rali',
+            'Economize suas cartas Coringa (Golpe UBT) para momentos críticos, como o Ponto Decisivo (40-40 No-Ad) ou quando estiver sem a categoria exigida',
+            'Cartas de Ataque (Smash, Gancho Ataque e Verônica Ataque) obrigam o oponente a gastar o Monte Azul de apenas 8 cartas — pressione para esgotar a defesa adversária!',
+            'Atenção ao defender um ataque com Def Lob: ela devolve a bola alta e permite ao adversário emendar um novo Smash na sequência',
+            'Use a Cavação quando não tiver a resposta exigida na mão: se a 1ª carta cavada não servir, ela vai para a sua mão e você ainda tem a 2ª tentativa!'
+        ],
+        tags: ['Card Game', 'Beach Tennis', 'Estratégia', 'Esporte', 'TCG', 'IA Adaptativa'],
+        relatedGames: ['poker', 'chess', 'strategy_game']
     }
 };
 
@@ -583,7 +608,8 @@ function generateRelatedGamesHTML(relatedGames) {
             'driving_simulator': '🚗',
             'rede_neural_evolutiva': '🧠',
             'threejs_earth': '🌍',
-            'ded_make_character': '📜'
+            'ded_make_character': '📜',
+            'beach_tennis': '🎾'
         };
         
         return `

@@ -212,6 +212,7 @@ createHtmlRoute('/jogos/planning_poker', 'jogos/planning_poker.html');
 createHtmlRoute('/jogos/blender_game', 'jogos/blender_game.html');
 createHtmlRoute('/jogos/tumbalacatumba', 'jogos/tumbalacatumba.html');
 createHtmlRoute('/jogos/ded_make_character', 'jogos/ded_make_character.html');
+createHtmlRoute('/jogos/beach_tennis', 'jogos/beach_tennis.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -243,6 +244,7 @@ createHtmlRoute('/blender_game', 'blender_game/game_fps.html');
 createHtmlRoute('/blender_game/fps', 'blender_game/game_fps.html');
 createHtmlRoute('/blender_game/island', 'blender_game/game.html');
 createHtmlRoute('/tumbalacatumba', 'tumbalacatumba/Tumbalacatumba.html');
+createHtmlRoute('/beach_tennis', 'beach_tennis/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
