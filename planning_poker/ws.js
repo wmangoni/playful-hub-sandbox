@@ -296,15 +296,42 @@ function cleanupStaleRooms(wss) {
   });
 }
 
+function ensureSharedUpgradeDispatcher(httpServer) {
+  if (httpServer._sharedWsRoutes) {
+    return httpServer._sharedWsRoutes;
+  }
+  const routes = new Map();
+  httpServer._sharedWsRoutes = routes;
+  httpServer.on('upgrade', (request, socket, head) => {
+    let pathname = '';
+    try {
+      pathname = new URL(request.url, 'http://localhost').pathname;
+    } catch {
+      socket.destroy();
+      return;
+    }
+    const targetWss = routes.get(pathname);
+    if (targetWss) {
+      targetWss.handleUpgrade(request, socket, head, (ws) => {
+        targetWss.emit('connection', ws, request);
+      });
+    }
+  });
+  return routes;
+}
+
 /**
  * Atrela o WebSocketServer ao servidor HTTP existente.
  * @param {import('http').Server} httpServer
  */
 function attach(httpServer, options) {
+  const wsPath = (options && options.path) || WS_PATH;
   const wss = new WebSocketServer({
-    server: httpServer,
-    path: (options && options.path) || WS_PATH
+    noServer: true
   });
+
+  const routes = ensureSharedUpgradeDispatcher(httpServer);
+  routes.set(wsPath, wss);
 
   wss.on('connection', (socket) => {
     socket._ppId = crypto.randomUUID();
@@ -324,6 +351,7 @@ function attach(httpServer, options) {
   if (typeof cleanupTimer.unref === 'function') cleanupTimer.unref();
 
   wss.on('close', () => {
+    routes.delete(wsPath);
     clearInterval(heartbeatTimer);
     clearInterval(cleanupTimer);
   });

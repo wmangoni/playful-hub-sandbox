@@ -4,6 +4,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const planningPoker = require('./planning_poker/ws.js');
+const beachTennisWs = require('./beach_tennis/server/ws.js');
 const app = express();
 const port = process.env.PORT || 3000;
 const fs = require('fs'); // Adicionado para verificar a existência do arquivo ads.txt
@@ -58,6 +59,19 @@ app.get('/planning_poker/:roomId', (req, res) => {
     res.sendFile(path.join(__dirname, 'planning_poker/index.html'));
 });
 
+// Beach Tennis Card Game: sala multiplayer 1v1 identificada na URL (/beach_tennis/sala/:roomId)
+app.get('/beach_tennis/online', (req, res) => {
+    const roomId = beachTennisWs.issueRoomId();
+    res.redirect(302, '/beach_tennis/sala/' + roomId);
+});
+app.get('/beach_tennis/sala/:roomId', (req, res) => {
+    if (!/^[A-Za-z0-9]{4,16}$/.test(req.params.roomId)) {
+        return res.status(404).send('Sala inválida');
+    }
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, 'beach_tennis/index.html'));
+});
+
 // Tumbalacatumba: servir arquivo HTML compilado standalone diretamente
 app.get(['/tumbalacatumba', '/tumbalacatumba/'], (req, res) => {
     res.sendFile(path.join(__dirname, 'tumbalacatumba/Tumbalacatumba.html'));
@@ -98,9 +112,10 @@ const ocultarArquivosDoProjeto = (req, res, next) => {
     } catch {
         return res.status(404).send('Not Found');
     }
-    const [primeira] = partes;
+    const [primeira, segunda] = partes;
     const privado = partes.some(p => p.startsWith('.') || /\.md$/i.test(p))
         || PASTAS_RAIZ_PRIVADAS.has(primeira)
+        || (primeira === 'beach_tennis' && new Set(['server', 'scripts', 'tests', 'src']).has(segunda))
         || (partes.length === 1 && ARQUIVOS_RAIZ_PRIVADOS.test(primeira));
     if (privado) return res.status(404).send('Not Found');
     next();
@@ -212,6 +227,7 @@ createHtmlRoute('/jogos/planning_poker', 'jogos/planning_poker.html');
 createHtmlRoute('/jogos/blender_game', 'jogos/blender_game.html');
 createHtmlRoute('/jogos/tumbalacatumba', 'jogos/tumbalacatumba.html');
 createHtmlRoute('/jogos/ded_make_character', 'jogos/ded_make_character.html');
+createHtmlRoute('/jogos/beach_tennis', 'jogos/beach_tennis.html');
 
 // Rotas legadas para compatibilidade (redirecionam para as novas)
 createHtmlRoute('/ded', 'ded/index.html');
@@ -243,6 +259,7 @@ createHtmlRoute('/blender_game', 'blender_game/game_fps.html');
 createHtmlRoute('/blender_game/fps', 'blender_game/game_fps.html');
 createHtmlRoute('/blender_game/island', 'blender_game/game.html');
 createHtmlRoute('/tumbalacatumba', 'tumbalacatumba/Tumbalacatumba.html');
+createHtmlRoute('/beach_tennis', 'beach_tennis/index.html');
 
 
 app.use('/3d_shooter/assets', express.static(path.join(__dirname, '3d_shooter/assets')));
@@ -295,9 +312,11 @@ if (process.env.NODE_ENV !== 'test') {
         console.log(`Servidor rodando em http://localhost:${port}`);
         console.log(`Jogo acessível em http://localhost:${port}/jogo`);
         console.log(`Planning Poker (WebSocket) em ws://localhost:${port}${planningPoker.WS_PATH}`);
+        console.log(`Beach Tennis (WebSocket) em ws://localhost:${port}${beachTennisWs.WS_PATH}`);
     });
-    // Atrela o WebSocket de salas do Planning Poker ao mesmo servidor HTTP
+    // Atrela os servidores WebSocket ao mesmo servidor HTTP
     planningPoker.attach(httpServer);
+    beachTennisWs.attach(httpServer);
 }
 
 module.exports = app;
